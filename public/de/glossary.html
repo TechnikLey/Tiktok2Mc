@@ -1,0 +1,568 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Glossary - Streaming Tool Dev</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-b2c70054.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-d60bcc93.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Streaming Tool Dev</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="glossary"><a class="header" href="#glossary">Glossary</a></h1>
+<p>A complete reference of all technical terms and concepts. If you come across an unfamiliar term, you will find a quick explanation here.</p>
+<hr>
+<h2 id="a"><a class="header" href="#a">A</a></h2>
+<h3 id="action"><a class="header" href="#action">Action</a></h3>
+<p>An operation that the system performs (e.g. “send command to Minecraft”). Actions are triggered by events and configured in <code>actions.mca</code>.</p>
+<p><strong>Example:</strong> The gift event “Rose” triggers the action “play_sound”.</p>
+<h3 id="async--asynchronous-programming"><a class="header" href="#async--asynchronous-programming">Async / Asynchronous Programming</a></h3>
+<p>Programming in which multiple tasks run concurrently rather than sequentially. One process does not have to wait for another to finish.</p>
+<p><strong>In this project:</strong> TikTok events arrive (Async 1) while the main loop processes Minecraft commands (Async 2).</p>
+<h3 id="api-application-programming-interface"><a class="header" href="#api-application-programming-interface">API (Application Programming Interface)</a></h3>
+<p>An interface through which two programs communicate with each other.</p>
+<p><strong>In this project:</strong> We use the TikTokLive API (to receive events) and the RCON API (to send commands to Minecraft).</p>
+<hr>
+<h2 id="c"><a class="header" href="#c">C</a></h2>
+<h3 id="combo-gift"><a class="header" href="#combo-gift">Combo Gift</a></h3>
+<p>A gift that can be sent multiple times in a row. The viewer sees an animation showing the total number of gifts.</p>
+<p><strong>Example:</strong> Someone sends the same rose 5 times → the viewer sees “Rose ×5”.</p>
+<p><strong>In code:</strong> <code>event.gift.combo == True</code> and <code>event.repeat_count == 5</code></p>
+<h3 id="cors-cross-origin-resource-sharing"><a class="header" href="#cors-cross-origin-resource-sharing">CORS (Cross-Origin Resource Sharing)</a></h3>
+<p>A security mechanism in web servers that determines which external websites are allowed to send requests.</p>
+<p><strong>In this project:</strong> Our Flask server uses CORS to give plugin GUIs access to the APIs.</p>
+<h3 id="command-line-argument--flag"><a class="header" href="#command-line-argument--flag">Command-Line Argument / Flag</a></h3>
+<p>A value passed when starting a program.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash">python main.py --gui-hidden --register-only
+</code></pre>
+<p>Here, <code>--gui-hidden</code> and <code>--register-only</code> are flags.</p>
+<hr>
+<h2 id="d"><a class="header" href="#d">D</a></h2>
+<h3 id="dcs-direct-control-system"><a class="header" href="#dcs-direct-control-system">DCS (Direct Control System)</a></h3>
+<p>A communication protocol in which data is transmitted directly via HTTP.</p>
+<p><strong>Advantage:</strong> Fast &amp; reliable.<br><strong>Disadvantage:</strong> Requires open HTTP ports.</p>
+<p><strong>Alternative:</strong> ICS (Interface Control System).</p>
+<h3 id="decorator"><a class="header" href="#decorator">Decorator</a></h3>
+<p>A Python feature (<code>@...</code>) that “decorates” a function with additional behavior.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">@client.on(GiftEvent)
+def handle_gift(event):
+    pass
+</code></pre>
+<p>The <code>@client.on(...)</code> decorator registers this function as an event handler.</p>
+<h3 id="dependency"><a class="header" href="#dependency">Dependency</a></h3>
+<p>An external package that your project needs.</p>
+<p><strong>In this project:</strong></p>
+<ul>
+<li><code>TikTokLive</code> – dependency</li>
+<li><code>Flask</code> – dependency</li>
+<li>All are listed in <code>requirements.txt</code>.</li>
+</ul>
+<hr>
+<h2 id="e"><a class="header" href="#e">E</a></h2>
+<h3 id="event"><a class="header" href="#event">Event</a></h3>
+<p>An occurrence that happens in the system.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Someone sends a gift</li>
+<li>Someone follows</li>
+<li>A player dies in Minecraft</li>
+<li>The server starts</li>
+</ul>
+<p>All events have properties (data), e.g. <code>event.user</code>, <code>event.gift.name</code>.</p>
+<h3 id="event-handler"><a class="header" href="#event-handler">Event Handler</a></h3>
+<p>A function that reacts to an event.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">@client.on(GiftEvent)
+def on_gift(event):
+    print(f"Gift received: {event.gift.name}")
+</code></pre>
+<p><code>on_gift</code> is the event handler for GiftEvents.</p>
+<hr>
+<h2 id="f"><a class="header" href="#f">F</a></h2>
+<h3 id="flask"><a class="header" href="#flask">Flask</a></h3>
+<p>A Python web framework for building web servers.</p>
+<p><strong>Usage in our project:</strong></p>
+<ul>
+<li>Webhooks (receiving Minecraft events)</li>
+<li>GUIs (pywebview uses Flask for the backend API)</li>
+</ul>
+<p><strong>Not to be confused with:</strong> Django (different framework), FastAPI (newer standard).</p>
+<h3 id="function"><a class="header" href="#function">Function</a></h3>
+<p>See Handler / Function.</p>
+<hr>
+<h2 id="g"><a class="header" href="#g">G</a></h2>
+<h3 id="glossary-1"><a class="header" href="#glossary-1">Glossary</a></h3>
+<p>This document! A reference of technical terms.</p>
+<hr>
+<h2 id="h"><a class="header" href="#h">H</a></h2>
+<h3 id="handler"><a class="header" href="#handler">Handler</a></h3>
+<p>See Event Handler.</p>
+<h3 id="http--https"><a class="header" href="#http--https">HTTP / HTTPS</a></h3>
+<p>Network protocols for transferring data over the internet / network.</p>
+<p><strong>HTTP</strong> = unencrypted (but faster)<br><strong>HTTPS</strong> = encrypted (but more complex)</p>
+<p><strong>In this project:</strong> We use HTTP locally (not over the internet).</p>
+<hr>
+<h2 id="i"><a class="header" href="#i">I</a></h2>
+<h3 id="ics-interface-control-system"><a class="header" href="#ics-interface-control-system">ICS (Interface Control System)</a></h3>
+<p>A communication protocol in which data is transmitted via GUI / screen capture.</p>
+<p><strong>Advantage:</strong> Works everywhere (including TikTok Live Studio).<br><strong>Disadvantage:</strong> Slower &amp; more complex.</p>
+<p><strong>Alternative:</strong> DCS (Direct Control System).</p>
+<h3 id="import"><a class="header" href="#import">Import</a></h3>
+<p>Loading external code into your program.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">from core import load_config
+</code></pre>
+<p>This loads the <code>load_config</code> function from the <code>core</code> module.</p>
+<hr>
+<h2 id="j"><a class="header" href="#j">J</a></h2>
+<h3 id="json"><a class="header" href="#json">JSON</a></h3>
+<p>A data format for storing and transmitting structured data.</p>
+<p><strong>Format:</strong></p>
+<pre><code class="language-json">{
+    "name": "John",
+    "age": 30,
+    "gifts": ["Rose", "Diamond"]
+}
+</code></pre>
+<p><strong>In this project:</strong> Used for configurations, window states, and data.</p>
+<hr>
+<h2 id="l"><a class="header" href="#l">L</a></h2>
+<h3 id="logging--logs"><a class="header" href="#logging--logs">Logging / Logs</a></h3>
+<p>Recording program operations to a file or as output.</p>
+<p><strong>Purpose:</strong> Debugging &amp; monitoring.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">logging.info("Gift received")
+logging.error("Connection failed")
+</code></pre>
+<p>Logs end up in <code>logs/debug.log</code>.</p>
+<hr>
+<h2 id="m"><a class="header" href="#m">M</a></h2>
+<h3 id="mainpy"><a class="header" href="#mainpy">main.py</a></h3>
+<p>The main program file of the project. It connects TikTok to the rest of the system.</p>
+<h3 id="middleware"><a class="header" href="#middleware">Middleware</a></h3>
+<p>Software that mediates between two other systems.</p>
+<p><strong>In our project:</strong> <code>main.py</code> contains the webhook endpoint and acts as middleware between Minecraft and the plugins. <code>server.py</code>, on the other hand, starts the Minecraft server itself.</p>
+<h3 id="migration"><a class="header" href="#migration">Migration</a></h3>
+<p>The process of transferring data from an old format to a new one.</p>
+<p><strong>In this project:</strong></p>
+<ul>
+<li>Config migration: Old <code>config.yaml</code> is updated to match the new structure</li>
+<li>See <a href="./config.html">Config</a> for details.</li>
+</ul>
+<h3 id="module"><a class="header" href="#module">Module</a></h3>
+<p>A reusable code building block that other files/projects can use.</p>
+<p><strong>In this project:</strong></p>
+<ul>
+<li><code>core/models.py</code> – data structures module</li>
+<li><code>core/paths.py</code> – path module</li>
+<li>Always located in the <code>src/core/</code> folder.</li>
+</ul>
+<hr>
+<h2 id="o"><a class="header" href="#o">O</a></h2>
+<h3 id="overlay"><a class="header" href="#overlay">Overlay</a></h3>
+<p>A visual element that is overlaid on the stream / screen.</p>
+<p><strong>Example:</strong> A counter on the screen shows “Deaths: 5”, “Likes: 200”.</p>
+<p><strong>In this project:</strong> Plugins use overlays to display data visually.</p>
+<hr>
+<h2 id="p"><a class="header" href="#p">P</a></h2>
+<h3 id="parameter"><a class="header" href="#parameter">Parameter</a></h3>
+<p>A value passed to a function.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">def create_client(user):  # 'user' is the parameter
+    ...
+
+create_client("my_streamer")  # 'my_streamer' is passed
+</code></pre>
+<h3 id="path"><a class="header" href="#path">Path</a></h3>
+<p>A file path in the file system.</p>
+<p><strong>Windows:</strong> <code>C:\Users\...\config\config.yaml</code><br><strong>Linux:</strong> <code>/home/.../config/config.yaml</code></p>
+<h3 id="plugin"><a class="header" href="#plugin">Plugin</a></h3>
+<p>An independent program that integrates into the Streaming Tool.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Timer (countdown timer)</li>
+<li>DeathCounter (counts deaths)</li>
+<li>Your custom plugin</li>
+</ul>
+<h3 id="port"><a class="header" href="#port">Port</a></h3>
+<p>A virtual “port” through which a server accepts connections.</p>
+<p><strong>Example:</strong> <code>http://localhost:8080</code> – the port is <code>8080</code>.</p>
+<p><strong>Config:</strong> All ports are configurable in <code>config.yaml</code>.</p>
+<h3 id="pseudo-code"><a class="header" href="#pseudo-code">Pseudo Code</a></h3>
+<p>Simplified code that is not syntactically correct but illustrates the logic.</p>
+<p><strong>Example:</strong></p>
+<pre><code>1. When gift arrives
+2. Find configuration
+3. Execute action
+</code></pre>
+<hr>
+<h2 id="q"><a class="header" href="#q">Q</a></h2>
+<h3 id="queue"><a class="header" href="#queue">Queue</a></h3>
+<p>A data structure that stores elements in the order in which they were added (FIFO: First-In-First-Out).</p>
+<p><strong>In our project:</strong></p>
+<ul>
+<li><code>trigger_queue</code>: Stores the triggers to be processed</li>
+<li><code>like_queue</code>: Stores like updates for the overlay</li>
+</ul>
+<hr>
+<h2 id="r"><a class="header" href="#r">R</a></h2>
+<h3 id="race-condition"><a class="header" href="#race-condition">Race Condition</a></h3>
+<p>A bug that occurs when two threads access the same resource at the same time.</p>
+<p><strong>Example:</strong> Thread 1 reads <code>event.total</code>, Thread 2 changes it → inconsistency!</p>
+<p><strong>Solution:</strong> Lock (Mutex) – only one thread may access at a time.</p>
+<h3 id="registry"><a class="header" href="#registry">Registry</a></h3>
+<p>A central management file or system.</p>
+<p><strong>In this project:</strong> <code>PLUGIN_REGISTRY</code> registers all modules &amp; plugins with their settings.</p>
+<h3 id="rcon-remote-console"><a class="header" href="#rcon-remote-console">RCON (Remote Console)</a></h3>
+<p>A protocol through which you can send Minecraft commands remotely.</p>
+<p><strong>Example:</strong> Instead of typing directly in the Minecraft console, the tool sends the command <code>/say "Hey!"</code> via RCON.</p>
+<h3 id="reverse-engineering"><a class="header" href="#reverse-engineering">Reverse Engineering</a></h3>
+<p>Reconstructing a system by observing its behavior from the outside.</p>
+<p><strong>In this project:</strong> The TikTokLive API is based on reverse engineering (not officially provided by TikTok).</p>
+<hr>
+<h2 id="s"><a class="header" href="#s">S</a></h2>
+<h3 id="streak"><a class="header" href="#streak">Streak</a></h3>
+<p>A combo that is triggered multiple times in a row.</p>
+<p><strong>Example:</strong> The same rose is sent 5 times in a row → “Streak: 5”.</p>
+<h3 id="sql--database"><a class="header" href="#sql--database">SQL / Database</a></h3>
+<p>A system for structured data storage (not centrally relevant in this project).</p>
+<hr>
+<h2 id="t"><a class="header" href="#t">T</a></h2>
+<h3 id="thread--threading"><a class="header" href="#thread--threading">Thread / Threading</a></h3>
+<p>An independent execution flow within a program.</p>
+<p><strong>Analogy:</strong> A program with 2 threads is like a streamer with 2 microphones – both can speak at the same time.</p>
+<p><strong>Danger:</strong> Race conditions (two threads modifying data in parallel).</p>
+<h3 id="trigger"><a class="header" href="#trigger">Trigger</a></h3>
+<p>A condition that causes an action to execute.</p>
+<p><strong>Example:</strong></p>
+<ul>
+<li><code>gift_1001</code> is a trigger (when this gift arrives)</li>
+<li><code>follow</code> is a trigger (when someone follows)</li>
+<li>When a trigger fires → the action is executed</li>
+</ul>
+<h3 id="tiktoklive-api"><a class="header" href="#tiktoklive-api">TikTokLive API</a></h3>
+<p>The external library through which we access TikTok live streams.</p>
+<p><strong>Based on:</strong> Reverse engineering (unofficial).</p>
+<p><strong>Usage:</strong> <code>from TikTokLive import TikTokLiveClient</code></p>
+<hr>
+<h2 id="u"><a class="header" href="#u">U</a></h2>
+<h3 id="update"><a class="header" href="#update">Update</a></h3>
+<p>A new release / version of the project.</p>
+<p><strong>Process:</strong></p>
+<ol>
+<li>New version is uploaded to GitHub</li>
+<li>User starts the program</li>
+<li>Update script downloads the new version</li>
+<li>Old data is retained (<code>config/</code>, <code>data/</code> are not overwritten)</li>
+</ol>
+<p><strong>Details:</strong> See <a href="./update.html">Update</a>.</p>
+<hr>
+<h2 id="v"><a class="header" href="#v">V</a></h2>
+<h3 id="validator"><a class="header" href="#validator">Validator</a></h3>
+<p>A module that checks whether data is correct.</p>
+<p><strong>Example:</strong> <code>validator.py</code> checks whether <code>config.yaml</code> is valid YAML.</p>
+<h3 id="variable"><a class="header" href="#variable">Variable</a></h3>
+<p>A named container for data.</p>
+<p><strong>Example:</strong> <code>gift_name = event.gift.name</code> – <code>gift_name</code> is the variable.</p>
+<hr>
+<h2 id="w"><a class="header" href="#w">W</a></h2>
+<h3 id="webhook"><a class="header" href="#webhook">Webhook</a></h3>
+<p>A mechanism where one system automatically sends data to another when something happens.</p>
+<p><strong>In this project:</strong></p>
+<ul>
+<li>Minecraft server sends a webhook to our tool (when a player dies, spawns, etc.)</li>
+<li>Our tool then processes the webhook</li>
+</ul>
+<p><strong>Format:</strong> Typically HTTP POST with JSON data.</p>
+<hr>
+<h2 id="x"><a class="header" href="#x">X</a></h2>
+<h3 id="no-common-terms"><a class="header" href="#no-common-terms">(no common terms)</a></h3>
+<hr>
+<h2 id="y"><a class="header" href="#y">Y</a></h2>
+<h3 id="yaml"><a class="header" href="#yaml">YAML</a></h3>
+<p>A data format for storing structured data (similar to JSON, but more human-readable).</p>
+<p><strong>Format:</strong></p>
+<pre><code class="language-yaml">timer:
+  enable: true
+  start_time: 10
+  max_time: 60
+</code></pre>
+<p><strong>In this project:</strong> <code>config.yaml</code> is written in YAML.</p>
+<hr>
+<h2 id="z"><a class="header" href="#z">Z</a></h2>
+<h3 id="centralization"><a class="header" href="#centralization">Centralization</a></h3>
+<p>The concept of managing everything in one place.</p>
+<p><strong>In this project:</strong> <code>PLUGIN_REGISTRY</code> is the central management system for all modules.</p>
+<hr>
+<h2 id="quick-index-by-category"><a class="header" href="#quick-index-by-category">Quick Index by Category</a></h2>
+<h3 id="event-system"><a class="header" href="#event-system"><strong>Event System</strong></a></h3>
+<ul>
+<li>Event, Event Handler, Trigger, Action</li>
+<li>Webhook, RCON</li>
+</ul>
+<h3 id="technology"><a class="header" href="#technology"><strong>Technology</strong></a></h3>
+<ul>
+<li>API, HTTP/HTTPS, Port</li>
+<li>Thread/Threading, Race Condition</li>
+<li>Async, Middleware</li>
+</ul>
+<h3 id="python--code"><a class="header" href="#python--code"><strong>Python &amp; Code</strong></a></h3>
+<ul>
+<li>Import, Module, Decorator</li>
+<li>Parameter, Variable, Handler</li>
+<li>Function, Logging</li>
+</ul>
+<h3 id="data-formats"><a class="header" href="#data-formats"><strong>Data Formats</strong></a></h3>
+<ul>
+<li>JSON, YAML, Database</li>
+</ul>
+<h3 id="structure--organization"><a class="header" href="#structure--organization"><strong>Structure &amp; Organization</strong></a></h3>
+<ul>
+<li>Registry, Migration</li>
+<li>Queue</li>
+<li>Path</li>
+</ul>
+<h3 id="control--communication"><a class="header" href="#control--communication"><strong>Control &amp; Communication</strong></a></h3>
+<ul>
+<li>DCS, ICS, Flask</li>
+<li>CORS</li>
+</ul>
+<h3 id="debugging--development"><a class="header" href="#debugging--development"><strong>Debugging &amp; Development</strong></a></h3>
+<ul>
+<li>Logging, Validator</li>
+<li>Pseudo Code, Reverse Engineering</li>
+</ul>
+<hr>
+<h2 id="i-still-dont-understand-term-xyz"><a class="header" href="#i-still-dont-understand-term-xyz">“I still don’t understand term XYZ!”</a></h2>
+<p>That’s OK. Here are your options:</p>
+<ol>
+<li><strong>Re-read:</strong> Simply read it again</li>
+<li><strong>Context:</strong> Search for the term in the documentation – context helps</li>
+<li><strong>Read code:</strong> Look at how the term is used in actual code</li>
+<li><strong>Ask:</strong> Other developers or an AI for help</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="attachment.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="core-modules.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="attachment.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="core-modules.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
