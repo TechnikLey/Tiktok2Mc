@@ -34,9 +34,9 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
       - name: Build dev-book-de with admonish
-        run: mdbook-admonish build docs/dev-book-de --dest-dir ../../public/de
+        run: build docs/dev-book-de --dest-dir ../../public/de
       - name: Build dev-book-en with admonish
-        run: mdbook-admonish build docs/dev-book-en --dest-dir ../../public/en
+        run: build docs/dev-book-en --dest-dir ../../public/en
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
