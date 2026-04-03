@@ -13,6 +13,14 @@ In this chapter you will set up your local development environment. This is a on
 - **Git** (to clone the repository)
 - **PowerShell 7**
 
+### Java & Minecraft Server
+
+- **Java Runtime Environment**: The folder `tools/Java/` must exist (either with Java files or your own Java installation).
+- **Minecraft Server**: The file `tools/server.jar` is required (Minecraft server JAR file).
+
+> [!IMPORTANT]
+> Make sure both the folder `tools/Java/` and the file `tools/server.jar` are present in your project. Without these, some features (e.g. Minecraft integration) will not work!
+
 ### macOS / Linux
 
 - **Python 3.12+** (recommended: Python 3.12)
@@ -88,6 +96,9 @@ sudo apt install git
 ## Step 3: Clone the Repository
 
 The repository is your local project. You save your work there.
+
+> [!TIP]
+> After cloning, check if the folder `tools/Java/` and the file `tools/server.jar` exist. If not, you need to add them yourself (see README or project page for instructions).
 
 There are two options:
 
@@ -205,6 +216,9 @@ The packages will be installed **globally** on your system.
 ## Step 5: Install Dependencies
 
 Now let's install all the Python packages the project needs:
+
+> [!NOTE]
+> For Minecraft integration, you also need a Java runtime in `tools/Java/` and the file `tools/server.jar`.
 
 ```bash
 pip install --upgrade pip
