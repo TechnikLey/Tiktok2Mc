@@ -37,8 +37,8 @@ For a detailed walkthrough of all settings, action syntax, overlays, and trouble
 
 ## Documentation for Dev
 
-- **[Developer Documentation (English)](./docs/dev-book-en/src/introduction.md)** -- System architecture and codebase overview.
-- **[Entwickler-Dokumentation (Deutsch)](./docs/dev-book-de/src/introduction.md)** -- Systemarchitektur und Code-Übersicht.
+- **[Developer Documentation (English)](./docs/dev-book-en/src/Introduction.md)** -- System architecture and codebase overview.
+- **[Entwickler-Dokumentation (Deutsch)](./docs/dev-book-de/src/Introduction.md)** -- Systemarchitektur und Code-Übersicht.
 
 > [!NOTE]
 > The developer documentation may not always be fully up to date.
