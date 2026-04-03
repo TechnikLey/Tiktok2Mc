@@ -3,6 +3,8 @@ name: Deploy mdBook site to Pages
 on:
   push:
     branches: ["main"]
+    paths:
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -28,12 +30,6 @@ jobs:
           rustup update
       - name: Install mdBook
         run: cargo install --version ${MDBOOK_VERSION} mdbook
-      - name: Install mdbook-admonish
-        run: cargo install --version ${MDBOOK_ADMONISH_VERSION} mdbook-admonish
-      - name: Install mdbook-admonish assets
-        run: mdbook-admonish install docs/dev-book-de
-      - name: Install mdbook-admonish assets (en)
-        run: mdbook-admonish install docs/dev-book-en
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
