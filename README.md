@@ -58,7 +58,7 @@ This project is licensed under the **PolyForm Noncommercial License 1.0.0** with
 
 **Attribution:** When sharing or redistributing, include this notice:
 
-`Required Notice: Copyright (c) 2026 TechnikLey - https://github.com/TechnikLey/Streaming_Tool.git`
+`Required Notice: Copyright (c) 2026 TechnikLey - https://github.com/TechnikLey/Tiktok2Mc.git`
 
 For the full legal text, see the [LICENSE](LICENSE) file.
 
