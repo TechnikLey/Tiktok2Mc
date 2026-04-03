@@ -5,3 +5,5 @@ language = "en"
 
 [build]
 build-dir = "../public/de"
+
+[preprocessor.admonish]
