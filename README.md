@@ -64,5 +64,5 @@ For the full legal text, see the [LICENSE](LICENSE) file.
 
 ## Contact
 
-- **GitHub:** [Open an Issue](https://github.com/TechnikLey/Tiktok-Mc-Gift/issues) or start a discussion.
+- **GitHub:** [Open an Issue](https://github.com/TechnikLey/Tiktok2Mc/issues) or start a discussion.
 - **Profile:** [TechnikLey on GitHub](https://github.com/TechnikLey)
