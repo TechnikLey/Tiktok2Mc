@@ -1,4 +1,4 @@
-[Einführung](./introduction.md)
+[Einführung](./Introduction.md)
 [Grundkonzepte & Begriffe](./ch00-00-Fundamentals-and-Concepts.md)
 [Lokale Entwicklung einrichten](./ch00-01-Setting-Up-Local-Development.md)
 
