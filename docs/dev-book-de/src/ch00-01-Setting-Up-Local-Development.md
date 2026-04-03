@@ -13,6 +13,14 @@ In diesem Kapitel richtest du deine lokale Entwicklungsumgebung ein. Das ist ein
 - **Git** (zum Repository klonen)
 - **PowerShell 7**
 
+### Java & Minecraft Server
+
+- **Java-Laufzeitumgebung**: Der Ordner `tools/Java/` muss vorhanden sein (entweder mit Java-Dateien oder deiner eigenen Java-Installation).
+- **Minecraft Server**: Die Datei `tools/server.jar` wird benötigt (Minecraft-Server-JAR-Datei).
+
+> [!IMPORTANT]
+> Stelle sicher, dass sich sowohl der Ordner `tools/Java/` als auch die Datei `tools/server.jar` im Projekt befinden. Ohne diese Komponenten funktionieren einige Features (z.B. Minecraft-Integration) nicht!
+
 ### macOS / Linux
 
 - **Python 3.12+** (empfohlen Python 3.12)
@@ -88,6 +96,9 @@ sudo apt install git
 ## Schritt 3: Repository klonen
 
 Das Repository ist dein lokales Projekt. Du speicherst deine Arbeitung dort.
+
+> [!TIP]
+> Prüfe nach dem Klonen, ob der Ordner `tools/Java/` und die Datei `tools/server.jar` vorhanden sind. Falls nicht, musst du sie selbst hinzufügen.
 
 Es gibt zwei Möglichkeiten:
 
@@ -205,6 +216,9 @@ Die Pakete werden **global** auf deinem System installiert.
 ## Schritt 5: Abhängigkeiten installieren
 
 Jetzt installieren wir alle Python-Pakete, die das Projekt braucht:
+
+> [!NOTE]
+> Für die Minecraft-Integration wird zusätzlich eine Java-Laufzeitumgebung im Ordner `tools/Java/` und die Datei `tools/server.jar` benötigt.
 
 ```bash
 pip install --upgrade pip
