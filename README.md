@@ -40,13 +40,13 @@ For a detailed walkthrough of all settings, action syntax, overlays, and trouble
 
 The developer documentation is best viewed online:
 
-- **[English Documentation](https://technikley.github.io/Tiktok2Mc/en)**
-- **[Deutsche Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
+- **[English-Dev-Documentation](https://technikley.github.io/Tiktok2Mc/en)**
+- **[Deutsche-Dev-Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
 
 > [!TIP]
 > The online docs are better organized and easier to navigate. You can also browse the Markdown files directly in the repository if you prefer:
-> - [English sources](./docs/dev-book-en/src/Introduction.md)
-> - [Deutsche Quellen](./docs/dev-book-de/src/Introduction.md)
+> - [English-Dev-Documentation](./docs/dev-book-en/src/Introduction.md)
+> - [Deutsche-Dev-Dokumentation](./docs/dev-book-de/src/Introduction.md)
 
 > [!NOTE]
 > The developer documentation may not always be fully up to date.
