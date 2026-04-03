@@ -35,10 +35,18 @@ That's it. The tool will start the Minecraft server, connect to your TikTok Live
 
 For a detailed walkthrough of all settings, action syntax, overlays, and troubleshooting, see the **[User Guide](./docs/GUIDE.md)**.
 
-## Documentation for Dev
 
-- **[Developer Documentation (English)](./docs/dev-book-en/src/Introduction.md)** -- System architecture and codebase overview.
-- **[Entwickler-Dokumentation (Deutsch)](./docs/dev-book-de/src/Introduction.md)** -- Systemarchitektur und Code-Übersicht.
+## Developer Documentation
+
+The developer documentation is best viewed online:
+
+- **[English Documentation](https://technikley.github.io/Tiktok2Mc/en)**
+- **[Deutsche Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
+
+> [!TIP]
+> The online docs are better organized and easier to navigate. You can also browse the Markdown files directly in the repository if you prefer:
+> - [English sources](./docs/dev-book-en/src/Introduction.md)
+> - [Deutsche Quellen](./docs/dev-book-de/src/Introduction.md)
 
 > [!NOTE]
 > The developer documentation may not always be fully up to date.
