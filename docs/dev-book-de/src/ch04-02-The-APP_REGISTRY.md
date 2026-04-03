@@ -1,0 +1,1 @@
+# Die PLUGIN_REGISTRY

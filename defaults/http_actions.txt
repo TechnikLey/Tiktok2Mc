@@ -1,0 +1,7 @@
+18508:curl -X Post http://localhost:8080/add?amount=10
+16071:curl -X Post http://localhost:8080/remove?amount=10
+13165:curl -X Post http://localhost:8080/add?amount=40
+9154:curl -X Post http://localhost:8080/remove?amount=40
+7319:curl -X Post http://localhost:8080/add?amount=400
+18338:curl -X Post http://localhost:8080/remove?amount=400
+9101:curl -X Post http://localhost:8080/remove?amount=1000

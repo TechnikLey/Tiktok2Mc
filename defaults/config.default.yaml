@@ -1,0 +1,232 @@
+# -------------------------------------------------------------------------
+# STREAMING TOOL CONFIGURATION TEMPLATE
+# -------------------------------------------------------------------------
+# This file is a template.
+# Personal settings should be changed in 'config.yaml' only.
+# -------------------------------------------------------------------------
+config_version: 1
+
+# -------------------------------------------------------------------------
+# IMPORTANT FOR BEGINNERS:
+# 1. DO NOT remove the space after the colon (e.g., 'key: value').
+# 2. DO NOT use the 'Tab' key for spacing; use the 'Space' bar only.
+# 3. PORTS: Each port must be unique. If a port is used twice, the tool 
+#    will crash or fail to start.
+# -------------------------------------------------------------------------
+
+# SETTINGS PROTECTION
+# Set this to false if you do not want the tool to overwrite personal settings.
+# Disabling this may block important updates or cause configuration issues.
+auto_update_config: true
+
+# ==============================================================================
+# STREAMING CONTROL METHOD SELECTION
+# ==============================================================================
+# Choose how this tool communicates with your streaming software.
+#
+# Options:
+#   DCS (Direct Control System):
+#     Recommended for most users.
+#     Uses direct HTTP-based control and offers the best performance,
+#     lowest latency, and full access to advanced features.
+#     Best for software such as OBS Studio, vMix, and Streamlabs Desktop.
+#
+#   ICS (Interface Control System):
+#     Uses the graphical user interface for control.
+#     Easier to use in some cases, but slower and with fewer supported features.
+#     Some features may be unavailable or may not work properly.
+#     Required for software such as TikTok Live Studio and Twitch Studio.
+#
+# Recommendation:
+#   Use DCS whenever possible for the best reliability and performance.
+# ==============================================================================
+control_method: DCS
+
+# -------------------------------------------------------------------------
+# MINECRAFT SERVER SETTINGS (JAVA)
+# -------------------------------------------------------------------------
+Java:
+  # RAM allocation (Memory). 'G' stands for Gigabytes.
+  # Using the same value for Xms and Xmx is recommended for most users.
+  # Xms: Initial memory | Xmx: Maximum memory.
+  Xms: 4G
+  Xmx: 4G
+
+  # Default Minecraft server port.
+  Port: 25565
+
+# -------------------------------------------------------------------------
+# REMOTE CONTROL (RCON)
+# -------------------------------------------------------------------------
+RCON:
+  # Enable remote console access.
+  # Disable only if you are sure you do not need it.
+  Enable: true
+
+  # Strongly recommended: change this password before using the server publicly.
+  Password: ABC1234
+
+  # Default RCON port.
+  Port: 25575
+
+# -------------------------------------------------------------------------
+# TIKTOK LIVE INTEGRATION
+# -------------------------------------------------------------------------
+TikTok:
+  # TikTok username to track.
+  User: your_tiktok_username
+
+  # Time to wait before reconnecting after a lost connection.
+  ReconnectDelaySeconds: 30
+
+# -------------------------------------------------------------------------
+# LIKE GOAL / ENGAGEMENT TRIGGERS
+# -------------------------------------------------------------------------
+Gifts:
+  # Like-based triggers.
+  like_triggers:
+    - id: likes_standard
+      every: 100
+      function: likes
+      payload: Community
+      enable: true
+
+    - id: likes_100k
+      every: 100_000
+      function: like_2
+      payload: Community
+      enable: true
+
+  # Web server port used for the OBS overlay.
+  LIKE_GOAL_PORT: 9797
+
+# -------------------------------------------------------------------------
+# SYSTEM & CONSOLE CONTROL
+# -------------------------------------------------------------------------
+# Changing these settings can affect startup behavior and process visibility.
+Console:
+  # Controls which windows are shown during startup:
+  #
+  # Level 0: Off
+  #   Hides everything, including GUI windows.
+  #
+  # Level 1: Silent
+  #   Hides console windows, but keeps GUI features active.
+  #
+  # Level 2: Standard
+  #   Shows only the main applications.
+  #
+  # Level 3: Advanced
+  #   Also shows background services.
+  #
+  # Level 4: Debug
+  #   Shows all enabled processes.
+  #
+  # Level 5: Override
+  #   Shows every process, even if enable is false.
+  #   Intended for debugging only.
+  log_level: 2
+
+  # Main console window visibility.
+  visible: true
+
+  # Process handling:
+  # true  = keep the script running so typing 'exit' closes everything cleanly
+  # false = start programs and exit immediately
+  allow_close: true
+
+# -------------------------------------------------------------------------
+# MODULES
+# -------------------------------------------------------------------------
+
+# WEB INTERFACE
+GUI:
+  # Enable the web-based dashboard for server management.
+  Enable: false
+  Port: 5000
+
+# UPDATER
+Update:
+  # Automatically check for and install tool updates.
+  Enable: true
+
+# MINECRAFT SERVER API
+MinecraftServerAPI:
+  Enable: true
+
+  # API and web server ports.
+  APIPort: 7000
+  WebServerPort: 7777
+  WebServerPortTimer: 7878
+  DEATHCOUNTER_PORT: 7979
+
+# OVERLAY TOOLS
+WinCounter:
+  Enable: true
+  WebServerPort: 8080
+
+Overlaytxt:
+  Enable: true
+  Port: 5005
+
+  # Controls how new overlay messages are handled when a previous
+  # message is still on screen.
+  #
+  # overwrite:
+  #   The new message immediately replaces the current one.
+  #   Use this if you only care about the latest event.
+  #
+  # queue:
+  #   Messages are queued and shown one after another.
+  #   Each message stays for its full duration before the next one appears.
+  #   Use this if every notification matters (e.g. follower names).
+  #
+  #   WARNING: In queue mode, messages can pile up during busy streams.
+  #   If many events fire at once, the queue may take a long time to clear
+  #   and viewers will see outdated notifications.
+  DisplayMode: overwrite
+
+  # Fade-in and fade-out animation duration in milliseconds.
+  # These are NOT included in the Duration value from >>commands.
+  # Example: with FadeIn: 500, FadeOut: 500 and a Duration of 3,
+  # the total visible time is 0.5s + 3s + 0.5s = 4s.
+  # Set to 0 for instant appear/disappear (no animation).
+  FadeIn: 500
+  FadeOut: 500
+
+# STREAM TIMER
+Timer:
+  Enable: true
+
+  # Initial timer value in minutes.
+  StartTime: 10
+
+# DEATH COUNTER
+DeathCounter:
+  Enable: true
+
+LikeGoal:
+  Enable: true
+  # Text shown above the like goal progress bar.
+  DisplayText: Like Goal
+  # Number of likes needed to reach the first goal.
+  # You can use underscores for readability (e.g., 100_000 instead of 100000).
+  # Do not use dots or commas (100.000 and 100,000 will not work).
+  InitialGoal: 100_000
+  # Controls what happens after a goal is reached.
+  #
+  # GoalMultiplier: 0
+  #   Reset mode. Likes reset to 0 and the goal starts over.
+  #   Example with InitialGoal 100_000:
+  #   100_000 reached → reset to 0 → 100_000 reached → reset to 0 → ...
+  #
+  # GoalMultiplier: 1
+  #   Step mode. The goal increases by InitialGoal each time.
+  #   Example with InitialGoal 100_000:
+  #   100_000 → 200_000 → 300_000 → 400_000 → ...
+  #
+  # GoalMultiplier: 2 (or higher)
+  #   Multiply mode. The goal is multiplied by this value each time.
+  #   Example with InitialGoal 100_000 and GoalMultiplier 2:
+  #   100_000 → 200_000 → 400_000 → 800_000 → ...
+  GoalMultiplier: 2

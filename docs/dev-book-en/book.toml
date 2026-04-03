@@ -1,0 +1,7 @@
+[book]
+title = "Streaming Tool Dev"
+authors = ["TechnikLey"]
+language = "en"
+
+[build]
+build-dir = "../public/de"

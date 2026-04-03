@@ -1,0 +1,7 @@
+build/
+tools/Java/
+tools/server.jar
+dist/*
+.env
+src/python/requirements311.txt
+upload.ps1

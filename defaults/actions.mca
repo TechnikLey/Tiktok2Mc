@@ -1,0 +1,25 @@
+5655:!tnt 2 0.1 2 Notch
+16111:/give @a minecraft:diamond
+follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now following you!|5
+5487:/give @a minecraft:totem_of_undying
+8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
+17490:/execute at @a run summon minecraft:ravager ~ ~ ~ x5
+likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x2
+6560:/execute at @a run summon minecraft:zombie ~ ~ ~ {IsBaby:1} x6
+5879:/item replace entity @a armor.head with minecraft:diamond_helmet; /item replace entity @a armor.chest with minecraft:diamond_chestplate; /item replace entity @a armor.legs with minecraft:diamond_leggings; /item replace entity @a armor.feet with minecraft:diamond_boots
+5509:/execute at @a run summon minecraft:warden ~ ~ ~ x20
+8600:/execute at @a run summon minecraft:wither ~ ~ ~ x15
+6267:!tnt 600 0.1 2 Notch
+7168:/execute at @a run summon minecraft:wither ~ ~ ~ x50
+11046:/clear @a *; /execute at @a run summon minecraft:wither ~ ~ ~ x20; !tnt 20 0.1 2 Notch
+7934:/give @a minecraft:enchanted_golden_apple 2
+7569:/execute at @a run fill ~-7 ~-15 ~-7 ~8 ~0 ~8 minecraft:air replace
+15509:/execute at @a run summon minecraft:wither_skeleton ~ ~ ~ x5
+10604:/give @a minecraft:wind_charge 10
+12988:/item replace entity @a armor.head with minecraft:netherite_helmet; /item replace entity @a armor.chest with minecraft:netherite_chestplate; /item replace entity @a armor.legs with minecraft:netherite_leggings; /item replace entity @a armor.feet with minecraft:netherite_boots
+5897:/clear @a *
+5658:/give @a minecraft:ender_pearl 16
+16558:/execute at @p run fill ~-8 -64 ~-8 ~7 31 ~7 minecraft:air replace; /execute at @p run fill ~-8 32 ~-8 ~7 127 ~7 minecraft:air replace; /execute at @p run fill ~-8 128 ~-8 ~7 223 ~7 minecraft:air replace; /execute at @p run fill ~-8 224 ~-8 ~7 319 ~7 minecraft:air replace
+5774:/clear @a *; /execute at @a run summon minecraft:wither ~ ~ ~ x100; !tnt 100 0.1 2 Notch # ignore-lag
+like_2:/clear @a *; /kill @a
+16071:$random

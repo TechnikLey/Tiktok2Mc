@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Datenbank</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Button rechts oben */
+        .top-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 15px;
+            background-color: #ffd54f;
+            color: #121212;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #1e1e1e;
+        }
+
+        tr:nth-child(even) {
+            background-color: #2d2d2d;
+        }
+
+        tr:hover {
+            background-color: #444;
+        }
+
+        body {
+            position: relative; /* für top-button */
+            min-height: 100vh;
+            padding: 40px 20px 20px 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Datenbank durchsuchen</h1>
+
+    <form method="POST">
+        <div class="field-group">
+            <label for="search">Suchbegriff:</label>
+            <input type="text" id="search" name="search" value="{{ search_query }}">
+        </div>
+
+        <div class="field-group">
+            <label for="field">Feld:</label>
+            <select name="field" id="field">
+                <option value="name" {% if field=="name" %}selected{% endif %}>Name</option>
+                <option value="coins" {% if field=="coins" %}selected{% endif %}>Coins</option>
+                <option value="id" {% if field=="id" %}selected{% endif %}>ID</option>
+            </select>
+        </div>
+
+        <input type="submit" value="Suchen" class="btn-save">
+    </form>
+
+    <button onclick="window.location.href='/'" class="top-button">Zurück zum Menü</button>
+
+    <hr>
+
+    {% if results %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Coins</th>
+                    <th>ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in results %}
+                    <tr>
+                        <td>{{ entry.name }}</td>
+                        <td>{{ entry.coins }}</td>
+                        <td>{{ entry.id }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Keine Ergebnisse gefunden.</p>
+    {% endif %}
+</body>
+</html>

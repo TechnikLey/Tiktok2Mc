@@ -1,0 +1,16 @@
+# === CORE DEPENDENCIES ===
+PyYAML==6.0.3
+pywebview==6.1
+Flask==3.1.3
+flask-cors==6.0.2
+requests==2.32.5
+
+# === STREAMING & INTEGRATION ===
+aiohttp==3.13.3
+TikTokLive==6.6.5
+mcrcon==0.7.0
+
+# === BUILD & UTILS ===
+pyinstaller==6.13.0
+packaging==26.0
+ruamel.yaml==0.19.1
