@@ -1,18 +1,18 @@
-# Ordner für Plugins
+# Folder for plugins
 $pluginsDir = "src/plugins"
 $version = "v1.0.0"
 
-# Funktion zum Abfragen eines gültigen Plugin-Namens
+# Function to prompt for a valid plugin name
 function Get-ValidPluginName {
     param([string]$prompt)
     do {
         $pluginName = Read-Host $prompt
 
         if ($pluginName -notmatch '^[a-z0-9]+$') {
-            Write-Host "Ungültiger Name! Nur a-z und 0-9 erlaubt." -ForegroundColor Red
+            Write-Host "Invalid name! Only a-z and 0-9 allowed." -ForegroundColor Red
             $valid = $false
         } elseif (Test-Path (Join-Path $pluginsDir $pluginName)) {
-            Write-Host "Ordner existiert bereits! Bitte anderen Namen wählen." -ForegroundColor Red
+            Write-Host "Folder already exists! Please choose another name." -ForegroundColor Red
             $valid = $false
         } else {
             $valid = $true
@@ -21,15 +21,15 @@ function Get-ValidPluginName {
     return $pluginName
 }
 
-# Modulname abfragen
-$pluginName = Get-ValidPluginName "Bitte Modulname eingeben (nur a-z und 0-9)"
+# Prompt for module name
+$pluginName = Get-ValidPluginName "Please enter module name (only a-z and 0-9)"
 
-# Pfad erstellen
+# Create path
 $pluginPath = Join-Path $pluginsDir $pluginName
 New-Item -ItemType Directory -Path $pluginPath | Out-Null
-Write-Host "Ordner '$pluginName' erstellt."
+Write-Host "Folder '$pluginName' created."
 
-# main.py erstellen mit Template
+# Create main.py with template
 $mainFile = Join-Path $pluginPath "main.py"
 @"
 from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, register_plugin, AppConfig
@@ -57,20 +57,20 @@ if register_only:
     ))
     sys.exit(0)
 "@ | Out-File -FilePath $mainFile -Encoding UTF8
-Write-Host "Datei 'main.py' erstellt."
+Write-Host "File 'main.py' created."
 
-# version.txt erstellen
+# Create version.txt
 $versionFile = Join-Path $pluginPath "version.txt"
 $version | Out-File -FilePath $versionFile -Encoding UTF8
-Write-Host "Datei 'version.txt' mit Inhalt '$version' erstellt."
+Write-Host "File 'version.txt' with content '$version' created."
 
-# README.md erstellen
+# Create README.md
 $readmeFile = Join-Path $pluginPath "README.md"
 "# $pluginName
 
 Version: $version
 
-Beschreibung: " | Out-File -FilePath $readmeFile -Encoding UTF8
-Write-Host "Datei 'README.md' erstellt."
+Description: " | Out-File -FilePath $readmeFile -Encoding UTF8
+Write-Host "File 'README.md' created."
 
 pause
