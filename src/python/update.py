@@ -69,7 +69,7 @@ WHITELIST_FILES = {
 }
 
 GITHUB_USER = "TechnikLey"
-GITHUB_REPO = "Streaming_Tool"
+GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
 
 try:

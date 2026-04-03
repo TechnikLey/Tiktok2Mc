@@ -25,7 +25,7 @@ Set-Location -LiteralPath $PSScriptRoot
 # ----- 0️⃣ Configuration -----
 $MaxThreads = 8
 $MaxCopyThreads = 16
-$ToolVersion    = "v0.1.0-beta"
+$ToolVersion    = "v0.1.0"
 $UpdaterVersion = "v1.0.0"             
 $OutDir         = Join-Path $PSScriptRoot "build\release"
 $CacheDir       = Join-Path $PSScriptRoot "build\cache"
