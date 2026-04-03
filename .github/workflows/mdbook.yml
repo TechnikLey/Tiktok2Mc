@@ -33,10 +33,10 @@ jobs:
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
-      - name: Build dev-book-de with admonish
-        run: build docs/dev-book-de --dest-dir ../../public/de
-      - name: Build dev-book-en with admonish
-        run: build docs/dev-book-en --dest-dir ../../public/en
+      - name: Build dev-book-de
+        run: mdbook build docs/dev-book-de --dest-dir ../../public/de
+      - name: Build dev-book-en
+        run: mdbook build docs/dev-book-en --dest-dir ../../public/en
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
