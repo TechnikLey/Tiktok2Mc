@@ -30,7 +30,6 @@ def cprint(msg, color=Color.RESET):
 if sys.platform == "win32":
     os.system("")  # enables ANSI escape sequences in Windows terminal
 
-
 def main():
     start = time.time()
 
@@ -121,6 +120,16 @@ def main():
                     "src": str(py_file),
                     "dest": dest,
                 })
+
+                # Also copy version.txt and README.md if present in the same plugin folder
+                for extra_file in ["version.txt", "README.md"]:
+                    extra_path = py_file.parent / extra_file
+                    if extra_path.exists():
+                        # Schedule copy as a build task (handled in asset/resource sync phase)
+                        # Here, just copy directly to OUT_DIR/plugins/rel/extra_file
+                        target_dir = OUT_DIR / dest
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(extra_path, target_dir / extra_file)
 
         # ----- Execution: Parallel Build -----
         cprint(

@@ -19,11 +19,12 @@ Each version is split into two sections:
 - Linux support — the tool now runs on Linux in addition to Windows.
 - Each process runs in its own terminal session on Linux for better overview.
 - Interactive setup on first Linux launch — choose to install tmux/screen, continue without, or abort.
-- `$random` exclusion list is now configurable in `config.yaml` under `Gifts > random_exclude` instead of being hardcoded.
+	- `$random` exclusion list is now configurable in `config.yaml` under `Gifts > random_exclude` instead of being fixed in the program.
 
 #### Fixed
 - Overlay now shows a transparent background when opened via browser URL instead of a green screen.
 - Auto-update no longer falsely reports "Update has been installed" when no update was available.
+- Plugin releases now always include the plugin's version.txt and README.md if present, so users get all plugin info in the release folder.
 
 #### Changed
 - README and User Guide updated to reflect Linux support, platform-specific start commands, and Java availability per OS.
@@ -56,6 +57,7 @@ Each version is split into two sections:
 #### Fixed
 - PyInstaller build errors (stdout + stderr) are now captured and displayed on failure instead of being silenced.
 - Updater exit code `0` (no update) was not handled, causing false "Update installed" message in `start.py`.
+- The build script now copies version.txt and README.md from each plugin folder (if present) into the release, so plugin metadata and documentation are always included.
 
 #### Docs
 - Dev-Book (DE + EN) `ch03` — documentation across all ch03 chapters rewritten to be generic; prefixes are no longer hardcoded in multiple places but reference one authoritative list in `ch03-02`.
