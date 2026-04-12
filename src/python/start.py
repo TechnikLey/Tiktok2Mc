@@ -13,9 +13,97 @@ import subprocess
 import atexit
 import time
 import json
+import shutil
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
+
+IS_WINDOWS = sys.platform == "win32"
+
+# -----------------------------
+# Linux: Detect tmux/screen
+# -----------------------------
+TMUX_PATH = None if IS_WINDOWS else shutil.which("tmux")
+SCREEN_PATH = None if IS_WINDOWS else shutil.which("screen")
+SESSION_TOOL = None
+
+def _detect_package_manager():
+    """Returns (install_cmd_tmux, install_cmd_screen) or (None, None)."""
+    for pm, flag in [("apt", "install -y"), ("dnf", "install -y"), ("pacman", "-S --noconfirm"), ("zypper", "install -y")]:
+        if shutil.which(pm):
+            return (f"sudo {pm} {flag} tmux", f"sudo {pm} {flag} screen")
+    return (None, None)
+
+if not IS_WINDOWS:
+    if TMUX_PATH:
+        SESSION_TOOL = "tmux"
+    elif SCREEN_PATH:
+        SESSION_TOOL = "screen"
+    else:
+        import os
+        print()
+        print("[WARN] Neither tmux nor screen found!")
+        print("Without one of these, all processes will share this terminal.")
+        print()
+        print("  [1] Install tmux now (recommended)")
+        print("  [2] Install screen now")
+        print("  [3] Continue anyway (all in one terminal)")
+        print("  [4] Abort")
+        print()
+
+        choice = input("Choice [1/2/3/4]: ").strip()
+        tmux_cmd, screen_cmd = _detect_package_manager()
+
+        if choice == "1":
+            if tmux_cmd:
+                print(f"\n=> {tmux_cmd}")
+                ret = os.system(tmux_cmd)
+                if ret == 0:
+                    TMUX_PATH = shutil.which("tmux")
+                    if TMUX_PATH:
+                        SESSION_TOOL = "tmux"
+                        print("[OK] tmux installed successfully.\n")
+                    else:
+                        print("[FAIL] tmux was installed but could not be found.")
+                        sys.exit(1)
+                else:
+                    print("[FAIL] Installation failed. Please install manually.")
+                    sys.exit(1)
+            else:
+                print("[FAIL] No package manager detected. Please install manually:")
+                print("         Ubuntu/Debian : sudo apt install tmux")
+                print("         Fedora/RHEL   : sudo dnf install tmux")
+                print("         Arch Linux    : sudo pacman -S tmux")
+                sys.exit(1)
+
+        elif choice == "2":
+            if screen_cmd:
+                print(f"\n=> {screen_cmd}")
+                ret = os.system(screen_cmd)
+                if ret == 0:
+                    SCREEN_PATH = shutil.which("screen")
+                    if SCREEN_PATH:
+                        SESSION_TOOL = "screen"
+                        print("[OK] screen installed successfully.\n")
+                    else:
+                        print("[FAIL] screen was installed but could not be found.")
+                        sys.exit(1)
+                else:
+                    print("[FAIL] Installation failed. Please install manually.")
+                    sys.exit(1)
+            else:
+                print("[FAIL] No package manager detected. Please install manually:")
+                print("         Ubuntu/Debian : sudo apt install screen")
+                print("         Fedora/RHEL   : sudo dnf install screen")
+                print("         Arch Linux    : sudo pacman -S screen")
+                sys.exit(1)
+
+        elif choice == "3":
+            print("\n[OK] Continuing without tmux/screen...\n")
+
+        else:
+            print("\nAborted.")
+            sys.exit(0)
 
 # -----------------------------
 # Base directory
@@ -64,6 +152,7 @@ MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", Tru
 # Process dictionary
 # -----------------------------
 processes = {}
+linux_sessions = []  # Track tmux/screen session names
 
 # -----------------------------
 # Process management (start, stop, visibility)
@@ -78,28 +167,63 @@ def get_visibility(required_level):
     
     return LOG_LEVEL < required_level
 
+def _sanitize_session_name(name):
+    return name.replace(" ", "-").replace("/", "-").lower()
+
 def start_exe(path, name, hidden=False, gui_hidden=None):
-    """Starts an executable in its own window or hidden.
-    Optionally passes a --gui-hidden flag to the started process.
-    """
+    """Starts an executable in its own window (Windows) or tmux/screen session (Linux)."""
     if not path.exists():
         if ALLOW_CLOSE:
             print(f"[-] Houston, we have a problem: {path} is missing. Did it run away?")
         return
     try:
-        # Base command
-        cmd = [path]
-        # Optional flag
+        cmd = [str(path)]
         if gui_hidden is not None:
-            cmd.append(f"--gui-hidden")  # bool -> 0/1
-        kwargs = {}
-        if sys.platform == "win32":
+            cmd.append("--gui-hidden")
+
+        if IS_WINDOWS:
+            kwargs = {}
             flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
             kwargs["creationflags"] = flags
-        proc = subprocess.Popen(cmd, **kwargs)
-        processes[name] = proc
+            proc = subprocess.Popen(cmd, **kwargs)
+            processes[name] = proc
+        elif SESSION_TOOL == "tmux":
+            session_name = _sanitize_session_name(f"mc-{name}")
+            # Kill stale session with same name if it exists
+            subprocess.run(
+                ["tmux", "kill-session", "-t", session_name],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            subprocess.Popen(
+                ["tmux", "new-session", "-d", "-s", session_name] + cmd
+            )
+            linux_sessions.append(session_name)
+            processes[name] = None  # tracked by session name
+        elif SESSION_TOOL == "screen":
+            session_name = _sanitize_session_name(f"mc-{name}")
+            subprocess.run(
+                ["screen", "-X", "-S", session_name, "quit"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            subprocess.Popen(
+                ["screen", "-dmS", session_name] + cmd
+            )
+            linux_sessions.append(session_name)
+            processes[name] = None
+        else:
+            # Fallback: run in background, redirect to log file
+            log_dir = BASE_DIR / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / f"{_sanitize_session_name(name)}.log"
+            with open(log_file, "w") as lf:
+                proc = subprocess.Popen(cmd, stdout=lf, stderr=lf)
+            processes[name] = proc
+
         if ALLOW_CLOSE:
-            print(f"{name} started{' (hidden)' if hidden else ''}, gui_hidden={gui_hidden}.")
+            if SESSION_TOOL and not IS_WINDOWS:
+                print(f"{name} started in {SESSION_TOOL} session: {_sanitize_session_name(f'mc-{name}')}")
+            else:
+                print(f"{name} started{' (hidden)' if hidden else ''}, gui_hidden={gui_hidden}.")
     except Exception as e:
         if ALLOW_CLOSE:
             print(f"Error starting {name}: {e}")
@@ -110,10 +234,31 @@ def stop_all_processes():
         return  # In background mode, do not stop anything
 
     print("\nTerminating all started processes...")
-    for name, proc in processes.items():
-        if proc.poll() is None:
+
+    # Kill tmux/screen sessions on Linux
+    if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
+        for session_name in linux_sessions:
             try:
-                if sys.platform == "win32":
+                if SESSION_TOOL == "tmux":
+                    subprocess.run(
+                        ["tmux", "kill-session", "-t", session_name],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                elif SESSION_TOOL == "screen":
+                    subprocess.run(
+                        ["screen", "-X", "-S", session_name, "quit"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                print(f"{session_name} session terminated.")
+            except Exception:
+                pass
+        linux_sessions.clear()
+
+    # Kill Windows processes / fallback Linux processes
+    for name, proc in processes.items():
+        if proc is not None and proc.poll() is None:
+            try:
+                if IS_WINDOWS:
                     subprocess.run(f"taskkill /F /PID {proc.pid} /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
                     proc.terminate()
@@ -142,10 +287,26 @@ def replace_updater_if_exists():
             print(f"[FAIL] Error: {update_exe.name} is still locked.")
 
 def start_update_exe():
-    kwargs = {}
-    if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
-    proc = subprocess.Popen([UPDATE_EXE_PATH], **kwargs)
+    if IS_WINDOWS:
+        proc = subprocess.Popen([UPDATE_EXE_PATH], creationflags=subprocess.CREATE_NEW_CONSOLE)
+    elif SESSION_TOOL == "tmux":
+        session_name = "mc-updater"
+        subprocess.run(["tmux", "kill-session", "-t", session_name],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(
+            ["tmux", "new-session", "-d", "-s", session_name, str(UPDATE_EXE_PATH)]
+        )
+        linux_sessions.append(session_name)
+    elif SESSION_TOOL == "screen":
+        session_name = "mc-updater"
+        subprocess.run(["screen", "-X", "-S", session_name, "quit"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(
+            ["screen", "-dmS", session_name, str(UPDATE_EXE_PATH)]
+        )
+        linux_sessions.append(session_name)
+    else:
+        proc = subprocess.Popen([str(UPDATE_EXE_PATH)])
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
@@ -268,9 +429,20 @@ for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
 # -----------------------------
 if ALLOW_CLOSE:
     print("\nAll programs have been started.")
+
+    # Show active sessions on Linux
+    if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
+        print(f"\n--- Active {SESSION_TOOL} sessions ---")
+        for s in linux_sessions:
+            if SESSION_TOOL == "tmux":
+                print(f"  tmux attach -t {s}")
+            elif SESSION_TOOL == "screen":
+                print(f"  screen -r {s}")
+        print("-----------------------------------")
+
     try:
         while True:
-            cmd = input("\nGib 'exit' ein, um alle Programme zu beenden: ").strip().lower()
+            cmd = input("\nType 'exit' to stop all programs: ").strip().lower()
             if cmd == "exit":
                 sys.exit(0) # atexit calls stop_all_processes
     except KeyboardInterrupt:
