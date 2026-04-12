@@ -25,7 +25,7 @@ The tool includes a ready-to-use Minecraft server (1.21.11) and a bundled Java r
 2. Find the line `User: your_tiktok_username` and replace `your_tiktok_username` with your actual TikTok username.
 3. Find `Password: ABC1234` and change it to any password you like. This is the password for the connection between the tool and the Minecraft server.
 4. Save the file.
-5. Open `data/actions.mca` and set up your actions. This file defines what happens in Minecraft when viewers send gifts, follow, or hit like milestones. There are already some example actions included, but you should adjust them to your liking. See the [User Guide](GUIDE.md#setting-up-actions) for a full explanation.
+5. Open `data/actions.mca` and set up your actions. This file defines what happens in Minecraft when viewers send gifts, follow, or hit like milestones. There are already some example actions included, but you should adjust them to your liking. See the [User Guide](./docs/GUIDE.md#setting-up-actions) for a full explanation.
 6. Double-click `start.exe` to launch everything.
 
 That's it. The tool will start the Minecraft server, connect to your TikTok Live, and begin listening for events.
