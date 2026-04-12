@@ -48,7 +48,7 @@ The developer documentation is best viewed online:
 > - [English-Dev-Documentation](./docs/dev-book-en/src/Introduction.md)
 > - [Deutsche-Dev-Dokumentation](./docs/dev-book-de/src/Introduction.md)
 
-> [!NOTE]
+> [!WARNING]
 > The developer documentation may not always be fully up to date.
 
 ## License

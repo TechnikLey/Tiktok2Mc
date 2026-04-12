@@ -14,6 +14,7 @@ import atexit
 import time
 import json
 import shutil
+import os
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
@@ -40,14 +41,13 @@ if not IS_WINDOWS:
     elif SCREEN_PATH:
         SESSION_TOOL = "screen"
     else:
-        import os
         print()
-        print("[WARN] Neither tmux nor screen found!")
+        print("[WARN] Neither tmux or screen found!")
         print("Without one of these, all processes will share this terminal.")
         print()
-        print("  [1] Install tmux now (recommended)")
-        print("  [2] Install screen now")
-        print("  [3] Continue anyway (all in one terminal)")
+        print("  [1] Install tmux (recommended)")
+        print("  [2] Install screen")
+        print("  [3] Continue (all in one terminal)")
         print("  [4] Abort")
         print()
 
@@ -287,14 +287,15 @@ def replace_updater_if_exists():
             print(f"[FAIL] Error: {update_exe.name} is still locked.")
 
 def start_update_exe():
+    cmd = [str(UPDATE_EXE_PATH), "--auto"]
     if IS_WINDOWS:
-        proc = subprocess.Popen([UPDATE_EXE_PATH], creationflags=subprocess.CREATE_NEW_CONSOLE)
+        proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     elif SESSION_TOOL == "tmux":
         session_name = "mc-updater"
         subprocess.run(["tmux", "kill-session", "-t", session_name],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         proc = subprocess.Popen(
-            ["tmux", "new-session", "-d", "-s", session_name, str(UPDATE_EXE_PATH)]
+            ["tmux", "new-session", "-d", "-s", session_name] + cmd
         )
         linux_sessions.append(session_name)
     elif SESSION_TOOL == "screen":
@@ -302,11 +303,11 @@ def start_update_exe():
         subprocess.run(["screen", "-X", "-S", session_name, "quit"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         proc = subprocess.Popen(
-            ["screen", "-dmS", session_name, str(UPDATE_EXE_PATH)]
+            ["screen", "-dmS", session_name] + cmd
         )
         linux_sessions.append(session_name)
     else:
-        proc = subprocess.Popen([str(UPDATE_EXE_PATH)])
+        proc = subprocess.Popen(cmd)
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"

@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `upload.py` — git tag & push script to trigger CI/CD releases.
 - `.github/workflows/build.yml` — dual-platform CI/CD workflow (Windows + Linux), triggered by `v*` tags, produces `.zip` and `.tar.gz` release artifacts.
 - Shebang lines (`#!/usr/bin/env python3`) added to all Python source files.
+- `requirements.txt` — added PyQt6, PyQt6-WebEngine, and qtpy to support the pywebview Qt backend.
 
 #### Changed
 - `start.py` — tmux/screen session management on Linux with interactive installer prompt if neither is found. Processes tracked by session name, listed with attach commands after startup.

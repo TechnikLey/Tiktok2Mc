@@ -82,10 +82,15 @@ try:
         cfg = yaml.safe_load(f)
 except Exception as e:
     print(f"Error loading config: {e}")
-    input("Press Enter to exit...")
+    wait_for_key()
     sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
+AUTO_MODE = "--auto" in sys.argv
+
+def wait_for_key(msg="Press Enter to exit..."):
+    if not AUTO_MODE:
+        input(msg)
 
 # =========================
 # Helper functions
@@ -230,7 +235,7 @@ def run_update():
             release = response.json()
         except Exception as e:
             print(f"[FAIL] API error: {e}")
-            input("Press Enter to exit...")
+            wait_for_key()
             sys.exit(5)
 
         online_tag = release["tag_name"]
@@ -238,10 +243,12 @@ def run_update():
 
         if not (version.parse(online_tool_v) > version.parse(local["tool"])):
             print(f"[OK] Tool is up to date ({local['tool']}).")
-            input("Press Enter to exit...")
+            wait_for_key()
             sys.exit(5)
 
         if "beta" in online_tag.lower():
+            if AUTO_MODE:
+                sys.exit(5)  # skip beta in auto mode
             choice = input(f"[!] Beta version {online_tag} available. Install? (y/N): ").lower()
             if choice != 'y': sys.exit(5)
 
@@ -319,7 +326,7 @@ def run_update():
         migrate_config_if_needed()
 
     print("\n[OK] Update complete.")
-    input("Press Enter to exit...")
+    wait_for_key()
 
     sys.exit(0)
 
