@@ -35,6 +35,7 @@ That's it. The tool will start the Minecraft server, connect to your TikTok Live
 
 For a detailed walkthrough of all settings, action syntax, overlays, and troubleshooting, see the **[User Guide](./docs/GUIDE.md)**.
 
+For a list of all changes between versions, see the **[Changelog](./docs/CHANGELOG.md)**.
 
 ## Developer Documentation
 

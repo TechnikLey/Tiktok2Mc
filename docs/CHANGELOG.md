@@ -4,18 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+Each release is split into two sections:
+
+- **User** — changes relevant to end users (new features, bug fixes, behavior changes).
+- **Developer** — internal/technical changes relevant to contributors and developers (build system, code structure, tooling).
+
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-04-12
 
 ### User
 
 #### Added
 - Linux support — the tool now runs on Linux in addition to Windows.
 - Each process runs in its own terminal session on Linux for better overview.
+- Interactive setup on first Linux launch — choose to install tmux/screen, continue without, or abort.
 
 #### Fixed
-- overlay now shows a transparent background when opened via browser URL instead of a green screen.
+- Overlay now shows a transparent background when opened via browser URL instead of a green screen.
+- Auto-update no longer falsely reports "Update has been installed" when no update was available.
 
 ### Developer
 
@@ -30,11 +37,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Changed
 - `start.py` — tmux/screen session management on Linux with interactive installer prompt if neither is found. Processes tracked by session name, listed with attach commands after startup.
 - `start.py` — `subprocess.CREATE_NEW_CONSOLE` and `taskkill` calls guarded by `sys.platform == "win32"` checks.
+- `start.py` — display environment variables (`DISPLAY`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`) forwarded to tmux/screen sessions so GUI apps (pywebview) work.
+- `start.py` — updater runs synchronously without tmux/screen to preserve exit code handling.
 - `server.py` — Java auto-discovery via bundled path, then system `PATH`, then automatic install through detected package manager (apt/dnf/pacman/zypper).
 - `registry.py` — plugin discovery uses execute-permission checks on Linux instead of `.exe` file extension matching.
 - `paths.py` — `EXE_SUFFIX` variable replaces all hardcoded `.exe` references.
 - `update.py` — whitelist and binary paths use dynamic `EXE`/`BIN` suffixes per platform.
+- `update.py` — `--auto` flag for non-interactive mode when launched by `start.py` (skips all `input()` prompts).
 - Server binary uses `.bin` suffix on Linux to avoid name collision with system commands.
 
 #### Fixed
 - PyInstaller build errors (stdout + stderr) are now captured and displayed on failure instead of being silenced.
+- Updater exit code `0` (no update) was not handled, causing false "Update installed" message in `start.py`.
