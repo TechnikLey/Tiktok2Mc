@@ -1,25 +1,72 @@
-5655:!tnt 2 0.1 2 Notch
-16111:/give @a minecraft:diamond
+# actions.mca — TikTok Events → Minecraft Commands
+# For more info see GUIDE.md
+# Gift IDs: see core/gifts.json
+
+# =====================================================================
+#  FOLLOW — triggers when someone follows your TikTok account
+# =====================================================================
+
+# Give every player 7 golden apples as a follow reward,
+# AND show an overlay notification on stream for 5 seconds.
+# The ; chains both commands: first the /give, then the >> overlay.
+# {user} is automatically replaced with the follower's TikTok name.
 follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now following you!|5
-5487:/give @a minecraft:totem_of_undying
-8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
-17490:/execute at @a run summon minecraft:ravager ~ ~ ~ x5
+
+# =====================================================================
+#  LIKES — triggers based on accumulated like count
+# =====================================================================
+
+# "likes" fires every N likes (default: every 100, configured in config.yaml).
+# This spawns 2 Creepers at every player's position.
+# x2 = repeat the summon command 2 times = 2 Creepers.
 likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x2
-6560:/execute at @a run summon minecraft:zombie ~ ~ ~ {IsBaby:1} x6
-5879:/item replace entity @a armor.head with minecraft:diamond_helmet; /item replace entity @a armor.chest with minecraft:diamond_chestplate; /item replace entity @a armor.legs with minecraft:diamond_leggings; /item replace entity @a armor.feet with minecraft:diamond_boots
-5509:/execute at @a run summon minecraft:warden ~ ~ ~ x20
-8600:/execute at @a run summon minecraft:wither ~ ~ ~ x15
-6267:!tnt 600 0.1 2 Notch
-7168:/execute at @a run summon minecraft:wither ~ ~ ~ x50
-11046:/clear @a *; /execute at @a run summon minecraft:wither ~ ~ ~ x20; !tnt 20 0.1 2 Notch
-7934:/give @a minecraft:enchanted_golden_apple 2
-7569:/execute at @a run fill ~-7 ~-15 ~-7 ~8 ~0 ~8 minecraft:air replace
-15509:/execute at @a run summon minecraft:wither_skeleton ~ ~ ~ x5
-10604:/give @a minecraft:wind_charge 10
-12988:/item replace entity @a armor.head with minecraft:netherite_helmet; /item replace entity @a armor.chest with minecraft:netherite_chestplate; /item replace entity @a armor.legs with minecraft:netherite_leggings; /item replace entity @a armor.feet with minecraft:netherite_boots
-5897:/clear @a *
-5658:/give @a minecraft:ender_pearl 16
-16558:/execute at @p run fill ~-8 -64 ~-8 ~7 31 ~7 minecraft:air replace; /execute at @p run fill ~-8 32 ~-8 ~7 127 ~7 minecraft:air replace; /execute at @p run fill ~-8 128 ~-8 ~7 223 ~7 minecraft:air replace; /execute at @p run fill ~-8 224 ~-8 ~7 319 ~7 minecraft:air replace
-5774:/clear @a *; /execute at @a run summon minecraft:wither ~ ~ ~ x100; !tnt 100 0.1 2 Notch # ignore-lag
+
+# "like_2" fires at a bigger milestone (default: every 100_000 likes).
+# First clears every player's inventory, then kills all players.
+# The ; chains both commands: /clear runs first, then /kill.
 like_2:/clear @a *; /kill @a
+
+# =====================================================================
+#  GIFTS — triggered by specific TikTok gift IDs
+#  (find all IDs in core/gifts.json)
+# =====================================================================
+
+# --- Rose (Gift ID: 5655) ---
+# Spawns 2 TNT at the player "Notch" using the DelayedTNT plugin.
+# !tnt is a server plugin command (not vanilla Minecraft).
+# Parameters: !tnt <Amount> <Delay> <Fuse> <Player>
+#   Amount = 2      → spawn 2 TNT blocks
+#   Delay  = 0.1    → 0.1 seconds between each TNT spawn
+#   Fuse   = 2      → each TNT explodes after 2 seconds
+#   Player = Notch  → TNT spawns at this player's position
+5655:!tnt 2 0.1 2 Notch
+
+# --- Mamma Mia (Gift ID: 16111) ---
+# Gives every player 1 diamond. Simple vanilla /give command.
+16111:/give @a minecraft:diamond
+
+# --- Rosa (Gift ID: 8913) ---
+# Summons 3 Evokers at every player's position.
+# /execute at @a run ... = run the command at each player's location.
+# x3 = repeat 3 times = 3 Evokers per player.
+8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
+
+# --- Corgi (Gift ID: 6267) ---
+# Spawns 600 TNT using the DelayedTNT plugin (massive explosion!).
+# Same syntax as above: !tnt <Amount> <Delay> <Fuse> <Player>
+6267:!tnt 600 0.1 2 Notch
+
+# --- Money Gun (Gift ID: 7168) ---
+# Summons 50 Withers at every player's position.
+# x50 = repeat 50 times = 50 Withers.
+7168:/execute at @a run summon minecraft:wither ~ ~ ~ x50
+
+# =====================================================================
+#  SPECIAL FUNCTIONS ($)
+# =====================================================================
+
+# --- Flower Show (Gift ID: 16071) ---
+# $random picks one random action from all defined triggers
+# and executes it. It excludes itself, follow and all like triggers
+# Great for chaos/surprise events on stream!
 16071:$random

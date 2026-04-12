@@ -26,6 +26,7 @@ Each version is split into two sections:
 
 #### Changed
 - README and User Guide updated to reflect Linux support, platform-specific start commands, and Java availability per OS.
+- `data/actions.mca` — rewritten with fewer examples, clear comments explaining each line, and a compact header summarizing the format.
 
 ### Developer
 
@@ -58,3 +59,4 @@ Each version is split into two sections:
 #### Docs
 - Dev-Book (DE + EN) `ch03` — documentation across all ch03 chapters rewritten to be generic; prefixes are no longer hardcoded in multiple places but reference one authoritative list in `ch03-02`.
 - Dev-Book (DE + EN) `ch03-02` — added missing `>>` (Overlay) type to the "Command Types Explained" section.
+- `defaults/actions.mca` — reduced from 23 to 8 representative examples covering all prefixes (`/`, `!`, `$`, `>>`), with inline comments explaining each action.
