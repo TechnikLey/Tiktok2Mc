@@ -38,14 +38,6 @@ def _detect_package_manager():
 if not IS_WINDOWS:
     if TMUX_PATH:
         SESSION_TOOL = "tmux"
-        # Forward display env vars so GUI apps (pywebview) work inside tmux sessions
-        for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
-            val = os.environ.get(var)
-            if val:
-                subprocess.run(
-                    ["tmux", "set-environment", "-g", var, val],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
     elif SCREEN_PATH:
         SESSION_TOOL = "screen"
     else:
@@ -178,13 +170,22 @@ def get_visibility(required_level):
 def _sanitize_session_name(name):
     return name.replace(" ", "-").replace("/", "-").lower()
 
-def _build_display_env():
-    """Build env prefix args for forwarding display vars to screen sessions."""
+def _build_display_env_tmux():
+    """Build -e flags for tmux new-session to forward display vars."""
+    args = []
+    for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+        val = os.environ.get(var)
+        if val:
+            args.extend(["-e", f"{var}={val}"])
+    return args
+
+def _build_display_env_screen():
+    """Build env prefix for screen sessions to forward display vars."""
     env_args = []
     for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
         val = os.environ.get(var)
         if val:
-            env_args.extend([f"{var}={val}"])
+            env_args.append(f"{var}={val}")
     if env_args:
         return ["env"] + env_args
     return []
@@ -214,7 +215,7 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
             subprocess.Popen(
-                ["tmux", "new-session", "-d", "-s", session_name] + cmd
+                ["tmux", "new-session", "-d", "-s", session_name] + _build_display_env_tmux() + cmd
             )
             linux_sessions.append(session_name)
             processes[name] = None  # tracked by session name
@@ -225,7 +226,7 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
             subprocess.Popen(
-                ["screen", "-dmS", session_name] + _build_display_env() + cmd
+                ["screen", "-dmS", session_name] + _build_display_env_screen() + cmd
             )
             linux_sessions.append(session_name)
             processes[name] = None
