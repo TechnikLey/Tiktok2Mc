@@ -27,16 +27,19 @@ CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 # -----------------------------
 # Executable paths
 # -----------------------------
-GUI_EXE_PATH = (BASE_DIR / "core" / "gui.exe").resolve()
-SERVER_EXE_PATH = (BASE_DIR / "server.exe").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / "update.exe").resolve()
-APP_EXE_PATH = (BASE_DIR / "core" / "app.exe").resolve()
-PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / "PortChecker.exe").resolve()
-PUBLISHER_EXE_PATH = (BASE_DIR / "core" / "publisher.exe").resolve()
-REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / "registry.exe").resolve()
+EXE = ".exe" if sys.platform == "win32" else ""
+BIN = ".exe" if sys.platform == "win32" else ".bin"
+
+GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{EXE}").resolve()
+SERVER_EXE_PATH = (BASE_DIR / f"server{BIN}").resolve()
+UPDATE_EXE_PATH = (BASE_DIR / f"update{EXE}").resolve()
+APP_EXE_PATH = (BASE_DIR / "core" / f"app{EXE}").resolve()
+PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{EXE}").resolve()
+PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{EXE}").resolve()
+REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{EXE}").resolve()
 APP_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
-update_exe = (BASE_DIR / "update.exe").resolve()
-update_new = (BASE_DIR / "update_new.exe").resolve()
+update_exe = (BASE_DIR / f"update{EXE}").resolve()
+update_new = (BASE_DIR / f"update_new{EXE}").resolve()
 
 # -----------------------------
 # Load configuration
@@ -136,7 +139,7 @@ def replace_updater_if_exists():
             print("[OK] Updater successfully updated.")
             time.sleep(0.5)
         except PermissionError:
-            print("[FAIL] Error: update.exe is still locked.")
+            print(f"[FAIL] Error: {update_exe.name} is still locked.")
 
 def start_update_exe():
     kwargs = {}
