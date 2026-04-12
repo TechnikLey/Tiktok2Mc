@@ -2,4 +2,4 @@ build/
 tools/Java/
 tools/server.jar
 dist/*
-upload.ps1
+upload.py

@@ -44,7 +44,7 @@ Diese Dokumentation richtet sich an Entwickler, die verstehen wollen:
 
 ## Umfang & Fokus
 
-Das Projekt umfasst etwa **3.000–4.000 Zeilen Python-Code**. Wir analysieren nicht jede einzelne Zeile – das würde sinnlos sein.
+Das Projekt umfasst etwa **4.000–4.500 Zeilen Python-Code**. Wir analysieren nicht jede einzelne Zeile – das würde sinnlos sein.
 
 Stattdessen konzentrieren wir uns auf:
 

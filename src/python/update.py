@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # ==================================================
 # update.py - Auto-updater for the Streaming Tool
 # ==================================================
@@ -14,6 +15,7 @@ import requests
 import re
 import time
 import io
+import os
 import yaml
 from pathlib import Path
 from packaging import version
@@ -58,14 +60,17 @@ WHITELIST_DIRS = {
     "plugins/wincounter",
 }
 
+EXE = ".exe" if sys.platform == "win32" else ""
+BIN = ".exe" if sys.platform == "win32" else ".bin"
+
 WHITELIST_FILES = {
     "version.txt",
     "README.md",
     "LICENSE",
-    "update.exe",
-    "server.exe",
-    "start.exe",
-    "plugins/registry.exe"
+    f"update{EXE}",
+    f"server{BIN}",
+    f"start{EXE}",
+    f"plugins/registry{EXE}"
 }
 
 GITHUB_USER = "TechnikLey"
@@ -77,10 +82,15 @@ try:
         cfg = yaml.safe_load(f)
 except Exception as e:
     print(f"Error loading config: {e}")
-    input("Press Enter to exit...")
+    wait_for_key()
     sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
+AUTO_MODE = "--auto" in sys.argv
+
+def wait_for_key(msg="Press Enter to exit..."):
+    if not AUTO_MODE:
+        input(msg)
 
 # =========================
 # Helper functions
@@ -225,7 +235,7 @@ def run_update():
             release = response.json()
         except Exception as e:
             print(f"[FAIL] API error: {e}")
-            input("Press Enter to exit...")
+            wait_for_key()
             sys.exit(5)
 
         online_tag = release["tag_name"]
@@ -233,10 +243,12 @@ def run_update():
 
         if not (version.parse(online_tool_v) > version.parse(local["tool"])):
             print(f"[OK] Tool is up to date ({local['tool']}).")
-            input("Press Enter to exit...")
+            wait_for_key()
             sys.exit(5)
 
         if "beta" in online_tag.lower():
+            if AUTO_MODE:
+                sys.exit(5)  # skip beta in auto mode
             choice = input(f"[!] Beta version {online_tag} available. Install? (y/N): ").lower()
             if choice != 'y': sys.exit(5)
 
@@ -266,18 +278,17 @@ def run_update():
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
         print(f"\ud83d\udd04 New updater found ({zip_v['updater']}).")
-        new_up_src = extracted_root_path / "update.exe"
+        new_up_src = extracted_root_path / f"update{EXE}"
         
         if new_up_src.exists():
-            new_up_dest = BASE_DIR / "update_new.exe"
+            new_up_dest = BASE_DIR / f"update_new{EXE}"
             shutil.copy2(new_up_src, new_up_dest)
             # Save only updater version
             save_versions(local["tool"], zip_v["updater"])
             
             print("\ud83d\ude80 Starting new updater and resuming tool update...")
-            # execv replaces the current process with update_new.exe
+            # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
-            import os
             os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
             sys.exit(0)  # Safety fallback
 
@@ -298,7 +309,7 @@ def run_update():
 
         for file in files:
             if rel_path_str == "." and file not in WHITELIST_FILES: continue
-            if file.lower() == "update.exe": continue
+            if file.lower() == f"update{EXE}".lower(): continue
             if file.lower() == "config.yaml": continue
             
             src = root / file
@@ -315,7 +326,7 @@ def run_update():
         migrate_config_if_needed()
 
     print("\n[OK] Update complete.")
-    input("Press Enter to exit...")
+    wait_for_key()
 
     sys.exit(0)
 

@@ -44,7 +44,7 @@ This documentation is aimed at developers who want to understand:
 
 ## Scope & Focus
 
-The project comprises roughly **3,000–4,000 lines of Python code**. We don't analyze every single line – that would be pointless.
+The project comprises roughly **4,000–4,500 lines of Python code**. We don't analyze every single line – that would be pointless.
 
 Instead, we focus on:
 

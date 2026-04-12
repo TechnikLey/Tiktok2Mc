@@ -1,5 +1,8 @@
+#!/usr/bin/env python3
 from pathlib import Path
 import sys
+
+EXE_SUFFIX = ".exe" if sys.platform == "win32" else ""
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -12,7 +15,7 @@ def get_root_dir() -> Path:
 
 def get_base_file() -> Path:
     base = get_base_dir()
-    return (base / "main.exe").resolve()
+    return (base / f"main{EXE_SUFFIX}").resolve()
 
 def get_config_file() -> Path:
     root = get_root_dir()

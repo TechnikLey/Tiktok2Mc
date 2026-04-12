@@ -98,6 +98,9 @@ elif cmd.startswith("!"):
     kind = "plugin"
 elif cmd.startswith("$"):
     kind = "built_in"
+elif cmd.startswith(">>"):
+    kind = "overlay"
+# ... more prefixes can be added here
 ```
 
 **Simple, efficient, robust!**

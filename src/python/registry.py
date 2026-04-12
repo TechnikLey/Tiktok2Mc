@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # ==================================================
 # registry.py - Plugin discovery & registration
 # ==================================================
@@ -13,6 +14,7 @@ from pathlib import Path
 import json
 import os
 import subprocess
+import sys
 import threading
 from typing import Any
 from core.paths import get_base_dir
@@ -180,8 +182,11 @@ def register_plugin(config: dict[str, Any] | AppConfig) -> AppConfig:
 # ==================================================
 
 def find_main_executables(base_dir: Path) -> list[Path]:
-    return sorted(base_dir.rglob("main.exe"))
-
+    if sys.platform == "win32":
+        return sorted(base_dir.rglob("main.exe"))
+    else:
+        candidates = sorted(base_dir.rglob("main"))
+        return [p for p in candidates if p.is_file() and os.access(p, os.X_OK)]
 
 def _fingerprint(path: Path) -> dict[str, int]:
     stat = path.stat()

@@ -2,7 +2,7 @@
 
 Connect your TikTok Live stream to a Minecraft server. Gifts, follows, and likes from your viewers trigger real-time commands in the game.
 
-The tool includes a ready-to-use Minecraft server (1.21.11) and a bundled Java runtime -- no additional installations required.
+The tool includes a ready-to-use Minecraft server (1.21.11). On Windows, a bundled Java runtime is included -- no additional installations required. On Linux, the tool will locate or install Java automatically.
 
 ## Features
 
@@ -16,7 +16,7 @@ The tool includes a ready-to-use Minecraft server (1.21.11) and a bundled Java r
 
 ## Requirements
 
-- **OS:** Windows (Linux/macOS support planned)
+- **OS:** Windows or Linux
 - **RAM:** 12 GB minimum recommended (the Minecraft server uses up to 4 GB by default, adjustable)
 
 ## Quick Start
@@ -26,7 +26,7 @@ The tool includes a ready-to-use Minecraft server (1.21.11) and a bundled Java r
 3. Find `Password: ABC1234` and change it to any password you like. This is the password for the connection between the tool and the Minecraft server.
 4. Save the file.
 5. Open `data/actions.mca` and set up your actions. This file defines what happens in Minecraft when viewers send gifts, follow, or hit like milestones. There are already some example actions included, but you should adjust them to your liking. See the [User Guide](./docs/GUIDE.md#setting-up-actions) for a full explanation.
-6. Double-click `start.exe` to launch everything.
+6. Run `start.exe` (Windows) or `./start` (Linux) to launch everything.
 
 That's it. The tool will start the Minecraft server, connect to your TikTok Live, and begin listening for events.
 
@@ -35,6 +35,7 @@ That's it. The tool will start the Minecraft server, connect to your TikTok Live
 
 For a detailed walkthrough of all settings, action syntax, overlays, and troubleshooting, see the **[User Guide](./docs/GUIDE.md)**.
 
+For a list of all changes between versions, see the **[Changelog](./docs/CHANGELOG.md)**.
 
 ## Developer Documentation
 
@@ -48,7 +49,7 @@ The developer documentation is best viewed online:
 > - [English-Dev-Documentation](./docs/dev-book-en/src/Introduction.md)
 > - [Deutsche-Dev-Dokumentation](./docs/dev-book-de/src/Introduction.md)
 
-> [!NOTE]
+> [!WARNING]
 > The developer documentation may not always be fully up to date.
 
 ## License

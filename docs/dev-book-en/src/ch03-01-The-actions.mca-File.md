@@ -14,7 +14,7 @@ TRIGGER:<TYPE>COMMAND xNUMBER
 ```
 
 - **TRIGGER** = name or ID (e.g. `follow`, `8913`)
-- **TYPE** = prefix: `/` (vanilla), `!` (Plugin/Custom), `$` (special function)
+- **TYPE** = prefix that determines the command type — see [Syntax & Commands](./ch03-02-Structure.md))
 - **COMMAND** = The command to execute
 - **xNUMBER** = Optional: Repeat command N times
 
@@ -49,7 +49,7 @@ for line_num, original_line in enumerate(f, 1):
         print(f"[ERROR] Invalid command without prefix on line {line_num}: {cmd}")
 ```
 
-**Every command needs a prefix** (`/`, `!` or `$`). Lines without a valid prefix are skipped at startup with an error message.
+**Every command needs a valid prefix.** The list of all supported prefixes can be found in the chapter [Syntax & Commands](./ch03-02-Structure.md). Lines without a valid prefix are skipped at startup with an error message.
 
 ---
 

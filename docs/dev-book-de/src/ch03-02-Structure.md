@@ -11,7 +11,7 @@ trigger_name:<type>command xAnzahl
 │            │     │       │
 │            │     │       └─→ Wiederholung (optional)
 │            │     └───────→ Der eigentliche Befehl
-│            └───────────→ Präfix: / ! oder $
+│            └───────────→ Präfix (bestimmt den Command-Typ)
 └─────────────→ Der Name, den Event-Handler nutzen
 ```
 
@@ -154,7 +154,9 @@ Können in `config.yaml` konfiguriert werden.
 
 ### Command-Typen erklärt
 
-**Typ 1: Vanilla Commands (`/`)**
+Die folgenden Command-Typen werden aktuell unterstützt. Neue Typen können in Zukunft hinzukommen — die jeweils gültige Liste findest du immer hier.
+
+**Typ: Vanilla Commands (`/`)**
 
 ```
 /give @a minecraft:diamond
@@ -167,7 +169,7 @@ Beginnt mit `/` → Standard Minecraft-Befehl. Wird in eine `.mcfunction`-Datei 
 
 ---
 
-**Typ 2: Plugin Commands (`!`)**
+**Typ: Plugin Commands (`!`)**
 
 ```
 5655:!tnt 2 0.1 2 Notch
@@ -180,7 +182,7 @@ Beginnt mit `!` → Custom-Befehl. Wird **direkt per RCON** an den Server gesend
 
 ---
 
-**Typ 3: Spezial-Funktionen (`$`)**
+**Typ: Spezial-Funktionen (`$`)**
 
 ```
 16071:$random
@@ -191,6 +193,20 @@ Beginnt mit `$` → Interne Spezialfunktion des Streaming-Tools. Aktuell ist nur
 `$random` wählt einen **zufälligen anderen Trigger** aus und führt ihn aus. Dabei werden Endlos-Schleifen verhindert: Trigger mit `$random` sowie Basis-Trigger wie `likes`, `like_2` und `follow` werden automatisch ausgeschlossen.
 
 → [Details zu $random → Funktion des $random Commands](./ch03-05-Function-of-the-$random-Command.md)
+
+---
+
+**Typ: Overlay-Ausgabe (`>>`)**
+
+```
+follow:>>Neuer Follower!|{user} folgt dir jetzt!|5
+```
+
+Beginnt mit `>>` → Text wird als Overlay im Stream eingeblendet, **kein** Minecraft-Command. Format: `Titel|Untertitel|Dauer`, getrennt durch `|`.
+
+- **Untertitel** und **Dauer** sind optional (Standard: 3 Sekunden)
+- `{user}` wird automatisch durch den Namen des Auslösers ersetzt
+- `xANZAHL` wird hier **nicht** unterstützt
 
 ---
 
@@ -284,7 +300,7 @@ follow:/give @a diamond x          # ← x ohne Zahl
 | Concept | Erklärung |
 |---------|-----------|
 | **Trigger** | Gift-ID, `follow`, `likes`, `like_2` |
-| **Command-Typen** | `/` (Vanilla → mcfunction), `!` (Plugin → RCON), `$` (Spezial) |
+| **Command-Typen** | Präfix bestimmt den Typ (siehe [Command-Typen erklärt](#command-typen-erklärt)) |
 | **xANZAHL** | Command N-mal wiederholen |
 | **Semikolon** | Mehrere Commands in einer Zeile |
 | **Kommentare** | `#` zum Deaktivieren/Dokumentieren |

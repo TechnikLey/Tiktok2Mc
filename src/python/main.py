@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # ==================================================
 # main.py - TikTok Live to Minecraft bridge
 # ==================================================
@@ -23,7 +24,7 @@ import random
 import time
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics
@@ -50,6 +51,7 @@ DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
 LIKE_GOAL_PORT = 9797
 LIKE_TRIGGERS = []
+RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
 
 # --- Queues & throttling (for optimal RCON performance) ---
 trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -84,6 +86,13 @@ LIKEGOAL_INTERVAL = 3
 
 
 DISABLE_TIKTOK_CONNECT = False  # Toggle for disabling TikTok connection
+
+# --- Comment commands ---
+COMMENT_CMD_ENABLE = False
+COMMENT_CMD_PREFIX = "!"
+COMMENT_CMD_ROLES = ["moderator"]
+COMMENT_CMD_WHITELIST = []  # Only these commands allowed (empty = all allowed)
+COMMENT_CMD_BLACKLIST = []  # These commands are blocked
 app = Flask(__name__)
 
 log = logging.getLogger('werkzeug')
@@ -95,7 +104,8 @@ log.setLevel(logging.ERROR)
 
 def load_config():
     """Loads configuration values from the YAML config file."""
-    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS
+    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, RANDOM_EXCLUDE
+    global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
 
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
@@ -113,8 +123,29 @@ def load_config():
         OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
         LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
 
+        raw_exclude = config.get("Gifts", {}).get("random_exclude", ["likes", "like_2", "follow"])
+        if isinstance(raw_exclude, list):
+            RANDOM_EXCLUDE = [str(e).strip() for e in raw_exclude if str(e).strip()]
+        else:
+            RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
+
         LIKE_TRIGGERS = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
-        
+
+        comment_cmd_cfg = config.get("CommentCommands", {})
+        COMMENT_CMD_ENABLE = bool(comment_cmd_cfg.get("Enable", False))
+        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "!"))
+        raw_roles = comment_cmd_cfg.get("AllowedRoles", ["moderator"])
+        if isinstance(raw_roles, list):
+            COMMENT_CMD_ROLES = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
+        else:
+            COMMENT_CMD_ROLES = ["moderator"]
+        raw_whitelist = comment_cmd_cfg.get("Whitelist", [])
+        COMMENT_CMD_WHITELIST = [str(c).strip() for c in raw_whitelist if str(c).strip()] if isinstance(raw_whitelist, list) else []
+        raw_blacklist = comment_cmd_cfg.get("Blacklist", [])
+        COMMENT_CMD_BLACKLIST = [str(c).strip() for c in raw_blacklist if str(c).strip()] if isinstance(raw_blacklist, list) else []
+        if COMMENT_CMD_ENABLE and not COMMENT_CMD_WHITELIST and not COMMENT_CMD_BLACKLIST:
+            print("[WARN] CommentCommands: Whitelist and Blacklist are both empty — ALL Minecraft commands are allowed!")
+
         DATAPACK_ROOT = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
         return DATAPACK_ROOT.exists() and DATAPACK_ROOT.is_dir()
     except Exception as e:
@@ -242,7 +273,7 @@ def generate_datapack():
             f.write('{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}')
 
         # === Build possible_random_actions (safe pool for $random) ===
-        exclude = {"likes", "like_2", "follow"}
+        exclude = set(RANDOM_EXCLUDE)
         random_sources = {n for n, acts in script_actions.items() if "random" in acts}
         exclude |= random_sources
         possible_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
@@ -375,11 +406,25 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 print(f"[HOOK] [WARN] Unknown script action: '{action}'") 
 
     # --- 0. OVERLAY TEXT ---
+    # Allow {comment} as a placeholder for overlay text
+    comment_text = None
+    # If source_user is a dict, a comment text can be passed (for comment triggers)
+    if isinstance(source_user, dict):
+        comment_text = source_user.get('comment', '')
+        user_display = source_user.get('user', '')
+    else:
+        user_display = source_user
+
     if name in overlay_actions:
         for raw_body in overlay_actions[name]:
             parts = raw_body.split("|")
-            title = parts[0].replace("{user}", source_user) if len(parts) > 0 else ""
-            subtitle = parts[1].replace("{user}", source_user) if len(parts) > 1 else ""
+            # {user} ersetzen
+            title = parts[0].replace("{user}", user_display) if len(parts) > 0 else ""
+            subtitle = parts[1].replace("{user}", user_display) if len(parts) > 1 else ""
+            # {comment} ersetzen, falls vorhanden
+            if comment_text is not None:
+                title = title.replace("{comment}", comment_text)
+                subtitle = subtitle.replace("{comment}", comment_text)
             try:
                 duration = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 3
             except (ValueError, IndexError):
@@ -822,6 +867,73 @@ def create_client(user):
                     pass
         except Exception as e:
             print(f"[EVENT ERROR] Error in like handling: {e}")
+
+    # ========================
+    # Join events
+    # ========================
+    @client.on(JoinEvent)
+    def on_join(event):
+        username = get_safe_username(event.user)
+        if "join" in valid_functions:
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("join", username))
+
+    # =========================
+    # COMMENT events
+    # =========================
+    @client.on(CommentEvent)
+    def on_comment(event):
+        username = get_safe_username(event.user)
+        comment_text = getattr(event, 'comment', '')
+
+        is_super_fan = getattr(event, 'user_is_super_fan', None)
+
+        in_fanclub = False
+        fan_ticket_count = getattr(event.user, 'fan_ticket_count', None)
+        fans_club = getattr(event.user, 'fans_club', None)
+        fans_club_info = getattr(event.user, 'fans_club_info', None)
+        if fan_ticket_count and fan_ticket_count > 0:
+            in_fanclub = True
+        elif hasattr(fans_club, 'club_name') or hasattr(fans_club_info, 'club_name'):
+            in_fanclub = True
+
+        is_moderator = getattr(event.user, 'is_moderator', None)
+
+        print(f"[COMMENT] {username}: {comment_text}")
+        print(f"  Superfan: {is_super_fan}")
+        print(f"  Fanclub-Mitglied: {in_fanclub}")
+        print(f"  Moderator: {is_moderator}")
+
+        # --- Comment commands ---
+        if COMMENT_CMD_ENABLE and COMMENT_CMD_PREFIX and comment_text.startswith(COMMENT_CMD_PREFIX):
+            cmd_text = comment_text[len(COMMENT_CMD_PREFIX):].strip()
+            if cmd_text:
+                allowed = False
+                if "all" in COMMENT_CMD_ROLES:
+                    allowed = True
+                elif "moderator" in COMMENT_CMD_ROLES and is_moderator:
+                    allowed = True
+                elif "superfan" in COMMENT_CMD_ROLES and is_super_fan:
+                    allowed = True
+                elif "fanclub" in COMMENT_CMD_ROLES and in_fanclub:
+                    allowed = True
+
+                if allowed:
+                    base_cmd = cmd_text.split()[0].lower()
+                    # Whitelist: if not empty, only commands whose first word is listed pass
+                    if COMMENT_CMD_WHITELIST and base_cmd not in COMMENT_CMD_WHITELIST:
+                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not in whitelist")
+                    # Blacklist: if not empty, block commands whose first word is listed
+                    elif COMMENT_CMD_BLACKLIST and base_cmd in COMMENT_CMD_BLACKLIST:
+                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked by blacklist")
+                    else:
+                        print(f"[COMMENT CMD] {username} -> {cmd_text}")
+                        MAIN_LOOP.call_soon_threadsafe(rcon_queue.put_nowait, ([cmd_text], username))
+                else:
+                    print(f"[COMMENT CMD] {username} has no permission (roles: {COMMENT_CMD_ROLES})")
+
+        if "comment" in valid_functions:
+            # For overlay: allow {comment} as a placeholder
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
 
     # =========================
     # CONNECT event

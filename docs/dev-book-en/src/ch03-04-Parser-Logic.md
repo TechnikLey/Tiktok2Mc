@@ -13,7 +13,7 @@ Processing of the `actions.mca` file takes place **at startup**:
    ↓
 4. Parser parses each line:
    - Read trigger
-   - Determine command type (/, !, $)
+   - Determine command type
    - Extract repeats (x)
    ↓
 5. Build in-memory dictionary:
@@ -73,6 +73,10 @@ def parse_actions(filename):
             elif cmd.startswith("$"):
                 cmd_type = "built_in"
                 body = cmd[1:].strip()
+            elif cmd.startswith(">>"):
+                cmd_type = "overlay"
+                body = cmd[2:].strip()
+            # ... more prefixes can be added here
             else:
                 print(f"[ERROR] Line {line_num}: Invalid prefix")
                 continue
@@ -94,9 +98,12 @@ def parse_actions(filename):
 
 ### Command Type Differentiation
 
-When parsing, a distinction is made between 3 types:
+When parsing, a distinction is made between the following types.
+The complete and current list can be found in [Syntax & Commands → Command Types Explained](./ch03-02-Structure.md#command-types-explained).
 
-**Type 1: Vanilla (`/`)**
+Here is the short version for the code:
+
+**Type: Vanilla (`/`)**
 
 ```python
 if cmd.startswith("/"):
@@ -109,7 +116,7 @@ if cmd.startswith("/"):
 
 ---
 
-**Type 2: Plugin (`!`)**
+**Type: Plugin (`!`)**
 
 ```python
 elif cmd.startswith("!"):
@@ -122,7 +129,7 @@ elif cmd.startswith("!"):
 
 ---
 
-**Type 3: Built-in (`$`)**
+**Type: Built-in (`$`)**
 
 ```python
 elif cmd.startswith("$"):
@@ -132,6 +139,19 @@ elif cmd.startswith("$"):
 
 → Processed by the program itself
 → Example: `$random` chooses another trigger
+
+---
+
+**Type: Overlay (`>>`)**
+
+```python
+elif cmd.startswith(">>"):
+    kind = "overlay"
+    body = cmd[2:]  # Remove ">>"
+```
+
+→ Text is displayed as an overlay on stream
+→ Format: `Title|Subtitle|Duration`
 
 ---
 
@@ -172,6 +192,12 @@ elif kind == "plugin":
 elif kind == "script":
     # Interpreted by the program (e.g. $random)
     execute_built_in(body, source_user)
+
+elif kind == "overlay":
+    # Display text as overlay on stream
+    show_overlay(body)
+
+# ... more types follow the same pattern
 ```
 
 The `kind` distinction determines **how** the command is executed!
@@ -187,7 +213,7 @@ The cost of an action depends on:
 - E.g. `/summon` takes longer than `/say`
 - E.g. `!tnt 1000` takes longer than `!tnt 1`
 
-Type (/, !, $) doesn't matter from a performance perspective!
+The prefix type doesn't matter from a performance perspective!
 <br>It depends on the command.
 
 ---
@@ -196,7 +222,7 @@ Type (/, !, $) doesn't matter from a performance perspective!
 
 1. **Parser** disassembles actions.mca once at startup
 2. **In-memory dictionary** is built
-3. **Command types** are classified (/, !, $)
+3. **Command types** are classified (see [Command Types Explained](./ch03-02-Structure.md#command-types-explained))
 4. **Runtime** = fast dictionary lookups
 5. **No parsing at runtime** = more performance
 
