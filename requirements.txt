@@ -14,3 +14,8 @@ mcrcon==0.7.0
 pyinstaller==6.13.0
 packaging==26.0
 ruamel.yaml==0.19.1
+
+# === PYWEBVIEW QT BACKEND ===
+PyQt6==6.7.1
+PyQt6-WebEngine==6.7.0
+qtpy==2.4.1

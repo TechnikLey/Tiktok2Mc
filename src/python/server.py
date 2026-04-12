@@ -2,6 +2,7 @@
 import subprocess
 import yaml
 import sys
+import shutil
 from pathlib import Path
 from core.paths import get_base_dir
 
@@ -17,9 +18,46 @@ from core.paths import get_base_dir
 BASE_DIR = get_base_dir()
 
 SERVER_DIR = (BASE_DIR / "server" / "mc").resolve()
-JAVA_EXE = (BASE_DIR / "server" / "java" / "bin" / "java.exe").resolve()
 CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 SERVER_JAR = (SERVER_DIR / "server.jar").resolve()
+
+# Use bundled Java on Windows, system Java on Linux
+_bundled_java = (BASE_DIR / "server" / "java" / "bin" / "java.exe").resolve()
+if _bundled_java.exists():
+    JAVA_EXE = _bundled_java
+else:
+    _system_java = shutil.which("java")
+    if _system_java:
+        JAVA_EXE = Path(_system_java).resolve()
+    else:
+        print("Java not found. Attempting to install...")
+        _install_cmds = {
+            "apt": ["sudo", "apt", "install", "-y", "openjdk-21-jre-headless"],
+            "dnf": ["sudo", "dnf", "install", "-y", "java-21-openjdk-headless"],
+            "pacman": ["sudo", "pacman", "-S", "--noconfirm", "jre-openjdk"],
+            "zypper": ["sudo", "zypper", "install", "-y", "java-21-openjdk-headless"],
+        }
+        _installed = False
+        for pkg_mgr, cmd in _install_cmds.items():
+            if shutil.which(pkg_mgr):
+                print(f"Using {pkg_mgr} to install Java...")
+                result = subprocess.run(cmd)
+                if result.returncode == 0 and shutil.which("java"):
+                    JAVA_EXE = Path(shutil.which("java")).resolve()
+                    _installed = True
+                    print(f"Java installed successfully: {JAVA_EXE}")
+                break
+
+        if not _installed:
+            print("\nError: Java could not be installed automatically.")
+            print("Please install Java 21 manually:")
+            print("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
+            print("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
+            print("  Arch Linux    : sudo pacman -S jre-openjdk")
+            print("  openSUSE      : sudo zypper install java-21-openjdk-headless")
+            print("  macOS         : brew install openjdk@21")
+            sys.exit(1)
+
 SERVER_PROPERTIES = (SERVER_DIR / "server.properties").resolve()
 IGNORE_RCON_FILE = (BASE_DIR / "config" / ".ignore_rcon_warning").resolve()
 PLUGINS_DIR = (SERVER_DIR / "plugins").resolve()
