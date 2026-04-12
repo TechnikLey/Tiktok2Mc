@@ -406,11 +406,25 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 print(f"[HOOK] [WARN] Unknown script action: '{action}'") 
 
     # --- 0. OVERLAY TEXT ---
+    # Allow {comment} as a placeholder for overlay text
+    comment_text = None
+    # If source_user is a dict, a comment text can be passed (for comment triggers)
+    if isinstance(source_user, dict):
+        comment_text = source_user.get('comment', '')
+        user_display = source_user.get('user', '')
+    else:
+        user_display = source_user
+
     if name in overlay_actions:
         for raw_body in overlay_actions[name]:
             parts = raw_body.split("|")
-            title = parts[0].replace("{user}", source_user) if len(parts) > 0 else ""
-            subtitle = parts[1].replace("{user}", source_user) if len(parts) > 1 else ""
+            # {user} ersetzen
+            title = parts[0].replace("{user}", user_display) if len(parts) > 0 else ""
+            subtitle = parts[1].replace("{user}", user_display) if len(parts) > 1 else ""
+            # {comment} ersetzen, falls vorhanden
+            if comment_text is not None:
+                title = title.replace("{comment}", comment_text)
+                subtitle = subtitle.replace("{comment}", comment_text)
             try:
                 duration = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 3
             except (ValueError, IndexError):
@@ -918,7 +932,8 @@ def create_client(user):
                     print(f"[COMMENT CMD] {username} has no permission (roles: {COMMENT_CMD_ROLES})")
 
         if "comment" in valid_functions:
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", username))
+            # For overlay: allow {comment} as a placeholder
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
 
     # =========================
     # CONNECT event

@@ -27,7 +27,8 @@ join:>>Welcome!|{user} just joined the stream!|3
 # This fires for EVERY comment — can be very frequent on active streams.
 # Use with caution: avoid expensive or spammy commands here.
 # The example below is disabled (#). Remove the # to activate it.
-#comment:>>New comment!|{user} commented!|2
+# You can use {comment} to show the comment text in the overlay:
+#comment:>>{user} wrote:|{comment}|3
 
 # =====================================================================
 #  LIKES — triggers based on accumulated like count

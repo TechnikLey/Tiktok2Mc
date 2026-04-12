@@ -685,7 +685,17 @@ Set either value to `0` to disable that animation (instant appear or disappear).
 - **Duration** -- How many seconds the text stays visible (optional, default: 3).
 - **`|`** -- A pipe character separates the three parts from each other.
 
-Use `{user}` as a placeholder -- it will be replaced with the TikTok username of the viewer who triggered the action.
+You can use the following placeholders in overlay text:
+
+- `{user}` — replaced with the TikTok username of the viewer who triggered the action.
+- `{comment}` — replaced with the comment text (only for the `comment` trigger).
+
+Example:
+
+```
+comment:>>{user} wrote:|{comment}|3
+```
+This will show the username and the comment text in the overlay when someone writes a comment.
 
 **Examples:**
 
@@ -717,6 +727,27 @@ This gives golden apples to all players **and** shows the overlay text at the sa
 ---
 
 ## Maintenance
+
+### MCA VS Code Extension (mca.vsix)
+
+To make editing `.mca` files easier and safer, a custom VS Code extension (`mca.vsix`) is included in this project.
+
+**Features:**
+- Syntax highlighting for `.mca` files (TikTok event → Minecraft action mapping)
+- Error highlighting for common mistakes (missing colons, wrong prefixes, etc.)
+- Colorful formatting for triggers, commands, and comments
+- Helps prevent mistakes and makes writing actions much easier
+
+**Installation Tutorial:**
+1. Open VS Code.
+2. Go to the Extensions view (Ctrl+Shift+X).
+3. Click the three-dot menu ("...") in the top right and select "Install from VSIX...".
+4. Select the `mca.vsix` file from this repository in `core/assets/mca.vsix`.
+5. Open any `.mca` file in like `data/actions.mca`. You should now see colors and error squiggles.
+
+This extension is highly recommended for anyone editing `.mca` files, as it helps avoid formatting errors and speeds up writing new actions.
+
+---
 
 ### Ports Used by the Tool
 

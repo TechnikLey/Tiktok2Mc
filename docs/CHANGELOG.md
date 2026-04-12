@@ -23,6 +23,7 @@ Each version is split into two sections:
 - `comment` trigger — fires every time a viewer writes a comment in the live chat.
 - `join` trigger — fires every time a viewer joins the live stream.
 - `CommentCommands` config option — lets viewers send Minecraft commands via chat comments. Configurable prefix, role restrictions (`all`, `moderator`, `superfan`, `fanclub`), whitelist, and blacklist.
+- `mca.vsix` extension — adds syntax highlighting and error checking for `.mca` files in VS Code.
 
 #### Fixed
 - Overlay now shows a transparent background when opened via browser URL instead of a green screen.
