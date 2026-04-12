@@ -19,6 +19,7 @@ Each version is split into two sections:
 - Linux support — the tool now runs on Linux in addition to Windows.
 - Each process runs in its own terminal session on Linux for better overview.
 - Interactive setup on first Linux launch — choose to install tmux/screen, continue without, or abort.
+- `$random` exclusion list is now configurable in `config.yaml` under `Gifts > random_exclude` instead of being hardcoded.
 
 #### Fixed
 - Overlay now shows a transparent background when opened via browser URL instead of a green screen.
@@ -59,4 +60,6 @@ Each version is split into two sections:
 #### Docs
 - Dev-Book (DE + EN) `ch03` — documentation across all ch03 chapters rewritten to be generic; prefixes are no longer hardcoded in multiple places but reference one authoritative list in `ch03-02`.
 - Dev-Book (DE + EN) `ch03-02` — added missing `>>` (Overlay) type to the "Command Types Explained" section.
+- Dev-Book (DE + EN) `ch03-05` — updated `$random` documentation to reflect configurable exclusion list via `config.yaml`.
 - `defaults/actions.mca` — reduced from 23 to 8 representative examples covering all prefixes (`/`, `!`, `$`, `>>`), with inline comments explaining each action.
+- `GUIDE.md` — `$random` section updated with `random_exclude` config example.

@@ -4,7 +4,7 @@
 # This file is a template.
 # Personal settings should be changed in 'config.yaml' only.
 # -------------------------------------------------------------------------
-config_version: 1
+config_version: 2
 
 # -------------------------------------------------------------------------
 # IMPORTANT FOR BEGINNERS:
@@ -99,6 +99,15 @@ Gifts:
 
   # Web server port used for the OBS overlay.
   LIKE_GOAL_PORT: 9797
+
+  # Triggers excluded from $random selection.
+  # These triggers will never be chosen when $random is executed.
+  # Triggers that contain $random themselves are always excluded automatically.
+  # Example: ["likes", "like_2", "follow"]
+  random_exclude:
+    - likes
+    - like_2
+    - follow
 
 # -------------------------------------------------------------------------
 # SYSTEM & CONSOLE CONTROL

@@ -51,6 +51,7 @@ DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
 LIKE_GOAL_PORT = 9797
 LIKE_TRIGGERS = []
+RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
 
 # --- Queues & throttling (for optimal RCON performance) ---
 trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -96,7 +97,7 @@ log.setLevel(logging.ERROR)
 
 def load_config():
     """Loads configuration values from the YAML config file."""
-    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS
+    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, RANDOM_EXCLUDE
 
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
@@ -113,6 +114,12 @@ def load_config():
         MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
         OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
         LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
+
+        raw_exclude = config.get("Gifts", {}).get("random_exclude", ["likes", "like_2", "follow"])
+        if isinstance(raw_exclude, list):
+            RANDOM_EXCLUDE = [str(e).strip() for e in raw_exclude if str(e).strip()]
+        else:
+            RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
 
         LIKE_TRIGGERS = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
         
@@ -243,7 +250,7 @@ def generate_datapack():
             f.write('{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}')
 
         # === Build possible_random_actions (safe pool for $random) ===
-        exclude = {"likes", "like_2", "follow"}
+        exclude = set(RANDOM_EXCLUDE)
         random_sources = {n for n, acts in script_actions.items() if "random" in acts}
         exclude |= random_sources
         possible_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]

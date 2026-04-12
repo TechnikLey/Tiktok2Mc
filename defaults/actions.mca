@@ -66,7 +66,8 @@ like_2:/clear @a *; /kill @a
 # =====================================================================
 
 # --- Flower Show (Gift ID: 16071) ---
-# $random picks one random action from all defined triggers
-# and executes it. It excludes itself, follow and all like triggers
-# Great for chaos/surprise events on stream!
+# $random picks one random action from all defined triggers above
+# and executes it. Triggers containing $random are always excluded.
+# Additional exclusions are configurable in config.yaml under:
+#   Gifts > random_exclude (default: likes, like_2, follow)
 16071:$random

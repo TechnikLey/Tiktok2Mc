@@ -67,8 +67,10 @@ likes:$random  ← Starts the random selection
 
 > [!NOTE]
 > The command `/say Welcome!` will never be executed,
-> since all `follow`, `like` and the `$random` trigger itself
-> are excluded from random selection.
+> since `follow` is in the exclusion list by default.
+> Which triggers are excluded is configurable in `config.yaml` under
+> `Gifts > random_exclude`.
+> Triggers that contain `$random` themselves are **always** excluded automatically.
 
 ---
 
@@ -76,14 +78,23 @@ likes:$random  ← Starts the random selection
 
 **1. Self-recursion avoided**
 
-```python
-# $random will NOT be included in the list
-possible_triggers = get_all_triggers()  # Filters out $random itself!
+Triggers that contain `$random` themselves are **always** automatically removed from the pool — regardless of configuration.
+
+**2. Exclusion list is configurable**
+
+In `config.yaml` under `Gifts > random_exclude` you can define which triggers are additionally excluded:
+
+```yaml
+Gifts:
+  random_exclude:
+    - likes
+    - like_2
+    - follow
 ```
 
-Otherwise: `likes:$random` could choose `$random` again = endless loop!
+By default, `likes`, `like_2`, and `follow` are excluded. You can adjust this list as needed.
 
-**2. All triggers are equally likely**
+**3. All triggers are equally likely**
 
 ```python
 chosen = random.choice(possible_triggers)  # Uniform distribution

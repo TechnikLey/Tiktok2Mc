@@ -279,7 +279,19 @@ Use `$random` to trigger a random action from your list:
 16071:$random
 ```
 
-When this gift is sent, the tool picks a random action from all your other defined actions (excluding follow triggers, like triggers, and itself) and runs it.
+When this gift is sent, the tool picks a random action from all your other defined actions and runs it. Triggers that contain `$random` themselves are always excluded automatically to prevent infinite loops.
+
+By default, `follow`, `likes`, and `like_2` are also excluded. You can change this in `config/config.yaml`:
+
+```yaml
+Gifts:
+  random_exclude:
+    - likes
+    - like_2
+    - follow
+```
+
+Add or remove trigger names from this list to control which actions `$random` can never pick.
 
 ### Like Triggers
 
