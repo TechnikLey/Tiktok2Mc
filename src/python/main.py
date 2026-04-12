@@ -24,7 +24,7 @@ import random
 import time
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics
@@ -830,6 +830,32 @@ def create_client(user):
                     pass
         except Exception as e:
             print(f"[EVENT ERROR] Error in like handling: {e}")
+
+    # =========================
+    # COMMENT events
+    # =========================
+    @client.on(CommentEvent)
+    def on_comment(event):
+        username = get_safe_username(event.user)
+        comment_text = getattr(event, 'comment', '')
+        is_super_fan = False
+        try:
+            is_super_fan = getattr(event, 'user_is_super_fan', False)
+        except Exception:
+            pass
+        print(f"[COMMENT] {username}: {comment_text} | Superfan: {is_super_fan}")
+
+        # Debug: Gib alle Attribute des Events aus
+        print("[COMMENT DEBUG] Alle Attribute von event:")
+        for attr in dir(event):
+            if not attr.startswith("_"):
+                try:
+                    value = getattr(event, attr)
+                except Exception as e:
+                    value = f"<Error: {e}>"
+                print(f"  {attr}: {value}")
+        if "comment" in valid_functions:
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", username))
 
     # =========================
     # CONNECT event
