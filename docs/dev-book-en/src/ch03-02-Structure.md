@@ -11,7 +11,7 @@ trigger_name:<type>command xnumber
 │            │     │       │
 │            │     │       └─→ Repeat (optional)
 │            │     └───────→ The actual command
-│            └───────────→ Prefix: /! or $
+│            └───────────→ Prefix (determines the command type)
 └─────────────→ The name that event handlers use
 ```
 
@@ -21,7 +21,7 @@ Every part is important:
 |------|---------|---------|
 | **TRIGGER** | Unique name or ID | `8913`, `follow`, `likes` |
 | **:** | Separator | `:` (always required) |
-| **\<TYPE\>** | Type of command | `/`, `!`, `$` |
+| **\<TYPE\>** | Type of command | `/`, `!`, `$`, `>>` |
 | **COMMAND** | What should happen? | `give @a diamond`, `tnt 2 0.1 2` |
 | **xNUMBER** | How often? (Optional) | `x3`, `x10` (without x = 1×) |
 
@@ -152,7 +152,9 @@ Can be configured in `config.yaml`.
 
 ### Command Types Explained
 
-**Type 1: Vanilla Commands (`/`)**
+The following command types are currently supported. New types may be added in the future — the current list can always be found here.
+
+**Type: Vanilla Commands (`/`)**
 
 ```
 /give @a minecraft:diamond
@@ -165,7 +167,7 @@ Starts with `/` → Standard Minecraft command. Is written into a `.mcfunction` 
 
 ---
 
-**Type 2: Plugin Commands (`!`)**
+**Type: Plugin Commands (`!`)**
 
 ```
 5655:!tnt 2 0.1 2 Notch
@@ -178,7 +180,7 @@ Starts with `!` → Custom command. Is sent **directly via RCON** to the server,
 
 ---
 
-**Type 3: Special Functions (`$`)**
+**Type: Special Functions (`$`)**
 
 ```
 16071:$random
@@ -189,6 +191,20 @@ Starts with `$` → Internal special function of the streaming tool. Currently o
 `$random` chooses a **random other trigger** and executes it. This prevents endless loops: triggers with `$random` as well as basic triggers like `likes`, `like_2` and `follow` are automatically excluded.
 
 → [Details about $random → Function of the $random command](./ch03-05-Function-of-the-$random-Command.md)
+
+---
+
+**Type: Overlay Output (`>>`)**
+
+```
+follow:>>New Follower!|{user} is now following you!|5
+```
+
+Starts with `>>` → Text is displayed as an overlay on stream, **not** a Minecraft command. Format: `Title|Subtitle|Duration`, separated by `|`.
+
+- **Subtitle** and **Duration** are optional (default: 3 seconds)
+- `{user}` is automatically replaced by the name of the person who triggered the action
+- `xNUMBER` is **not** supported here
 
 ---
 
@@ -282,7 +298,7 @@ follow:/give @a diamond x          # ← x without a number
 | Concept | Explanation |
 |---------| ------------|
 | **Triggers** | Gift ID, `follow`, `likes`, `like_2` |
-| **Command types** | `/` (Vanilla → mcfunction), `!` (Plugin → RCON), `$` (Special) |
+| **Command types** | Prefix determines the type (see [Command Types Explained](#command-types-explained)) |
 | **xNUMBER** | Repeat command N times |
 | **Semicolon** | Multiple commands in one line |
 | **Comments** | `#` to disable/document |

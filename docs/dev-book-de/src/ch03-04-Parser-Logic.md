@@ -13,7 +13,7 @@ Die Verarbeitung der `actions.mca` Datei findet **beim Start** statt:
    ↓
 4. Parser zerlegt jede Zeile:
    - Trigger auslesen
-   - Command-Typ bestimmen (/, !, $)
+   - Command-Typ bestimmen
    - Wiederholungen (x) extrahieren
    ↓
 5. In-Memory-Dictionary aufbauen:
@@ -73,6 +73,10 @@ def parse_actions(filename):
             elif cmd.startswith("$"):
                 cmd_type = "built_in"
                 body = cmd[1:].strip()
+            elif cmd.startswith(">>"):
+                cmd_type = "overlay"
+                body = cmd[2:].strip()
+            # ... weitere Präfixe können hier ergänzt werden
             else:
                 print(f"[ERROR] Zeile {line_num}: Ungültiger Prefix")
                 continue
@@ -94,9 +98,12 @@ def parse_actions(filename):
 
 ### Command-Typ Differenzierung
 
-Beim Parsen wird unterschieden zwischen 3 Typen:
+Beim Parsen wird zwischen folgenden Typen unterschieden.
+Die vollständige und aktuelle Liste findest du in [Syntax & Befehle → Command-Typen erklärt](./ch03-02-Structure.md#command-typen-erklärt).
 
-**Typ 1: Vanilla (`/`)**
+Hier die Kurzfassung für den Code:
+
+**Typ: Vanilla (`/`)**
 
 ```python
 if cmd.startswith("/"):
@@ -109,7 +116,7 @@ if cmd.startswith("/"):
 
 ---
 
-**Typ 2: Plugin (`!`)**
+**Typ: Plugin (`!`)**
 
 ```python
 elif cmd.startswith("!"):
@@ -122,7 +129,7 @@ elif cmd.startswith("!"):
 
 ---
 
-**Typ 3: Built-in (`$`)**
+**Typ: Built-in (`$`)**
 
 ```python
 elif cmd.startswith("$"):
@@ -132,6 +139,19 @@ elif cmd.startswith("$"):
 
 → Wird vom Programm selbst verarbeitet
 → Beispiel: `$random` wählt anderen Trigger
+
+---
+
+**Typ: Overlay (`>>`)**
+
+```python
+elif cmd.startswith(">>"):
+    kind = "overlay"
+    body = cmd[2:]  # ">>" entfernen
+```
+
+→ Text wird als Overlay im Stream eingeblendet
+→ Format: `Titel|Untertitel|Dauer`
 
 ---
 
@@ -172,6 +192,12 @@ elif kind == "plugin":
 elif kind == "script":
     # Vom Programm interpretiert (z.B. $random)
     execute_built_in(body, source_user)
+
+elif kind == "overlay":
+    # Text als Overlay im Stream anzeigen
+    show_overlay(body)
+
+# ... weitere Typen analog
 ```
 
 Die `kind`-Unterscheidung bestimmt, **wie** der Command ausgeführt wird!
@@ -183,12 +209,12 @@ Die `kind`-Unterscheidung bestimmt, **wie** der Command ausgeführt wird!
 **Alle Command-Typen haben die gleiche Performance!**
 
 Die Kosten einer Aktion hängen ab von:
-- **Was** der Command macht (nicht **welcher** Type)
+- **Was** der Command macht (nicht **welcher** Typ)
 - Z.B. `/summon` dauert länger als `/say`
 - Z.B. `!tnt 1000` dauert länger als `!tnt 1`
 
-Type (/, !, $) ist aus Performence sicht egal!
-<br> Es kommt auf denn Command an.
+Der Präfix-Typ ist aus Performance-Sicht egal!
+<br> Es kommt auf den Command an.
 
 ---
 
@@ -196,6 +222,8 @@ Type (/, !, $) ist aus Performence sicht egal!
 
 1. **Parser** zerlegt actions.mca einmal beim Start
 2. **In-Memory-Dictionary** wird aufgebaut
-3. **Command-Typen** werden klassifiziert (/, !, $)
+3. **Command-Typen** werden klassifiziert (siehe [Command-Typen erklärt](./ch03-02-Structure.md#command-typen-erklärt))
 4. **Runtime** = schnelle Dictionary-Lookups
-5. **Keine Parsing zur Laufzeit** = mehr Performance
+5. **Kein Parsing zur Laufzeit** = mehr Performance
+
+---

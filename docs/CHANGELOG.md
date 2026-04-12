@@ -54,3 +54,7 @@ Each version is split into two sections:
 #### Fixed
 - PyInstaller build errors (stdout + stderr) are now captured and displayed on failure instead of being silenced.
 - Updater exit code `0` (no update) was not handled, causing false "Update installed" message in `start.py`.
+
+#### Docs
+- Dev-Book (DE + EN) `ch03` — documentation across all ch03 chapters rewritten to be generic; prefixes are no longer hardcoded in multiple places but reference one authoritative list in `ch03-02`.
+- Dev-Book (DE + EN) `ch03-02` — added missing `>>` (Overlay) type to the "Command Types Explained" section.

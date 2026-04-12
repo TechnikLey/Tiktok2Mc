@@ -14,7 +14,7 @@ TRIGGER:<TYPE>COMMAND xANZAHL
 ```
 
 - **TRIGGER** = Name oder ID (z.B. `follow`, `8913`)
-- **TYPE** = Präfix: `/` (Vanilla), `!` (Plugin/Custom), `$` (Spezialfunktion)
+- **TYPE** = Präfix, das den Command-Typ bestimmt — siehe [Syntax & Befehle](./ch03-02-Structure.md)
 - **COMMAND** = Der auszuführende Befehl
 - **xANZAHL** = Optional: Command N-mal wiederholen
 
@@ -45,11 +45,9 @@ for line_num, original_line in enumerate(f, 1):
         continue
     trigger, full_cmd_line = map(str.strip, line.split(":", 1))
     # ...
-    if not cmd.startswith(("/", "!", "$")):
-        print(f"[ERROR] Ungültiger Befehl ohne Präfix in Zeile {line_num}: {cmd}")
 ```
 
-**Jeder Command braucht ein Präfix** (`/`, `!` oder `$`). Zeilen ohne gültiges Präfix werden beim Start mit einer Fehlermeldung übersprungen.
+**Jeder Command braucht ein gültiges Präfix.** Die Liste aller unterstützten Präfixe findest du im Kapitel [Syntax & Befehle](./ch03-02-Structure.md). Zeilen ohne gültiges Präfix werden beim Start mit einer Fehlermeldung übersprungen.
 
 ---
 
