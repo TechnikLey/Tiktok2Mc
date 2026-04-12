@@ -69,7 +69,8 @@ listeners = []
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE, display_mode=DISPLAY_MODE, fade_in=FADE_IN, fade_out=FADE_OUT)
+    chroma = request.args.get('chroma', '0') == '1'
+    return render_template_string(HTML_TEMPLATE, display_mode=DISPLAY_MODE, fade_in=FADE_IN, fade_out=FADE_OUT, chroma=chroma)
 
 @app.route("/stream")
 def stream():
@@ -110,7 +111,7 @@ HTML_TEMPLATE = """
     <style>
         body {
             margin: 0; padding: 0; overflow: hidden;
-            background-color: #00FF00; /* Chroma-key green */
+            background-color: {% if chroma %}#00FF00{% else %}transparent{% endif %};
             display: flex;
             justify-content: center;
             align-items: center;
@@ -198,8 +199,8 @@ if __name__ == '__main__':
     if not gui_hidden:
         window = webview.create_window(
             'Overlay', 
-            f'http://127.0.0.1:{APP_PORT}', 
-            transparent=False, # Disabled for green screen
+            f'http://127.0.0.1:{APP_PORT}?chroma=1', 
+            transparent=False, # Green screen for webview
             frameless=False, 
             on_top=True,
             width=800, # Wider for long text

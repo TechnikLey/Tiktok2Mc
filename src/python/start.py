@@ -84,13 +84,16 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
             print(f"[-] Houston, we have a problem: {path} is missing. Did it run away?")
         return
     try:
-        flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
         # Base command
         cmd = [path]
         # Optional flag
         if gui_hidden is not None:
             cmd.append(f"--gui-hidden")  # bool -> 0/1
-        proc = subprocess.Popen(cmd, creationflags=flags)
+        kwargs = {}
+        if sys.platform == "win32":
+            flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
+            kwargs["creationflags"] = flags
+        proc = subprocess.Popen(cmd, **kwargs)
         processes[name] = proc
         if ALLOW_CLOSE:
             print(f"{name} started{' (hidden)' if hidden else ''}, gui_hidden={gui_hidden}.")
@@ -136,10 +139,10 @@ def replace_updater_if_exists():
             print("[FAIL] Error: update.exe is still locked.")
 
 def start_update_exe():
-    proc = subprocess.Popen(
-        [UPDATE_EXE_PATH],
-        creationflags=subprocess.CREATE_NEW_CONSOLE
-    )
+    kwargs = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+    proc = subprocess.Popen([UPDATE_EXE_PATH], **kwargs)
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
