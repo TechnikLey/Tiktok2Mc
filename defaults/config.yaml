@@ -127,9 +127,13 @@ CommentCommands:
   # Enable or disable this feature.
   Enable: false
 
-  # The character that must appear at the start of a comment to be
-  # recognized as a command. Can be any character, e.g. "!", "/", "#".
-  Prefix: "!"
+  # The character that must appear at the start of a comment to be recognized as a command.
+  # Most characters can be used as a prefix,
+  # but some (like !) may not work reliably in all environments.
+  # The # prefix is fully supported and has been tested to work without problems.
+  # Example: Prefix: "#"  →  #say Hello
+  # will trigger the command.
+  Prefix: "#"
 
   # Who is allowed to use comment commands.
   # Available roles: all, moderator, superfan, fanclub
