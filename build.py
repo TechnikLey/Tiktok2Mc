@@ -177,8 +177,8 @@ def main():
 
                 result = subprocess.run(
                     cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                 )
 
                 fresh = t_dist / item["name"]
@@ -189,6 +189,8 @@ def main():
                     cprint(f"Done: {item['name']}", Color.GREEN)
                 else:
                     cprint(f"FAILED: {item['name']}", Color.RED)
+                    if result.stdout:
+                        cprint(result.stdout.decode(errors="replace"), Color.RED)
                     return False
 
                 # Cleanup temp for this thread
