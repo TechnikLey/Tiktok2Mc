@@ -35,10 +35,10 @@ def main():
     start = time.time()
 
     try:
-        # ----- 0️⃣ Configuration -----
+        # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.1.0"
+        TOOL_VERSION = "v0.2.0"
         UPDATER_VERSION = "v1.0.0"
 
         IS_WINDOWS = sys.platform == "win32"
@@ -64,8 +64,8 @@ def main():
             {"name": "test_trigger",   "src": "tests/send_trigger.py",   "dest": "test"},
         ]
 
-        # ----- 1️⃣ Preparation & Directory Structure -----
-        cprint("📂 Preparing build environment...", Color.CYAN)
+        # ----- Preparation & Directory Structure -----
+        cprint("Preparing build environment...", Color.CYAN)
 
         if OUT_DIR.exists():
             shutil.rmtree(OUT_DIR)
@@ -93,8 +93,8 @@ def main():
         for d in REQUIRED_DIRS:
             d.mkdir(parents=True, exist_ok=True)
 
-        # ----- 2️⃣ Collect Build Tasks -----
-        cprint("🔍 Collecting all files to compile...", Color.CYAN)
+        # ----- Collect Build Tasks -----
+        cprint("Collecting all files to compile...", Color.CYAN)
         all_build_tasks = []
 
         # Add main EXEs
@@ -120,9 +120,9 @@ def main():
                     "dest": dest,
                 })
 
-        # ----- 3️⃣ Execution: Parallel Build -----
+        # ----- Execution: Parallel Build -----
         cprint(
-            f"\n🚀 Starting parallel build with {MAX_THREADS} threads for {len(all_build_tasks)} files...",
+            f"\nStarting parallel build with {MAX_THREADS} threads for {len(all_build_tasks)} files...",
             Color.CYAN,
         )
 
@@ -153,7 +153,7 @@ def main():
             final_path = target_dir / item["name"]
 
             if need_build:
-                cprint(f"🔨 [Parallel] Compiling: {item['name']}...", Color.YELLOW)
+                cprint(f"[Parallel] Compiling: {item['name']}...", Color.YELLOW)
 
                 unique_id = uuid.uuid4().hex[:8]
                 t_dist = PARALLEL_TEMP_DIR / f"dist_{unique_id}"
@@ -184,16 +184,16 @@ def main():
                     shutil.copy2(fresh, final_path)
                     shutil.copy2(fresh, cache_exe)
                     hash_file.write_text(current_hash)
-                    cprint(f"✅ Done: {item['name']}", Color.GREEN)
+                    cprint(f"Done: {item['name']}", Color.GREEN)
                 else:
-                    cprint(f"❌ Failed to compile {item['name']}", Color.RED)
+                    cprint(f"FAILED: {item['name']}", Color.RED)
                     return False
 
                 # Cleanup temp for this thread
                 for p in (t_dist, t_work, t_spec):
                     shutil.rmtree(p, ignore_errors=True)
             else:
-                cprint(f"📦 Cache hit: {item['name']}", Color.GRAY)
+                cprint(f"Cache hit: {item['name']}", Color.GRAY)
                 if not final_path.exists():
                     shutil.copy2(cache_exe, final_path)
 
@@ -208,14 +208,14 @@ def main():
                     if not future.result():
                         failed = True
                 except Exception as exc:
-                    cprint(f"❌ {task['name']} generated an exception: {exc}", Color.RED)
+                    cprint(f"FAILED: {task['name']} - {exc}", Color.RED)
                     failed = True
 
             if failed:
                 raise RuntimeError("One or more build tasks failed.")
 
-        # ----- 4️⃣ Assets & Resources -----
-        cprint(f"\n📂 Synchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
+        # ----- Assets & Resources -----
+        cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
 
         def sync_folder(source, destination, threads=MAX_COPY_THREADS):
             src = Path(source)
@@ -262,8 +262,8 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_path, target)
 
-        # ----- 5️⃣ Metadata & Cleanup -----
-        cprint("🧹 Cleaning up temporary files...", Color.CYAN)
+        # ----- Metadata & Cleanup -----
+        cprint("Cleaning up temporary files...", Color.CYAN)
         (OUT_DIR / "version.txt").write_text(
             f"ToolVersion: {TOOL_VERSION}\nUpdaterVersion: {UPDATER_VERSION}\n",
             encoding="utf-8",
@@ -277,51 +277,71 @@ def main():
             if p.exists():
                 shutil.rmtree(p, ignore_errors=True)
 
-        # ----- 6️⃣ Release / Upload Script -----
-        cprint("📜 Creating upload.py...", Color.CYAN)
-        upload_content = f'''#!/usr/bin/env python3
-import os
-import subprocess
-import sys
-import shutil
-from pathlib import Path
-
-TOOL_VERSION = "{TOOL_VERSION}"
-RELEASE_ZIP = Path("build/{TOOL_VERSION}.zip")
-OUT_DIR = Path("{OUT_DIR.relative_to(SCRIPT_DIR)}")
-
-os.chdir(Path(__file__).resolve().parent)
-
-if not RELEASE_ZIP.exists():
-    print("\\033[96m📦 Creating ZIP...\\033[0m")
-    shutil.make_archive(str(RELEASE_ZIP.with_suffix("")), "zip", "build", "release")
-
-result = subprocess.run(["gh", "release", "view", TOOL_VERSION], capture_output=True)
-if result.returncode == 0:
-    subprocess.run(["gh", "release", "delete", TOOL_VERSION, "--yes"], check=True)
-    import time; time.sleep(2)
-
-subprocess.run([
-    "gh", "release", "create", TOOL_VERSION, str(RELEASE_ZIP),
-    "--title", TOOL_VERSION, "--notes", f"Release {{TOOL_VERSION}}"
-], check=True)
-
-input("\\nPress Enter to exit...")
-'''
+        # ----- Release / Upload Script -----
+        cprint("Creating upload.py...", Color.CYAN)
+        upload_content = (
+            '#!/usr/bin/env python3\n'
+            'import subprocess\n'
+            'import sys\n'
+            'import os\n'
+            'from pathlib import Path\n'
+            '\n'
+            f'TOOL_VERSION = "{TOOL_VERSION}"\n'
+            '\n'
+            'os.chdir(Path(__file__).resolve().parent)\n'
+            '\n'
+            'C = "\\033[96m"\n'
+            'G = "\\033[92m"\n'
+            'Y = "\\033[93m"\n'
+            'R = "\\033[91m"\n'
+            'X = "\\033[0m"\n'
+            '\n'
+            'def run(cmd, check=True):\n'
+            '    print(f"{C}> {\' \'.join(cmd)}{X}")\n'
+            '    return subprocess.run(cmd, check=check, capture_output=False)\n'
+            '\n'
+            '# 1. Stage all changes\n'
+            'print(f"\\n{C}Staging changes...{X}")\n'
+            'run(["git", "add", "-A"])\n'
+            '\n'
+            '# 2. Commit (ask for message)\n'
+            f'msg = input(f"\\n{{Y}}Commit message (Enter = \'Release {TOOL_VERSION}\'): {{X}}").strip()\n'
+            'if not msg:\n'
+            f'    msg = "Release {TOOL_VERSION}"\n'
+            'result = run(["git", "commit", "-m", msg], check=False)\n'
+            'if result.returncode != 0:\n'
+            '    print(f"{Y}No changes to commit, continuing...{X}")\n'
+            '\n'
+            '# 3. Push\n'
+            'print(f"\\n{C}Pushing to remote...{X}")\n'
+            'run(["git", "push"])\n'
+            '\n'
+            '# 4. Create and push tag\n'
+            f'print(f"\\n{{C}}Creating tag {TOOL_VERSION}...{{X}}")\n'
+            f'run(["git", "tag", "-d", "{TOOL_VERSION}"], check=False)\n'
+            f'run(["git", "push", "origin", "--delete", "{TOOL_VERSION}"], check=False)\n'
+            f'run(["git", "tag", "{TOOL_VERSION}"])\n'
+            f'run(["git", "push", "origin", "{TOOL_VERSION}"])\n'
+            '\n'
+            f'print(f"\\n{{G}}Done! GitHub Actions will now build & release {TOOL_VERSION}{{X}}")\n'
+            'print(f"{C}   Check progress: https://github.com/<OWNER>/<REPO>/actions{X}")\n'
+            '\n'
+            'input("\\nPress Enter to exit...")\n'
+        )
         Path("upload.py").write_text(upload_content, encoding="utf-8")
 
         # --- Finish ---
         elapsed = time.time() - start
         minutes, seconds = divmod(elapsed, 60)
         cprint(f"\n======================================", Color.GREEN)
-        cprint(f"✅ Build completed in {int(minutes):02d}:{seconds:06.3f}", Color.GREEN)
+        cprint(f"Build completed in {int(minutes):02d}:{seconds:06.3f}", Color.GREEN)
         cprint(f"======================================", Color.GREEN)
 
     except Exception as e:
         elapsed = time.time() - start
         minutes, seconds = divmod(elapsed, 60)
         cprint(f"\n======================================", Color.RED)
-        cprint(f"❌ Build FAILED in {int(minutes):02d}:{seconds:06.3f}", Color.RED)
+        cprint(f"Build FAILED in {int(minutes):02d}:{seconds:06.3f}", Color.RED)
         cprint(f"======================================", Color.RED)
         cprint(f"\nError message:", Color.YELLOW)
         cprint(str(e), Color.RED)
