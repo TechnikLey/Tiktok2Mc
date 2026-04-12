@@ -26,7 +26,7 @@ When you go live on TikTok, the tool connects to your stream automatically. It w
 
 Each event is linked to a Minecraft command that you define. For example, you could set it up so that every time someone sends a Rose gift, a Creeper spawns next to the player.
 
-The tool includes a built-in Minecraft server (version 1.21.11), so you do not need to download one separately. Java is also included -- you do not need to install it yourself.
+The tool includes a built-in Minecraft server (version 1.21.11), so you do not need to download one separately. On Windows, Java is also included. On Linux, the tool will find Java on your system or offer to install it automatically.
 
 ---
 
@@ -367,10 +367,10 @@ Want to test your triggers without going live on TikTok? No problem!
 
 There is a simple test tool included:
 
-- **Location:** `test/test_trigger.exe`
+- **Location:** `test/test_trigger.exe` (Windows) or `test/test_trigger` (Linux)
 - **How to use:**
   1. Make sure the tool is running (the tool must be started, but TikTok connection is not required).
-  2. Start the .exe file.
+  2. Start the executable.
   3. Enter any trigger name (e.g. `follow`, `like_2`, or a gift ID like `5655`) and optionally a username when prompted.
   4. The tool will simulate the trigger as if it came from TikTok -- all actions, overlays, and Minecraft commands will run as configured.
 
@@ -408,7 +408,7 @@ You can also find images of all TikTok gifts in the `core/assets/` folder. These
 
 ### Joining Locally
 
-1. Start the tool with `start.exe` (this also starts the Minecraft server).
+1. Start the tool with `start.exe` (Windows) or `./start` (Linux). This also starts the Minecraft server.
 2. Open Minecraft.
 3. Go to **Multiplayer** and click **Add Server**.
 4. Enter the address: `localhost:25565`

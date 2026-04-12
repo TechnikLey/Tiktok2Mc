@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-Each release is split into two sections:
+Each version is split into two sections:
 
 - **User** — changes relevant to end users (new features, bug fixes, behavior changes).
 - **Developer** — internal/technical changes relevant to contributors and developers (build system, code structure, tooling).
@@ -24,6 +24,9 @@ Each release is split into two sections:
 - Overlay now shows a transparent background when opened via browser URL instead of a green screen.
 - Auto-update no longer falsely reports "Update has been installed" when no update was available.
 
+#### Changed
+- README and User Guide updated to reflect Linux support, platform-specific start commands, and Java availability per OS.
+
 ### Developer
 
 #### Added
@@ -35,6 +38,8 @@ Each release is split into two sections:
 - `requirements.txt` — added PyQt6, PyQt6-WebEngine, and qtpy to support the pywebview Qt backend.
 
 #### Changed
+- `README.md` — updated OS requirements (Linux now supported), platform-specific start command, Java availability note for Linux.
+- `GUIDE.md` — updated Java section (not bundled on Linux), platform-specific paths for `start` and `test_trigger` executables.
 - `start.py` — tmux/screen session management on Linux with interactive installer prompt if neither is found. Processes tracked by session name, listed with attach commands after startup.
 - `start.py` — `subprocess.CREATE_NEW_CONSOLE` and `taskkill` calls guarded by `sys.platform == "win32"` checks.
 - `start.py` — display environment variables (`DISPLAY`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`) forwarded to tmux/screen sessions so GUI apps (pywebview) work.
