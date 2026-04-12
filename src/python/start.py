@@ -287,25 +287,10 @@ def replace_updater_if_exists():
             print(f"[FAIL] Error: {update_exe.name} is still locked.")
 
 def start_update_exe():
+    """Run updater synchronously — must wait for exit code, so no tmux/screen here."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
-    elif SESSION_TOOL == "tmux":
-        session_name = "mc-updater"
-        subprocess.run(["tmux", "kill-session", "-t", session_name],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        proc = subprocess.Popen(
-            ["tmux", "new-session", "-d", "-s", session_name] + cmd
-        )
-        linux_sessions.append(session_name)
-    elif SESSION_TOOL == "screen":
-        session_name = "mc-updater"
-        subprocess.run(["screen", "-X", "-S", session_name, "quit"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        proc = subprocess.Popen(
-            ["screen", "-dmS", session_name] + cmd
-        )
-        linux_sessions.append(session_name)
     else:
         proc = subprocess.Popen(cmd)
 
