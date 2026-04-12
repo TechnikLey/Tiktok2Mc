@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, register_plugin, AppConfig
 import sys
 

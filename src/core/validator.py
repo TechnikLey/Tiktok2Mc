@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # validator.py
 import re
 from enum import Enum

@@ -1,0 +1,73 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: TikTok-MC-Gift-Windows
+          - os: ubuntu-latest
+            artifact: TikTok-MC-Gift-Linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Build
+        run: python build.py
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/release/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows Build
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTok-MC-Gift-Windows
+          path: build-windows/
+
+      - name: Download Linux Build
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTok-MC-Gift-Linux
+          path: build-linux/
+
+      - name: Create Archives
+        run: |
+          cd build-windows && zip -r ../TikTok-MC-Gift-Windows.zip . && cd ..
+          tar -czf TikTok-MC-Gift-Linux.tar.gz -C build-linux .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            TikTok-MC-Gift-Windows.zip
+            TikTok-MC-Gift-Linux.tar.gz
