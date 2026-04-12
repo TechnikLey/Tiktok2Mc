@@ -24,7 +24,7 @@ import random
 import time
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics
@@ -86,6 +86,13 @@ LIKEGOAL_INTERVAL = 3
 
 
 DISABLE_TIKTOK_CONNECT = False  # Toggle for disabling TikTok connection
+
+# --- Comment commands ---
+COMMENT_CMD_ENABLE = False
+COMMENT_CMD_PREFIX = "!"
+COMMENT_CMD_ROLES = ["moderator"]
+COMMENT_CMD_WHITELIST = []  # Only these commands allowed (empty = all allowed)
+COMMENT_CMD_BLACKLIST = []  # These commands are blocked
 app = Flask(__name__)
 
 log = logging.getLogger('werkzeug')
@@ -98,6 +105,7 @@ log.setLevel(logging.ERROR)
 def load_config():
     """Loads configuration values from the YAML config file."""
     global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, RANDOM_EXCLUDE
+    global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
 
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
@@ -122,7 +130,22 @@ def load_config():
             RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
 
         LIKE_TRIGGERS = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
-        
+
+        comment_cmd_cfg = config.get("CommentCommands", {})
+        COMMENT_CMD_ENABLE = bool(comment_cmd_cfg.get("Enable", False))
+        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "!"))
+        raw_roles = comment_cmd_cfg.get("AllowedRoles", ["moderator"])
+        if isinstance(raw_roles, list):
+            COMMENT_CMD_ROLES = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
+        else:
+            COMMENT_CMD_ROLES = ["moderator"]
+        raw_whitelist = comment_cmd_cfg.get("Whitelist", [])
+        COMMENT_CMD_WHITELIST = [str(c).strip() for c in raw_whitelist if str(c).strip()] if isinstance(raw_whitelist, list) else []
+        raw_blacklist = comment_cmd_cfg.get("Blacklist", [])
+        COMMENT_CMD_BLACKLIST = [str(c).strip() for c in raw_blacklist if str(c).strip()] if isinstance(raw_blacklist, list) else []
+        if COMMENT_CMD_ENABLE and not COMMENT_CMD_WHITELIST and not COMMENT_CMD_BLACKLIST:
+            print("[WARN] CommentCommands: Whitelist and Blacklist are both empty — ALL Minecraft commands are allowed!")
+
         DATAPACK_ROOT = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
         return DATAPACK_ROOT.exists() and DATAPACK_ROOT.is_dir()
     except Exception as e:
@@ -831,6 +854,15 @@ def create_client(user):
         except Exception as e:
             print(f"[EVENT ERROR] Error in like handling: {e}")
 
+    # ========================
+    # Join events
+    # ========================
+    @client.on(JoinEvent)
+    def on_join(event):
+        username = get_safe_username(event.user)
+        if "join" in valid_functions:
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("join", username))
+
     # =========================
     # COMMENT events
     # =========================
@@ -838,22 +870,53 @@ def create_client(user):
     def on_comment(event):
         username = get_safe_username(event.user)
         comment_text = getattr(event, 'comment', '')
-        is_super_fan = False
-        try:
-            is_super_fan = getattr(event, 'user_is_super_fan', False)
-        except Exception:
-            pass
-        print(f"[COMMENT] {username}: {comment_text} | Superfan: {is_super_fan}")
 
-        # Debug: Gib alle Attribute des Events aus
-        print("[COMMENT DEBUG] Alle Attribute von event:")
-        for attr in dir(event):
-            if not attr.startswith("_"):
-                try:
-                    value = getattr(event, attr)
-                except Exception as e:
-                    value = f"<Error: {e}>"
-                print(f"  {attr}: {value}")
+        is_super_fan = getattr(event, 'user_is_super_fan', None)
+
+        in_fanclub = False
+        fan_ticket_count = getattr(event.user, 'fan_ticket_count', None)
+        fans_club = getattr(event.user, 'fans_club', None)
+        fans_club_info = getattr(event.user, 'fans_club_info', None)
+        if fan_ticket_count and fan_ticket_count > 0:
+            in_fanclub = True
+        elif hasattr(fans_club, 'club_name') or hasattr(fans_club_info, 'club_name'):
+            in_fanclub = True
+
+        is_moderator = getattr(event.user, 'is_moderator', None)
+
+        print(f"[COMMENT] {username}: {comment_text}")
+        print(f"  Superfan: {is_super_fan}")
+        print(f"  Fanclub-Mitglied: {in_fanclub}")
+        print(f"  Moderator: {is_moderator}")
+
+        # --- Comment commands ---
+        if COMMENT_CMD_ENABLE and COMMENT_CMD_PREFIX and comment_text.startswith(COMMENT_CMD_PREFIX):
+            cmd_text = comment_text[len(COMMENT_CMD_PREFIX):].strip()
+            if cmd_text:
+                allowed = False
+                if "all" in COMMENT_CMD_ROLES:
+                    allowed = True
+                elif "moderator" in COMMENT_CMD_ROLES and is_moderator:
+                    allowed = True
+                elif "superfan" in COMMENT_CMD_ROLES and is_super_fan:
+                    allowed = True
+                elif "fanclub" in COMMENT_CMD_ROLES and in_fanclub:
+                    allowed = True
+
+                if allowed:
+                    base_cmd = cmd_text.split()[0].lower()
+                    # Whitelist: if not empty, only commands whose first word is listed pass
+                    if COMMENT_CMD_WHITELIST and base_cmd not in COMMENT_CMD_WHITELIST:
+                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not in whitelist")
+                    # Blacklist: if not empty, block commands whose first word is listed
+                    elif COMMENT_CMD_BLACKLIST and base_cmd in COMMENT_CMD_BLACKLIST:
+                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked by blacklist")
+                    else:
+                        print(f"[COMMENT CMD] {username} -> {cmd_text}")
+                        MAIN_LOOP.call_soon_threadsafe(rcon_queue.put_nowait, ([cmd_text], username))
+                else:
+                    print(f"[COMMENT CMD] {username} has no permission (roles: {COMMENT_CMD_ROLES})")
+
         if "comment" in valid_functions:
             MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", username))
 

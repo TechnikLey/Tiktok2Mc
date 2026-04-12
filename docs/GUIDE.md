@@ -8,7 +8,9 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 - [How It Works](#how-it-works)
 - [Configuration](#configuration)
+  - [Comment Commands](#comment-commands)
 - [Setting Up Actions](#setting-up-actions)
+  - [HTTP Actions (http_actions.txt)](#http-actions-http_actionstxt)
 - [Minecraft Server](#minecraft-server)
 - [Plugins and Overlays](#plugins-and-overlays)
 - [Maintenance](#maintenance)
@@ -18,11 +20,13 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 ## How It Works
 
-When you go live on TikTok, the tool connects to your stream automatically. It watches for three types of events:
+When you go live on TikTok, the tool connects to your stream automatically. It watches for five types of events:
 
 - **Gifts** -- A viewer sends a TikTok gift.
 - **Follows** -- A viewer follows your account.
 - **Likes** -- Viewers accumulate a certain number of likes.
+- **Comments** -- A viewer writes a comment in the live chat.
+- **Joins** -- A viewer joins the live stream.
 
 Each event is linked to a Minecraft command that you define. For example, you could set it up so that every time someone sends a Rose gift, a Creeper spawns next to the player.
 
@@ -136,6 +140,84 @@ Console:
 
 For normal use, keep this at 2.
 
+### Comment Commands
+
+The `CommentCommands` feature lets viewers send Minecraft commands directly to your server by writing a comment that starts with a configurable prefix character.
+
+> [!WARNING]
+> This sends raw commands directly to your Minecraft server via RCON. Anyone with the required role can execute commands. **Always use a Whitelist when `AllowedRoles` includes `all`, `fanclub`, or `superfan`.**
+
+```yaml
+CommentCommands:
+  Enable: false
+  Prefix: "!"
+  AllowedRoles:
+    - moderator
+  Whitelist: []
+  Blacklist:
+    - op
+    - deop
+    - stop
+    - ban
+    - kick
+    - whitelist
+```
+
+**Enable** -- Set to `true` to activate this feature.
+
+**Prefix** -- The character a comment must start with to be treated as a command. Can be any character, for example `!`, `/`, or `#`. With `Prefix: "!"`, a viewer writing `!say Hello` sends the command `say Hello` to Minecraft.
+
+**AllowedRoles** -- Controls who is allowed to use comment commands:
+
+| Role | Description |
+|------|-------------|
+| `all` | Every viewer in the live chat |
+| `moderator` | Stream moderators |
+| `superfan` | Viewers with Superfan status |
+| `fanclub` | Fanclub members |
+
+You can combine multiple roles -- a viewer only needs to match one:
+
+```yaml
+AllowedRoles:
+  - moderator
+  - superfan
+```
+
+**Whitelist and Blacklist** -- Only the **first word** of the comment (the base command, e.g. `say` from `say Hello World`) is checked against these lists.
+
+| Whitelist | Blacklist | Result |
+|-----------|-----------|--------|
+| Empty | Empty | ALL commands are allowed -- use with caution! |
+| Empty | Filled | All commands allowed EXCEPT those in the Blacklist |
+| Filled | Empty | ONLY commands whose base word is in the Whitelist |
+| Both filled | -- | Must be in Whitelist AND NOT in Blacklist |
+
+Example -- allow only `say` and `give`, always block dangerous commands:
+
+```yaml
+CommentCommands:
+  Enable: true
+  Prefix: "!"
+  AllowedRoles:
+    - moderator
+  Whitelist:
+    - say
+    - give
+  Blacklist:
+    - op
+    - deop
+    - stop
+    - ban
+    - kick
+    - whitelist
+```
+
+With this setup, a moderator writing `!say Hello stream` sends `say Hello stream` to Minecraft. A moderator writing `!op Notch` is blocked because `op` is in the Blacklist. A non-moderator viewer is blocked at the role check and never reaches the Whitelist or Blacklist at all.
+
+> [!NOTE]
+> Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.
+
 ---
 
 ## Setting Up Actions
@@ -175,7 +257,7 @@ Here, `follow` is the trigger, `/` is the type (Minecraft command), and `give @a
 
 ### Trigger Types
 
-There are three types of triggers:
+There are five types of triggers:
 
 **Gift ID** -- A number that represents a specific TikTok gift. Each gift has a unique ID. Example:
 
@@ -187,6 +269,23 @@ There are three types of triggers:
 
 ```
 follow:/give @a minecraft:golden_apple 7
+```
+
+**join** -- Triggers every time a viewer joins the live stream. Example:
+
+```
+join:>>Welcome!|{user} just joined the stream!|3
+```
+
+**comment** -- Triggers every time a viewer writes a comment in the live chat.
+
+> [!WARNING]
+> The `comment` trigger fires for **every** comment. On active streams this can be very frequent. Avoid complex or expensive commands here.
+
+Example:
+
+```
+comment:>>New comment!|{user} commented!|2
 ```
 
 **likes** and **like_2** -- Trigger based on accumulated likes. See [Like Triggers](#like-triggers) for details.
@@ -395,6 +494,48 @@ If you want to temporarily disable or re-enable the TikTok connection (for testi
 
 > [!NOTE] 
 > This setting is only valid until you restart the tool. After restarting, the TikTok connection will be enabled again by default.
+
+### HTTP Actions (http_actions.txt)
+
+The file `data/http_actions.txt` is a second action file that runs alongside `actions.mca`. While `actions.mca` sends commands to Minecraft, `http_actions.txt` runs any **shell command on your computer** when a gift is received.
+
+**Trigger type:** Gift IDs only. HTTP actions are not supported for `follow`, `join`, `comment`, or like triggers.
+
+**Independence:** Both files are checked for every gift event. If the same gift ID appears in both `actions.mca` and `http_actions.txt`, both actions run — they do not conflict.
+
+#### Format
+
+Each line follows the same pattern as `actions.mca`:
+
+```
+GiftID:ShellCommand
+```
+
+- **GiftID** -- The numeric gift ID (same IDs as in `actions.mca` and `core/gifts.json`).
+- **ShellCommand** -- Any shell command that can run on your computer.
+
+Lines starting with `#` are treated as comments and ignored.
+
+#### Example
+
+```
+18508:curl -X POST http://localhost:8080/add?amount=10
+16071:curl -X POST http://localhost:8080/remove?amount=10
+```
+
+This uses `curl` to send HTTP requests to the WinCounter plugin (port 8080). The first line adds 10 points to the counter when gift `18508` is received, the second removes 10 points when gift `16071` is received.
+
+> [!NOTE]
+> The WinCounter runs on `http://localhost:8080`. You can call its endpoints directly:
+> - `/add?amount=N` -- Adds N to the counter.
+> - `/remove?amount=N` -- Subtracts N from the counter.
+>
+> The same gift ID can also have an entry in `actions.mca` at the same time -- both will run independently.
+
+> [!WARNING]
+> `http_actions.txt` runs the command directly on your computer as a shell command. Only put commands here that you trust and understand.
+
+---
 
 ### Finding Gift IDs
 

@@ -13,6 +13,23 @@
 follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now following you!|5
 
 # =====================================================================
+#  JOIN — triggers when a viewer joins the live stream
+# =====================================================================
+
+# Show a welcome overlay when someone joins the stream.
+# {user} is replaced with the viewer's TikTok username.
+join:>>Welcome!|{user} just joined the stream!|3
+
+# =====================================================================
+#  COMMENT — triggers on every comment in the live chat
+# =====================================================================
+
+# This fires for EVERY comment — can be very frequent on active streams.
+# Use with caution: avoid expensive or spammy commands here.
+# The example below is disabled (#). Remove the # to activate it.
+#comment:>>New comment!|{user} commented!|2
+
+# =====================================================================
 #  LIKES — triggers based on accumulated like count
 # =====================================================================
 

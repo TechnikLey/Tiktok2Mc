@@ -110,6 +110,73 @@ Gifts:
     - follow
 
 # -------------------------------------------------------------------------
+# COMMENT COMMANDS
+# -------------------------------------------------------------------------
+# Allows viewers to send real Minecraft commands by writing a comment
+# that starts with a specific prefix character.
+# Example: If prefix is "!" and a viewer writes "!say Hello", the command
+# "say Hello" will be sent directly to the Minecraft server via RCON.
+#
+# !!! WARNING !!!
+# This feature sends raw commands to your Minecraft server.
+# Anyone with the required role can execute ANY command unless you
+# restrict them with a Whitelist or Blacklist.
+# It is STRONGLY recommended to use a Whitelist when AllowedRoles
+# includes "all", "fanclub", or "superfan".
+CommentCommands:
+  # Enable or disable this feature.
+  Enable: false
+
+  # The character that must appear at the start of a comment to be
+  # recognized as a command. Can be any character, e.g. "!", "/", "#".
+  Prefix: "!"
+
+  # Who is allowed to use comment commands.
+  # Available roles: all, moderator, superfan, fanclub
+  # Use "all" to allow every viewer.
+  # You can combine multiple roles, e.g. moderator + superfan.
+  AllowedRoles:
+    - moderator
+    - superfan
+
+  # How Whitelist and Blacklist interact:
+  #
+  #   Whitelist empty, Blacklist empty:
+  #     ALL commands are allowed. Use with caution!
+  #
+  #   Whitelist empty, Blacklist filled:
+  #     All commands are allowed EXCEPT those in the Blacklist.
+  #     Example: Blacklist has "op" → "op Notch" is blocked, everything else works.
+  #
+  #   Whitelist filled, Blacklist empty:
+  #     ONLY commands in the Whitelist are allowed, everything else is blocked.
+  #     Example: Whitelist has "say" → only "say ..." works.
+  #
+  #   Both filled:
+  #     A command must be in the Whitelist AND NOT in the Blacklist to pass.
+  #     The Blacklist can be used to block specific entries from the Whitelist.
+
+  # Whitelist: Only commands starting with these base words are allowed.
+  # If the list is empty, all commands are allowed (see above).
+  # Only the first word of the comment is checked.
+  # Example: "say" allows "say Hello", "say Test", etc.
+  # Example: "give" allows "give @a diamond 1", "give @p sword 1", etc.
+  Whitelist:
+    - say
+    - give
+
+  # Blacklist: Commands starting with these base words are always blocked.
+  # Only the first word of the comment is checked.
+  # Example: "op" blocks "op", "op Notch", etc.
+  Blacklist:
+    - op
+    - deop
+    - stop
+    - ban
+    - kick
+    - whitelist
+
+# -------------------------------------------------------------------------
 # SYSTEM & CONSOLE CONTROL
 # -------------------------------------------------------------------------
 # Changing these settings can affect startup behavior and process visibility.
