@@ -24,6 +24,7 @@ Each version is split into two sections:
 - `join` trigger — fires every time a viewer joins the live stream.
 - `CommentCommands` config option — lets viewers send Minecraft commands via chat comments. Configurable prefix, role restrictions (`all`, `moderator`, `superfan`, `fanclub`), whitelist, and blacklist.
 - `mca.vsix` extension — adds syntax highlighting and error checking for `.mca` files in VS Code.
+- Give Error if you use `{comment}` in overlay text for triggers other than `comment` (prevents mistakes).
 
 #### Fixed
 - Overlay now shows a transparent background when opened via browser URL instead of a green screen.
@@ -47,6 +48,7 @@ Each version is split into two sections:
 - `main.py` — `on_join` event handler.
 - `main.py` — `CommentCommands`: prefix and role check (moderator, superfan, fanclub), whitelist/blacklist filtering, direct RCON forwarding.
 - `main.py` — user status extraction in `on_comment` (moderator, superfan, fanclub via `fan_ticket_count`/`fans_club`/`fans_club_info`).
+- `Validator.py`: `{comment}` in overlay text now only allowed for the `comment` trigger. otherwise output an error.
 
 #### Changed
 - `README.md` — updated OS requirements (Linux now supported), platform-specific start command, Java availability note for Linux.

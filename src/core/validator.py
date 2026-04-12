@@ -178,8 +178,14 @@ def validate_text(text: str) -> List[Diagnostic]:
 
             # Check prefix: '/', '$', '!' or '>>'
             if cmd_trim.startswith(">>"):
-                # Overlay command — no further prefix checks needed
-                pass
+                # Overlay command — check for {comment} placeholder
+                if "{comment}" in cmd_trim and trigger.lower() != "comment":
+                    ph_pos = cmd_start_global + cmd_trim.find("{comment}")
+                    diagnostics.append(_make_diag(
+                        line_number, ph_pos, ph_pos + len("{comment}"),
+                        "'{comment}' is only resolved for the 'comment' trigger. It will not be replaced for any other trigger.",
+                        Severity.ERROR, "comment_placeholder_wrong_trigger"
+                    ))
             elif cmd_trim[0] not in ("/", "$", "!"):
                 diagnostics.append(_make_diag(
                     line_number, cmd_start_global, cmd_start_global + len(cmd_trim),
