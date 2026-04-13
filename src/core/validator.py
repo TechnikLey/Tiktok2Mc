@@ -176,8 +176,9 @@ def validate_text(text: str) -> List[Diagnostic]:
                     ))
                 continue
 
-            # Check prefix: '/', '$', '!' or '>>'
-            if cmd_trim.startswith(">>"):
+            # Check prefix: '/', '$', '!' or '>>' or '@NAME>>'
+            _overlay_re = re.match(r"@(\w+)>>", cmd_trim)
+            if cmd_trim.startswith(">>") or _overlay_re:
                 # Overlay command — check for {comment} placeholder
                 if "{comment}" in cmd_trim and trigger.lower() != "comment":
                     ph_pos = cmd_start_global + cmd_trim.find("{comment}")
@@ -193,9 +194,9 @@ def validate_text(text: str) -> List[Diagnostic]:
                     Severity.ERROR, "invalid_prefix"
                 ))
 
-            # '!' may only appear at the beginning (skip for >> overlay commands)
+            # '!' may only appear at the beginning (skip for >> and @NAME>> overlay commands)
             idx_bang = cmd_trim.find("!")
-            if idx_bang > 0 and not cmd_trim.startswith(">>"):
+            if idx_bang > 0 and not cmd_trim.startswith(">>") and not re.match(r"@\w+>>", cmd_trim):
                 # position of the bad '!' relative to line
                 diagnostics.append(_make_diag(
                     line_number, cmd_start_global + idx_bang, cmd_start_global + idx_bang + 1,

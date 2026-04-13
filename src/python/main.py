@@ -31,6 +31,7 @@ from core.validator import validate_file, print_diagnostics
 from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
+from core.overlay_utils import send_overlay_text
 
 # Windows-specific fix for the event loop (prevents WinError 6)
 if sys.platform == "win32":
@@ -213,8 +214,14 @@ def generate_datapack():
                             continue
 
                         # Detect command prefix
-                        if cmd.startswith(">>"): 
+                        _overlay_match = re.match(r"@(\w+)>>", cmd)
+                        if _overlay_match:
                             kind = "overlay"
+                            overlay_name = _overlay_match.group(1)
+                            body = cmd[_overlay_match.end():].strip()
+                        elif cmd.startswith(">>"):
+                            kind = "overlay"
+                            overlay_name = "defaults"
                             body = cmd[2:].strip()
                         elif cmd.startswith("!"):
                             kind = "rcon"
@@ -242,8 +249,8 @@ def generate_datapack():
 
                         # Sort into the appropriate action list
                         if kind == "overlay":
-                            # Store raw body (with {user} placeholder intact) — no multiplier
-                            overlay_actions.setdefault(name, []).append(body)
+                            # Store (overlay_name, raw body) — no multiplier
+                            overlay_actions.setdefault(name, []).append((overlay_name, body))
                             valid_functions.add(name)
                         else:
                             for _ in range(times):
@@ -416,7 +423,7 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
         user_display = source_user
 
     if name in overlay_actions:
-        for raw_body in overlay_actions[name]:
+        for overlay_name, raw_body in overlay_actions[name]:
             parts = raw_body.split("|")
             # {user} ersetzen
             title = parts[0].replace("{user}", user_display) if len(parts) > 0 else ""
@@ -429,7 +436,7 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 duration = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 3
             except (ValueError, IndexError):
                 duration = 3
-            send_overlay_text(title, subtitle, duration)
+            send_overlay_text(title, subtitle, duration, overlay_name)
 
     # --- 1. VANILLA COMMANDS ---
     if name in vanilla_functions:
@@ -604,19 +611,6 @@ def execute_gift_action(gift_id: str):
         print(f"[HTTP] Action for gift {gift_id} started")
     except Exception as e:
         print(f"[HTTP ERROR] {e}")
-
-# ==========================================
-# Overlay text sender (overlaytxt plugin)
-# ==========================================
-def send_overlay_text(title, subtitle, duration=3):
-    url = f"http://127.0.0.1:{OVERLAYTXT_PORT}/display"
-    payload = {"title": title, "subtitle": subtitle, "duration": duration}
-    try:
-        response = requests.post(url, json=payload, timeout=2)
-        if response.status_code == 200:
-            print(f"[OVERLAYTXT] Sent: {title}")
-    except Exception as e:
-        print(f"[OVERLAYTXT] Error sending: {e}")
 
 # ==========================================
 # User-friendly name extraction

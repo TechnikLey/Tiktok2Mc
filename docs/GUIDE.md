@@ -241,6 +241,7 @@ Trigger:TypeCommand
   - `!` for Minecraft server plugin commands
   - `$` for special built-in actions
   - `>>` for overlay text (see [Overlay Text](#overlay-text))
+  - `@Name>>` for overlay text sent to a specific named overlay window (see [Multiple Overlays](#multiple-overlays))
 - **Command** -- The actual command to run.
 
 > [!WARNING]
@@ -337,6 +338,8 @@ follow:/give @a minecraft:golden_apple 7
 ```
 follow:>>Neuer Follower!|{user} folgt dir!|5
 ```
+
+**`@Name>>` -- Named overlay text.** Same as `>>`, but targets a specific named overlay window. Replace `Name` with the name of one of your configured overlays. If you write `>>` without a name, the overlay named `default` is used automatically. See [Multiple Overlays](#multiple-overlays) for details.
 
 ### Repeating Commands
 
@@ -638,7 +641,7 @@ A countdown timer for your stream. It pauses when the player dies and resumes on
 
 Displays custom text on your stream overlay. You can trigger overlay text directly from `actions.mca` using the `>>` prefix.
 
-- **URL for OBS:** `http://localhost:5005`
+- **URL for OBS:** `http://localhost:5005/?overlay=default`
 - **Config setting:** `Overlaytxt: Enable: true`
 
 #### Display Mode
@@ -718,6 +721,53 @@ follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now followin
 ```
 
 This gives golden apples to all players **and** shows the overlay text at the same time.
+
+#### Multiple Overlays
+
+You can run several overlay windows at the same time — each one as a separate OBS Browser Source showing different information. For example, one overlay in the top-left corner for gifts and another in the bottom-right for follower notifications.
+
+To do this, add each overlay by name to `config/config.yaml`:
+
+```yaml
+Overlaytxt:
+  Port: 5005
+  Overlays:
+    - name: default
+    - name: stats
+    - name: alerts
+```
+
+Each name creates a separate URL you can use as a Browser Source in OBS:
+
+| Overlay name | URL |
+|---|---|
+| `default` | `http://localhost:5005/?overlay=default` |
+| `stats` | `http://localhost:5005/?overlay=stats` |
+| `alerts` | `http://localhost:5005/?overlay=alerts` |
+
+All overlays share the same `Port`, `DisplayMode`, `FadeIn`, `FadeOut`, `MaxFails`, and `Cooldown` settings.
+
+To send text to a specific overlay from `actions.mca`, write `@Name>>` instead of `>>`:
+
+```
+follow:@alerts>>New Follower!|{user} is now following you!|5
+join:@stats>>Welcome!|{user} just joined!|3
+```
+
+If you write `>>` without a name, the overlay named `default` is used automatically:
+
+```
+follow:>>New Follower!|{user} is now following you!|5
+```
+
+This is exactly the same as:
+
+```
+follow:@default>>New Follower!|{user} is now following you!|5
+```
+
+> [!IMPORTANT]
+> The name must exactly match one of the names defined under `Overlays` in `config.yaml`. If no match is found, the message is silently dropped.
 
 > [!NOTE]
 > Overlay Text works best with **DCS** mode (OBS Studio, vMix, Streamlabs Desktop). In DCS mode, you can add the overlay as a Browser Source with a transparent background -- the text appears cleanly on top of your stream.

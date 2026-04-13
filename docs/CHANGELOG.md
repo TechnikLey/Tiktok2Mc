@@ -15,13 +15,22 @@ Each version is split into two sections:
 
 ### User
 
-### Fixed
+#### Added
+- **Named overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define overlay names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` instead of `>>` in `actions.mca` to target a specific window. Writing `>>` without a name still targets the `default` overlay automatically.
+
+#### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
 
-### Changed
-- **Edit actions.mca examples** - Commented out the join trigger because it can spam the Overlay with many messages.
+#### Changed
+- **Edit actions.mca examples** — Commented out the `join` trigger because it can spam the overlay with many messages.
 
 ### Developer
+
+#### Added
+- **Named overlay routing (`main.py`)** — The `>>` parser now extracts an optional `@Name` prefix. The overlay name is stored alongside the body and forwarded to `send_overlay_text()` as the `overlay_name` parameter. Without a name, `"default"` is used automatically.
+- **`@Name>>` validator support (`validator.py`, `server.js`)** — The `.mca` validator and the VS Code language server both recognise `@Name>>` as a valid command prefix. No error is raised for this syntax.
+- **`@Name>>` syntax highlighting (`mca.tmLanguage.json`)** — The `@Name` part is coloured distinctly (entity type colour) and the `>>` operator is highlighted separately to visually distinguish named overlays from plain `>>`.
+
 ---
 
 ## [0.2.0] - 2026-04-13

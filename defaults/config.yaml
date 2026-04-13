@@ -4,7 +4,7 @@
 # This file is a template.
 # Personal settings should be changed in 'config.yaml' only.
 # -------------------------------------------------------------------------
-config_version: 2
+config_version: 3
 
 # -------------------------------------------------------------------------
 # IMPORTANT FOR BEGINNERS:
@@ -273,6 +273,22 @@ Overlaytxt:
   # Set to 0 for instant appear/disappear (no animation).
   FadeIn: 500
   FadeOut: 500
+
+  # The number of consecutive connection failures allowed before
+  # the circuit breaker triggers and temporarily blocks requests.
+  MaxFails: 3
+
+  # The duration in seconds to wait before attempting to 
+  # send messages again after the MaxFails limit is reached.
+  Cooldown: 10
+
+  # A list of available overlay instances. 
+  # Each 'name' creates a unique endpoint and can be opened 
+  # as a separate window or OBS source.
+  # URL format: http://127.0.0.1:PORT/?overlay=NAME
+  # Replace PORT with the configured port number and NAME with the overlay name.
+  Overlays:
+    - name: "default"
 
 # STREAM TIMER
 Timer:
