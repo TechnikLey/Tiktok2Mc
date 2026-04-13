@@ -83,7 +83,6 @@ try:
         cfg = yaml.safe_load(f)
 except Exception as e:
     print(f"Error loading config: {e}")
-    wait_for_key()
     sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)

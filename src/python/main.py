@@ -769,6 +769,9 @@ def initialize_likes(total_likes):
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
 
+    _connect_time = [None]  # Tracks when the live connection was established
+    COMMENT_WARMUP_SECONDS = 1  # Ignore comments arriving within this window after connect
+
     # =========================
     # GIFT events
     # =========================
@@ -882,6 +885,10 @@ def create_client(user):
     # =========================
     @client.on(CommentEvent)
     def on_comment(event):
+        # Skip the initial burst of historical comments TikTok sends on connect
+        if _connect_time[0] is None or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS:
+            return
+
         username = get_safe_username(event.user)
         comment_text = getattr(event, 'comment', '')
 
@@ -940,6 +947,7 @@ def create_client(user):
     # =========================
     @client.on(ConnectEvent)
     def on_connect(_):
+        _connect_time[0] = time.time()
         print(f"[OK] Live connection established: @{user}")
 
     return client

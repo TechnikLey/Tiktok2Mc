@@ -15,6 +15,9 @@ Each version is split into two sections:
 
 ### User
 
+### Fixed
+- **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
+
 ### Changed
 - **Edit actions.mca examples** - Commented out the join trigger because it can spam the Overlay with many messages.
 
