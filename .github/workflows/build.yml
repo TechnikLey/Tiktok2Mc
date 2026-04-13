@@ -62,8 +62,8 @@ jobs:
 
       - name: Create Archives
         run: |
-          cd build-windows && zip -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
-          tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
+          cd build-windows && zip -9 -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
+          GZIP=-9 tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
