@@ -12,9 +12,9 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact: TikTok-MC-Gift-Windows
+            artifact: TikTok2Mc-Windows
           - os: ubuntu-latest
-            artifact: TikTok-MC-Gift-Linux
+            artifact: TikTok2Mc-Linux
 
     runs-on: ${{ matrix.os }}
 
@@ -51,23 +51,23 @@ jobs:
       - name: Download Windows Build
         uses: actions/download-artifact@v4
         with:
-          name: TikTok-MC-Gift-Windows
+          name: TikTok2Mc-Windows
           path: build-windows/
 
       - name: Download Linux Build
         uses: actions/download-artifact@v4
         with:
-          name: TikTok-MC-Gift-Linux
+          name: TikTok2Mc-Linux
           path: build-linux/
 
       - name: Create Archives
         run: |
-          cd build-windows && zip -r ../TikTok-MC-Gift-Windows.zip . && cd ..
-          tar -czf TikTok-MC-Gift-Linux.tar.gz -C build-linux .
+          cd build-windows && zip -r ../TikTok2Mc-Windows.zip . && cd ..
+          tar -czf TikTok2Mc-Linux.tar.gz -C build-linux .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            TikTok-MC-Gift-Windows.zip
-            TikTok-MC-Gift-Linux.tar.gz
+            TikTok2Mc-Windows.zip
+            TikTok2Mc-Linux.tar.gz
