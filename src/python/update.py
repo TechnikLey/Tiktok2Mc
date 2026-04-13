@@ -11,6 +11,7 @@
 import sys
 import shutil
 import zipfile
+import tarfile
 import requests
 import re
 import time
@@ -254,18 +255,30 @@ def run_update():
 
         # Download & extract
         print(f"[>>] Downloading package...")
-        asset = next((a for a in release.get("assets", []) if a["name"].endswith(".zip")), None)
-        if not asset: sys.exit(5)
+        if sys.platform == "win32":
+            asset = next((a for a in release.get("assets", []) if "Windows" in a["name"] and a["name"].endswith(".zip")), None)
+            archive_name = "release.zip"
+        else:
+            asset = next((a for a in release.get("assets", []) if "Linux" in a["name"] and a["name"].endswith(".tar.gz")), None)
+            archive_name = "release.tar.gz"
+
+        if not asset:
+            print("[FAIL] No matching release asset found for this platform.")
+            sys.exit(5)
 
         if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR)
         TEMP_DIR.mkdir(parents=True)
-        zip_path = TEMP_DIR / "release.zip"
-        download_with_progress(asset["url"], zip_path)
+        archive_path = TEMP_DIR / archive_name
+        download_with_progress(asset["url"], archive_path)
 
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(TEMP_DIR)
+        if sys.platform == "win32":
+            with zipfile.ZipFile(archive_path, "r") as z:
+                z.extractall(TEMP_DIR)
+        else:
+            with tarfile.open(archive_path, "r:gz") as t:
+                t.extractall(TEMP_DIR)
 
-        subs = [d for d in {x.name for x in TEMP_DIR.iterdir()} if d != "release.zip"]
+        subs = [d for d in {x.name for x in TEMP_DIR.iterdir()} if d != archive_name]
         temp_items = [TEMP_DIR / s for s in subs]
         extracted_root = str(next((p for p in temp_items if p.is_dir()), TEMP_DIR))
 
