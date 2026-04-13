@@ -11,6 +11,16 @@ Each version is split into two sections:
 
 ---
 
+## [Unreleased]
+
+### User
+
+### Changed
+- **Edit actions.mca examples** - Commented out the join trigger because it can spam the Overlay with many messages.
+
+### Developer
+---
+
 ## [0.2.0] - 2026-04-13
 
 ### User
