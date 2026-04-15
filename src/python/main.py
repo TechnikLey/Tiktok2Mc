@@ -291,24 +291,13 @@ def generate_datapack():
         base_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
         # === Apply whitelist / blacklist logic ===
         # === Apply whitelist / blacklist logic with debug ===
-        if RANDOM_TRIGGER_WHITELIST:
-            possible_random_actions = []
-            for cmd in base_random_actions:
-                if cmd not in RANDOM_TRIGGER_WHITELIST:
-                    print(f"[RANDOM] '{cmd}' not in whitelist")
-                elif cmd in RANDOM_TRIGGER_BLACKLIST:
-                    print(f"[RANDOM] '{cmd}' blocked by blacklist")
-                else:
-                    possible_random_actions.append(cmd)
-        elif RANDOM_TRIGGER_BLACKLIST:
-            possible_random_actions = []
-            for cmd in base_random_actions:
-                if cmd in RANDOM_TRIGGER_BLACKLIST:
-                    print(f"[RANDOM] '{cmd}' blocked by blacklist")
-                else:
-                    possible_random_actions.append(cmd)
-        else:
-            possible_random_actions = base_random_actions
+        for cmd in base_random_actions:
+            if RANDOM_TRIGGER_WHITELIST and cmd not in RANDOM_TRIGGER_WHITELIST:
+                print(f"[RANDOM] {cmd} is not in the witelist, excluding from $random pool.")
+            elif RANDOM_TRIGGER_BLACKLIST and cmd in RANDOM_TRIGGER_BLACKLIST:
+                print(f"[RANDOM] {cmd} is in the blacklist, excluding from $random pool.")
+            else:
+                possible_random_actions.append(cmd)
 
         # Create ZIP archive
         zip_path = Path(DATAPACK_ROOT) / DATAPACK_NAME
@@ -428,6 +417,8 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
             if action == "random" and possible_random_actions:
                 chosen = random.choice(possible_random_actions)
                 await execute_global_command(chosen, source_user, chain_depth)
+            elif action == "random" and not possible_random_actions:
+                print(f"[HOOK] [WARN] No possible actions available for $random trigger '{name}'")
             elif action in HOOK_ACTIONS:
                 try:
                     _hook_api._current_depth = chain_depth

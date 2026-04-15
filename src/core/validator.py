@@ -129,16 +129,26 @@ def validate_text(text: str) -> List[Diagnostic]:
             ))
 
         # F: trigger validation (name & duplicates)
+
         trigger_raw = line_no_comment[:colon_index_rel]
         trigger = trigger_raw.strip()
         # compute where trigger starts in global coordinates
         trigger_rel_index = line_no_comment.find(trigger_raw)
         trigger_global_start = base_offset + trigger_rel_index + trigger_raw.find(trigger) if trigger_raw.strip() != "" else base_offset
 
-        if not re.fullmatch(r"[A-Za-z0-9_]+", trigger):
+        is_quoted = trigger.startswith("'") and trigger.endswith("'")
+        if is_quoted:
+            valid = re.fullmatch(r"'[A-Za-z0-9_ ]+'", trigger)
+        else:
+            valid = re.fullmatch(r"[A-Za-z0-9_]+", trigger)
+        if not valid:
+            if is_quoted:
+                msg = f"Invalid quoted trigger {trigger!r} (allowed: A-Z, 0-9, _, space, in single quotes)."
+            else:
+                msg = f"Invalid trigger name '{trigger}' (allowed: A-Z, 0-9, _). Für Leerzeichen: Trigger in einfache Anführungszeichen setzen."
             diagnostics.append(_make_diag(
                 line_number, trigger_global_start, trigger_global_start + len(trigger),
-                f"Invalid trigger name '{trigger}' (allowed: A-Z, 0-9, _).",
+                msg,
                 Severity.ERROR, "invalid_trigger_name"
             ))
 

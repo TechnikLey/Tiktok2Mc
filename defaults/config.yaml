@@ -123,7 +123,6 @@ Gifts:
   #   "gift_1" → allows only "gift_1" to be selected
   #   ["gift_1", "gift_2"] → allows only these two
   random_included:
-    -
 
   # random_exclude:
   # These triggers will NEVER be selected by $random.
