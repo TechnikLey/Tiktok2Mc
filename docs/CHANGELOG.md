@@ -18,7 +18,9 @@ Each version is split into two sections:
 #### Added
 - **Named overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define overlay names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` instead of `>>` in `actions.mca` to target a specific window. Writing `>>` without a name still targets the `default` overlay automatically.
 - **random_included config options** — The `$random` command now respects one new list in `config.yaml` under `Gifts`: `random_included` (whitelist). This allows you to precisely control which triggers are eligible for random selection.
-- **`docs` folder** - The entire `docs` folder is now included, so you can access all documentation files (like this changelog) directly from the release without needing to visit GitHub. 
+- **`docs` folder** - The entire `docs` folder is now included, so you can access all documentation files (like this changelog) directly from the release without needing to visit GitHub.
+- **Triggers Names** - Now you can use trigger names instead of just trigger numbers in the `actions.mca` file.
+- **Add New Chapter to GUID.md** - Added a new chapter to the GUIDE.md about using trigger names or IDs in the `actions.mca` file, including priority rules and handling names with spaces. 
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
@@ -29,6 +31,7 @@ Each version is split into two sections:
 - **Edit default config values** - Add `join` and `comment` to the default `random_exclude` list for `$random`-Command
 - **Update random_excluded list function** - The function of the `random_exclude` list has been changed to work better with the new `random_included` list.
 - **Edit GUIDE.md** - Updated the `$random` section to reflect the new configurable inclusion list and added a note about automatic exclusion of triggers containing `$random` to prevent recursion.
+- **VS Code extension** - Updated `mca.vsix` to include the new `''` syntax for trigger names with a with space between the leeters.
 
 ### Developer
 
@@ -37,6 +40,9 @@ Each version is split into two sections:
 - **`@Name>>` validator support (`validator.py`, `server.js`)** — The `.mca` validator and the VS Code language server both recognise `@Name>>` as a valid command prefix. No error is raised for this syntax.
 - **`@Name>>` syntax highlighting (`mca.tmLanguage.json`)** — The `@Name` part is coloured distinctly (entity type colour) and the `>>` operator is highlighted separately to visually distinguish named overlays from plain `>>`.
 - **Exclude files/folder from build (`build.py`)** — The `sync_folder()` function now accepts an `exclude` parameter with glob patterns to specify files or folders that should be ignored during the build process.
+
+#### Fixed
+- **$random logic:** - Resolved an issue where an empty action list would trigger a misleading `[HOOK] [WARN] Unknown script action: 'random'` error.
 
 #### Changed
 - **Config version** - bumped from `3` to `4`

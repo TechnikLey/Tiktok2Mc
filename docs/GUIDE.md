@@ -282,6 +282,8 @@ join:>>Welcome!|{user} just joined the stream!|3
 
 > [!WARNING]
 > The `comment` trigger fires for **every** comment. On active streams this can be very frequent. Avoid complex or expensive commands here.
+> [!WARNING]
+> The `join` trigger fires for every viewer that joins the stream, which can be very frequent on busy streams. Use with caution to avoid overwhelming your server with commands.
 
 Example:
 
@@ -290,6 +292,67 @@ comment:>>New comment!|{user} commented!|2
 ```
 
 **likes** and **like_2** -- Trigger based on accumulated likes. See [Like Triggers](#like-triggers) for details.
+
+---
+
+#### Using Trigger Names or IDs
+
+You can use either **trigger IDs** or **trigger names** in your `actions.mca` file.
+
+The available gifts are defined in `core/gifts.json`, for example:
+
+```json
+{
+  "name": "Tom the Tomato",
+  "coins": 1,
+  "id": 16379
+},
+{
+  "name": "Cool",
+  "coins": 1,
+  "id": 16212
+}
+```
+
+---
+
+##### Example Usage
+
+Both of the following lines in `actions.mca` do the same thing:
+
+```mcfunction
+16212:/give @a minecraft:diamond 5
+Cool:/give @a minecraft:diamond 5
+```
+
+When the gift **"Cool"** is received, all players will get 5 diamonds.
+
+---
+
+##### Priority Rule
+
+> [!IMPORTANT]
+> * The system checks **names first**, then **IDs**.
+> * If a **name match is found**, the corresponding command is executed.
+> * The line using the **ID will be ignored** in that case.
+>
+> If you use both a name and its ID in `actions.mca`, only the **name-based trigger** will run.
+
+---
+
+##### Handling Names with Spaces
+
+Gift names that contain spaces must be wrapped in single quotes `' '`.
+
+###### Example:
+
+```
+'Tom the Tomato':/give @a minecraft:carrot 10
+```
+
+Without quotes, the trigger will not work correctly.
+
+---
 
 ### Command Types
 

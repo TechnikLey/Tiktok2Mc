@@ -418,7 +418,7 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 chosen = random.choice(possible_random_actions)
                 await execute_global_command(chosen, source_user, chain_depth)
             elif action == "random" and not possible_random_actions:
-                print(f"[HOOK] [WARN] No possible actions available for $random trigger '{name}'")
+                print(f"[HOOK] [WARN] No possible actions available for $random trigger.")
             elif action in HOOK_ACTIONS:
                 try:
                     _hook_api._current_depth = chain_depth

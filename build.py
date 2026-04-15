@@ -40,7 +40,7 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.2.0"
+        TOOL_VERSION = "v0.3.0"
         UPDATER_VERSION = "v1.1.0"
 
         IS_WINDOWS = sys.platform == "win32"
