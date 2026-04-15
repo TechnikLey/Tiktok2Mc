@@ -92,3 +92,18 @@ like_2:/clear @a *; /kill @a
 # Additional exclusions are configurable in config.yaml under:
 #   Gifts > random_exclude (default: likes, like_2, follow)
 16071:$random
+
+# =====================================================================
+# Trigger Name instead of ID
+# =====================================================================
+
+# You can also use trigger names instead of numeric IDs.
+# It you trigger name has spaces, enclose it in single quotes ('').
+# The example below defines a trigger named "Tom the Tomato" for the same gift ID 16379.
+# When you define trigger name and trigger ID for the same action, the name takes priority.
+# This example below executes then the Gift was sent
+'Tom the Tomato':$random
+# As long as the example above is active, the trigger name "Tom the Tomato" will take priority 
+# over the numeric ID 16379.
+# So the example below will never be executed.
+16379:$random
