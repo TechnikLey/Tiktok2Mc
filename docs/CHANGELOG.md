@@ -17,6 +17,7 @@ Each version is split into two sections:
 
 #### Added
 - **Named overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define overlay names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` instead of `>>` in `actions.mca` to target a specific window. Writing `>>` without a name still targets the `default` overlay automatically.
+- **random_included config options** — The `$random` command now respects one new list in `config.yaml` under `Gifts`: `random_included` (whitelist). This allows you to precisely control which triggers are eligible for random selection.
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
@@ -25,6 +26,8 @@ Each version is split into two sections:
 - **Edit actions.mca examples** — Commented out the `join` trigger because it can spam the overlay with many messages.
 - **Edit default config values** - Updated `GoalMultiplier` default from `2` to `1` to prevent overwhelming growth of goal-based triggers for new users.
 - **Edit default config values** - Add `join` and `comment` to the default `random_exclude` list for `$random`-Command
+- **Update random_excluded list function** - The function of the `random_exclude` list has been changed to work better with the new `random_included` list.
+- **Edit GUIDE.md** - Updated the `$random` section to reflect the new configurable inclusion list and added a note about automatic exclusion of triggers containing `$random` to prevent recursion.
 
 ### Developer
 

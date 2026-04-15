@@ -51,7 +51,6 @@ DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
 LIKE_GOAL_PORT = 9797
 LIKE_TRIGGERS = []
-RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
 
 # --- Queues & throttling (for optimal RCON performance) ---
 trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -93,6 +92,10 @@ COMMENT_CMD_PREFIX = "!"
 COMMENT_CMD_ROLES = ["moderator"]
 COMMENT_CMD_WHITELIST = []  # Only these commands allowed (empty = all allowed)
 COMMENT_CMD_BLACKLIST = []  # These commands are blocked
+
+RANDOM_TRIGGER_WHITELIST = []
+RANDOM_TRIGGER_BLACKLIST = []
+
 app = Flask(__name__)
 
 log = logging.getLogger('werkzeug')
@@ -106,6 +109,7 @@ def load_config():
     """Loads configuration values from the YAML config file."""
     global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, RANDOM_EXCLUDE
     global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
+    global RANDOM_TRIGGER_WHITELIST, RANDOM_TRIGGER_BLACKLIST
 
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
@@ -123,17 +127,16 @@ def load_config():
         OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
         LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
 
-        raw_exclude = config.get("Gifts", {}).get("random_exclude", ["likes", "like_2", "follow"])
-        if isinstance(raw_exclude, list):
-            RANDOM_EXCLUDE = [str(e).strip() for e in raw_exclude if str(e).strip()]
-        else:
-            RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
+        raw_included = config.get("Gifts", {}).get("random_included", [])
+        RANDOM_TRIGGER_WHITELIST = [str(c).strip() for c in raw_included if str(c).strip()] if isinstance(raw_included, list) else []
+        raw_exclude = config.get("Gifts", {}).get("random_exclude", [])
+        RANDOM_TRIGGER_BLACKLIST = [str(c).strip() for c in raw_exclude if str(c).strip()] if isinstance(raw_exclude, list) else []
 
         LIKE_TRIGGERS = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
 
         comment_cmd_cfg = config.get("CommentCommands", {})
         COMMENT_CMD_ENABLE = bool(comment_cmd_cfg.get("Enable", False))
-        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "!"))
+        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "#"))
         raw_roles = comment_cmd_cfg.get("AllowedRoles", ["moderator"])
         if isinstance(raw_roles, list):
             COMMENT_CMD_ROLES = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
@@ -278,11 +281,34 @@ def generate_datapack():
         with meta_file.open("w", encoding="utf-8") as f:
             f.write('{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}')
 
+        # =============================================================
         # === Build possible_random_actions (safe pool for $random) ===
-        exclude = set(RANDOM_EXCLUDE)
+        # =============================================================
+        exclude = set(RANDOM_TRIGGER_BLACKLIST)
         random_sources = {n for n, acts in script_actions.items() if "random" in acts}
         exclude |= random_sources
-        possible_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
+        # Base pool
+        base_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
+        # === Apply whitelist / blacklist logic ===
+        # === Apply whitelist / blacklist logic with debug ===
+        if RANDOM_TRIGGER_WHITELIST:
+            possible_random_actions = []
+            for cmd in base_random_actions:
+                if cmd not in RANDOM_TRIGGER_WHITELIST:
+                    print(f"[RANDOM] '{cmd}' not in whitelist")
+                elif cmd in RANDOM_TRIGGER_BLACKLIST:
+                    print(f"[RANDOM] '{cmd}' blocked by blacklist")
+                else:
+                    possible_random_actions.append(cmd)
+        elif RANDOM_TRIGGER_BLACKLIST:
+            possible_random_actions = []
+            for cmd in base_random_actions:
+                if cmd in RANDOM_TRIGGER_BLACKLIST:
+                    print(f"[RANDOM] '{cmd}' blocked by blacklist")
+                else:
+                    possible_random_actions.append(cmd)
+        else:
+            possible_random_actions = base_random_actions
 
         # Create ZIP archive
         zip_path = Path(DATAPACK_ROOT) / DATAPACK_NAME

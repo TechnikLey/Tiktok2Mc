@@ -373,27 +373,63 @@ Put a `#` at the beginning of a line to disable it:
 
 This line will be ignored. You can use this to temporarily turn off an action without deleting it.
 
+---
+
 ### The Random Action
 
-Use `$random` to trigger a random action from your list:
+The `$random` command allows the tool to pick and execute a random action from your defined list. You can fine-tune exactly which actions are eligible using the `random_included` and `random_exclude` lists.
 
-```
-16071:$random
-```
+#### How the Filters Work
+The selection process follows a specific hierarchy based on how you fill the lists:
 
-When this gift is sent, the tool picks a random action from all your other defined actions and runs it. Triggers that contain `$random` themselves are always excluded automatically to prevent infinite loops.
+| Scenario | Result |
+| :--- | :--- |
+| **Both lists are empty** | All triggers are allowed. |
+| **ONLY `random_exclude` is set** | All triggers are allowed **EXCEPT** those in this list. |
+| **ONLY `random_included` is set** | **ONLY** triggers in this list are allowed. |
+| **BOTH lists are set** | A trigger must be in `included` **AND NOT** in `exclude`. |
 
-By default, `follow`, `likes`, and `like_2` are also excluded. You can change this in `config/config.yaml`:
+> [!IMPORTANT]
+> **The Override Rule:** The `random_exclude` list always acts as a "veto." Even if an action is specifically listed in `random_included`, it will be blocked if it also appears in `random_exclude`.
+
+---
+
+#### Configuration
+
+You can manage these settings directly in your `config/config.yaml` file. Here is an example setup:
 
 ```yaml
 Gifts:
+  # WHITELIST: Only these triggers can be selected by $random.
+  # Leave empty to allow all triggers (subject to exclusion rules).
+  random_included:
+    - 
+
+  # BLACKLIST: These triggers will NEVER be selected by $random.
   random_exclude:
     - likes
     - like_2
     - follow
+    - join
+    - comment
 ```
 
-Add or remove trigger names from this list to control which actions `$random` can never pick.
+---
+
+> [!NOTE]
+> * **Recursion Safety:** Any trigger that contains the `$random` command itself is **automatically excluded** by the system. This prevents the tool from getting stuck in an infinite loop.
+> * **Standard Exclusions:** By default, common interactions like `follow`, `likes`, `like_2`, `join`, and `comment` are excluded. You can manually remove them from the `exclude` list if you want them included in the pool.
+> * **Precision Matters:** Ensure the trigger names in these lists match your action definitions exactly (case-sensitive).
+
+---
+
+#### Implementation Example
+If you define a gift trigger like this:
+```yaml
+16071:$random
+```
+
+When the gift with ID **16071** is received, the tool will look at your configuration, filter out the forbidden actions, and roll the dice on the remaining ones.
 
 ### Like Triggers
 

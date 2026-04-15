@@ -100,10 +100,41 @@ Gifts:
   # Web server port used for the OBS overlay.
   LIKE_GOAL_PORT: 9797
 
-  # Triggers excluded from $random selection.
-  # These triggers will never be chosen when $random is executed.
-  # Triggers that contain $random themselves are always excluded automatically.
-  # Example: ["likes", "like_2", "follow"]
+  # How random_included and random_exclude work:
+  #
+  #   - If BOTH lists are empty:
+  #       → All triggers are allowed (use with caution).
+  #
+  #   - If ONLY random_exclude is set:
+  #       → All triggers are allowed EXCEPT those in random_exclude.
+  #
+  #   - If ONLY random_included is set:
+  #       → ONLY triggers in random_included are allowed.
+  #
+  #   - If BOTH are set:
+  #       → A trigger must be in random_included AND NOT in random_exclude.
+  #       → random_exclude can override (block) entries from random_included.
+
+  # random_included:
+  # Only these triggers can be selected by $random.
+  # If empty, all triggers are allowed (see rules above).
+  #
+  # Examples:
+  #   "gift_1" → allows only "gift_1" to be selected
+  #   ["gift_1", "gift_2"] → allows only these two
+  random_included:
+    -
+
+  # random_exclude:
+  # These triggers will NEVER be selected by $random.
+  #
+  # Note:
+  #   Triggers that contain "$random" are automatically excluded
+  #   to prevent recursion.
+  #
+  # Examples:
+  #   "likes" → will never be selected
+  #   ["likes", "follow"] → both are always excluded
   random_exclude:
     - likes
     - like_2
