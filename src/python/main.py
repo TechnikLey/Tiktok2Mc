@@ -23,7 +23,7 @@ import random
 import time
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics
@@ -951,6 +951,15 @@ def create_client(user):
         if "comment" in valid_functions:
             # For overlay: allow {comment} as a placeholder
             MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
+
+    # =========================
+    # Share events
+    # =========================
+    @client.on(ShareEvent)
+    def on_share(event):
+        username = get_safe_username(event.user)
+        if "share" in valid_functions:
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("share", username))
 
     # =========================
     # CONNECT event

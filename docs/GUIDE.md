@@ -20,13 +20,14 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 ## How It Works
 
-When you go live on TikTok, the tool connects to your stream automatically. It watches for five types of events:
+When you go live on TikTok, the tool connects to your stream automatically. It watches for these types of events:
 
 - **Gifts** -- A viewer sends a TikTok gift.
 - **Follows** -- A viewer follows your account.
 - **Likes** -- Viewers accumulate a certain number of likes.
 - **Comments** -- A viewer writes a comment in the live chat.
 - **Joins** -- A viewer joins the live stream.
+- **Shares** -- A viewer shares the live stream.
 
 Each event is linked to a Minecraft command that you define. For example, you could set it up so that every time someone sends a Rose gift, a Creeper spawns next to the player.
 

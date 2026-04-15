@@ -21,6 +21,7 @@ Each version is split into two sections:
 - **`docs` folder** - The entire `docs` folder is now included, so you can access all documentation files (like this changelog) directly from the release without needing to visit GitHub.
 - **Triggers Names** - Now you can use trigger names instead of just trigger numbers in the `actions.mca` file.
 - **Add New Chapter to GUID.md** - Added a new chapter to the GUIDE.md about using trigger names or IDs in the `actions.mca` file, including priority rules and handling names with spaces. 
+- **New Trigger** - Added a new trigger type `share` that fires when a viewer shares the live stream.
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
@@ -33,6 +34,7 @@ Each version is split into two sections:
 - **Update random_excluded list function** - The function of the `random_exclude` list has been changed to work better with the new `random_included` list.
 - **Edit GUIDE.md** - Updated the `$random` section to reflect the new configurable inclusion list and added a note about automatic exclusion of triggers containing `$random` to prevent recursion.
 - **VS Code extension** - Updated `mca.vsix` to include the new `''` syntax for trigger names with a with space between the leeters.
+- **GUIDE.md** - Added the new trigger `share` to the list of available triggers.
 
 ### Developer
 
