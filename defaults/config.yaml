@@ -146,7 +146,7 @@ Gifts:
 # -------------------------------------------------------------------------
 # Allows viewers to send real Minecraft commands by writing a comment
 # that starts with a specific prefix character.
-# Example: If prefix is "!" and a viewer writes "!say Hello", the command
+# Example: If prefix is "#" and a viewer writes "#say Hello", the command
 # "say Hello" will be sent directly to the Minecraft server via RCON.
 #
 # !!! WARNING !!!

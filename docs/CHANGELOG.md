@@ -24,6 +24,7 @@ Each version is split into two sections:
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
+- **Config Comment** - Fixed a Comment for the Prefix option in the `CommentCommands` section of the `config.yaml` file.
 
 #### Changed
 - **Edit actions.mca examples** — Commented out the `join` trigger because it can spam the overlay with many messages.
