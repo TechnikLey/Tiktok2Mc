@@ -3,6 +3,9 @@
 # build.py - TikTok-MC-Gift (Parallel & Cross-Platform)
 # ==========================================
 
+from asyncio import threads
+from email.mime import base
+from multiprocessing import pool
 import sys
 import os
 import hashlib
@@ -88,6 +91,7 @@ def main():
             OUT_DIR / "server" / "mc" / "world" / "datapacks" / "StreamingTool" / "data" / "streamingtool" / "function",
             OUT_DIR / "server" / "mc" / "plugins" / "DelayedTNT",
             OUT_DIR / "event_hooks",
+            OUT_DIR / "docs",
         ]
 
         for d in REQUIRED_DIRS:
@@ -230,20 +234,34 @@ def main():
         # ----- Assets & Resources -----
         cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
 
-        def sync_folder(source, destination, threads=MAX_COPY_THREADS):
+        def sync_folder(source, destination, threads=MAX_COPY_THREADS, exclude=None):
             src = Path(source)
             dst = Path(destination)
             if not src.exists():
                 return
             dst.mkdir(parents=True, exist_ok=True)
-            all_files = [f for f in src.rglob("*") if f.is_file()]
-
+            exclude = exclude or []
+            def is_excluded(path):
+                rel = path.relative_to(src)
+                for pattern in exclude:
+                    # kompletter Ordner (rekursiv)
+                    if pattern.endswith("/**"):
+                        base = Path(pattern[:-3])
+                        if base in rel.parents or rel == base:
+                            return True
+                    # einfache Glob-Patterns (*.md etc.)
+                    elif rel.match(pattern):
+                        return True
+                return False
+            all_files = [
+                f for f in src.rglob("*")
+                if f.is_file() and not is_excluded(f)
+            ]
             def copy_one(f):
                 rel = f.relative_to(src)
                 target = dst / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, target)
-
             with ThreadPoolExecutor(max_workers=threads) as pool:
                 pool.map(copy_one, all_files)
 
@@ -251,6 +269,7 @@ def main():
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
         sync_folder("src/event_hooks", OUT_DIR / "event_hooks")
+        sync_folder("docs",            OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),

@@ -18,6 +18,7 @@ Each version is split into two sections:
 #### Added
 - **Named overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define overlay names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` instead of `>>` in `actions.mca` to target a specific window. Writing `>>` without a name still targets the `default` overlay automatically.
 - **random_included config options** — The `$random` command now respects one new list in `config.yaml` under `Gifts`: `random_included` (whitelist). This allows you to precisely control which triggers are eligible for random selection.
+- **`docs` folder** - The entire `docs` folder is now included, so you can access all documentation files (like this changelog) directly from the release without needing to visit GitHub. 
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
@@ -35,9 +36,11 @@ Each version is split into two sections:
 - **Named overlay routing (`main.py`)** — The `>>` parser now extracts an optional `@Name` prefix. The overlay name is stored alongside the body and forwarded to `send_overlay_text()` as the `overlay_name` parameter. Without a name, `"default"` is used automatically.
 - **`@Name>>` validator support (`validator.py`, `server.js`)** — The `.mca` validator and the VS Code language server both recognise `@Name>>` as a valid command prefix. No error is raised for this syntax.
 - **`@Name>>` syntax highlighting (`mca.tmLanguage.json`)** — The `@Name` part is coloured distinctly (entity type colour) and the `>>` operator is highlighted separately to visually distinguish named overlays from plain `>>`.
+- **Exclude files/folder from build (`build.py`)** — The `sync_folder()` function now accepts an `exclude` parameter with glob patterns to specify files or folders that should be ignored during the build process.
 
 #### Changed
 - **Config version** - bumped from `3` to `4`
+- **Edit main.py** - Refactored the `$random` trigger selection logic to first apply the new `random_included` whitelist and then the `random_exclude` blacklist, ensuring that only explicitly allowed triggers are considered for random selection.
 
 ---
 
