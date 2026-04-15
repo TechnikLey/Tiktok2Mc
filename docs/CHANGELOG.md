@@ -23,6 +23,8 @@ Each version is split into two sections:
 
 #### Changed
 - **Edit actions.mca examples** — Commented out the `join` trigger because it can spam the overlay with many messages.
+- **Edit default config values** - Updated `GoalMultiplier` default from `2` to `1` to prevent overwhelming growth of goal-based triggers for new users.
+- **Edit default config values** - Add `join` and `comment` to the default `random_exclude` list for `$random`-Command
 
 ### Developer
 
@@ -30,6 +32,9 @@ Each version is split into two sections:
 - **Named overlay routing (`main.py`)** — The `>>` parser now extracts an optional `@Name` prefix. The overlay name is stored alongside the body and forwarded to `send_overlay_text()` as the `overlay_name` parameter. Without a name, `"default"` is used automatically.
 - **`@Name>>` validator support (`validator.py`, `server.js`)** — The `.mca` validator and the VS Code language server both recognise `@Name>>` as a valid command prefix. No error is raised for this syntax.
 - **`@Name>>` syntax highlighting (`mca.tmLanguage.json`)** — The `@Name` part is coloured distinctly (entity type colour) and the `>>` operator is highlighted separately to visually distinguish named overlays from plain `>>`.
+
+#### Changed
+- **Config version** - bumped from `3` to `4`
 
 ---
 

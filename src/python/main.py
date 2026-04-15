@@ -18,7 +18,6 @@ import shutil
 import subprocess
 import threading
 import logging
-import requests
 import traceback
 import random
 import time

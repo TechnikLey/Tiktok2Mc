@@ -4,7 +4,7 @@
 # This file is a template.
 # Personal settings should be changed in 'config.yaml' only.
 # -------------------------------------------------------------------------
-config_version: 3
+config_version: 4
 
 # -------------------------------------------------------------------------
 # IMPORTANT FOR BEGINNERS:
@@ -108,6 +108,8 @@ Gifts:
     - likes
     - like_2
     - follow
+    - join
+    - comment
 
 # -------------------------------------------------------------------------
 # COMMENT COMMANDS
@@ -325,4 +327,4 @@ LikeGoal:
   #   Multiply mode. The goal is multiplied by this value each time.
   #   Example with InitialGoal 100_000 and GoalMultiplier 2:
   #   100_000 → 200_000 → 400_000 → 800_000 → ...
-  GoalMultiplier: 2
+  GoalMultiplier: 1
