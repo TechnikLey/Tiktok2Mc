@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Callable
+from typing import Callable, Optional
 
 # Global registry: action_name -> handler callable
 HOOK_ACTIONS: dict[str, Callable] = {}
@@ -116,3 +116,14 @@ class HookAPI:
     def log(self, msg: str) -> None:
         """Print a message with [HOOK] prefix."""
         print(f"[HOOK] {msg}")
+
+    def send_overlay_text(self, title: str, subtitle: str = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
+        """
+        Display overlay text on stream overlays. Returns True if successful.
+        """
+        try:
+            from core.overlay_utils import send_overlay_text
+            return send_overlay_text(title, subtitle, duration, overlay_name)
+        except Exception as e:
+            print(f"[HOOK] [ERROR] send_overlay_text failed: {e}")
+            return False

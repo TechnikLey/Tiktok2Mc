@@ -88,7 +88,6 @@ last_likegoal_sent = 0
 last_likegoal_time = 0
 LIKEGOAL_INTERVAL = 3
 
-
 DISABLE_TIKTOK_CONNECT = False  # Toggle for disabling TikTok connection
 
 # --- Comment commands ---
