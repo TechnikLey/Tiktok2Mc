@@ -51,6 +51,8 @@ HTTP_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "http_actions.txt").resolve()
 MC_HOST, MC_PORT, MC_PASS = "localhost", 25575, ""
 DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = "127.0.0.1"
 LIKE_GOAL_PORT = 9797
 LIKE_TRIGGERS = []
 AUTOSAVE_INTERVAL_SECONDS = 60
@@ -115,7 +117,7 @@ def load_config():
     """Loads configuration values from the YAML config file."""
     global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, AUTOSAVE_INTERVAL_SECONDS
     global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
-    global RANDOM_TRIGGER_WHITELIST, RANDOM_TRIGGER_BLACKLIST
+    global RANDOM_TRIGGER_WHITELIST, RANDOM_TRIGGER_BLACKLIST, SERVER_HOST
 
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
@@ -127,6 +129,7 @@ def load_config():
 
         MC_PASS = config.get("RCON", {}).get("Password", "")
         MC_PORT = config.get("RCON", {}).get("Port", 25575)
+        SERVER_HOST = config.get("server_host", "127.0.0.1")
         CONFIG_TIKTOK_USER = config.get("TikTok", {}).get("User", "")
         RECONNECT_DELAY = config.get("TikTok", {}).get("ReconnectDelaySeconds", 10)
         MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)

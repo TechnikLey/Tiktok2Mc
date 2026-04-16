@@ -31,6 +31,8 @@ if not CONFIG_FILE.exists():
 with CONFIG_FILE.open("r", encoding="utf-8") as f:
     config = yaml.safe_load(f) or {}
 
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = config.get("server_host", "127.0.0.1")
 GUI_PORT = config.get("GUI", {}).get("Port", 5000)
 GUI_ENABLED = config.get("GUI", {}).get("Enable", False)
 
@@ -77,7 +79,7 @@ def db_page():
 
 
 def start_flask():
-    app.run(host="127.0.0.1", port=GUI_PORT, debug=False, use_reloader=False)
+    app.run(host=SERVER_HOST, port=GUI_PORT, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":

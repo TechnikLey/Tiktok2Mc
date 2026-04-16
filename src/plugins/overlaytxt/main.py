@@ -30,6 +30,8 @@ DISPLAY_MODE = "overwrite"
 FADE_IN = 500
 FADE_OUT = 500
 OVERLAYS_CONFIG = []
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = "127.0.0.1"
 
 if CONFIG_FILE.exists():
     try:
@@ -45,6 +47,7 @@ if CONFIG_FILE.exists():
             
             # NEU: Liste wird jetzt hier gesucht
             OVERLAYS_CONFIG = conf.get("Overlays", [])
+            SERVER_HOST = full_config.get("server_host", "127.0.0.1")
             
     except Exception as e:
         print(f"[!] Config error: {e}")
@@ -210,7 +213,7 @@ HTML_TEMPLATE = """
 gui_hidden = getattr(args, 'gui_hidden', False)
 
 def start_flask():
-    app.run(host='127.0.0.1', port=APP_PORT, debug=False, use_reloader=False)
+    app.run(host=SERVER_HOST, port=APP_PORT, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
     server_thread = threading.Thread(target=start_flask, daemon=True)

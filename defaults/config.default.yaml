@@ -24,6 +24,15 @@ auto_shutdown_on_live_end: true
 # If auto shutdown is enabled, this value controls how many seconds to wait before shutting down after the live stream ends.
 shutdown_delay_seconds: 30
 
+# =======================================================================
+# SERVER HOST BIND ADDRESS
+# =======================================================================
+# The IP address the servers will bind to.
+# Use "127.0.0.1" to allow only local access (default).
+# Use "0.0.0.0" to allow access from other devices in your network.
+# Use "<IP_ADDRESS>" to bind to a specific network interface.
+server_host: "127.0.0.1"
+
 # ==============================================================================
 # STREAMING CONTROL METHOD SELECTION
 # ==============================================================================

@@ -26,6 +26,7 @@ Each version is split into two sections:
 - **Config value for Autosave** - Added a new config value `autosave_interval_seconds` to control how ofte the `revenue_log.jsonl` file is saved to disk, allowing for more frequent updates and better data integrity in case of crashes. Default is set to `60` seconds.
 - **Auto shutdown on live end** - The application now automatically shuts down when the live stream ends
 - **Configurable shutdown behavior** – The automatic shutdown after a live session can now be controlled via configuration. Users can define a custom shutdown delay or disable automatic shutdown entirely, allowing time for final statistics review or post-live processing before manually terminating the system.
+- **Configurable network access (`server_host`)** — All web servers (main GUI, plugins, overlay, etc.) can now be made accessible from other devices in your network by setting `server_host: "0.0.0.0"` in your `config.yaml`. This allows you to use overlays and APIs from other PCs or OBS instances.
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
@@ -55,6 +56,7 @@ Each version is split into two sections:
 #### Changed
 - **Config version** - bumped from `3` to `4`
 - **Edit main.py** - Refactored the `$random` trigger selection logic to first apply the new `random_included` whitelist and then the `random_exclude` blacklist, ensuring that only explicitly allowed triggers are considered for random selection.
+- **Unified host configuration** — All Flask servers and plugin APIs now consistently read the server_host value from config.yaml for their bind address, but internal URLs and webview windows are hardcoded to 127.0.0.1 to avoid cross-device issues.
 
 ---
 

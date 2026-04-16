@@ -81,6 +81,8 @@ try:
     WEBSERVERPORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
     APIPORT = cfg.get("MinecraftServerAPI", {}).get("APIPort", 7000)
     MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+    # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+    SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 
 except Exception as e:
     print(f"Config error: {e}")
@@ -91,7 +93,7 @@ with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
     cfg_api = yaml.safe_load(f)
 
     webhook = cfg_api.setdefault("webhooks", {})
-    urls = webhook.setdefault("urls", [f"http://localhost:{WEBSERVERPORT}"])
+    urls = webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
     URL = urls[0]
 
     if APIPORT != cfg_api.get("port", 7000):
