@@ -465,7 +465,6 @@ async def shutdown_countdown():
         )
         await asyncio.sleep(1)
     print("\nShutting down now!")
-    stop_all_processes()
     sys.exit(0)
 
 # =============================================================================
@@ -503,7 +502,6 @@ async def command_loop():
         )
         cmd = cmd.strip().lower()
         if cmd == "exit":
-            stop_all_processes()
             sys.exit(0)
         if cmd == "stop":
             shutdown_cancel_event.set()

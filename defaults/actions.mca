@@ -1,6 +1,6 @@
 # actions.mca — TikTok Events → Minecraft Commands
 # For more info see GUIDE.md
-# Gift IDs: see core/gifts.json
+# Gift IDs and Names: see core/gifts.json
 
 # =====================================================================
 #  FOLLOW — triggers when someone follows your TikTok account
@@ -21,7 +21,7 @@ follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now followin
 # The example below is disabled (#). Remove the # to activate it.
 # Show a welcome overlay when someone joins the stream.
 # {user} is replaced with the viewer's TikTok username.
-#join:>>Welcome!|{user} just joined the stream!|3
+#join:>>Welcome!|{user} just joined the stream!
 
 # =====================================================================
 #  COMMENT — triggers on every comment in the live chat
@@ -31,7 +31,7 @@ follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now followin
 # Use with caution: avoid expensive or spammy commands here.
 # The example below is disabled (#). Remove the # to activate it.
 # You can use {comment} to show the comment text in the overlay:
-#comment:>>{user} wrote:|{comment}|3
+#comment:>>{user} wrote:|{comment}
 
 # =====================================================================
 #  LIKES — triggers based on accumulated like count
@@ -73,7 +73,7 @@ like_2:/clear @a *; /kill @a
 8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
 
 # --- Corgi (Gift ID: 6267) ---
-# Spawns 600 TNT using the DelayedTNT plugin (massive explosion!).
+# Spawns 600 TNT using the DelayedTNT plugin.
 # Same syntax as above: !tnt <Amount> <Delay> <Fuse> <Player>
 6267:!tnt 600 0.1 2 Notch
 
@@ -87,10 +87,10 @@ like_2:/clear @a *; /kill @a
 # =====================================================================
 
 # --- Flower Show (Gift ID: 16071) ---
-# $random picks one random action from all defined triggers above
+# $random picks one random action from all defined triggers
 # and executes it. Triggers containing $random are always excluded.
 # Additional exclusions are configurable in config.yaml under:
-#   Gifts > random_exclude (default: likes, like_2, follow)
+#   Gifts > random_exclude (default: likes, like_2, follow, join, comment)
 16071:$random
 
 # =====================================================================
@@ -105,5 +105,5 @@ like_2:/clear @a *; /kill @a
 'Tom the Tomato':$random
 # As long as the example above is active, the trigger name "Tom the Tomato" will take priority 
 # over the numeric ID 16379.
-# So the example below will never be executed.
+# So the example below will never be executed as long as the trigger name ('Tom the Tomato') is defined.
 16379:$random
