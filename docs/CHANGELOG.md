@@ -39,6 +39,7 @@ Each version is split into two sections:
 - **Edit GUIDE.md** - Updated the `$random` section to reflect the new configurable inclusion list and added a note about automatic exclusion of triggers containing `$random` to prevent recursion.
 - **VS Code extension** - Updated `mca.vsix` to include the new `''` syntax for trigger names with a with space between the leeters.
 - **GUIDE.md** - Added the new trigger `share` to the list of available triggers.
+- **Edit actions.mca examples** - Rewrite some Comments and Commands examples to be more clear and concise.
 
 ### Developer
 
