@@ -44,7 +44,9 @@ Erstelle eine neue `.py`-Datei im Ordner `src/event_hooks/`.
 **Beispiel:** `src/event_hooks/begruessung.py`
 
 ```python
-def register(api):
+from core.hook_api import HookAPI
+
+def register(api: HookAPI):
     def begruessung(user, trigger, context):
         api.rcon_enqueue([
             f"say {user} folgt jetzt!",
@@ -53,6 +55,10 @@ def register(api):
 
     api.register_action("begruessung", begruessung)
 ```
+
+> [!NOTE]
+> Der Import von `HookAPI` ist optional, aber empfohlen. Er ermöglicht dir die Nutzung von IntelliSense und Docstrings in deinem Editor, damit du leichter mit der API arbeiten kannst.
+> Der Import wird zur Laufzeit ignoriert.
 
 Was passiert hier?
 

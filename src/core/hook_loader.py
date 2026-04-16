@@ -82,6 +82,11 @@ def _load_single_hook(api: HookAPI, path: Path) -> None:
     # Import whitelist check — runs before the module is loaded
     # ------------------------------------------------------------------
     disallowed = _check_imports(path)
+    try:
+        disallowed.remove("core.hook_api")
+        disallowed.remove("HookAPI")
+    except ValueError:
+        pass
     if disallowed:
         for name in disallowed:
             print(

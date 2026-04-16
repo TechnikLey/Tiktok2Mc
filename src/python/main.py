@@ -1064,7 +1064,7 @@ async def run_bot():
     # Load event_hooks scripts ($-command handlers)
     global _hook_api
     EVENT_HOOKS_DIR = (BASE_DIR / ".." / "event_hooks").resolve()
-    _hook_api = HookAPI(rcon_queue, trigger_queue, MAIN_LOOP, {})
+    _hook_api = HookAPI(rcon_queue, trigger_queue, MAIN_LOOP, {}, valid_functions)
     load_event_hooks(_hook_api, EVENT_HOOKS_DIR)
 
     # Start all background workers

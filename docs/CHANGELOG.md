@@ -58,6 +58,9 @@ Each version is split into two sections:
 - **Edit main.py** - Refactored the `$random` trigger selection logic to first apply the new `random_included` whitelist and then the `random_exclude` blacklist, ensuring that only explicitly allowed triggers are considered for random selection.
 - **Unified host configuration** — All Flask servers and plugin APIs now consistently read the server_host value from config.yaml for their bind address, but internal URLs and webview windows are hardcoded to 127.0.0.1 to avoid cross-device issues.
 
+#### Docs
+- **Dev-Book `ch03-06`** - Added a NOTE block and updated the example to recommend importing `HookAPI` for better IntelliSense and docstrings in editors.
+
 ---
 
 ## [0.2.0] - 2026-04-13

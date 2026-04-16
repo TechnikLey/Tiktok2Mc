@@ -40,11 +40,13 @@ class HookAPI:
         trigger_queue: asyncio.Queue,
         main_loop: asyncio.AbstractEventLoop,
         config: dict,
+        valid_functions: set[str],
     ) -> None:
         self._rcon_queue = rcon_queue
         self._trigger_queue = trigger_queue
         self._main_loop = main_loop
         self._config = config
+        self._valid_functions = valid_functions
         self._current_depth: int = 0  # Set by main.py before each handler call
         self._banned_triggers: set[str] = set()  # Triggers blocked after loop detection
 
@@ -127,3 +129,7 @@ class HookAPI:
         except Exception as e:
             print(f"[HOOK] [ERROR] send_overlay_text failed: {e}")
             return False
+    
+    def get_valid_functions(self) -> set[str]:
+        """Return the set of valid function names for RCON commands."""
+        return self._valid_functions

@@ -17,6 +17,8 @@
 #   context — reserved dict for future use (currently empty)
 # ==================================================
 
+# Import for type hints and IntelliSense in your editor.
+# This import is only used for development (autocomplete, docstrings) and has no effect at runtime.
 from core.hook_api import HookAPI
 
 def register(api: HookAPI):
