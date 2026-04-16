@@ -126,7 +126,7 @@ APP_EXE_PATH = (BASE_DIR / "core" / f"app{EXE}").resolve()
 PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{EXE}").resolve()
 PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{EXE}").resolve()
 REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{EXE}").resolve()
-APP_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
+PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
 update_exe = (BASE_DIR / f"update{EXE}").resolve()
 update_new = (BASE_DIR / f"update_new{EXE}").resolve()
 
@@ -149,7 +149,7 @@ LOG_LEVEL = console_cfg.get("log_level", 1)
 CONTROL_METHOD = cfg.get("control_method", "DCS")
 MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
 
-AUTO_SHUTDOWN_ENABLED = cfg.get("auto_shutdwn_on_live_end", True)
+AUTO_SHUTDOWN_ENABLED = cfg.get("auto_shutdown_on_live_end", True)
 SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown_delay_seconds", 30)
 
 # -----------------------------
@@ -388,8 +388,8 @@ if ALLOW_CLOSE:
 
 PLUGIN_REGISTRY: list[AppConfig] = []
 
-if APP_REGISTRY_FILE.exists():
-    with APP_REGISTRY_FILE.open("r", encoding="utf-8") as f:
+if PLUGIN_REGISTRY_FILE.exists():
+    with PLUGIN_REGISTRY_FILE.open("r", encoding="utf-8") as f:
         data = json.load(f) 
 
     for item in data:
