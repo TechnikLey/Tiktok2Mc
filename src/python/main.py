@@ -21,9 +21,11 @@ import logging
 import traceback
 import random
 import time
+import datetime
+import json
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics
@@ -51,6 +53,7 @@ DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
 LIKE_GOAL_PORT = 9797
 LIKE_TRIGGERS = []
+AUTOSAVE_INTERVAL_SECONDS = 60
 
 # --- Queues & throttling (for optimal RCON performance) ---
 trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -96,6 +99,9 @@ COMMENT_CMD_BLACKLIST = []  # These commands are blocked
 RANDOM_TRIGGER_WHITELIST = []
 RANDOM_TRIGGER_BLACKLIST = []
 
+GIFT_VALUE_USD = 0
+RUNTIME_PATH_SHUTDOWN = (BASE_DIR / "runtime" / "shutdown").resolve()
+
 app = Flask(__name__)
 
 log = logging.getLogger('werkzeug')
@@ -107,7 +113,7 @@ log.setLevel(logging.ERROR)
 
 def load_config():
     """Loads configuration values from the YAML config file."""
-    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, RANDOM_EXCLUDE
+    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, AUTOSAVE_INTERVAL_SECONDS
     global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
     global RANDOM_TRIGGER_WHITELIST, RANDOM_TRIGGER_BLACKLIST
 
@@ -126,6 +132,7 @@ def load_config():
         MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
         OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
         LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
+        AUTOSAVE_INTERVAL_SECONDS = config.get("Gifts", {}).get("autosave_interval_seconds", 60)
 
         raw_included = config.get("Gifts", {}).get("random_included", [])
         RANDOM_TRIGGER_WHITELIST = [str(c).strip() for c in raw_included if str(c).strip()] if isinstance(raw_included, list) else []
@@ -772,6 +779,37 @@ def initialize_likes(total_likes):
             return True
     return False
 
+# =========================================
+# Daily revenue logger
+# =========================================
+
+def update_daily_revenue():
+    file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
+    today = datetime.now().strftime("%Y-%m-%d")
+    new_entry = {
+        "date": today,
+        "estimated_revenue_usd": GIFT_VALUE_USD
+    }
+    entries = []
+    if file_path.exists():
+        with file_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    updated = False
+    for i, entry in enumerate(entries):
+        if entry.get("date") == today:
+            entries[i] = new_entry
+            updated = True
+            break
+    if not updated:
+        entries.append(new_entry)
+    with file_path.open("w", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
 # ==========================================
 # TIKTOK CLIENT
 # ==========================================
@@ -787,6 +825,7 @@ def create_client(user):
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
+        global GIFT_VALUE_USD
         try:
             # Combo gift: check if still streaking (intermediate update)
             if event.gift.combo:
@@ -802,6 +841,8 @@ def create_client(user):
 
             gift_name = sanitize_filename(event.gift.name)
             gift_id = str(event.gift.id)
+
+            GIFT_VALUE_USD += event.value
 
             # Execute associated HTTP action
             execute_gift_action(gift_id)
@@ -962,6 +1003,15 @@ def create_client(user):
             MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("share", username))
 
     # =========================
+    # Live end events
+    # =========================
+    @client.on(LiveEndEvent)
+    def on_live_end(_):
+        update_daily_revenue()
+        print(f"[STATUS] Live ended for @{user}.")
+        RUNTIME_PATH_SHUTDOWN.touch(exist_ok=True)
+
+    # =========================
     # CONNECT event
     # =========================
     @client.on(ConnectEvent)
@@ -970,6 +1020,14 @@ def create_client(user):
         print(f"[OK] Live connection established: @{user}")
 
     return client
+
+# ========================
+# Counter for gift revenue estimation
+# ========================
+async def gift_revenue_counter():
+    while True:
+        await asyncio.sleep(AUTOSAVE_INTERVAL_SECONDS)
+        update_daily_revenue()
 
 # ==========================================
 # MAIN ENTRY POINT
@@ -1055,5 +1113,6 @@ if __name__ == "__main__":
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
+        asyncio.run(gift_revenue_counter())
     except KeyboardInterrupt:
         print("\n[STOP] Script stopped manually.")

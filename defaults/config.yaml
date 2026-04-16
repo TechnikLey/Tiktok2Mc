@@ -19,6 +19,11 @@ config_version: 4
 # Disabling this may block important updates or cause configuration issues.
 auto_update_config: true
 
+# These control whether the tool automatically shuts down when the live stream ends
+auto_shutdwn_on_live_end: true
+# If auto shutdown is enabled, this value controls how many seconds to wait before shutting down after the live stream ends.
+shutdown_delay_seconds: 30
+
 # ==============================================================================
 # STREAMING CONTROL METHOD SELECTION
 # ==============================================================================
@@ -83,6 +88,9 @@ TikTok:
 # LIKE GOAL / ENGAGEMENT TRIGGERS
 # -------------------------------------------------------------------------
 Gifts:
+  # Set the autosave interval for the gift_revenue_log.jsonl file in seconds.
+  # This file is used to log estimated revenue from gifts.
+  autosave_interval_seconds: 60
   # Like-based triggers.
   like_triggers:
     - id: likes_standard

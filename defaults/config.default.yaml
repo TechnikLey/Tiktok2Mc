@@ -83,6 +83,9 @@ TikTok:
 # LIKE GOAL / ENGAGEMENT TRIGGERS
 # -------------------------------------------------------------------------
 Gifts:
+  # Set the autosave interval for the gift_revenue_log.jsonl file in seconds.
+  # This file is used to log estimated revenue from gifts.
+  autosave_interval_seconds: 60
   # Like-based triggers.
   like_triggers:
     - id: likes_standard
@@ -146,7 +149,7 @@ Gifts:
 # -------------------------------------------------------------------------
 # Allows viewers to send real Minecraft commands by writing a comment
 # that starts with a specific prefix character.
-# Example: If prefix is "!" and a viewer writes "!say Hello", the command
+# Example: If prefix is "#" and a viewer writes "#say Hello", the command
 # "say Hello" will be sent directly to the Minecraft server via RCON.
 #
 # !!! WARNING !!!

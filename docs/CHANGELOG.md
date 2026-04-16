@@ -22,6 +22,10 @@ Each version is split into two sections:
 - **Triggers Names** - Now you can use trigger names instead of just trigger numbers in the `actions.mca` file.
 - **Add New Chapter to GUID.md** - Added a new chapter to the GUIDE.md about using trigger names or IDs in the `actions.mca` file, including priority rules and handling names with spaces. 
 - **New Trigger** - Added a new trigger type `share` that fires when a viewer shares the live stream.
+- **Track Income from Streaming** - The application now tracks the income based on received gifts and their USD value. This Informations is stored in the `revenue_log.jsonl` file and can be used for analytics.
+- **Config value for Autosave** - Added a new config value `autosave_interval_seconds` to control how ofte the `revenue_log.jsonl` file is saved to disk, allowing for more frequent updates and better data integrity in case of crashes. Default is set to `60` seconds.
+- **Auto shutdown on live end** - The application now automatically shuts down when the live stream ends
+- **Configurable shutdown behavior** – The automatic shutdown after a live session can now be controlled via configuration. Users can define a custom shutdown delay or disable automatic shutdown entirely, allowing time for final statistics review or post-live processing before manually terminating the system.
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.

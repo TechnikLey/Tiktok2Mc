@@ -15,6 +15,7 @@ import time
 import json
 import shutil
 import os
+import asyncio
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
@@ -147,6 +148,9 @@ ALLOW_CLOSE = console_cfg.get("allow_close", True)
 LOG_LEVEL = console_cfg.get("log_level", 1)
 CONTROL_METHOD = cfg.get("control_method", "DCS")
 MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+
+AUTO_SHUTDOWN_ENABLED = cfg.get("auto_shutdwn_on_live_end", True)
+SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown_delay_seconds", 30)
 
 # -----------------------------
 # Process dictionary
@@ -430,11 +434,99 @@ for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
                     hidden=get_visibility(app.level)
                 )
 
-# -----------------------------
-# Interactive control loop
-# -----------------------------
+# =============================================================================
+# STATE
+# =============================================================================
+
+RUNTIME_DIR = (BASE_DIR / "core" / "runtime").resolve()
+
+shutdown_pending = False
+shutdown_cancel_event = asyncio.Event()
+
+# =============================================================================
+# SHUTDOWN COUNTDOWN
+# =============================================================================
+
+async def shutdown_countdown():
+    global shutdown_pending
+
+    delay = SHUTDOWN_DELAY_SECONDS
+
+    for remaining in range(delay, 0, -1):
+        if shutdown_cancel_event.is_set():
+            shutdown_cancel_event.clear()
+            shutdown_pending = False
+            print("\nCancelled shutdown.")
+            return
+        print(
+            f"\rShutdown in {remaining} seconds... Press 'stop' to cancel.",
+            end="",
+            flush=True
+        )
+        await asyncio.sleep(1)
+    print("\nShutting down now!")
+    stop_all_processes()
+    sys.exit(0)
+
+# =============================================================================
+# FILE WATCHER
+# =============================================================================
+
+async def check_and_run():
+    global shutdown_pending
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    while True:
+        for file in list(RUNTIME_DIR.iterdir()):
+            if not file.is_file():
+                continue
+            name = file.stem.lower()
+            file.unlink(missing_ok=True)
+            if name == "shutdown":
+                if not AUTO_SHUTDOWN_ENABLED:
+                    print("Shutdown signal detected, but Auto shutdown is disabled.")
+                    continue
+                if not shutdown_pending:
+                    shutdown_pending = True
+                    print(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
+                    asyncio.create_task(shutdown_countdown())
+        await asyncio.sleep(5)
+
+# =============================================================================
+# USER INPUT LOOP
+# =============================================================================
+
+async def command_loop():
+    while True:
+        cmd = await asyncio.to_thread(
+            input,
+            "\nType 'exit' to stop all programs: "
+        )
+        cmd = cmd.strip().lower()
+        if cmd == "exit":
+            stop_all_processes()
+            sys.exit(0)
+        if cmd == "stop":
+            shutdown_cancel_event.set()
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+async def main():
+    watcher = asyncio.create_task(check_and_run())
+    try:
+        await command_loop()
+    finally:
+        watcher.cancel()
+
+# =============================================================================
+# EVENT DEFINITIONS (ENTRY POINT)
+# =============================================================================
+
 if ALLOW_CLOSE:
     print("\nAll programs have been started.")
+
+    asyncio.run(main())
 
     # Show active sessions on Linux
     if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
@@ -446,13 +538,6 @@ if ALLOW_CLOSE:
                 print(f"  screen -r {s}")
         print("-----------------------------------")
 
-    try:
-        while True:
-            cmd = input("\nType 'exit' to stop all programs: ").strip().lower()
-            if cmd == "exit":
-                sys.exit(0) # atexit calls stop_all_processes
-    except KeyboardInterrupt:
-        sys.exit(0)
 else:
-    # AllowClose=False -> script exits itself, EXEs continue running quietly in the background
+    # AllowClose=False -> script exits itself, EXEs continue running quietly
     pass
