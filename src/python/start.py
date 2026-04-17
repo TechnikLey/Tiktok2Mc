@@ -322,8 +322,7 @@ def start_update_exe():
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
-        print(f"Preparing to run updater")
-        print("Please wait...")
+        print("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
         log_dir = BASE_DIR / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "updater.log"
@@ -339,7 +338,7 @@ def start_update_exe():
         update_signal = BASE_DIR / "update_signal.tmp"
         if update_signal.exists():
             update_signal.unlink()
-            print("\n Please restart the application.")
+            print("Please restart the application.")
             time.sleep(2)
             return "kill"
         time.sleep(1)

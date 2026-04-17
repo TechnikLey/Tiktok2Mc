@@ -17,7 +17,6 @@ import re
 import time
 import io
 import os
-import subprocess
 from pathlib import Path
 from packaging import version
 from ruamel.yaml import YAML
@@ -414,9 +413,22 @@ def run_update():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
 
+    # Set executable permissions for all files without extension and with .bin extension (Linux/Mac only)
+    if sys.platform != "win32":
+        for dirpath, dirnames, filenames in os.walk(BASE_DIR):
+            for fname in filenames:
+                fpath = os.path.join(dirpath, fname)
+                # Check if file has no extension or .bin extension
+                if not os.path.splitext(fname)[1] or fname.endswith('.bin'):
+                    try:
+                        os.chmod(fpath, 0o755)
+                        print(f"[PERM] Set executable: {fpath}")
+                    except Exception as e:
+                        print(f"[PERM] Failed to set executable for {fpath}: {e}")
+
     save_versions(zip_v["tool"], zip_v["updater"])
     if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
-    
+
     if CONFIG_UPDATE_ENABLE: 
         migrate_config_if_needed()
 
