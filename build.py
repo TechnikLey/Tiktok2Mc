@@ -3,9 +3,6 @@
 # build.py - TikTok-MC-Gift (Parallel & Cross-Platform)
 # ==========================================
 
-from asyncio import threads
-from email.mime import base
-from multiprocessing import pool
 import sys
 import os
 import hashlib
