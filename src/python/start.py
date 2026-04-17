@@ -25,7 +25,7 @@ IS_WINDOWS = sys.platform == "win32"
 if sys.platform != "win32":
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to start the tool.")
-        wait_for_key()
+        input("Press Enter to exit...")
         sys.exit(1)
 
 # -----------------------------
