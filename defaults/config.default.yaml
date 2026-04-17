@@ -12,6 +12,12 @@ config_version: 4
 # 2. DO NOT use the 'Tab' key for spacing; use the 'Space' bar only.
 # 3. PORTS: Each port must be unique. If a port is used twice, the tool 
 #    will crash or fail to start.
+# 4. To define a list, use:
+#      list_key:
+#        - item1
+#        - item2
+#    For an empty list, use:
+#      list_key: []
 # -------------------------------------------------------------------------
 
 # SETTINGS PROTECTION

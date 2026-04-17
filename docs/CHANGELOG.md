@@ -27,10 +27,13 @@ Each version is split into two sections:
 - **Auto shutdown on live end** - The application now automatically shuts down when the live stream ends
 - **Configurable shutdown behavior** – The automatic shutdown after a live session can now be controlled via configuration. Users can define a custom shutdown delay or disable automatic shutdown entirely, allowing time for final statistics review or post-live processing before manually terminating the system.
 - **Configurable network access (`server_host`)** — All web servers (main GUI, plugins, overlay, etc.) can now be made accessible from other devices in your network by setting `server_host: "0.0.0.0"` in your `config.yaml`. This allows you to use overlays and APIs from other PCs or OBS instances.
+- **Add additional info to the Config** - Added some additional info to the `config.yaml` file to avoid Errors cause by misinterpretation of list Key Values.
 
 #### Fixed
 - **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
 - **Config Comment** - Fixed a Comment for the Prefix option in the `CommentCommands` section of the `config.yaml` file.
+- **Update** - Fixed an issue where the updater falsely reported `[FAIL] Critical error parsing YAML files: 'NoneType' object is not subscriptable`.
+- **Fixed Config** - Fixed an issue where the `random_included` config list was not being read correctly, causing to unexpected behavior of the Updater script.
 
 #### Changed
 - **Edit actions.mca examples** — Commented out the `join` trigger because it can spam the overlay with many messages.
@@ -41,6 +44,7 @@ Each version is split into two sections:
 - **VS Code extension** - Updated `mca.vsix` to include the new `''` syntax for trigger names with a with space between the leeters.
 - **GUIDE.md** - Added the new trigger `share` to the list of available triggers.
 - **Edit actions.mca examples** - Rewrite some Comments and Commands examples to be more clear and concise.
+- **Edit Updater error handling** - Updated the error handling in the updater to provide more specific messages for YAML parsing errors, including the file name and line number where the error occurred.
 
 ### Developer
 
@@ -57,6 +61,7 @@ Each version is split into two sections:
 - **Config version** - bumped from `3` to `4`
 - **Edit main.py** - Refactored the `$random` trigger selection logic to first apply the new `random_included` whitelist and then the `random_exclude` blacklist, ensuring that only explicitly allowed triggers are considered for random selection.
 - **Unified host configuration** — All Flask servers and plugin APIs now consistently read the server_host value from config.yaml for their bind address, but internal URLs and webview windows are hardcoded to 127.0.0.1 to avoid cross-device issues.
+- **Updater error handling** - Updated the updater's YAML parsing error handling to catch `YAMLError` exceptions and provide more specific feedback about the nature of the parsing issue, including the file name and line number where the error occurred. This replaces the previous generic exception handling that resulted in less informative error messages.
 
 #### Docs
 - **Dev-Book `ch03-06`** - Added a NOTE block and updated the example to recommend importing `HookAPI` for better IntelliSense and docstrings in editors.
