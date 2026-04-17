@@ -138,7 +138,7 @@ def download_with_progress(url, target):
 # =========================
 def migrate_config_if_needed() -> bool:
     if not DEFAULT_CONFIG_FILE.exists():
-        print(f"[!] Error: {DEFAULT_CONFIG_FILE} is missing.")
+        print(f"[ERROR] Master template missing: {DEFAULT_CONFIG_FILE}")
         return False
 
     yaml_obj = YAML(typ="rt")
@@ -146,66 +146,127 @@ def migrate_config_if_needed() -> bool:
     yaml_obj.indent(mapping=2, sequence=4, offset=2)
     yaml_obj.width = 120
 
-    # If no user config exists yet, copy the default template
+    # Case 1: No user config exists
     if not CONFIG_FILE.exists():
-        shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
-        print("[INFO] config.yaml created from template.")
-        return True
+        try:
+            shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
+            print(f"[INFO] No config found. Created new config from template.")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to copy template: {e}")
+            return False
 
     try:
-        # Load the master template (preserving comments and structure)
+        # Load Template
         with DEFAULT_CONFIG_FILE.open("r", encoding="utf-8") as f:
-            new_template = yaml_obj.load(f) or CommentedMap()
+            template_data = yaml_obj.load(f)
+            if template_data is None:
+                template_data = CommentedMap()
         
-        new_template.yaml_set_start_comment(None)
+        # Clean up template start comments
+        template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
 
-        new_template.yaml_set_start_comment("DO NOT EDIT the config_version")
-
-        # Load current user values
+        # Load User Config
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            user_data = yaml_obj.load(f) or CommentedMap()
+            user_data = yaml_obj.load(f)
+            # If file is empty, initialize as empty map
+            if user_data is None:
+                user_data = CommentedMap()
+
     except Exception as e:
-        print(f"[FAIL] Error loading config files: {e}")
+        print(f"[FAIL] Critical error parsing YAML files: {e}")
         return False
 
-    default_version = int(new_template.get("config_version", 0))
-    user_version = int(user_data.get("config_version", 0))
+    # Version Check
+    try:
+        default_version = int(template_data.get("config_version", 0))
+        user_version = int(user_data.get("config_version", 0))
+    except (ValueError, TypeError):
+        print("[WARNING] Version keys are invalid. Forcing migration...")
+        default_version, user_version = 1, 0
 
     if user_version >= default_version:
-        print("i Config is already up to date.")
+        print(f"[INFO] Config is up to date (v{user_version}).")
         return False
 
-    # Backup the old config file
-    backup_path = CONFIG_FILE.with_stem(CONFIG_FILE.stem + ".bak")
-    shutil.copy2(CONFIG_FILE, backup_path)
-    print(f"[INFO] Backup created: {backup_path}")
+    print(f"[INFO] Migrating config: v{user_version} -> v{default_version}")
 
-    # STRICT INJECTION:
-    # Only iterate over keys defined in the template.
-    _inject_values_strictly(new_template, user_data)
+    # Backup
+    backup_path = CONFIG_FILE.with_suffix(".yaml.bak")
+    try:
+        shutil.copy2(CONFIG_FILE, backup_path)
+        print(f"[INFO] Backup created at: {backup_path}")
+    except Exception as e:
+        print(f"[ERROR] Migration aborted. Could not create backup: {e}")
+        return False
 
-    # Set version to the template's version
-    new_template["config_version"] = default_version
+    # Perform strict injection
+    _inject_values_strictly(template_data, user_data)
 
-    with CONFIG_FILE.open("w", encoding="utf-8") as f:
-        yaml_obj.dump(new_template, f)
+    # Force the new version number
+    template_data["config_version"] = default_version
 
-    print(f"[OK] Config migrated. Structure & comments match the template 100%.")
-    return True
+    try:
+        with CONFIG_FILE.open("w", encoding="utf-8") as f:
+            yaml_obj.dump(template_data, f)
+        print(f"[SUCCESS] Config migrated successfully to v{default_version}.")
+        return True
+    except Exception as e:
+        print(f"[FAIL] Error writing migrated config: {e}")
+        return False
 
-def _inject_values_strictly(template, user_source):
-    """
-    Walks the template and fills it with user values.
-    Keys that only exist in the user file are ignored (dropped).
-    """
-    for key in template:
-        if key in user_source:
-            if isinstance(template[key], dict) and isinstance(user_source[key], dict):
-                # Recurse into nested structures
-                _inject_values_strictly(template[key], user_source[key])
+def _inject_values_strictly(template, user_source, path=""):
+    # 1. BASE GUARD: If user_source is None or not a dictionary-like object
+    if user_source is None:
+        try:
+            # Load Template
+            try:
+                with DEFAULT_CONFIG_FILE.open("r", encoding="utf-8") as f:
+                    template_data = yaml_obj.load(f)
+                    if template_data is None:
+                        template_data = CommentedMap()
+            except Exception as e:
+                # Try to extract line/column info if it's a YAML error
+                if hasattr(e, 'problem_mark'):
+                    mark = e.problem_mark
+                    print(f"[FAIL] YAML error in file: {DEFAULT_CONFIG_FILE.name}\n→ Line: {mark.line + 1}, Column: {mark.column + 1}\n→ Error: {str(e).splitlines()[0]}")
+                else:
+                    print(f"[FAIL] YAML error in file: {DEFAULT_CONFIG_FILE.name}\n→ Error: {e}")
+                return False
+
+            # Clean up template start comments
+            template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
+
+            # Load User Config
+            try:
+                with CONFIG_FILE.open("r", encoding="utf-8") as f:
+                    user_data = yaml_obj.load(f)
+                    if user_data is None:
+                        user_data = CommentedMap()
+            except Exception as e:
+                if hasattr(e, 'problem_mark'):
+                    mark = e.problem_mark
+                    print(f"[FAIL] YAML error in file: {CONFIG_FILE.name}\n→ Line: {mark.line + 1}, Column: {mark.column + 1}\n→ Error: {str(e).splitlines()[0]}")
+                else:
+                    print(f"[FAIL] YAML error in file: {CONFIG_FILE.name}\n→ Error: {e}")
+                return False
+
+        except Exception as e:
+            print(f"[FAIL] Critical error parsing YAML files: {e}")
+            return False
+                else:
+                    # User put a single value where a dictionary was expected
+                    print(f"[WARNING] Type mismatch at '{current_path}': Expected a section, got a value. Skipping.")
+            # CASE B: Template expects a simple value (String, Int, Bool, List)
             else:
-                # Adopt the user's value, keeping the template's position
-                template[key] = user_source[key]
+                if user_value is not None:
+                    template[key] = user_value
+                    print(f"[DEBUG] Migrated: {current_path}")
+                else:
+                    print(f"[DEBUG] Value for '{current_path}' is null/empty. Using default.")
+        else:
+            # Key doesn't exist in user config at all
+            print(f"[DEBUG] Key '{current_path}' missing in user config. Using default.")
 
 # =========================
 # Main update process
@@ -303,6 +364,8 @@ def run_update():
             # Pass --resume so it continues directly at step 2
             os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
             sys.exit(0)  # Safety fallback
+
+    print(f"\ud83d\udd04 Updater is up to date ({local['updater']}). Proceeding with tool update...")
 
     # ==========================================
     # 2. TOOL UPDATE (copy files)
