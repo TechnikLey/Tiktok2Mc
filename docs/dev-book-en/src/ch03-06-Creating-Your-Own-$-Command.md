@@ -310,6 +310,38 @@ What happens on gift `5655`?
 
 On gift `8913` the same happens via `big_gift`, but the same `thank_you` action runs at the end. The logic is written only once.
 
+#### `api.send_overlay_text(title, subtitle, duration=3, overlay_name="default")`
+
+Displays overlay text on the stream. You can use this to show a title and optional subtitle on any overlay from your hook.
+
+**Parameters:**
+- `title` (str): Main text, shown large
+- `subtitle` (str, optional): Smaller text below (default: empty)
+- `duration` (int, optional): How long to display the text (seconds, default: 3)
+- `overlay_name` (str, optional): Name of the overlay (default: "default")
+
+**Example:**
+```python
+api.send_overlay_text("New Follower!", f"{user} just joined!", 5)
+api.send_overlay_text("Like goal reached!", "", 4, overlay_name="likegoal")
+```
+
+Returns `True` if sending was successful, otherwise `False` (e.g. if the overlay is not reachable).
+
+---
+
+#### `api.get_valid_functions()`
+
+Returns a set of all function names that are allowed as RCON commands in the current context.
+
+**Example:**
+```python
+if "effect" in api.get_valid_functions():
+    api.rcon_enqueue(["effect give @a minecraft:speed 10 2 true"])
+```
+
+The result is a set of strings, e.g. `{ "say", "effect", "give", ... }`.
+
 ---
 
 ##### Why create your own trigger?

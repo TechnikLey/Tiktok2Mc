@@ -58,6 +58,8 @@ Each version is split into two sections:
 * **Syntax Highlighting** — Updated `mca.tmLanguage.json` to include distinct scoping for the `@Name` entity and the `>>` operator, providing better visual separation in editors.
 * **Build Exclusions (`build.py`)** — Enhanced the `sync_folder()` function to support an `exclude` parameter, allowing for glob patterns to ignore specific files or directories during the build process.
 * **IntelliSense Improvements** — Updated Dev-Book `ch03-06` with a new `NOTE` block recommending the import of `HookAPI` to enable better docstrings and IntelliSense support in development environments.
+* **valid_functions** - Added `get_valid_functions` to the hook API to allow plugins to retrieve a list of valid functions.
+* **ch03-06** - Added a new section on using `get_valid_functions` and `send_overlay_text`.
 
 #### Changed
 * **Config Versioning** — Bumped the configuration version from `3` to `4`.

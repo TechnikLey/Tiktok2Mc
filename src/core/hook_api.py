@@ -119,7 +119,7 @@ class HookAPI:
         """Print a message with [HOOK] prefix."""
         print(f"[HOOK] {msg}")
 
-    def send_overlay_text(self, title: str, subtitle: str = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
+    def send_overlay_text(self, title: str, subtitle: Optional[str] = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
         """
         Display overlay text on stream overlays. Returns True if successful.
         """
