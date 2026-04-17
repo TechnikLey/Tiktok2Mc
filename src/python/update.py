@@ -392,7 +392,7 @@ def run_update():
     # ==========================================
     # Signal the start script to shut down so files are unlocked
     with (BASE_DIR / "update_signal.tmp").open("w") as f: f.write("kill")
-    time.sleep(2)  # pause to let the start script exit
+    time.sleep(5)  # pause to let the start script exit
 
     print(f"[..] Installing files...")
     for root, dirs, files in (extracted_root_path).walk():

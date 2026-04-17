@@ -316,14 +316,6 @@ def replace_updater_if_exists():
         except PermissionError:
             print(f"[FAIL] Error: {update_exe.name} is still locked.")
 
-async def animated_wait_message(proc):
-    dots = 0
-    while proc.poll() is None:
-        msg = "Please wait" + "." * (dots % 4)
-        print("\r" + msg + "   ", end="", flush=True)
-        await asyncio.sleep(0.7)
-        dots += 1
-
 def start_update_exe():
     """Run updater synchronously — must wait for exit code, so no tmux/screen here."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
@@ -331,6 +323,7 @@ def start_update_exe():
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
         print(f"Preparing to run updater")
+        print("Please wait...")
         log_dir = BASE_DIR / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "updater.log"
@@ -342,25 +335,15 @@ def start_update_exe():
                 preexec_fn=os.setsid
             )
 
-    # Starte die animierte Warteanzeige im Hintergrund
-    wait_task = None
-    if not IS_WINDOWS:
-        loop = asyncio.get_event_loop()
-        wait_task = loop.create_task(animated_wait_message(proc))
-
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
         if update_signal.exists():
             update_signal.unlink()
-            print("\n[!] Update Start. Please restart the application.")
-            if wait_task:
-                wait_task.cancel()
+            print("\n Please restart the application.")
+            time.sleep(2)
             return "kill"
         time.sleep(1)
 
-    if wait_task:
-        wait_task.cancel()
-    print("\r", end="")
     return proc.returncode
 
 replace_updater_if_exists()
