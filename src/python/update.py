@@ -287,8 +287,8 @@ def run_update():
             idx = sys.argv.index("--resume")
             extracted_root = sys.argv[idx + 1]
             print(f"[>] Resume: Using extracted files from {extracted_root}")
-        except (ValueError, IndexError):
-            pass
+        except (ValueError, IndexError) as e:
+            print(f"[ERROR] Failed to parse --resume argument: {e}\n sys.argv: {sys.argv}")
 
     local = get_versions(VERSION_FILE)
 
