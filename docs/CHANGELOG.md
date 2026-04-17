@@ -16,55 +16,54 @@ Each version is split into two sections:
 ### User
 
 #### Added
-- **Named overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define overlay names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` instead of `>>` in `actions.mca` to target a specific window. Writing `>>` without a name still targets the `default` overlay automatically.
-- **random_included config options** — The `$random` command now respects one new list in `config.yaml` under `Gifts`: `random_included` (whitelist). This allows you to precisely control which triggers are eligible for random selection.
-- **`docs` folder** - The entire `docs` folder is now included, so you can access all documentation files (like this changelog) directly from the release without needing to visit GitHub.
-- **Triggers Names** - Now you can use trigger names instead of just trigger numbers in the `actions.mca` file.
-- **Add New Chapter to GUID.md** - Added a new chapter to the GUIDE.md about using trigger names or IDs in the `actions.mca` file, including priority rules and handling names with spaces. 
-- **New Trigger** - Added a new trigger type `share` that fires when a viewer shares the live stream.
-- **Track Income from Streaming** - The application now tracks the income based on received gifts and their USD value. This Informations is stored in the `revenue_log.jsonl` file and can be used for analytics.
-- **Config value for Autosave** - Added a new config value `autosave_interval_seconds` to control how ofte the `revenue_log.jsonl` file is saved to disk, allowing for more frequent updates and better data integrity in case of crashes. Default is set to `60` seconds.
-- **Auto shutdown on live end** - The application now automatically shuts down when the live stream ends
-- **Configurable shutdown behavior** – The automatic shutdown after a live session can now be controlled via configuration. Users can define a custom shutdown delay or disable automatic shutdown entirely, allowing time for final statistics review or post-live processing before manually terminating the system.
-- **Configurable network access (`server_host`)** — All web servers (main GUI, plugins, overlay, etc.) can now be made accessible from other devices in your network by setting `server_host: "0.0.0.0"` in your `config.yaml`. This allows you to use overlays and APIs from other PCs or OBS instances.
-- **Add additional info to the Config** - Added some additional info to the `config.yaml` file to avoid Errors cause by misinterpretation of list Key Values.
-
-#### Fixed
-- **Comment** – Fixed an issue where comments sent before establishing the connection were displayed immediately after joining a live stream. The application now temporarily filters out these earlier messages, ensuring that only new chat activity is shown.
-- **Config Comment** - Fixed a Comment for the Prefix option in the `CommentCommands` section of the `config.yaml` file.
-- **Update** - Fixed an issue where the updater falsely reported `[FAIL] Critical error parsing YAML files: 'NoneType' object is not subscriptable`.
-- **Fixed Config** - Fixed an issue where the `random_included` config list was not being read correctly, causing to unexpected behavior of the Updater script.
+* **Named Overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` in `actions.mca` to target a window. Using `>>` without a name still targets the `default` overlay.
+* **`random_included` configuration** — A new whitelist in `config.yaml` under `Gifts` that allows you to precisely control which triggers are eligible for selection by the `$random` command.
+* **Release Documentation** — The entire `docs` folder is now included in the release, allowing you to access all documentation files and changelogs directly without visiting GitHub.
+* **Trigger Names** — You can now use descriptive trigger names instead of just trigger numbers within the `actions.mca` file for better readability.
+* **Share Trigger** — Added a new trigger type `share` that fires whenever a viewer shares the live stream.
+* **Streaming Income Tracking** — The application now tracks income based on received gifts and their USD value. This data is stored in `revenue_log.jsonl` and can be used for analytics.
+* **Autosave for Revenue Logs** — Added `autosave_interval_seconds` to the config to control how often revenue data is saved to disk (default is `60` seconds), ensuring data integrity in case of crashes.
+* **Automatic Shutdown** — The application can now automatically shut down when the live stream ends.
+* **Configurable Shutdown Behavior** — You can now define a custom shutdown delay or disable the automatic shutdown entirely via the configuration settings to allow for post-live processing.
+* **Network Access (`server_host`)** — Web servers (GUI, plugins, overlays) can now be made accessible from other devices in your network by setting `server_host: "0.0.0.0"` in `config.yaml`. This is useful for using overlays on separate PCs or OBS instances.
+* **Enhanced Configuration Info** — Added additional explanatory info to the `config.yaml` file to prevent errors caused by misinterpreting list key values.
+* **New Guide Chapters** — Updated `GUIDE.md` with a new chapter on using trigger names/IDs, priority rules, and handling names that contain spaces.
 
 #### Changed
-- **Edit actions.mca examples** — Commented out the `join` trigger because it can spam the overlay with many messages.
-- **Edit default config values** - Updated `GoalMultiplier` default from `2` to `1` to prevent overwhelming growth of goal-based triggers for new users.
-- **Edit default config values** - Add `join` and `comment` to the default `random_exclude` list for `$random`-Command
-- **Update random_excluded list function** - The function of the `random_exclude` list has been changed to work better with the new `random_included` list.
-- **Edit GUIDE.md** - Updated the `$random` section to reflect the new configurable inclusion list and added a note about automatic exclusion of triggers containing `$random` to prevent recursion.
-- **VS Code extension** - Updated `mca.vsix` to include the new `''` syntax for trigger names with a with space between the leeters.
-- **GUIDE.md** - Added the new trigger `share` to the list of available triggers.
-- **Edit actions.mca examples** - Rewrite some Comments and Commands examples to be more clear and concise.
-- **Edit Updater error handling** - Updated the error handling in the updater to provide more specific messages for YAML parsing errors, including the file name and line number where the error occurred.
+* **GoalMultiplier Default** — Updated the default `GoalMultiplier` from `2` to `1` to prevent overwhelming growth of goal-based triggers for new users.
+* **Random Command Defaults** — Added `join` and `comment` to the default `random_exclude` list for the `$random` command to reduce spam.
+* **Random List Logic** — Updated the logic of the `random_exclude` list to work more effectively alongside the new `random_included` whitelist.
+* **Example Actions** — Commented out the `join` trigger in the `actions.mca` examples to prevent overlay spam. Rewrote various command examples to be more concise.
+* **VS Code Extension** — Updated the `mca.vsix` extension to support the new `''` syntax for trigger names that contain spaces.
+* **Updater Error Reporting** — The updater now provides more specific error messages for YAML parsing, including the exact filename and line number where the error occurred.
+* **Recursive Random Protection** — Added a note in `GUIDE.md` about the automatic exclusion of triggers containing `$random` to prevent infinite loops.
+
+#### Fixed
+* **Early Comment Filtering** — Fixed an issue where chat messages sent before the connection was established were displayed immediately upon joining. The application now filters these out to ensure only new activity is shown.
+* **Config Syntax** — Fixed a descriptive comment for the Prefix option in the `CommentCommands` section of the `config.yaml`.
+* **Updater False Positives** — Resolved an issue where the updater falsely reported a critical 'NoneType' error during YAML parsing.
+* **Config Loading** — Fixed a bug where the `random_included` list was not being read correctly, which previously caused unexpected behavior in the updater script.
 
 ### Developer
 
-#### Added
-- **Named overlay routing (`main.py`)** — The `>>` parser now extracts an optional `@Name` prefix. The overlay name is stored alongside the body and forwarded to `send_overlay_text()` as the `overlay_name` parameter. Without a name, `"default"` is used automatically.
-- **`@Name>>` validator support (`validator.py`, `server.js`)** — The `.mca` validator and the VS Code language server both recognise `@Name>>` as a valid command prefix. No error is raised for this syntax.
-- **`@Name>>` syntax highlighting (`mca.tmLanguage.json`)** — The `@Name` part is coloured distinctly (entity type colour) and the `>>` operator is highlighted separately to visually distinguish named overlays from plain `>>`.
-- **Exclude files/folder from build (`build.py`)** — The `sync_folder()` function now accepts an `exclude` parameter with glob patterns to specify files or folders that should be ignored during the build process.
+#### Deprecated
+* **Developer Changelog Section** – Starting with release `v0.3.0`, the `"Developer"` section will no longer be maintained. Internal technical changes will continue to be documented in commit messages and the `dev-book`. Please use GitHub to review changes by checking the commits and viewing the diffs to see exactly what has been modified.
 
-#### Fixed
-- **$random logic:** - Resolved an issue where an empty action list would trigger a misleading `[HOOK] [WARN] Unknown script action: 'random'` error.
+#### Added
+* **Named Overlay Routing (`main.py`)** — Refactored the `>>` parser to extract optional `@Name` prefixes. The overlay name is now stored with the message body and passed to `send_overlay_text()` via the `overlay_name` parameter (defaults to `"default"`).
+* **Validation Support** — Added support for `@Name>>` syntax in the `.mca` validator (`validator.py`) and the VS Code language server (`server.js`) to prevent false-positive syntax errors.
+* **Syntax Highlighting** — Updated `mca.tmLanguage.json` to include distinct scoping for the `@Name` entity and the `>>` operator, providing better visual separation in editors.
+* **Build Exclusions (`build.py`)** — Enhanced the `sync_folder()` function to support an `exclude` parameter, allowing for glob patterns to ignore specific files or directories during the build process.
+* **IntelliSense Improvements** — Updated Dev-Book `ch03-06` with a new `NOTE` block recommending the import of `HookAPI` to enable better docstrings and IntelliSense support in development environments.
 
 #### Changed
-- **Config version** - bumped from `3` to `4`
-- **Edit main.py** - Refactored the `$random` trigger selection logic to first apply the new `random_included` whitelist and then the `random_exclude` blacklist, ensuring that only explicitly allowed triggers are considered for random selection.
-- **Unified host configuration** — All Flask servers and plugin APIs now consistently read the server_host value from config.yaml for their bind address, but internal URLs and webview windows are hardcoded to 127.0.0.1 to avoid cross-device issues.
-- **Updater error handling** - Updated the updater's YAML parsing error handling to catch `YAMLError` exceptions and provide more specific feedback about the nature of the parsing issue, including the file name and line number where the error occurred. This replaces the previous generic exception handling that resulted in less informative error messages.
+* **Config Versioning** — Bumped the configuration version from `3` to `4`.
+* **Random Selection Logic** — Refactored the selection logic in `main.py`. The system now applies the `random_included` whitelist first, followed by the `random_exclude` blacklist, ensuring precise control over eligible triggers.
+* **Host Configuration Binding** — Standardized Flask and Plugin API servers to pull bind addresses from `server_host` in `config.yaml`. Internal URLs and webview windows remain hardcoded to `127.0.0.1` to prevent cross-device security issues.
+* **Advanced Error Handling** — Upgraded the updater's YAML parser to catch specific `YAMLError` exceptions. It now reports the exact file name and line number, replacing generic exception handling.
 
-#### Docs
-- **Dev-Book `ch03-06`** - Added a NOTE block and updated the example to recommend importing `HookAPI` for better IntelliSense and docstrings in editors.
+#### Fixed
+* **`$random` Hook Logic** — Resolved a bug where an empty action list caused a misleading `[HOOK] [WARN] Unknown script action: 'random'` error. The logic now correctly handles empty sets.
 
 ---
 
