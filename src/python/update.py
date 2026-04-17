@@ -426,11 +426,8 @@ def run_update():
     print("\n[OK] Update complete.")
     wait_for_key()
 
-    if START_FILE.exists():
-        if sys.platform == "win32":
-            subprocess.Popen([str(START_FILE)], creationflags=subprocess.CREATE_NEW_CONSOLE)
-        else:
-            os.execvp(str(START_FILE), [str(START_FILE)])
+    if START_FILE.exists() and sys.platform != "win32":
+        os.execvp(str(START_FILE), [str(START_FILE)])
 
     sys.exit(0)
 
