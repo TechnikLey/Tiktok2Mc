@@ -112,6 +112,10 @@ def get_versions(path):
                     k, val = map(str.strip, line.split(":", 1))
                     if "toolversion" in k.lower(): v["tool"] = extract_version(val)
                     elif "updaterversion" in k.lower(): v["updater"] = extract_version(val)
+    else:
+        print(f"[ERROR] Version file not found: {path}")
+        wait_for_key()
+
     return v
 
 def save_versions(tool_v, updater_v):
@@ -338,9 +342,17 @@ def run_update():
             with tarfile.open(archive_path, "r:gz") as t:
                 t.extractall(TEMP_DIR)
 
-        subs = [d for d in {x.name for x in TEMP_DIR.iterdir()} if d != archive_name]
-        temp_items = [TEMP_DIR / s for s in subs]
-        extracted_root = str(next((p for p in temp_items if p.is_dir()), TEMP_DIR))
+        if (TEMP_DIR / "version.txt").exists():
+            extracted_root = TEMP_DIR
+        else:
+            found = False
+            for x in TEMP_DIR.iterdir():
+                if x.is_dir() and (x / "version.txt").exists():
+                    extracted_root = x
+                    found = True
+                    break
+            if not found:
+                extracted_root = TEMP_DIR  # Fallback
 
     # Read versions from the downloaded package
     extracted_root_path = Path(extracted_root) if isinstance(extracted_root, str) else extracted_root
@@ -399,6 +411,9 @@ def run_update():
     
     if CONFIG_UPDATE_ENABLE: 
         migrate_config_if_needed()
+
+    if (BASE_DIR / "update_signal.tmp").exists():
+        (BASE_DIR / "update_signal.tmp").unlink()
 
     print("\n[OK] Update complete.")
     wait_for_key()
