@@ -350,7 +350,7 @@ def run_update():
     # 1. UPDATER SELF-UPDATE (via execv)
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
-        print(f"\ud83d\udd04 New updater found ({zip_v['updater']}).")
+        print(f"[UPDATE] New updater found ({zip_v['updater']}).")
         new_up_src = extracted_root_path / f"update{EXE}"
         
         if new_up_src.exists():
@@ -359,13 +359,13 @@ def run_update():
             # Save only updater version
             save_versions(local["tool"], zip_v["updater"])
             
-            print("\ud83d\ude80 Starting new updater and resuming tool update...")
+            print("[INFO] Starting new updater and resuming tool update...")
             # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
             os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
             sys.exit(0)  # Safety fallback
 
-    print(f"\ud83d\udd04 Updater is up to date ({local['updater']}). Proceeding with tool update...")
+    print(f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update...")
 
     # ==========================================
     # 2. TOOL UPDATE (copy files)
