@@ -322,7 +322,7 @@ def start_update_exe():
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
-        proc = subprocess.Popen(cmd)
+        proc = subprocess.Popen(cmd, start_new_session=True)
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
