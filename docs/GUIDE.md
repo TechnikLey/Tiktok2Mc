@@ -39,6 +39,9 @@ The tool includes a built-in Minecraft server (version 1.21.11), so you do not n
 
 All settings are stored in `config/config.yaml`. Open this file with any text editor.
 
+> [!IMPORTANT]
+> Not all settings are explained here. For a full explanation of every config option, see the `config.yaml` file itself. It contains detailed comments for every setting.
+
 > [!WARNING]
 > When editing this file, do not use the Tab key. Always use the  spacebar for indentation. Also, always keep a space after colons (for example `User: myname`, not `User:myname`).
 
@@ -151,7 +154,7 @@ The `CommentCommands` feature lets viewers send Minecraft commands directly to y
 ```yaml
 CommentCommands:
   Enable: false
-  Prefix: "!"
+  Prefix: "#"
   AllowedRoles:
     - moderator
   Whitelist: []
@@ -166,7 +169,7 @@ CommentCommands:
 
 **Enable** -- Set to `true` to activate this feature.
 
-**Prefix** -- The character a comment must start with to be treated as a command. Can be any character, for example `!`, `/`, or `#`. With `Prefix: "!"`, a viewer writing `!say Hello` sends the command `say Hello` to Minecraft.
+**Prefix** -- The character a comment must start with to be treated as a command. Can be any character, for example `/`, or `#`. With `Prefix: "#"` a viewer writing `#say Hello` sends the command `say Hello` to Minecraft.
 
 **AllowedRoles** -- Controls who is allowed to use comment commands:
 
@@ -199,7 +202,7 @@ Example -- allow only `say` and `give`, always block dangerous commands:
 ```yaml
 CommentCommands:
   Enable: true
-  Prefix: "!"
+  Prefix: "#"
   AllowedRoles:
     - moderator
   Whitelist:
@@ -214,7 +217,7 @@ CommentCommands:
     - whitelist
 ```
 
-With this setup, a moderator writing `!say Hello stream` sends `say Hello stream` to Minecraft. A moderator writing `!op Notch` is blocked because `op` is in the Blacklist. A non-moderator viewer is blocked at the role check and never reaches the Whitelist or Blacklist at all.
+With this setup, a moderator writing `#say Hello stream` sends `say Hello stream` to Minecraft. A moderator writing `#op Notch` is blocked because `op` is in the Blacklist. A non-moderator viewer is blocked at the role check and never reaches the Whitelist or Blacklist at all.
 
 > [!NOTE]
 > Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.

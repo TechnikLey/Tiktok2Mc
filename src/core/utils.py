@@ -8,7 +8,7 @@ def load_config(config: str | Path) -> dict:
 
     if not path.exists():
         print(f"Config file not found: {path}")
-        input("Press Enter zum Beenden...")
+        input("Press Enter to exit...")
         sys.exit(1)
 
     try:
@@ -16,8 +16,9 @@ def load_config(config: str | Path) -> dict:
             return yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
         print(f"YAML error in {path}: {e}")
+        input("Press Enter to exit...")
+        sys.exit(1)
     except Exception as e:
         print(f"General error in {path}: {e}")
-
-    input("Press Enter zum Beenden...")
-    sys.exit(1)
+        input("Press Enter to exit...")
+        sys.exit(1)

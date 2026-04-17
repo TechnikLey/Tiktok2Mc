@@ -17,18 +17,30 @@ import re
 import time
 import io
 import os
-import yaml
 from pathlib import Path
 from packaging import version
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 from core.paths import get_base_dir
+from core.utils import load_config
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-if sys.platform != "win32":
+# =========================
+# Base paths & configuration
+# =========================
+BASE_DIR = get_base_dir()
+
+TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
+VERSION_FILE = (BASE_DIR / "version.txt").resolve()
+DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
+CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
+
+cfg = load_config(CONFIG_FILE)
+
+if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to perform updates.")
         wait_for_key()
@@ -45,16 +57,6 @@ HEADERS_ASSET = {
     "Accept": "application/octet-stream",
     "User-Agent": "Streaming-Tool-Updater"
 }
-
-# =========================
-# Base paths & configuration
-# =========================
-BASE_DIR = get_base_dir()
-
-TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
-VERSION_FILE = (BASE_DIR / "version.txt").resolve()
-DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
-CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 
 # Directories and individual files that may be overwritten by an update
 WHITELIST_DIRS = {
@@ -84,13 +86,6 @@ WHITELIST_FILES = {
 GITHUB_USER = "TechnikLey"
 GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
-
-try:
-    with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-except Exception as e:
-    print(f"Error loading config: {e}")
-    sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
 AUTO_MODE = "--auto" in sys.argv

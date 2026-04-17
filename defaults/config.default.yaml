@@ -30,6 +30,14 @@ auto_shutdown_on_live_end: true
 # If auto shutdown is enabled, this value controls how many seconds to wait before shutting down after the live stream ends.
 shutdown_delay_seconds: 30
 
+# Set this to true to disable the warning about running the tool without sudo on Linux.
+# WARNING: Running without sudo on Linux can cause various issues, 
+# including failed updates and permission errors. 
+# Only disable this warning if you are sure you understand the risks
+# and have configured your system accordingly.
+# (Linux only, has no effect on Windows)
+no_sudo_warning: False
+
 # =======================================================================
 # SERVER HOST BIND ADDRESS
 # =======================================================================

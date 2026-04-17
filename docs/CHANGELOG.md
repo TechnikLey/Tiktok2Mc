@@ -28,6 +28,7 @@ Each version is split into two sections:
 * **Network Access (`server_host`)** — Web servers (GUI, plugins, overlays) can now be made accessible from other devices in your network by setting `server_host: "0.0.0.0"` in `config.yaml`. This is useful for using overlays on separate PCs or OBS instances.
 * **Enhanced Configuration Info** — Added additional explanatory info to the `config.yaml` file to prevent errors caused by misinterpreting list key values.
 * **New Guide Chapters** — Updated `GUIDE.md` with a new chapter on using trigger names/IDs, priority rules, and handling names that contain spaces.
+* **Config Option: `no_sudo_warning`** — New config key to suppress the warning about missing sudo/root privileges on Linux systems.
 
 #### Changed
 * **GoalMultiplier Default** — Updated the default `GoalMultiplier` from `2` to `1` to prevent overwhelming growth of goal-based triggers for new users.
@@ -37,6 +38,8 @@ Each version is split into two sections:
 * **VS Code Extension** — Updated the `mca.vsix` extension to support the new `''` syntax for trigger names that contain spaces.
 * **Updater Error Reporting** — The updater now provides more specific error messages for YAML parsing, including the exact filename and line number where the error occurred.
 * **Recursive Random Protection** — Added a note in `GUIDE.md` about the automatic exclusion of triggers containing `$random` to prevent infinite loops.
+* **sudo Requirement** — The updater and the start script now require sudo privileges on Linux.
+* **Configuration Guide Improved** — The [Configuration](./GUIDE.md#Configuration) chapter in `GUIDE.md` has been revised and expanded for clarity.
 
 #### Fixed
 * **Early Comment Filtering** — Fixed an issue where chat messages sent before the connection was established were displayed immediately upon joining. The application now filters these out to ensure only new activity is shown.
@@ -46,6 +49,7 @@ Each version is split into two sections:
 * **UTF-8 Encoding** — Fixed a potential UTF-8 encoding error in the updater that occurred when printing emojis to the console. The updater now uses only ASCII output to ensure compatibility with all terminals.
 * **Java (Windows)** — Fixed an issue where Java was missing from the project directory after download. The tool now automatically downloads and installs a portable Java runtime in the project directory on Windows if it is not already present.
 * **Update handler** — Fixed a bug where the updater sometimes failed to detect the correct `version.txt` file in the release folder, which could cause the version to be set to `v0.0.0`. The updater now reliably locates and reads the correct version information after an update.
+* **Permission Errors on Linux** — Fixed various permission-related issues on Linux by ensuring that all necessary files are created with appropriate permissions and that the updater and start script require sudo privileges to run.
 
 ### Developer
 

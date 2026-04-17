@@ -22,7 +22,36 @@ from core.paths import get_base_dir
 
 IS_WINDOWS = sys.platform == "win32"
 
-if sys.platform != "win32":
+# -----------------------------
+# Base directory
+# -----------------------------
+BASE_DIR = get_base_dir()
+
+CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
+
+# -----------------------------
+# Executable paths
+# -----------------------------
+EXE = ".exe" if sys.platform == "win32" else ""
+BIN = ".exe" if sys.platform == "win32" else ".bin"
+
+GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{EXE}").resolve()
+SERVER_EXE_PATH = (BASE_DIR / f"server{BIN}").resolve()
+UPDATE_EXE_PATH = (BASE_DIR / f"update{EXE}").resolve()
+APP_EXE_PATH = (BASE_DIR / "core" / f"app{EXE}").resolve()
+PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{EXE}").resolve()
+PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{EXE}").resolve()
+REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{EXE}").resolve()
+PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
+update_exe = (BASE_DIR / f"update{EXE}").resolve()
+update_new = (BASE_DIR / f"update_new{EXE}").resolve()
+
+# -----------------------------
+# Load configuration
+# -----------------------------
+cfg = load_config(CONFIG_FILE)
+
+if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to start the tool.")
         input("Press Enter to exit...")
@@ -111,35 +140,6 @@ if not IS_WINDOWS:
         else:
             print("\nAborted.")
             sys.exit(0)
-
-# -----------------------------
-# Base directory
-# -----------------------------
-BASE_DIR = get_base_dir()
-
-CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
-
-# -----------------------------
-# Executable paths
-# -----------------------------
-EXE = ".exe" if sys.platform == "win32" else ""
-BIN = ".exe" if sys.platform == "win32" else ".bin"
-
-GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{EXE}").resolve()
-SERVER_EXE_PATH = (BASE_DIR / f"server{BIN}").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / f"update{EXE}").resolve()
-APP_EXE_PATH = (BASE_DIR / "core" / f"app{EXE}").resolve()
-PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{EXE}").resolve()
-PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{EXE}").resolve()
-REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{EXE}").resolve()
-PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
-update_exe = (BASE_DIR / f"update{EXE}").resolve()
-update_new = (BASE_DIR / f"update_new{EXE}").resolve()
-
-# -----------------------------
-# Load configuration
-# -----------------------------
-cfg = load_config(CONFIG_FILE)
 
 # -----------------------------
 # Settings
