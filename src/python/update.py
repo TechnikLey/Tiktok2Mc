@@ -376,7 +376,9 @@ def run_update():
             shutil.copy2(new_up_src, new_up_dest)
             # Save only updater version
             save_versions(local["tool"], zip_v["updater"])
-            
+            # Set executable permissions on Linux/Mac
+            if sys.platform != "win32":
+                os.chmod(new_up_dest, 0o755)
             print("[INFO] Starting new updater and resuming tool update...")
             # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
