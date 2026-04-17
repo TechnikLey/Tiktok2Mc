@@ -322,7 +322,16 @@ def start_update_exe():
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
-        proc = subprocess.Popen(cmd, start_new_session=True)
+        log_dir = BASE_DIR / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "updater.log"
+        with open(log_file, "a") as lf:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=lf,
+                stderr=lf,
+                preexec_fn=os.setsid
+            )
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
