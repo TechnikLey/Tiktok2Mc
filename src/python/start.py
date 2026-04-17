@@ -22,6 +22,12 @@ from core.paths import get_base_dir
 
 IS_WINDOWS = sys.platform == "win32"
 
+if sys.platform != "win32":
+    if os.geteuid() != 0:
+        print("[ERROR] This script must be run as root on Linux to start the tool.")
+        wait_for_key()
+        sys.exit(1)
+
 # -----------------------------
 # Linux: Detect tmux/screen
 # -----------------------------

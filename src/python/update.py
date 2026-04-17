@@ -28,6 +28,12 @@ from core.paths import get_base_dir
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
+if sys.platform != "win32":
+    if os.geteuid() != 0:
+        print("[ERROR] This script must be run as root on Linux to perform updates.")
+        wait_for_key()
+        sys.exit(1)
+
 # =========================
 # HTTP headers for GitHub API
 # =========================
