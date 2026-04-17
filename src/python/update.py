@@ -21,6 +21,7 @@ import yaml
 from pathlib import Path
 from packaging import version
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 from core.paths import get_base_dir
 
@@ -156,25 +157,17 @@ def migrate_config_if_needed() -> bool:
             print(f"[ERROR] Failed to copy template: {e}")
             return False
 
-    try:
-        # Load Template
-        with DEFAULT_CONFIG_FILE.open("r", encoding="utf-8") as f:
-            template_data = yaml_obj.load(f)
-            if template_data is None:
-                template_data = CommentedMap()
-        
-        # Clean up template start comments
-        template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
+    # Load Template
+    template_data = load_yaml_with_debug(DEFAULT_CONFIG_FILE, yaml_obj, "Template")
+    if template_data is None:
+        return False
 
-        # Load User Config
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            user_data = yaml_obj.load(f)
-            # If file is empty, initialize as empty map
-            if user_data is None:
-                user_data = CommentedMap()
+    # Clean up template start comments
+    template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
 
-    except Exception as e:
-        print(f"[FAIL] Critical error parsing YAML files: {e}")
+    # Load User Config
+    user_data = load_yaml_with_debug(CONFIG_FILE, yaml_obj, "User Config")
+    if user_data is None:
         return False
 
     # Version Check
@@ -218,42 +211,27 @@ def migrate_config_if_needed() -> bool:
 def _inject_values_strictly(template, user_source, path=""):
     # 1. BASE GUARD: If user_source is None or not a dictionary-like object
     if user_source is None:
-        try:
-            # Load Template
-            try:
-                with DEFAULT_CONFIG_FILE.open("r", encoding="utf-8") as f:
-                    template_data = yaml_obj.load(f)
-                    if template_data is None:
-                        template_data = CommentedMap()
-            except Exception as e:
-                # Try to extract line/column info if it's a YAML error
-                if hasattr(e, 'problem_mark'):
-                    mark = e.problem_mark
-                    print(f"[FAIL] YAML error in file: {DEFAULT_CONFIG_FILE.name}\n→ Line: {mark.line + 1}, Column: {mark.column + 1}\n→ Error: {str(e).splitlines()[0]}")
-                else:
-                    print(f"[FAIL] YAML error in file: {DEFAULT_CONFIG_FILE.name}\n→ Error: {e}")
-                return False
-
-            # Clean up template start comments
-            template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
-
-            # Load User Config
-            try:
-                with CONFIG_FILE.open("r", encoding="utf-8") as f:
-                    user_data = yaml_obj.load(f)
-                    if user_data is None:
-                        user_data = CommentedMap()
-            except Exception as e:
-                if hasattr(e, 'problem_mark'):
-                    mark = e.problem_mark
-                    print(f"[FAIL] YAML error in file: {CONFIG_FILE.name}\n→ Line: {mark.line + 1}, Column: {mark.column + 1}\n→ Error: {str(e).splitlines()[0]}")
-                else:
-                    print(f"[FAIL] YAML error in file: {CONFIG_FILE.name}\n→ Error: {e}")
-                return False
-
-        except Exception as e:
-            print(f"[FAIL] Critical error parsing YAML files: {e}")
-            return False
+        if path:
+            print(f"[WARNING] Configuration path '{path}' is empty in user config. Skipping.")
+        return
+    if not isinstance(user_source, (dict, CommentedMap)):
+        if path:
+            print(f"[WARNING] Expected a section at '{path}', but found {type(user_source).__name__}. Skipping.")
+        return
+    # 2. ITERATE: Only if user_source is guaranteed to be a dict
+    for key in template:
+        current_path = f"{path}.{key}" if path else key 
+        # Check if user actually has this key
+        if key in user_source:
+            user_value = user_source[key]
+            template_value = template[key]
+            # CASE A: Both are nested structures -> Recurse
+            if isinstance(template_value, (dict, CommentedMap)):
+                if isinstance(user_value, (dict, CommentedMap)):
+                    _inject_values_strictly(template_value, user_value, current_path)
+                elif user_value is None:
+                    # User left a whole category empty (e.g., 'Java: ')
+                    print(f"[WARNING] Section '{current_path}' is empty in user config. Keeping defaults.")
                 else:
                     # User put a single value where a dictionary was expected
                     print(f"[WARNING] Type mismatch at '{current_path}': Expected a section, got a value. Skipping.")
@@ -267,6 +245,28 @@ def _inject_values_strictly(template, user_source, path=""):
         else:
             # Key doesn't exist in user config at all
             print(f"[DEBUG] Key '{current_path}' missing in user config. Using default.")
+
+def load_yaml_with_debug(path, yaml_obj, label):
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml_obj.load(f)
+            if data is None:
+                return CommentedMap()
+            return data
+    except YAMLError as e:
+        print(f"[FAIL] YAML error in {label}: {path}")
+
+        # Print line / column if available
+        if hasattr(e, "problem_mark") and e.problem_mark is not None:
+            mark = e.problem_mark
+            print(f"[FAIL] Line: {mark.line + 1}, Column: {mark.column + 1}")
+
+        print(f"[FAIL] Details: {e}")
+        return None
+    except Exception as e:
+        print(f"[FAIL] Unexpected error while loading {label}: {path}")
+        print(f"[FAIL] Details: {e}")
+        return None
 
 # =========================
 # Main update process
