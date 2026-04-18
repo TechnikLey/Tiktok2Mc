@@ -9,11 +9,18 @@ Each version is split into two sections:
 - **User** — changes relevant to end users (new features, bug fixes, behavior changes).
 - **Developer** — internal/technical changes relevant to contributors and developers (build system, code structure, tooling).
 
+> [!IMPORTANT]
+> Please note that the **Developer** category starting after version `v0.3.0` is now deprecated and will no longer be maintained. Internal technical changes will continue to be documented in commit messages and the `dev-book`. Please use GitHub to review changes by checking the commits and viewing the diffs to see exactly what has been modified.
+
 ---
 
 ## [Unreleased]
 
 ### User
+
+[!WARNING]
+> When updating your project to this version, errors may occur.
+> If you encounter problems, please download the latest release and copy your `data` folder (and any > other important files like `config.yaml`) into the new release directory.
 
 #### Added
 * **Named Overlays (`@Name>>`)** — You can now run multiple overlay windows simultaneously and route messages to specific ones. Define names in `config.yaml` under `Overlaytxt > Overlays` and use `@Name>>` in `actions.mca` to target a window. Using `>>` without a name still targets the `default` overlay.
