@@ -16,6 +16,7 @@ import json
 import shutil
 import os
 import asyncio
+from datetime import datetime
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
@@ -322,9 +323,31 @@ def start_update_exe():
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
         print("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
-        log_dir = BASE_DIR / "logs"
+        log_dir = BASE_DIR / "logs" / "update_logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "updater.log"
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        log_file = log_dir / f"updater_{timestamp}.log"
+        update_cfg = cfg.get("Update", {})
+        max_logs = update_cfg.get("max_update_logs", 20)
+        try:
+            max_logs = int(max_logs)
+        except Exception as e:
+            print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
+            max_logs = 20
+        if max_logs == 0:
+            logs = list(log_dir.glob("updater_*.log"))
+            for old_log in logs:
+                try:
+                    old_log.unlink()
+                except Exception as e:
+                    print(f"[WARN] Failed to delete old log {old_log}: {e}")
+        elif max_logs > 0:
+            logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
+            for old_log in logs[max_logs - 1:]:
+                try:
+                    old_log.unlink()
+                except Exception as e:
+                    print(f"[WARN] Failed to delete old log {old_log}: {e}")
         with open(log_file, "a") as lf:
             proc = subprocess.Popen(
                 cmd,

@@ -18,6 +18,15 @@ Each version is split into two sections:
 
 ### User
 
+#### Added
+* **Config Option: `max_update_logs`** — A new configuration option under the `Updater` section in `config.yaml` that allows users to specify how many update log files to keep in the `logs/update_logs` directory.
+
+#### Changed
+* **Updater Logging (Linux)** — The updater now creates a new log file for each update attempt in the `logs/update_logs` directory, named with a timestamp in 24-hour format (e.g., `updater_2026-04-19_14-30.log`). This allows users to keep a history of update attempts and their outcomes without overwriting previous logs.
+
+#### Fixed
+* **Updater EOFError** - Fixed an issue where the updater could raise an `EOFERROR` when no input is available (In most cases only on Linux) during the update process. The updater now catches this exception and prints an informational message instead of crashing.
+
 ---
 
 ## [v0.3.0] - 2026-04-18

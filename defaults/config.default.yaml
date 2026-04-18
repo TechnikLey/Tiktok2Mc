@@ -4,7 +4,7 @@
 # This file is a template.
 # Personal settings should be changed in 'config.yaml' only.
 # -------------------------------------------------------------------------
-config_version: 4
+config_version: 5
 
 # -------------------------------------------------------------------------
 # IMPORTANT FOR BEGINNERS:
@@ -292,6 +292,11 @@ GUI:
 Update:
   # Automatically check for and install tool updates.
   Enable: true
+
+  # The maximum number of update logs to keep in the logs/update_logs directory.
+  # When the number is 0 all logs will be deleted after each update.
+  # If the number is less than 0 logs will never be deleted.
+  max_update_logs: 20
 
 # MINECRAFT SERVER API
 MinecraftServerAPI:
