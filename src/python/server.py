@@ -3,6 +3,9 @@ import subprocess
 import yaml
 import sys
 import shutil
+import platform
+import zipfile
+import urllib.request
 from pathlib import Path
 from core.paths import get_base_dir
 
@@ -21,42 +24,74 @@ SERVER_DIR = (BASE_DIR / "server" / "mc").resolve()
 CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 SERVER_JAR = (SERVER_DIR / "server.jar").resolve()
 
-# Use bundled Java on Windows, system Java on Linux
+# --- Java detection and auto-download---
 _bundled_java = (BASE_DIR / "server" / "java" / "bin" / "java.exe").resolve()
 if _bundled_java.exists():
     JAVA_EXE = _bundled_java
 else:
-    _system_java = shutil.which("java")
-    if _system_java:
-        JAVA_EXE = Path(_system_java).resolve()
+    if platform.system() == "Windows":
+        _system_java = shutil.which("java")
+        if _system_java:
+            JAVA_EXE = Path(_system_java).resolve()
+        else:
+            java_dir = BASE_DIR / "server" / "java"
+            java_bin = java_dir / "bin" / "java.exe"
+            if not java_bin.exists():
+                print("No bundled Java found and none in PATH. Downloading OpenJDK 21 for Windows...")
+                # Adoptium Temurin 21 JRE (portable ZIP, x64)
+                jdk_url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip"
+                zip_path = BASE_DIR / "server" / "java_download.zip"
+                try:
+                    urllib.request.urlretrieve(jdk_url, zip_path)
+                    print("Download complete. Extracting...")
+                    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                        zip_ref.extractall(java_dir)
+                    for sub in java_dir.iterdir():
+                        if sub.is_dir() and (sub / "bin" / "java.exe").exists():
+                            for item in sub.iterdir():
+                                target = java_dir / item.name
+                                if not target.exists():
+                                    item.rename(target)
+                            shutil.rmtree(sub)
+                            break
+                    zip_path.unlink()
+                    print("Java extraction complete.")
+                except Exception as e:
+                    print(f"Failed to download/extract Java: {e}")
+                    sys.exit(1)
+            JAVA_EXE = java_bin
     else:
-        print("Java not found. Attempting to install...")
-        _install_cmds = {
-            "apt": ["sudo", "apt", "install", "-y", "openjdk-21-jre-headless"],
-            "dnf": ["sudo", "dnf", "install", "-y", "java-21-openjdk-headless"],
-            "pacman": ["sudo", "pacman", "-S", "--noconfirm", "jre-openjdk"],
-            "zypper": ["sudo", "zypper", "install", "-y", "java-21-openjdk-headless"],
-        }
-        _installed = False
-        for pkg_mgr, cmd in _install_cmds.items():
-            if shutil.which(pkg_mgr):
-                print(f"Using {pkg_mgr} to install Java...")
-                result = subprocess.run(cmd)
-                if result.returncode == 0 and shutil.which("java"):
-                    JAVA_EXE = Path(shutil.which("java")).resolve()
-                    _installed = True
-                    print(f"Java installed successfully: {JAVA_EXE}")
-                break
+        _system_java = shutil.which("java")
+        if _system_java:
+            JAVA_EXE = Path(_system_java).resolve()
+        else:
+            print("Java not found. Attempting to install...")
+            _install_cmds = {
+                "apt": ["sudo", "apt", "install", "-y", "openjdk-21-jre-headless"],
+                "dnf": ["sudo", "dnf", "install", "-y", "java-21-openjdk-headless"],
+                "pacman": ["sudo", "pacman", "-S", "--noconfirm", "jre-openjdk"],
+                "zypper": ["sudo", "zypper", "install", "-y", "java-21-openjdk-headless"],
+            }
+            _installed = False
+            for pkg_mgr, cmd in _install_cmds.items():
+                if shutil.which(pkg_mgr):
+                    print(f"Using {pkg_mgr} to install Java...")
+                    result = subprocess.run(cmd)
+                    if result.returncode == 0 and shutil.which("java"):
+                        JAVA_EXE = Path(shutil.which("java")).resolve()
+                        _installed = True
+                        print(f"Java installed successfully: {JAVA_EXE}")
+                    break
 
-        if not _installed:
-            print("\nError: Java could not be installed automatically.")
-            print("Please install Java 21 manually:")
-            print("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
-            print("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
-            print("  Arch Linux    : sudo pacman -S jre-openjdk")
-            print("  openSUSE      : sudo zypper install java-21-openjdk-headless")
-            print("  macOS         : brew install openjdk@21")
-            sys.exit(1)
+            if not _installed:
+                print("\nError: Java could not be installed automatically.")
+                print("Please install Java 21 manually:")
+                print("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
+                print("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
+                print("  Arch Linux    : sudo pacman -S jre-openjdk")
+                print("  openSUSE      : sudo zypper install java-21-openjdk-headless")
+                print("  macOS         : brew install openjdk@21")
+                sys.exit(1)
 
 SERVER_PROPERTIES = (SERVER_DIR / "server.properties").resolve()
 IGNORE_RCON_FILE = (BASE_DIR / "config" / ".ignore_rcon_warning").resolve()
@@ -81,6 +116,8 @@ try:
     WEBSERVERPORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
     APIPORT = cfg.get("MinecraftServerAPI", {}).get("APIPort", 7000)
     MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+    # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+    SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 
 except Exception as e:
     print(f"Config error: {e}")
@@ -91,7 +128,7 @@ with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
     cfg_api = yaml.safe_load(f)
 
     webhook = cfg_api.setdefault("webhooks", {})
-    urls = webhook.setdefault("urls", [f"http://localhost:{WEBSERVERPORT}"])
+    urls = webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
     URL = urls[0]
 
     if APIPORT != cfg_api.get("port", 7000):

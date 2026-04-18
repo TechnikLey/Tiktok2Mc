@@ -18,19 +18,21 @@ import shutil
 import subprocess
 import threading
 import logging
-import requests
 import traceback
 import random
 import time
+import datetime
+import json
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics
 from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
+from core.overlay_utils import send_overlay_text
 
 # Windows-specific fix for the event loop (prevents WinError 6)
 if sys.platform == "win32":
@@ -49,9 +51,11 @@ HTTP_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "http_actions.txt").resolve()
 MC_HOST, MC_PORT, MC_PASS = "localhost", 25575, ""
 DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = "127.0.0.1"
 LIKE_GOAL_PORT = 9797
 LIKE_TRIGGERS = []
-RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
+AUTOSAVE_INTERVAL_SECONDS = 60
 
 # --- Queues & throttling (for optimal RCON performance) ---
 trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -84,7 +88,6 @@ last_likegoal_sent = 0
 last_likegoal_time = 0
 LIKEGOAL_INTERVAL = 3
 
-
 DISABLE_TIKTOK_CONNECT = False  # Toggle for disabling TikTok connection
 
 # --- Comment commands ---
@@ -93,6 +96,13 @@ COMMENT_CMD_PREFIX = "!"
 COMMENT_CMD_ROLES = ["moderator"]
 COMMENT_CMD_WHITELIST = []  # Only these commands allowed (empty = all allowed)
 COMMENT_CMD_BLACKLIST = []  # These commands are blocked
+
+RANDOM_TRIGGER_WHITELIST = []
+RANDOM_TRIGGER_BLACKLIST = []
+
+GIFT_VALUE_USD = 0
+RUNTIME_PATH_SHUTDOWN = (BASE_DIR / "runtime" / "shutdown").resolve()
+
 app = Flask(__name__)
 
 log = logging.getLogger('werkzeug')
@@ -104,8 +114,9 @@ log.setLevel(logging.ERROR)
 
 def load_config():
     """Loads configuration values from the YAML config file."""
-    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, RANDOM_EXCLUDE
+    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, AUTOSAVE_INTERVAL_SECONDS
     global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
+    global RANDOM_TRIGGER_WHITELIST, RANDOM_TRIGGER_BLACKLIST, SERVER_HOST
 
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
@@ -117,23 +128,24 @@ def load_config():
 
         MC_PASS = config.get("RCON", {}).get("Password", "")
         MC_PORT = config.get("RCON", {}).get("Port", 25575)
+        SERVER_HOST = config.get("server_host", "127.0.0.1")
         CONFIG_TIKTOK_USER = config.get("TikTok", {}).get("User", "")
         RECONNECT_DELAY = config.get("TikTok", {}).get("ReconnectDelaySeconds", 10)
         MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
         OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
         LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
+        AUTOSAVE_INTERVAL_SECONDS = config.get("Gifts", {}).get("autosave_interval_seconds", 60)
 
-        raw_exclude = config.get("Gifts", {}).get("random_exclude", ["likes", "like_2", "follow"])
-        if isinstance(raw_exclude, list):
-            RANDOM_EXCLUDE = [str(e).strip() for e in raw_exclude if str(e).strip()]
-        else:
-            RANDOM_EXCLUDE = ["likes", "like_2", "follow"]
+        raw_included = config.get("Gifts", {}).get("random_included", [])
+        RANDOM_TRIGGER_WHITELIST = [str(c).strip() for c in raw_included if str(c).strip()] if isinstance(raw_included, list) else []
+        raw_exclude = config.get("Gifts", {}).get("random_exclude", [])
+        RANDOM_TRIGGER_BLACKLIST = [str(c).strip() for c in raw_exclude if str(c).strip()] if isinstance(raw_exclude, list) else []
 
         LIKE_TRIGGERS = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
 
         comment_cmd_cfg = config.get("CommentCommands", {})
         COMMENT_CMD_ENABLE = bool(comment_cmd_cfg.get("Enable", False))
-        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "!"))
+        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "#"))
         raw_roles = comment_cmd_cfg.get("AllowedRoles", ["moderator"])
         if isinstance(raw_roles, list):
             COMMENT_CMD_ROLES = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
@@ -213,8 +225,14 @@ def generate_datapack():
                             continue
 
                         # Detect command prefix
-                        if cmd.startswith(">>"): 
+                        _overlay_match = re.match(r"@(\w+)>>", cmd)
+                        if _overlay_match:
                             kind = "overlay"
+                            overlay_name = _overlay_match.group(1)
+                            body = cmd[_overlay_match.end():].strip()
+                        elif cmd.startswith(">>"):
+                            kind = "overlay"
+                            overlay_name = "defaults"
                             body = cmd[2:].strip()
                         elif cmd.startswith("!"):
                             kind = "rcon"
@@ -242,8 +260,8 @@ def generate_datapack():
 
                         # Sort into the appropriate action list
                         if kind == "overlay":
-                            # Store raw body (with {user} placeholder intact) — no multiplier
-                            overlay_actions.setdefault(name, []).append(body)
+                            # Store (overlay_name, raw body) — no multiplier
+                            overlay_actions.setdefault(name, []).append((overlay_name, body))
                             valid_functions.add(name)
                         else:
                             for _ in range(times):
@@ -272,11 +290,23 @@ def generate_datapack():
         with meta_file.open("w", encoding="utf-8") as f:
             f.write('{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}')
 
+        # =============================================================
         # === Build possible_random_actions (safe pool for $random) ===
-        exclude = set(RANDOM_EXCLUDE)
+        # =============================================================
+        exclude = set(RANDOM_TRIGGER_BLACKLIST)
         random_sources = {n for n, acts in script_actions.items() if "random" in acts}
         exclude |= random_sources
-        possible_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
+        # Base pool
+        base_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
+        # === Apply whitelist / blacklist logic ===
+        # === Apply whitelist / blacklist logic with debug ===
+        for cmd in base_random_actions:
+            if RANDOM_TRIGGER_WHITELIST and cmd not in RANDOM_TRIGGER_WHITELIST:
+                print(f"[RANDOM] {cmd} is not in the witelist, excluding from $random pool.")
+            elif RANDOM_TRIGGER_BLACKLIST and cmd in RANDOM_TRIGGER_BLACKLIST:
+                print(f"[RANDOM] {cmd} is in the blacklist, excluding from $random pool.")
+            else:
+                possible_random_actions.append(cmd)
 
         # Create ZIP archive
         zip_path = Path(DATAPACK_ROOT) / DATAPACK_NAME
@@ -396,6 +426,8 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
             if action == "random" and possible_random_actions:
                 chosen = random.choice(possible_random_actions)
                 await execute_global_command(chosen, source_user, chain_depth)
+            elif action == "random" and not possible_random_actions:
+                print(f"[HOOK] [WARN] No possible actions available for $random trigger.")
             elif action in HOOK_ACTIONS:
                 try:
                     _hook_api._current_depth = chain_depth
@@ -416,7 +448,7 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
         user_display = source_user
 
     if name in overlay_actions:
-        for raw_body in overlay_actions[name]:
+        for overlay_name, raw_body in overlay_actions[name]:
             parts = raw_body.split("|")
             # {user} ersetzen
             title = parts[0].replace("{user}", user_display) if len(parts) > 0 else ""
@@ -429,7 +461,7 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 duration = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 3
             except (ValueError, IndexError):
                 duration = 3
-            send_overlay_text(title, subtitle, duration)
+            send_overlay_text(title, subtitle, duration, overlay_name)
 
     # --- 1. VANILLA COMMANDS ---
     if name in vanilla_functions:
@@ -606,19 +638,6 @@ def execute_gift_action(gift_id: str):
         print(f"[HTTP ERROR] {e}")
 
 # ==========================================
-# Overlay text sender (overlaytxt plugin)
-# ==========================================
-def send_overlay_text(title, subtitle, duration=3):
-    url = f"http://127.0.0.1:{OVERLAYTXT_PORT}/display"
-    payload = {"title": title, "subtitle": subtitle, "duration": duration}
-    try:
-        response = requests.post(url, json=payload, timeout=2)
-        if response.status_code == 200:
-            print(f"[OVERLAYTXT] Sent: {title}")
-    except Exception as e:
-        print(f"[OVERLAYTXT] Error sending: {e}")
-
-# ==========================================
 # User-friendly name extraction
 # =========================================
 def get_safe_username(user):
@@ -762,6 +781,37 @@ def initialize_likes(total_likes):
             return True
     return False
 
+# =========================================
+# Daily revenue logger
+# =========================================
+
+def update_daily_revenue():
+    file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
+    today = datetime.now().strftime("%Y-%m-%d")
+    new_entry = {
+        "date": today,
+        "estimated_revenue_usd": GIFT_VALUE_USD
+    }
+    entries = []
+    if file_path.exists():
+        with file_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    updated = False
+    for i, entry in enumerate(entries):
+        if entry.get("date") == today:
+            entries[i] = new_entry
+            updated = True
+            break
+    if not updated:
+        entries.append(new_entry)
+    with file_path.open("w", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
 # ==========================================
 # TIKTOK CLIENT
 # ==========================================
@@ -769,11 +819,15 @@ def initialize_likes(total_likes):
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
 
+    _connect_time = [None]  # Tracks when the live connection was established
+    COMMENT_WARMUP_SECONDS = 1  # Ignore comments arriving within this window after connect
+
     # =========================
     # GIFT events
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
+        global GIFT_VALUE_USD
         try:
             # Combo gift: check if still streaking (intermediate update)
             if event.gift.combo:
@@ -789,6 +843,8 @@ def create_client(user):
 
             gift_name = sanitize_filename(event.gift.name)
             gift_id = str(event.gift.id)
+
+            GIFT_VALUE_USD += event.value
 
             # Execute associated HTTP action
             execute_gift_action(gift_id)
@@ -882,6 +938,10 @@ def create_client(user):
     # =========================
     @client.on(CommentEvent)
     def on_comment(event):
+        # Skip the initial burst of historical comments TikTok sends on connect
+        if _connect_time[0] is None or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS:
+            return
+
         username = get_safe_username(event.user)
         comment_text = getattr(event, 'comment', '')
 
@@ -936,13 +996,40 @@ def create_client(user):
             MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
 
     # =========================
+    # Share events
+    # =========================
+    @client.on(ShareEvent)
+    def on_share(event):
+        username = get_safe_username(event.user)
+        if "share" in valid_functions:
+            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("share", username))
+
+    # =========================
+    # Live end events
+    # =========================
+    @client.on(LiveEndEvent)
+    def on_live_end(_):
+        update_daily_revenue()
+        print(f"[STATUS] Live ended for @{user}.")
+        RUNTIME_PATH_SHUTDOWN.touch(exist_ok=True)
+
+    # =========================
     # CONNECT event
     # =========================
     @client.on(ConnectEvent)
     def on_connect(_):
+        _connect_time[0] = time.time()
         print(f"[OK] Live connection established: @{user}")
 
     return client
+
+# ========================
+# Counter for gift revenue estimation
+# ========================
+async def gift_revenue_counter():
+    while True:
+        await asyncio.sleep(AUTOSAVE_INTERVAL_SECONDS)
+        update_daily_revenue()
 
 # ==========================================
 # MAIN ENTRY POINT
@@ -977,7 +1064,7 @@ async def run_bot():
     # Load event_hooks scripts ($-command handlers)
     global _hook_api
     EVENT_HOOKS_DIR = (BASE_DIR / ".." / "event_hooks").resolve()
-    _hook_api = HookAPI(rcon_queue, trigger_queue, MAIN_LOOP, {})
+    _hook_api = HookAPI(rcon_queue, trigger_queue, MAIN_LOOP, {}, valid_functions)
     load_event_hooks(_hook_api, EVENT_HOOKS_DIR)
 
     # Start all background workers
@@ -1028,5 +1115,6 @@ if __name__ == "__main__":
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
+        asyncio.run(gift_revenue_counter())
     except KeyboardInterrupt:
         print("\n[STOP] Script stopped manually.")

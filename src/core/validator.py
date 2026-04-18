@@ -129,16 +129,26 @@ def validate_text(text: str) -> List[Diagnostic]:
             ))
 
         # F: trigger validation (name & duplicates)
+
         trigger_raw = line_no_comment[:colon_index_rel]
         trigger = trigger_raw.strip()
         # compute where trigger starts in global coordinates
         trigger_rel_index = line_no_comment.find(trigger_raw)
         trigger_global_start = base_offset + trigger_rel_index + trigger_raw.find(trigger) if trigger_raw.strip() != "" else base_offset
 
-        if not re.fullmatch(r"[A-Za-z0-9_]+", trigger):
+        is_quoted = trigger.startswith("'") and trigger.endswith("'")
+        if is_quoted:
+            valid = re.fullmatch(r"'[A-Za-z0-9_ ]+'", trigger)
+        else:
+            valid = re.fullmatch(r"[A-Za-z0-9_]+", trigger)
+        if not valid:
+            if is_quoted:
+                msg = f"Invalid quoted trigger {trigger!r} (allowed: A-Z, 0-9, _, space, in single quotes)."
+            else:
+                msg = f"Invalid trigger name '{trigger}' (allowed: A-Z, 0-9, _). Für Leerzeichen: Trigger in einfache Anführungszeichen setzen."
             diagnostics.append(_make_diag(
                 line_number, trigger_global_start, trigger_global_start + len(trigger),
-                f"Invalid trigger name '{trigger}' (allowed: A-Z, 0-9, _).",
+                msg,
                 Severity.ERROR, "invalid_trigger_name"
             ))
 
@@ -176,8 +186,9 @@ def validate_text(text: str) -> List[Diagnostic]:
                     ))
                 continue
 
-            # Check prefix: '/', '$', '!' or '>>'
-            if cmd_trim.startswith(">>"):
+            # Check prefix: '/', '$', '!' or '>>' or '@NAME>>'
+            _overlay_re = re.match(r"@(\w+)>>", cmd_trim)
+            if cmd_trim.startswith(">>") or _overlay_re:
                 # Overlay command — check for {comment} placeholder
                 if "{comment}" in cmd_trim and trigger.lower() != "comment":
                     ph_pos = cmd_start_global + cmd_trim.find("{comment}")
@@ -193,9 +204,9 @@ def validate_text(text: str) -> List[Diagnostic]:
                     Severity.ERROR, "invalid_prefix"
                 ))
 
-            # '!' may only appear at the beginning (skip for >> overlay commands)
+            # '!' may only appear at the beginning (skip for >> and @NAME>> overlay commands)
             idx_bang = cmd_trim.find("!")
-            if idx_bang > 0 and not cmd_trim.startswith(">>"):
+            if idx_bang > 0 and not cmd_trim.startswith(">>") and not re.match(r"@\w+>>", cmd_trim):
                 # position of the bad '!' relative to line
                 diagnostics.append(_make_diag(
                     line_number, cmd_start_global + idx_bang, cmd_start_global + idx_bang + 1,

@@ -15,11 +15,46 @@ import time
 import json
 import shutil
 import os
+import asyncio
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
 
 IS_WINDOWS = sys.platform == "win32"
+
+# -----------------------------
+# Base directory
+# -----------------------------
+BASE_DIR = get_base_dir()
+
+CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
+
+# -----------------------------
+# Executable paths
+# -----------------------------
+SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
+
+GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
+SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
+UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
+APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
+PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{SUFFIX}").resolve()
+PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{SUFFIX}").resolve()
+REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
+PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
+update_exe = (BASE_DIR / f"update{SUFFIX}").resolve()
+update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
+
+# -----------------------------
+# Load configuration
+# -----------------------------
+cfg = load_config(CONFIG_FILE)
+
+if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
+    if os.geteuid() != 0:
+        print("[ERROR] This script must be run as root on Linux to start the tool.")
+        input("Press Enter to exit...")
+        sys.exit(1)
 
 # -----------------------------
 # Linux: Detect tmux/screen
@@ -106,35 +141,6 @@ if not IS_WINDOWS:
             sys.exit(0)
 
 # -----------------------------
-# Base directory
-# -----------------------------
-BASE_DIR = get_base_dir()
-
-CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
-
-# -----------------------------
-# Executable paths
-# -----------------------------
-EXE = ".exe" if sys.platform == "win32" else ""
-BIN = ".exe" if sys.platform == "win32" else ".bin"
-
-GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{EXE}").resolve()
-SERVER_EXE_PATH = (BASE_DIR / f"server{BIN}").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / f"update{EXE}").resolve()
-APP_EXE_PATH = (BASE_DIR / "core" / f"app{EXE}").resolve()
-PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{EXE}").resolve()
-PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{EXE}").resolve()
-REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{EXE}").resolve()
-APP_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
-update_exe = (BASE_DIR / f"update{EXE}").resolve()
-update_new = (BASE_DIR / f"update_new{EXE}").resolve()
-
-# -----------------------------
-# Load configuration
-# -----------------------------
-cfg = load_config(CONFIG_FILE)
-
-# -----------------------------
 # Settings
 # -----------------------------
 gui_cfg = cfg.get("GUI", {})
@@ -147,6 +153,9 @@ ALLOW_CLOSE = console_cfg.get("allow_close", True)
 LOG_LEVEL = console_cfg.get("log_level", 1)
 CONTROL_METHOD = cfg.get("control_method", "DCS")
 MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+
+AUTO_SHUTDOWN_ENABLED = cfg.get("auto_shutdown_on_live_end", True)
+SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown_delay_seconds", 30)
 
 # -----------------------------
 # Process dictionary
@@ -312,14 +321,26 @@ def start_update_exe():
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
-        proc = subprocess.Popen(cmd)
+        print("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
+        log_dir = BASE_DIR / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "updater.log"
+        with open(log_file, "a") as lf:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=lf,
+                stderr=lf,
+                preexec_fn=os.setsid
+            )
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
         if update_signal.exists():
             update_signal.unlink()
+            print("Please restart the application.")
+            time.sleep(2)
             return "kill"
-        time.sleep(0.5)
+        time.sleep(1)
 
     return proc.returncode
 
@@ -384,8 +405,8 @@ if ALLOW_CLOSE:
 
 PLUGIN_REGISTRY: list[AppConfig] = []
 
-if APP_REGISTRY_FILE.exists():
-    with APP_REGISTRY_FILE.open("r", encoding="utf-8") as f:
+if PLUGIN_REGISTRY_FILE.exists():
+    with PLUGIN_REGISTRY_FILE.open("r", encoding="utf-8") as f:
         data = json.load(f) 
 
     for item in data:
@@ -430,11 +451,97 @@ for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
                     hidden=get_visibility(app.level)
                 )
 
-# -----------------------------
-# Interactive control loop
-# -----------------------------
+# =============================================================================
+# STATE
+# =============================================================================
+
+RUNTIME_DIR = (BASE_DIR / "core" / "runtime").resolve()
+
+shutdown_pending = False
+shutdown_cancel_event = asyncio.Event()
+
+# =============================================================================
+# SHUTDOWN COUNTDOWN
+# =============================================================================
+
+async def shutdown_countdown():
+    global shutdown_pending
+
+    delay = SHUTDOWN_DELAY_SECONDS
+
+    for remaining in range(delay, 0, -1):
+        if shutdown_cancel_event.is_set():
+            shutdown_cancel_event.clear()
+            shutdown_pending = False
+            print("\nCancelled shutdown.")
+            return
+        print(
+            f"\rShutdown in {remaining} seconds... Press 'stop' to cancel.",
+            end="",
+            flush=True
+        )
+        await asyncio.sleep(1)
+    print("\nShutting down now!")
+    sys.exit(0)
+
+# =============================================================================
+# FILE WATCHER
+# =============================================================================
+
+async def check_and_run():
+    global shutdown_pending
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    while True:
+        for file in list(RUNTIME_DIR.iterdir()):
+            if not file.is_file():
+                continue
+            name = file.stem.lower()
+            file.unlink(missing_ok=True)
+            if name == "shutdown":
+                if not AUTO_SHUTDOWN_ENABLED:
+                    print("Shutdown signal detected, but Auto shutdown is disabled.")
+                    continue
+                if not shutdown_pending:
+                    shutdown_pending = True
+                    print(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
+                    asyncio.create_task(shutdown_countdown())
+        await asyncio.sleep(5)
+
+# =============================================================================
+# USER INPUT LOOP
+# =============================================================================
+
+async def command_loop():
+    while True:
+        cmd = await asyncio.to_thread(
+            input,
+            "\nType 'exit' to stop all programs: "
+        )
+        cmd = cmd.strip().lower()
+        if cmd == "exit":
+            sys.exit(0)
+        if cmd == "stop":
+            shutdown_cancel_event.set()
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+async def main():
+    watcher = asyncio.create_task(check_and_run())
+    try:
+        await command_loop()
+    finally:
+        watcher.cancel()
+
+# =============================================================================
+# EVENT DEFINITIONS (ENTRY POINT)
+# =============================================================================
+
 if ALLOW_CLOSE:
     print("\nAll programs have been started.")
+
+    asyncio.run(main())
 
     # Show active sessions on Linux
     if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
@@ -446,13 +553,6 @@ if ALLOW_CLOSE:
                 print(f"  screen -r {s}")
         print("-----------------------------------")
 
-    try:
-        while True:
-            cmd = input("\nType 'exit' to stop all programs: ").strip().lower()
-            if cmd == "exit":
-                sys.exit(0) # atexit calls stop_all_processes
-    except KeyboardInterrupt:
-        sys.exit(0)
 else:
-    # AllowClose=False -> script exits itself, EXEs continue running quietly in the background
+    # AllowClose=False -> script exits itself, EXEs continue running quietly
     pass

@@ -45,6 +45,9 @@ else:
     print(f"Config file not found: {CONFIG_FILE}")
     sys.exit(1)
 
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
 MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
 SERVERAPI_EXE_PATH = get_base_file()
 
@@ -159,7 +162,7 @@ gui_hidden = args.gui_hidden
 
 if __name__ == "__main__":
     win = load_win_size()
-    server_thread = threading.Thread(target=lambda: app.run(host="127.0.0.1", port=WEB_SERVER_PORT, threaded=True, use_reloader=False), daemon=True)
+    server_thread = threading.Thread(target=lambda: app.run(host=SERVER_HOST, port=WEB_SERVER_PORT, threaded=True, use_reloader=False), daemon=True)
     server_thread.start()
 
     if not gui_hidden:

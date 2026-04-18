@@ -1,10 +1,4 @@
-# -------------------------------------------------------------------------
-# STREAMING TOOL CONFIGURATION TEMPLATE
-# -------------------------------------------------------------------------
-# This file is a template.
-# Personal settings should be changed in 'config.yaml' only.
-# -------------------------------------------------------------------------
-config_version: 2
+config_version: 4
 
 # -------------------------------------------------------------------------
 # IMPORTANT FOR BEGINNERS:
@@ -12,12 +6,40 @@ config_version: 2
 # 2. DO NOT use the 'Tab' key for spacing; use the 'Space' bar only.
 # 3. PORTS: Each port must be unique. If a port is used twice, the tool 
 #    will crash or fail to start.
+# 4. To define a list, use:
+#      list_key:
+#        - item1
+#        - item2
+#    For an empty list, use:
+#      list_key: []
 # -------------------------------------------------------------------------
 
 # SETTINGS PROTECTION
 # Set this to false if you do not want the tool to overwrite personal settings.
 # Disabling this may block important updates or cause configuration issues.
 auto_update_config: true
+
+# These control whether the tool automatically shuts down when the live stream ends
+auto_shutdown_on_live_end: true
+# If auto shutdown is enabled, this value controls how many seconds to wait before shutting down after the live stream ends.
+shutdown_delay_seconds: 30
+
+# Set this to true to disable the warning about running the tool without sudo on Linux.
+# WARNING: Running without sudo on Linux can cause various issues, 
+# including failed updates and permission errors. 
+# Only disable this warning if you are sure you understand the risks
+# and have configured your system accordingly.
+# (Linux only, has no effect on Windows)
+no_sudo_warning: False
+
+# =======================================================================
+# SERVER HOST BIND ADDRESS
+# =======================================================================
+# The IP address the servers will bind to.
+# Use "127.0.0.1" to allow only local access (default).
+# Use "0.0.0.0" to allow access from other devices in your network.
+# Use "<IP_ADDRESS>" to bind to a specific network interface.
+server_host: "127.0.0.1"
 
 # ==============================================================================
 # STREAMING CONTROL METHOD SELECTION
@@ -83,6 +105,9 @@ TikTok:
 # LIKE GOAL / ENGAGEMENT TRIGGERS
 # -------------------------------------------------------------------------
 Gifts:
+  # Set the autosave interval for the gift_revenue_log.jsonl file in seconds.
+  # This file is used to log estimated revenue from gifts.
+  autosave_interval_seconds: 60
   # Like-based triggers.
   like_triggers:
     - id: likes_standard
@@ -100,21 +125,53 @@ Gifts:
   # Web server port used for the OBS overlay.
   LIKE_GOAL_PORT: 9797
 
-  # Triggers excluded from $random selection.
-  # These triggers will never be chosen when $random is executed.
-  # Triggers that contain $random themselves are always excluded automatically.
-  # Example: ["likes", "like_2", "follow"]
+  # How random_included and random_exclude work:
+  #
+  #   - If BOTH lists are empty:
+  #       → All triggers are allowed (use with caution).
+  #
+  #   - If ONLY random_exclude is set:
+  #       → All triggers are allowed EXCEPT those in random_exclude.
+  #
+  #   - If ONLY random_included is set:
+  #       → ONLY triggers in random_included are allowed.
+  #
+  #   - If BOTH are set:
+  #       → A trigger must be in random_included AND NOT in random_exclude.
+  #       → random_exclude can override (block) entries from random_included.
+
+  # random_included:
+  # Only these triggers can be selected by $random.
+  # If empty, all triggers are allowed (see rules above).
+  #
+  # Examples:
+  #   "gift_1" → allows only "gift_1" to be selected
+  #   ["gift_1", "gift_2"] → allows only these two
+  random_included: []
+
+  # random_exclude:
+  # These triggers will NEVER be selected by $random.
+  #
+  # Note:
+  #   Triggers that contain "$random" are automatically excluded
+  #   to prevent recursion.
+  #
+  # Examples:
+  #   "likes" → will never be selected
+  #   ["likes", "follow"] → both are always excluded
   random_exclude:
     - likes
     - like_2
     - follow
+    - join
+    - comment
 
 # -------------------------------------------------------------------------
 # COMMENT COMMANDS
 # -------------------------------------------------------------------------
 # Allows viewers to send real Minecraft commands by writing a comment
 # that starts with a specific prefix character.
-# Example: If prefix is "!" and a viewer writes "!say Hello", the command
+# Example: If prefix is "#" and a viewer writes "#say Hello", the command
 # "say Hello" will be sent directly to the Minecraft server via RCON.
 #
 # !!! WARNING !!!
@@ -274,6 +331,22 @@ Overlaytxt:
   FadeIn: 500
   FadeOut: 500
 
+  # The number of consecutive connection failures allowed before
+  # the circuit breaker triggers and temporarily blocks requests.
+  MaxFails: 3
+
+  # The duration in seconds to wait before attempting to 
+  # send messages again after the MaxFails limit is reached.
+  Cooldown: 10
+
+  # A list of available overlay instances. 
+  # Each 'name' creates a unique endpoint and can be opened 
+  # as a separate window or OBS source.
+  # URL format: http://127.0.0.1:PORT/?overlay=NAME
+  # Replace PORT with the configured port number and NAME with the overlay name.
+  Overlays:
+    - name: "default"
+
 # STREAM TIMER
 Timer:
   Enable: true
@@ -309,4 +382,4 @@ LikeGoal:
   #   Multiply mode. The goal is multiplied by this value each time.
   #   Example with InitialGoal 100_000 and GoalMultiplier 2:
   #   100_000 → 200_000 → 400_000 → 800_000 → ...
-  GoalMultiplier: 2
+  GoalMultiplier: 1

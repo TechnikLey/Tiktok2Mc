@@ -44,7 +44,9 @@ Erstelle eine neue `.py`-Datei im Ordner `src/event_hooks/`.
 **Beispiel:** `src/event_hooks/begruessung.py`
 
 ```python
-def register(api):
+from core.hook_api import HookAPI
+
+def register(api: HookAPI):
     def begruessung(user, trigger, context):
         api.rcon_enqueue([
             f"say {user} folgt jetzt!",
@@ -53,6 +55,10 @@ def register(api):
 
     api.register_action("begruessung", begruessung)
 ```
+
+> [!NOTE]
+> Der Import von `HookAPI` ist optional, aber empfohlen. Er ermöglicht dir die Nutzung von IntelliSense und Docstrings in deinem Editor, damit du leichter mit der API arbeiten kannst.
+> Der Import wird zur Laufzeit ignoriert.
 
 Was passiert hier?
 
@@ -304,6 +310,38 @@ Was passiert bei Gift `5655`?
 4. Handler sendet die Danke-Nachricht
 
 Bei Gift `8913` passiert dasselbe über `geschenk_gross`, aber am Ende läuft dieselbe `dankeschoen`-Aktion. Die Logik steht nur einmal im Code.
+
+#### `api.send_overlay_text(title, subtitle, duration=3, overlay_name="default")`
+
+Zeigt einen Overlay-Text im Stream an. Du kannst damit aus deinem Hook heraus einen Titel und optional einen Untertitel auf einem Overlay deiner Wahl anzeigen lassen.
+
+**Parameter:**
+- `title` (str): Haupttext, der groß angezeigt wird
+- `subtitle` (str, optional): Kleinerer Text darunter (Standard: leer)
+- `duration` (int, optional): Wie lange der Text angezeigt wird (Sekunden, Standard: 3)
+- `overlay_name` (str, optional): Name des Overlays (Standard: "default")
+
+**Beispiel:**
+```python
+api.send_overlay_text("Neuer Follower!", f"{user} ist jetzt dabei!", 5)
+api.send_overlay_text("Like-Ziel erreicht!", "", 4, overlay_name="likegoal")
+```
+
+Gibt `True` zurück, wenn das Senden erfolgreich war, sonst `False` (z.B. wenn das Overlay nicht erreichbar ist).
+
+---
+
+#### `api.get_valid_functions()`
+
+Gibt eine Menge (`set`) aller Funktionsnamen zurück, die im aktuellen Kontext als Trigger erlaubt sind.
+
+**Beispiel:**
+```python
+if "follow" in api.get_valid_functions():
+    api.enqueue_trigger("follow", user)
+```
+
+Das Ergebnis ist ein Set von Strings, z.B. `{ "follow", "like", "comment", "5655", ... }`.
 
 ---
 

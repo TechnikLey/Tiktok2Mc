@@ -44,12 +44,15 @@ try:
         CUSTOM_TEXT = cfg.get("LikeGoal", {}).get("DisplayText", "Like Goal")
         INITIAL_GOAL = cfg.get("LikeGoal", {}).get("InitialGoal", 100_000)
         GOAL_MULTIPLIER = cfg.get("LikeGoal", {}).get("GoalMultiplier", 2)
+        # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+        SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
     print(f"Config error: {e}")
     LIKE_GOAL_PORT = 9797
     CUSTOM_TEXT = "Like Goal"
     INITIAL_GOAL = 100_000
     GOAL_MULTIPLIER = 2
+    SERVER_HOST = "127.0.0.1"
 
 LIKEGOAL_EXE_PATH = get_base_file()
 
@@ -212,8 +215,7 @@ HTML_TEMPLATE = f"""
 </div>
 
 <script>
-const LIKE_GOAL_PORT = "{LIKE_GOAL_PORT}"; 
-const evtSource = new EventSource(`http://127.0.0.1:${{LIKE_GOAL_PORT}}/stream`);
+const evtSource = new EventSource(`/stream`);
 
 evtSource.onmessage = function(event) {{
     try {{
@@ -268,7 +270,7 @@ def stream():
     return Response(event_stream(), mimetype="text/event-stream")
 
 def run_flask():
-    app.run(host="127.0.0.1", port=LIKE_GOAL_PORT, threaded=True)
+    app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True)
 
 gui_hidden = args.gui_hidden
 

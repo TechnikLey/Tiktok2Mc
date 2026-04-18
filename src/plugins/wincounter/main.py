@@ -48,6 +48,8 @@ try:
         cfg = yaml.safe_load(f) or {}
 except Exception: cfg = {}
 PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 WINCOUNTER_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
@@ -241,7 +243,7 @@ gui_hidden = args.gui_hidden
 
 if __name__ == "__main__":
     size = load_win_size()
-    server_thread = threading.Thread(target=lambda: app.run(host="127.0.0.1", port=PORT, threaded=True, use_reloader=False), daemon=True)
+    server_thread = threading.Thread(target=lambda: app.run(host=SERVER_HOST, port=PORT, threaded=True, use_reloader=False), daemon=True)
 
     server_thread.start()
     

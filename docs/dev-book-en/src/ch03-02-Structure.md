@@ -21,7 +21,7 @@ Every part is important:
 |------|---------|---------|
 | **TRIGGER** | Unique name or ID | `8913`, `follow`, `likes` |
 | **:** | Separator | `:` (always required) |
-| **\<TYPE\>** | Type of command | `/`, `!`, `$`, `>>` |
+| **\<TYPE\>** | Type of command | `/`, `!`, `$`, `>>`, `@Name>>` |
 | **COMMAND** | What should happen? | `give @a diamond`, `tnt 2 0.1 2` |
 | **xNUMBER** | How often? (Optional) | `x3`, `x10` (without x = 1×) |
 
@@ -208,6 +208,41 @@ Starts with `>>` → Text is displayed as an overlay on stream, **not** a Minecr
 
 ---
 
+**Type: Named Overlay (`@Name>>`)**
+
+```
+follow:@alerts>>New Follower!|{user} is now following you!|5
+join:@stats>>Welcome!|{user} just joined!|3
+```
+
+Starts with `@Name>>` → Same as `>>`, but sends the text to a **specific named overlay window**.
+`Name` must match an entry in the `Overlays` list in `config.yaml`.
+
+If you write `>>` without a name, the overlay named `default` is used automatically.
+
+Available overlays are defined in `config.yaml`:
+
+```yaml
+Overlaytxt:
+  Overlays:
+    - name: default
+    - name: stats
+    - name: alerts
+```
+
+Each name creates its own URL for OBS:
+
+| Overlay name | URL |
+|---|---|
+| `default` | `http://localhost:5005/?overlay=default` |
+| `stats` | `http://localhost:5005/?overlay=stats` |
+| `alerts` | `http://localhost:5005/?overlay=alerts` |
+
+> [!IMPORTANT] 
+> The name must exactly match one of the configured overlays. If no match is found, the message is silently dropped.
+
+---
+
 ### Repetitions: The xNUMBER System
 
 ```
@@ -302,6 +337,7 @@ follow:/give @a diamond x          # ← x without a number
 | **xNUMBER** | Repeat command N times |
 | **Semicolon** | Multiple commands in one line |
 | **Comments** | `#` to disable/document |
+| **`@Name>>`** | Send overlay text to a named window |
 
 → [Next chapter: Design decisions](./ch03-03-Design-Decisions.md)
 
