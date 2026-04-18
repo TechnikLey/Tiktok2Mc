@@ -40,6 +40,7 @@ Each version is split into two sections:
 * **Recursive Random Protection** — Added a note in `GUIDE.md` about the automatic exclusion of triggers containing `$random` to prevent infinite loops.
 * **sudo Requirement** — The updater and the start script now require sudo privileges on Linux.
 * **Configuration Guide Improved** — The [Configuration](./GUIDE.md#Configuration) chapter in `GUIDE.md` has been revised and expanded for clarity.
+* **Linux Suffixes** - All executable Files now use `.bin` suffix on Linux.
 
 #### Fixed
 * **Early Comment Filtering** — Fixed an issue where chat messages sent before the connection was established were displayed immediately upon joining. The application now filters these out to ensure only new activity is shown.

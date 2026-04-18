@@ -41,8 +41,7 @@ def main():
         UPDATER_VERSION = "v1.2.0"
 
         IS_WINDOWS = sys.platform == "win32"
-        EXE_SUFFIX = ".exe" if IS_WINDOWS else ""
-        BIN_SUFFIX = ".exe" if IS_WINDOWS else ".bin"
+        SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
         SCRIPT_DIR = Path(__file__).resolve().parent
         os.chdir(SCRIPT_DIR)
@@ -58,7 +57,7 @@ def main():
             {"name": "app",            "src": "src/python/main.py",      "dest": "core"},
             {"name": "update",         "src": "src/python/update.py",    "dest": ""},
             {"name": "gui",            "src": "src/python/gui.py",       "dest": "core"},
-            {"name": "server",         "src": "src/python/server.py",    "dest": "",        "suffix": BIN_SUFFIX},
+            {"name": "server",         "src": "src/python/server.py",    "dest": "",},
             {"name": "start",          "src": "src/python/start.py",     "dest": ""},
             {"name": "registry",       "src": "src/python/registry.py",  "dest": "plugins"},
             {"name": "test_trigger",   "src": "tests/send_trigger.py",   "dest": "test"},
@@ -100,7 +99,7 @@ def main():
 
         # Add main EXEs
         for item in CORE_EXECUTABLES:
-            suffix = item.get("suffix", EXE_SUFFIX)
+            suffix = item.get("suffix", SUFFIX)
             all_build_tasks.append({
                 "name": item["name"] + suffix,
                 "src": item["src"],
@@ -117,7 +116,7 @@ def main():
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
                 all_build_tasks.append({
-                    "name": py_file.stem + EXE_SUFFIX,
+                    "name": py_file.stem + SUFFIX,
                     "src": str(py_file),
                     "dest": dest,
                 })
@@ -151,7 +150,7 @@ def main():
             # Unique name for cache/hash
             safe_name = str(full_src.relative_to(SCRIPT_DIR)).replace(os.sep, "_")
             hash_file = HASH_CACHE_DIR / f"{safe_name}.sha256"
-            cache_exe = EXE_CACHE_DIR / safe_name.replace(".py", EXE_SUFFIX)
+            cache_exe = EXE_CACHE_DIR / safe_name.replace(".py", SUFFIX)
 
             current_hash = sha256_file(full_src)
             need_build = True

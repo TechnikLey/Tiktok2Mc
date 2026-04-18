@@ -33,14 +33,13 @@ if sys.stdout.encoding != 'utf-8':
 # =========================
 BASE_DIR = get_base_dir()
 
-EXE = ".exe" if sys.platform == "win32" else ""
-BIN = ".exe" if sys.platform == "win32" else ".bin"
+SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 
 TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
 VERSION_FILE = (BASE_DIR / "version.txt").resolve()
 DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
 CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
-START_FILE = (BASE_DIR / f"start{EXE}").resolve()
+START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
 
 cfg = load_config(CONFIG_FILE)
 
@@ -74,17 +73,14 @@ WHITELIST_DIRS = {
     "plugins/wincounter",
 }
 
-EXE = ".exe" if sys.platform == "win32" else ""
-BIN = ".exe" if sys.platform == "win32" else ".bin"
-
 WHITELIST_FILES = {
     "version.txt",
     "README.md",
     "LICENSE",
-    f"update{EXE}",
-    f"server{BIN}",
-    f"start{EXE}",
-    f"plugins/registry{EXE}"
+    f"update{SUFFIX}",
+    f"server{SUFFIX}",
+    f"start{SUFFIX}",
+    f"plugins/registry{SUFFIX}"
 }
 
 GITHUB_USER = "TechnikLey"
@@ -368,10 +364,10 @@ def run_update():
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
         print(f"[UPDATE] New updater found ({zip_v['updater']}).")
-        new_up_src = extracted_root_path / f"update{EXE}"
+        new_up_src = extracted_root_path / f"update{SUFFIX}"
         
         if new_up_src.exists():
-            new_up_dest = BASE_DIR / f"update_new{EXE}"
+            new_up_dest = BASE_DIR / f"update_new{SUFFIX}"
             shutil.copy2(new_up_src, new_up_dest)
             # Save only updater version
             save_versions(local["tool"], zip_v["updater"])
@@ -403,7 +399,7 @@ def run_update():
 
         for file in files:
             if rel_path_str == "." and file not in WHITELIST_FILES: continue
-            if file.lower() == f"update{EXE}".lower(): continue
+            if file.lower() == f"update{SUFFIX}".lower(): continue
             if file.lower() == "config.yaml": continue
             
             src = root / file

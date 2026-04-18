@@ -32,19 +32,18 @@ CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 # -----------------------------
 # Executable paths
 # -----------------------------
-EXE = ".exe" if sys.platform == "win32" else ""
-BIN = ".exe" if sys.platform == "win32" else ".bin"
+SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 
-GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{EXE}").resolve()
-SERVER_EXE_PATH = (BASE_DIR / f"server{BIN}").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / f"update{EXE}").resolve()
-APP_EXE_PATH = (BASE_DIR / "core" / f"app{EXE}").resolve()
-PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{EXE}").resolve()
-PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{EXE}").resolve()
-REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{EXE}").resolve()
+GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
+SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
+UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
+APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
+PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{SUFFIX}").resolve()
+PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{SUFFIX}").resolve()
+REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
 PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
-update_exe = (BASE_DIR / f"update{EXE}").resolve()
-update_new = (BASE_DIR / f"update_new{EXE}").resolve()
+update_exe = (BASE_DIR / f"update{SUFFIX}").resolve()
+update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------
 # Load configuration

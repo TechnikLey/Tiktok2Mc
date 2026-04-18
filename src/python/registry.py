@@ -185,8 +185,7 @@ def find_main_executables(base_dir: Path) -> list[Path]:
     if sys.platform == "win32":
         return sorted(base_dir.rglob("main.exe"))
     else:
-        candidates = sorted(base_dir.rglob("main"))
-        return [p for p in candidates if p.is_file() and os.access(p, os.X_OK)]
+        return sorted(base_dir.rglob("main.bin"))
 
 def _fingerprint(path: Path) -> dict[str, int]:
     stat = path.stat()
