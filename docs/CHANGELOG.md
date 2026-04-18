@@ -14,7 +14,7 @@ Each version is split into two sections:
 
 ---
 
-## [Unreleased]
+## [v0.3.0] - 2026-04-18
 
 ### User
 
@@ -62,7 +62,7 @@ Each version is split into two sections:
 ### Developer
 
 #### Deprecated
-* **Developer Changelog Section** – Starting with release `v0.3.0`, the `"Developer"` section will no longer be maintained. Internal technical changes will continue to be documented in commit messages and the `dev-book`. Please use GitHub to review changes by checking the commits and viewing the diffs to see exactly what has been modified.
+* **Developer Changelog Section** – Starting after release `v0.3.0`, the `"Developer"` section will no longer be maintained. Internal technical changes will continue to be documented in commit messages and the `dev-book`. Please use GitHub to review changes by checking the commits and viewing the diffs to see exactly what has been modified.
 
 #### Added
 * **Named Overlay Routing (`main.py`)** — Refactored the `>>` parser to extract optional `@Name` prefixes. The overlay name is now stored with the message body and passed to `send_overlay_text()` via the `overlay_name` parameter (defaults to `"default"`).
