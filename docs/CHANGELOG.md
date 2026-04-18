@@ -18,7 +18,7 @@ Each version is split into two sections:
 
 ### User
 
-[!WARNING]
+> [!WARNING]
 > When updating your project to this version, errors may occur.
 > If you encounter problems, please download the latest release and copy your `data` folder (and any > other important files like `config.yaml`) into the new release directory.
 
