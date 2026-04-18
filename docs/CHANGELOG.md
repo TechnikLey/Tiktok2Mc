@@ -14,6 +14,12 @@ Each version is split into two sections:
 
 ---
 
+## [Unreleased]
+
+### User
+
+---
+
 ## [v0.3.0] - 2026-04-18
 
 ### User
