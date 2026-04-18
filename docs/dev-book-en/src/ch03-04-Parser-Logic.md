@@ -75,7 +75,13 @@ def parse_actions(filename):
                 body = cmd[1:].strip()
             elif cmd.startswith(">>"):
                 cmd_type = "overlay"
+                overlay_name = "default"  # Falls back to default overlay
                 body = cmd[2:].strip()
+            elif re.match(r"@(\w+)>>", cmd):
+                m = re.match(r"@(\w+)>>", cmd)
+                cmd_type = "overlay"
+                overlay_name = m.group(1)  # Extract name from @Name>>
+                body = cmd[m.end():].strip()
             # ... more prefixes can be added here
             else:
                 print(f"[ERROR] Line {line_num}: Invalid prefix")
@@ -147,11 +153,29 @@ elif cmd.startswith("$"):
 ```python
 elif cmd.startswith(">>"):
     kind = "overlay"
+    overlay_name = "default"  # Falls back to the default overlay
     body = cmd[2:]  # Remove ">>"
 ```
 
 → Text is displayed as an overlay on stream
 → Format: `Title|Subtitle|Duration`
+
+---
+
+**Type: Named Overlay (`@Name>>`)**
+
+```python
+import re
+m = re.match(r"@(\w+)>>", cmd)
+if m:
+    kind = "overlay"
+    overlay_name = m.group(1)  # e.g. "alerts", "stats"
+    body = cmd[m.end():]  # Everything after "@Name>>" is the text
+```
+
+→ Text is sent to a **specific named overlay window**
+→ `overlay_name` is passed to the `OverlayManager` at dispatch time
+→ If no matching name is found, the message is silently dropped
 
 ---
 
@@ -195,7 +219,8 @@ elif kind == "script":
 
 elif kind == "overlay":
     # Display text as overlay on stream
-    show_overlay(body)
+    # overlay_name specifies which named overlay window to use
+    show_overlay(body, overlay_name)
 
 # ... more types follow the same pattern
 ```

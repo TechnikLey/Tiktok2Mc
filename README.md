@@ -2,7 +2,7 @@
 
 Connect your TikTok Live stream to a Minecraft server. Gifts, follows, and likes from your viewers trigger real-time commands in the game.
 
-The tool includes a ready-to-use Minecraft server (1.21.11). On Windows, a bundled Java runtime is included -- no additional installations required. On Linux, the tool will locate or install Java automatically.
+The tool includes a ready-to-use Minecraft server (1.21.11). On Windows, Java is automatically downloaded and set up if not already present, no manual installation required. On Linux, the tool will locate or install Java automatically.
 
 ## Features
 

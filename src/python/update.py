@@ -21,11 +21,34 @@ import yaml
 from pathlib import Path
 from packaging import version
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 from core.paths import get_base_dir
+from core.utils import load_config
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+# =========================
+# Base paths & configuration
+# =========================
+BASE_DIR = get_base_dir()
+
+SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
+
+TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
+VERSION_FILE = (BASE_DIR / "version.txt").resolve()
+DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
+CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
+START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
+
+cfg = load_config(CONFIG_FILE)
+
+if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
+    if os.geteuid() != 0:
+        print("[ERROR] This script must be run as root on Linux to perform updates.")
+        wait_for_key()
+        sys.exit(1)
 
 # =========================
 # HTTP headers for GitHub API
@@ -39,16 +62,6 @@ HEADERS_ASSET = {
     "User-Agent": "Streaming-Tool-Updater"
 }
 
-# =========================
-# Base paths & configuration
-# =========================
-BASE_DIR = get_base_dir()
-
-TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
-VERSION_FILE = (BASE_DIR / "version.txt").resolve()
-DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
-CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
-
 # Directories and individual files that may be overwritten by an update
 WHITELIST_DIRS = {
     "core",
@@ -61,17 +74,14 @@ WHITELIST_DIRS = {
     "plugins/wincounter",
 }
 
-EXE = ".exe" if sys.platform == "win32" else ""
-BIN = ".exe" if sys.platform == "win32" else ".bin"
-
 WHITELIST_FILES = {
     "version.txt",
     "README.md",
     "LICENSE",
-    f"update{EXE}",
-    f"server{BIN}",
-    f"start{EXE}",
-    f"plugins/registry{EXE}"
+    f"update{SUFFIX}",
+    f"server{SUFFIX}",
+    f"start{SUFFIX}",
+    f"plugins/registry{SUFFIX}"
 }
 
 GITHUB_USER = "TechnikLey"
@@ -112,6 +122,10 @@ def get_versions(path):
                     k, val = map(str.strip, line.split(":", 1))
                     if "toolversion" in k.lower(): v["tool"] = extract_version(val)
                     elif "updaterversion" in k.lower(): v["updater"] = extract_version(val)
+    else:
+        print(f"[ERROR] Version file not found: {path}")
+        wait_for_key()
+
     return v
 
 def save_versions(tool_v, updater_v):
@@ -139,7 +153,7 @@ def download_with_progress(url, target):
 # =========================
 def migrate_config_if_needed() -> bool:
     if not DEFAULT_CONFIG_FILE.exists():
-        print(f"[!] Error: {DEFAULT_CONFIG_FILE} is missing.")
+        print(f"[ERROR] Master template missing: {DEFAULT_CONFIG_FILE}")
         return False
 
     yaml_obj = YAML(typ="rt")
@@ -147,66 +161,126 @@ def migrate_config_if_needed() -> bool:
     yaml_obj.indent(mapping=2, sequence=4, offset=2)
     yaml_obj.width = 120
 
-    # If no user config exists yet, copy the default template
+    # Case 1: No user config exists
     if not CONFIG_FILE.exists():
-        shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
-        print("[INFO] config.yaml created from template.")
-        return True
+        try:
+            shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
+            print(f"[INFO] No config found. Created new config from template.")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to copy template: {e}")
+            return False
 
-    try:
-        # Load the master template (preserving comments and structure)
-        with DEFAULT_CONFIG_FILE.open("r", encoding="utf-8") as f:
-            new_template = yaml_obj.load(f) or CommentedMap()
-        
-        new_template.yaml_set_start_comment(None)
-
-        new_template.yaml_set_start_comment("DO NOT EDIT the config_version")
-
-        # Load current user values
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            user_data = yaml_obj.load(f) or CommentedMap()
-    except Exception as e:
-        print(f"[FAIL] Error loading config files: {e}")
+    # Load Template
+    template_data = load_yaml_with_debug(DEFAULT_CONFIG_FILE, yaml_obj, "Template")
+    if template_data is None:
         return False
 
-    default_version = int(new_template.get("config_version", 0))
-    user_version = int(user_data.get("config_version", 0))
+    # Clean up template start comments
+    template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
+
+    # Load User Config
+    user_data = load_yaml_with_debug(CONFIG_FILE, yaml_obj, "User Config")
+    if user_data is None:
+        return False
+
+    # Version Check
+    try:
+        default_version = int(template_data.get("config_version", 0))
+        user_version = int(user_data.get("config_version", 0))
+    except (ValueError, TypeError):
+        print("[WARNING] Version keys are invalid. Forcing migration...")
+        default_version, user_version = 1, 0
 
     if user_version >= default_version:
-        print("i Config is already up to date.")
+        print(f"[INFO] Config is up to date (v{user_version}).")
         return False
 
-    # Backup the old config file
-    backup_path = CONFIG_FILE.with_stem(CONFIG_FILE.stem + ".bak")
-    shutil.copy2(CONFIG_FILE, backup_path)
-    print(f"[INFO] Backup created: {backup_path}")
+    print(f"[INFO] Migrating config: v{user_version} -> v{default_version}")
 
-    # STRICT INJECTION:
-    # Only iterate over keys defined in the template.
-    _inject_values_strictly(new_template, user_data)
+    # Backup
+    backup_path = CONFIG_FILE.with_suffix(".yaml.bak")
+    try:
+        shutil.copy2(CONFIG_FILE, backup_path)
+        print(f"[INFO] Backup created at: {backup_path}")
+    except Exception as e:
+        print(f"[ERROR] Migration aborted. Could not create backup: {e}")
+        return False
 
-    # Set version to the template's version
-    new_template["config_version"] = default_version
+    # Perform strict injection
+    _inject_values_strictly(template_data, user_data)
 
-    with CONFIG_FILE.open("w", encoding="utf-8") as f:
-        yaml_obj.dump(new_template, f)
+    # Force the new version number
+    template_data["config_version"] = default_version
 
-    print(f"[OK] Config migrated. Structure & comments match the template 100%.")
-    return True
+    try:
+        with CONFIG_FILE.open("w", encoding="utf-8") as f:
+            yaml_obj.dump(template_data, f)
+        print(f"[SUCCESS] Config migrated successfully to v{default_version}.")
+        return True
+    except Exception as e:
+        print(f"[FAIL] Error writing migrated config: {e}")
+        return False
 
-def _inject_values_strictly(template, user_source):
-    """
-    Walks the template and fills it with user values.
-    Keys that only exist in the user file are ignored (dropped).
-    """
+def _inject_values_strictly(template, user_source, path=""):
+    # 1. BASE GUARD: If user_source is None or not a dictionary-like object
+    if user_source is None:
+        if path:
+            print(f"[WARNING] Configuration path '{path}' is empty in user config. Skipping.")
+        return
+    if not isinstance(user_source, (dict, CommentedMap)):
+        if path:
+            print(f"[WARNING] Expected a section at '{path}', but found {type(user_source).__name__}. Skipping.")
+        return
+    # 2. ITERATE: Only if user_source is guaranteed to be a dict
     for key in template:
+        current_path = f"{path}.{key}" if path else key 
+        # Check if user actually has this key
         if key in user_source:
-            if isinstance(template[key], dict) and isinstance(user_source[key], dict):
-                # Recurse into nested structures
-                _inject_values_strictly(template[key], user_source[key])
+            user_value = user_source[key]
+            template_value = template[key]
+            # CASE A: Both are nested structures -> Recurse
+            if isinstance(template_value, (dict, CommentedMap)):
+                if isinstance(user_value, (dict, CommentedMap)):
+                    _inject_values_strictly(template_value, user_value, current_path)
+                elif user_value is None:
+                    # User left a whole category empty (e.g., 'Java: ')
+                    print(f"[WARNING] Section '{current_path}' is empty in user config. Keeping defaults.")
+                else:
+                    # User put a single value where a dictionary was expected
+                    print(f"[WARNING] Type mismatch at '{current_path}': Expected a section, got a value. Skipping.")
+            # CASE B: Template expects a simple value (String, Int, Bool, List)
             else:
-                # Adopt the user's value, keeping the template's position
-                template[key] = user_source[key]
+                if user_value is not None:
+                    template[key] = user_value
+                    print(f"[DEBUG] Migrated: {current_path}")
+                else:
+                    print(f"[DEBUG] Value for '{current_path}' is null/empty. Using default.")
+        else:
+            # Key doesn't exist in user config at all
+            print(f"[DEBUG] Key '{current_path}' missing in user config. Using default.")
+
+def load_yaml_with_debug(path, yaml_obj, label):
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml_obj.load(f)
+            if data is None:
+                return CommentedMap()
+            return data
+    except YAMLError as e:
+        print(f"[FAIL] YAML error in {label}: {path}")
+
+        # Print line / column if available
+        if hasattr(e, "problem_mark") and e.problem_mark is not None:
+            mark = e.problem_mark
+            print(f"[FAIL] Line: {mark.line + 1}, Column: {mark.column + 1}")
+
+        print(f"[FAIL] Details: {e}")
+        return None
+    except Exception as e:
+        print(f"[FAIL] Unexpected error while loading {label}: {path}")
+        print(f"[FAIL] Details: {e}")
+        return None
 
 # =========================
 # Main update process
@@ -222,8 +296,8 @@ def run_update():
             idx = sys.argv.index("--resume")
             extracted_root = sys.argv[idx + 1]
             print(f"[>] Resume: Using extracted files from {extracted_root}")
-        except (ValueError, IndexError):
-            pass
+        except (ValueError, IndexError) as e:
+            print(f"[ERROR] Failed to parse --resume argument: {e}\n sys.argv: {sys.argv}")
 
     local = get_versions(VERSION_FILE)
 
@@ -278,9 +352,17 @@ def run_update():
             with tarfile.open(archive_path, "r:gz") as t:
                 t.extractall(TEMP_DIR)
 
-        subs = [d for d in {x.name for x in TEMP_DIR.iterdir()} if d != archive_name]
-        temp_items = [TEMP_DIR / s for s in subs]
-        extracted_root = str(next((p for p in temp_items if p.is_dir()), TEMP_DIR))
+        if (TEMP_DIR / "version.txt").exists():
+            extracted_root = TEMP_DIR
+        else:
+            found = False
+            for x in TEMP_DIR.iterdir():
+                if x.is_dir() and (x / "version.txt").exists():
+                    extracted_root = x
+                    found = True
+                    break
+            if not found:
+                extracted_root = TEMP_DIR  # Fallback
 
     # Read versions from the downloaded package
     extracted_root_path = Path(extracted_root) if isinstance(extracted_root, str) else extracted_root
@@ -290,27 +372,31 @@ def run_update():
     # 1. UPDATER SELF-UPDATE (via execv)
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
-        print(f"\ud83d\udd04 New updater found ({zip_v['updater']}).")
-        new_up_src = extracted_root_path / f"update{EXE}"
+        print(f"[UPDATE] New updater found ({zip_v['updater']}).")
+        new_up_src = extracted_root_path / f"update{SUFFIX}"
         
         if new_up_src.exists():
-            new_up_dest = BASE_DIR / f"update_new{EXE}"
+            new_up_dest = BASE_DIR / f"update_new{SUFFIX}"
             shutil.copy2(new_up_src, new_up_dest)
             # Save only updater version
             save_versions(local["tool"], zip_v["updater"])
-            
-            print("\ud83d\ude80 Starting new updater and resuming tool update...")
+            # Set executable permissions on Linux/Mac
+            if sys.platform != "win32":
+                os.chmod(new_up_dest, 0o755)
+            print("[INFO] Starting new updater and resuming tool update...")
             # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
             os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
             sys.exit(0)  # Safety fallback
+
+    print(f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update...")
 
     # ==========================================
     # 2. TOOL UPDATE (copy files)
     # ==========================================
     # Signal the start script to shut down so files are unlocked
     with (BASE_DIR / "update_signal.tmp").open("w") as f: f.write("kill")
-    time.sleep(1)  # pause to let the start script exit
+    time.sleep(5)  # pause to let the start script exit
 
     print(f"[..] Installing files...")
     for root, dirs, files in (extracted_root_path).walk():
@@ -322,7 +408,7 @@ def run_update():
 
         for file in files:
             if rel_path_str == "." and file not in WHITELIST_FILES: continue
-            if file.lower() == f"update{EXE}".lower(): continue
+            if file.lower() == f"update{SUFFIX}".lower(): continue
             if file.lower() == "config.yaml": continue
             
             src = root / file
@@ -332,11 +418,27 @@ def run_update():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
 
+    # Set executable permissions for all files without extension and with .bin extension (Linux/Mac only)
+    if sys.platform != "win32":
+        for dirpath, dirnames, filenames in os.walk(BASE_DIR):
+            for fname in filenames:
+                fpath = os.path.join(dirpath, fname)
+                # Check if file has no extension or .bin extension
+                if not os.path.splitext(fname)[1] or fname.endswith('.bin'):
+                    try:
+                        os.chmod(fpath, 0o755)
+                        print(f"[PERM] Set executable: {fpath}")
+                    except Exception as e:
+                        print(f"[PERM] Failed to set executable for {fpath}: {e}")
+
     save_versions(zip_v["tool"], zip_v["updater"])
     if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
-    
+
     if CONFIG_UPDATE_ENABLE: 
         migrate_config_if_needed()
+
+    if (BASE_DIR / "update_signal.tmp").exists():
+        (BASE_DIR / "update_signal.tmp").unlink()
 
     print("\n[OK] Update complete.")
     wait_for_key()

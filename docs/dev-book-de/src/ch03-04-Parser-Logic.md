@@ -75,7 +75,13 @@ def parse_actions(filename):
                 body = cmd[1:].strip()
             elif cmd.startswith(">>"):
                 cmd_type = "overlay"
+                overlay_name = "default"  # Standard-Overlay
                 body = cmd[2:].strip()
+            elif re.match(r"@(\w+)>>", cmd):
+                m = re.match(r"@(\w+)>>", cmd)
+                cmd_type = "overlay"
+                overlay_name = m.group(1)  # Name aus @Name>> extrahieren
+                body = cmd[m.end():].strip()
             # ... weitere Präfixe können hier ergänzt werden
             else:
                 print(f"[ERROR] Zeile {line_num}: Ungültiger Prefix")
@@ -147,11 +153,29 @@ elif cmd.startswith("$"):
 ```python
 elif cmd.startswith(">>"):
     kind = "overlay"
+    overlay_name = "default"  # Fällt auf Standard-Overlay zurück
     body = cmd[2:]  # ">>" entfernen
 ```
 
 → Text wird als Overlay im Stream eingeblendet
 → Format: `Titel|Untertitel|Dauer`
+
+---
+
+**Typ: Benannter Overlay (`@Name>>`)**
+
+```python
+import re
+m = re.match(r"@(\w+)>>", cmd)
+if m:
+    kind = "overlay"
+    overlay_name = m.group(1)  # z.B. "alerts", "stats"
+    body = cmd[m.end():]  # Alles nach "@Name>>" ist der Text
+```
+
+→ Text wird an ein **bestimmtes, benanntes Overlay-Fenster** gesendet
+→ `overlay_name` wird beim Dispatch an den `OverlayManager` weitergegeben
+→ Stimmt kein Name überein, wird die Nachricht stillschweigend verworfen
 
 ---
 
@@ -195,7 +219,8 @@ elif kind == "script":
 
 elif kind == "overlay":
     # Text als Overlay im Stream anzeigen
-    show_overlay(body)
+    # overlay_name gibt an, welches benannte Overlay genutzt wird
+    show_overlay(body, overlay_name)
 
 # ... weitere Typen analog
 ```

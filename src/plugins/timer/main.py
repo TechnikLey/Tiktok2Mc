@@ -31,8 +31,11 @@ except Exception: cfg = {}
 TIMER_MINS = cfg.get("Timer", {}).get("StartTime", 10)
 WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
 WEB_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPortTimer", 7878)
+# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
+SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # Win counter URL for incrementing wins when timer expires
-ADD_URL = f"http://localhost:{WIN_PORT}/add?amount=1"
+# Always 127.0.0.1 because timer and wincounter run on the same machine
+ADD_URL = f"http://127.0.0.1:{WIN_PORT}/add?amount=1"
 TIMER_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
@@ -206,7 +209,7 @@ gui_hidden = args.gui_hidden
 if __name__ == '__main__':
     size = load_win_size()
     api = API()
-    server_thread = threading.Thread(target=lambda: app.run(host="127.0.0.1", port=WEB_PORT, threaded=True, debug=False, use_reloader=False), daemon=True)
+    server_thread = threading.Thread(target=lambda: app.run(host=SERVER_HOST, port=WEB_PORT, threaded=True, debug=False, use_reloader=False), daemon=True)
     
     server_thread.start()
 

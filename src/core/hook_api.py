@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Callable
+from typing import Callable, Optional
 
 # Global registry: action_name -> handler callable
 HOOK_ACTIONS: dict[str, Callable] = {}
@@ -40,11 +40,13 @@ class HookAPI:
         trigger_queue: asyncio.Queue,
         main_loop: asyncio.AbstractEventLoop,
         config: dict,
+        valid_functions: set[str],
     ) -> None:
         self._rcon_queue = rcon_queue
         self._trigger_queue = trigger_queue
         self._main_loop = main_loop
         self._config = config
+        self._valid_functions = valid_functions
         self._current_depth: int = 0  # Set by main.py before each handler call
         self._banned_triggers: set[str] = set()  # Triggers blocked after loop detection
 
@@ -116,3 +118,18 @@ class HookAPI:
     def log(self, msg: str) -> None:
         """Print a message with [HOOK] prefix."""
         print(f"[HOOK] {msg}")
+
+    def send_overlay_text(self, title: str, subtitle: Optional[str] = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
+        """
+        Display overlay text on stream overlays. Returns True if successful.
+        """
+        try:
+            from core.overlay_utils import send_overlay_text
+            return send_overlay_text(title, subtitle, duration, overlay_name)
+        except Exception as e:
+            print(f"[HOOK] [ERROR] send_overlay_text failed: {e}")
+            return False
+    
+    def get_valid_functions(self) -> set[str]:
+        """Return the set of valid function names for RCON commands."""
+        return self._valid_functions

@@ -20,13 +20,14 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 ## How It Works
 
-When you go live on TikTok, the tool connects to your stream automatically. It watches for five types of events:
+When you go live on TikTok, the tool connects to your stream automatically. It watches for these types of events:
 
 - **Gifts** -- A viewer sends a TikTok gift.
 - **Follows** -- A viewer follows your account.
 - **Likes** -- Viewers accumulate a certain number of likes.
 - **Comments** -- A viewer writes a comment in the live chat.
 - **Joins** -- A viewer joins the live stream.
+- **Shares** -- A viewer shares the live stream.
 
 Each event is linked to a Minecraft command that you define. For example, you could set it up so that every time someone sends a Rose gift, a Creeper spawns next to the player.
 
@@ -37,6 +38,9 @@ The tool includes a built-in Minecraft server (version 1.21.11), so you do not n
 ## Configuration
 
 All settings are stored in `config/config.yaml`. Open this file with any text editor.
+
+> [!IMPORTANT]
+> Not all settings are explained here. For a full explanation of every config option, see the `config.yaml` file itself. It contains detailed comments for every setting.
 
 > [!WARNING]
 > When editing this file, do not use the Tab key. Always use the  spacebar for indentation. Also, always keep a space after colons (for example `User: myname`, not `User:myname`).
@@ -150,7 +154,7 @@ The `CommentCommands` feature lets viewers send Minecraft commands directly to y
 ```yaml
 CommentCommands:
   Enable: false
-  Prefix: "!"
+  Prefix: "#"
   AllowedRoles:
     - moderator
   Whitelist: []
@@ -165,7 +169,7 @@ CommentCommands:
 
 **Enable** -- Set to `true` to activate this feature.
 
-**Prefix** -- The character a comment must start with to be treated as a command. Can be any character, for example `!`, `/`, or `#`. With `Prefix: "!"`, a viewer writing `!say Hello` sends the command `say Hello` to Minecraft.
+**Prefix** -- The character a comment must start with to be treated as a command. Can be any character, for example `/`, or `#`. With `Prefix: "#"` a viewer writing `#say Hello` sends the command `say Hello` to Minecraft.
 
 **AllowedRoles** -- Controls who is allowed to use comment commands:
 
@@ -198,7 +202,7 @@ Example -- allow only `say` and `give`, always block dangerous commands:
 ```yaml
 CommentCommands:
   Enable: true
-  Prefix: "!"
+  Prefix: "#"
   AllowedRoles:
     - moderator
   Whitelist:
@@ -213,7 +217,7 @@ CommentCommands:
     - whitelist
 ```
 
-With this setup, a moderator writing `!say Hello stream` sends `say Hello stream` to Minecraft. A moderator writing `!op Notch` is blocked because `op` is in the Blacklist. A non-moderator viewer is blocked at the role check and never reaches the Whitelist or Blacklist at all.
+With this setup, a moderator writing `#say Hello stream` sends `say Hello stream` to Minecraft. A moderator writing `#op Notch` is blocked because `op` is in the Blacklist. A non-moderator viewer is blocked at the role check and never reaches the Whitelist or Blacklist at all.
 
 > [!NOTE]
 > Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.
@@ -241,6 +245,7 @@ Trigger:TypeCommand
   - `!` for Minecraft server plugin commands
   - `$` for special built-in actions
   - `>>` for overlay text (see [Overlay Text](#overlay-text))
+  - `@Name>>` for overlay text sent to a specific named overlay window (see [Multiple Overlays](#multiple-overlays))
 - **Command** -- The actual command to run.
 
 > [!WARNING]
@@ -281,6 +286,8 @@ join:>>Welcome!|{user} just joined the stream!|3
 
 > [!WARNING]
 > The `comment` trigger fires for **every** comment. On active streams this can be very frequent. Avoid complex or expensive commands here.
+> [!WARNING]
+> The `join` trigger fires for every viewer that joins the stream, which can be very frequent on busy streams. Use with caution to avoid overwhelming your server with commands.
 
 Example:
 
@@ -289,6 +296,67 @@ comment:>>New comment!|{user} commented!|2
 ```
 
 **likes** and **like_2** -- Trigger based on accumulated likes. See [Like Triggers](#like-triggers) for details.
+
+---
+
+#### Using Trigger Names or IDs
+
+You can use either **trigger IDs** or **trigger names** in your `actions.mca` file.
+
+The available gifts are defined in `core/gifts.json`, for example:
+
+```json
+{
+  "name": "Tom the Tomato",
+  "coins": 1,
+  "id": 16379
+},
+{
+  "name": "Cool",
+  "coins": 1,
+  "id": 16212
+}
+```
+
+---
+
+##### Example Usage
+
+Both of the following lines in `actions.mca` do the same thing:
+
+```mcfunction
+16212:/give @a minecraft:diamond 5
+Cool:/give @a minecraft:diamond 5
+```
+
+When the gift **"Cool"** is received, all players will get 5 diamonds.
+
+---
+
+##### Priority Rule
+
+> [!IMPORTANT]
+> * The system checks **names first**, then **IDs**.
+> * If a **name match is found**, the corresponding command is executed.
+> * The line using the **ID will be ignored** in that case.
+>
+> If you use both a name and its ID in `actions.mca`, only the **name-based trigger** will run.
+
+---
+
+##### Handling Names with Spaces
+
+Gift names that contain spaces must be wrapped in single quotes `' '`.
+
+###### Example:
+
+```
+'Tom the Tomato':/give @a minecraft:carrot 10
+```
+
+Without quotes, the trigger will not work correctly.
+
+---
 
 ### Command Types
 
@@ -338,6 +406,8 @@ follow:/give @a minecraft:golden_apple 7
 follow:>>Neuer Follower!|{user} folgt dir!|5
 ```
 
+**`@Name>>` -- Named overlay text.** Same as `>>`, but targets a specific named overlay window. Replace `Name` with the name of one of your configured overlays. If you write `>>` without a name, the overlay named `default` is used automatically. See [Multiple Overlays](#multiple-overlays) for details.
+
 ### Repeating Commands
 
 Add `x` followed by a number at the end of a command to repeat it:
@@ -370,27 +440,63 @@ Put a `#` at the beginning of a line to disable it:
 
 This line will be ignored. You can use this to temporarily turn off an action without deleting it.
 
+---
+
 ### The Random Action
 
-Use `$random` to trigger a random action from your list:
+The `$random` command allows the tool to pick and execute a random action from your defined list. You can fine-tune exactly which actions are eligible using the `random_included` and `random_exclude` lists.
 
-```
-16071:$random
-```
+#### How the Filters Work
+The selection process follows a specific hierarchy based on how you fill the lists:
 
-When this gift is sent, the tool picks a random action from all your other defined actions and runs it. Triggers that contain `$random` themselves are always excluded automatically to prevent infinite loops.
+| Scenario | Result |
+| :--- | :--- |
+| **Both lists are empty** | All triggers are allowed. |
+| **ONLY `random_exclude` is set** | All triggers are allowed **EXCEPT** those in this list. |
+| **ONLY `random_included` is set** | **ONLY** triggers in this list are allowed. |
+| **BOTH lists are set** | A trigger must be in `included` **AND NOT** in `exclude`. |
 
-By default, `follow`, `likes`, and `like_2` are also excluded. You can change this in `config/config.yaml`:
+> [!IMPORTANT]
+> **The Override Rule:** The `random_exclude` list always acts as a "veto." Even if an action is specifically listed in `random_included`, it will be blocked if it also appears in `random_exclude`.
+
+---
+
+#### Configuration
+
+You can manage these settings directly in your `config/config.yaml` file. Here is an example setup:
 
 ```yaml
 Gifts:
+  # WHITELIST: Only these triggers can be selected by $random.
+  # Leave empty to allow all triggers (subject to exclusion rules).
+  random_included:
+    - 
+
+  # BLACKLIST: These triggers will NEVER be selected by $random.
   random_exclude:
     - likes
     - like_2
     - follow
+    - join
+    - comment
 ```
 
-Add or remove trigger names from this list to control which actions `$random` can never pick.
+---
+
+> [!NOTE]
+> * **Recursion Safety:** Any trigger that contains the `$random` command itself is **automatically excluded** by the system. This prevents the tool from getting stuck in an infinite loop.
+> * **Standard Exclusions:** By default, common interactions like `follow`, `likes`, `like_2`, `join`, and `comment` are excluded. You can manually remove them from the `exclude` list if you want them included in the pool.
+> * **Precision Matters:** Ensure the trigger names in these lists match your action definitions exactly (case-sensitive).
+
+---
+
+#### Implementation Example
+If you define a gift trigger like this:
+```yaml
+16071:$random
+```
+
+When the gift with ID **16071** is received, the tool will look at your configuration, filter out the forbidden actions, and roll the dice on the remaining ones.
 
 ### Like Triggers
 
@@ -638,7 +744,7 @@ A countdown timer for your stream. It pauses when the player dies and resumes on
 
 Displays custom text on your stream overlay. You can trigger overlay text directly from `actions.mca` using the `>>` prefix.
 
-- **URL for OBS:** `http://localhost:5005`
+- **URL for OBS:** `http://localhost:5005/?overlay=default`
 - **Config setting:** `Overlaytxt: Enable: true`
 
 #### Display Mode
@@ -718,6 +824,53 @@ follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now followin
 ```
 
 This gives golden apples to all players **and** shows the overlay text at the same time.
+
+#### Multiple Overlays
+
+You can run several overlay windows at the same time — each one as a separate OBS Browser Source showing different information. For example, one overlay in the top-left corner for gifts and another in the bottom-right for follower notifications.
+
+To do this, add each overlay by name to `config/config.yaml`:
+
+```yaml
+Overlaytxt:
+  Port: 5005
+  Overlays:
+    - name: default
+    - name: stats
+    - name: alerts
+```
+
+Each name creates a separate URL you can use as a Browser Source in OBS:
+
+| Overlay name | URL |
+|---|---|
+| `default` | `http://localhost:5005/?overlay=default` |
+| `stats` | `http://localhost:5005/?overlay=stats` |
+| `alerts` | `http://localhost:5005/?overlay=alerts` |
+
+All overlays share the same `Port`, `DisplayMode`, `FadeIn`, `FadeOut`, `MaxFails`, and `Cooldown` settings.
+
+To send text to a specific overlay from `actions.mca`, write `@Name>>` instead of `>>`:
+
+```
+follow:@alerts>>New Follower!|{user} is now following you!|5
+join:@stats>>Welcome!|{user} just joined!|3
+```
+
+If you write `>>` without a name, the overlay named `default` is used automatically:
+
+```
+follow:>>New Follower!|{user} is now following you!|5
+```
+
+This is exactly the same as:
+
+```
+follow:@default>>New Follower!|{user} is now following you!|5
+```
+
+> [!IMPORTANT]
+> The name must exactly match one of the names defined under `Overlays` in `config.yaml`. If no match is found, the message is silently dropped.
 
 > [!NOTE]
 > Overlay Text works best with **DCS** mode (OBS Studio, vMix, Streamlabs Desktop). In DCS mode, you can add the overlay as a Browser Source with a transparent background -- the text appears cleanly on top of your stream.

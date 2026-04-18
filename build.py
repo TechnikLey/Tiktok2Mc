@@ -37,12 +37,11 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.2.0"
-        UPDATER_VERSION = "v1.1.0"
+        TOOL_VERSION = "v0.3.0"
+        UPDATER_VERSION = "v1.2.0"
 
         IS_WINDOWS = sys.platform == "win32"
-        EXE_SUFFIX = ".exe" if IS_WINDOWS else ""
-        BIN_SUFFIX = ".exe" if IS_WINDOWS else ".bin"
+        SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
         SCRIPT_DIR = Path(__file__).resolve().parent
         os.chdir(SCRIPT_DIR)
@@ -58,7 +57,7 @@ def main():
             {"name": "app",            "src": "src/python/main.py",      "dest": "core"},
             {"name": "update",         "src": "src/python/update.py",    "dest": ""},
             {"name": "gui",            "src": "src/python/gui.py",       "dest": "core"},
-            {"name": "server",         "src": "src/python/server.py",    "dest": "",        "suffix": BIN_SUFFIX},
+            {"name": "server",         "src": "src/python/server.py",    "dest": "",},
             {"name": "start",          "src": "src/python/start.py",     "dest": ""},
             {"name": "registry",       "src": "src/python/registry.py",  "dest": "plugins"},
             {"name": "test_trigger",   "src": "tests/send_trigger.py",   "dest": "test"},
@@ -88,6 +87,7 @@ def main():
             OUT_DIR / "server" / "mc" / "world" / "datapacks" / "StreamingTool" / "data" / "streamingtool" / "function",
             OUT_DIR / "server" / "mc" / "plugins" / "DelayedTNT",
             OUT_DIR / "event_hooks",
+            OUT_DIR / "docs",
         ]
 
         for d in REQUIRED_DIRS:
@@ -99,7 +99,7 @@ def main():
 
         # Add main EXEs
         for item in CORE_EXECUTABLES:
-            suffix = item.get("suffix", EXE_SUFFIX)
+            suffix = item.get("suffix", SUFFIX)
             all_build_tasks.append({
                 "name": item["name"] + suffix,
                 "src": item["src"],
@@ -116,7 +116,7 @@ def main():
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
                 all_build_tasks.append({
-                    "name": py_file.stem + EXE_SUFFIX,
+                    "name": py_file.stem + SUFFIX,
                     "src": str(py_file),
                     "dest": dest,
                 })
@@ -150,7 +150,7 @@ def main():
             # Unique name for cache/hash
             safe_name = str(full_src.relative_to(SCRIPT_DIR)).replace(os.sep, "_")
             hash_file = HASH_CACHE_DIR / f"{safe_name}.sha256"
-            cache_exe = EXE_CACHE_DIR / safe_name.replace(".py", EXE_SUFFIX)
+            cache_exe = EXE_CACHE_DIR / safe_name.replace(".py", SUFFIX)
 
             current_hash = sha256_file(full_src)
             need_build = True
@@ -230,20 +230,34 @@ def main():
         # ----- Assets & Resources -----
         cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
 
-        def sync_folder(source, destination, threads=MAX_COPY_THREADS):
+        def sync_folder(source, destination, threads=MAX_COPY_THREADS, exclude=None):
             src = Path(source)
             dst = Path(destination)
             if not src.exists():
                 return
             dst.mkdir(parents=True, exist_ok=True)
-            all_files = [f for f in src.rglob("*") if f.is_file()]
-
+            exclude = exclude or []
+            def is_excluded(path):
+                rel = path.relative_to(src)
+                for pattern in exclude:
+                    # kompletter Ordner (rekursiv)
+                    if pattern.endswith("/**"):
+                        base = Path(pattern[:-3])
+                        if base in rel.parents or rel == base:
+                            return True
+                    # einfache Glob-Patterns (*.md etc.)
+                    elif rel.match(pattern):
+                        return True
+                return False
+            all_files = [
+                f for f in src.rglob("*")
+                if f.is_file() and not is_excluded(f)
+            ]
             def copy_one(f):
                 rel = f.relative_to(src)
                 target = dst / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, target)
-
             with ThreadPoolExecutor(max_workers=threads) as pool:
                 pool.map(copy_one, all_files)
 
@@ -251,6 +265,7 @@ def main():
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
         sync_folder("src/event_hooks", OUT_DIR / "event_hooks")
+        sync_folder("docs",            OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),

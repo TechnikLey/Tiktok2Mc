@@ -21,7 +21,7 @@ Jeder Teil ist wichtig:
 |------|-----------|----------|
 | **TRIGGER** | Eindeutiger Name oder ID | `8913`, `follow`, `likes` |
 | **:** | Trennzeichen | `:` (immer erforderlich) |
-| **\<TYPE\>** | Art des Commands | `/`, `!`, `$`, `>>` |
+| **\<TYPE\>** | Art des Commands | `/`, `!`, `$`, `>>`, `@Name>>` |
 | **COMMAND** | Was soll passieren? | `give @a diamond`, `tnt 2 0.1 2` |
 | **xANZAHL** | Wie oft? (Optional) | `x3`, `x10` (ohne x = 1×) |
 
@@ -210,6 +210,41 @@ Beginnt mit `>>` → Text wird als Overlay im Stream eingeblendet, **kein** Mine
 
 ---
 
+**Typ: Benannter Overlay (`@Name>>`)**
+
+```
+follow:@alerts>>Neuer Follower!|{user} folgt dir jetzt!|5
+join:@stats>>Willkommen!|{user} ist beigetreten!|3
+```
+
+Beginnt mit `@Name>>` → Wie `>>`, aber sendet den Text an ein **bestimmtes, benanntes Overlay-Fenster**.
+`Name` muss mit einem Eintrag in der `Overlays`-Liste in `config.yaml` übereinstimmen.
+
+Wird `>>` ohne Namen geschrieben, wird automatisch das Overlay mit dem Namen `default` gewählt.
+
+Die verfügbaren Overlays werden in `config.yaml` definiert:
+
+```yaml
+Overlaytxt:
+  Overlays:
+    - name: default
+    - name: stats
+    - name: alerts
+```
+
+Jeder Name erzeugt eine eigene URL für OBS:
+
+| Overlay-Name | URL |
+|---|---|
+| `default` | `http://localhost:5005/?overlay=default` |
+| `stats` | `http://localhost:5005/?overlay=stats` |
+| `alerts` | `http://localhost:5005/?overlay=alerts` |
+
+> [!IMPORTANT] 
+> Der Name muss exakt mit einem eingetragenen Overlay übereinstimmen. Stimmt kein Name überein, wird die Nachricht stillschweigend verworfen.
+
+---
+
 ### Wiederholungen: Das xANZAHL-System
 
 ```
@@ -304,5 +339,6 @@ follow:/give @a diamond x          # ← x ohne Zahl
 | **xANZAHL** | Command N-mal wiederholen |
 | **Semikolon** | Mehrere Commands in einer Zeile |
 | **Kommentare** | `#` zum Deaktivieren/Dokumentieren |
+| **`@Name>>`** | Overlay an benanntes Fenster senden |
 
 → [Nächstes Kapitel: Design-Entscheidungen](./ch03-03-Design-Decisions.md)
