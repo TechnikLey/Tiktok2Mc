@@ -69,6 +69,17 @@ class OverlayManager:
                 max_fails=def_fails,
                 cooldown=def_cooldown
             )
+
+        # Immer ein "default" Overlay bereitstellen, auch wenn es nicht in der Config steht
+        if "default" not in self.clients:
+            self.clients["default"] = OverlayClient(
+                name="default",
+                global_port=global_port,
+                max_fails=def_fails,
+                cooldown=def_cooldown
+            )
+            logging.info(f"Created fallback 'default' overlay (not in config).")
+
         logging.info(f"Loaded {len(self.clients)} overlays from {self.config_path}")
 
     def dispatch(self, title, subtitle, duration, target_name):

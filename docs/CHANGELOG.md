@@ -23,9 +23,13 @@ Each version is split into two sections:
 
 #### Changed
 * **Updater Logging (Linux)** — The updater now creates a new log file for each update attempt in the `logs/update_logs` directory, named with a timestamp in 24-hour format (e.g., `updater_2026-04-19_14-30.log`). This allows users to keep a history of update attempts and their outcomes without overwriting previous logs.
+* **Documentation rewrite** — The user guide (`docs/GUIDE.md`) has been completely rewritten as `docs/rework_temp.md` with improved structure, readability, and beginner-friendliness. All configuration explanations outside the Quick Start section have been replaced with references to `config.yaml`.
+* **Improved config template** — A new annotated config template (`docs/config_explanatory.yaml`) with enhanced inline comments and a quick-start checklist has been added.
 
 #### Fixed
 * **Updater EOFError** - Fixed an issue where the updater could raise an `EOFERROR` when no input is available (In most cases only on Linux) during the update process. The updater now catches this exception and prints an informational message instead of crashing.
+* **Overlay `>>` command not working** — Fixed a bug where the `>>` overlay command (without `@Name`) used the wrong fallback name (`"defaults"` instead of `"default"`), causing overlay text to silently fail.
+* **default overlay not available after removing from config** — Fixed a bug where removing the `default` overlay from `config.yaml` caused the `>>` command to stop working. A fallback `default` overlay is now always created internally.
 
 ---
 

@@ -232,7 +232,7 @@ def generate_datapack():
                             body = cmd[_overlay_match.end():].strip()
                         elif cmd.startswith(">>"):
                             kind = "overlay"
-                            overlay_name = "defaults"
+                            overlay_name = "default"
                             body = cmd[2:].strip()
                         elif cmd.startswith("!"):
                             kind = "rcon"
