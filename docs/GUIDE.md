@@ -696,6 +696,34 @@ A: Increase the RAM allocation (`Java.Xms` / `Java.Xmx` in `config.yaml`) if you
 
 ---
 
+## AI Prompt File
+
+The file [`AIPrompt.md`](../AIPrompt.md) at the project root is a **system prompt template for AI-powered coding assistants** such as opencode, Cursor, GitHub Copilot, or Claude Projects.
+
+### What it does
+
+When loaded into a compatible AI assistant, this prompt instructs the AI to:
+
+- Start in **English** by default, then **ask the user for their preferred language** during the first conversation.
+- **Save the user's choice** by editing the `USER_LANGUAGE` field in `AIPrompt.md` itself.
+- Follow strict **safety rules**: always read `GUIDE.md` first when unsure, never guess, and never proceed if required information is missing.
+- Always **propose changes before editing files** and wait for explicit user confirmation.
+- Only use information that is directly supported by the project files or documented comments — no invented facts.
+- Treat event hooks as advanced and potentially error-prone.
+
+### How to use it
+
+1. Open your AI assistant's configuration or custom instructions settings.
+2. Copy the entire contents of `AIPrompt.md`.
+3. Paste it as the system prompt / custom instructions.
+4. The assistant will now follow the rules defined in the prompt when working on this project.
+
+### Who this is for
+
+This file is intended for **developers and project maintainers** who use AI tools to help with this project. It ensures consistent, safe, and beginner-friendly behavior regardless of which AI assistant is being used.
+
+---
+
 ## Additional Resources
 
 - **Developer Documentation (English):** [docs/dev-book-en/src/Introduction.md](./dev-book-en/src/Introduction.md) or [online](https://technikley.github.io/Tiktok2Mc/en)
@@ -704,3 +732,4 @@ A: Increase the RAM allocation (`Java.Xms` / `Java.Xmx` in `config.yaml`) if you
 - **GitHub Repository:** [https://github.com/TechnikLey/Tiktok2Mc](https://github.com/TechnikLey/Tiktok2Mc)
 - **Report Issues:** [GitHub Issues](https://github.com/TechnikLey/Tiktok2Mc/issues)
 - **TikTokLive Library:** [https://github.com/isaackogan/TikTokLive](https://github.com/isaackogan/TikTokLive)
+- **AI Prompt File:** [AIPrompt.md](#ai-prompt-file) (see section above)
