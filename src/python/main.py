@@ -542,21 +542,22 @@ def handle_minecraft_events():
     global QUEUE_ACTIVE
     try:
         data = request.json
-        if not data:
-            return {"status": "no data"}, 400
-
-        event = data.get("event")
-
-        if event == "player_death":
-            QUEUE_ACTIVE = False
-            print("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
-        
-        elif event == "player_respawn":
-            QUEUE_ACTIVE = True
-            print("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
-
     except Exception as e:
-        print(f"[ERROR] Webhook error: {e}")
+        print(f"[ERROR] Webhook invalid JSON: {e}")
+        return {"status": "invalid json"}, 400
+
+    if not data:
+        return {"status": "no data"}, 400
+
+    event = data.get("event")
+
+    if event == "player_death":
+        QUEUE_ACTIVE = False
+        print("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
+    
+    elif event == "player_respawn":
+        QUEUE_ACTIVE = True
+        print("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
 
     return {"status": "processed"}, 200
 
