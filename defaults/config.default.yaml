@@ -4,7 +4,7 @@
 # This file is a template.
 # Personal settings should be changed in 'config.yaml' only.
 # -------------------------------------------------------------------------
-config_version: 5
+config_version: 6
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
