@@ -103,7 +103,10 @@ class OverlayManager:
             client.mark_failure()
         return False
 
-_manager = OverlayManager()
+_manager = None
 
 def send_overlay_text(title, subtitle, duration=3, overlay_name="default"):
+    global _manager
+    if _manager is None:
+        _manager = OverlayManager()
     return _manager.dispatch(title, subtitle, duration, overlay_name)

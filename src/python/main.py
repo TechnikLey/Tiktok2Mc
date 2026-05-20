@@ -75,6 +75,7 @@ script_actions = {}
 overlay_actions = {}
 triggered_blocks = {}
 like_lock = threading.Lock()
+tiktok_lock = threading.Lock()
 
 MAIN_LOOP = None
 _hook_api = None
@@ -101,6 +102,8 @@ RANDOM_TRIGGER_WHITELIST = []
 RANDOM_TRIGGER_BLACKLIST = []
 
 GIFT_VALUE_USD = 0
+GIFT_DAY_START_VALUE = 0
+GIFT_CURRENT_LOG_DATE = None
 RUNTIME_PATH_SHUTDOWN = (BASE_DIR / "runtime" / "shutdown").resolve()
 
 app = Flask(__name__)
@@ -126,6 +129,7 @@ def load_config():
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
+        MC_HOST = config.get("server_host", "127.0.0.1")
         MC_PASS = config.get("RCON", {}).get("Password", "")
         MC_PORT = config.get("RCON", {}).get("Port", 25575)
         SERVER_HOST = config.get("server_host", "127.0.0.1")
@@ -356,9 +360,8 @@ async def rcon_worker():
         commands, source_user = await rcon_queue.get()
         
         if not QUEUE_ACTIVE:
-            await asyncio.sleep(1)
             await rcon_queue.put((commands, source_user))
-            rcon_queue.task_done()
+            await asyncio.sleep(1)
             continue
 
         q_size = rcon_queue.qsize()
@@ -586,9 +589,11 @@ def handle_custom_trigger():
         global DISABLE_TIKTOK_CONNECT
         # Special toggle: if trigger is 'tiktok', toggle TikTok connection
         if sanitized == "tiktok":
-            DISABLE_TIKTOK_CONNECT = not DISABLE_TIKTOK_CONNECT
-            print(f"[CUSTOM TRIGGER] TikTok connect toggled: {not DISABLE_TIKTOK_CONNECT} -> {DISABLE_TIKTOK_CONNECT}")
-            return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={DISABLE_TIKTOK_CONNECT}"}, 200
+            with tiktok_lock:
+                DISABLE_TIKTOK_CONNECT = not DISABLE_TIKTOK_CONNECT
+                new_state = DISABLE_TIKTOK_CONNECT
+            print(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
+            return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}"}, 200
 
         if sanitized not in valid_functions:
             return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
@@ -610,7 +615,7 @@ def handle_custom_trigger():
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
-    app.run(port=MCSERVER_API_PORT, debug=False, use_reloader=False)
+    app.run(host=SERVER_HOST, port=MCSERVER_API_PORT, debug=False, use_reloader=False)
 
 # ==========================================
 # HTTP command executor
@@ -787,11 +792,18 @@ def initialize_likes(total_likes):
 # =========================================
 
 def update_daily_revenue():
+    global GIFT_DAY_START_VALUE, GIFT_CURRENT_LOG_DATE
     file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
     today = datetime.now().strftime("%Y-%m-%d")
+
+    if GIFT_CURRENT_LOG_DATE != today:
+        GIFT_DAY_START_VALUE = GIFT_VALUE_USD
+        GIFT_CURRENT_LOG_DATE = today
+
+    daily_value = GIFT_VALUE_USD - GIFT_DAY_START_VALUE
     new_entry = {
         "date": today,
-        "estimated_revenue_usd": GIFT_VALUE_USD
+        "estimated_revenue_usd": daily_value
     }
     entries = []
     if file_path.exists():
@@ -1042,7 +1054,9 @@ async def run_bot():
     global MAIN_LOOP, LIKE_TRIGGERS
     MAIN_LOOP = asyncio.get_running_loop()
     
-    load_config()
+    if load_config() == False:
+        print("Error in load_config")
+        sys.exit(0)
 
     # Validate actions.mca before proceeding
     try:
@@ -1075,7 +1089,9 @@ async def run_bot():
     asyncio.create_task(gift_revenue_counter())
 
     while True:
-        if DISABLE_TIKTOK_CONNECT:
+        with tiktok_lock:
+            _disabled = DISABLE_TIKTOK_CONNECT
+        if _disabled:
             await asyncio.sleep(RECONNECT_DELAY)
             continue
 

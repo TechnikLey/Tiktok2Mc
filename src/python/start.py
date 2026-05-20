@@ -39,8 +39,6 @@ GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
-PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{SUFFIX}").resolve()
-PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{SUFFIX}").resolve()
 REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
 PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
 update_exe = (BASE_DIR / f"update{SUFFIX}").resolve()
@@ -505,7 +503,7 @@ async def shutdown_countdown():
         )
         await asyncio.sleep(1)
     print("\nShutting down now!")
-    sys.exit(0)
+    os._exit(0)
 
 # =============================================================================
 # FILE WATCHER
@@ -542,7 +540,7 @@ async def command_loop():
         )
         cmd = cmd.strip().lower()
         if cmd == "exit":
-            sys.exit(0)
+            break
         if cmd == "stop":
             shutdown_cancel_event.set()
 

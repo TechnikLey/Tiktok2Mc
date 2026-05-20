@@ -28,6 +28,9 @@ Each version is split into two sections:
 * **AI Prompt documentation** — The `AIPrompt.md` file is now referenced in the user guide under Additional Resources.
 
 #### Fixed
+* **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
+* **Webhook server ignored `server_host` setting** — The internal webhook server (for MinecraftServerAPI events) now respects the `server_host` configuration. Previously it always bound to `127.0.0.1`, even when `server_host` was set to `0.0.0.0`.
+* **Startup crash when config is broken** — The bot now properly stops if the configuration file cannot be loaded, instead of continuing with invalid settings and failing silently later.
 * **Updater EOFError** - Fixed an issue where the updater could raise an `EOFERROR` when no input is available (In most cases only on Linux) during the update process. The updater now catches this exception and prints an informational message instead of crashing.
 * **Overlay `>>` command not working** — Fixed a bug where the `>>` overlay command (without `@Name`) used the wrong fallback name (`"defaults"` instead of `"default"`), causing overlay text to silently fail.
 * **default overlay not available after removing from config** — Fixed a bug where removing the `default` overlay from `config.yaml` caused the `>>` command to stop working. A fallback `default` overlay is now always created internally.
