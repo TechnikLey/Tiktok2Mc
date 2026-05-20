@@ -405,7 +405,8 @@ async def rcon_worker():
             await asyncio.sleep(5)
             try:
                 await rcon_queue.put((commands, source_user))
-            except Exception: pass 
+            except Exception:
+                print("RCON Queue Error") 
 
         finally:
             await asyncio.sleep(wait_time)
@@ -1071,6 +1072,7 @@ async def run_bot():
     asyncio.create_task(trigger_worker())
     asyncio.create_task(rcon_worker())
     asyncio.create_task(likegoal_worker())
+    asyncio.create_task(gift_revenue_counter())
 
     while True:
         if DISABLE_TIKTOK_CONNECT:
@@ -1115,6 +1117,5 @@ if __name__ == "__main__":
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
-        asyncio.run(gift_revenue_counter())
     except KeyboardInterrupt:
         print("\n[STOP] Script stopped manually.")

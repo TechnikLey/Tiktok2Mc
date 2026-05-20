@@ -28,7 +28,8 @@ def load_win_size():
     if STATE_FILE.exists():
         try:
             with STATE_FILE.open("r") as f: return json.load(f)
-        except Exception: pass
+        except Exception as e:
+            print(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}
 
 cfg = {}
@@ -37,7 +38,7 @@ if CONFIG_FILE.exists():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-            WEB_SERVER_PORT = cfg.get("MinecraftServerAPI", {}).get("DEATHCOUNTER", 7979)
+            WEB_SERVER_PORT = cfg.get("MinecraftServerAPI", {}).get("DEATHCOUNTER_PORT", 7979)
     except Exception as e:
         print(f"Config error: {e}")
         cfg = {}

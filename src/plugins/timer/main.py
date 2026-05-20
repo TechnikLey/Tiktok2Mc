@@ -55,7 +55,8 @@ def load_win_size():
     if STATE_FILE.exists():
         try:
             with STATE_FILE.open("r") as f: return json.load(f)
-        except Exception: pass
+        except Exception as e:
+            print(f"[TIMER] Failed to load state: {e}")
     return {"width": 400, "height": 200}
 
 # --- API bridge (Python <-> JS via pywebview) ---

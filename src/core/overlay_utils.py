@@ -105,5 +105,5 @@ class OverlayManager:
 
 _manager = OverlayManager()
 
-def send_overlay_text(title, subtitle, duration=3, overlay_name=None):
+def send_overlay_text(title, subtitle, duration=3, overlay_name="default"):
     return _manager.dispatch(title, subtitle, duration, overlay_name)

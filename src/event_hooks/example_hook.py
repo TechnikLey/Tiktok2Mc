@@ -8,7 +8,7 @@
 # USAGE:
 #   1. Add a line in data/actions.mca:
 #          follow: $superjump
-#   2. Start the build.ps1 Script
+#   2. Start the build.py Script
 #   3. Start/Restart the bot — the hook is loaded automatically.
 #
 # The handler receives:

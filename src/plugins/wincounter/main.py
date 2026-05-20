@@ -39,7 +39,8 @@ def load_win_size():
                     "width": max(size.get("width", 600), 200),
                     "height": max(size.get("height", 300), 100)
                 }
-        except Exception: pass
+        except Exception as e:
+            print(f"[WINCOUNTER] Failed to load window size: {e}")
     return {"width": 600, "height": 300}
 
 # --- Configuration ---
@@ -83,13 +84,15 @@ class WinManager:
                     self.wins = d.get("wins", 0)
                     self.needed = d.get("needed", 10)
                     self.record = d.get("record", 0)
-            except Exception: pass
+            except Exception as e:
+                print(f"[WINCOUNTER] Failed to load stats: {e}")
 
     def save_stats(self):
         try:
             with STATS_FILE.open("w") as f:
                 json.dump({"wins": self.wins, "record": self.record, "needed": self.needed}, f, indent=4)
-        except Exception: pass
+        except Exception as e:
+            print(f"[WINCOUNTER] Failed to save stats: {e}")
 
     def _notify(self):
         self.save_stats()

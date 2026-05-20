@@ -31,6 +31,12 @@ Each version is split into two sections:
 * **Updater EOFError** - Fixed an issue where the updater could raise an `EOFERROR` when no input is available (In most cases only on Linux) during the update process. The updater now catches this exception and prints an informational message instead of crashing.
 * **Overlay `>>` command not working** — Fixed a bug where the `>>` overlay command (without `@Name`) used the wrong fallback name (`"defaults"` instead of `"default"`), causing overlay text to silently fail.
 * **default overlay not available after removing from config** — Fixed a bug where removing the `default` overlay from `config.yaml` caused the `>>` command to stop working. A fallback `default` overlay is now always created internally.
+* **Gift revenue counter not updating** — Fixed a bug where the gift revenue counter never actually ran. It now works and updates correctly.
+* **Deathcounter port configuration ignored** — The deathcounter plugin now correctly reads the configured port from `config.yaml`. Previously a custom port setting was silently ignored.
+* **Overlay text without overlay name** — Overlay text commands now work reliably even when no specific overlay name is provided.
+* **Missing error messages in plugins** — Errors when loading or saving plugin data (window sizes, stats) are now shown in the console instead of being silently ignored.
+* **Missing error messages for RCON connection** — Connection issues to the Minecraft server are now shown in the console, making it easier to spot problems.
+* **Wrong Linux command in README** — Fixed the startup command in the quick-start guide (`./start` → `./start.bin`).
 
 ---
 
