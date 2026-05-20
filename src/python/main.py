@@ -778,16 +778,6 @@ def prepare_like_triggers(raw_triggers, valid_functions):
 
     return prepared
 
-def initialize_likes(total_likes):
-    """Called once to set the initial like count baseline."""
-    global start_likes
-    with like_lock:
-        if start_likes is None:
-            start_likes = total_likes
-            print(f"[LIKE] Initial count set: {start_likes}")
-            return True
-    return False
-
 # =========================================
 # Daily revenue logger
 # =========================================
@@ -900,10 +890,12 @@ def create_client(user):
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
         global start_likes, last_likegoal_sent, last_likegoal_time
-        # 1. Quick initialization check
-        if start_likes is None:
-            initialize_likes(event.total)
-            return
+        # 1. Quick initialization check (thread-safe)
+        with like_lock:
+            if start_likes is None:
+                start_likes = event.total
+                print(f"[LIKE] Initial count set: {start_likes}")
+                return
         try:
             total_since_start = event.total - start_likes
             # 2. Critical section: trigger logic (thread-safe)

@@ -29,6 +29,8 @@ Each version is split into two sections:
 
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
+* **Webhook endpoint returns 400 on invalid JSON** — The internal webhook endpoint no longer silently returns `200 OK` when it receives malformed JSON. It now correctly returns `400 Bad Request` and logs the error.
+* **Like trigger race condition on startup** — Fixed a race condition where the first like event could be silently dropped if two like events arrived simultaneously during initialization.
 * **Webhook server ignored `server_host` setting** — The internal webhook server (for MinecraftServerAPI events) now respects the `server_host` configuration. Previously it always bound to `127.0.0.1`, even when `server_host` was set to `0.0.0.0`.
 * **Startup crash when config is broken** — The bot now properly stops if the configuration file cannot be loaded, instead of continuing with invalid settings and failing silently later.
 * **Updater EOFError** - Fixed an issue where the updater could raise an `EOFERROR` when no input is available (In most cases only on Linux) during the update process. The updater now catches this exception and prints an informational message instead of crashing.

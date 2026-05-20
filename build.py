@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import uuid
 import time
-import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -110,8 +109,8 @@ def main():
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
         if src_plugins_root.exists():
             for py_file in src_plugins_root.rglob("*.py"):
-                # Skip cache/pycache directories
-                if re.search(r"[\\/](hash|exe_cache|__pycache__)([\\/]|$)", str(py_file)):
+                # Skip __pycache__ directories
+                if "__pycache__" in str(py_file):
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
