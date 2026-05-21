@@ -30,6 +30,7 @@ Each version is split into two sections:
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
 * **Webhook endpoint returns 400 on invalid JSON** — The internal webhook endpoint no longer silently returns `200 OK` when it receives malformed JSON. It now correctly returns `400 Bad Request` and logs the error.
+* **Custom trigger now also handles HTTP actions** — The `/custom_trigger` endpoint (used by `send_trigger.py` / `test_trigger.exe`) now also accepts gift IDs from `http_actions.txt`, not just trigger names from `actions.mca`. This allows you to test HTTP-based actions alongside normal Minecraft commands.
 * **Like goal connection problems now visible** — Errors when connecting to the like goal overlay are now shown in the console instead of being silently ignored. This makes it easier to notice and fix connection issues.
 * **Like trigger race condition on startup** — Fixed a race condition where the first like event could be silently dropped if two like events arrived simultaneously during initialization.
 * **Webhook server ignored `server_host` setting** — The internal webhook server (for MinecraftServerAPI events) now respects the `server_host` configuration. Previously it always bound to `127.0.0.1`, even when `server_host` was set to `0.0.0.0`.
