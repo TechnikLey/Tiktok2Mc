@@ -596,19 +596,30 @@ def handle_custom_trigger():
             print(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
             return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}"}, 200
 
-        if sanitized not in valid_functions:
-            return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
-
         if MAIN_LOOP is None:
             return {"status": "error", "message": "Bot event loop not ready yet."}, 503
 
-        try:
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, (sanitized, user))
-        except asyncio.QueueFull:
-            return {"status": "error", "message": "Trigger queue is full. Try again later."}, 503
+        # Check valid_functions first (actions.mca triggers)
+        if sanitized in valid_functions:
+            try:
+                MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, (sanitized, user))
+            except asyncio.QueueFull:
+                return {"status": "error", "message": "Trigger queue is full. Try again later."}, 503
+            print(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
+            return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
-        print(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
-        return {"status": "ok", "trigger": sanitized, "user": user}, 200
+        # Fallback: check http_actions_cache (gift IDs / HTTP actions)
+        raw_trigger = str(data.get("trigger", "")).strip()
+        cmd = http_actions_cache.get(raw_trigger) or http_actions_cache.get(sanitized)
+        if cmd:
+            try:
+                asyncio.run_coroutine_threadsafe(execute_http_command(cmd), MAIN_LOOP)
+            except Exception as e:
+                return {"status": "error", "message": str(e)}, 500
+            print(f"[CUSTOM TRIGGER] HTTP action for '{raw_trigger}' executed")
+            return {"status": "ok", "trigger": raw_trigger, "user": user}, 200
+
+        return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
 
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
@@ -639,7 +650,7 @@ def execute_gift_action(gift_id: str):
         return
 
     try:
-        MAIN_LOOP.call_soon_threadsafe(asyncio.ensure_future, execute_http_command(cmd))
+        asyncio.run_coroutine_threadsafe(execute_http_command(cmd), MAIN_LOOP)
         print(f"[HTTP] Action for gift {gift_id} started")
     except Exception as e:
         print(f"[HTTP ERROR] {e}")
