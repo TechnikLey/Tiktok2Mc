@@ -11,7 +11,8 @@ PLUGINS_DIR = Path("src/plugins")
 VERSION = "v1.0.0"
 
 MAIN_PY_TEMPLATE = '''\
-from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, register_plugin, AppConfig
+from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, AppConfig
+from python.registry import register_plugin
 import sys
 
 BASE_DIR = get_base_dir()

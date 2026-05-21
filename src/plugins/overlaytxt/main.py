@@ -11,7 +11,8 @@ import yaml
 import json
 from queue import Queue
 from collections import defaultdict
-from core import parse_args, register_plugin, AppConfig, get_root_dir, get_base_dir, get_base_file
+from core import parse_args, AppConfig, get_root_dir, get_base_dir, get_base_file
+from python.registry import register_plugin
 
 # ==========================================
 # Paths & configuration

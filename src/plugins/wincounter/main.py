@@ -13,7 +13,8 @@ import webview, threading, json, sys, yaml
 from pathlib import Path
 from flask import Flask, render_template_string, Response, request
 from queue import Queue
-from core import parse_args, register_plugin, AppConfig, get_base_file, get_base_dir, get_root_dir
+from core import parse_args, AppConfig, get_base_file, get_base_dir, get_root_dir
+from python.registry import register_plugin
 
 # --- Paths ---
 BASE_DIR = get_base_dir()

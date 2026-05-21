@@ -409,11 +409,11 @@ async def rcon_worker():
             try:
                 await rcon_queue.put((commands, source_user))
             except Exception:
-                print("RCON Queue Error") 
-
-        finally:
+                print("RCON Queue Error")
             await asyncio.sleep(wait_time)
-            rcon_queue.task_done()
+            continue
+        rcon_queue.task_done()
+        await asyncio.sleep(wait_time)
 
 async def execute_global_command(trigger_name: str, source_user: str, chain_depth: int = 0):
     """Resolves a trigger name into RCON commands and enqueues them."""
@@ -665,8 +665,8 @@ async def likegoal_worker():
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         pass
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[LIKEGOAL ERROR] {e}")
             finally:
                 likegoal_queue.task_done()
 

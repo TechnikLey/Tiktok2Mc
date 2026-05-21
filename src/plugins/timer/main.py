@@ -9,7 +9,8 @@
 
 import webview, threading, requests, json, sys, yaml, logging
 from flask import Flask, request
-from core import parse_args, register_plugin, AppConfig, get_root_dir, get_base_file, get_base_dir
+from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
+from python.registry import register_plugin
 
 # --- Paths ---
 BASE_DIR = get_base_dir()

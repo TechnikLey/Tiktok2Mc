@@ -12,7 +12,8 @@ import json, yaml, sys, threading, webview
 from flask import Flask, Response, request, render_template_string
 from flask_cors import CORS
 from queue import Queue
-from core import parse_args, register_plugin, AppConfig, get_base_dir, get_root_dir, get_base_file
+from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
+from python.registry import register_plugin
 
 # --- Paths & configuration ---
 args = parse_args()

@@ -88,6 +88,8 @@ GITHUB_USER = "TechnikLey"
 GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
 
+AUTO_MODE = "--auto" in sys.argv
+
 def wait_for_key(msg="Press Enter to exit..."):
     if not AUTO_MODE:
         try:
@@ -104,7 +106,6 @@ except Exception as e:
     sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
-AUTO_MODE = "--auto" in sys.argv
 
 # =========================
 # Helper functions
