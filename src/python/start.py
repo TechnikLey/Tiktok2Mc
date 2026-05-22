@@ -143,19 +143,19 @@ if not IS_WINDOWS:
 # -----------------------------
 # Settings
 # -----------------------------
-gui_cfg = cfg.get("GUI", {})
-GUI_ENABLED = gui_cfg.get("Enable", False)
-UPDATE_ENABLED = cfg.get("Update", {}).get("Enable", True)
+gui_cfg = cfg.get("gui", {})
+GUI_ENABLED = gui_cfg.get("enabled", False)
+UPDATE_ENABLED = cfg.get("update", {}).get("enabled", True)
 
-console_cfg = cfg.get("Console", {})
+console_cfg = cfg.get("console", {})
 CONSOLE_VISIBLE = console_cfg.get("visible", True)
 ALLOW_CLOSE = console_cfg.get("allow_close", True)
 LOG_LEVEL = console_cfg.get("log_level", 1)
 CONTROL_METHOD = cfg.get("control_method", "DCS")
-MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
 
-AUTO_SHUTDOWN_ENABLED = cfg.get("Shutdown", {}).get("Enabled", True)
-SHUTDOWN_DELAY_SECONDS = cfg.get("Shutdown", {}).get("DelaySeconds", 30)
+AUTO_SHUTDOWN_ENABLED = cfg.get("shutdown", {}).get("enabled", True)
+SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown", {}).get("delay_seconds", 30)
 
 # -----------------------------
 # Process dictionary
@@ -326,8 +326,8 @@ def start_update_exe():
         log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
-        update_cfg = cfg.get("Update", {})
-        max_logs = update_cfg.get("max_update_logs", 20)
+    update_cfg = cfg.get("update", {})
+    max_logs = update_cfg.get("max_update_logs", 20)
         try:
             max_logs = int(max_logs)
         except Exception as e:

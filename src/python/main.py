@@ -148,36 +148,36 @@ def load_config():
             config = yaml.safe_load(f)
 
         ctx.mc_host = config.get("server_host", "127.0.0.1")
-        ctx.mc_pass = config.get("RCON", {}).get("Password", "")
-        ctx.mc_port = config.get("RCON", {}).get("Port", 25575)
+        ctx.mc_pass = config.get("rcon", {}).get("password", "")
+        ctx.mc_port = config.get("rcon", {}).get("port", 25575)
         ctx.server_host = config.get("server_host", "127.0.0.1")
-        ctx.tiktok_user = config.get("TikTok", {}).get("User", "")
-        ctx.reconnect_delay = config.get("TikTok", {}).get("ReconnectDelaySeconds", 10)
-        ctx.mcserver_api_port = config.get("MinecraftServerAPI", {}).get("WebServerPort", 29188)
-        ctx.overlaytxt_port = config.get("Overlaytxt", {}).get("Port", 29186)
-        ctx.like_goal_port = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 29193)
-        ctx.autosave_interval_seconds = config.get("Gifts", {}).get("autosave_interval_seconds", 60)
+        ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
+        ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
+        ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
+        ctx.overlaytxt_port = config.get("overlay_text", {}).get("port", 29186)
+        ctx.like_goal_port = config.get("gifts", {}).get("like_goal_port", 29193)
+        ctx.autosave_interval_seconds = config.get("gifts", {}).get("autosave_interval_seconds", 60)
 
-        random_cfg = config.get("RandomTriggers", {})
-        ctx.random_trigger_mode = str(random_cfg.get("Mode", "deny-all")).lower()
-        raw_list = random_cfg.get("Triggers", [])
+        random_cfg = config.get("random_triggers", {})
+        ctx.random_trigger_mode = str(random_cfg.get("mode", "deny-all")).lower()
+        raw_list = random_cfg.get("triggers", [])
         ctx.random_trigger_list = [str(t).strip() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []
 
-        ctx.like_triggers = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
+        ctx.like_triggers = validate_like_triggers(config.get("gifts", {}).get("like_triggers", []))
 
-        comment_cmd_cfg = config.get("CommentCommands", {})
-        ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("Enable", False))
-        ctx.comment_cmd_prefix = str(comment_cmd_cfg.get("Prefix", "#"))
-        raw_roles = comment_cmd_cfg.get("AllowedRoles", ["moderator"])
+        comment_cmd_cfg = config.get("comment_commands", {})
+        ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
+        ctx.comment_cmd_prefix = str(comment_cmd_cfg.get("prefix", "#"))
+        raw_roles = comment_cmd_cfg.get("allowed_roles", ["moderator"])
         if isinstance(raw_roles, list):
             ctx.comment_cmd_roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
         else:
             ctx.comment_cmd_roles = ["moderator"]
-        ctx.comment_cmd_mode = str(comment_cmd_cfg.get("Mode", "deny-all")).lower()
-        raw_commands = comment_cmd_cfg.get("Commands", [])
+        ctx.comment_cmd_mode = str(comment_cmd_cfg.get("mode", "deny-all")).lower()
+        raw_commands = comment_cmd_cfg.get("commands", [])
         ctx.comment_cmd_list = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
         if ctx.comment_cmd_enable and ctx.comment_cmd_mode == "allow-all" and not ctx.comment_cmd_list:
-            print("[WARN] CommentCommands: Mode is 'allow-all' with an empty list — ALL Minecraft commands are allowed!")
+            print("[WARN] comment_commands: Mode is 'allow-all' with an empty list — ALL Minecraft commands are allowed!")
 
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
         return ctx.datapack_root.exists() and ctx.datapack_root.is_dir()

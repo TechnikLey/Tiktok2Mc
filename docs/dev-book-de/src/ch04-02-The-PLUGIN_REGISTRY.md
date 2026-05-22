@@ -124,7 +124,7 @@ if args.register_only:
     register_plugin(AppConfig(
         name="Timer",
         path=get_base_file(),
-        enable=cfg.get("Timer", {}).get("Enable", True),
+        enable=cfg.get("timer", {}).get("enabled", True),
         level=4,
         ics=True
     ))

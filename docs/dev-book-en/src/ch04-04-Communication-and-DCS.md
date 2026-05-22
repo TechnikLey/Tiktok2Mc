@@ -45,7 +45,7 @@ def add():
 
 **Timer (client):**
 ```python
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
+WIN_PORT = cfg.get("win_counter", {}).get("web_server_port", 29191)
 ADD_URL = f"http://localhost:{WIN_PORT}/add?amount=1"
 
 class API:

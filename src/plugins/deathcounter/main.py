@@ -39,7 +39,7 @@ if CONFIG_FILE.exists():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-            WEB_SERVER_PORT = cfg.get("MinecraftServerAPI", {}).get("DEATHCOUNTER_PORT", 29190)
+            WEB_SERVER_PORT = cfg.get("minecraft_server_api", {}).get("deathcounter_port", 29190)
     except Exception as e:
         print(f"Config error: {e}")
         cfg = {}
@@ -50,7 +50,7 @@ else:
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 
-MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
 SERVERAPI_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---

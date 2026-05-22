@@ -382,7 +382,7 @@ api.log("Hook loaded successfully")
 Read-only access to the loaded values from `config.yaml`. Returns a nested dictionary.
 
 ```python
-port = api.config.get("RCON", {}).get("Port", 25575)
+port = api.config.get("rcon", {}).get("port", 25575)
 ```
 
 ---

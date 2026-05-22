@@ -35,6 +35,7 @@ Each version is split into two sections:
 * **Simplified `$random` trigger filter** – The settings for `$random` now live in their own `RandomTriggers` section (no longer hidden under `Gifts`). Same `deny-all` / `allow-all` mode as above.
 * **`Shutdown` section** – The auto-shutdown settings (`Enabled`, `DelaySeconds`) are now grouped in their own `Shutdown` block instead of being individual top-level keys.
 * **Sudo warning renamed** – `no_sudo_warning` is now `show_sudo_warning`. It is enabled by default; set it to `false` to hide the warning.
+* **Config keys renamed to snake_case** – All block names and setting names in `config.yaml` now use consistent snake_case (e.g., `MinecraftServerAPI` → `minecraft_server_api`, `Overlaytxt` → `overlay_text`, `Enable` → `enabled`, `Port` → `port`, `StartTime` → `start_time`). Sections have also been reordered in a more logical user-friendly sequence.
 * **`version.txt` format** – The file now uses a key:value format (`version: v1.0.0`, `update_url: ...`) instead of a single version number. This allows the updater to know where to check for new versions.
 * **Documentation overhaul** – Both the German and the English developer documentation have been extensively revised and adapted to the new plugin system. All chapters now reflect the current structure.
 

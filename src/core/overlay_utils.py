@@ -51,17 +51,17 @@ class OverlayManager:
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 full_config = yaml.safe_load(f)
-                conf = full_config.get("Overlaytxt", {})
+                conf = full_config.get("overlay_text", {})
         except Exception as e:
             logging.error(f"YAML Error: {e}")
             return
 
-        global_port = conf.get("Port", 29186)
-        def_fails = conf.get("MaxFails", 3)
-        def_cooldown = conf.get("Cooldown", 10)
+        global_port = conf.get("port", 29186)
+        def_fails = conf.get("max_fails", 3)
+        def_cooldown = conf.get("cooldown", 10)
 
         # Overlays aus dem Unterpunkt laden
-        for item in conf.get("Overlays", []):
+        for item in conf.get("overlays", []):
             name = item.get("name")
             self.clients[name] = OverlayClient(
                 name=name,

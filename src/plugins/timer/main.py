@@ -29,9 +29,9 @@ try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f: cfg = yaml.safe_load(f) or {}
 except Exception: cfg = {}
 
-TIMER_MINS = cfg.get("Timer", {}).get("StartTime", 10)
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
-WEB_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPortTimer", 29189)
+TIMER_MINS = cfg.get("timer", {}).get("start_time", 10)
+WIN_PORT = cfg.get("win_counter", {}).get("web_server_port", 29191)
+WEB_PORT = cfg.get("minecraft_server_api", {}).get("web_server_port_timer", 29189)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # Win counter URL for incrementing wins when timer expires
@@ -46,7 +46,7 @@ if register_only:
     register_plugin(AppConfig(
         name="Timer",
         path=TIMER_EXE_PATH,
-        enable=cfg.get("Timer", {}).get("Enable", True),
+        enable=cfg.get("timer", {}).get("enabled", True),
         level=4,
         ics=True
     ))

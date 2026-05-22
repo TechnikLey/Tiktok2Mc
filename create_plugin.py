@@ -17,7 +17,7 @@ CONFIG_YAML_TEMPLATE = '''\
 # This is the local configuration file for this plugin.
 # Settings here override the global config.yaml when applicable.
 
-Enable: true
+enabled: true
 '''
 
 MAIN_PY_TEMPLATE = '''\
@@ -39,7 +39,7 @@ if register_only:
     register_plugin(AppConfig(
         name="{name}",
         path=MAIN_FILE,
-        enable=cfg.get("Enable", True),
+        enable=cfg.get("enabled", True),
         level=4,
         ics=False
     ))

@@ -8,9 +8,9 @@ config_version: 6
 # first stream.
 #
 # QUICK START — MINIMUM CHANGES REQUIRED:
-#   1. Set TikTok.User to your TikTok username (without @)
-#   2. Change RCON.Password to something secure
-#   3. Optionally adjust Java.Xms / Java.Xmx if RAM is limited
+#   1. Set tiktok.user to your TikTok username (without @)
+#   2. Change rcon.password to something secure
+#   3. Optionally adjust java.xms / java.xmx if RAM is limited
 #   4. Save the file and run start.exe (Windows) or ./start.bin (Linux)
 #
 # FORMATTING RULES (important!):
@@ -32,15 +32,6 @@ config_version: 6
 # Existing user-defined values are preserved. Only obsolete internally-managed
 # keys may be replaced or updated when required.
 auto_update_config: true
-
-# ---------------------------------------------------------------------------
-#  AUTO-SHUTDOWN
-# ---------------------------------------------------------------------------
-# When enabled, the tool shuts down automatically after your live stream ends.
-# DelaySeconds controls the wait time before shutdown.
-Shutdown:
-  Enabled: true
-  DelaySeconds: 30
 
 # ---------------------------------------------------------------------------
 #  SUDO WARNING (Linux only — has no effect on Windows)
@@ -73,50 +64,58 @@ server_host: "127.0.0.1"
 #     Required for: TikTok Live Studio, Twitch Studio.
 control_method: DCS
 
+# ---------------------------------------------------------------------------
+#  AUTO-SHUTDOWN
+# ---------------------------------------------------------------------------
+# When enabled, the tool shuts down automatically after your live stream ends.
+shutdown:
+  enabled: true
+  delay_seconds: 30
+
 # ===========================================================================
 #  MINECRAFT SERVER (JAVA)
 # ===========================================================================
-Java:
+java:
   # RAM allocation. 'G' = Gigabytes.
-  # Using the same value for Xms (initial) and Xmx (maximum) is recommended.
+  # Using the same value for xms (initial) and xmx (maximum) is recommended.
   # Default: 4G — reduce to 2G or 1G if your system has less than 8 GB RAM.
   # Low RAM may cause lag, slow chunk loading, or server crashes.
-  Xms: 4G
-  Xmx: 4G
+  xms: 4G
+  xmx: 4G
 
   # Minecraft server port (default: 25565)
-  Port: 25565
+  port: 25565
 
 # ===========================================================================
 #  REMOTE CONSOLE (RCON)
 # ===========================================================================
 # RCON allows the tool to send commands to the Minecraft server.
 # IMPORTANT: Keep this enabled — disabling it breaks most functionality.
-RCON:
-  Enable: true
+rcon:
+  enabled: true
 
   # CHANGE THIS PASSWORD before using the server publicly.
   # Anyone with this password can control your Minecraft server.
-  Password: ABC1234
+  password: ABC1234
 
   # RCON port (default: 25575)
-  Port: 25575
+  port: 25575
 
 # ===========================================================================
 #  TIKTOK LIVE
 # ===========================================================================
-TikTok:
+tiktok:
   # Your TikTok username — without the @ symbol.
   # Example: "TechnikLey"  (not "@TechnikLey")
-  User: your_tiktok_username
+  user: your_tiktok_username
 
   # Seconds to wait before attempting to reconnect after a connection loss.
-  ReconnectDelaySeconds: 30
+  reconnect_delay_seconds: 30
 
 # ===========================================================================
 #  GIFT & LIKE SETTINGS
 # ===========================================================================
-Gifts:
+gifts:
   # How often (in seconds) the gift revenue log file is saved to disk.
   # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
@@ -132,7 +131,7 @@ Gifts:
   #   every    — Like interval between activations (e.g., 100 = every 100 likes)
   #   function — The trigger name used in data/actions.mca (connects config to command)
   #   payload  — (optional) A label passed with the trigger (default: "Community")
-  #   enable   — (optional) Set to false to disable without deleting (default: true)
+  #   enabled  — (optional) Set to false to disable without deleting (default: true)
   #
   # Example: With "every: 100" and function "likes", the trigger fires every
   # 100 likes and executes whatever command you wrote for "likes" in actions.mca.
@@ -141,16 +140,61 @@ Gifts:
       every: 100
       function: likes
       payload: Community
-      enable: true
+      enabled: true
 
     - id: likes_100k
       every: 100_000
       function: like_2
       payload: Community
-      enable: true
+      enabled: true
 
   # Port for the Like Goal OBS overlay.
-  LIKE_GOAL_PORT: 29193
+  like_goal_port: 29193
+
+# ===========================================================================
+#  COMMENT COMMANDS
+# ===========================================================================
+# Let viewers send Minecraft commands by writing comments with a prefix.
+# Example: If prefix is "#" and a viewer writes "#say Hello", the command
+# "say Hello" is sent to your Minecraft server via RCON.
+#
+# !!! SECURITY WARNING !!!
+# This sends RAW commands to your Minecraft server. Anyone with the
+# required role can execute any command.
+# ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
+# or "superfan".
+comment_commands:
+  # Set to true to enable this feature.
+  enabled: false
+
+  # The character that must appear at the start of a comment.
+  # "#" works reliably across all environments. Some characters like
+  # "!" may not work in all streaming software.
+  # Example: "#" → a comment "#say Hello" triggers the "say" command.
+  prefix: "#"
+
+  # Who is allowed to use comment commands.
+  # Available roles: all, moderator, superfan, fanclub
+  # You can list multiple roles (a viewer needs to match only one).
+  allowed_roles:
+    - moderator
+    - superfan
+
+  # --- ALLOW / DENY RULES ---
+  # Only the FIRST WORD of the comment is checked (e.g., "say" from "say Hello").
+  #
+  # mode:
+  #   "deny-all"  — Only commands in the list are allowed
+  #   "allow-all" — All commands are allowed EXCEPT those in the list
+  #
+  # Example:
+  #   deny-all  + [say, give]  → only "say" and "give" work
+  #   allow-all + [op, stop]   → everything works except "op" and "stop"
+  #   deny-all  + []           → nothing works
+  mode: deny-all
+  commands:
+    - say
+    - give
 
 # ===========================================================================
 #  RANDOM TRIGGER FILTER ($random)
@@ -158,15 +202,15 @@ Gifts:
 # Controls which triggers can be selected by the $random action
 # in data/actions.mca.
 #
-# Mode:
-#   "deny-all"  — Only triggers in the list below are allowed
-#   "allow-all" — All triggers are allowed EXCEPT those in the list
+# mode:
+#   "deny-all"  — Only triggers in the list are eligible
+#   "allow-all" — All triggers are eligible EXCEPT those in the list
 #
 # NOTE: Triggers that contain "$random" are automatically excluded
 # to prevent infinite recursion.
-RandomTriggers:
-  Mode: deny-all
-  Triggers:
+random_triggers:
+  mode: deny-all
+  triggers:
     - likes
     - like_2
     - follow
@@ -174,56 +218,11 @@ RandomTriggers:
     - comment
 
 # ===========================================================================
-#  COMMENT COMMANDS
-# ===========================================================================
-# Let viewers send Minecraft commands by writing comments with a prefix.
-# Example: If Prefix is "#" and a viewer writes "#say Hello", the command
-# "say Hello" is sent to your Minecraft server via RCON.
-#
-# !!! SECURITY WARNING !!!
-# This sends RAW commands to your Minecraft server. Anyone with the
-# required role can execute any command.
-# ALWAYS use deny-all mode when AllowedRoles includes "all", "fanclub",
-# or "superfan".
-CommentCommands:
-  # Set to true to enable this feature.
-  Enable: false
-
-  # The character that must appear at the start of a comment.
-  # "#" works reliably across all environments. Some characters like
-  # "!" may not work in all streaming software.
-  # Example: "#" → a comment "#say Hello" triggers the "say" command.
-  Prefix: "#"
-
-  # Who is allowed to use comment commands.
-  # Available roles: all, moderator, superfan, fanclub
-  # You can list multiple roles (a viewer needs to match only one).
-  AllowedRoles:
-    - moderator
-    - superfan
-
-  # --- ALLOW / DENY RULES ---
-  # Only the FIRST WORD of the comment is checked (e.g., "say" from "say Hello").
-  #
-  # Mode:
-  #   "deny-all"  — Only commands in the list below are allowed
-  #   "allow-all" — All commands are allowed EXCEPT those in the list
-  #
-  # Example:
-  #   deny-all  + [say, give]  → only "say" and "give" work
-  #   allow-all + [op, stop]   → everything works except "op" and "stop"
-  #   deny-all  + []           → nothing works
-  Mode: deny-all
-  Commands:
-    - say
-    - give
-
-# ===========================================================================
 #  CONSOLE VISIBILITY
 # ===========================================================================
 # Controls which windows / processes are shown on screen.
 # Changing these affects what you see when the tool starts.
-Console:
+console:
   # Visibility level:
   #   0 — Off:       Hides everything
   #   1 — Silent:    Hides console, keeps GUI and overlays
@@ -247,15 +246,15 @@ Console:
 # --- WEB DASHBOARD (GUI) ---
 # A web-based gift browser and server dashboard.
 # Enable this to search gift IDs visually in a browser window.
-GUI:
-  Enable: false
-  Port: 29185
+gui:
+  enabled: false
+  port: 29185
 
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.
-Update:
-  Enable: true
+update:
+  enabled: true
 
   # Maximum number of update log files to keep in logs/update_logs/.
   #  0  = delete all logs after each update
@@ -265,81 +264,81 @@ Update:
 # --- MINECRAFT SERVER API ---
 # Handles communication between the bridge and the Minecraft server.
 # Required for player death/respawn detection, datapack loading, etc.
-MinecraftServerAPI:
-  Enable: true
-  APIPort: 29187
-  WebServerPort: 29188
-  WebServerPortTimer: 29189
-  DEATHCOUNTER_PORT: 29190
+minecraft_server_api:
+  enabled: true
+  api_port: 29187
+  web_server_port: 29188
+  web_server_port_timer: 29189
+  deathcounter_port: 29190
 
 # --- WIN COUNTER OVERLAY ---
 # Tracks wins and losses. Decrements on death, increments on timer expiry.
-WinCounter:
-  Enable: true
-  WebServerPort: 29191
+win_counter:
+  enabled: true
+  web_server_port: 29191
 
 # --- OVERLAY TEXT ---
 # Displays text notifications on stream (triggered via >> in actions.mca).
 # Works as an OBS Browser Source with transparent background.
-Overlaytxt:
-  Enable: true
-  Port: 29186
+overlay_text:
+  enabled: true
+  port: 29186
 
   # Display mode when a new message arrives while one is still shown:
   #   "overwrite" — New message replaces current one (recommended)
   #   "queue"     — Messages queue up and show one after another
   #   WARNING: Queue mode can pile up on busy streams.
-  DisplayMode: overwrite
+  display_mode: overwrite
 
   # Fade-in and fade-out duration in milliseconds.
   # These are NOT included in the Duration from >>commands.
-  # Example: FadeIn=500, FadeOut=500, Duration=3 → total visible = 4s
+  # Example: fade_in=500, fade_out=500, Duration=3 → total visible = 4s
   # Set to 0 for instant appear/disappear.
-  FadeIn: 500
-  FadeOut: 500
+  fade_in: 500
+  fade_out: 500
 
-  # Circuit breaker: after MaxFails consecutive failures, stop trying
-  # for Cooldown seconds before retrying.
-  MaxFails: 3
-  Cooldown: 10
+  # Circuit breaker: after max_fails consecutive failures, stop trying
+  # for cooldown seconds before retrying.
+  max_fails: 3
+  cooldown: 10
 
   # Named overlay instances. Each name creates a separate URL:
   #   http://127.0.0.1:PORT/?overlay=NAME
   # You can send text to a specific overlay from actions.mca using
   # @NAME>> syntax (e.g., @alerts>>Title|Subtitle|3).
   # If you use >> without a name, the "default" overlay is used.
-  Overlays:
+  overlays:
     - name: "default"
 
 # --- STREAM TIMER ---
 # A countdown timer for your stream. Pauses on player death, resumes on
 # respawn. When it reaches zero, a win is counted.
-Timer:
-  Enable: true
-  StartTime: 10   # Minutes
+timer:
+  enabled: true
+  start_time: 10   # Minutes
 
 # --- DEATH COUNTER ---
 # Displays the number of player deaths on stream.
-DeathCounter:
-  Enable: true
+death_counter:
+  enabled: true
 
 # --- LIKE GOAL ---
 # A progress bar tracking likes toward a goal.
-LikeGoal:
-  Enable: true
+like_goal:
+  enabled: true
 
   # Text displayed above the progress bar.
-  DisplayText: "Like Goal"
+  display_text: "Like Goal"
 
   # Number of likes needed to reach the first goal.
   # Use underscores for readability (100_000 = 100000).
   # Do NOT use dots or commas (100.000 and 100,000 will not work).
-  InitialGoal: 100_000
+  initial_goal: 100_000
 
   # What happens after a goal is reached:
   #   0  — Reset mode:     Likes reset to 0, goal starts over
-  #   1  — Step mode:      Goal increases by InitialGoal each time
+  #   1  — Step mode:      Goal increases by initial_goal each time
   #                         (100k → 200k → 300k → ...)
   #   2+ — Multiply mode:  Goal is multiplied by this value each time
   #                         (100k → 200k → 400k → 800k → ...)
-  GoalMultiplier: 1
+  goal_multiplier: 1

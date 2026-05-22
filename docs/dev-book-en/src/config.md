@@ -101,7 +101,7 @@ db_host = cfg.get("Database", {}).get("Host", "localhost")
 db_port = cfg.get("Database", {}).get("Port", 29194)
 
 # Entire section with default
-timer_cfg = cfg.get("Timer", {})
+timer_cfg = cfg.get("timer", {})
 ```
 
 ### Checklist for Config Changes

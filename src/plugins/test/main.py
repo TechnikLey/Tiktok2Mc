@@ -17,7 +17,7 @@ if register_only:
     register_plugin(AppConfig(
         name="test",
         path=MAIN_FILE,
-        enable=cfg.get("Enable", True),
+        enable=cfg.get("enabled", True),
         level=4,
         ics=False
     ))
