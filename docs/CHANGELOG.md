@@ -7,16 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Each version is split into two sections:
 
 - **User** — changes relevant to end users (new features, bug fixes, behavior changes).
-- **Developer** — internal/technical changes relevant to contributors and developers (build system, code structure, tooling).
-
-> [!IMPORTANT]
-> Please note that the **Developer** category starting after version `v0.3.0` is now deprecated and will no longer be maintained. Internal technical changes will continue to be documented in commit messages and the `dev-book`. Please use GitHub to review changes by checking the commits and viewing the diffs to see exactly what has been modified.
+- **Developer** — internal/technical changes relevant to contributors and developers (build system, code structure, tooling). [REMOVED after v0.3.0]
 
 ---
 
 ## [Unreleased]
-
-### User
 
 #### Added
 * **Config Option: `max_update_logs`** — A new configuration option under the `Updater` section in `config.yaml` that allows users to specify how many update log files to keep in the `logs/update_logs` directory.
@@ -27,6 +22,8 @@ Each version is split into two sections:
 * **Improved config template** — A new annotated config template (`docs/config_explanatory.yaml`) with enhanced inline comments and a quick-start checklist has been added.
 * **AI Prompt documentation** — The `AIPrompt.md` file is now referenced in the user guide under Additional Resources.
 * **Default Port Change** Changed the default ports for several internal services to less commonly used ports to avoid conflicts with other software (GUI: 29185, OverlayTxt: 29186, MinecraftServerAPI: 29187, Webhook: 29188, Timer: 29189, DeathCounter: 29190, WinCounter: 29191, LikeGoal: 29193). The Minecraft server (25565) and RCON (25575) ports remain unchanged.
+    > [!IMPORTANT]
+    > For all users who already have the project installed, the ports defined in their current config will continue to be used. These settings will remain exactly as configured. Updates never overwrite user-defined config values, so existing port configurations will stay unchanged.
 
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
