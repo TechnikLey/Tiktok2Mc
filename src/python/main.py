@@ -155,7 +155,7 @@ def load_config():
         ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
         ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
         ctx.overlaytxt_port = config.get("overlay_text", {}).get("port", 29186)
-        ctx.like_goal_port = config.get("gifts", {}).get("like_goal_port", 29193)
+        ctx.like_goal_port = config.get("like_goal", {}).get("port", 29193)
         ctx.autosave_interval_seconds = config.get("gifts", {}).get("autosave_interval_seconds", 60)
 
         random_cfg = config.get("random_triggers", {})

@@ -379,7 +379,7 @@ You can control which triggers are eligible using the `RandomTriggers` section i
 
 Like triggers fire when the total number of likes reaches a configured threshold. They are defined in two places that work together:
 
-- **`config.yaml`** — under `Gifts.like_triggers`, you define the interval (every N likes), the trigger name, and whether it is enabled.
+- **`config.yaml`** — under `gifts.like_triggers`, you define the interval (every N likes), the trigger name, and whether it is enabled.
 - **`actions.mca`** — you add a line using the trigger name from the config to specify which command to run.
 
 See `config/config.yaml` for the full configuration options and examples.
@@ -557,7 +557,7 @@ Displays custom text notifications on stream.
 
 ### Multiple Overlays
 
-You can run several overlay windows simultaneously — each as a separate OBS Browser Source pointing to a different named overlay. Configure the list of overlay names in `config/config.yaml` under `Overlaytxt.Overlays`.
+You can run several overlay windows simultaneously — each as a separate OBS Browser Source pointing to a different named overlay. Configure the list of overlay names in `config/config.yaml` under `overlay_text.overlays`.
 
 Each name creates a unique URL: `http://localhost:29186/?overlay=NAME`
 

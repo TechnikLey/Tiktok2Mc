@@ -148,9 +148,6 @@ gifts:
       payload: Community
       enabled: true
 
-  # Port for the Like Goal OBS overlay.
-  like_goal_port: 29193
-
 # ===========================================================================
 #  COMMENT COMMANDS
 # ===========================================================================
@@ -326,6 +323,9 @@ death_counter:
 # A progress bar tracking likes toward a goal.
 like_goal:
   enabled: true
+
+  # Port for the Like Goal OBS overlay.
+  port: 29193
 
   # Text displayed above the progress bar.
   display_text: "Like Goal"

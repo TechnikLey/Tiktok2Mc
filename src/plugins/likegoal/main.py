@@ -41,7 +41,7 @@ try:
     else:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-        LIKE_GOAL_PORT = cfg.get("gifts", {}).get("like_goal_port", 29193)
+        LIKE_GOAL_PORT = cfg.get("like_goal", {}).get("port", 29193)
         CUSTOM_TEXT = cfg.get("like_goal", {}).get("display_text", "Like Goal")
         INITIAL_GOAL = cfg.get("like_goal", {}).get("initial_goal", 100_000)
         GOAL_MULTIPLIER = cfg.get("like_goal", {}).get("goal_multiplier", 2)

@@ -63,13 +63,13 @@ Each plugin has its own port, defined in `config.yaml`:
 
 | Plugin | Port | Config key |
 |--------|------|-----------|
-| GUI | 29185 | `GUI.Port` |
-| OverlayTxt | 29186 | `Overlaytxt.Port` |
-| MinecraftServerAPI | 29188 | `MinecraftServerAPI.WebServerPort` |
-| Timer | 29189 | `MinecraftServerAPI.WebServerPortTimer` |
-| DeathCounter | 29190 | `MinecraftServerAPI.DEATHCOUNTER_PORT` |
-| WinCounter | 29191 | `WinCounter.WebServerPort` |
-| LikeGoal | 29193 | `Gifts.LIKE_GOAL_PORT` |
+| GUI | 29185 | `gui.port` |
+| OverlayTxt | 29186 | `overlay_text.port` |
+| MinecraftServerAPI | 29188 | `minecraft_server_api.web_server_port` |
+| Timer | 29189 | `minecraft_server_api.web_server_port_timer` |
+| DeathCounter | 29190 | `minecraft_server_api.deathcounter_port` |
+| WinCounter | 29191 | `win_counter.web_server_port` |
+| LikeGoal | 29193 | `like_goal.port` |
 
 > [!IMPORTANT]
 > Every port must be **unique**. If two plugins use the same port, startup will fail.
