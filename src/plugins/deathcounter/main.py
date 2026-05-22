@@ -12,7 +12,8 @@ import json, yaml, sys, threading, webview
 from flask import Flask, Response, request, render_template_string
 from flask_cors import CORS
 from queue import Queue
-from core import parse_args, register_plugin, AppConfig, get_base_dir, get_root_dir, get_base_file
+from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
+from python.registry import register_plugin
 
 # --- Paths & configuration ---
 args = parse_args()
@@ -22,13 +23,14 @@ ROOT_DIR = get_root_dir()
 
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 STATE_FILE = (ROOT_DIR / "data" / "window_state_death.json").resolve()
-WEB_SERVER_PORT = 7979 
+WEB_SERVER_PORT = 29190 
 
 def load_win_size():
     if STATE_FILE.exists():
         try:
             with STATE_FILE.open("r") as f: return json.load(f)
-        except Exception: pass
+        except Exception as e:
+            print(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}
 
 cfg = {}
@@ -37,7 +39,7 @@ if CONFIG_FILE.exists():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-            WEB_SERVER_PORT = cfg.get("MinecraftServerAPI", {}).get("DEATHCOUNTER", 7979)
+            WEB_SERVER_PORT = cfg.get("death_counter", {}).get("port", 29190)
     except Exception as e:
         print(f"Config error: {e}")
         cfg = {}
@@ -48,8 +50,8 @@ else:
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 
-MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
-SERVERAPI_EXE_PATH = get_base_file()
+DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", True)
+DEATH_COUNTER_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
 register_only = args.register_only
@@ -57,8 +59,8 @@ register_only = args.register_only
 if register_only:
     register_plugin(AppConfig(
         name="Death Counter",
-        path=SERVERAPI_EXE_PATH,
-        enable=MINECRAFTSERVERAPI_ENABLED,
+        path=DEATH_COUNTER_EXE_PATH,
+        enable=DEATH_COUNTER_ENABLED,
         level=4,
         ics=True
     ))
@@ -142,8 +144,12 @@ def save_dims():
 
 @app.route("/webhook", methods=["POST"])
 def add():
-    if request.json.get("event") == "player_death":
-        death_manager.add_death()
+    try:
+        data = request.json
+        if data and data.get("event") == "player_death":
+            death_manager.add_death()
+    except Exception as e:
+        print(f"[DEATHCOUNTER] Webhook error: {e}")
     return "OK"
 
 @app.route("/stream")

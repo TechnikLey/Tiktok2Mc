@@ -11,7 +11,8 @@ import yaml
 import json
 from queue import Queue
 from collections import defaultdict
-from core import parse_args, register_plugin, AppConfig, get_root_dir, get_base_dir, get_base_file
+from core import parse_args, AppConfig, get_root_dir, get_base_dir, get_base_file
+from python.registry import register_plugin
 
 # ==========================================
 # Paths & configuration
@@ -22,10 +23,10 @@ ROOT_DIR = get_root_dir()
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 
 args = parse_args()
-config = {}
+full_config = {}
 
 # Standardwerte
-APP_PORT = 5005 
+APP_PORT = 29186 
 DISPLAY_MODE = "overwrite"
 FADE_IN = 500
 FADE_OUT = 500
@@ -38,15 +39,15 @@ if CONFIG_FILE.exists():
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             full_config = yaml.safe_load(f)
             # Fokus auf den Unterpunkt Overlaytxt
-            conf = full_config.get("Overlaytxt", {})
+            conf = full_config.get("overlay_text", {})
             
-            APP_PORT = conf.get("Port", 5005)
-            DISPLAY_MODE = conf.get("DisplayMode", "overwrite")
-            FADE_IN = max(0, int(conf.get("FadeIn", 500)))
-            FADE_OUT = max(0, int(conf.get("FadeOut", 500)))
+            APP_PORT = conf.get("port", 29186)
+            DISPLAY_MODE = conf.get("display_mode", "overwrite")
+            FADE_IN = max(0, int(conf.get("fade_in", 500)))
+            FADE_OUT = max(0, int(conf.get("fade_out", 500)))
             
             # NEU: Liste wird jetzt hier gesucht
-            OVERLAYS_CONFIG = conf.get("Overlays", [])
+            OVERLAYS_CONFIG = conf.get("overlays", [])
             SERVER_HOST = full_config.get("server_host", "127.0.0.1")
             
     except Exception as e:
@@ -63,7 +64,7 @@ if register_only:
     register_plugin(AppConfig(
         name="Overlaytxt",
         path=OVERLAYTXT_EXE_PATH,
-        enable=config.get("Overlaytxt", {}).get("Enable", True),
+        enable=full_config.get("overlay_text", {}).get("enabled", True),
         level=4,
         ics=True
     ))

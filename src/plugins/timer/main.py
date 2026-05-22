@@ -9,7 +9,8 @@
 
 import webview, threading, requests, json, sys, yaml, logging
 from flask import Flask, request
-from core import parse_args, register_plugin, AppConfig, get_root_dir, get_base_file, get_base_dir
+from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
+from python.registry import register_plugin
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
@@ -28,9 +29,9 @@ try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f: cfg = yaml.safe_load(f) or {}
 except Exception: cfg = {}
 
-TIMER_MINS = cfg.get("Timer", {}).get("StartTime", 10)
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
-WEB_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPortTimer", 7878)
+TIMER_MINS = cfg.get("timer", {}).get("start_time", 10)
+WIN_PORT = cfg.get("win_counter", {}).get("port", 29191)
+WEB_PORT = cfg.get("timer", {}).get("port", 29189)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # Win counter URL for incrementing wins when timer expires
@@ -45,7 +46,7 @@ if register_only:
     register_plugin(AppConfig(
         name="Timer",
         path=TIMER_EXE_PATH,
-        enable=cfg.get("Timer", {}).get("Enable", True),
+        enable=cfg.get("timer", {}).get("enabled", True),
         level=4,
         ics=True
     ))
@@ -55,7 +56,8 @@ def load_win_size():
     if STATE_FILE.exists():
         try:
             with STATE_FILE.open("r") as f: return json.load(f)
-        except Exception: pass
+        except Exception as e:
+            print(f"[TIMER] Failed to load state: {e}")
     return {"width": 400, "height": 200}
 
 # --- API bridge (Python <-> JS via pywebview) ---

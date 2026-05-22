@@ -10,14 +10,23 @@ from pathlib import Path
 PLUGINS_DIR = Path("src/plugins")
 VERSION = "v1.0.0"
 
+CONFIG_YAML_TEMPLATE = '''\
+# ==========================================
+# Plugin configuration
+# ==========================================
+# This is the local configuration file for this plugin.
+# Settings here override the global config.yaml when applicable.
+
+enabled: true
+'''
+
 MAIN_PY_TEMPLATE = '''\
-from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, register_plugin, AppConfig
+from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
+from python.registry import register_plugin
 import sys
 
-BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
-DATA_DIR = (ROOT_DIR / "data").resolve()
+PLUGIN_DIR = get_plugin_dir()
+CONFIG_FILE = get_plugin_config_file()
 MAIN_FILE = get_base_file()
 args = parse_args()
 
@@ -28,15 +37,14 @@ register_only = args.register_only
 
 if register_only:
     register_plugin(AppConfig(
-        name="test",
+        name="{name}",
         path=MAIN_FILE,
-        enable=True,
+        enable=cfg.get("enabled", True),
         level=4,
         ics=False
     ))
     sys.exit(0)
 '''
-
 
 def get_valid_plugin_name():
     while True:
@@ -49,6 +57,17 @@ def get_valid_plugin_name():
         else:
             return name
 
+def get_update_url():
+    url = input("GitHub API update URL (optional, Enter to skip):\nhttps://api.github.com/repos/").strip()
+    if not url:
+        return ""
+    full_url = f"https://api.github.com/repos/{url}"
+    if not full_url.endswith("/releases/latest"):
+        if full_url.endswith("/"):
+            full_url += "releases/latest"
+        else:
+            full_url += "/releases/latest"
+    return full_url
 
 def main():
     plugin_name = get_valid_plugin_name()
@@ -58,20 +77,27 @@ def main():
     print(f"Folder '{plugin_name}' created.")
 
     # Create main.py
-    (plugin_path / "main.py").write_text(MAIN_PY_TEMPLATE, encoding="utf-8")
+    (plugin_path / "main.py").write_text(MAIN_PY_TEMPLATE.format(name=plugin_name), encoding="utf-8")
     print("File 'main.py' created.")
 
+    # Ask for update URL
+    update_url = get_update_url()
+
     # Create version.txt
-    (plugin_path / "version.txt").write_text(VERSION + "\n", encoding="utf-8")
-    print(f"File 'version.txt' with content '{VERSION}' created.")
+    version_content = f"version: {VERSION}\nupdate_url: {update_url}\n"
+    (plugin_path / "version.txt").write_text(version_content, encoding="utf-8")
+    print(f"File 'version.txt' created.")
 
     # Create README.md
     readme = f"# {plugin_name}\n\nVersion: {VERSION}\n\nDescription: \n"
     (plugin_path / "README.md").write_text(readme, encoding="utf-8")
     print("File 'README.md' created.")
 
-    input("\nPress Enter to exit...")
+    # Create config.yaml
+    (plugin_path / "config.yaml").write_text(CONFIG_YAML_TEMPLATE, encoding="utf-8")
+    print("File 'config.yaml' created.")
 
+    input("\nPress Enter to exit...")
 
 if __name__ == "__main__":
     main()

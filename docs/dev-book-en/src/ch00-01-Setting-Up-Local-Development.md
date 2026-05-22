@@ -269,7 +269,7 @@ tiktok_user: "your_tiktok_name"
 # Ports for different modules
 MinecraftServerAPI:
   Enable: true
-  WebServerPort: 8888
+  WebServerPort: 29192
   
 Timer:
   Enable: true
@@ -293,12 +293,12 @@ DeathCounter:
 
 If you want to quickly create a small test plugin:
 
-```powershell
+```bash
 # Windows
-.\create_plugin.ps1
+python create_plugin.py
 
 # macOS / Linux
-bash create_plugin.ps1
+python create_plugin.py
 ```
 
 The script will ask you for a plugin ID. Enter e.g. `testplugin`.
@@ -335,8 +335,8 @@ deactivate
 |---------|----------|
 | `python: command not found` | Python not in the PATH. Reinstall and enable "Add Python to PATH". |
 | `ModuleNotFoundError: No module named 'TikTokLive'` | `pip install -r requirements.txt` not yet run |
-| `Port 8080 already in use` | Another application is using the port. Choose a different port in `config.yaml` |
-| `Permission denied` (macOS/Linux) | Run `chmod +x create_plugin.ps1` |
+| `Port 29191 already in use` | Another application is using the port. Choose a different port in `config.yaml` |
+| `Permission denied` (macOS/Linux) | Run `chmod +x create_plugin.py` |
 | venv does not activate (PowerShell) | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 | `pip: The term 'pip' is not recognized as a name of a cmdlet, function, script file, or executable program.` | Try `python -m pip` instead – this may help |
 

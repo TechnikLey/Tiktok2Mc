@@ -83,7 +83,7 @@ def load_default_config():
 
 # Read values with defaults
 cfg = load_config()
-port = cfg.get("WebServer", {}).get("Port", 5000)
+port = cfg.get("WebServer", {}).get("Port", 29185)
 enabled = cfg.get("MyPlugin", {}).get("Enable", True)
 ```
 
@@ -98,10 +98,10 @@ log_level = cfg["Log"]["Level"]  # KeyError risk!
 
 # Deep get
 db_host = cfg.get("Database", {}).get("Host", "localhost")
-db_port = cfg.get("Database", {}).get("Port", 5432)
+db_port = cfg.get("Database", {}).get("Port", 29194)
 
 # Entire section with default
-timer_cfg = cfg.get("Timer", {})
+timer_cfg = cfg.get("timer", {})
 ```
 
 ### Checklist for Config Changes
@@ -210,3 +210,26 @@ if cfg.get("config_version", 0) < 2:
 > * **Nested structures:** Learn how to access deeper levels efficiently (e.g. via `cfg['database']['host']` or safer chaining).
 > * **Type hinting:** Look into how to use type hints so your IDE can assist you while coding and you know exactly whether a value should be an `int`, `bool`, or `str`.
 > * **Exceptions:** Understand how to catch specific errors when parsing YAML files to show the end user helpful error messages instead of cryptic tracebacks.
+
+---
+
+### Per-Plugin config.yaml
+
+Since v0.4.0, **external plugins** have their own `config.yaml` in their plugin
+directory. The global `config.yaml` is now only used by the main program and
+built-in plugins.
+
+**Advantages:**
+- Each plugin manages its config independently
+- No conflicts between plugin keys
+- Simpler updates (config stays with the plugin)
+
+**Loading in plugin code:**
+```python
+from core import load_config, get_plugin_config_file
+
+cfg = load_config(get_plugin_config_file())
+enable = cfg.get("Enable", True)
+```
+
+The plugin's config is **never overwritten** by the update mechanism (`plugin_updater.py`).

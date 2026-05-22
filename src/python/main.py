@@ -34,10 +34,6 @@ from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
 
-# Windows-specific fix for the event loop (prevents WinError 6)
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
@@ -48,60 +44,93 @@ CONFIG_FILE = (BASE_DIR / ".." / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR / ".." / "data" / "actions.mca").resolve()
 HTTP_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "http_actions.txt").resolve()
 
-MC_HOST, MC_PORT, MC_PASS = "localhost", 25575, ""
-DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
-RECONNECT_DELAY = 30
-# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
-SERVER_HOST = "127.0.0.1"
-LIKE_GOAL_PORT = 9797
-LIKE_TRIGGERS = []
-AUTOSAVE_INTERVAL_SECONDS = 60
 
-# --- Queues & throttling (for optimal RCON performance) ---
-trigger_queue = asyncio.Queue(maxsize=10_000)
-rcon_queue = asyncio.Queue(maxsize=10_000)
-likegoal_queue = asyncio.Queue()
-THROTTLE_TIME = 0.5 
 
-# --- Datapack constants ---
-DATAPACK_NAME = "StreamingTool"
-NAMESPACE = "streamingtool"
-start_likes = None
-valid_functions = set()
-vanilla_functions = set()
-http_actions_cache = {}
-possible_random_actions = []
-script_actions = {}
-overlay_actions = {}
-triggered_blocks = {}
-like_lock = threading.Lock()
+class BotContext:
+    """Central state container for the TikTok-to-Minecraft bridge."""
+    def __init__(self):
+        # RCON
+        self.mc_host = "localhost"
+        self.mc_port = 25575
+        self.mc_pass = ""
 
-MAIN_LOOP = None
-_hook_api = None
+        # Config values (set by load_config)
+        self.datapack_root = Path("")
+        self.tiktok_user = ""
+        self.reconnect_delay = 30
+        self.server_host = "127.0.0.1"
+        self.like_goal_port = 29193
+        self.mcserver_api_port = 29188
+        self.overlaytxt_port = 29186
+        self.like_triggers = []
+        self.autosave_interval_seconds = 60
 
-QUEUE_ACTIVE = True
-MCSERVER_API_PORT = 7777
+        # Comment commands
+        self.comment_cmd_enable = False
+        self.comment_cmd_prefix = "!"
+        self.comment_cmd_roles = ["moderator"]
+        self.comment_cmd_mode = "deny-all"
+        self.comment_cmd_list = []
 
-OVERLAYTXT_PORT = 5005
+        # Random triggers
+        self.random_trigger_mode = "deny-all"
+        self.random_trigger_list = []
 
-last_likegoal_sent = 0
-last_likegoal_time = 0
-LIKEGOAL_INTERVAL = 3
+        # Queues
+        self.trigger_queue = asyncio.Queue(maxsize=10_000)
+        self.rcon_queue = asyncio.Queue(maxsize=10_000)
+        self.likegoal_queue = asyncio.Queue()
 
-DISABLE_TIKTOK_CONNECT = False  # Toggle for disabling TikTok connection
+        # Throttling
+        self.throttle_time = 0.5
 
-# --- Comment commands ---
-COMMENT_CMD_ENABLE = False
-COMMENT_CMD_PREFIX = "!"
-COMMENT_CMD_ROLES = ["moderator"]
-COMMENT_CMD_WHITELIST = []  # Only these commands allowed (empty = all allowed)
-COMMENT_CMD_BLACKLIST = []  # These commands are blocked
+        # Datapack
+        self.datapack_name = "StreamingTool"
+        self.namespace = "streamingtool"
+        self.start_likes = None
+        self.valid_functions = set()
+        self.vanilla_functions = set()
+        self.http_actions_cache = {}
+        self.possible_random_actions = []
+        self.script_actions = {}
+        self.overlay_actions = {}
+        self.rcon_only_actions = {}
 
-RANDOM_TRIGGER_WHITELIST = []
-RANDOM_TRIGGER_BLACKLIST = []
+        # Threading
+        self.like_lock = threading.Lock()
+        self.tiktok_lock = threading.Lock()
+        self.gift_lock = threading.Lock()
+        self.rcon_pool_lock = asyncio.Lock()
 
-GIFT_VALUE_USD = 0
-RUNTIME_PATH_SHUTDOWN = (BASE_DIR / "runtime" / "shutdown").resolve()
+        # RCON state
+        self.rcon_connection = None
+        self.last_rcon_attempt = 0
+
+        # Like goal state
+        self.last_likegoal_sent = 0
+        self.last_likegoal_time = 0
+        self.likegoal_interval = 3
+
+        # TikTok state
+        self.disable_tiktok_connect = False
+
+        # Gift tracking
+        self.gift_value_usd = 0
+        self.gift_day_start_value = 0
+        self.gift_current_log_date = None
+
+        # Runtime
+        self.main_loop = None
+        self.hook_api = None
+        self.queue_active = True
+        self.runtime_path_shutdown = (BASE_DIR / "runtime" / "shutdown").resolve()
+
+        # RCON retry tracking (keyed by repr(commands) to limit re-queue loops)
+        self.max_rcon_retries = 3
+        self.rcon_queue_retries: dict[str, int] = {}
+
+
+ctx = BotContext()
 
 app = Flask(__name__)
 
@@ -114,10 +143,6 @@ log.setLevel(logging.ERROR)
 
 def load_config():
     """Loads configuration values from the YAML config file."""
-    global MC_HOST, MC_PORT, MC_PASS, DATAPACK_ROOT, CONFIG_TIKTOK_USER, RECONNECT_DELAY, MCSERVER_API_PORT, OVERLAYTXT_PORT, LIKE_GOAL_PORT, LIKE_TRIGGERS, AUTOSAVE_INTERVAL_SECONDS
-    global COMMENT_CMD_ENABLE, COMMENT_CMD_PREFIX, COMMENT_CMD_ROLES, COMMENT_CMD_WHITELIST, COMMENT_CMD_BLACKLIST
-    global RANDOM_TRIGGER_WHITELIST, RANDOM_TRIGGER_BLACKLIST, SERVER_HOST
-
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
         return False
@@ -126,40 +151,40 @@ def load_config():
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
-        MC_PASS = config.get("RCON", {}).get("Password", "")
-        MC_PORT = config.get("RCON", {}).get("Port", 25575)
-        SERVER_HOST = config.get("server_host", "127.0.0.1")
-        CONFIG_TIKTOK_USER = config.get("TikTok", {}).get("User", "")
-        RECONNECT_DELAY = config.get("TikTok", {}).get("ReconnectDelaySeconds", 10)
-        MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
-        OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
-        LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
-        AUTOSAVE_INTERVAL_SECONDS = config.get("Gifts", {}).get("autosave_interval_seconds", 60)
+        ctx.mc_host = config.get("server_host", "127.0.0.1")
+        ctx.mc_pass = config.get("rcon", {}).get("password", "")
+        ctx.mc_port = config.get("rcon", {}).get("port", 25575)
+        ctx.server_host = config.get("server_host", "127.0.0.1")
+        ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
+        ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
+        ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
+        ctx.overlaytxt_port = config.get("overlay_text", {}).get("port", 29186)
+        ctx.like_goal_port = config.get("like_goal", {}).get("port", 29193)
+        ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
-        raw_included = config.get("Gifts", {}).get("random_included", [])
-        RANDOM_TRIGGER_WHITELIST = [str(c).strip() for c in raw_included if str(c).strip()] if isinstance(raw_included, list) else []
-        raw_exclude = config.get("Gifts", {}).get("random_exclude", [])
-        RANDOM_TRIGGER_BLACKLIST = [str(c).strip() for c in raw_exclude if str(c).strip()] if isinstance(raw_exclude, list) else []
+        random_cfg = config.get("random_triggers", {})
+        ctx.random_trigger_mode = str(random_cfg.get("mode", "deny-all")).lower()
+        raw_list = random_cfg.get("triggers", [])
+        ctx.random_trigger_list = [str(t).strip() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []
 
-        LIKE_TRIGGERS = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
+        ctx.like_triggers = validate_like_triggers(config.get("like_goal", {}).get("triggers", []))
 
-        comment_cmd_cfg = config.get("CommentCommands", {})
-        COMMENT_CMD_ENABLE = bool(comment_cmd_cfg.get("Enable", False))
-        COMMENT_CMD_PREFIX = str(comment_cmd_cfg.get("Prefix", "#"))
-        raw_roles = comment_cmd_cfg.get("AllowedRoles", ["moderator"])
+        comment_cmd_cfg = config.get("comment_commands", {})
+        ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
+        ctx.comment_cmd_prefix = str(comment_cmd_cfg.get("prefix", "#"))
+        raw_roles = comment_cmd_cfg.get("allowed_roles", ["moderator"])
         if isinstance(raw_roles, list):
-            COMMENT_CMD_ROLES = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
+            ctx.comment_cmd_roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
         else:
-            COMMENT_CMD_ROLES = ["moderator"]
-        raw_whitelist = comment_cmd_cfg.get("Whitelist", [])
-        COMMENT_CMD_WHITELIST = [str(c).strip() for c in raw_whitelist if str(c).strip()] if isinstance(raw_whitelist, list) else []
-        raw_blacklist = comment_cmd_cfg.get("Blacklist", [])
-        COMMENT_CMD_BLACKLIST = [str(c).strip() for c in raw_blacklist if str(c).strip()] if isinstance(raw_blacklist, list) else []
-        if COMMENT_CMD_ENABLE and not COMMENT_CMD_WHITELIST and not COMMENT_CMD_BLACKLIST:
-            print("[WARN] CommentCommands: Whitelist and Blacklist are both empty — ALL Minecraft commands are allowed!")
+            ctx.comment_cmd_roles = ["moderator"]
+        ctx.comment_cmd_mode = str(comment_cmd_cfg.get("mode", "deny-all")).lower()
+        raw_commands = comment_cmd_cfg.get("commands", [])
+        ctx.comment_cmd_list = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
+        if ctx.comment_cmd_enable and ctx.comment_cmd_mode == "allow-all" and not ctx.comment_cmd_list:
+            print("[WARN] comment_commands: Mode is 'allow-all' with an empty list — ALL Minecraft commands are allowed!")
 
-        DATAPACK_ROOT = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
-        return DATAPACK_ROOT.exists() and DATAPACK_ROOT.is_dir()
+        ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
+        return ctx.datapack_root.exists() and ctx.datapack_root.is_dir()
     except Exception as e:
         print(f"[ERROR] Config error: {e}")
         return False
@@ -169,29 +194,25 @@ def sanitize_filename(name):
     name = str(name).lower().replace(" ", "_")
     return re.sub(r"[^a-z0-9_-]", "", name)
 
-# Commands that cannot run inside datapacks and must be sent via RCON
-rcon_only_actions = {}
-
 def generate_datapack():
     """Generates datapack files for vanilla commands and stores
     plugin/script commands separately.
     Supported command prefixes: '!' (RCON), '$' (script), '/' (vanilla).
     Multiplier ' xN' applies to all types.
     """
-    global valid_functions, rcon_only_actions, vanilla_functions, possible_random_actions, script_actions, overlay_actions
-    print(f"\n[BUILD] Generating datapack in: {DATAPACK_ROOT}")
+    print(f"\n[BUILD] Generating datapack in: {ctx.datapack_root}")
 
-    full_dp_path = DATAPACK_ROOT / DATAPACK_NAME
-    functions_path = full_dp_path / "data" / NAMESPACE / "function"
+    full_dp_path = ctx.datapack_root / ctx.datapack_name
+    functions_path = full_dp_path / "data" / ctx.namespace / "function"
 
-    # Reset globals
-    rcon_only_actions = {}
-    valid_functions = set()
+    # Reset state
+    ctx.rcon_only_actions = {}
+    ctx.valid_functions = set()
     collected_vanilla = {}
-    vanilla_functions = set()
-    script_actions = {}
-    overlay_actions = {}
-    possible_random_actions = []
+    ctx.vanilla_functions = set()
+    ctx.script_actions = {}
+    ctx.overlay_actions = {}
+    ctx.possible_random_actions = []
 
     # Prepare filesystem
     try:
@@ -232,7 +253,7 @@ def generate_datapack():
                             body = cmd[_overlay_match.end():].strip()
                         elif cmd.startswith(">>"):
                             kind = "overlay"
-                            overlay_name = "defaults"
+                            overlay_name = "default"
                             body = cmd[2:].strip()
                         elif cmd.startswith("!"):
                             kind = "rcon"
@@ -261,20 +282,20 @@ def generate_datapack():
                         # Sort into the appropriate action list
                         if kind == "overlay":
                             # Store (overlay_name, raw body) — no multiplier
-                            overlay_actions.setdefault(name, []).append((overlay_name, body))
-                            valid_functions.add(name)
+                            ctx.overlay_actions.setdefault(name, []).append((overlay_name, body))
+                            ctx.valid_functions.add(name)
                         else:
                             for _ in range(times):
                                 if kind == "script":
-                                    script_actions.setdefault(name, []).append(base_cmd)
-                                    valid_functions.add(name)
+                                    ctx.script_actions.setdefault(name, []).append(base_cmd)
+                                    ctx.valid_functions.add(name)
                                 elif kind == "rcon":
-                                    rcon_only_actions.setdefault(name, []).append(base_cmd)
-                                    valid_functions.add(name)
+                                    ctx.rcon_only_actions.setdefault(name, []).append(base_cmd)
+                                    ctx.valid_functions.add(name)
                                 elif kind == "vanilla":
                                     collected_vanilla.setdefault(name, []).append(base_cmd)
-                                    valid_functions.add(name)
-                                    vanilla_functions.add(name)
+                                    ctx.valid_functions.add(name)
+                                    ctx.vanilla_functions.add(name)
 
         # === Write datapack files (vanilla commands only) ===
         for name, commands in collected_vanilla.items():
@@ -293,144 +314,122 @@ def generate_datapack():
         # =============================================================
         # === Build possible_random_actions (safe pool for $random) ===
         # =============================================================
-        exclude = set(RANDOM_TRIGGER_BLACKLIST)
-        random_sources = {n for n, acts in script_actions.items() if "random" in acts}
-        exclude |= random_sources
-        # Base pool
-        base_random_actions = [cmd for cmd in sorted(valid_functions) if cmd not in exclude]
-        # === Apply whitelist / blacklist logic ===
-        # === Apply whitelist / blacklist logic with debug ===
+        random_sources = {n for n, acts in ctx.script_actions.items() if "random" in acts}
+        exclude = set(random_sources)
+        base_random_actions = [cmd for cmd in sorted(ctx.valid_functions) if cmd not in exclude]
         for cmd in base_random_actions:
-            if RANDOM_TRIGGER_WHITELIST and cmd not in RANDOM_TRIGGER_WHITELIST:
-                print(f"[RANDOM] {cmd} is not in the witelist, excluding from $random pool.")
-            elif RANDOM_TRIGGER_BLACKLIST and cmd in RANDOM_TRIGGER_BLACKLIST:
-                print(f"[RANDOM] {cmd} is in the blacklist, excluding from $random pool.")
-            else:
-                possible_random_actions.append(cmd)
+            if ctx.random_trigger_mode == "deny-all":
+                if cmd in ctx.random_trigger_list:
+                    ctx.possible_random_actions.append(cmd)
+                else:
+                    print(f"[RANDOM] {cmd} is not in the list, excluding from $random pool (deny-all).")
+            else:  # allow-all
+                if cmd in ctx.random_trigger_list:
+                    print(f"[RANDOM] {cmd} is in the list, excluding from $random pool (allow-all).")
+                else:
+                    ctx.possible_random_actions.append(cmd)
 
         # Create ZIP archive
-        zip_path = Path(DATAPACK_ROOT) / DATAPACK_NAME
+        zip_path = Path(ctx.datapack_root) / ctx.datapack_name
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
-
-        # === Debug summary (commented out) ===
-        #print("\n[TRIGGER OVERVIEW]")
-
-        #print(f"\nTotal valid triggers ({len(valid_functions)}):")
-        #for name in sorted(valid_functions):
-            #print(f"  - {name}")
-
-        #print(f"\nVanilla triggers ({len(vanilla_functions)}):")
-        #for name in sorted(vanilla_functions):
-            #print(f"  - {name}")
-
-        #real_rcon = {n: cmds for n, cmds in rcon_only_actions.items() if cmds}
-        #print(f"\nRCON-only Trigger ({len(real_rcon)}):")
-        #for name in sorted(real_rcon.keys()):
-            #print(f"  - {name} -> {real_rcon[name]}")
-
-        #print(f"\nPossible $random actions ({len(possible_random_actions)}):")
-        #for name in sorted(possible_random_actions):
-            #print(f"  - {name}")
-
-        #print("\nPossible script actions:")
-        #for name in sorted(script_actions.keys()):
-            #print(f"  - {name} -> {script_actions[name]}")
 
     except Exception as e:
         traceback.print_exc()
         print(f"[ERROR] Datapack build failed: {e}")
 
-rcon_pool_lock = asyncio.Lock()
-rcon_connection = None
-
 # ================================
 # RCON WORKER
 # ================================
-LAST_RCON_ATTEMPT = 0
 
 async def rcon_worker():
     """Background worker that dequeues RCON commands and sends them to the Minecraft server."""
-    global rcon_connection, LAST_RCON_ATTEMPT
     print("[RCON-QUEUE] Worker started.")
     while True:
-        commands, source_user = await rcon_queue.get()
-        
-        if not QUEUE_ACTIVE:
-            await asyncio.sleep(1)
-            await rcon_queue.put((commands, source_user))
-            rcon_queue.task_done()
-            continue
-
-        q_size = rcon_queue.qsize()
-        wait_time = THROTTLE_TIME
-        inner_pause = 0.01 
-        
-        # Dynamic throttling based on queue depth
-        if q_size > 100:
-            wait_time, inner_pause = 0.01, 0.001
-        elif q_size > 50:
-            wait_time, inner_pause = 0.05, 0.005
-        elif q_size > 20:
-            wait_time, inner_pause = 0.1, 0.01
-
+        commands, source_user = await ctx.rcon_queue.get()
         try:
-            async with rcon_pool_lock:
-                if rcon_connection is None:
+            if not ctx.queue_active:
+                await ctx.rcon_queue.put((commands, source_user))
+                await asyncio.sleep(1)
+                continue
+
+            q_size = ctx.rcon_queue.qsize()
+            wait_time = ctx.throttle_time
+            inner_pause = 0.01 
+            
+            # Dynamic throttling based on queue depth
+            if q_size > 100:
+                wait_time, inner_pause = 0.01, 0.001
+            elif q_size > 50:
+                wait_time, inner_pause = 0.05, 0.005
+            elif q_size > 20:
+                wait_time, inner_pause = 0.1, 0.01
+
+            async with ctx.rcon_pool_lock:
+                if ctx.rcon_connection is None:
                     now = time.time()
-                    if now - LAST_RCON_ATTEMPT < 5:
+                    if now - ctx.last_rcon_attempt < 5:
                         raise ConnectionError("Reconnect cooldown active")
                     
-                    LAST_RCON_ATTEMPT = now
+                    ctx.last_rcon_attempt = now
                     try:
-                        rcon_connection = await asyncio.wait_for(
-                            asyncio.to_thread(lambda: MCRcon(MC_HOST, MC_PASS, port=MC_PORT)),
+                        ctx.rcon_connection = await asyncio.wait_for(
+                            asyncio.to_thread(lambda: MCRcon(ctx.mc_host, ctx.mc_pass, port=ctx.mc_port)),
                             timeout=0.5
                         )
                         await asyncio.wait_for(
-                            asyncio.to_thread(rcon_connection.connect),
+                            asyncio.to_thread(ctx.rcon_connection.connect),
                             timeout=0.5
                         )
                     except (asyncio.TimeoutError, Exception) as e:
-                        rcon_connection = None
+                        ctx.rcon_connection = None
                         raise ConnectionError(f"Server unreachable: {e}")
 
                 for cmd in commands:
-                    await asyncio.to_thread(rcon_connection.command, cmd)
+                    await asyncio.to_thread(ctx.rcon_connection.command, cmd)
                     if inner_pause > 0:
                         await asyncio.sleep(inner_pause)
 
         except Exception as e:
             print(f"[RCON OFFLINE] {e}")
-            rcon_connection = None
+            ctx.rcon_connection = None
             await asyncio.sleep(5)
-            try:
-                await rcon_queue.put((commands, source_user))
-            except Exception: pass 
-
-        finally:
+            retry_key = repr((commands, source_user))
+            retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
+            if retries <= ctx.max_rcon_retries:
+                ctx.rcon_queue_retries[retry_key] = retries
+                try:
+                    await ctx.rcon_queue.put((commands, source_user))
+                except Exception:
+                    print("RCON Queue Error")
+            else:
+                print(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
+                ctx.rcon_queue_retries.pop(retry_key, None)
             await asyncio.sleep(wait_time)
-            rcon_queue.task_done()
+            continue
+        finally:
+            ctx.rcon_queue.task_done()
+            await asyncio.sleep(wait_time)
 
 async def execute_global_command(trigger_name: str, source_user: str, chain_depth: int = 0):
     """Resolves a trigger name into RCON commands and enqueues them."""
     name = sanitize_filename(trigger_name)
     
-    if name not in valid_functions:
+    if name not in ctx.valid_functions:
         return
 
     commands_to_send = []
 
     # When you add a built-in command also add it to _RESERVED_NAMES in hook_api.py to prevent overrides by other hooks
-    if name in script_actions:
-        for action in script_actions[name]:
-            if action == "random" and possible_random_actions:
-                chosen = random.choice(possible_random_actions)
+    if name in ctx.script_actions:
+        for action in ctx.script_actions[name]:
+            if action == "random" and ctx.possible_random_actions:
+                chosen = random.choice(ctx.possible_random_actions)
                 await execute_global_command(chosen, source_user, chain_depth)
-            elif action == "random" and not possible_random_actions:
+            elif action == "random" and not ctx.possible_random_actions:
                 print(f"[HOOK] [WARN] No possible actions available for $random trigger.")
             elif action in HOOK_ACTIONS:
                 try:
-                    _hook_api._current_depth = chain_depth
+                    ctx.hook_api._current_depth = chain_depth
                     HOOK_ACTIONS[action](source_user, action, {})
                 except Exception as e:
                     print(f"[HOOK] [WARN] Error in action '{action}': {e}")
@@ -438,22 +437,18 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 print(f"[HOOK] [WARN] Unknown script action: '{action}'") 
 
     # --- 0. OVERLAY TEXT ---
-    # Allow {comment} as a placeholder for overlay text
     comment_text = None
-    # If source_user is a dict, a comment text can be passed (for comment triggers)
     if isinstance(source_user, dict):
         comment_text = source_user.get('comment', '')
         user_display = source_user.get('user', '')
     else:
         user_display = source_user
 
-    if name in overlay_actions:
-        for overlay_name, raw_body in overlay_actions[name]:
+    if name in ctx.overlay_actions:
+        for overlay_name, raw_body in ctx.overlay_actions[name]:
             parts = raw_body.split("|")
-            # {user} ersetzen
             title = parts[0].replace("{user}", user_display) if len(parts) > 0 else ""
             subtitle = parts[1].replace("{user}", user_display) if len(parts) > 1 else ""
-            # {comment} ersetzen, falls vorhanden
             if comment_text is not None:
                 title = title.replace("{comment}", comment_text)
                 subtitle = subtitle.replace("{comment}", comment_text)
@@ -464,20 +459,20 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
             send_overlay_text(title, subtitle, duration, overlay_name)
 
     # --- 1. VANILLA COMMANDS ---
-    if name in vanilla_functions:
-        commands_to_send.append(f"execute as @a run function {NAMESPACE}:{name}")
+    if name in ctx.vanilla_functions:
+        commands_to_send.append(f"execute as @a run function {ctx.namespace}:{name}")
 
     # --- 2. RCON-ONLY COMMANDS ---
-    if name in rcon_only_actions:
-        commands_to_send.extend(rcon_only_actions[name])
+    if name in ctx.rcon_only_actions:
+        commands_to_send.extend(ctx.rcon_only_actions[name])
 
     if not commands_to_send:
         return
 
     # --- 3. ENQUEUE ---
     try:
-        MAIN_LOOP.call_soon_threadsafe(rcon_queue.put_nowait, (commands_to_send, source_user))
-        if rcon_queue.qsize() < 10: 
+        ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, (commands_to_send, source_user))
+        if ctx.rcon_queue.qsize() < 10: 
             print(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
     except asyncio.QueueFull:
         print(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
@@ -490,7 +485,7 @@ async def trigger_worker():
     print("[TRIGGER-QUEUE] Worker started.")
     while True:
         try:
-            item = await trigger_queue.get()
+            item = await ctx.trigger_queue.get()
             if len(item) == 3:
                 trigger, source_user, chain_depth = item
             else:
@@ -501,7 +496,7 @@ async def trigger_worker():
             except Exception as e:
                 print(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
             finally:
-                trigger_queue.task_done()
+                ctx.trigger_queue.task_done()
         except Exception as e_outer:
             print(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             await asyncio.sleep(0.1)  
@@ -512,8 +507,7 @@ async def trigger_worker():
 
 def load_http_actions(file_path=HTTP_ACTIONS_FILE):
     """Loads all HTTP actions into memory at startup."""
-    global http_actions_cache
-    http_actions_cache = {}
+    ctx.http_actions_cache = {}
 
     if not file_path.exists():
         print(f"[ERROR] File not found: {file_path}")
@@ -521,38 +515,38 @@ def load_http_actions(file_path=HTTP_ACTIONS_FILE):
 
     with file_path.open("r", encoding="utf-8") as f:
         for line in f:
-            line_clean = line.split("#", 1)[0].strip()  # Strip comments
+            line_clean = line.split("#", 1)[0].strip()
             if not line_clean or ":" not in line_clean:
                 continue
 
             trigger_id, cmd = map(str.strip, line_clean.split(":", 1))
-            http_actions_cache[trigger_id] = cmd
+            ctx.http_actions_cache[trigger_id] = cmd
 
-    print(f"[INFO] HTTP actions loaded: {len(http_actions_cache)} entries")
+    print(f"[INFO] HTTP actions loaded: {len(ctx.http_actions_cache)} entries")
 
 # ==========================================
 # Webhook endpoint for MinecraftServerAPI
 # ==========================================
 @app.route('/webhook', methods=['POST'])
 def handle_minecraft_events():
-    global QUEUE_ACTIVE
     try:
         data = request.json
-        if not data:
-            return {"status": "no data"}, 400
-
-        event = data.get("event")
-
-        if event == "player_death":
-            QUEUE_ACTIVE = False
-            print("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
-        
-        elif event == "player_respawn":
-            QUEUE_ACTIVE = True
-            print("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
-
     except Exception as e:
-        print(f"[ERROR] Webhook error: {e}")
+        print(f"[ERROR] Webhook invalid JSON: {e}")
+        return {"status": "invalid json"}, 400
+
+    if not data:
+        return {"status": "no data"}, 400
+
+    event = data.get("event")
+
+    if event == "player_death":
+        ctx.queue_active = False
+        print("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
+    
+    elif event == "player_respawn":
+        ctx.queue_active = True
+        print("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
 
     return {"status": "processed"}, 200
 
@@ -569,7 +563,6 @@ def handle_custom_trigger():
         trigger = data.get("trigger", "")
         user = data.get("user", "System").strip() or "System"
 
-        # Accept int or str for trigger, convert int to str
         if isinstance(trigger, int):
             sanitized = str(trigger)
         elif isinstance(trigger, str):
@@ -582,26 +575,36 @@ def handle_custom_trigger():
         else:
             return {"status": "error", "message": "Field 'trigger' must be string or int."}, 400
 
-        global DISABLE_TIKTOK_CONNECT
         # Special toggle: if trigger is 'tiktok', toggle TikTok connection
         if sanitized == "tiktok":
-            DISABLE_TIKTOK_CONNECT = not DISABLE_TIKTOK_CONNECT
-            print(f"[CUSTOM TRIGGER] TikTok connect toggled: {not DISABLE_TIKTOK_CONNECT} -> {DISABLE_TIKTOK_CONNECT}")
-            return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={DISABLE_TIKTOK_CONNECT}"}, 200
+            with ctx.tiktok_lock:
+                ctx.disable_tiktok_connect = not ctx.disable_tiktok_connect
+                new_state = ctx.disable_tiktok_connect
+            print(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
+            return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}"}, 200
 
-        if sanitized not in valid_functions:
-            return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
-
-        if MAIN_LOOP is None:
+        if ctx.main_loop is None:
             return {"status": "error", "message": "Bot event loop not ready yet."}, 503
 
-        try:
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, (sanitized, user))
-        except asyncio.QueueFull:
-            return {"status": "error", "message": "Trigger queue is full. Try again later."}, 503
+        if sanitized in ctx.valid_functions:
+            try:
+                ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (sanitized, user))
+            except asyncio.QueueFull:
+                return {"status": "error", "message": "Trigger queue is full. Try again later."}, 503
+            print(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
+            return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
-        print(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
-        return {"status": "ok", "trigger": sanitized, "user": user}, 200
+        raw_trigger = str(data.get("trigger", "")).strip()
+        cmd = ctx.http_actions_cache.get(raw_trigger) or ctx.http_actions_cache.get(sanitized)
+        if cmd:
+            try:
+                asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
+            except Exception as e:
+                return {"status": "error", "message": str(e)}, 500
+            print(f"[CUSTOM TRIGGER] HTTP action for '{raw_trigger}' executed")
+            return {"status": "ok", "trigger": raw_trigger, "user": user}, 200
+
+        return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
 
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
@@ -609,7 +612,7 @@ def handle_custom_trigger():
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
-    app.run(port=MCSERVER_API_PORT, debug=False, use_reloader=False)
+    app.run(host=ctx.server_host, port=ctx.mcserver_api_port, debug=False, use_reloader=False)
 
 # ==========================================
 # HTTP command executor
@@ -627,12 +630,12 @@ async def execute_http_command(cmd: str):
 
 def execute_gift_action(gift_id: str):
     """Executes an HTTP action for a gift asynchronously."""
-    cmd = http_actions_cache.get(gift_id)
+    cmd = ctx.http_actions_cache.get(gift_id)
     if not cmd:
         return
 
     try:
-        MAIN_LOOP.call_soon_threadsafe(asyncio.ensure_future, execute_http_command(cmd))
+        asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
         print(f"[HTTP] Action for gift {gift_id} started")
     except Exception as e:
         print(f"[HTTP ERROR] {e}")
@@ -652,16 +655,16 @@ async def likegoal_worker():
     print("[LIKEGOAL-QUEUE] Worker started.")
     async with aiohttp.ClientSession(timeout=timeout) as session:
         while True:
-            delta_val = await likegoal_queue.get()
+            delta_val = await ctx.likegoal_queue.get()
             try:
-                url = f"http://127.0.0.1:{LIKE_GOAL_PORT}/update_likes?add={delta_val}"
+                url = f"http://127.0.0.1:{ctx.like_goal_port}/update_likes?add={delta_val}"
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         pass
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[LIKEGOAL ERROR] {e}")
             finally:
-                likegoal_queue.task_done()
+                ctx.likegoal_queue.task_done()
 
 # =========================================
 # Like trigger validation
@@ -729,7 +732,7 @@ def validate_like_triggers(raw_triggers):
             continue
 
         # --- ENABLE (on/off toggle, optional) ---
-        enable = rule.get("enable", True)
+        enable = rule.get("enabled", True)
 
         # Cast to bool (handles strings like "true", "false")
         if isinstance(enable, str):
@@ -750,14 +753,14 @@ def validate_like_triggers(raw_triggers):
 
     return valid_triggers
 
-def prepare_like_triggers(raw_triggers, valid_functions):
+def prepare_like_triggers(raw_triggers):
     prepared = []
 
     for rule in raw_triggers:
         if not rule["enable"]:
             continue
 
-        if rule["function"] not in valid_functions:
+        if rule["function"] not in ctx.valid_functions:
             print(f"[CONFIG ERROR] Unknown function: {rule['function']}")
             continue
 
@@ -766,20 +769,10 @@ def prepare_like_triggers(raw_triggers, valid_functions):
             "every": rule["every"],
             "function": rule["function"],
             "payload": rule["payload"],
-            "last_blocks": 0  # Track state per trigger
+            "last_blocks": 0
         })
 
     return prepared
-
-def initialize_likes(total_likes):
-    """Called once to set the initial like count baseline."""
-    global start_likes
-    with like_lock:
-        if start_likes is None:
-            start_likes = total_likes
-            print(f"[LIKE] Initial count set: {start_likes}")
-            return True
-    return False
 
 # =========================================
 # Daily revenue logger
@@ -788,29 +781,36 @@ def initialize_likes(total_likes):
 def update_daily_revenue():
     file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
     today = datetime.now().strftime("%Y-%m-%d")
-    new_entry = {
-        "date": today,
-        "estimated_revenue_usd": GIFT_VALUE_USD
-    }
-    entries = []
-    if file_path.exists():
-        with file_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    updated = False
-    for i, entry in enumerate(entries):
-        if entry.get("date") == today:
-            entries[i] = new_entry
-            updated = True
-            break
-    if not updated:
-        entries.append(new_entry)
-    with file_path.open("w", encoding="utf-8") as f:
-        for entry in entries:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    with ctx.gift_lock:
+        if ctx.gift_current_log_date != today:
+            ctx.gift_day_start_value = ctx.gift_value_usd
+            ctx.gift_current_log_date = today
+        daily_value = ctx.gift_value_usd - ctx.gift_day_start_value
+
+        new_entry = {
+            "date": today,
+            "estimated_revenue_usd": daily_value
+        }
+        entries = []
+        if file_path.exists():
+            with file_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        updated = False
+        for i, entry in enumerate(entries):
+            if entry.get("date") == today:
+                entries[i] = new_entry
+                updated = True
+                break
+        if not updated:
+            entries.append(new_entry)
+        with file_path.open("w", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 # ==========================================
 # TIKTOK CLIENT
@@ -819,23 +819,18 @@ def update_daily_revenue():
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
 
-    _connect_time = [None]  # Tracks when the live connection was established
-    COMMENT_WARMUP_SECONDS = 1  # Ignore comments arriving within this window after connect
+    _connect_time = [None]
+    COMMENT_WARMUP_SECONDS = 1
 
     # =========================
     # GIFT events
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
-        global GIFT_VALUE_USD
         try:
-            # Combo gift: check if still streaking (intermediate update)
             if event.gift.combo:
-                if getattr(event, 'streaking', False) == True:
-                    try:
-                        if event.streaking: return
-                    except AttributeError:
-                        pass    
+                if getattr(event, 'streaking', False):
+                    return
 
                 count = event.repeat_count
             else:
@@ -844,16 +839,15 @@ def create_client(user):
             gift_name = sanitize_filename(event.gift.name)
             gift_id = str(event.gift.id)
 
-            GIFT_VALUE_USD += event.value
+            with ctx.gift_lock:
+                ctx.gift_value_usd += event.value
 
-            # Execute associated HTTP action
             execute_gift_action(gift_id)
 
-            # Check if this gift has a registered trigger
             target = None
-            if gift_name in valid_functions:
+            if gift_name in ctx.valid_functions:
                 target = gift_name
-            elif gift_id in valid_functions:
+            elif gift_id in ctx.valid_functions:
                 target = gift_id
 
             if not target:
@@ -861,9 +855,8 @@ def create_client(user):
 
             username = get_safe_username(event.user)
 
-            # Enqueue commands for processing
             for _ in range(count):
-                MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, (target, username))
+                ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (target, username))
 
         except Exception:
             print("\n" + "!"*30)
@@ -877,48 +870,43 @@ def create_client(user):
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
         username = get_safe_username(event.user)
-        if "follow" in valid_functions:
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("follow", username))
+        if "follow" in ctx.valid_functions:
+            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
 
     # =========================
     # LIKE events
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
-        global start_likes, last_likegoal_sent, last_likegoal_time
-        # 1. Quick initialization check
-        if start_likes is None:
-            initialize_likes(event.total)
-            return
+        with ctx.like_lock:
+            if ctx.start_likes is None:
+                ctx.start_likes = event.total
+                print(f"[LIKE] Initial count set: {ctx.start_likes}")
+                return
+            total_since_start = event.total - ctx.start_likes
         try:
-            total_since_start = event.total - start_likes
-            # 2. Critical section: trigger logic (thread-safe)
-            with like_lock:
-                for rule in LIKE_TRIGGERS:
+            with ctx.like_lock:
+                for rule in ctx.like_triggers:
                     every = rule["every"]
-                    # Avoid division by zero or negative values
                     if every <= 0: continue
                     current_blocks = total_since_start // every
                     last_blocks = rule["last_blocks"]
                     if current_blocks > last_blocks:
                         diff = current_blocks - last_blocks
                         rule["last_blocks"] = current_blocks
-                        # Enqueue trigger functions
                         print(f"[LIKE] Trigger '{rule['id']}' -> +{diff}")
-                        # Push trigger functions into the queue
                         for _ in range(diff):
-                            MAIN_LOOP.call_soon_threadsafe(
-                                trigger_queue.put_nowait,
+                            ctx.main_loop.call_soon_threadsafe(
+                                ctx.trigger_queue.put_nowait,
                                 (rule["function"], rule["payload"])
                             )
-            # 3. Likegoal logic (outside the lock, uses atomic values)
             now = time.time()
-            delta = total_since_start - last_likegoal_sent
-            if delta > 0 and (now - last_likegoal_time) >= LIKEGOAL_INTERVAL:
+            delta = total_since_start - ctx.last_likegoal_sent
+            if delta > 0 and (now - ctx.last_likegoal_time) >= ctx.likegoal_interval:
                 try:
-                    MAIN_LOOP.call_soon_threadsafe(likegoal_queue.put_nowait, delta)
-                    last_likegoal_sent = total_since_start
-                    last_likegoal_time = now
+                    ctx.main_loop.call_soon_threadsafe(ctx.likegoal_queue.put_nowait, delta)
+                    ctx.last_likegoal_sent = total_since_start
+                    ctx.last_likegoal_time = now
                 except asyncio.QueueFull:
                     pass
         except Exception as e:
@@ -930,15 +918,14 @@ def create_client(user):
     @client.on(JoinEvent)
     def on_join(event):
         username = get_safe_username(event.user)
-        if "join" in valid_functions:
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("join", username))
+        if "join" in ctx.valid_functions:
+            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("join", username))
 
     # =========================
     # COMMENT events
     # =========================
     @client.on(CommentEvent)
     def on_comment(event):
-        # Skip the initial burst of historical comments TikTok sends on connect
         if _connect_time[0] is None or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS:
             return
 
@@ -963,37 +950,38 @@ def create_client(user):
         print(f"  Fanclub-Mitglied: {in_fanclub}")
         print(f"  Moderator: {is_moderator}")
 
-        # --- Comment commands ---
-        if COMMENT_CMD_ENABLE and COMMENT_CMD_PREFIX and comment_text.startswith(COMMENT_CMD_PREFIX):
-            cmd_text = comment_text[len(COMMENT_CMD_PREFIX):].strip()
+        if ctx.comment_cmd_enable and ctx.comment_cmd_prefix and comment_text.startswith(ctx.comment_cmd_prefix):
+            cmd_text = comment_text[len(ctx.comment_cmd_prefix):].strip()
             if cmd_text:
                 allowed = False
-                if "all" in COMMENT_CMD_ROLES:
+                if "all" in ctx.comment_cmd_roles:
                     allowed = True
-                elif "moderator" in COMMENT_CMD_ROLES and is_moderator:
+                elif "moderator" in ctx.comment_cmd_roles and is_moderator:
                     allowed = True
-                elif "superfan" in COMMENT_CMD_ROLES and is_super_fan:
+                elif "superfan" in ctx.comment_cmd_roles and is_super_fan:
                     allowed = True
-                elif "fanclub" in COMMENT_CMD_ROLES and in_fanclub:
+                elif "fanclub" in ctx.comment_cmd_roles and in_fanclub:
                     allowed = True
 
                 if allowed:
                     base_cmd = cmd_text.split()[0].lower()
-                    # Whitelist: if not empty, only commands whose first word is listed pass
-                    if COMMENT_CMD_WHITELIST and base_cmd not in COMMENT_CMD_WHITELIST:
-                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not in whitelist")
-                    # Blacklist: if not empty, block commands whose first word is listed
-                    elif COMMENT_CMD_BLACKLIST and base_cmd in COMMENT_CMD_BLACKLIST:
-                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked by blacklist")
-                    else:
-                        print(f"[COMMENT CMD] {username} -> {cmd_text}")
-                        MAIN_LOOP.call_soon_threadsafe(rcon_queue.put_nowait, ([cmd_text], username))
+                    if ctx.comment_cmd_mode == "deny-all":
+                        if base_cmd in ctx.comment_cmd_list:
+                            print(f"[COMMENT CMD] {username} -> {cmd_text}")
+                            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                        else:
+                            print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not allowed (deny-all)")
+                    else:  # allow-all
+                        if base_cmd in ctx.comment_cmd_list:
+                            print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked (allow-all)")
+                        else:
+                            print(f"[COMMENT CMD] {username} -> {cmd_text}")
+                            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
                 else:
-                    print(f"[COMMENT CMD] {username} has no permission (roles: {COMMENT_CMD_ROLES})")
+                    print(f"[COMMENT CMD] {username} has no permission (roles: {ctx.comment_cmd_roles})")
 
-        if "comment" in valid_functions:
-            # For overlay: allow {comment} as a placeholder
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
+        if "comment" in ctx.valid_functions:
+            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
 
     # =========================
     # Share events
@@ -1001,8 +989,8 @@ def create_client(user):
     @client.on(ShareEvent)
     def on_share(event):
         username = get_safe_username(event.user)
-        if "share" in valid_functions:
-            MAIN_LOOP.call_soon_threadsafe(trigger_queue.put_nowait, ("share", username))
+        if "share" in ctx.valid_functions:
+            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("share", username))
 
     # =========================
     # Live end events
@@ -1011,7 +999,7 @@ def create_client(user):
     def on_live_end(_):
         update_daily_revenue()
         print(f"[STATUS] Live ended for @{user}.")
-        RUNTIME_PATH_SHUTDOWN.touch(exist_ok=True)
+        ctx.runtime_path_shutdown.touch(exist_ok=True)
 
     # =========================
     # CONNECT event
@@ -1028,7 +1016,7 @@ def create_client(user):
 # ========================
 async def gift_revenue_counter():
     while True:
-        await asyncio.sleep(AUTOSAVE_INTERVAL_SECONDS)
+        await asyncio.sleep(ctx.autosave_interval_seconds)
         update_daily_revenue()
 
 # ==========================================
@@ -1038,12 +1026,12 @@ async def gift_revenue_counter():
 async def run_bot():
     """Main async loop: initializes config, builds the datapack,
     starts all workers, and connects to TikTok Live."""
-    global MAIN_LOOP, LIKE_TRIGGERS
-    MAIN_LOOP = asyncio.get_running_loop()
+    ctx.main_loop = asyncio.get_running_loop()
     
-    load_config()
+    if not load_config():
+        print("Error in load_config")
+        sys.exit(0)
 
-    # Validate actions.mca before proceeding
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)
         if diags:
@@ -1058,30 +1046,29 @@ async def run_bot():
         return
 
     generate_datapack()
-    LIKE_TRIGGERS = prepare_like_triggers(LIKE_TRIGGERS, valid_functions)
+    ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
     load_http_actions()
 
-    # Load event_hooks scripts ($-command handlers)
-    global _hook_api
     EVENT_HOOKS_DIR = (BASE_DIR / ".." / "event_hooks").resolve()
-    _hook_api = HookAPI(rcon_queue, trigger_queue, MAIN_LOOP, {}, valid_functions)
-    load_event_hooks(_hook_api, EVENT_HOOKS_DIR)
+    ctx.hook_api = HookAPI(ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop, {}, ctx.valid_functions)
+    load_event_hooks(ctx.hook_api, EVENT_HOOKS_DIR)
 
-    # Start all background workers
     asyncio.create_task(trigger_worker())
     asyncio.create_task(rcon_worker())
     asyncio.create_task(likegoal_worker())
+    asyncio.create_task(gift_revenue_counter())
 
     while True:
-        if DISABLE_TIKTOK_CONNECT:
-            await asyncio.sleep(RECONNECT_DELAY)
+        with ctx.tiktok_lock:
+            _disabled = ctx.disable_tiktok_connect
+        if _disabled:
+            await asyncio.sleep(ctx.reconnect_delay)
             continue
 
-        client = create_client(CONFIG_TIKTOK_USER)
+        client = create_client(ctx.tiktok_user)
 
         try:
-            print(f"[*] Connecting to @{CONFIG_TIKTOK_USER}...")
-            # Run blocking TikTok client in a separate thread
+            print(f"[*] Connecting to @{ctx.tiktok_user}...")
             await asyncio.to_thread(client.run)
 
         except Exception as e:
@@ -1093,13 +1080,13 @@ async def run_bot():
             error_str = str(e)
             print(f"[..] Connection lost: {error_str}")
 
-            if "DEVICE_BLOCKED" in error_str or "200" in error_str:
+            if "DEVICE_BLOCKED" in error_str or bool(re.search(r"\b(err_code|code|status)\b.*?\b200\b", error_str, re.IGNORECASE)):
                 print("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 print("[TIP] Wait 15 minutes or restart your router.")
                 await asyncio.sleep(900)
             else:
-                print(f"[..] Reconnect in {RECONNECT_DELAY}s...")
-                await asyncio.sleep(RECONNECT_DELAY)
+                print(f"[..] Reconnect in {ctx.reconnect_delay}s...")
+                await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
             try:
@@ -1115,6 +1102,5 @@ if __name__ == "__main__":
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
-        asyncio.run(gift_revenue_counter())
     except KeyboardInterrupt:
         print("\n[STOP] Script stopped manually.")

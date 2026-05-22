@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import uuid
 import time
-import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -37,8 +36,8 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.3.0"
-        UPDATER_VERSION = "v1.2.0"
+        TOOL_VERSION = "v0.4.0"
+        UPDATER_VERSION = "v1.3.0"
 
         IS_WINDOWS = sys.platform == "win32"
         SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -54,13 +53,14 @@ def main():
 
         # Definition of main files
         CORE_EXECUTABLES = [
-            {"name": "app",            "src": "src/python/main.py",      "dest": "core"},
-            {"name": "update",         "src": "src/python/update.py",    "dest": ""},
-            {"name": "gui",            "src": "src/python/gui.py",       "dest": "core"},
-            {"name": "server",         "src": "src/python/server.py",    "dest": "",},
-            {"name": "start",          "src": "src/python/start.py",     "dest": ""},
-            {"name": "registry",       "src": "src/python/registry.py",  "dest": "plugins"},
-            {"name": "test_trigger",   "src": "tests/send_trigger.py",   "dest": "test"},
+            {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
+            {"name": "update",         "src": "src/python/update.py",         "dest": ""},
+            {"name": "gui",            "src": "src/python/gui.py",            "dest": "core"},
+            {"name": "server",         "src": "src/python/server.py",         "dest": "",},
+            {"name": "start",          "src": "src/python/start.py",          "dest": ""},
+            {"name": "registry",       "src": "src/python/registry.py",       "dest": "plugins"},
+            {"name": "plugin_updater", "src": "src/python/plugin_updater.py", "dest": "plugins"},
+            {"name": "test_trigger",   "src": "tests/send_trigger.py",        "dest": "test"},
         ]
 
         # ----- Preparation & Directory Structure -----
@@ -110,8 +110,8 @@ def main():
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
         if src_plugins_root.exists():
             for py_file in src_plugins_root.rglob("*.py"):
-                # Skip cache/pycache directories
-                if re.search(r"[\\/](hash|exe_cache|__pycache__)([\\/]|$)", str(py_file)):
+                # Skip __pycache__ directories
+                if "__pycache__" in str(py_file):
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
@@ -121,12 +121,10 @@ def main():
                     "dest": dest,
                 })
 
-                # Also copy version.txt and README.md if present in the same plugin folder
-                for extra_file in ["version.txt", "README.md"]:
+                # Also copy extra files if present in the same plugin folder
+                for extra_file in ["version.txt", "README.md", "config.yaml"]:
                     extra_path = py_file.parent / extra_file
                     if extra_path.exists():
-                        # Schedule copy as a build task (handled in asset/resource sync phase)
-                        # Here, just copy directly to OUT_DIR/plugins/rel/extra_file
                         target_dir = OUT_DIR / dest
                         target_dir.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(extra_path, target_dir / extra_file)
@@ -270,7 +268,6 @@ def main():
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),
             ("defaults/config.yaml",                "config/config.yaml"),
-            ("defaults/config.default.yaml",        "config/config.default.yaml"),
             ("defaults/gifts.json",                 "core/gifts.json"),
             ("LICENSE",                             "LICENSE"),
             ("README.md",                           "README.md"),
@@ -282,6 +279,7 @@ def main():
             ("tools/DelayedTNT.jar",                "server/mc/plugins/DelayedTNT.jar"),
             ("tools/server.jar",                    "server/mc/server.jar"),
             ("tools/mca.vsix",                      "core/assets/mca.vsix"),
+            ("AIPrompt.md",                         "AIPrompt.md"),
         ]
 
         for src_rel, dst_rel in FILES:
@@ -290,6 +288,21 @@ def main():
                 target = OUT_DIR / dst_rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_path, target)
+
+        # Generate config.default.yaml from config.yaml with template header
+        config_src = OUT_DIR / "config" / "config.yaml"
+        config_default = OUT_DIR / "config" / "config.default.yaml"
+        if config_src.exists():
+            header = (
+                "# -------------------------------------------------------------------------\n"
+                "# STREAMING TOOL CONFIGURATION TEMPLATE\n"
+                "# -------------------------------------------------------------------------\n"
+                "# This file is a template.\n"
+                "# Personal settings should be changed in 'config.yaml' only.\n"
+                "# -------------------------------------------------------------------------\n"
+            )
+            content = config_src.read_text(encoding="utf-8")
+            config_default.write_text(header + content, encoding="utf-8")
 
         # ----- Metadata & Cleanup -----
         cprint("Cleaning up temporary files...", Color.CYAN)
@@ -301,10 +314,8 @@ def main():
         if PARALLEL_TEMP_DIR.exists():
             shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
 
-        for cache_dir in ["src/core/__pycache__", "src/python/__pycache__"]:
-            p = Path(cache_dir)
-            if p.exists():
-                shutil.rmtree(p, ignore_errors=True)
+        for cache_dir in sorted(SCRIPT_DIR.rglob("__pycache__")):
+            shutil.rmtree(cache_dir, ignore_errors=True)
 
         # ----- Release / Upload Script -----
         cprint("Creating upload.py...", Color.CYAN)

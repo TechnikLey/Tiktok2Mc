@@ -13,7 +13,8 @@ import webview, threading, json, sys, yaml
 from pathlib import Path
 from flask import Flask, render_template_string, Response, request
 from queue import Queue
-from core import parse_args, register_plugin, AppConfig, get_base_file, get_base_dir, get_root_dir
+from core import parse_args, AppConfig, get_base_file, get_base_dir, get_root_dir
+from python.registry import register_plugin
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
@@ -39,7 +40,8 @@ def load_win_size():
                     "width": max(size.get("width", 600), 200),
                     "height": max(size.get("height", 300), 100)
                 }
-        except Exception: pass
+        except Exception as e:
+            print(f"[WINCOUNTER] Failed to load window size: {e}")
     return {"width": 600, "height": 300}
 
 # --- Configuration ---
@@ -47,7 +49,7 @@ try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
 except Exception: cfg = {}
-PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
+PORT = cfg.get("win_counter", {}).get("port", 29191)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 WINCOUNTER_EXE_PATH = get_base_file()
@@ -59,7 +61,7 @@ if register_only:
     register_plugin(AppConfig(
         name="Win Counter",
         path=WINCOUNTER_EXE_PATH,
-        enable=cfg.get("WinCounter", {}).get("Enable", True),
+        enable=cfg.get("win_counter", {}).get("enabled", True),
         level=4,
         ics=True
     ))
@@ -83,13 +85,15 @@ class WinManager:
                     self.wins = d.get("wins", 0)
                     self.needed = d.get("needed", 10)
                     self.record = d.get("record", 0)
-            except Exception: pass
+            except Exception as e:
+                print(f"[WINCOUNTER] Failed to load stats: {e}")
 
     def save_stats(self):
         try:
             with STATS_FILE.open("w") as f:
                 json.dump({"wins": self.wins, "record": self.record, "needed": self.needed}, f, indent=4)
-        except Exception: pass
+        except Exception as e:
+            print(f"[WINCOUNTER] Failed to save stats: {e}")
 
     def _notify(self):
         self.save_stats()

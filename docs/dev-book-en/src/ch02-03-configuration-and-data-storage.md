@@ -19,7 +19,7 @@ config/
 └── config.yaml
     └── MyPlugin:
         ├── Enable: true
-        ├── WebServerPort: 8001
+        ├── WebServerPort: 29196
         └── Theme: "dark"
                 ↓
           [Plugin starts]
@@ -54,7 +54,7 @@ except Exception as e:
 **Step 2: Read out values with defaults**
 ```python
 # With .get() you stay safe from KeyErrors
-port = config.get("MyPlugin", {}).get("WebServerPort", 8001)
+port = config.get("MyPlugin", {}).get("WebServerPort", 29196)
 enabled = config.get("MyPlugin", {}).get("Enable", True)
 theme = config.get("MyPlugin", {}).get("Theme", "light")
 ```
@@ -108,7 +108,7 @@ except Exception as e:
     cfg = {}
 
 # Read out value with default value
-port = cfg.get("MyPlugin", {}).get("WebServerPort", 8000)
+port = cfg.get("MyPlugin", {}).get("WebServerPort", 29195)
 enable = cfg.get("MyPlugin", {}).get("Enable", True)
 ```
 

@@ -38,7 +38,7 @@ from flask import Flask, request
 app = Flask(__name__)
 
 def start_server():
-    app.run(host="127.0.0.1", port=8001, debug=False, threaded=True)
+    app.run(host="127.0.0.1", port=29196, debug=False, threaded=True)
 
 import threading
 srv = threading.Thread(target=start_server, daemon=True)
@@ -68,17 +68,17 @@ def webhook():
 ```yaml
 MyPlugin:
   Enable: true
-  WebServerPort: 8001
+  WebServerPort: 29196
 ```
 
 und in der `configServerAPI.yml`:
 ```yaml
   urls:
-    - "http://localhost:7777/webhook"
-    - "http://localhost:7878/webhook"
-    - "http://localhost:7979/webhook"
-    - "http://localhost:8080/webhook"
-    - "http://localhost:8001/webhook" # Dein webhook
+    - "http://localhost:29188/webhook"
+    - "http://localhost:29189/webhook"
+    - "http://localhost:29190/webhook"
+    - "http://localhost:29191/webhook"
+    - "http://localhost:29196/webhook" # Dein webhook
 ```
 
 ### Komplettes Beispiel: DeathCounter
@@ -119,7 +119,7 @@ def webhook():
 
 if __name__ == '__main__':
     import threading
-    threading.Thread(target=lambda: app.run(port=8001), daemon=True).start()
+    threading.Thread(target=lambda: app.run(port=29196), daemon=True).start()
     input("Server läuft. Enter zum Stoppen...")
 ```
 
@@ -197,8 +197,8 @@ Dein Plugin muss in der `config.yaml` eine Port-Einstellung haben. Die `configSe
 ```yaml
 # config.yaml
 MinecraftServerAPI:
-  WebServerPortDeathCounter: 7979
-  WebServerPortTimer: 7878
+  WebServerPortDeathCounter: 29190
+  WebServerPortTimer: 29189
 ```
 
 Die Webhook-URLs werden dann so konfiguriert:
@@ -207,8 +207,8 @@ Die Webhook-URLs werden dann so konfiguriert:
 # configServerAPI.yml
 webhooks:
   urls:
-    - "http://localhost:7979/webhook"    # DeathCounter
-    - "http://localhost:7878/webhook"    # Timer
+    - "http://localhost:29190/webhook"    # DeathCounter
+    - "http://localhost:29189/webhook"    # Timer
 ```
 
 > [!IMPORTANT]
@@ -224,7 +224,7 @@ Die Lösung: Flask in einem **Thread** starten:
 import threading
 
 def start_flask_server():
-    app.run(host='127.0.0.1', port=7878, debug=False)
+    app.run(host='127.0.0.1', port=29189, debug=False)
 
 # Im Hauptprogramm:
 flask_thread = threading.Thread(target=start_flask_server, daemon=True)

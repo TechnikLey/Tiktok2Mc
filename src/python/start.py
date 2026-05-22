@@ -16,6 +16,7 @@ import json
 import shutil
 import os
 import asyncio
+from datetime import datetime
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
@@ -38,11 +39,9 @@ GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
-PORTCHECKER_EXE_PATH = (BASE_DIR / "core" / f"PortChecker{SUFFIX}").resolve()
-PUBLISHER_EXE_PATH = (BASE_DIR / "core" / f"publisher{SUFFIX}").resolve()
 REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
+PLUGIN_UPDATER_EXE_PATH = (BASE_DIR / "plugins" / f"plugin_updater{SUFFIX}").resolve()
 PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
-update_exe = (BASE_DIR / f"update{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------
@@ -50,7 +49,7 @@ update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 # -----------------------------
 cfg = load_config(CONFIG_FILE)
 
-if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
+if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to start the tool.")
         input("Press Enter to exit...")
@@ -143,19 +142,19 @@ if not IS_WINDOWS:
 # -----------------------------
 # Settings
 # -----------------------------
-gui_cfg = cfg.get("GUI", {})
-GUI_ENABLED = gui_cfg.get("Enable", False)
-UPDATE_ENABLED = cfg.get("Update", {}).get("Enable", True)
+gui_cfg = cfg.get("gui", {})
+GUI_ENABLED = gui_cfg.get("enabled", False)
+UPDATE_ENABLED = cfg.get("update", {}).get("enabled", True)
 
-console_cfg = cfg.get("Console", {})
+console_cfg = cfg.get("console", {})
 CONSOLE_VISIBLE = console_cfg.get("visible", True)
 ALLOW_CLOSE = console_cfg.get("allow_close", True)
 LOG_LEVEL = console_cfg.get("log_level", 1)
 CONTROL_METHOD = cfg.get("control_method", "DCS")
-MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
+MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
 
-AUTO_SHUTDOWN_ENABLED = cfg.get("auto_shutdown_on_live_end", True)
-SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown_delay_seconds", 30)
+AUTO_SHUTDOWN_ENABLED = cfg.get("shutdown", {}).get("enabled", True)
+SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown", {}).get("delay_seconds", 30)
 
 # -----------------------------
 # Process dictionary
@@ -309,22 +308,23 @@ def replace_updater_if_exists():
     if update_new.exists():
         print("[..] New updater found. Installing...")
         try:
-            update_new.replace(update_exe)
+            update_new.replace(UPDATE_EXE_PATH)
             print("[OK] Updater successfully updated.")
             time.sleep(0.5)
         except PermissionError:
-            print(f"[FAIL] Error: {update_exe.name} is still locked.")
+            print(f"[FAIL] Error: {UPDATE_EXE_PATH.name} is still locked.")
 
-def start_update_exe():
+def start_UPDATE_EXE_PATH():
     """Run updater synchronously — must wait for exit code, so no tmux/screen here."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
+    log_dir = BASE_DIR / "logs" / "update_logs"
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
         print("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
-        log_dir = BASE_DIR / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "updater.log"
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        log_file = log_dir / f"updater_{timestamp}.log"
         with open(log_file, "a") as lf:
             proc = subprocess.Popen(
                 cmd,
@@ -332,6 +332,29 @@ def start_update_exe():
                 stderr=lf,
                 preexec_fn=os.setsid
             )
+    update_cfg = cfg.get("update", {})
+    max_logs = update_cfg.get("max_update_logs", 20)
+    try:
+        max_logs = int(max_logs)
+    except Exception as e:
+        print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
+        max_logs = 20
+    if max_logs < 0:
+        pass
+    elif max_logs == 0:
+        logs = list(log_dir.glob("updater_*.log"))
+        for old_log in logs:
+            try:
+                old_log.unlink()
+            except Exception as e:
+                print(f"[WARN] Failed to delete old log {old_log}: {e}")
+    else:
+        logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for old_log in logs[max_logs:]:
+            try:
+                old_log.unlink()
+            except Exception as e:
+                print(f"[WARN] Failed to delete old log {old_log}: {e}")
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
@@ -351,7 +374,7 @@ if UPDATE_ENABLED:
     print("Automatic updates are enabled.")
 
     while True:
-        result = start_update_exe()
+        result = start_UPDATE_EXE_PATH()
 
         if result is None:
             break
@@ -383,6 +406,15 @@ try:
         print("Error")
 except FileNotFoundError:
     print("File not found")
+
+# -------------------------------------------------------------------------
+# Plugin Update Check (optional — skips if plugin_updater exe is missing)
+# -------------------------------------------------------------------------
+if PLUGIN_UPDATER_EXE_PATH.exists():
+    try:
+        subprocess.run([PLUGIN_UPDATER_EXE_PATH])
+    except Exception as e:
+        print(f"[WARN] Plugin updater failed: {e}")
 # =============================================================================
 
 # -----------------------------
@@ -482,7 +514,7 @@ async def shutdown_countdown():
         )
         await asyncio.sleep(1)
     print("\nShutting down now!")
-    sys.exit(0)
+    os._exit(0)
 
 # =============================================================================
 # FILE WATCHER
@@ -519,7 +551,7 @@ async def command_loop():
         )
         cmd = cmd.strip().lower()
         if cmd == "exit":
-            sys.exit(0)
+            break
         if cmd == "stop":
             shutdown_cancel_event.set()
 

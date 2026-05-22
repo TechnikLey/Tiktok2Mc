@@ -34,14 +34,14 @@ Streaming tools (OBS, Streamlabs, etc.) need access to your modules:
 **In OBS:**
 
 1. `Source` → `+` → `Browser Source` add
-2. Enter URL: `http://localhost:PORT` (e.g. `http://localhost:9797`)
+2. Enter URL: `http://localhost:PORT` (e.g. `http://localhost:29193`)
 3. Set width/height (e.g. 1280×720)
 4. Refresh rate: 60 FPS
 5. Done – browser renders your HTML UI live
 
 **Practical example:**
 
-The like counter runs on port 9797:
+The like counter runs on port 29193:
 
 ```python
 # likegoal.py
@@ -70,10 +70,10 @@ def get_like_count():
     return {"count": current_likes}
 
 # Start Flask in thread
-Thread(target=lambda: app.run(port=9797, debug=False, use_reloader=False), daemon=True).start()
+Thread(target=lambda: app.run(port=29193, debug=False, use_reloader=False), daemon=True).start()
 ```
 
-**In OBS:** Browser source with URL `http://localhost:9797` → Live Like Counter overlay!
+**In OBS:** Browser source with URL `http://localhost:29193` → Live Like Counter overlay!
 
 ### Common Problems & Solutions
 

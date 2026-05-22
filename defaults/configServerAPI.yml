@@ -1,7 +1,7 @@
 # This is the configuration file for the MinecraftServerAPI-Plugin.
 
 # The port the API should listen on.
-port: 7000
+port: 29187
 
 # Enable swagger documentation for the API endpoints
 swagger: true
@@ -23,10 +23,10 @@ webhooks:
   # You can set a list of URLs which should be called when the Webhook is triggered.
   # You can set multiple URLs here.
   urls:
-    - "http://localhost:7777/webhook"
-    - "http://localhost:7878/webhook"
-    - "http://localhost:7979/webhook"
-    - "http://localhost:8080/webhook"
+    - "http://localhost:29188/webhook"
+    - "http://localhost:29189/webhook"
+    - "http://localhost:29190/webhook"
+    - "http://localhost:29191/webhook"
   
   # If set to true, only the message content will be sent to the webhook endpoints
   # instead of the full JSON object with event, load_type, and message fields.

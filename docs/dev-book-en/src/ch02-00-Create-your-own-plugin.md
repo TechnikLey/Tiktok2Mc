@@ -1,14 +1,9 @@
 # Create Your Own Plugin
 
-> [!WARNING]
-> Currently all plugins use the `config.yaml`.
-> However, this will change in the future, as this file is only intended
-> for the main program.
-> The exact implementation will be introduced in future updates and this chapter will be adjusted accordingly.
-> Keep this in mind and watch for changes.
->
-> You can already create your own `config.yaml` in the plugin folder and use it for settings.
-> This saves you from having to make adjustments to the code later if the global `config.yaml` can no longer be used for plugins.
+> [!NOTE]
+> Since v0.4.0, every plugin has its own `config.yaml` in its plugin folder.
+> The global `config.yaml` is now only used by the main program and built-in plugins.
+> Your plugin loads its config automatically from its own file — you don't need to do anything.
 
 ### What Is a Plugin?
 
@@ -16,7 +11,7 @@ A **plugin** is an independent Python program that integrates with the streaming
 - Runs as a **separate process** (registered in the registry)
 - **Communicates via DCS** (HTTP) with other modules
 - Optionally has a **GUI (ICS)** with pywebview
-- Is centrally configured in `config.yaml`
+- Has its own `config.yaml` in the plugin folder
 - Has **access to events** via webhook
 
 **Built-in plugins (examples):**
@@ -30,19 +25,21 @@ A **plugin** is an independent Python program that integrates with the streaming
 ### Plugin Lifecycle
 
 ```
-1. Create plugin folder (with create_plugin.ps1) (plugins/myPlugin/)
+1. Create plugin folder (with create_plugin.py) (plugins/myPlugin/)
    ↓
 2. Write main.py (HTTP server, event handler)
    ↓
-3. Register in registry.py (PLUGIN_REGISTRY)
+3. Edit plugin-specific config.yaml (user configuration)
    ↓
-4. Edit config.yaml (user configuration)
+4. Register in registry.py (PLUGIN_REGISTRY)
    ↓
 5. Load into start.py (start process)
    ↓
 6. Events arrive via /webhook endpoint
    ↓
 7. Plugin processes, sends commands
+   ↓
+8. plugin_updater.py checks for updates (automatically on startup)
 ```
 
 ### Roadmap of This Chapter

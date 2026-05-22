@@ -116,7 +116,7 @@ UpdaterVersion: 1.0.2
 **WILL NOT be overwritten (user data!):**
 - `config/config.yaml` (your settings)
 - `data/` (counters, logs, states)
-- `plugins/` (user plugins)
+- `plugins/` (user plugins, managed by `plugin_updater.py`)
 
 ### Checklist: Update-Safe
 
@@ -241,12 +241,17 @@ The updater works with a whitelist.
 
 ### Allowed Directories
 
-Only these top-level directories are processed:
+Only these directories are processed:
 
 * `core`
 * `scripts`
 * `server`
 * `config`
+* `plugins/deathcounter`
+* `plugins/likegoal`
+* `plugins/overlaytxt`
+* `plugins/timer`
+* `plugins/wincounter`
 
 ### Allowed Root Files
 
@@ -268,8 +273,8 @@ Only these top-level files are copied:
 The update therefore only affects areas that have been explicitly whitelisted.
 
 ```python
-WHITELIST_DIRS = {"core", "scripts", "server", "config"}
-WHITELIST_FILES = {"version.txt", "README.md", "LICENSE", "update.exe", "server.exe", "start.exe"}
+WHITELIST_DIRS = {"core", "scripts", "config", "plugins/deathcounter", "plugins/likegoal", "plugins/overlaytxt", "plugins/timer", "plugins/wincounter"}
+WHITELIST_FILES = {"version.txt", "README.md", "LICENSE", "update.exe", "server.exe", "start.exe", "plugins/registry.exe", "plugins/plugin_updater.exe"}
 ```
 
 ---
@@ -301,3 +306,38 @@ Migration is strict:
 * The structure comes from the default file.
 * User values are only adopted where the template has a matching key.
 * Additional old keys are not retained.
+
+---
+
+## Plugin Updates (plugin_updater.py)
+
+Since v0.4.0 there is a separate mechanism for plugin updates:
+
+**`plugin_updater.py`** (compiled to `plugins/plugin_updater.exe`) runs
+automatically when the streaming tool starts and checks all plugins for
+updates.
+
+### How It Works
+
+1. The updater scans all plugin directories for `version.txt` files.
+2. If a plugin has an `update_url` set (GitHub API), it queries the API.
+3. The `tag_name` version of the GitHub release is compared to the local one.
+4. If a newer version is found, the matching asset is downloaded.
+5. The archive is extracted and the plugin files are replaced.
+6. The plugin's `config.yaml` is preserved.
+
+### version.txt (Plugin)
+
+```
+version: v1.0.0
+update_url: https://api.github.com/repos/USER/REPO/releases/latest
+```
+
+### Assets in a GitHub Release
+
+- **Windows**: `pluginname-v1.1.0-Windows.zip`
+- **Linux**: `pluginname-v1.1.0-Linux.tar.gz`
+
+> [!NOTE]
+> **No effect on tool updates:** The plugin updater runs independently of the
+> tool updater. Built-in plugins continue to be updated via the normal tool update.

@@ -34,14 +34,14 @@ Die Streaming-Tools (OBS, Streamlabs, etc.) brauchen Zugriff auf deine Plugins:
 **In OBS:**
 
 1. `Quelle` → `+` → `Browserquelle` hinzufügen
-2. URL eingeben: `http://localhost:PORT` (z.B. `http://localhost:9797`)
+2. URL eingeben: `http://localhost:PORT` (z.B. `http://localhost:29193`)
 3. Breite/Höhe einstellen (z.B. 1280×720)
 4. Aktualisierungsrate: 60 FPS
 5. Fertig – Browser rendert deine HTML-UI live
 
 **Praktisches Beispiel:**
 
-Der Like-Counter läuft auf Port 9797:
+Der Like-Counter läuft auf Port 29193:
 
 ```python
 # likegoal.py
@@ -70,10 +70,10 @@ def get_like_count():
     return {"count": current_likes}
 
 # Flask im Thread starten
-Thread(target=lambda: app.run(port=9797, debug=False, use_reloader=False), daemon=True).start()
+Thread(target=lambda: app.run(port=29193, debug=False, use_reloader=False), daemon=True).start()
 ```
 
-**In OBS:** Browser-Quelle mit URL `http://localhost:9797` → Live Like-Counter overlay!
+**In OBS:** Browser-Quelle mit URL `http://localhost:29193` → Live Like-Counter overlay!
 
 ### Häufige Probleme & Lösungen
 

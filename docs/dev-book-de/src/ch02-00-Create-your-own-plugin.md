@@ -1,14 +1,9 @@
 # Eigenes Plugin erstellen
 
-> [!WARNING]
-> Aktuell nutzen alle Plugins die `config.yaml`.
-> In Zukunft wird sich das jedoch ändern, da diese Datei ausschließlich
-> für das Hauptprogramm vorgesehen sein soll.
-> Die genaue Umsetzung wird in zukünftigen Updates eingeführt, und das Kapitel wird entsprechend angepasst.
-> Behalte dies im Hinterkopf und halte Ausschau nach Änderungen.
->
-> Du kannst bereits jetzt eine eigene `config.yaml` im Plugin-Ordner erstellen und diese für Einstellungen nutzen.
-> So sparst du dir später Anpassungen am Code, wenn die globale `config.yaml` nicht mehr für Plugins verwendet werden darf.
+> [!NOTE]
+> Jedes Plugin hat seit v0.4.0 eine eigene `config.yaml` im Plugin-Ordner.
+> Die globale `config.yaml` ist nur noch für das Hauptprogramm und Built-in-Plugins zuständig.
+> Dein Plugin lädt seine Config automatisch aus der eigenen Datei – du musst nichts weiter tun.
 
 ###  Was ist ein Plugin?
 
@@ -30,19 +25,21 @@ Ein **Plugin** ist ein unabhängiges Python-Programm, das sich in das Streaming 
 ### Plugin-Lifecycle
 
 ```
-1. Plugin-Ordner erstellen (mit create_plugin.ps1) (plugins/myPlugin/)
+1. Plugin-Ordner erstellen (mit create_plugin.py) (plugins/myPlugin/)
    ↓
 2. main.py schreiben (HTTP-Server, Event-Handler)
    ↓
-3. In registry.py registrieren (PLUGIN_REGISTRY)
+3. plugin-eigene config.yaml bearbeiten (Benutzerkonfiguration)
    ↓
-4. config.yaml bearbeiten (Benutzerkonfiguration)
+4. In registry.py registrieren (PLUGIN_REGISTRY)
    ↓
 5. In Start.py laden (Prozess starten)
    ↓
 6. Events kommen via /webhook Endpoint
    ↓
 7. Plugin verarbeitet, sendet Befehle
+   ↓
+8. plugin_updater.exe prüft auf Updates (automatisch beim Start)
 ```
 
 ### Roadmap dieses Kapitels

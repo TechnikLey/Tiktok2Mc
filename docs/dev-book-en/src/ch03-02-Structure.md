@@ -234,9 +234,9 @@ Each name creates its own URL for OBS:
 
 | Overlay name | URL |
 |---|---|
-| `default` | `http://localhost:5005/?overlay=default` |
-| `stats` | `http://localhost:5005/?overlay=stats` |
-| `alerts` | `http://localhost:5005/?overlay=alerts` |
+| `default` | `http://localhost:29186/?overlay=default` |
+| `stats` | `http://localhost:29186/?overlay=stats` |
+| `alerts` | `http://localhost:29186/?overlay=alerts` |
 
 > [!IMPORTANT] 
 > The name must exactly match one of the configured overlays. If no match is found, the message is silently dropped.

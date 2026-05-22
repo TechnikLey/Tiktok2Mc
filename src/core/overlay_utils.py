@@ -51,17 +51,17 @@ class OverlayManager:
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 full_config = yaml.safe_load(f)
-                conf = full_config.get("Overlaytxt", {})
+                conf = full_config.get("overlay_text", {})
         except Exception as e:
             logging.error(f"YAML Error: {e}")
             return
 
-        global_port = conf.get("Port", 5005)
-        def_fails = conf.get("MaxFails", 3)
-        def_cooldown = conf.get("Cooldown", 10)
+        global_port = conf.get("port", 29186)
+        def_fails = conf.get("max_fails", 3)
+        def_cooldown = conf.get("cooldown", 10)
 
         # Overlays aus dem Unterpunkt laden
-        for item in conf.get("Overlays", []):
+        for item in conf.get("overlays", []):
             name = item.get("name")
             self.clients[name] = OverlayClient(
                 name=name,
@@ -69,6 +69,17 @@ class OverlayManager:
                 max_fails=def_fails,
                 cooldown=def_cooldown
             )
+
+        # Immer ein "default" Overlay bereitstellen, auch wenn es nicht in der Config steht
+        if "default" not in self.clients:
+            self.clients["default"] = OverlayClient(
+                name="default",
+                global_port=global_port,
+                max_fails=def_fails,
+                cooldown=def_cooldown
+            )
+            logging.info(f"Created fallback 'default' overlay (not in config).")
+
         logging.info(f"Loaded {len(self.clients)} overlays from {self.config_path}")
 
     def dispatch(self, title, subtitle, duration, target_name):
@@ -88,11 +99,14 @@ class OverlayManager:
                 client.mark_success()
                 return True
             client.mark_failure()
-        except:
+        except Exception:
             client.mark_failure()
         return False
 
-_manager = OverlayManager()
+_manager = None
 
-def send_overlay_text(title, subtitle, duration=3, overlay_name=None):
+def send_overlay_text(title, subtitle, duration=3, overlay_name="default"):
+    global _manager
+    if _manager is None:
+        _manager = OverlayManager()
     return _manager.dispatch(title, subtitle, duration, overlay_name)

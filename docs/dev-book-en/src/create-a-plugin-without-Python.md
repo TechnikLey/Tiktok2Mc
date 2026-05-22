@@ -29,8 +29,9 @@ You can write a plugin in any language that produces a native Windows `.exe`. Th
 src/plugins/
 └── myplugin/
     ├── main.exe        ← started by the system (compiled from your code)
+    ├── config.yaml     ← Plugin-specific configuration
     ├── README.md
-    └── version.txt
+    └── version.txt     ← Version + update URL
 ```
 
 During the build, the entire `src/plugins/myplugin/` folder is copied to `build/release/plugins/myplugin/`.
@@ -158,7 +159,7 @@ Add a port entry for your plugin in `config.yaml`:
 ```yaml
 MyPlugin:
   Enable: true
-  WebServerPort: 8888
+  WebServerPort: 29192
 ```
 
 Then add the webhook URL to `configServerAPI.yml` (Minecraft plugin config):
@@ -166,11 +167,11 @@ Then add the webhook URL to `configServerAPI.yml` (Minecraft plugin config):
 ```yaml
 webhooks:
   urls:
-    - "http://localhost:7777/webhook"
-    - "http://localhost:7878/webhook"
-    - "http://localhost:7979/webhook"
-    - "http://localhost:8080/webhook"
-    - "http://localhost:8888/webhook"   # your plugin
+    - "http://localhost:29188/webhook"
+    - "http://localhost:29189/webhook"
+    - "http://localhost:29190/webhook"
+    - "http://localhost:29191/webhook"
+    - "http://localhost:29192/webhook"   # your plugin
 ```
 
 > [!IMPORTANT]
@@ -236,14 +237,14 @@ fs::path logs_dir    = root_dir / "logs";
 ```rust
 let content = std::fs::read_to_string(&config_file).unwrap_or_default();
 let cfg: serde_yaml::Value = serde_yaml::from_str(&content).unwrap_or(serde_yaml::Value::Null);
-let port    = cfg["MyPlugin"]["WebServerPort"].as_u64().unwrap_or(8888) as u16;
+let port    = cfg["MyPlugin"]["WebServerPort"].as_u64().unwrap_or(29192) as u16;
 let enabled = cfg["MyPlugin"]["Enable"].as_bool().unwrap_or(true);
 ```
 
 **C++** (with [`yaml-cpp`](https://github.com/jbeder/yaml-cpp)):
 ```cpp
 YAML::Node cfg = YAML::LoadFile(config_file.string());
-int  port    = cfg["MyPlugin"]["WebServerPort"].as<int>(8888);
+int  port    = cfg["MyPlugin"]["WebServerPort"].as<int>(29192);
 bool enabled = cfg["MyPlugin"]["Enable"].as<bool>(true);
 ```
 
@@ -269,20 +270,20 @@ Plugins communicate via HTTP on `localhost`. Ports are defined in `config.yaml`:
 
 ```yaml
 WinCounter:
-  WebServerPort: 8080
+  WebServerPort: 29191
 ```
 
 **Rust** (with [`ureq`](https://crates.io/crates/ureq)):
 ```rust
 // Fire-and-forget (no waiting for response)
 std::thread::spawn(|| {
-    let _ = ureq::post("http://localhost:8080/add?amount=1").call();
+    let _ = ureq::post("http://localhost:29191/add?amount=1").call();
 });
 ```
 
 **C++** (with [cpp-httplib](https://github.com/yhirose/cpp-httplib)):
 ```cpp
-httplib::Client cli("localhost", 8080);
+httplib::Client cli("localhost", 29191);
 cli.set_connection_timeout(2);
 auto res = cli.Post("/add?amount=1");
 if (!res || res->status != 200) {
@@ -392,7 +393,7 @@ fn main() {
 
     let port: u16 = cfg["MyPlugin"]["WebServerPort"]
         .as_u64()
-        .unwrap_or(8888) as u16;
+        .unwrap_or(29192) as u16;
 
     // --- Load state ---
     let data_dir = root.join("data");
@@ -564,7 +565,7 @@ int main(int argc, char* argv[]) {
     fs::create_directories(data_dir);
     fs::path state_file  = data_dir / "myplugin_state.json";
 
-    uint16_t port = read_port(config_file, 8888);
+    uint16_t port = read_port(config_file, 29192);
 
     // --- Load state ---
     load_state(state_file);
@@ -625,3 +626,31 @@ Write logs to `ROOT_DIR/logs/myplugin.log`. Use append mode and log at minimum:
 - Plugin start with port number
 - Each received event type
 - Every error with a timestamp
+
+---
+
+## Plugin Updates
+
+Since v0.4.0, `plugin_updater.py` (compiled to `plugin_updater.exe`) checks
+for plugin updates automatically when the streaming tool starts.
+
+### `version.txt` (new format)
+
+```
+version: v1.0.0
+update_url: https://api.github.com/repos/USER/REPO/releases/latest
+```
+
+### How It Works
+
+1. The updater reads `version.txt` from each plugin directory.
+2. If `update_url` is set (GitHub API URL), it fetches the GitHub API.
+3. The `tag_name` version is compared to the local version.
+4. If a newer version is found, the matching platform asset is downloaded.
+5. The archive is extracted and plugin files are replaced.
+6. The `config.yaml` of the plugin is **not overwritten**.
+
+### GitHub Release Assets
+
+- **Windows**: `myplugin-v1.1.0-Windows.zip`
+- **Linux**: `myplugin-v1.1.0-Linux.tar.gz`

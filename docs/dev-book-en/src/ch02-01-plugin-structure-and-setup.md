@@ -9,23 +9,25 @@ Every plugin is an **isolated Python program** with a standard structure. Benefi
 
 ### Folder Structure
 
-**Automatically created via PowerShell script (create_plugin.ps1):**
+**Automatically created via script (`create_plugin.py`):**
 ```
 src/plugins/
 └── my_plugin/
     ├── main.py           ← Plugin core
+    ├── config.yaml       ← Plugin-specific configuration
     ├── README.md        
     └── version.txt       
 ```
 
 ### Creating a Plugin: 2 Steps
 
-If you use the PowerShell script `create_plugin.ps1`, it will ask you for the name of your plugin. It then automatically creates the complete folder structure for you. This then looks like this:
+If you use the PowerShell script `create_plugin.py`, it will ask you for the name of your plugin. It then automatically creates the complete folder structure for you. This then looks like this:
 
 ```text
 .
 ├── your_plugin_name
 │   ├── main.py
+│   ├── config.yaml
 │   ├── README.md
 │   └── version.txt
 ```
@@ -36,16 +38,15 @@ The new folder will be created at `src/plugins/` with the name you specified dur
 
 ### `main.py` – The Heart of Your Plugin
 
-This is the most important file! This is where you write the actual logic of your plugin. If you create a plugin with `create_plugin.ps1`, you automatically get base code inserted. It looks something like this:
+This is the most important file! This is where you write the actual logic of your plugin. If you create a plugin with `create_plugin.py`, you automatically get base code inserted. It looks something like this:
 
 ```python
-from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, register_plugin, AppConfig
+from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
+from python.registry import register_plugin
 import sys
 
-BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
-CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"
-DATA_DIR = ROOT_DIR / "data"
+PLUGIN_DIR = get_plugin_dir()
+CONFIG_FILE = get_plugin_config_file()
 MAIN_FILE = get_base_file()
 args = parse_args()
 
@@ -58,7 +59,7 @@ if register_only:
     register_plugin(AppConfig(
         name="test",
         path=MAIN_FILE,
-        enable=True,
+        enable=cfg.get("Enable", True),
         level=4,
         ics=False
     ))
@@ -66,17 +67,8 @@ if register_only:
 ```
 
 > [!TIP]
-> If you want to use a `config.yaml` file directly in the plugin folder, replace:
-> ```python
-> CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"
-> ```
->
-> With this code:
-> 
-> ```python
-> CONFIG_FILE = BASE_DIR / "config.yaml"
-> CONFIG_FILE.touch(exist_ok=True)  # Creates the file if you haven't already done it yourself.
-> ```
+> Your plugin now has its own `config.yaml` in the plugin folder.
+> It is automatically created and loaded – you don't need to worry about a thing.
 
 #### What Exactly Is Happening?
 
@@ -84,17 +76,16 @@ if register_only:
 You import functions and classes from the `core` module. This saves you a lot of writing work:
 - `load_config`: Loads the configuration file
 - `parse_args`: Reads command-line arguments
-- `get_root_dir`, `get_base_dir`, `get_base_file`: Determine important directories and file paths
-- `register_plugin`: Registers your plugin
+- `get_plugin_dir`, `get_plugin_config_file`: Determine your plugin's directories and config file path
+- `get_base_file`: Determines important file paths
+- `register_plugin`: Registers your plugin (from `python.registry`)
 - `AppConfig`: A class that stores the plugin configuration
 
 **Setting Up Important Paths**  
 ```python
-BASE_DIR = get_base_dir()     # The base folder of the application
-ROOT_DIR = get_root_dir()     # The root path, two levels above BASE_DIR
-CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"  # Path to configuration
-DATA_DIR = ROOT_DIR / "data"  # Folder for user data
-MAIN_FILE = get_base_file()   # The path to main.exe (main.py in the dev folder)
+PLUGIN_DIR = get_plugin_dir()           # Your plugin's folder
+CONFIG_FILE = get_plugin_config_file()  # Path to your plugin's config.yaml
+MAIN_FILE = get_base_file()             # The path to main.exe (main.py in the dev folder)
 ```
 
 You will need these variables later in your code — for example to save files or load the config.
@@ -229,15 +220,19 @@ This file is your chance to show other developers what your plugin does. Write h
 
 A good README makes things easier for yourself and others later!
 
-### `version.txt` – The Version Number
+### `version.txt` – Version Number & Update URL
 
-In this file you save the current version of your plugin. By default, when you create a new plugin it says:
+In this file you save the current version of your plugin and optionally a link
+for the `plugin_updater.py` to check for updates. By default, when you create
+a new plugin it says:
 
 ```
-v1.0.0
+version: v1.0.0
+update_url: 
 ```
 
-**Important:** Stick to this format! It follows the [Semantic Versioning](https://semver.org/) standard:
+**version:**  
+The version number follows the [Semantic Versioning](https://semver.org/) standard:
 - **v1.0.0** = Major.Minor.Patch
 - **Major**: Breaking changes (big changes)
 - **Minor**: New features (backwards compatible)
@@ -247,6 +242,19 @@ Examples:
 - v1.0.0 → v1.0.1 (small bug fix)
 - v1.0.1 → v1.1.0 (new feature added)
 - v1.1.0 → v2.0.0 (major conversion, no longer compatible)
+
+**update_url:**  
+A GitHub API URL where the `plugin_updater.py` can check for new versions:
+```
+https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest
+```
+
+The updater fetches the GitHub API, compares the `tag_name` version with the
+local version, and downloads the matching release asset if a newer version
+is found (Windows → `*.zip` with "Windows" in the name, Linux → `*.tar.gz`
+with "Linux" in the name). The plugin's `config.yaml` is never overwritten.
+
+If no `update_url` is set, the updater skips your plugin.
 
 ---
 
@@ -264,6 +272,47 @@ When you leave Python, you have to do a lot of things yourself that Python modul
 The basic structure can quickly require **several hundred lines of code** depending on the language — significantly more than the ~20 lines of Python above.
 
 **Rule of thumb:** Python is the best place to start. If you need more performance later, you can always optimize performance-critical parts or create them in a different language.
+
+---
+
+## Plugin Updates (plugin_updater.py)
+
+External plugins can be updated automatically using `plugin_updater.py`
+(compiled to `plugin_updater.exe`). It runs automatically when the streaming
+tool starts (after the registry scan).
+
+### How It Works
+
+1. The updater scans all plugin directories for `version.txt` files.
+2. If an `update_url` is set (GitHub API URL), it fetches the GitHub API.
+3. The `tag_name` version of the release is compared to the local version.
+4. If the release version is newer, the matching asset is downloaded.
+5. The archive is extracted and the plugin files are replaced.
+6. The plugin's `config.yaml` is **never overwritten**.
+
+### Preparing a GitHub Release
+
+For your plugin to be updatable, create a GitHub release with:
+
+- **Tag**: e.g. `v1.1.0`
+- **Asset (Windows)**: `myplugin-v1.1.0-Windows.zip`
+- **Asset (Linux)**: `myplugin-v1.1.0-Linux.tar.gz`
+
+The archive should have this structure:
+
+```
+myplugin-v1.1.0-Windows.zip
+├── main.exe
+├── version.txt
+├── README.md
+├── config.yaml     ← ignored (user config is preserved)
+└── ...             ← additional resources
+```
+
+The `update_url` in your `version.txt` must look like this:
+```
+update_url: https://api.github.com/repos/{YOUR_USER}/{YOUR_REPO}/releases/latest
+```
 
 ---
 

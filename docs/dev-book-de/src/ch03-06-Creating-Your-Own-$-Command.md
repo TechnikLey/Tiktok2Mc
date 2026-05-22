@@ -383,7 +383,7 @@ api.log("Hook erfolgreich geladen")
 Lesezugriff auf die geladenen Werte aus `config.yaml`. Gibt ein verschachteltes Dictionary zurück.
 
 ```python
-port = api.config.get("RCON", {}).get("Port", 25575)
+port = api.config.get("rcon", {}).get("port", 25575)
 ```
 
 ---

@@ -194,7 +194,7 @@ Wenn Fehler → YAML-Syntax überprüfen (Einrückung, Doppelpunkte, etc.)
 
 ### 3. "Port schon in Verwendung"
 
-**Fehler:** `Address already in use :8080`
+**Fehler:** `Address already in use :29191`
 
 **Ursache:** Ein anderes Programm nutzt den Port.
 
@@ -202,13 +202,13 @@ Wenn Fehler → YAML-Syntax überprüfen (Einrückung, Doppelpunkte, etc.)
 
 **Windows:**
 ```powershell
-netstat -ano | findstr :8080
+netstat -ano | findstr :29191
 taskkill /PID <pid_nummer> /F
 ```
 
 **macOS/Linux:**
 ```bash
-lsof -i :8080
+lsof -i :29191
 kill -9 <pid>
 ```
 
@@ -216,7 +216,7 @@ kill -9 <pid>
 
 ```yaml
 Timer:
-  WebServerPort: 8081  # Statt 8080
+  WebServerPort: 8081  # Statt 29191
 ```
 
 ---
@@ -258,10 +258,11 @@ except Exception as e:
 
 2. **Check:** Plugin hat `main.py`?
    ```
-   src/plugins/my_plugin/
-   ├── main.py       # Muss existieren!
-   ├── README.md
-   └── version.txt
+src/plugins/my_plugin/
+├── main.py       # Muss existieren!
+├── config.yaml   # Plugin-eigene Konfiguration
+├── README.md
+└── version.txt
    ```
 
 3. **Check:** Plugin kann importieren?
@@ -290,7 +291,7 @@ def webhook():
 
 1. **Flask läuft?** 
    ```bash
-   curl http://localhost:7878/webhook -X POST -d "{}"
+   curl http://localhost:29189/webhook -X POST -d "{}"
    ```
 
 2. **Firewall erlaubt Port?** Port muss offen sein.

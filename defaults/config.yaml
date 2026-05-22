@@ -1,385 +1,340 @@
-config_version: 4
+config_version: 6
 
-# -------------------------------------------------------------------------
-# IMPORTANT FOR BEGINNERS:
-# 1. DO NOT remove the space after the colon (e.g., 'key: value').
-# 2. DO NOT use the 'Tab' key for spacing; use the 'Space' bar only.
-# 3. PORTS: Each port must be unique. If a port is used twice, the tool 
-#    will crash or fail to start.
-# 4. To define a list, use:
-#      list_key:
-#        - item1
-#        - item2
-#    For an empty list, use:
-#      list_key: []
-# -------------------------------------------------------------------------
+# =============================================================================
+#  TIKTOK2MC — CONFIGURATION FILE
+# =============================================================================
+# This is the main configuration file for the TikTok-to-Minecraft tool.
+# Every option is explained below. Read through it carefully before your
+# first stream.
+#
+# QUICK START — MINIMUM CHANGES REQUIRED:
+#   1. Set tiktok.user to your TikTok username (without @)
+#   2. Change rcon.password to something secure
+#   3. Optionally adjust java.xms / java.xmx if RAM is limited
+#   4. Save the file and run start.exe (Windows) or ./start.bin (Linux)
+#
+# FORMATTING RULES (important!):
+#   - Use SPACES only — never use the Tab key
+#   - Always put a space after the colon:  key: value  (not key:value)
+#   - For lists, use:
+#       list_name:
+#         - item1
+#         - item2
+#   - For empty lists, use:  list_name: []
+#   - Lines starting with # are comments and are ignored
+# =============================================================================
 
-# SETTINGS PROTECTION
-# Set this to false if you do not want the tool to overwrite personal settings.
-# Disabling this may block important updates or cause configuration issues.
+# ---------------------------------------------------------------------------
+#  AUTO-UPDATE CONFIG
+# ---------------------------------------------------------------------------
+# When enabled (recommended), new configuration options introduced by updates
+# are automatically merged into your existing config.yaml.
+# Existing user-defined values are preserved. Only obsolete internally-managed
+# keys may be replaced or updated when required.
 auto_update_config: true
 
-# These control whether the tool automatically shuts down when the live stream ends
-auto_shutdown_on_live_end: true
-# If auto shutdown is enabled, this value controls how many seconds to wait before shutting down after the live stream ends.
-shutdown_delay_seconds: 30
+# ---------------------------------------------------------------------------
+#  SUDO WARNING (Linux only — has no effect on Windows)
+# ---------------------------------------------------------------------------
+# On Linux, running without sudo can cause update and permission issues.
+# Set to false to hide this warning if you have configured your system
+# to handle permissions properly without sudo.
+show_sudo_warning: true
 
-# Set this to true to disable the warning about running the tool without sudo on Linux.
-# WARNING: Running without sudo on Linux can cause various issues, 
-# including failed updates and permission errors. 
-# Only disable this warning if you are sure you understand the risks
-# and have configured your system accordingly.
-# (Linux only, has no effect on Windows)
-no_sudo_warning: False
-
-# =======================================================================
-# SERVER HOST BIND ADDRESS
-# =======================================================================
-# The IP address the servers will bind to.
-# Use "127.0.0.1" to allow only local access (default).
-# Use "0.0.0.0" to allow access from other devices in your network.
-# Use "<IP_ADDRESS>" to bind to a specific network interface.
+# ---------------------------------------------------------------------------
+#  SERVER BIND ADDRESS
+# ---------------------------------------------------------------------------
+# Controls which network interfaces the servers listen on.
+#   "127.0.0.1"  — Local access only (default, safe)
+#   "0.0.0.0"    — Allow access from other devices on your network
+#   "<IP>"       — Bind to a specific network interface
 server_host: "127.0.0.1"
 
-# ==============================================================================
-# STREAMING CONTROL METHOD SELECTION
-# ==============================================================================
-# Choose how this tool communicates with your streaming software.
+# ---------------------------------------------------------------------------
+#  CONTROL METHOD
+# ---------------------------------------------------------------------------
+# How the tool communicates with your streaming software.
 #
-# Options:
-#   DCS (Direct Control System):
-#     Recommended for most users.
-#     Uses direct HTTP-based control and offers the best performance,
-#     lowest latency, and full access to advanced features.
-#     Best for software such as OBS Studio, vMix, and Streamlabs Desktop.
+#   DCS (Direct Control System) — RECOMMENDED
+#     Best performance, lowest latency, full feature access.
+#     Use with: OBS Studio, vMix, Streamlabs Desktop.
 #
-#   ICS (Interface Control System):
-#     Uses the graphical user interface for control.
-#     Easier to use in some cases, but slower and with fewer supported features.
-#     Some features may be unavailable or may not work properly.
-#     Required for software such as TikTok Live Studio and Twitch Studio.
-#
-# Recommendation:
-#   Use DCS whenever possible for the best reliability and performance.
-# ==============================================================================
+#   ICS (Interface Control System)
+#     Uses graphical interface. Slower, fewer features.
+#     Required for: TikTok Live Studio, Twitch Studio.
 control_method: DCS
 
-# -------------------------------------------------------------------------
-# MINECRAFT SERVER SETTINGS (JAVA)
-# -------------------------------------------------------------------------
-Java:
-  # RAM allocation (Memory). 'G' stands for Gigabytes.
-  # Using the same value for Xms and Xmx is recommended for most users.
-  # Xms: Initial memory | Xmx: Maximum memory.
-  Xms: 4G
-  Xmx: 4G
+# ---------------------------------------------------------------------------
+#  AUTO-SHUTDOWN
+# ---------------------------------------------------------------------------
+# When enabled, the tool shuts down automatically after your live stream ends.
+shutdown:
+  enabled: true
+  delay_seconds: 30
 
-  # Default Minecraft server port.
-  Port: 25565
+# ===========================================================================
+#  MINECRAFT SERVER (JAVA)
+# ===========================================================================
+java:
+  # RAM allocation. 'G' = Gigabytes.
+  # Using the same value for xms (initial) and xmx (maximum) is recommended.
+  # Default: 4G — reduce to 2G or 1G if your system has less than 8 GB RAM.
+  # Low RAM may cause lag, slow chunk loading, or server crashes.
+  xms: 4G
+  xmx: 4G
 
-# -------------------------------------------------------------------------
-# REMOTE CONTROL (RCON)
-# -------------------------------------------------------------------------
-RCON:
-  # Enable remote console access.
-  # Disable only if you are sure you do not need it.
-  Enable: true
+  # Minecraft server port (default: 25565)
+  port: 25565
 
-  # Strongly recommended: change this password before using the server publicly.
-  Password: ABC1234
+# ===========================================================================
+#  REMOTE CONSOLE (RCON)
+# ===========================================================================
+# RCON allows the tool to send commands to the Minecraft server.
+# IMPORTANT: Keep this enabled — disabling it breaks most functionality.
+rcon:
+  enabled: true
 
-  # Default RCON port.
-  Port: 25575
+  # CHANGE THIS PASSWORD before using the server publicly.
+  # Anyone with this password can control your Minecraft server.
+  password: ABC1234
 
-# -------------------------------------------------------------------------
-# TIKTOK LIVE INTEGRATION
-# -------------------------------------------------------------------------
-TikTok:
-  # TikTok username to track.
-  User: your_tiktok_username
+  # RCON port (default: 25575)
+  port: 25575
 
-  # Time to wait before reconnecting after a lost connection.
-  ReconnectDelaySeconds: 30
+# ===========================================================================
+#  TIKTOK LIVE
+# ===========================================================================
+tiktok:
+  # Your TikTok username — without the @ symbol.
+  # Example: "TechnikLey"  (not "@TechnikLey")
+  user: your_tiktok_username
 
-# -------------------------------------------------------------------------
-# LIKE GOAL / ENGAGEMENT TRIGGERS
-# -------------------------------------------------------------------------
-Gifts:
-  # Set the autosave interval for the gift_revenue_log.jsonl file in seconds.
-  # This file is used to log estimated revenue from gifts.
+  # Seconds to wait before attempting to reconnect after a connection loss.
+  reconnect_delay_seconds: 30
+
+  # How often (in seconds) the gift revenue log file is saved to disk.
+  # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
-  # Like-based triggers.
-  like_triggers:
-    - id: likes_standard
-      every: 100
-      function: likes
-      payload: Community
-      enable: true
 
-    - id: likes_100k
-      every: 100_000
-      function: like_2
-      payload: Community
-      enable: true
+# ===========================================================================
+#  COMMENT COMMANDS
+# ===========================================================================
+# Let viewers send Minecraft commands by writing comments with a prefix.
+# Example: If prefix is "#" and a viewer writes "#say Hello", the command
+# "say Hello" is sent to your Minecraft server via RCON.
+#
+# !!! SECURITY WARNING !!!
+# This sends RAW commands to your Minecraft server. Anyone with the
+# required role can execute any command.
+# ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
+# or "superfan".
+comment_commands:
+  # Set to true to enable this feature.
+  enabled: false
 
-  # Web server port used for the OBS overlay.
-  LIKE_GOAL_PORT: 9797
+  # The character that must appear at the start of a comment.
+  # "#" works reliably across all environments. Some characters like
+  # "!" may not work in all streaming software.
+  # Example: "#" → a comment "#say Hello" triggers the "say" command.
+  prefix: "#"
 
-  # How random_included and random_exclude work:
-  #
-  #   - If BOTH lists are empty:
-  #       → All triggers are allowed (use with caution).
-  #
-  #   - If ONLY random_exclude is set:
-  #       → All triggers are allowed EXCEPT those in random_exclude.
-  #
-  #   - If ONLY random_included is set:
-  #       → ONLY triggers in random_included are allowed.
-  #
-  #   - If BOTH are set:
-  #       → A trigger must be in random_included AND NOT in random_exclude.
-  #       → random_exclude can override (block) entries from random_included.
+  # Who is allowed to use comment commands.
+  # Available roles: all, moderator, superfan, fanclub
+  # You can list multiple roles (a viewer needs to match only one).
+  allowed_roles:
+    - moderator
+    - superfan
 
-  # random_included:
-  # Only these triggers can be selected by $random.
-  # If empty, all triggers are allowed (see rules above).
+  # --- ALLOW / DENY RULES ---
+  # Only the FIRST WORD of the comment is checked (e.g., "say" from "say Hello").
   #
-  # Examples:
-  #   "gift_1" → allows only "gift_1" to be selected
-  #   ["gift_1", "gift_2"] → allows only these two
-  random_included: []
+  # mode:
+  #   "deny-all"  — Only commands in the list are allowed
+  #   "allow-all" — All commands are allowed EXCEPT those in the list
+  #
+  # Example:
+  #   deny-all  + [say, give]  → only "say" and "give" work
+  #   allow-all + [op, stop]   → everything works except "op" and "stop"
+  #   deny-all  + []           → nothing works
+  mode: deny-all
+  commands:
+    - say
+    - give
 
-  # random_exclude:
-  # These triggers will NEVER be selected by $random.
-  #
-  # Note:
-  #   Triggers that contain "$random" are automatically excluded
-  #   to prevent recursion.
-  #
-  # Examples:
-  #   "likes" → will never be selected
-  #   ["likes", "follow"] → both are always excluded
-  random_exclude:
+# ===========================================================================
+#  RANDOM TRIGGER FILTER ($random)
+# ===========================================================================
+# Controls which triggers can be selected by the $random action
+# in data/actions.mca.
+#
+# mode:
+#   "deny-all"  — Only triggers in the list are eligible
+#   "allow-all" — All triggers are eligible EXCEPT those in the list
+#
+# NOTE: Triggers that contain "$random" are automatically excluded
+# to prevent infinite recursion.
+random_triggers:
+  mode: deny-all
+  triggers:
     - likes
     - like_2
     - follow
     - join
     - comment
 
-# -------------------------------------------------------------------------
-# COMMENT COMMANDS
-# -------------------------------------------------------------------------
-# Allows viewers to send real Minecraft commands by writing a comment
-# that starts with a specific prefix character.
-# Example: If prefix is "#" and a viewer writes "#say Hello", the command
-# "say Hello" will be sent directly to the Minecraft server via RCON.
-#
-# !!! WARNING !!!
-# This feature sends raw commands to your Minecraft server.
-# Anyone with the required role can execute ANY command unless you
-# restrict them with a Whitelist or Blacklist.
-# It is STRONGLY recommended to use a Whitelist when AllowedRoles
-# includes "all", "fanclub", or "superfan".
-CommentCommands:
-  # Enable or disable this feature.
-  Enable: false
-
-  # The character that must appear at the start of a comment to be recognized as a command.
-  # Most characters can be used as a prefix,
-  # but some (like !) may not work reliably in all environments.
-  # The # prefix is fully supported and has been tested to work without problems.
-  # Example: Prefix: "#"  →  #say Hello
-  # will trigger the command.
-  Prefix: "#"
-
-  # Who is allowed to use comment commands.
-  # Available roles: all, moderator, superfan, fanclub
-  # Use "all" to allow every viewer.
-  # You can combine multiple roles, e.g. moderator + superfan.
-  AllowedRoles:
-    - moderator
-    - superfan
-
-  # How Whitelist and Blacklist interact:
-  #
-  #   Whitelist empty, Blacklist empty:
-  #     ALL commands are allowed. Use with caution!
-  #
-  #   Whitelist empty, Blacklist filled:
-  #     All commands are allowed EXCEPT those in the Blacklist.
-  #     Example: Blacklist has "op" → "op Notch" is blocked, everything else works.
-  #
-  #   Whitelist filled, Blacklist empty:
-  #     ONLY commands in the Whitelist are allowed, everything else is blocked.
-  #     Example: Whitelist has "say" → only "say ..." works.
-  #
-  #   Both filled:
-  #     A command must be in the Whitelist AND NOT in the Blacklist to pass.
-  #     The Blacklist can be used to block specific entries from the Whitelist.
-
-  # Whitelist: Only commands starting with these base words are allowed.
-  # If the list is empty, all commands are allowed (see above).
-  # Only the first word of the comment is checked.
-  # Example: "say" allows "say Hello", "say Test", etc.
-  # Example: "give" allows "give @a diamond 1", "give @p sword 1", etc.
-  Whitelist:
-    - say
-    - give
-
-  # Blacklist: Commands starting with these base words are always blocked.
-  # Only the first word of the comment is checked.
-  # Example: "op" blocks "op", "op Notch", etc.
-  Blacklist:
-    - op
-    - deop
-    - stop
-    - ban
-    - kick
-    - whitelist
-
-# -------------------------------------------------------------------------
-# SYSTEM & CONSOLE CONTROL
-# -------------------------------------------------------------------------
-# Changing these settings can affect startup behavior and process visibility.
-Console:
-  # Controls which windows are shown during startup:
-  #
-  # Level 0: Off
-  #   Hides everything, including GUI windows.
-  #
-  # Level 1: Silent
-  #   Hides console windows, but keeps GUI features active.
-  #
-  # Level 2: Standard
-  #   Shows only the main applications.
-  #
-  # Level 3: Advanced
-  #   Also shows background services.
-  #
-  # Level 4: Debug
-  #   Shows all enabled processes.
-  #
-  # Level 5: Override
-  #   Shows every process, even if enable is false.
-  #   Intended for debugging only.
+# ===========================================================================
+#  CONSOLE VISIBILITY
+# ===========================================================================
+# Controls which windows / processes are shown on screen.
+# Changing these affects what you see when the tool starts.
+console:
+  # Visibility level:
+  #   0 — Off:       Hides everything
+  #   1 — Silent:    Hides console, keeps GUI and overlays
+  #   2 — Standard:  Shows main windows (recommended)
+  #   3 — Advanced:  Also shows background services
+  #   4 — Debug:     Shows all enabled processes
+  #   5 — Override:  Shows every process (even disabled ones, debugging only)
   log_level: 2
 
-  # Main console window visibility.
+  # Show the main console window.
   visible: true
 
-  # Process handling:
-  # true  = keep the script running so typing 'exit' closes everything cleanly
-  # false = start programs and exit immediately
+  # If true, the script stays open and typing 'exit' shuts down cleanly.
+  # If false, programs start and the launcher exits immediately.
   allow_close: true
 
-# -------------------------------------------------------------------------
-# MODULES
-# -------------------------------------------------------------------------
+# ===========================================================================
+#  MODULES — ENABLE / DISABLE INDIVIDUAL FEATURES
+# ===========================================================================
 
-# WEB INTERFACE
-GUI:
-  # Enable the web-based dashboard for server management.
-  Enable: false
-  Port: 5000
+# --- MINECRAFT SERVER API ---
+# Handles communication between the bridge and the Minecraft server.
+# Required for player death/respawn detection, datapack loading, etc.
+minecraft_server_api:
+  enabled: true
+  api_port: 29187
+  web_server_port: 29188
 
-# UPDATER
-Update:
-  # Automatically check for and install tool updates.
-  Enable: true
+# --- OVERLAY TEXT ---
+# Displays text notifications on stream (triggered via >> in actions.mca).
+# Works as an OBS Browser Source with transparent background.
+overlay_text:
+  enabled: true
+  port: 29186
 
-# MINECRAFT SERVER API
-MinecraftServerAPI:
-  Enable: true
+  # Display mode when a new message arrives while one is still shown:
+  #   "overwrite" — New message replaces current one (recommended)
+  #   "queue"     — Messages queue up and show one after another
+  #   WARNING: Queue mode can pile up on busy streams.
+  display_mode: overwrite
 
-  # API and web server ports.
-  APIPort: 7000
-  WebServerPort: 7777
-  WebServerPortTimer: 7878
-  DEATHCOUNTER_PORT: 7979
+  # Fade-in and fade-out duration in milliseconds.
+  # These are NOT included in the Duration from >>commands.
+  # Example: fade_in=500, fade_out=500, Duration=3 → total visible = 4s
+  # Set to 0 for instant appear/disappear.
+  fade_in: 500
+  fade_out: 500
 
-# OVERLAY TOOLS
-WinCounter:
-  Enable: true
-  WebServerPort: 8080
+  # Circuit breaker: after max_fails consecutive failures, stop trying
+  # for cooldown seconds before retrying.
+  max_fails: 3
+  cooldown: 10
 
-Overlaytxt:
-  Enable: true
-  Port: 5005
-
-  # Controls how new overlay messages are handled when a previous
-  # message is still on screen.
-  #
-  # overwrite:
-  #   The new message immediately replaces the current one.
-  #   Use this if you only care about the latest event.
-  #
-  # queue:
-  #   Messages are queued and shown one after another.
-  #   Each message stays for its full duration before the next one appears.
-  #   Use this if every notification matters (e.g. follower names).
-  #
-  #   WARNING: In queue mode, messages can pile up during busy streams.
-  #   If many events fire at once, the queue may take a long time to clear
-  #   and viewers will see outdated notifications.
-  DisplayMode: overwrite
-
-  # Fade-in and fade-out animation duration in milliseconds.
-  # These are NOT included in the Duration value from >>commands.
-  # Example: with FadeIn: 500, FadeOut: 500 and a Duration of 3,
-  # the total visible time is 0.5s + 3s + 0.5s = 4s.
-  # Set to 0 for instant appear/disappear (no animation).
-  FadeIn: 500
-  FadeOut: 500
-
-  # The number of consecutive connection failures allowed before
-  # the circuit breaker triggers and temporarily blocks requests.
-  MaxFails: 3
-
-  # The duration in seconds to wait before attempting to 
-  # send messages again after the MaxFails limit is reached.
-  Cooldown: 10
-
-  # A list of available overlay instances. 
-  # Each 'name' creates a unique endpoint and can be opened 
-  # as a separate window or OBS source.
-  # URL format: http://127.0.0.1:PORT/?overlay=NAME
-  # Replace PORT with the configured port number and NAME with the overlay name.
-  Overlays:
+  # Named overlay instances. Each name creates a separate URL:
+  #   http://127.0.0.1:PORT/?overlay=NAME
+  # You can send text to a specific overlay from actions.mca using
+  # @NAME>> syntax (e.g., @alerts>>Title|Subtitle|3).
+  # If you use >> without a name, the "default" overlay is used.
+  overlays:
     - name: "default"
 
-# STREAM TIMER
-Timer:
-  Enable: true
+# --- LIKE GOAL ---
+# A progress bar tracking likes toward a goal.
+like_goal:
+  enabled: true
 
-  # Initial timer value in minutes.
-  StartTime: 10
+  # Port for the Like Goal OBS overlay.
+  port: 29193
 
-# DEATH COUNTER
-DeathCounter:
-  Enable: true
+  # -----------------------------------------------------------------------
+  #  LIKE TRIGGERS
+  # -----------------------------------------------------------------------
+  # Like triggers fire when the total stream likes reach a threshold.
+  # You can define multiple triggers with different intervals.
+  #
+  # Each entry requires:
+  #   id       — A unique name for this trigger (used in logs)
+  #   every    — Like interval between activations (e.g., 100 = every 100 likes)
+  #   function — The trigger name used in data/actions.mca (connects config to command)
+  #   payload  — (optional) A label passed with the trigger (default: "Community")
+  #   enabled  — (optional) Set to false to disable without deleting (default: true)
+  #
+  # Example: With "every: 100" and function "likes", the trigger fires every
+  # 100 likes and executes whatever command you wrote for "likes" in actions.mca.
+  triggers:
+    - id: likes_standard
+      every: 100
+      function: likes
+      payload: Community
+      enabled: true
 
-LikeGoal:
-  Enable: true
-  # Text shown above the like goal progress bar.
-  DisplayText: Like Goal
+    - id: likes_100k
+      every: 100_000
+      function: like_2
+      payload: Community
+      enabled: true
+
+  # Text displayed above the progress bar.
+  display_text: "Like Goal"
+
   # Number of likes needed to reach the first goal.
-  # You can use underscores for readability (e.g., 100_000 instead of 100000).
-  # Do not use dots or commas (100.000 and 100,000 will not work).
-  InitialGoal: 100_000
-  # Controls what happens after a goal is reached.
-  #
-  # GoalMultiplier: 0
-  #   Reset mode. Likes reset to 0 and the goal starts over.
-  #   Example with InitialGoal 100_000:
-  #   100_000 reached → reset to 0 → 100_000 reached → reset to 0 → ...
-  #
-  # GoalMultiplier: 1
-  #   Step mode. The goal increases by InitialGoal each time.
-  #   Example with InitialGoal 100_000:
-  #   100_000 → 200_000 → 300_000 → 400_000 → ...
-  #
-  # GoalMultiplier: 2 (or higher)
-  #   Multiply mode. The goal is multiplied by this value each time.
-  #   Example with InitialGoal 100_000 and GoalMultiplier 2:
-  #   100_000 → 200_000 → 400_000 → 800_000 → ...
-  GoalMultiplier: 1
+  # Use underscores for readability (100_000 = 100000).
+  # Do NOT use dots or commas (100.000 and 100,000 will not work).
+  initial_goal: 100_000
+
+  # What happens after a goal is reached:
+  #   0  — Reset mode:     Likes reset to 0, goal starts over
+  #   1  — Step mode:      Goal increases by initial_goal each time
+  #                         (100k → 200k → 300k → ...)
+  #   2+ — Multiply mode:  Goal is multiplied by this value each time
+  #                         (100k → 200k → 400k → 800k → ...)
+  goal_multiplier: 1
+
+# --- STREAM TIMER ---
+# A countdown timer for your stream. Pauses on player death, resumes on
+# respawn. When it reaches zero, a win is counted.
+timer:
+  enabled: true
+  port: 29189
+  start_time: 10   # Minutes
+
+# --- DEATH COUNTER ---
+# Displays the number of player deaths on stream.
+death_counter:
+  enabled: true
+  port: 29190
+
+# --- WIN COUNTER OVERLAY ---
+# Tracks wins and losses. Decrements on death, increments on timer expiry.
+win_counter:
+  enabled: true
+  port: 29191
+
+# --- WEB DASHBOARD (GUI) ---
+# A web-based gift browser and server dashboard.
+# Enable this to search gift IDs visually in a browser window.
+gui:
+  enabled: false
+  port: 29185
+
+# --- AUTO-UPDATER ---
+# Checks for new versions on startup and installs them automatically.
+# It is strongly recommended to keep this enabled.
+update:
+  enabled: true
+
+  # Maximum number of update log files to keep in logs/update_logs/.
+  #  0  = delete all logs after each update
+  #  -1 = never delete logs
+  max_update_logs: 20

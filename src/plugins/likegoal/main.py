@@ -19,7 +19,8 @@ from queue import Queue
 from flask import Flask, Response, request, jsonify
 import sys
 import yaml
-from core import parse_args, register_plugin, AppConfig, get_base_dir, get_base_file, get_root_dir
+from core import parse_args, AppConfig, get_base_dir, get_base_file, get_root_dir
+from python.registry import register_plugin
 
 # =========================
 # Paths & configuration
@@ -40,15 +41,15 @@ try:
     else:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-        LIKE_GOAL_PORT = cfg.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
-        CUSTOM_TEXT = cfg.get("LikeGoal", {}).get("DisplayText", "Like Goal")
-        INITIAL_GOAL = cfg.get("LikeGoal", {}).get("InitialGoal", 100_000)
-        GOAL_MULTIPLIER = cfg.get("LikeGoal", {}).get("GoalMultiplier", 2)
+        LIKE_GOAL_PORT = cfg.get("like_goal", {}).get("port", 29193)
+        CUSTOM_TEXT = cfg.get("like_goal", {}).get("display_text", "Like Goal")
+        INITIAL_GOAL = cfg.get("like_goal", {}).get("initial_goal", 100_000)
+        GOAL_MULTIPLIER = cfg.get("like_goal", {}).get("goal_multiplier", 2)
         # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
     print(f"Config error: {e}")
-    LIKE_GOAL_PORT = 9797
+    LIKE_GOAL_PORT = 29193
     CUSTOM_TEXT = "Like Goal"
     INITIAL_GOAL = 100_000
     GOAL_MULTIPLIER = 2
@@ -63,7 +64,7 @@ if register_only:
     register_plugin(AppConfig(
         name="Like Goal",
         path=LIKEGOAL_EXE_PATH,
-        enable=cfg.get("LikeGoal", {}).get("Enable", True),
+        enable=cfg.get("like_goal", {}).get("enabled", True),
         level=4,
         ics=True
     ))

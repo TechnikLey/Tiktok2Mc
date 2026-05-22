@@ -46,7 +46,7 @@ except Exception as e:
 
 try:
     # Flask starten
-    threading.Thread(target=lambda: app.run(port=cfg.get("port", 8001)), 
+    threading.Thread(target=lambda: app.run(port=cfg.get("port", 29196)), 
                      daemon=True).start()
 except Exception as e:
     logging.critical(f"Flask-Fehler: {e}")
@@ -127,7 +127,7 @@ logger.critical("Plugin cannot recover from this error!")
 
 | Fehler | Ursache | Fix |
 |--------|--------|-----|
-| **Port already in use** | Port 8001 belegt | Alternative Port in config.yaml |
+| **Port already in use** | Port 29196 belegt | Alternative Port in config.yaml |
 | **Connection refused** | Anderes Plugin offline | try-except + Fallback |
 | **Timeout** | Request zu langsam | `timeout=5` erhöhen |
 | **JSON decode error** | Malformed response | `json.JSONDecodeError` fangen |
@@ -178,7 +178,7 @@ try:
     flask_thread = threading.Thread(target=start_flask)
     flask_thread.start()
     
-    webview.create_window('Plugin', 'http://127.0.0.1:7777')
+    webview.create_window('Plugin', 'http://127.0.0.1:29188')
     webview.start()
 
 except Exception as e:
@@ -292,7 +292,7 @@ app.run()  # Flask läuft parallel
 port = cfg["MyPlugin"]["port"]  # KeyError wenn nicht vorhanden!
 
 # RICHTIG:
-port = cfg.get("MyPlugin", {}).get("port", 8000)  # Mit Default
+port = cfg.get("MyPlugin", {}).get("port", 29195)  # Mit Default
 ```
 
 ### 5. Race Conditions bei Datei-Zugriff
@@ -357,7 +357,7 @@ Andere Plugins können checken, ob du noch läufst:
 
 ```python
 try:
-    r = requests.get("http://localhost:7878/health", timeout=1)
+    r = requests.get("http://localhost:29189/health", timeout=1)
     if r.status_code == 200:
         print("Plugin läuft")
 except:
@@ -409,12 +409,12 @@ import requests
 import time
 
 def test_basic():
-    # Plugin sollte auf Port 7878 laufen
-    r = requests.get("http://localhost:7878/health")
+    # Plugin sollte auf Port 29189 laufen
+    r = requests.get("http://localhost:29189/health")
     assert r.status_code == 200
 
 def test_webhook():
-    r = requests.post("http://localhost:7878/webhook", json={
+    r = requests.post("http://localhost:29189/webhook", json={
         "event": "player_death",
         "message": "Test"
     })

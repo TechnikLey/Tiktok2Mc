@@ -271,7 +271,7 @@ An independent program that integrates into the Streaming Tool.
 ### Port
 A virtual "port" through which a server accepts connections.
 
-**Example:** `http://localhost:8080` – the port is `8080`.
+**Example:** `http://localhost:29191` – the port is `29191`.
 
 **Config:** All ports are configurable in `config.yaml`.
 
