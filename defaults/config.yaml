@@ -151,29 +151,21 @@ Gifts:
   # Port for the Like Goal OBS overlay.
   LIKE_GOAL_PORT: 29193
 
-  # -----------------------------------------------------------------------
-  #  $random — INCLUDE / EXCLUDE FILTERS
-  # -----------------------------------------------------------------------
-  # These two lists control which triggers can be selected by the $random
-  # action in data/actions.mca.
-  #
-  # RULES:
-  #   Both empty           → All triggers are eligible
-  #   Only exclude set     → All triggers EXCEPT those listed
-  #   Only include set     → ONLY triggers in this list
-  #   Both set             → Must be in include AND NOT in exclude
-  #
-  # NOTE: Triggers that contain "$random" are automatically excluded
-  # to prevent infinite recursion.
-  #
-  # TIP: By default, likes, follow, join, and comment are excluded from
-  # random because they fire very frequently. You can remove them if desired.
-
-  # Whitelist — only these triggers can be picked (empty = all allowed)
-  random_included: []
-
-  # Blacklist — these triggers will never be picked
-  random_exclude:
+# ===========================================================================
+#  RANDOM TRIGGER FILTER ($random)
+# ===========================================================================
+# Controls which triggers can be selected by the $random action
+# in data/actions.mca.
+#
+# Mode:
+#   "deny-all"  — Only triggers in the list below are allowed
+#   "allow-all" — All triggers are allowed EXCEPT those in the list
+#
+# NOTE: Triggers that contain "$random" are automatically excluded
+# to prevent infinite recursion.
+RandomTriggers:
+  Mode: deny-all
+  Triggers:
     - likes
     - like_2
     - follow
@@ -189,9 +181,8 @@ Gifts:
 #
 # !!! SECURITY WARNING !!!
 # This sends RAW commands to your Minecraft server. Anyone with the
-# required role can execute any command unless you restrict them with
-# a Whitelist or Blacklist.
-# ALWAYS use a Whitelist when AllowedRoles includes "all", "fanclub",
+# required role can execute any command.
+# ALWAYS use deny-all mode when AllowedRoles includes "all", "fanclub",
 # or "superfan".
 CommentCommands:
   # Set to true to enable this feature.
@@ -210,28 +201,21 @@ CommentCommands:
     - moderator
     - superfan
 
-  # --- WHITELIST / BLACKLIST RULES ---
+  # --- ALLOW / DENY RULES ---
   # Only the FIRST WORD of the comment is checked (e.g., "say" from "say Hello").
   #
-  #   Both empty   → ALL commands allowed (dangerous!)
-  #   Only blacklist → All commands EXCEPT blacklisted ones
-  #   Only whitelist → ONLY whitelisted commands
-  #   Both set     → Must be in whitelist AND NOT in blacklist
-
-  # Commands whose base word is in this list are ALLOWED.
-  # Empty = allow everything.
-  Whitelist:
+  # Mode:
+  #   "deny-all"  — Only commands in the list below are allowed
+  #   "allow-all" — All commands are allowed EXCEPT those in the list
+  #
+  # Example:
+  #   deny-all  + [say, give]  → only "say" and "give" work
+  #   allow-all + [op, stop]   → everything works except "op" and "stop"
+  #   deny-all  + []           → nothing works (safe default)
+  Mode: deny-all
+  Commands:
     - say
     - give
-
-  # Commands whose base word is in this list are BLOCKED.
-  Blacklist:
-    - op
-    - deop
-    - stop
-    - ban
-    - kick
-    - whitelist
 
 # ===========================================================================
 #  CONSOLE VISIBILITY

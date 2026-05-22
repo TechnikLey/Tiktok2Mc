@@ -371,7 +371,7 @@ The `$random` command picks a random eligible trigger from your defined actions 
 
 When gift ID 16071 is received, the tool selects one random trigger from the pool and runs its command.
 
-You can control which triggers are eligible using the `random_included` and `random_exclude` settings in `config/config.yaml`. The file contains inline comments explaining how these lists work.
+You can control which triggers are eligible using the `RandomTriggers` section in `config/config.yaml`. Use `Mode: deny-all` to allow only the listed triggers, or `Mode: allow-all` to allow all triggers except those listed.
 
 ---
 
@@ -394,13 +394,13 @@ For example, if the prefix is `#` and a moderator writes `#say Hello`, the comma
 
 The feature supports:
 - **Role-based access control** — restrict to moderators, superfans, fanclub members, or everyone
-- **Whitelist** — only allow specific base commands
-- **Blacklist** — always block dangerous commands
+- **deny-all mode** — only specific base commands are allowed
+- **allow-all mode** — all commands are allowed except those blocked
 
-All settings, including the prefix character, allowed roles, whitelist, and blacklist, are configured in `config/config.yaml` under `CommentCommands`. The file contains detailed inline comments explaining every option.
+All settings, including the prefix character, allowed roles, mode, and command list, are configured in `config/config.yaml` under `CommentCommands`. The file contains detailed inline comments explaining every option.
 
 > [!WARNING]
-> This sends raw commands to your Minecraft server via RCON. Always use a Whitelist when allowing access to `all`, `fanclub`, or `superfan`.
+> This sends raw commands to your Minecraft server via RCON. Always use `deny-all` mode when allowing access to `all`, `fanclub`, or `superfan`.
 
 > [!NOTE]
 > Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.

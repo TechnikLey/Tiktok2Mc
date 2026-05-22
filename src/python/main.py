@@ -69,12 +69,12 @@ class BotContext:
         self.comment_cmd_enable = False
         self.comment_cmd_prefix = "!"
         self.comment_cmd_roles = ["moderator"]
-        self.comment_cmd_whitelist = []
-        self.comment_cmd_blacklist = []
+        self.comment_cmd_mode = "deny-all"
+        self.comment_cmd_list = []
 
         # Random triggers
-        self.random_trigger_whitelist = []
-        self.random_trigger_blacklist = []
+        self.random_trigger_mode = "deny-all"
+        self.random_trigger_list = []
 
         # Queues
         self.trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -158,10 +158,10 @@ def load_config():
         ctx.like_goal_port = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 29193)
         ctx.autosave_interval_seconds = config.get("Gifts", {}).get("autosave_interval_seconds", 60)
 
-        raw_included = config.get("Gifts", {}).get("random_included", [])
-        ctx.random_trigger_whitelist = [str(c).strip() for c in raw_included if str(c).strip()] if isinstance(raw_included, list) else []
-        raw_exclude = config.get("Gifts", {}).get("random_exclude", [])
-        ctx.random_trigger_blacklist = [str(c).strip() for c in raw_exclude if str(c).strip()] if isinstance(raw_exclude, list) else []
+        random_cfg = config.get("RandomTriggers", {})
+        ctx.random_trigger_mode = str(random_cfg.get("Mode", "deny-all")).lower()
+        raw_list = random_cfg.get("Triggers", [])
+        ctx.random_trigger_list = [str(t).strip() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []
 
         ctx.like_triggers = validate_like_triggers(config.get("Gifts", {}).get("like_triggers", []))
 
@@ -173,12 +173,11 @@ def load_config():
             ctx.comment_cmd_roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
         else:
             ctx.comment_cmd_roles = ["moderator"]
-        raw_whitelist = comment_cmd_cfg.get("Whitelist", [])
-        ctx.comment_cmd_whitelist = [str(c).strip() for c in raw_whitelist if str(c).strip()] if isinstance(raw_whitelist, list) else []
-        raw_blacklist = comment_cmd_cfg.get("Blacklist", [])
-        ctx.comment_cmd_blacklist = [str(c).strip() for c in raw_blacklist if str(c).strip()] if isinstance(raw_blacklist, list) else []
-        if ctx.comment_cmd_enable and not ctx.comment_cmd_whitelist and not ctx.comment_cmd_blacklist:
-            print("[WARN] CommentCommands: Whitelist and Blacklist are both empty — ALL Minecraft commands are allowed!")
+        ctx.comment_cmd_mode = str(comment_cmd_cfg.get("Mode", "deny-all")).lower()
+        raw_commands = comment_cmd_cfg.get("Commands", [])
+        ctx.comment_cmd_list = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
+        if ctx.comment_cmd_enable and ctx.comment_cmd_mode == "allow-all" and not ctx.comment_cmd_list:
+            print("[WARN] CommentCommands: Mode is 'allow-all' with an empty list — ALL Minecraft commands are allowed!")
 
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
         return ctx.datapack_root.exists() and ctx.datapack_root.is_dir()
@@ -311,20 +310,20 @@ def generate_datapack():
         # =============================================================
         # === Build possible_random_actions (safe pool for $random) ===
         # =============================================================
-        exclude = set(ctx.random_trigger_blacklist)
         random_sources = {n for n, acts in ctx.script_actions.items() if "random" in acts}
-        exclude |= random_sources
-        # Base pool
+        exclude = set(random_sources)
         base_random_actions = [cmd for cmd in sorted(ctx.valid_functions) if cmd not in exclude]
-        # === Apply whitelist / blacklist logic ===
-        # === Apply whitelist / blacklist logic with debug ===
         for cmd in base_random_actions:
-            if ctx.random_trigger_whitelist and cmd not in ctx.random_trigger_whitelist:
-                print(f"[RANDOM] {cmd} is not in the whitelist, excluding from $random pool.")
-            elif ctx.random_trigger_blacklist and cmd in ctx.random_trigger_blacklist:
-                print(f"[RANDOM] {cmd} is in the blacklist, excluding from $random pool.")
-            else:
-                ctx.possible_random_actions.append(cmd)
+            if ctx.random_trigger_mode == "deny-all":
+                if cmd in ctx.random_trigger_list:
+                    ctx.possible_random_actions.append(cmd)
+                else:
+                    print(f"[RANDOM] {cmd} is not in the list, excluding from $random pool (deny-all).")
+            else:  # allow-all
+                if cmd in ctx.random_trigger_list:
+                    print(f"[RANDOM] {cmd} is in the list, excluding from $random pool (allow-all).")
+                else:
+                    ctx.possible_random_actions.append(cmd)
 
         # Create ZIP archive
         zip_path = Path(ctx.datapack_root) / ctx.datapack_name
@@ -957,13 +956,18 @@ def create_client(user):
 
                 if allowed:
                     base_cmd = cmd_text.split()[0].lower()
-                    if ctx.comment_cmd_whitelist and base_cmd not in ctx.comment_cmd_whitelist:
-                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not in whitelist")
-                    elif ctx.comment_cmd_blacklist and base_cmd in ctx.comment_cmd_blacklist:
-                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked by blacklist")
-                    else:
-                        print(f"[COMMENT CMD] {username} -> {cmd_text}")
-                        ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                    if ctx.comment_cmd_mode == "deny-all":
+                        if base_cmd in ctx.comment_cmd_list:
+                            print(f"[COMMENT CMD] {username} -> {cmd_text}")
+                            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                        else:
+                            print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not allowed (deny-all)")
+                    else:  # allow-all
+                        if base_cmd in ctx.comment_cmd_list:
+                            print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked (allow-all)")
+                        else:
+                            print(f"[COMMENT CMD] {username} -> {cmd_text}")
+                            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
                 else:
                     print(f"[COMMENT CMD] {username} has no permission (roles: {ctx.comment_cmd_roles})")
 
