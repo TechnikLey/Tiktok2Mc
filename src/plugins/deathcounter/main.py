@@ -50,8 +50,8 @@ else:
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 
-MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
-SERVERAPI_EXE_PATH = get_base_file()
+DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", True)
+DEATH_COUNTER_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
 register_only = args.register_only
@@ -59,8 +59,8 @@ register_only = args.register_only
 if register_only:
     register_plugin(AppConfig(
         name="Death Counter",
-        path=SERVERAPI_EXE_PATH,
-        enable=MINECRAFTSERVERAPI_ENABLED,
+        path=DEATH_COUNTER_EXE_PATH,
+        enable=DEATH_COUNTER_ENABLED,
         level=4,
         ics=True
     ))

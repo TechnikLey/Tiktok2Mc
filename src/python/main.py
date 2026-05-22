@@ -817,11 +817,8 @@ def create_client(user):
     def on_gift(event: GiftEvent):
         try:
             if event.gift.combo:
-                if getattr(event, 'streaking', False) == True:
-                    try:
-                        if event.streaking: return
-                    except AttributeError:
-                        pass    
+                if getattr(event, 'streaking', False):
+                    return
 
                 count = event.repeat_count
             else:

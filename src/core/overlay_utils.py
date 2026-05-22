@@ -99,7 +99,7 @@ class OverlayManager:
                 client.mark_success()
                 return True
             client.mark_failure()
-        except:
+        except Exception:
             client.mark_failure()
         return False
 

@@ -3,3 +3,5 @@ tools/Java/
 tools/server.jar
 dist/*
 upload.py
+__pycache__/
+*.pyc

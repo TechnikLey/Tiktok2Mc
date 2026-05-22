@@ -23,7 +23,7 @@ ROOT_DIR = get_root_dir()
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 
 args = parse_args()
-config = {}
+full_config = {}
 
 # Standardwerte
 APP_PORT = 29186 
@@ -64,7 +64,7 @@ if register_only:
     register_plugin(AppConfig(
         name="Overlaytxt",
         path=OVERLAYTXT_EXE_PATH,
-        enable=config.get("overlay_text", {}).get("enabled", True),
+        enable=full_config.get("overlay_text", {}).get("enabled", True),
         level=4,
         ics=True
     ))

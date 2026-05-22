@@ -128,8 +128,7 @@ with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
     cfg_api = yaml.safe_load(f)
 
     webhook = cfg_api.setdefault("webhooks", {})
-    urls = webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
-    URL = urls[0]
+    webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
 
     if APIPORT != cfg_api.get("port", 29187):
         cfg_api["port"] = int(APIPORT)

@@ -42,7 +42,6 @@ APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
 REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
 PLUGIN_UPDATER_EXE_PATH = (BASE_DIR / "plugins" / f"plugin_updater{SUFFIX}").resolve()
 PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
-update_exe = (BASE_DIR / f"update{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------
@@ -309,13 +308,13 @@ def replace_updater_if_exists():
     if update_new.exists():
         print("[..] New updater found. Installing...")
         try:
-            update_new.replace(update_exe)
+            update_new.replace(UPDATE_EXE_PATH)
             print("[OK] Updater successfully updated.")
             time.sleep(0.5)
         except PermissionError:
-            print(f"[FAIL] Error: {update_exe.name} is still locked.")
+            print(f"[FAIL] Error: {UPDATE_EXE_PATH.name} is still locked.")
 
-def start_update_exe():
+def start_UPDATE_EXE_PATH():
     """Run updater synchronously — must wait for exit code, so no tmux/screen here."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
     log_dir = BASE_DIR / "logs" / "update_logs"
@@ -340,16 +339,18 @@ def start_update_exe():
     except Exception as e:
         print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
         max_logs = 20
-    if max_logs == 0:
+    if max_logs < 0:
+        pass
+    elif max_logs == 0:
         logs = list(log_dir.glob("updater_*.log"))
         for old_log in logs:
             try:
                 old_log.unlink()
             except Exception as e:
                 print(f"[WARN] Failed to delete old log {old_log}: {e}")
-    elif max_logs > 0:
+    else:
         logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
-        for old_log in logs[max_logs - 1:]:
+        for old_log in logs[max_logs:]:
             try:
                 old_log.unlink()
             except Exception as e:
@@ -373,7 +374,7 @@ if UPDATE_ENABLED:
     print("Automatic updates are enabled.")
 
     while True:
-        result = start_update_exe()
+        result = start_UPDATE_EXE_PATH()
 
         if result is None:
             break
