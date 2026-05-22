@@ -44,7 +44,6 @@ Each version is split into two sections:
 * **Ports moved to own modules** – `deathcounter_port` moved from `minecraft_server_api` to `death_counter.port`; `web_server_port_timer` moved to `timer.port`. Each module now owns its own port.
 * **`version.txt` format** – The file now uses a key:value format (`version: v1.0.0`, `update_url: ...`) instead of a single version number. This allows the updater to know where to check for new versions.
 * **Documentation overhaul** – Both the German and the English developer documentation have been extensively revised and adapted to the new plugin system. All chapters now reflect the current structure.
-* **`__pycache__` cleanup** – The build script now recursively removes all `__pycache__` directories instead of only the hardcoded `src/core/` and `src/python/` paths, preventing stale bytecode from interfering with PyInstaller.
 
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
@@ -68,10 +67,7 @@ Each version is split into two sections:
 * **Death counter read wrong config key** — The death counter plugin read `minecraft_server_api.enabled` instead of `death_counter.enabled` to determine whether it should be active.
 * **Update log retention off-by-one** — When `max_update_logs` was set, the updater kept one fewer log than configured (e.g., 19 instead of 20).
 * **Like trigger rule `enable` key name mismatch** — The internal rule parser read `enable` (without *d*) while config.yaml uses `enabled`. Triggers with `enabled: false` were always treated as enabled.
-* **Win counter record only tracked lowest** — The `record` field was only updated when removing wins, never when adding them. It now also updates when a new high score is reached.
 * **Bare `except:` caught system interrupts** — A bare `except:` in overlay utilities could catch `KeyboardInterrupt` and `SystemExit`, making the tool harder to stop.
-* **Dead code removed** — Removed a redundant `try/except` in the gift event handler that could never fire, and an unused `URL` variable in `server.py`.
-* **Duplicate variable** — Removed a duplicate `update_exe` variable that was identical to the already-existing `UPDATE_EXE_PATH`.
 
 ---
 
