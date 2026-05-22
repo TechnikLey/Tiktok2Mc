@@ -36,18 +36,19 @@ auto_update_config: true
 # ---------------------------------------------------------------------------
 #  AUTO-SHUTDOWN
 # ---------------------------------------------------------------------------
-# When true, the tool shuts down automatically after your live stream ends.
-# shutdown_delay_seconds controls the wait time before shutdown.
-auto_shutdown_on_live_end: true
-shutdown_delay_seconds: 30
+# When enabled, the tool shuts down automatically after your live stream ends.
+# DelaySeconds controls the wait time before shutdown.
+Shutdown:
+  Enabled: true
+  DelaySeconds: 30
 
 # ---------------------------------------------------------------------------
 #  SUDO WARNING (Linux only — has no effect on Windows)
 # ---------------------------------------------------------------------------
 # On Linux, running without sudo can cause update and permission issues.
-# Set to true to hide this warning if you have configured your system
+# Set to false to hide this warning if you have configured your system
 # to handle permissions properly without sudo.
-no_sudo_warning: false
+show_sudo_warning: true
 
 # ---------------------------------------------------------------------------
 #  SERVER BIND ADDRESS
@@ -211,7 +212,7 @@ CommentCommands:
   # Example:
   #   deny-all  + [say, give]  → only "say" and "give" work
   #   allow-all + [op, stop]   → everything works except "op" and "stop"
-  #   deny-all  + []           → nothing works (safe default)
+  #   deny-all  + []           → nothing works
   Mode: deny-all
   Commands:
     - say

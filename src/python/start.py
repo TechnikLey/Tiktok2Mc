@@ -50,7 +50,7 @@ update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 # -----------------------------
 cfg = load_config(CONFIG_FILE)
 
-if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
+if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to start the tool.")
         input("Press Enter to exit...")
@@ -154,8 +154,8 @@ LOG_LEVEL = console_cfg.get("log_level", 1)
 CONTROL_METHOD = cfg.get("control_method", "DCS")
 MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
 
-AUTO_SHUTDOWN_ENABLED = cfg.get("auto_shutdown_on_live_end", True)
-SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown_delay_seconds", 30)
+AUTO_SHUTDOWN_ENABLED = cfg.get("Shutdown", {}).get("Enabled", True)
+SHUTDOWN_DELAY_SECONDS = cfg.get("Shutdown", {}).get("DelaySeconds", 30)
 
 # -----------------------------
 # Process dictionary

@@ -44,7 +44,7 @@ START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
 
 cfg = load_config(CONFIG_FILE)
 
-if sys.platform != "win32" and not cfg.get("no_sudo_warning", False):
+if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to perform updates.")
         wait_for_key()

@@ -126,7 +126,7 @@ No manual Java installation is required — the bundled Java runtime is used aut
 The tool will detect your system Java or prompt you to install it if missing. Running with `sudo` may be required for certain features (updates, permission-sensitive paths).
 
 > [!TIP]
-> You can suppress the sudo warning by setting `no_sudo_warning: true` in `config.yaml`.
+> The tool shows a sudo warning on Linux. You can disable it by setting `show_sudo_warning: false` in `config.yaml`.
 
 ---
 
