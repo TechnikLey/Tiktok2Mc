@@ -269,7 +269,6 @@ def main():
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),
             ("defaults/config.yaml",                "config/config.yaml"),
-            ("defaults/config.default.yaml",        "config/config.default.yaml"),
             ("defaults/gifts.json",                 "core/gifts.json"),
             ("LICENSE",                             "LICENSE"),
             ("README.md",                           "README.md"),
@@ -289,6 +288,21 @@ def main():
                 target = OUT_DIR / dst_rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_path, target)
+
+        # Generate config.default.yaml from config.yaml with template header
+        config_src = OUT_DIR / "config" / "config.yaml"
+        config_default = OUT_DIR / "config" / "config.default.yaml"
+        if config_src.exists():
+            header = (
+                "# -------------------------------------------------------------------------\n"
+                "# STREAMING TOOL CONFIGURATION TEMPLATE\n"
+                "# -------------------------------------------------------------------------\n"
+                "# This file is a template.\n"
+                "# Personal settings should be changed in 'config.yaml' only.\n"
+                "# -------------------------------------------------------------------------\n"
+            )
+            content = config_src.read_text(encoding="utf-8")
+            config_default.write_text(header + content, encoding="utf-8")
 
         # ----- Metadata & Cleanup -----
         cprint("Cleaning up temporary files...", Color.CYAN)
