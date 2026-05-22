@@ -34,10 +34,6 @@ from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
 
-# Windows-specific fix for the event loop (prevents WinError 6)
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
@@ -103,6 +99,7 @@ class BotContext:
         # Threading
         self.like_lock = threading.Lock()
         self.tiktok_lock = threading.Lock()
+        self.gift_lock = threading.Lock()
         self.rcon_pool_lock = asyncio.Lock()
 
         # RCON state
@@ -323,7 +320,7 @@ def generate_datapack():
         # === Apply whitelist / blacklist logic with debug ===
         for cmd in base_random_actions:
             if ctx.random_trigger_whitelist and cmd not in ctx.random_trigger_whitelist:
-                print(f"[RANDOM] {cmd} is not in the witelist, excluding from $random pool.")
+                print(f"[RANDOM] {cmd} is not in the whitelist, excluding from $random pool.")
             elif ctx.random_trigger_blacklist and cmd in ctx.random_trigger_blacklist:
                 print(f"[RANDOM] {cmd} is in the blacklist, excluding from $random pool.")
             else:
@@ -775,11 +772,11 @@ def update_daily_revenue():
     file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
     today = datetime.now().strftime("%Y-%m-%d")
 
-    if ctx.gift_current_log_date != today:
-        ctx.gift_day_start_value = ctx.gift_value_usd
-        ctx.gift_current_log_date = today
-
-    daily_value = ctx.gift_value_usd - ctx.gift_day_start_value
+    with ctx.gift_lock:
+        if ctx.gift_current_log_date != today:
+            ctx.gift_day_start_value = ctx.gift_value_usd
+            ctx.gift_current_log_date = today
+        daily_value = ctx.gift_value_usd - ctx.gift_day_start_value
     new_entry = {
         "date": today,
         "estimated_revenue_usd": daily_value
@@ -834,7 +831,8 @@ def create_client(user):
             gift_name = sanitize_filename(event.gift.name)
             gift_id = str(event.gift.id)
 
-            ctx.gift_value_usd += event.value
+            with ctx.gift_lock:
+                ctx.gift_value_usd += event.value
 
             execute_gift_action(gift_id)
 
@@ -1017,7 +1015,7 @@ async def run_bot():
     starts all workers, and connects to TikTok Live."""
     ctx.main_loop = asyncio.get_running_loop()
     
-    if load_config() == False:
+    if not load_config():
         print("Error in load_config")
         sys.exit(0)
 
