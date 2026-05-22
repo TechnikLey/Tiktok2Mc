@@ -102,8 +102,6 @@ class WinManager:
 
     def add_win(self, amount=1):
         self.wins += amount
-        if self.wins > self.record:
-            self.record = self.wins
         while self.wins >= self.needed:
             self.wins -= self.needed
             self.needed += 10
