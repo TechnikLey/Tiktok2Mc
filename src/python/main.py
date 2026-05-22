@@ -721,7 +721,7 @@ def validate_like_triggers(raw_triggers):
             continue
 
         # --- ENABLE (on/off toggle, optional) ---
-        enable = rule.get("enable", True)
+        enable = rule.get("enabled", True)
 
         # Cast to bool (handles strings like "true", "false")
         if isinstance(enable, str):
