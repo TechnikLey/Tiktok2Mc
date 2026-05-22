@@ -69,7 +69,7 @@ likes:$random  ← Starts the random selection
 > The command `/say Welcome!` will never be executed,
 > since `follow` is in the exclusion list by default.
 > Which triggers are excluded is configurable in `config.yaml` under
-> `RandomTriggers`. Use `Mode: deny-all` to allow only the listed triggers,
+> `random_triggers`. Use `mode: deny-all` to allow only the listed triggers,
 > or `Mode: allow-all` to exclude only the listed triggers.
 > Triggers that contain `$random` themselves are **always** excluded automatically.
 
@@ -83,12 +83,12 @@ Triggers that contain `$random` themselves are **always** automatically removed 
 
 **2. Trigger filter is configurable**
 
-In `config.yaml` under `RandomTriggers` you can define which triggers are allowed or blocked:
+In `config.yaml` under `random_triggers` you can define which triggers are allowed or blocked:
 
 ```yaml
-RandomTriggers:
-  Mode: deny-all
-  Triggers:
+random_triggers:
+  mode: deny-all
+  triggers:
     - likes
     - like_2
     - follow

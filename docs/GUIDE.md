@@ -371,7 +371,7 @@ The `$random` command picks a random eligible trigger from your defined actions 
 
 When gift ID 16071 is received, the tool selects one random trigger from the pool and runs its command.
 
-You can control which triggers are eligible using the `RandomTriggers` section in `config/config.yaml`. Use `Mode: deny-all` to allow only the listed triggers, or `Mode: allow-all` to allow all triggers except those listed.
+You can control which triggers are eligible using the `random_triggers` section in `config/config.yaml`. Use `mode: deny-all` to allow only the listed triggers, or `mode: allow-all` to allow all triggers except those listed.
 
 ---
 
@@ -379,7 +379,7 @@ You can control which triggers are eligible using the `RandomTriggers` section i
 
 Like triggers fire when the total number of likes reaches a configured threshold. They are defined in two places that work together:
 
-- **`config.yaml`** — under `gifts.like_triggers`, you define the interval (every N likes), the trigger name, and whether it is enabled.
+- **`config.yaml`** — under `like_goal.triggers`, you define the interval (every N likes), the trigger name, and whether it is enabled.
 - **`actions.mca`** — you add a line using the trigger name from the config to specify which command to run.
 
 See `config/config.yaml` for the full configuration options and examples.
@@ -388,7 +388,7 @@ See `config/config.yaml` for the full configuration options and examples.
 
 ### Comment Commands
 
-The `CommentCommands` feature lets viewers send Minecraft commands directly to your server by writing a comment that starts with a configurable prefix character (e.g., `#`).
+The `comment_commands` feature lets viewers send Minecraft commands directly to your server by writing a comment that starts with a configurable prefix character (e.g., `#`).
 
 For example, if the prefix is `#` and a moderator writes `#say Hello`, the command `say Hello` is sent to the Minecraft server via RCON.
 
@@ -397,7 +397,7 @@ The feature supports:
 - **deny-all mode** — only specific base commands are allowed
 - **allow-all mode** — all commands are allowed except those blocked
 
-All settings, including the prefix character, allowed roles, mode, and command list, are configured in `config/config.yaml` under `CommentCommands`. The file contains detailed inline comments explaining every option.
+All settings, including the prefix character, allowed roles, mode, and command list, are configured in `config/config.yaml` under `comment_commands`. The file contains detailed inline comments explaining every option.
 
 > [!WARNING]
 > This sends raw commands to your Minecraft server via RCON. Always use `deny-all` mode when allowing access to `all`, `fanclub`, or `superfan`.

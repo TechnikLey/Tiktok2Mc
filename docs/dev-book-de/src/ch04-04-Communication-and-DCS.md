@@ -45,7 +45,7 @@ def add():
 
 **Timer (Client):**
 ```python
-WIN_PORT = cfg.get("win_counter", {}).get("web_server_port", 29191)
+WIN_PORT = cfg.get("win_counter", {}).get("port", 29191)
 ADD_URL = f"http://localhost:{WIN_PORT}/add?amount=1"
 
 class API:
@@ -68,7 +68,7 @@ Jedes Plugin hat seinen eigenen Port, definiert in `config.yaml`:
 | MinecraftServerAPI | 29188 | `minecraft_server_api.web_server_port` |
 | Timer | 29189 | `minecraft_server_api.web_server_port_timer` |
 | DeathCounter | 29190 | `minecraft_server_api.deathcounter_port` |
-| WinCounter | 29191 | `win_counter.web_server_port` |
+| WinCounter | 29191 | `win_counter.port` |
 | LikeGoal | 29193 | `like_goal.port` |
 
 > [!IMPORTANT]

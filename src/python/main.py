@@ -156,14 +156,14 @@ def load_config():
         ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
         ctx.overlaytxt_port = config.get("overlay_text", {}).get("port", 29186)
         ctx.like_goal_port = config.get("like_goal", {}).get("port", 29193)
-        ctx.autosave_interval_seconds = config.get("gifts", {}).get("autosave_interval_seconds", 60)
+        ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
         random_cfg = config.get("random_triggers", {})
         ctx.random_trigger_mode = str(random_cfg.get("mode", "deny-all")).lower()
         raw_list = random_cfg.get("triggers", [])
         ctx.random_trigger_list = [str(t).strip() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []
 
-        ctx.like_triggers = validate_like_triggers(config.get("gifts", {}).get("like_triggers", []))
+        ctx.like_triggers = validate_like_triggers(config.get("like_goal", {}).get("triggers", []))
 
         comment_cmd_cfg = config.get("comment_commands", {})
         ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))

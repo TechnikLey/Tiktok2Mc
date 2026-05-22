@@ -112,41 +112,9 @@ tiktok:
   # Seconds to wait before attempting to reconnect after a connection loss.
   reconnect_delay_seconds: 30
 
-# ===========================================================================
-#  GIFT & LIKE SETTINGS
-# ===========================================================================
-gifts:
   # How often (in seconds) the gift revenue log file is saved to disk.
   # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
-
-  # -----------------------------------------------------------------------
-  #  LIKE TRIGGERS
-  # -----------------------------------------------------------------------
-  # Like triggers fire when the total stream likes reach a threshold.
-  # You can define multiple triggers with different intervals.
-  #
-  # Each entry requires:
-  #   id       — A unique name for this trigger (used in logs)
-  #   every    — Like interval between activations (e.g., 100 = every 100 likes)
-  #   function — The trigger name used in data/actions.mca (connects config to command)
-  #   payload  — (optional) A label passed with the trigger (default: "Community")
-  #   enabled  — (optional) Set to false to disable without deleting (default: true)
-  #
-  # Example: With "every: 100" and function "likes", the trigger fires every
-  # 100 likes and executes whatever command you wrote for "likes" in actions.mca.
-  like_triggers:
-    - id: likes_standard
-      every: 100
-      function: likes
-      payload: Community
-      enabled: true
-
-    - id: likes_100k
-      every: 100_000
-      function: like_2
-      payload: Community
-      enabled: true
 
 # ===========================================================================
 #  COMMENT COMMANDS
@@ -240,24 +208,6 @@ console:
 #  MODULES — ENABLE / DISABLE INDIVIDUAL FEATURES
 # ===========================================================================
 
-# --- WEB DASHBOARD (GUI) ---
-# A web-based gift browser and server dashboard.
-# Enable this to search gift IDs visually in a browser window.
-gui:
-  enabled: false
-  port: 29185
-
-# --- AUTO-UPDATER ---
-# Checks for new versions on startup and installs them automatically.
-# It is strongly recommended to keep this enabled.
-update:
-  enabled: true
-
-  # Maximum number of update log files to keep in logs/update_logs/.
-  #  0  = delete all logs after each update
-  #  -1 = never delete logs
-  max_update_logs: 20
-
 # --- MINECRAFT SERVER API ---
 # Handles communication between the bridge and the Minecraft server.
 # Required for player death/respawn detection, datapack loading, etc.
@@ -267,12 +217,6 @@ minecraft_server_api:
   web_server_port: 29188
   web_server_port_timer: 29189
   deathcounter_port: 29190
-
-# --- WIN COUNTER OVERLAY ---
-# Tracks wins and losses. Decrements on death, increments on timer expiry.
-win_counter:
-  enabled: true
-  web_server_port: 29191
 
 # --- OVERLAY TEXT ---
 # Displays text notifications on stream (triggered via >> in actions.mca).
@@ -307,18 +251,6 @@ overlay_text:
   overlays:
     - name: "default"
 
-# --- STREAM TIMER ---
-# A countdown timer for your stream. Pauses on player death, resumes on
-# respawn. When it reaches zero, a win is counted.
-timer:
-  enabled: true
-  start_time: 10   # Minutes
-
-# --- DEATH COUNTER ---
-# Displays the number of player deaths on stream.
-death_counter:
-  enabled: true
-
 # --- LIKE GOAL ---
 # A progress bar tracking likes toward a goal.
 like_goal:
@@ -326,6 +258,34 @@ like_goal:
 
   # Port for the Like Goal OBS overlay.
   port: 29193
+
+  # -----------------------------------------------------------------------
+  #  LIKE TRIGGERS
+  # -----------------------------------------------------------------------
+  # Like triggers fire when the total stream likes reach a threshold.
+  # You can define multiple triggers with different intervals.
+  #
+  # Each entry requires:
+  #   id       — A unique name for this trigger (used in logs)
+  #   every    — Like interval between activations (e.g., 100 = every 100 likes)
+  #   function — The trigger name used in data/actions.mca (connects config to command)
+  #   payload  — (optional) A label passed with the trigger (default: "Community")
+  #   enabled  — (optional) Set to false to disable without deleting (default: true)
+  #
+  # Example: With "every: 100" and function "likes", the trigger fires every
+  # 100 likes and executes whatever command you wrote for "likes" in actions.mca.
+  triggers:
+    - id: likes_standard
+      every: 100
+      function: likes
+      payload: Community
+      enabled: true
+
+    - id: likes_100k
+      every: 100_000
+      function: like_2
+      payload: Community
+      enabled: true
 
   # Text displayed above the progress bar.
   display_text: "Like Goal"
@@ -342,3 +302,39 @@ like_goal:
   #   2+ — Multiply mode:  Goal is multiplied by this value each time
   #                         (100k → 200k → 400k → 800k → ...)
   goal_multiplier: 1
+
+# --- STREAM TIMER ---
+# A countdown timer for your stream. Pauses on player death, resumes on
+# respawn. When it reaches zero, a win is counted.
+timer:
+  enabled: true
+  start_time: 10   # Minutes
+
+# --- DEATH COUNTER ---
+# Displays the number of player deaths on stream.
+death_counter:
+  enabled: true
+
+# --- WIN COUNTER OVERLAY ---
+# Tracks wins and losses. Decrements on death, increments on timer expiry.
+win_counter:
+  enabled: true
+  port: 29191
+
+# --- WEB DASHBOARD (GUI) ---
+# A web-based gift browser and server dashboard.
+# Enable this to search gift IDs visually in a browser window.
+gui:
+  enabled: false
+  port: 29185
+
+# --- AUTO-UPDATER ---
+# Checks for new versions on startup and installs them automatically.
+# It is strongly recommended to keep this enabled.
+update:
+  enabled: true
+
+  # Maximum number of update log files to keep in logs/update_logs/.
+  #  0  = delete all logs after each update
+  #  -1 = never delete logs
+  max_update_logs: 20

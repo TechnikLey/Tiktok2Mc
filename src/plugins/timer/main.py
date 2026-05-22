@@ -30,7 +30,7 @@ try:
 except Exception: cfg = {}
 
 TIMER_MINS = cfg.get("timer", {}).get("start_time", 10)
-WIN_PORT = cfg.get("win_counter", {}).get("web_server_port", 29191)
+WIN_PORT = cfg.get("win_counter", {}).get("port", 29191)
 WEB_PORT = cfg.get("minecraft_server_api", {}).get("web_server_port_timer", 29189)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
