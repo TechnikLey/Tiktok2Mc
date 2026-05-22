@@ -31,6 +31,10 @@ Each version is split into two sections:
 * **Default Port Change** Changed the default ports for several internal services to less commonly used ports to avoid conflicts with other software (GUI: 29185, OverlayTxt: 29186, MinecraftServerAPI: 29187, Webhook: 29188, Timer: 29189, DeathCounter: 29190, WinCounter: 29191, LikeGoal: 29193). The Minecraft server (25565) and RCON (25575) ports remain unchanged.
     > [!IMPORTANT]
     > For all users who already have the project installed, the ports defined in their current config will continue to be used. These settings will remain exactly as configured. Updates never overwrite user-defined config values, so existing port configurations will stay unchanged.
+* **Simplified allow/deny rules for Comment Commands** – Instead of two separate lists (Whitelist + Blacklist) with complex interaction rules, you now set a **Mode** (`deny-all` or `allow-all`) and a single **Commands** list. `deny-all` = only the listed commands work, `allow-all` = everything works except the listed commands.
+* **Simplified `$random` trigger filter** – The settings for `$random` now live in their own `RandomTriggers` section (no longer hidden under `Gifts`). Same `deny-all` / `allow-all` mode as above.
+* **`Shutdown` section** – The auto-shutdown settings (`Enabled`, `DelaySeconds`) are now grouped in their own `Shutdown` block instead of being individual top-level keys.
+* **Sudo warning renamed** – `no_sudo_warning` is now `show_sudo_warning`. It is enabled by default; set it to `false` to hide the warning.
 * **`version.txt` format** – The file now uses a key:value format (`version: v1.0.0`, `update_url: ...`) instead of a single version number. This allows the updater to know where to check for new versions.
 * **Documentation overhaul** – Both the German and the English developer documentation have been extensively revised and adapted to the new plugin system. All chapters now reflect the current structure.
 
