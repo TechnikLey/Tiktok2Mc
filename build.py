@@ -120,12 +120,10 @@ def main():
                     "dest": dest,
                 })
 
-                # Also copy version.txt and README.md if present in the same plugin folder
-                for extra_file in ["version.txt", "README.md"]:
+                # Also copy extra files if present in the same plugin folder
+                for extra_file in ["version.txt", "README.md", "config.yaml"]:
                     extra_path = py_file.parent / extra_file
                     if extra_path.exists():
-                        # Schedule copy as a build task (handled in asset/resource sync phase)
-                        # Here, just copy directly to OUT_DIR/plugins/rel/extra_file
                         target_dir = OUT_DIR / dest
                         target_dir.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(extra_path, target_dir / extra_file)
