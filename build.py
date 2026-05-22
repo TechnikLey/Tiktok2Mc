@@ -313,10 +313,8 @@ def main():
         if PARALLEL_TEMP_DIR.exists():
             shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
 
-        for cache_dir in ["src/core/__pycache__", "src/python/__pycache__"]:
-            p = Path(cache_dir)
-            if p.exists():
-                shutil.rmtree(p, ignore_errors=True)
+        for cache_dir in sorted(SCRIPT_DIR.rglob("__pycache__")):
+            shutil.rmtree(cache_dir, ignore_errors=True)
 
         # ----- Release / Upload Script -----
         cprint("Creating upload.py...", Color.CYAN)
