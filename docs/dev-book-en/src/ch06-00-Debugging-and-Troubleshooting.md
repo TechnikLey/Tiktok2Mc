@@ -260,6 +260,7 @@ except Exception as e:
    ```
    src/plugins/my_plugin/
    ├── main.py       # Must exist!
+   ├── config.yaml   # Plugin-specific configuration
    ├── README.md
    └── version.txt
    ```

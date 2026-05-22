@@ -29,8 +29,9 @@ You can write a plugin in any language that produces a native Windows `.exe`. Th
 src/plugins/
 └── myplugin/
     ├── main.exe        ← started by the system (compiled from your code)
+    ├── config.yaml     ← Plugin-specific configuration
     ├── README.md
-    └── version.txt
+    └── version.txt     ← Version + update URL
 ```
 
 During the build, the entire `src/plugins/myplugin/` folder is copied to `build/release/plugins/myplugin/`.
@@ -625,3 +626,31 @@ Write logs to `ROOT_DIR/logs/myplugin.log`. Use append mode and log at minimum:
 - Plugin start with port number
 - Each received event type
 - Every error with a timestamp
+
+---
+
+## Plugin Updates
+
+Since v0.4.0, `plugin_updater.py` (compiled to `plugin_updater.exe`) checks
+for plugin updates automatically when the streaming tool starts.
+
+### `version.txt` (new format)
+
+```
+version: v1.0.0
+update_url: https://api.github.com/repos/USER/REPO/releases/latest
+```
+
+### How It Works
+
+1. The updater reads `version.txt` from each plugin directory.
+2. If `update_url` is set (GitHub API URL), it fetches the GitHub API.
+3. The `tag_name` version is compared to the local version.
+4. If a newer version is found, the matching platform asset is downloaded.
+5. The archive is extracted and plugin files are replaced.
+6. The `config.yaml` of the plugin is **not overwritten**.
+
+### GitHub Release Assets
+
+- **Windows**: `myplugin-v1.1.0-Windows.zip`
+- **Linux**: `myplugin-v1.1.0-Linux.tar.gz`

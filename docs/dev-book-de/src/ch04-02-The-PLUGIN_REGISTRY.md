@@ -114,7 +114,8 @@ Plugins registrieren sich über das `--register-only` Flag. Der Ablauf:
 
 **Im Plugin (main.py):**
 ```python
-from core import parse_args, register_plugin, AppConfig, get_base_file
+from core import parse_args, AppConfig, get_base_file
+from python.registry import register_plugin
 from core.utils import load_config
 
 args = parse_args()

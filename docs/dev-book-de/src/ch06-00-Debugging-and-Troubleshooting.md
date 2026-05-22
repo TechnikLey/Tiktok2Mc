@@ -258,10 +258,11 @@ except Exception as e:
 
 2. **Check:** Plugin hat `main.py`?
    ```
-   src/plugins/my_plugin/
-   ├── main.py       # Muss existieren!
-   ├── README.md
-   └── version.txt
+src/plugins/my_plugin/
+├── main.py       # Muss existieren!
+├── config.yaml   # Plugin-eigene Konfiguration
+├── README.md
+└── version.txt
    ```
 
 3. **Check:** Plugin kann importieren?

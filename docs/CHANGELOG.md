@@ -19,6 +19,10 @@ Each version is split into two sections:
     > [!WARNING]
     > AI-generated change and suggestions may contain errors, especially for complex or safety-critical parts of this project. Always review changes carefully and test them before use. The AI does not have full understanding of your specific setup, live stream environment, or Minecraft server configuration.
 * **AI Prompt documentation** — The `AIPrompt.md` file is now referenced in the user guide (`docs/GUIDE.md`) under Additional Resources.
+* **Each plugin gets its own `config.yaml`** – External plugins are now independent of the global configuration. Every plugin folder contains its own `config.yaml`, so settings no longer get mixed up. Built-in plugins continue to use the global config.
+* **`create_plugin.py`** – The new script creates the complete plugin folder including `config.yaml` and `version.txt` with the new format. You will also be asked whether the plugin should be updatable via GitHub.
+* **Automatic plugin updates** – The new `plugin_updater` checks on startup whether a newer version of a plugin is available on GitHub. If yes, the update is downloaded and installed. Your plugin `config.yaml` is never overwritten!
+* **Sync of the English developer documentation** – The English dev book now has the same content and structure as the German version.
 
 #### Changed
 * **Updater Logging (Linux)** — The updater now creates a new log file for each update attempt in the `logs/update_logs` directory, named with a timestamp in 24-hour format (e.g., `updater_2026-04-19_14-30.log`). This allows users to keep a history of update attempts and their outcomes without overwriting previous logs.
@@ -27,6 +31,8 @@ Each version is split into two sections:
 * **Default Port Change** Changed the default ports for several internal services to less commonly used ports to avoid conflicts with other software (GUI: 29185, OverlayTxt: 29186, MinecraftServerAPI: 29187, Webhook: 29188, Timer: 29189, DeathCounter: 29190, WinCounter: 29191, LikeGoal: 29193). The Minecraft server (25565) and RCON (25575) ports remain unchanged.
     > [!IMPORTANT]
     > For all users who already have the project installed, the ports defined in their current config will continue to be used. These settings will remain exactly as configured. Updates never overwrite user-defined config values, so existing port configurations will stay unchanged.
+* **`version.txt` format** – The file now uses a key:value format (`version: v1.0.0`, `update_url: ...`) instead of a single version number. This allows the updater to know where to check for new versions.
+* **Documentation overhaul** – Both the German and the English developer documentation have been extensively revised and adapted to the new plugin system. All chapters now reflect the current structure.
 
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
@@ -45,6 +51,7 @@ Each version is split into two sections:
 * **Missing error messages in plugins** — Errors when loading or saving plugin data (window sizes, stats) are now shown in the console instead of being silently ignored.
 * **Missing error messages for RCON connection** — Connection issues to the Minecraft server are now shown in the console, making it easier to spot problems.
 * **Wrong Linux command in README** — Fixed the startup command in the quick-start guide (`./start` → `./start.bin`).
+* **Outdated references** – All `create_plugin.ps1` references have been replaced with `create_plugin.py`. The import for `register_plugin` now points to the correct module (`python.registry`).
 
 ---
 

@@ -40,6 +40,7 @@ SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
 REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
+PLUGIN_UPDATER_EXE_PATH = (BASE_DIR / "plugins" / f"plugin_updater{SUFFIX}").resolve()
 PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
 update_exe = (BASE_DIR / f"update{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
@@ -404,6 +405,15 @@ try:
         print("Error")
 except FileNotFoundError:
     print("File not found")
+
+# -------------------------------------------------------------------------
+# Plugin Update Check (optional — skips if plugin_updater exe is missing)
+# -------------------------------------------------------------------------
+if PLUGIN_UPDATER_EXE_PATH.exists():
+    try:
+        subprocess.run([PLUGIN_UPDATER_EXE_PATH])
+    except Exception as e:
+        print(f"[WARN] Plugin updater failed: {e}")
 # =============================================================================
 
 # -----------------------------

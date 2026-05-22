@@ -57,6 +57,18 @@ def get_valid_plugin_name():
         else:
             return name
 
+def get_update_url():
+    url = input("GitHub API update URL (optional, Enter to skip):\nhttps://api.github.com/repos/").strip()
+    if not url:
+        return ""
+    full_url = f"https://api.github.com/repos/{url}"
+    if not full_url.endswith("/releases/latest"):
+        if full_url.endswith("/"):
+            full_url += "releases/latest"
+        else:
+            full_url += "/releases/latest"
+    return full_url
+
 def main():
     plugin_name = get_valid_plugin_name()
 
@@ -68,9 +80,13 @@ def main():
     (plugin_path / "main.py").write_text(MAIN_PY_TEMPLATE.format(name=plugin_name), encoding="utf-8")
     print("File 'main.py' created.")
 
+    # Ask for update URL
+    update_url = get_update_url()
+
     # Create version.txt
-    (plugin_path / "version.txt").write_text(VERSION + "\n", encoding="utf-8")
-    print(f"File 'version.txt' with content '{VERSION}' created.")
+    version_content = f"version: {VERSION}\nupdate_url: {update_url}\n"
+    (plugin_path / "version.txt").write_text(version_content, encoding="utf-8")
+    print(f"File 'version.txt' created.")
 
     # Create README.md
     readme = f"# {plugin_name}\n\nVersion: {VERSION}\n\nDescription: \n"

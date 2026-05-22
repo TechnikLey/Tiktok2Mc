@@ -29,8 +29,9 @@ Du kannst ein Plugin in jeder Sprache schreiben, die eine native Windows-`.exe` 
 src/plugins/
 └── myplugin/
     ├── main.exe        ← vom System gestartet (kompiliert aus deinem Code)
+    ├── config.yaml     ← Plugin-eigene Konfiguration
     ├── README.md
-    └── version.txt
+    └── version.txt     ← Version + Update-URL
 ```
 
 Beim Build wird der gesamte `src/plugins/myplugin/`-Ordner nach `build/release/plugins/myplugin/` kopiert.
@@ -635,3 +636,38 @@ Schreibe Logs nach `ROOT_DIR/logs/meinplugin.log`. Nutze atomares Schreiben (anh
 - Plugin-Start mit Port
 - Jeden empfangenen Event-Typ
 - Jeden Fehler mit Zeitstempel
+
+---
+
+## Plugin-Updates
+
+Seit v0.4.0 gibt es den `plugin_updater.exe`, der automatisch beim Start
+des Streaming-Tools nach Plugin-Updates sucht.
+
+### `version.txt` (neues Format)
+
+```
+version: v1.0.0
+update_url: https://example.com/plugins/meinplugin/
+```
+
+### Funktionsweise
+
+1. Der Updater liest `version.txt` aus jedem Plugin-Ordner.
+2. Wenn `update_url` gesetzt ist (GitHub API URL), wird die GitHub API abgefragt.
+3. Die `tag_name`-Version des Releases wird mit der lokalen Version verglichen.
+4. Bei einer neueren Version wird das passende Asset heruntergeladen.
+5. Das Archiv wird entpackt und die Dateien im Plugin-Ordner ersetzt.
+6. Die `config.yaml` des Plugins wird **nicht überschrieben**.
+
+### `update_url` Format
+
+```
+update_url: https://api.github.com/repos/{USER}/{REPO}/releases/latest
+```
+
+### GitHub Release vorbereiten
+
+Erstelle ein Release mit plattformspezifischen Assets:
+- **Windows**: `meinplugin-v1.1.0-Windows.zip`
+- **Linux**: `meinplugin-v1.1.0-Linux.tar.gz`

@@ -53,13 +53,14 @@ def main():
 
         # Definition of main files
         CORE_EXECUTABLES = [
-            {"name": "app",            "src": "src/python/main.py",      "dest": "core"},
-            {"name": "update",         "src": "src/python/update.py",    "dest": ""},
-            {"name": "gui",            "src": "src/python/gui.py",       "dest": "core"},
-            {"name": "server",         "src": "src/python/server.py",    "dest": "",},
-            {"name": "start",          "src": "src/python/start.py",     "dest": ""},
-            {"name": "registry",       "src": "src/python/registry.py",  "dest": "plugins"},
-            {"name": "test_trigger",   "src": "tests/send_trigger.py",   "dest": "test"},
+            {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
+            {"name": "update",         "src": "src/python/update.py",         "dest": ""},
+            {"name": "gui",            "src": "src/python/gui.py",            "dest": "core"},
+            {"name": "server",         "src": "src/python/server.py",         "dest": "",},
+            {"name": "start",          "src": "src/python/start.py",          "dest": ""},
+            {"name": "registry",       "src": "src/python/registry.py",       "dest": "plugins"},
+            {"name": "plugin_updater", "src": "src/python/plugin_updater.py", "dest": "plugins"},
+            {"name": "test_trigger",   "src": "tests/send_trigger.py",        "dest": "test"},
         ]
 
         # ----- Preparation & Directory Structure -----

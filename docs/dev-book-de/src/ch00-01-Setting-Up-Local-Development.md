@@ -293,12 +293,12 @@ DeathCounter:
 
 Falls du schnell ein kleines Test-Plugin erstellen möchtest:
 
-```powershell
+```bash
 # Windows
-.\create_plugin.ps1
+python create_plugin.py
 
 # macOS / Linux
-bash create_plugin.ps1
+python create_plugin.py
 ```
 
 Das Skript fragt dich nach einer Plugin-ID. Gib z.B. `testplugin` ein.
@@ -336,7 +336,7 @@ deactivate
 | `python: command not found` | Python nicht im PATH. Neu installieren und "Add Python to PATH" aktivieren |
 | `ModuleNotFoundError: No module named 'TikTokLive'` | `pip install -r requirements.txt` noch nicht ausgeführt |
 | `Port 29191 already in use` | Andere Anwendung nutzt den Port. In `config.yaml` einen anderen Port wählen |
-| `Permission denied` (macOS/Linux) | `chmod +x create_plugin.ps1` ausführen |
+| `Permission denied` (macOS/Linux) | `chmod +x create_plugin.py` ausführen |
 | venv aktiviert sich nicht (PowerShell) | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` ausführen |
 | `pip: The term 'pip' is not recognized as a name of a cmdlet, function, script file, or executable program.` | Führe `python -m pip` aus dies kann helfen |
 

@@ -210,3 +210,25 @@ if cfg.get("config_version", 0) < 2:
 > * **Verschachtelte Strukturen:** Lerne, wie man effizient auf tiefer liegende Ebenen zugreift (z. B. über `cfg['database']['host']` oder sicherere Ketten).
 > * **Type Hinting:** Schau dir an, wie du Typ-Hinweise nutzt, damit deine IDE dich beim Programmieren unterstützt und du genau weißt, ob ein Wert ein `int`, `bool` oder `str` sein muss.
 > * **Exceptions:** Verstehe, wie man spezifische Fehler beim Parsen von YAML-Dateien abfängt, um dem Endnutzer hilfreiche Fehlermeldungen statt kryptischer Tracebacks zu zeigen.
+
+---
+
+### Plugin-eigene config.yaml
+
+Seit v0.4.0 haben **externe Plugins** ihre eigene `config.yaml` im Plugin-Ordner.
+Die globale `config.yaml` ist nur noch für das Hauptprogramm und Built-in-Plugins zuständig.
+
+**Vorteile:**
+- Jedes Plugin kann seine Config unabhängig verwalten
+- Keine Konflikte zwischen Plugin-Keys
+- Einfachere Updates (Config bleibt beim Plugin)
+
+**Laden im Plugin-Code:**
+```python
+from core import load_config, get_plugin_config_file
+
+cfg = load_config(get_plugin_config_file())
+enable = cfg.get("Enable", True)
+```
+
+Die plugin-eigene Config wird vom Update-Mechanismus (`plugin_updater.py`) **nicht überschrieben**.

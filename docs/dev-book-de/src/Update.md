@@ -116,7 +116,7 @@ UpdaterVersion: 1.0.2
 **WIRD NICHT überschrieben (User-Daten!):**
 - `config/config.yaml` (deine Einstellungen)
 - `data/` (Zähler, Logs, States)
-- `plugins/` (User-Plugins)
+- `plugins/` (User-Plugins, werden vom `plugin_updater.py` verwaltet)
 
 ### Checkliste: Update-Safe
 
@@ -241,12 +241,17 @@ Der Updater arbeitet mit einer Whitelist.
 
 ### Erlaubte Verzeichnisse
 
-Nur diese Top-Level-Verzeichnisse werden verarbeitet:
+Nur diese Verzeichnisse werden verarbeitet:
 
 * `core`
 * `scripts`
 * `server`
 * `config`
+* `plugins/deathcounter`
+* `plugins/likegoal`
+* `plugins/overlaytxt`
+* `plugins/timer`
+* `plugins/wincounter`
 
 ### Erlaubte Root-Dateien
 
@@ -268,8 +273,8 @@ Nur diese Dateien auf der obersten Ebene werden übernommen:
 Das Update betrifft damit nur genau die Bereiche, die explizit freigegeben sind.
 
 ```Python
-WHITELIST_DIRS = {"core", "scripts", "server", "config"}
-WHITELIST_FILES = {"version.txt", "README.md", "LICENSE", "update.exe", "server.exe", "start.exe"}
+WHITELIST_DIRS = {"core", "scripts", "config", "plugins/deathcounter", "plugins/likegoal", "plugins/overlaytxt", "plugins/timer", "plugins/wincounter"}
+WHITELIST_FILES = {"version.txt", "README.md", "LICENSE", "update.exe", "server.exe", "start.exe", "plugins/registry.exe", "plugins/plugin_updater.exe"}
 ```
 
 ---
@@ -333,3 +338,37 @@ Der Updater kümmert sich selbstständig darum, Dateien korrekt zu kopieren, Ver
 > - Neue Dateien oder Features: Wenn du neue Dateien hinzufügen willst, prüfe, ob sie vom Updater berücksichtigt werden sollen. Andernfalls lege sie außerhalb der Whitelist ab. 
 > - Config-Migration verstehen ist optional. Für normale Änderungen an der Logik oder den Assets musst du die Migration nicht ändern.
 > - Tool-Update vs. Updater-Update: Das Tool wird unabhängig vom Updater aktualisiert. Für Entwicklungszwecke reicht es, nur das Tool zu testen.
+
+---
+
+## Plugin-Updates (plugin_updater.py)
+
+Seit v0.4.0 gibt es einen separaten Mechanismus für Plugin-Updates:
+
+**`plugin_updater.py`** (kompiliert zu `plugins/plugin_updater.exe`) wird automatisch
+beim Start des Streaming-Tools ausgeführt und prüft alle Plugins auf Aktualisierungen.
+
+### Funktionsweise
+
+1. Der Updater durchsucht alle Plugin-Ordner nach `version.txt`-Dateien.
+2. Wenn ein Plugin eine `update_url` gesetzt hat (GitHub API), wird die API abgefragt.
+3. Die `tag_name`-Version des GitHub Releases wird mit der lokalen verglichen.
+4. Bei einer neueren Version wird das passende Asset heruntergeladen.
+5. Das Archiv wird entpackt und die Plugin-Dateien werden ersetzt.
+6. Die `config.yaml` des Plugins bleibt erhalten.
+
+### version.txt (Plugin)
+
+```
+version: v1.0.0
+update_url: https://api.github.com/repos/USER/REPO/releases/latest
+```
+
+### Assets im GitHub Release
+
+- **Windows**: `pluginname-v1.1.0-Windows.zip`
+- **Linux**: `pluginname-v1.1.0-Linux.tar.gz`
+
+> [!NOTE]
+> **Kein Einfluss auf Tool-Updates:** Der Plugin-Updater läuft unabhängig vom
+> Tool-Updater. Built-in-Plugins werden weiterhin über das normale Tool-Update aktualisiert.

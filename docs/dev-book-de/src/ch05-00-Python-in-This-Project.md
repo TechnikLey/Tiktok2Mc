@@ -40,14 +40,15 @@ Diese Datei verbindet TikTok mit dem Rest des Systems.
 |-------|-------|
 | `models.py` | Datenstrukturen (AppConfig, PluginInfo, etc.) |
 | `cli.py` | Command-Line Argumente parsen |
-| `paths.py` | Pfad-Funktionen (ROOT_DIR, BASE_DIR, etc.) |
+| `paths.py` | Pfad-Funktionen (ROOT_DIR, BASE_DIR, get_plugin_dir, get_plugin_config_file) |
 | `utils.py` | Helferfunktionen (Strings bereinigen, etc.) |
 | `validator.py` | Config validieren |
 
 Diese Module kannst du überall im Projekt importieren:
 
 ```python
-from core import load_config, register_plugin, get_root_dir
+from core import load_config, get_root_dir, get_plugin_dir, get_plugin_config_file
+from python.registry import register_plugin
 ```
 
 ### 3. **server.py** – Minecraft-Server-Starter
@@ -86,11 +87,13 @@ Hier schreibst du deine eigenen Plugins:
 src/plugins/
 ├── timer/
 │   ├── main.py        # Timer-Logik
+│   ├── config.yaml    # Plugin-eigene Konfiguration
 │   ├── README.md
 │   └── version.txt
 │
 ├── my_custom_plugin/  # Dein Plugin!
 │   ├── main.py
+│   ├── config.yaml    # Plugin-eigene Konfiguration
 │   ├── README.md
 │   └── version.txt
 ```

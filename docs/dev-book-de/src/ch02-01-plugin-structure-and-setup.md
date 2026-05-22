@@ -9,23 +9,25 @@ Jedes Plugin ist ein **isoliertes Python-Programm** mit Standardstruktur. Benefi
 
 ### Ordnerstruktur
 
-**Automatisch-erstellt per PowerShell-Skript (create_plugin.ps1):**
+**Automatisch erstellt per Skript (`create_plugin.py`):**
 ```
 src/plugins/
 └── my_plugin/
     ├── main.py           ← Plugin-Kern
+    ├── config.yaml       ← Plugin-eigene Konfiguration
     ├── README.md        
-    └── version.txt       
+    └── version.txt       ← Version + Update-URL
 ```
 
 ### Plugin erstellen: 2 Schritte
 
-Wenn du das PowerShell-Skript `create_plugin.ps1` ausführst, fragt es dich nach dem Namen deines Plugins. Danach erstellt es automatisch die komplette Ordnerstruktur für dich. Diese sieht dann so aus:
+Wenn du das Skript `create_plugin.py` ausführst, fragt es dich nach dem Namen deines Plugins. Danach erstellt es automatisch die komplette Ordnerstruktur für dich. Diese sieht dann so aus:
 
 ```text
 .
 ├── dein_plugin_name
 │   ├── main.py
+│   ├── config.yaml
 │   ├── README.md
 │   └── version.txt
 ```
@@ -36,16 +38,15 @@ Der neue Ordner wird unter `src/plugins/` erstellt und mit dem Namen benannt, de
 
 ### `main.py` – Das Herz deines Plugins
 
-Das ist die wichtigste Datei! Hier schreibst du die eigentliche Logik deines Plugins. Wenn du mit `create_plugin.ps1` ein Plugin erstellst, bekommst du automatisch einen Basis-Code eingefügt. Der sieht ungefähr so aus:
+Das ist die wichtigste Datei! Hier schreibst du die eigentliche Logik deines Plugins. Wenn du mit `create_plugin.py` ein Plugin erstellst, bekommst du automatisch einen Basis-Code eingefügt. Der sieht ungefähr so aus:
 
 ```python
-from core import load_config, parse_args, get_root_dir, get_base_dir, get_base_file, register_plugin, AppConfig
+from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
+from python.registry import register_plugin
 import sys
 
-BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
-CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"
-DATA_DIR = ROOT_DIR / "data"
+PLUGIN_DIR = get_plugin_dir()
+CONFIG_FILE = get_plugin_config_file()
 MAIN_FILE = get_base_file()
 args = parse_args()
 
@@ -58,7 +59,7 @@ if register_only:
     register_plugin(AppConfig(
         name="test",
         path=MAIN_FILE,
-        enable=True,
+        enable=cfg.get("Enable", True),
         level=4,
         ics=False
     ))
@@ -66,17 +67,8 @@ if register_only:
 ```
 
 > [!TIP]
-> Wenn du die `config.yaml` Datei direkt im Plugin Ordner nutzen willst dann ersetze:
-> ```Python
-> CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"
-> ```
->
-> Durch diesen Code:
-> 
-> ```Python
-> CONFIG_FILE = BASE_DIR / "config.yaml"
-> CONFIG_FILE.touch(exist_ok=True) # Legt die Datei an wenn du es nicht schon selbst gemacht hast.
-> ```
+> Dein Plugin hat jetzt eine eigene `config.yaml` im Plugin-Ordner.
+> Diese wird automatisch erstellt und geladen – du musst dich um nichts kümmern.
 
 #### Was passiert da genau?
 
@@ -90,11 +82,9 @@ Du importierst Funktionen und Klassen aus dem `core`-Modul. Das erspart dir viel
 
 **Wichtige Pfade einrichten**  
 ```python
-BASE_DIR = get_base_dir()           # Der Basis-Ordner der Anwendung
-ROOT_DIR = get_root_dir()           # Der Wurzelpfad, zwei Ebenen über BASE_DIR
-CONFIG_FILE = ROOT_DIR / "config" / "config.yaml"  # Pfad zur Konfiguration
-DATA_DIR = ROOT_DIR / "data"        # Ordner für User-Daten
-MAIN_FILE = get_base_file()         # Der Pfad zur main.exe (main.py im dev Ordner)
+PLUGIN_DIR = get_plugin_dir()           # Der Ordner deines Plugins
+CONFIG_FILE = get_plugin_config_file()  # Pfad zur plugin-eigenen config.yaml
+MAIN_FILE = get_base_file()             # Der Pfad zur main.exe (main.py im dev Ordner)
 ```
 
 Diese Variablen brauchst du später in deinem Code – zum Beispiel um Dateien zu speichern oder die Config zu laden.
@@ -229,15 +219,19 @@ Diese Datei ist deine Chance, anderen Entwicklern zu zeigen, was dein Plugin mac
 
 Ein gutes README macht es dir selbst und anderen später leichter!
 
-### `version.txt` – Die Versionsnummer
+### `version.txt` – Versionsnummer & Update-URL
 
-In dieser Datei speicherst du die aktuelle Version deines Plugins. Wenn du ein neues Plugin erstellst, steht dort standardmäßig:
+In dieser Datei speicherst du die aktuelle Version deines Plugins **und** optional einen Link,
+über den der `plugin_updater.exe` nach Updates suchen kann. Wenn du ein neues Plugin erstellst,
+sieht die Datei standardmäßig so aus:
 
 ```
-v1.0.0
+version: v1.0.0
+update_url: 
 ```
 
-**Wichtig:** Halte dich an dieses Format! Es befolgt das [Semantic Versioning](https://semver.org/)-Standard:
+**version:**  
+Die Versionsnummer im [Semantic Versioning](https://semver.org/)-Format:
 - **v1.0.0** = Major.Minor.Patch
 - **Major**: Breaking Changes (große Änderungen)
 - **Minor**: Neue Features (rückwärts-kompatibel)
@@ -247,6 +241,20 @@ Beispiele:
 - v1.0.0 → v1.0.1 (kleiner Bugfix)
 - v1.0.1 → v1.1.0 (neue Funktion hinzugefügt)
 - v1.1.0 → v2.0.0 (großer Umbau, nicht mehr kompatibel)
+
+**update_url:**  
+Hier kannst du eine **GitHub API URL** angeben, unter der der `plugin_updater.py`
+nach einer neuen Version suchen soll. Das Format ist:
+
+```
+https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest
+```
+
+Der Updater ruft die GitHub API auf, vergleicht die `tag_name`-Version mit der
+lokalen Version und lädt bei einer neueren Version das passende Release-Asset
+herunter (Windows → `.zip` mit "Windows" im Namen, Linux → `.tar.gz` mit "Linux").
+
+Wird kein `update_url` gesetzt, überspringt der Updater dein Plugin.
 
 ---
 
@@ -264,6 +272,46 @@ Wenn du Python verlässt, musst du viel selbst machen, das Python-Module dir abn
 Der Grundaufbau kann je nach Sprache schnell **mehrere hundert Zeilen Code** brauchen – deutlich mehr als die ~20 Zeilen Python oben.
 
 **Faustregel:** Python ist der beste Startpunkt. Wenn du später mehr Performance brauchst, kannst du Performance-kritische Teile später immer noch optimieren oder in eine andere Sprache erstellen.
+
+---
+
+## Plugin-Updates (plugin_updater.py)
+
+Für externe Plugins gibt es den `plugin_updater.py` (kompiliert zu `plugin_updater.exe`).
+Er wird automatisch beim Start des Streaming-Tools (nach dem Registry-Scan) ausgeführt.
+
+### Wie es funktioniert
+
+1. Der Updater durchsucht alle Plugin-Ordner nach `version.txt`-Dateien.
+2. Wenn eine `update_url` gesetzt ist (GitHub API URL), wird die GitHub API abgefragt.
+3. Die `tag_name`-Version des Releases wird mit der lokalen Version verglichen.
+4. Ist die Release-Version neuer, wird das passende Asset heruntergeladen.
+5. Das Archiv wird entpackt und die Dateien im Plugin-Ordner ersetzt.
+6. Die `config.yaml` des Plugins wird **nicht überschrieben**.
+
+### GitHub Release vorbereiten
+
+Damit dein Plugin aktualisiert werden kann, erstelle ein GitHub Release mit:
+
+- **Tag**: z. B. `v1.1.0`
+- **Asset (Windows)**: `meinplugin-v1.1.0-Windows.zip`
+- **Asset (Linux)**: `meinplugin-v1.1.0-Linux.tar.gz`
+
+Das Archiv sollte diese Struktur haben:
+
+```
+meinplugin-v1.1.0-Windows.zip
+├── main.exe
+├── version.txt
+├── README.md
+├── config.yaml     ← wird ignoriert (Nutzerconfig bleibt erhalten)
+└── ...             ← weitere Ressourcen
+```
+
+Die `update_url` in deiner `version.txt` muss so aussehen:
+```
+update_url: https://api.github.com/repos/{DEIN_USER}/{DEIN_REPO}/releases/latest
+```
 
 ---
 
