@@ -144,8 +144,12 @@ def save_dims():
 
 @app.route("/webhook", methods=["POST"])
 def add():
-    if request.json.get("event") == "player_death":
-        death_manager.add_death()
+    try:
+        data = request.json
+        if data and data.get("event") == "player_death":
+            death_manager.add_death()
+    except Exception as e:
+        print(f"[DEATHCOUNTER] Webhook error: {e}")
     return "OK"
 
 @app.route("/stream")
