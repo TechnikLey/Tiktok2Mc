@@ -125,7 +125,7 @@ except Exception as e:
     sys.exit(1)
 
 with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
-    cfg_api = yaml.safe_load(f)
+    cfg_api = yaml.safe_load(f) or {}
 
     webhook = cfg_api.setdefault("webhooks", {})
     webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])

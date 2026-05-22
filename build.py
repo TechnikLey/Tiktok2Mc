@@ -36,8 +36,8 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.3.0"
-        UPDATER_VERSION = "v1.2.0"
+        TOOL_VERSION = "v0.4.0"
+        UPDATER_VERSION = "v1.3.0"
 
         IS_WINDOWS = sys.platform == "win32"
         SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -279,6 +279,7 @@ def main():
             ("tools/DelayedTNT.jar",                "server/mc/plugins/DelayedTNT.jar"),
             ("tools/server.jar",                    "server/mc/server.jar"),
             ("tools/mca.vsix",                      "core/assets/mca.vsix"),
+            ("AIPrompt.md",                         "AIPrompt.md"),
         ]
 
         for src_rel, dst_rel in FILES:

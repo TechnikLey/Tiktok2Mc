@@ -13,6 +13,9 @@ Each version is split into two sections:
 
 ## [Unreleased]
 
+> [!WARNING]
+> Due to significant changes to the configuration structure, errors may occur. Please review the **Changed** section below and ensure your config matches the latest template. If you are affected, simply download the latest release and replace your `config.yaml` with the new one from the release package.
+
 #### Added
 * **Config Option: `max_update_logs`** — A new configuration option under the `Updater` section in `config.yaml` that allows users to specify how many update log files to keep in the `logs/update_logs` directory.
 * **`AIPrompt.md`** — Added a system prompt template for AI-powered assistants. When loaded, the AI follows strict rules.

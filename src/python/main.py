@@ -125,6 +125,10 @@ class BotContext:
         self.queue_active = True
         self.runtime_path_shutdown = (BASE_DIR / "runtime" / "shutdown").resolve()
 
+        # RCON retry tracking (keyed by repr(commands) to limit re-queue loops)
+        self.max_rcon_retries = 3
+        self.rcon_queue_retries: dict[str, int] = {}
+
 
 ctx = BotContext()
 
@@ -342,25 +346,24 @@ async def rcon_worker():
     print("[RCON-QUEUE] Worker started.")
     while True:
         commands, source_user = await ctx.rcon_queue.get()
-        
-        if not ctx.queue_active:
-            await ctx.rcon_queue.put((commands, source_user))
-            await asyncio.sleep(1)
-            continue
-
-        q_size = ctx.rcon_queue.qsize()
-        wait_time = ctx.throttle_time
-        inner_pause = 0.01 
-        
-        # Dynamic throttling based on queue depth
-        if q_size > 100:
-            wait_time, inner_pause = 0.01, 0.001
-        elif q_size > 50:
-            wait_time, inner_pause = 0.05, 0.005
-        elif q_size > 20:
-            wait_time, inner_pause = 0.1, 0.01
-
         try:
+            if not ctx.queue_active:
+                await ctx.rcon_queue.put((commands, source_user))
+                await asyncio.sleep(1)
+                continue
+
+            q_size = ctx.rcon_queue.qsize()
+            wait_time = ctx.throttle_time
+            inner_pause = 0.01 
+            
+            # Dynamic throttling based on queue depth
+            if q_size > 100:
+                wait_time, inner_pause = 0.01, 0.001
+            elif q_size > 50:
+                wait_time, inner_pause = 0.05, 0.005
+            elif q_size > 20:
+                wait_time, inner_pause = 0.1, 0.01
+
             async with ctx.rcon_pool_lock:
                 if ctx.rcon_connection is None:
                     now = time.time()
@@ -390,14 +393,22 @@ async def rcon_worker():
             print(f"[RCON OFFLINE] {e}")
             ctx.rcon_connection = None
             await asyncio.sleep(5)
-            try:
-                await ctx.rcon_queue.put((commands, source_user))
-            except Exception:
-                print("RCON Queue Error")
+            retry_key = repr((commands, source_user))
+            retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
+            if retries <= ctx.max_rcon_retries:
+                ctx.rcon_queue_retries[retry_key] = retries
+                try:
+                    await ctx.rcon_queue.put((commands, source_user))
+                except Exception:
+                    print("RCON Queue Error")
+            else:
+                print(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
+                ctx.rcon_queue_retries.pop(retry_key, None)
             await asyncio.sleep(wait_time)
             continue
-        ctx.rcon_queue.task_done()
-        await asyncio.sleep(wait_time)
+        finally:
+            ctx.rcon_queue.task_done()
+            await asyncio.sleep(wait_time)
 
 async def execute_global_command(trigger_name: str, source_user: str, chain_depth: int = 0):
     """Resolves a trigger name into RCON commands and enqueues them."""
@@ -776,29 +787,30 @@ def update_daily_revenue():
             ctx.gift_day_start_value = ctx.gift_value_usd
             ctx.gift_current_log_date = today
         daily_value = ctx.gift_value_usd - ctx.gift_day_start_value
-    new_entry = {
-        "date": today,
-        "estimated_revenue_usd": daily_value
-    }
-    entries = []
-    if file_path.exists():
-        with file_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    updated = False
-    for i, entry in enumerate(entries):
-        if entry.get("date") == today:
-            entries[i] = new_entry
-            updated = True
-            break
-    if not updated:
-        entries.append(new_entry)
-    with file_path.open("w", encoding="utf-8") as f:
-        for entry in entries:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+        new_entry = {
+            "date": today,
+            "estimated_revenue_usd": daily_value
+        }
+        entries = []
+        if file_path.exists():
+            with file_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        updated = False
+        for i, entry in enumerate(entries):
+            if entry.get("date") == today:
+                entries[i] = new_entry
+                updated = True
+                break
+        if not updated:
+            entries.append(new_entry)
+        with file_path.open("w", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 # ==========================================
 # TIKTOK CLIENT
@@ -871,8 +883,8 @@ def create_client(user):
                 ctx.start_likes = event.total
                 print(f"[LIKE] Initial count set: {ctx.start_likes}")
                 return
-        try:
             total_since_start = event.total - ctx.start_likes
+        try:
             with ctx.like_lock:
                 for rule in ctx.like_triggers:
                     every = rule["every"]
