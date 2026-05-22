@@ -215,8 +215,6 @@ minecraft_server_api:
   enabled: true
   api_port: 29187
   web_server_port: 29188
-  web_server_port_timer: 29189
-  deathcounter_port: 29190
 
 # --- OVERLAY TEXT ---
 # Displays text notifications on stream (triggered via >> in actions.mca).
@@ -308,12 +306,14 @@ like_goal:
 # respawn. When it reaches zero, a win is counted.
 timer:
   enabled: true
+  port: 29189
   start_time: 10   # Minutes
 
 # --- DEATH COUNTER ---
 # Displays the number of player deaths on stream.
 death_counter:
   enabled: true
+  port: 29190
 
 # --- WIN COUNTER OVERLAY ---
 # Tracks wins and losses. Decrements on death, increments on timer expiry.

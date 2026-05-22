@@ -66,8 +66,8 @@ Each plugin has its own port, defined in `config.yaml`:
 | GUI | 29185 | `gui.port` |
 | OverlayTxt | 29186 | `overlay_text.port` |
 | MinecraftServerAPI | 29188 | `minecraft_server_api.web_server_port` |
-| Timer | 29189 | `minecraft_server_api.web_server_port_timer` |
-| DeathCounter | 29190 | `minecraft_server_api.deathcounter_port` |
+| Timer | 29189 | `timer.port` |
+| DeathCounter | 29190 | `death_counter.port` |
 | WinCounter | 29191 | `win_counter.port` |
 | LikeGoal | 29193 | `like_goal.port` |
 

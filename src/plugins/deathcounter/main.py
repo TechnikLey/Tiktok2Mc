@@ -39,7 +39,7 @@ if CONFIG_FILE.exists():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-            WEB_SERVER_PORT = cfg.get("minecraft_server_api", {}).get("deathcounter_port", 29190)
+            WEB_SERVER_PORT = cfg.get("death_counter", {}).get("port", 29190)
     except Exception as e:
         print(f"Config error: {e}")
         cfg = {}

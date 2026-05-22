@@ -41,6 +41,7 @@ Each version is split into two sections:
 * **`autosave_interval_seconds` moved to `tiktok`** – Gift revenue logging moved under `tiktok.autosave_interval_seconds` (was `gifts.autosave_interval_seconds`). The `gifts` block has been removed.
 * **`win_counter.web_server_port` renamed to `win_counter.port`** – Consistent with other single-port modules.
 * **Modules section reordered** – Modules are now grouped logically: infrastructure → overlays → game logic → system.
+* **Ports moved to own modules** – `deathcounter_port` moved from `minecraft_server_api` to `death_counter.port`; `web_server_port_timer` moved to `timer.port`. Each module now owns its own port.
 * **`version.txt` format** – The file now uses a key:value format (`version: v1.0.0`, `update_url: ...`) instead of a single version number. This allows the updater to know where to check for new versions.
 * **Documentation overhaul** – Both the German and the English developer documentation have been extensively revised and adapted to the new plugin system. All chapters now reflect the current structure.
 
