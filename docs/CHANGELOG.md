@@ -11,7 +11,7 @@ Each version is split into two sections:
 
 ---
 
-## [Unreleased]
+## [v0.4.0] - 2026-05-22
 
 > [!WARNING]
 > Due to significant changes to the configuration structure, errors may occur. Please review the **Changed** section below and ensure your config matches the latest template. If you are affected, simply download the latest release and replace your `config.yaml` with the new one from the release package.
