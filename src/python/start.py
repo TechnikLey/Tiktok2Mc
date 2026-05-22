@@ -318,35 +318,14 @@ def replace_updater_if_exists():
 def start_update_exe():
     """Run updater synchronously — must wait for exit code, so no tmux/screen here."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
+    log_dir = BASE_DIR / "logs" / "update_logs"
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
         print("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
-        log_dir = BASE_DIR / "logs" / "update_logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
-    update_cfg = cfg.get("update", {})
-    max_logs = update_cfg.get("max_update_logs", 20)
-        try:
-            max_logs = int(max_logs)
-        except Exception as e:
-            print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
-            max_logs = 20
-        if max_logs == 0:
-            logs = list(log_dir.glob("updater_*.log"))
-            for old_log in logs:
-                try:
-                    old_log.unlink()
-                except Exception as e:
-                    print(f"[WARN] Failed to delete old log {old_log}: {e}")
-        elif max_logs > 0:
-            logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
-            for old_log in logs[max_logs - 1:]:
-                try:
-                    old_log.unlink()
-                except Exception as e:
-                    print(f"[WARN] Failed to delete old log {old_log}: {e}")
         with open(log_file, "a") as lf:
             proc = subprocess.Popen(
                 cmd,
@@ -354,6 +333,27 @@ def start_update_exe():
                 stderr=lf,
                 preexec_fn=os.setsid
             )
+    update_cfg = cfg.get("update", {})
+    max_logs = update_cfg.get("max_update_logs", 20)
+    try:
+        max_logs = int(max_logs)
+    except Exception as e:
+        print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
+        max_logs = 20
+    if max_logs == 0:
+        logs = list(log_dir.glob("updater_*.log"))
+        for old_log in logs:
+            try:
+                old_log.unlink()
+            except Exception as e:
+                print(f"[WARN] Failed to delete old log {old_log}: {e}")
+    elif max_logs > 0:
+        logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for old_log in logs[max_logs - 1:]:
+            try:
+                old_log.unlink()
+            except Exception as e:
+                print(f"[WARN] Failed to delete old log {old_log}: {e}")
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
