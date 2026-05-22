@@ -23,7 +23,7 @@ ROOT_DIR = get_root_dir()
 
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 STATE_FILE = (ROOT_DIR / "data" / "window_state_death.json").resolve()
-WEB_SERVER_PORT = 7979 
+WEB_SERVER_PORT = 29190 
 
 def load_win_size():
     if STATE_FILE.exists():
@@ -39,7 +39,7 @@ if CONFIG_FILE.exists():
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-            WEB_SERVER_PORT = cfg.get("MinecraftServerAPI", {}).get("DEATHCOUNTER_PORT", 7979)
+            WEB_SERVER_PORT = cfg.get("MinecraftServerAPI", {}).get("DEATHCOUNTER_PORT", 29190)
     except Exception as e:
         print(f"Config error: {e}")
         cfg = {}

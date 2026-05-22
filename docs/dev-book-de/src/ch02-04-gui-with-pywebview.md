@@ -84,14 +84,14 @@ import webview
 import threading
 
 def start_server():
-    app.run(port=8001, debug=False)
+    app.run(port=29196, debug=False)
 
 # Flask im Thread starten
 flask_thread = threading.Thread(target=start_server, daemon=True)
 flask_thread.start()
 
-# pywebview öffnet Fenster (zeigt localhost:8001)
-webview.create_window('Mein Plugin', 'http://localhost:8001', width=600, height=400)
+# pywebview öffnet Fenster (zeigt localhost:29196)
+webview.create_window('Mein Plugin', 'http://localhost:29196', width=600, height=400)
 webview.start()
 ```
 
@@ -160,10 +160,10 @@ def save_state():
 
 if __name__ == '__main__':
     # Flask im Thread
-    threading.Thread(target=lambda: app.run(port=8001), daemon=True).start()
+    threading.Thread(target=lambda: app.run(port=29196), daemon=True).start()
     
     # pywebview
-    webview.create_window('Counter', 'http://localhost:8001', width=400, height=300)
+    webview.create_window('Counter', 'http://localhost:29196', width=400, height=300)
     webview.start()
 ```
 
@@ -252,13 +252,13 @@ def update_count():
     return "OK"
 
 def start_flask():
-    app.run(host='127.0.0.1', port=7777, debug=False)
+    app.run(host='127.0.0.1', port=29188, debug=False)
 
 def start_gui():
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
     
-    webview.create_window('Counter Plugin', 'http://127.0.0.1:7777')
+    webview.create_window('Counter Plugin', 'http://127.0.0.1:29188')
     webview.start()
 
 # Im Hauptprogramm:

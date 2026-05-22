@@ -34,7 +34,7 @@ with open(CONFIG_FILE, "r") as f:
     cfg = yaml.safe_load(f)
 
 BOT_HOST = "http://127.0.0.1"
-BOT_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)  # Must match WebServerPort in config.yaml
+BOT_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPort", 29188)  # Must match WebServerPort in config.yaml
 
 URL = f"{BOT_HOST}:{BOT_PORT}/custom_trigger"
 

@@ -53,7 +53,7 @@ DATAPACK_ROOT, CONFIG_TIKTOK_USER = "", ""
 RECONNECT_DELAY = 30
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = "127.0.0.1"
-LIKE_GOAL_PORT = 9797
+LIKE_GOAL_PORT = 29193
 LIKE_TRIGGERS = []
 AUTOSAVE_INTERVAL_SECONDS = 60
 
@@ -81,9 +81,9 @@ MAIN_LOOP = None
 _hook_api = None
 
 QUEUE_ACTIVE = True
-MCSERVER_API_PORT = 7777
+MCSERVER_API_PORT = 29188
 
-OVERLAYTXT_PORT = 5005
+OVERLAYTXT_PORT = 29186
 
 last_likegoal_sent = 0
 last_likegoal_time = 0
@@ -135,9 +135,9 @@ def load_config():
         SERVER_HOST = config.get("server_host", "127.0.0.1")
         CONFIG_TIKTOK_USER = config.get("TikTok", {}).get("User", "")
         RECONNECT_DELAY = config.get("TikTok", {}).get("ReconnectDelaySeconds", 10)
-        MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
-        OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 5005)
-        LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
+        MCSERVER_API_PORT = config.get("MinecraftServerAPI", {}).get("WebServerPort", 29188)
+        OVERLAYTXT_PORT = config.get("Overlaytxt", {}).get("Port", 29186)
+        LIKE_GOAL_PORT = config.get("Gifts", {}).get("LIKE_GOAL_PORT", 29193)
         AUTOSAVE_INTERVAL_SECONDS = config.get("Gifts", {}).get("autosave_interval_seconds", 60)
 
         raw_included = config.get("Gifts", {}).get("random_included", [])

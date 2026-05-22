@@ -13,7 +13,7 @@ DCS ist die **universelle Kommunikationsmethode** – alle Plugins unterstützen
 ```
 ┌──────────────┐       HTTP Request         ┌──────────────┐
 │  Timer       ├───────────────────────────>│  WinCounter  │
-│  Port 7878   │  POST /add?amount=1        │  Port 8080   │
+│  Port 29189   │  POST /add?amount=1        │  Port 29191   │
 │              │                            │              │
 │              │       HTTP Response        │              │
 │              │<───────────────────────────┤              │
@@ -35,7 +35,7 @@ DCS ist die **universelle Kommunikationsmethode** – alle Plugins unterstützen
 
 Im echten Code passiert genau das: Wenn der Timer bei 0 ankommt, sendet er einen HTTP-POST an den WinCounter, um einen Win hinzuzufügen.
 
-**WinCounter (Server auf Port 8080):**
+**WinCounter (Server auf Port 29191):**
 ```python
 @app.route("/add", methods=["POST"])
 def add():
@@ -45,7 +45,7 @@ def add():
 
 **Timer (Client):**
 ```python
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
+WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
 ADD_URL = f"http://localhost:{WIN_PORT}/add?amount=1"
 
 class API:
@@ -63,13 +63,13 @@ Jedes Plugin hat seinen eigenen Port, definiert in `config.yaml`:
 
 | Plugin | Port | Config-Key |
 |--------|------|-----------|
-| GUI | 5000 | `GUI.Port` |
-| OverlayTxt | 5005 | `Overlaytxt.Port` |
-| MinecraftServerAPI | 7777 | `MinecraftServerAPI.WebServerPort` |
-| Timer | 7878 | `MinecraftServerAPI.WebServerPortTimer` |
-| DeathCounter | 7979 | `MinecraftServerAPI.DEATHCOUNTER_PORT` |
-| WinCounter | 8080 | `WinCounter.WebServerPort` |
-| LikeGoal | 9797 | `Gifts.LIKE_GOAL_PORT` |
+| GUI | 29185 | `GUI.Port` |
+| OverlayTxt | 29186 | `Overlaytxt.Port` |
+| MinecraftServerAPI | 29188 | `MinecraftServerAPI.WebServerPort` |
+| Timer | 29189 | `MinecraftServerAPI.WebServerPortTimer` |
+| DeathCounter | 29190 | `MinecraftServerAPI.DEATHCOUNTER_PORT` |
+| WinCounter | 29191 | `WinCounter.WebServerPort` |
+| LikeGoal | 29193 | `Gifts.LIKE_GOAL_PORT` |
 
 > [!IMPORTANT]
 > Jeder Port muss **eindeutig** sein. Wenn zwei Plugins den gleichen Port nutzen, schlägt der Start fehl.
@@ -142,10 +142,10 @@ Die Webhook-URLs werden in `configServerAPI.yml` konfiguriert:
 ```yaml
 webhooks:
   urls:
-    - "http://localhost:7777/webhook"    # Main App
-    - "http://localhost:7878/webhook"    # Timer
-    - "http://localhost:7979/webhook"    # DeathCounter
-    - "http://localhost:8080/webhook"    # WinCounter
+    - "http://localhost:29188/webhook"    # Main App
+    - "http://localhost:29189/webhook"    # Timer
+    - "http://localhost:29190/webhook"    # DeathCounter
+    - "http://localhost:29191/webhook"    # WinCounter
 ```
 
 > [!TIP]

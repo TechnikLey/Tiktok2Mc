@@ -41,7 +41,7 @@ try:
     else:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
-        LIKE_GOAL_PORT = cfg.get("Gifts", {}).get("LIKE_GOAL_PORT", 9797)
+        LIKE_GOAL_PORT = cfg.get("Gifts", {}).get("LIKE_GOAL_PORT", 29193)
         CUSTOM_TEXT = cfg.get("LikeGoal", {}).get("DisplayText", "Like Goal")
         INITIAL_GOAL = cfg.get("LikeGoal", {}).get("InitialGoal", 100_000)
         GOAL_MULTIPLIER = cfg.get("LikeGoal", {}).get("GoalMultiplier", 2)
@@ -49,7 +49,7 @@ try:
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
     print(f"Config error: {e}")
-    LIKE_GOAL_PORT = 9797
+    LIKE_GOAL_PORT = 29193
     CUSTOM_TEXT = "Like Goal"
     INITIAL_GOAL = 100_000
     GOAL_MULTIPLIER = 2

@@ -49,7 +49,7 @@ try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
 except Exception: cfg = {}
-PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
+PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 WINCOUNTER_EXE_PATH = get_base_file()

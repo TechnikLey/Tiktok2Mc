@@ -17,7 +17,7 @@ Plugins laufen parallel. Manchmal braucht eines Daten von einem anderen:
 ┌──────────────┐ POST /api/action ┌──────────────┐
 │   Plugin A   ├────────────────> │   Plugin B   │
 │  (Client)    │  {action: "add"} │   (Server)   │
-│   Port 8001  │                  │   Port 8002  │
+│   Port 29196  │                  │   Port 8002  │
 │              │<─────────────────┤              │
 │              │ {status: ok}     │              │
 └──────────────┘                  └──────────────┘
@@ -44,7 +44,7 @@ def add_wins():
 ```python
 import requests
 
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
+WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
 WIN_URL = f"http://localhost:{WIN_PORT}/add?amount=1"
 
 try:
@@ -63,11 +63,11 @@ except Exception as e:
 ```yaml
 WinCounter:
   Enable: true
-  WebServerPort: 8080
+  WebServerPort: 29191
 
 Timer:
   Enable: true
-  WebServerPortTimer: 7878
+  WebServerPortTimer: 29189
 ```
 
 **Timeout setzen:** Wenn das andere Plugin nicht lädt, wartet man nicht ewig.
@@ -126,7 +126,7 @@ Ein Plugin kann ein anderes Plugin vor bestimmten Events benachrichtigen, indem 
 
 ```python
 # Plugin A sendet Event an Plugin B:
-requests.post("http://localhost:7777/webhook", json={
+requests.post("http://localhost:29188/webhook", json={
     "event": "custom_event",
     "data": {"some": "data"}
 })
@@ -150,7 +150,7 @@ def webhook():
 ```python
 # Client wartet auf Antwort
 try:
-    r = requests.get(f"http://localhost:8080/stats", timeout=2)
+    r = requests.get(f"http://localhost:29191/stats", timeout=2)
     stats = r.json()
 except:
     stats = {}  # Fallback
@@ -164,7 +164,7 @@ except:
 # Client sendet, wartet nicht auf Antwort
 threading.Thread(
     target=requests.post,
-    args=(f"http://localhost:8080/trigger", ),
+    args=(f"http://localhost:29191/trigger", ),
     daemon=True
 ).start()
 ```
@@ -177,7 +177,7 @@ threading.Thread(
 def poll_other_plugin():
     while running:
         try:
-            r = requests.get(f"http://localhost:8080/status")
+            r = requests.get(f"http://localhost:29191/status")
             process_status(r.json())
         except:
             pass

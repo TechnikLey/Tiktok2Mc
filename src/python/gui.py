@@ -33,7 +33,7 @@ with CONFIG_FILE.open("r", encoding="utf-8") as f:
 
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = config.get("server_host", "127.0.0.1")
-GUI_PORT = config.get("GUI", {}).get("Port", 5000)
+GUI_PORT = config.get("GUI", {}).get("Port", 29185)
 GUI_ENABLED = config.get("GUI", {}).get("Enable", False)
 
 # --- Gift database file ---

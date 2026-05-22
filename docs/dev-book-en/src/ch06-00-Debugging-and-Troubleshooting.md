@@ -194,7 +194,7 @@ If errors → check YAML syntax (indentation, colons, etc.)
 
 ### 3. "Port already in use"
 
-**Error:** `Address already in use :8080`
+**Error:** `Address already in use :29191`
 
 **Cause:** Another program is using the port.
 
@@ -202,13 +202,13 @@ If errors → check YAML syntax (indentation, colons, etc.)
 
 **Windows:**
 ```powershell
-netstat -ano | findstr :8080
+netstat -ano | findstr :29191
 taskkill /PID <pid_nummer> /F
 ```
 
 **macOS/Linux:**
 ```bash
-lsof -i :8080
+lsof -i :29191
 kill -9 <pid>
 ```
 
@@ -216,7 +216,7 @@ kill -9 <pid>
 
 ```yaml
 Timer:
-  WebServerPort: 8081  # Instead of 8080
+  WebServerPort: 8081  # Instead of 29191
 ```
 
 ---
@@ -290,7 +290,7 @@ def webhook():
 
 1. **Is Flask running?** 
    ```bash
-   curl http://localhost:7878/webhook -X POST -d "{}"
+   curl http://localhost:29189/webhook -X POST -d "{}"
    ```
 
 2. **Firewall allows port?** Port must be open.

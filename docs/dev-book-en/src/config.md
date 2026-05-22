@@ -83,7 +83,7 @@ def load_default_config():
 
 # Read values with defaults
 cfg = load_config()
-port = cfg.get("WebServer", {}).get("Port", 5000)
+port = cfg.get("WebServer", {}).get("Port", 29185)
 enabled = cfg.get("MyPlugin", {}).get("Enable", True)
 ```
 
@@ -98,7 +98,7 @@ log_level = cfg["Log"]["Level"]  # KeyError risk!
 
 # Deep get
 db_host = cfg.get("Database", {}).get("Host", "localhost")
-db_port = cfg.get("Database", {}).get("Port", 5432)
+db_port = cfg.get("Database", {}).get("Port", 29194)
 
 # Entire section with default
 timer_cfg = cfg.get("Timer", {})

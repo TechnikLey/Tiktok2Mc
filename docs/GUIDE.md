@@ -423,8 +423,8 @@ GiftID:ShellCommand
 **Example:**
 
 ```
-18508:curl -X POST http://localhost:8080/add?amount=10
-16071:curl -X POST http://localhost:8080/remove?amount=10
+18508:curl -X POST http://localhost:29191/add?amount=10
+16071:curl -X POST http://localhost:29191/remove?amount=10
 ```
 
 **Important notes:**
@@ -435,7 +435,7 @@ GiftID:ShellCommand
 - The command runs directly on your computer. Only use commands you trust.
 
 > [!TIP]
-> The WinCounter plugin runs on `http://localhost:8080`. You can call its endpoints directly: `/add?amount=N` and `/remove?amount=N`.
+> The WinCounter plugin runs on `http://localhost:29191`. You can call its endpoints directly: `/add?amount=N` and `/remove?amount=N`.
 
 ---
 
@@ -524,31 +524,31 @@ The tool includes several built-in overlay plugins. These are small web pages th
 
 Displays the number of times the player has died. Updates automatically on in-game death.
 
-- **OBS URL:** `http://localhost:7979`
+- **OBS URL:** `http://localhost:29190`
 
 ### Win Counter
 
 Tracks wins and losses. Decrements on player death, increments when the Stream Timer reaches zero.
 
-- **OBS URL:** `http://localhost:8080`
+- **OBS URL:** `http://localhost:29191`
 
 ### Like Goal
 
 Shows a progress bar tracking likes toward a goal. Configure the display text, initial goal, and multiplier mode in `config/config.yaml`.
 
-- **OBS URL:** `http://localhost:9797`
+- **OBS URL:** `http://localhost:29193`
 
 ### Stream Timer
 
 A countdown timer that pauses on player death and resumes on respawn. When it reaches zero, a win is counted. The starting time is set in `config/config.yaml`.
 
-- **OBS URL:** `http://localhost:7878`
+- **OBS URL:** `http://localhost:29189`
 
 ### Overlay Text
 
 Displays custom text notifications on stream.
 
-- **OBS URL:** `http://localhost:5005/?overlay=default`
+- **OBS URL:** `http://localhost:29186/?overlay=default`
 
 > [!NOTE]
 > Overlay Text works best with **DCS** mode. In **ICS** mode, a green screen filter is needed, which may reduce text quality.
@@ -559,7 +559,7 @@ Displays custom text notifications on stream.
 
 You can run several overlay windows simultaneously — each as a separate OBS Browser Source pointing to a different named overlay. Configure the list of overlay names in `config/config.yaml` under `Overlaytxt.Overlays`.
 
-Each name creates a unique URL: `http://localhost:5005/?overlay=NAME`
+Each name creates a unique URL: `http://localhost:29186/?overlay=NAME`
 
 **Targeting overlays from `actions.mca`:**
 
@@ -619,14 +619,14 @@ Copy them to a safe location outside the tool folder.
 |------|----------|
 | 25565 | Minecraft Server |
 | 25575 | RCON (Server Communication) |
-| 5000 | Web Dashboard (GUI) |
-| 7000 | Minecraft Server API |
-| 7777 | Internal Web Server |
-| 7878 | Stream Timer Overlay |
-| 7979 | Death Counter Overlay |
-| 8080 | Win Counter Overlay |
-| 5005 | Overlay Text |
-| 9797 | Like Goal Overlay |
+| 29185 | Web Dashboard (GUI) |
+| 29187 | Minecraft Server API |
+| 29188 | Internal Web Server |
+| 29189 | Stream Timer Overlay |
+| 29190 | Death Counter Overlay |
+| 29191 | Win Counter Overlay |
+| 29186 | Overlay Text |
+| 29193 | Like Goal Overlay |
 
 Under normal circumstances, you do not need to change any ports. Only change a port if you get an "Address already in use" error.
 

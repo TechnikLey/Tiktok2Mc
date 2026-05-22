@@ -269,7 +269,7 @@ tiktok_user: "dein_tiktok_name"
 # Ports für verschiedene Plugins
 MinecraftServerAPI:
   Enable: true
-  WebServerPort: 8888
+  WebServerPort: 29192
   
 Timer:
   Enable: true
@@ -335,7 +335,7 @@ deactivate
 |---------|--------|
 | `python: command not found` | Python nicht im PATH. Neu installieren und "Add Python to PATH" aktivieren |
 | `ModuleNotFoundError: No module named 'TikTokLive'` | `pip install -r requirements.txt` noch nicht ausgeführt |
-| `Port 8080 already in use` | Andere Anwendung nutzt den Port. In `config.yaml` einen anderen Port wählen |
+| `Port 29191 already in use` | Andere Anwendung nutzt den Port. In `config.yaml` einen anderen Port wählen |
 | `Permission denied` (macOS/Linux) | `chmod +x create_plugin.ps1` ausführen |
 | venv aktiviert sich nicht (PowerShell) | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` ausführen |
 | `pip: The term 'pip' is not recognized as a name of a cmdlet, function, script file, or executable program.` | Führe `python -m pip` aus dies kann helfen |

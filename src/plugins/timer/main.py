@@ -30,8 +30,8 @@ try:
 except Exception: cfg = {}
 
 TIMER_MINS = cfg.get("Timer", {}).get("StartTime", 10)
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
-WEB_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPortTimer", 7878)
+WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
+WEB_PORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPortTimer", 29189)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # Win counter URL for incrementing wins when timer expires

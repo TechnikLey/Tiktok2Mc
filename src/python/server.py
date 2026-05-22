@@ -113,8 +113,8 @@ try:
     Xms = cfg.get("Java", {}).get("Xms", "1G")
     Xmx = cfg.get("Java", {}).get("Xmx", "1G")
     MC_PORT = cfg.get("Java", {}).get("Port", 25565)
-    WEBSERVERPORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPort", 7777)
-    APIPORT = cfg.get("MinecraftServerAPI", {}).get("APIPort", 7000)
+    WEBSERVERPORT = cfg.get("MinecraftServerAPI", {}).get("WebServerPort", 29188)
+    APIPORT = cfg.get("MinecraftServerAPI", {}).get("APIPort", 29187)
     MINECRAFTSERVERAPI_ENABLED = cfg.get("MinecraftServerAPI", {}).get("Enable", True)
     # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
     SERVER_HOST = cfg.get("server_host", "127.0.0.1")
@@ -131,7 +131,7 @@ with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
     urls = webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
     URL = urls[0]
 
-    if APIPORT != cfg_api.get("port", 7000):
+    if APIPORT != cfg_api.get("port", 29187):
         cfg_api["port"] = int(APIPORT)
     else:
         print("API Port is up to date.")

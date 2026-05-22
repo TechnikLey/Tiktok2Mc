@@ -26,6 +26,7 @@ Each version is split into two sections:
 * **Documentation rewrite** — The user guide (`docs/GUIDE.md`) has been completely rewritten as `docs/rework_temp.md` with improved structure, readability, and beginner-friendliness. All configuration explanations outside the Quick Start section have been replaced with references to `config.yaml`.
 * **Improved config template** — A new annotated config template (`docs/config_explanatory.yaml`) with enhanced inline comments and a quick-start checklist has been added.
 * **AI Prompt documentation** — The `AIPrompt.md` file is now referenced in the user guide under Additional Resources.
+* **Default Port Change** Changed the default ports for several internal services to less commonly used ports to avoid conflicts with other software (GUI: 29185, OverlayTxt: 29186, MinecraftServerAPI: 29187, Webhook: 29188, Timer: 29189, DeathCounter: 29190, WinCounter: 29191, LikeGoal: 29193). The Minecraft server (25565) and RCON (25575) ports remain unchanged.
 
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.

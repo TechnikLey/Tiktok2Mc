@@ -13,7 +13,7 @@ DCS is the **universal communication method** – all plugins support it.
 ```
 ┌──────────────┐       HTTP Request         ┌──────────────┐
 │  Timer       ├───────────────────────────>│  WinCounter  │
-│  Port 7878   │  POST /add?amount=1        │  Port 8080   │
+│  Port 29189   │  POST /add?amount=1        │  Port 29191   │
 │              │                            │              │
 │              │       HTTP Response        │              │
 │              │<───────────────────────────┤              │
@@ -35,7 +35,7 @@ DCS is the **universal communication method** – all plugins support it.
 
 In real code, this is exactly what happens: when the timer reaches 0, it sends an HTTP POST to the WinCounter to add a win.
 
-**WinCounter (server on port 8080):**
+**WinCounter (server on port 29191):**
 ```python
 @app.route("/add", methods=["POST"])
 def add():
@@ -45,7 +45,7 @@ def add():
 
 **Timer (client):**
 ```python
-WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 8080)
+WIN_PORT = cfg.get("WinCounter", {}).get("WebServerPort", 29191)
 ADD_URL = f"http://localhost:{WIN_PORT}/add?amount=1"
 
 class API:
@@ -63,13 +63,13 @@ Each plugin has its own port, defined in `config.yaml`:
 
 | Plugin | Port | Config key |
 |--------|------|-----------|
-| GUI | 5000 | `GUI.Port` |
-| OverlayTxt | 5005 | `Overlaytxt.Port` |
-| MinecraftServerAPI | 7777 | `MinecraftServerAPI.WebServerPort` |
-| Timer | 7878 | `MinecraftServerAPI.WebServerPortTimer` |
-| DeathCounter | 7979 | `MinecraftServerAPI.DEATHCOUNTER_PORT` |
-| WinCounter | 8080 | `WinCounter.WebServerPort` |
-| LikeGoal | 9797 | `Gifts.LIKE_GOAL_PORT` |
+| GUI | 29185 | `GUI.Port` |
+| OverlayTxt | 29186 | `Overlaytxt.Port` |
+| MinecraftServerAPI | 29188 | `MinecraftServerAPI.WebServerPort` |
+| Timer | 29189 | `MinecraftServerAPI.WebServerPortTimer` |
+| DeathCounter | 29190 | `MinecraftServerAPI.DEATHCOUNTER_PORT` |
+| WinCounter | 29191 | `WinCounter.WebServerPort` |
+| LikeGoal | 29193 | `Gifts.LIKE_GOAL_PORT` |
 
 > [!IMPORTANT]
 > Every port must be **unique**. If two plugins use the same port, startup will fail.
@@ -142,10 +142,10 @@ The webhook URLs are configured in `configServerAPI.yml`:
 ```yaml
 webhooks:
   urls:
-    - "http://localhost:7777/webhook"    # Main App
-    - "http://localhost:7878/webhook"    # Timer
-    - "http://localhost:7979/webhook"    # DeathCounter
-    - "http://localhost:8080/webhook"    # WinCounter
+    - "http://localhost:29188/webhook"    # Main App
+    - "http://localhost:29189/webhook"    # Timer
+    - "http://localhost:29190/webhook"    # DeathCounter
+    - "http://localhost:29191/webhook"    # WinCounter
 ```
 
 > [!TIP]

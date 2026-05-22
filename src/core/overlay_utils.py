@@ -56,7 +56,7 @@ class OverlayManager:
             logging.error(f"YAML Error: {e}")
             return
 
-        global_port = conf.get("Port", 5005)
+        global_port = conf.get("Port", 29186)
         def_fails = conf.get("MaxFails", 3)
         def_cooldown = conf.get("Cooldown", 10)
 

@@ -155,7 +155,7 @@ Gifts:
       enable: true
 
   # Port for the Like Goal OBS overlay.
-  LIKE_GOAL_PORT: 9797
+  LIKE_GOAL_PORT: 29193
 
   # -----------------------------------------------------------------------
   #  $random — INCLUDE / EXCLUDE FILTERS
@@ -270,7 +270,7 @@ Console:
 # Enable this to search gift IDs visually in a browser window.
 GUI:
   Enable: false
-  Port: 5000
+  Port: 29185
 
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
@@ -288,23 +288,23 @@ Update:
 # Required for player death/respawn detection, datapack loading, etc.
 MinecraftServerAPI:
   Enable: true
-  APIPort: 7000
-  WebServerPort: 7777
-  WebServerPortTimer: 7878
-  DEATHCOUNTER_PORT: 7979
+  APIPort: 29187
+  WebServerPort: 29188
+  WebServerPortTimer: 29189
+  DEATHCOUNTER_PORT: 29190
 
 # --- WIN COUNTER OVERLAY ---
 # Tracks wins and losses. Decrements on death, increments on timer expiry.
 WinCounter:
   Enable: true
-  WebServerPort: 8080
+  WebServerPort: 29191
 
 # --- OVERLAY TEXT ---
 # Displays text notifications on stream (triggered via >> in actions.mca).
 # Works as an OBS Browser Source with transparent background.
 Overlaytxt:
   Enable: true
-  Port: 5005
+  Port: 29186
 
   # Display mode when a new message arrives while one is still shown:
   #   "overwrite" — New message replaces current one (recommended)

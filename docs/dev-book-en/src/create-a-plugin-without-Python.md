@@ -158,7 +158,7 @@ Add a port entry for your plugin in `config.yaml`:
 ```yaml
 MyPlugin:
   Enable: true
-  WebServerPort: 8888
+  WebServerPort: 29192
 ```
 
 Then add the webhook URL to `configServerAPI.yml` (Minecraft plugin config):
@@ -166,11 +166,11 @@ Then add the webhook URL to `configServerAPI.yml` (Minecraft plugin config):
 ```yaml
 webhooks:
   urls:
-    - "http://localhost:7777/webhook"
-    - "http://localhost:7878/webhook"
-    - "http://localhost:7979/webhook"
-    - "http://localhost:8080/webhook"
-    - "http://localhost:8888/webhook"   # your plugin
+    - "http://localhost:29188/webhook"
+    - "http://localhost:29189/webhook"
+    - "http://localhost:29190/webhook"
+    - "http://localhost:29191/webhook"
+    - "http://localhost:29192/webhook"   # your plugin
 ```
 
 > [!IMPORTANT]
@@ -236,14 +236,14 @@ fs::path logs_dir    = root_dir / "logs";
 ```rust
 let content = std::fs::read_to_string(&config_file).unwrap_or_default();
 let cfg: serde_yaml::Value = serde_yaml::from_str(&content).unwrap_or(serde_yaml::Value::Null);
-let port    = cfg["MyPlugin"]["WebServerPort"].as_u64().unwrap_or(8888) as u16;
+let port    = cfg["MyPlugin"]["WebServerPort"].as_u64().unwrap_or(29192) as u16;
 let enabled = cfg["MyPlugin"]["Enable"].as_bool().unwrap_or(true);
 ```
 
 **C++** (with [`yaml-cpp`](https://github.com/jbeder/yaml-cpp)):
 ```cpp
 YAML::Node cfg = YAML::LoadFile(config_file.string());
-int  port    = cfg["MyPlugin"]["WebServerPort"].as<int>(8888);
+int  port    = cfg["MyPlugin"]["WebServerPort"].as<int>(29192);
 bool enabled = cfg["MyPlugin"]["Enable"].as<bool>(true);
 ```
 
@@ -269,20 +269,20 @@ Plugins communicate via HTTP on `localhost`. Ports are defined in `config.yaml`:
 
 ```yaml
 WinCounter:
-  WebServerPort: 8080
+  WebServerPort: 29191
 ```
 
 **Rust** (with [`ureq`](https://crates.io/crates/ureq)):
 ```rust
 // Fire-and-forget (no waiting for response)
 std::thread::spawn(|| {
-    let _ = ureq::post("http://localhost:8080/add?amount=1").call();
+    let _ = ureq::post("http://localhost:29191/add?amount=1").call();
 });
 ```
 
 **C++** (with [cpp-httplib](https://github.com/yhirose/cpp-httplib)):
 ```cpp
-httplib::Client cli("localhost", 8080);
+httplib::Client cli("localhost", 29191);
 cli.set_connection_timeout(2);
 auto res = cli.Post("/add?amount=1");
 if (!res || res->status != 200) {
@@ -392,7 +392,7 @@ fn main() {
 
     let port: u16 = cfg["MyPlugin"]["WebServerPort"]
         .as_u64()
-        .unwrap_or(8888) as u16;
+        .unwrap_or(29192) as u16;
 
     // --- Load state ---
     let data_dir = root.join("data");
@@ -564,7 +564,7 @@ int main(int argc, char* argv[]) {
     fs::create_directories(data_dir);
     fs::path state_file  = data_dir / "myplugin_state.json";
 
-    uint16_t port = read_port(config_file, 8888);
+    uint16_t port = read_port(config_file, 29192);
 
     // --- Load state ---
     load_state(state_file);
