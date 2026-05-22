@@ -15,12 +15,15 @@ Each version is split into two sections:
 
 #### Added
 * **Config Option: `max_update_logs`** — A new configuration option under the `Updater` section in `config.yaml` that allows users to specify how many update log files to keep in the `logs/update_logs` directory.
+* **`AIPrompt.md`** — Added a system prompt template for AI-powered assistants. When loaded, the AI follows strict rules.
+    > [!WARNING]
+    > AI-generated change and suggestions may contain errors, especially for complex or safety-critical parts of this project. Always review changes carefully and test them before use. The AI does not have full understanding of your specific setup, live stream environment, or Minecraft server configuration.
+* **AI Prompt documentation** — The `AIPrompt.md` file is now referenced in the user guide (`docs/GUIDE.md`) under Additional Resources.
 
 #### Changed
 * **Updater Logging (Linux)** — The updater now creates a new log file for each update attempt in the `logs/update_logs` directory, named with a timestamp in 24-hour format (e.g., `updater_2026-04-19_14-30.log`). This allows users to keep a history of update attempts and their outcomes without overwriting previous logs.
-* **Documentation rewrite** — The user guide (`docs/GUIDE.md`) has been completely rewritten as `docs/rework_temp.md` with improved structure, readability, and beginner-friendliness. All configuration explanations outside the Quick Start section have been replaced with references to `config.yaml`.
-* **Improved config template** — A new annotated config template (`docs/config_explanatory.yaml`) with enhanced inline comments and a quick-start checklist has been added.
-* **AI Prompt documentation** — The `AIPrompt.md` file is now referenced in the user guide under Additional Resources.
+* **Documentation rewrite** — The user guide (`docs/GUIDE.md`) has been completely rewritten with improved structure, readability, and beginner-friendliness. All configuration explanations outside the Quick Start section have been replaced with references to `config.yaml`.
+* **Improved config template** — Changed the annotated of the config file with enhanced inline comments and a quick-start checklist.
 * **Default Port Change** Changed the default ports for several internal services to less commonly used ports to avoid conflicts with other software (GUI: 29185, OverlayTxt: 29186, MinecraftServerAPI: 29187, Webhook: 29188, Timer: 29189, DeathCounter: 29190, WinCounter: 29191, LikeGoal: 29193). The Minecraft server (25565) and RCON (25575) ports remain unchanged.
     > [!IMPORTANT]
     > For all users who already have the project installed, the ports defined in their current config will continue to be used. These settings will remain exactly as configured. Updates never overwrite user-defined config values, so existing port configurations will stay unchanged.
