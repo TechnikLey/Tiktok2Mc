@@ -781,7 +781,7 @@ def prepare_like_triggers(raw_triggers):
 
 def update_daily_revenue():
     file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
 
     with ctx.gift_lock:
         if ctx.gift_current_log_date != today:

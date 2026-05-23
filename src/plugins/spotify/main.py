@@ -203,7 +203,10 @@ class SpotifyClient:
             if resp.status_code == 204:
                 return {}
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except Exception:
+                    return {}
             if resp.status_code == 404:
                 return None
             print(f"[SPOTIFY] API error {resp.status_code}: {resp.text[:200]}")
@@ -470,7 +473,7 @@ def cmd_comment():
     elif command == "pause":
         spotify.pause()
         _notify_overlay()
-    elif command in ("skip", "next"):
+    elif command == "skip":
         spotify.next_track()
         time.sleep(0.5)
         _notify_overlay()

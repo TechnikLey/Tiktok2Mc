@@ -582,7 +582,7 @@ Lets viewers control Spotify playback through TikTok chat comments and events. D
 
 #### Chat Commands via comment_commands
 
-The default `config.yaml` includes a `$` group for Spotify chat control (see `comment_commands` section). Viewers type `$play`, `$pause`, `$skip`, `$next`, `$prev`, `$volume 50`, `$save`, `$shuffle`, `$repeat`, `$current`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for details.
+The default `config.yaml` includes a `$` group for Spotify chat control (see `comment_commands` section). Viewers type `$play`, `$pause`, `$skip`, `$prev`, `$volume 50`, `$save`, `$shuffle`, `$repeat`, `$current`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for details.
 
 #### Direct Trigger Actions (for actions.mca)
 

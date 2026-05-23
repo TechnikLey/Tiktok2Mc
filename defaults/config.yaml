@@ -106,7 +106,6 @@ rcon:
 # ===========================================================================
 tiktok:
   # Your TikTok username — without the @ symbol.
-  # Example: "TechnikLey"  (not "@TechnikLey")
   user: your_tiktok_username
 
   # Seconds to wait before attempting to reconnect after a connection loss.
