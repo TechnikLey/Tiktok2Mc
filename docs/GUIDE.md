@@ -442,22 +442,28 @@ GiftID:ShellCommand
 
 ### Testing Triggers Without TikTok
 
-A test tool is included to simulate triggers without going live.
+A test tool is included to simulate triggers and comments without going live.
 
 - **Windows:** `test/test_trigger.exe`
 - **Linux:** `test/test_trigger.bin`
 
-**How to use:**
+**Simulating triggers (gifts, follows, likes, etc.):**
 
 1. Make sure the tool is running (TikTok connection is not required).
 2. Start the test executable.
 3. Enter any trigger name (e.g., `follow`, `like_2`, or a gift ID like `5655`) and optionally a username.
 4. The tool simulates the trigger — all actions, overlays, and Minecraft commands will run as configured.
 
+**Simulating chat comments:**
+
+1. Enter `comment` as the trigger.
+2. Enter a username, the comment text (including the prefix, e.g., `#say Hello` or `$play`), and optionally set moderator/superfan/fanclub roles.
+3. The tool processes the comment exactly as if a viewer typed it in TikTok chat — prefix matching, role checks, command filters, cooldowns, and dispatch all apply.
+
 **Toggle TikTok connection:** Enter `tiktok` as the trigger to toggle the TikTok connection on or off. This setting resets when the tool restarts.
 
 > [!IMPORTANT]
-> The test tool only confirms that the trigger was sent to the tool. It does not guarantee that the action was executed in Minecraft or by a plugin. Always check in-game or in the logs.
+> The test tool only confirms that the trigger or comment was sent to the tool. It does not guarantee that the action was executed in Minecraft or by a plugin. Always check in-game or in the logs.
 
 ---
 

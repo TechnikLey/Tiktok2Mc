@@ -551,6 +551,111 @@ def handle_minecraft_events():
 
     return {"status": "processed"}, 200
 
+
+def _dispatch_comment_http(url_template, username, cmd_text):
+    import urllib.request
+    import urllib.parse
+    try:
+        url = url_template.replace("{user}", urllib.parse.quote(username, safe=""))
+        url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+        req = urllib.request.Request(url, method="POST")
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"[COMMENT CMD] HTTP dispatch failed: {e}")
+
+
+# ==========================================
+# Custom trigger + test comment endpoints
+# ==========================================
+@app.route('/test_comment', methods=['POST'])
+def handle_test_comment():
+    try:
+        data = request.json
+        if not data:
+            return {"status": "error", "message": "No JSON body provided."}, 400
+        username = str(data.get("user", "TestUser")).strip() or "TestUser"
+        comment_text = str(data.get("text", "")).strip()
+        if not comment_text:
+            return {"status": "error", "message": "Field 'text' is required."}, 400
+        is_moderator = bool(data.get("moderator", False))
+        is_super_fan = bool(data.get("superfan", False))
+        in_fanclub = bool(data.get("fanclub", False))
+
+        print(f"[TEST COMMENT] {username}: {comment_text}")
+        print(f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}")
+
+        if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
+            for group in ctx.comment_cmd_groups:
+                prefix = group["prefix"]
+                if not prefix or not comment_text.startswith(prefix):
+                    continue
+                cmd_text = comment_text[len(prefix):].strip()
+                if not cmd_text:
+                    continue
+
+                allowed = False
+                if "all" in group["roles"]:
+                    allowed = True
+                elif "moderator" in group["roles"] and is_moderator:
+                    allowed = True
+                elif "superfan" in group["roles"] and is_super_fan:
+                    allowed = True
+                elif "fanclub" in group["roles"] and in_fanclub:
+                    allowed = True
+
+                if not allowed:
+                    print(f"[TEST COMMENT] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                    continue
+
+                base_cmd = cmd_text.split()[0].lower()
+                if group["mode"] == "deny-all":
+                    if base_cmd not in group["commands"]:
+                        print(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                        continue
+                else:
+                    if base_cmd in group["commands"]:
+                        print(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                        continue
+
+                now = time.time()
+                cd = group["cooldown"]
+                ucd = group["user_cooldown"]
+                if cd > 0:
+                    last = ctx.comment_cmd_last_global.get(prefix, 0)
+                    if now - last < cd:
+                        remaining = cd - (now - last)
+                        print(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                        continue
+                if ucd > 0:
+                    last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
+                    if now - last_user < ucd:
+                        remaining = ucd - (now - last_user)
+                        print(f"[TEST COMMENT] {username} blocked by user cooldown ({remaining:.1f}s left)")
+                        continue
+
+                print(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {group['handler']})")
+
+                ctx.comment_cmd_last_global[prefix] = now
+                ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+
+                if group["handler"] == "rcon":
+                    ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                elif group["handler"] == "http" and group["url"]:
+                    import urllib.request, urllib.parse
+                    url = group["url"].replace("{user}", urllib.parse.quote(username, safe=""))
+                    url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+                    threading.Thread(
+                        target=_dispatch_comment_http,
+                        args=(group["url"], username, cmd_text),
+                        daemon=True
+                    ).start()
+
+        return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
+    except Exception as e:
+        print(f"[TEST COMMENT] Error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
 # ==========================================
 # Webhook endpoint for custom trigger injection (test/simulation)
 # ==========================================
@@ -791,7 +896,7 @@ def update_daily_revenue():
 
         new_entry = {
             "date": today,
-            "estimated_revenue_usd": daily_value
+            "estimated_revenue_usd": round(daily_value, 2)
         }
         entries = []
         if file_path.exists():
@@ -925,17 +1030,6 @@ def create_client(user):
     # =========================
     # COMMENT events
     # =========================
-    def _dispatch_comment_http(url_template, username, cmd_text):
-        import urllib.request
-        import urllib.parse
-        try:
-            url = url_template.replace("{user}", urllib.parse.quote(username, safe=""))
-            url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
-            req = urllib.request.Request(url, method="POST")
-            urllib.request.urlopen(req, timeout=5)
-        except Exception as e:
-            print(f"[COMMENT CMD] HTTP dispatch failed: {e}")
-
     @client.on(CommentEvent)
     def on_comment(event):
         if _connect_time[0] is None or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS:

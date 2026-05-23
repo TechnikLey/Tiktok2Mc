@@ -24,7 +24,9 @@ from core.hook_api import HookAPI
 # ---------------------------------------------------------------------------
 ALLOWED_IMPORTS: frozenset[str] = frozenset({
     # standard library — safe utilities
-    "time", "random"
+    "time", "random",
+    # third-party — used by Spotify hook
+    "requests",
 })
 
 def _check_imports(path: Path) -> list[str]:
