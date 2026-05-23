@@ -21,12 +21,15 @@ Each version is split into two sections:
 * **Spotify chat commands** — The `$` group for Spotify is now pre-configured in the default `config.yaml`. Viewers can type `$play`, `$pause`, `$skip` and more directly in chat.
 * **Smart port resolution** — The Spotify URL in comment commands uses `{spotify_port}` and automatically picks up your configured port. No more hardcoded ports.
 * **Cooldown system for comment commands** — Each group can have a global cooldown (`cooldown`) and a per-user cooldown (`user_cooldown`) in seconds. Set `cooldown: 3` to force a 3s wait between any commands, or `user_cooldown: 10` so the same viewer can't spam commands faster than every 10 seconds.
+* **Test comment mode** — The test tool (`test/test_trigger.exe`) now supports simulating chat comments. Just enter `comment` as the trigger and you can test prefixes, role checks, cooldowns, and command dispatch — exactly as if a viewer typed it in chat.
+* **Startup prompt for TikTok username** — If your config still has the default `your_tiktok_username`, the tool will ask you to enter your real username on startup. Press Enter to keep the default and continue.
 
 #### Changed
 * **Spotify overlay updates live** — The overlay now polls Spotify every 2 seconds, so track changes show up automatically without refreshing the page. The progress bar runs smoothly between updates.
 * **Progress bar stops when paused** — No more jumping up and down. The bar stays still when the track is paused.
 * **Overlay scales with window** — The overlay resizes smoothly whether you're using pywebview or OBS. Set your browser source to any size and it fits.
 * **Track info stays after long pause** — If Spotify's been paused for a while, the last known track name, artist, and cover stay on screen instead of disappearing to "Unknown".
+* **Revenue rounded to 2 decimals** — The daily revenue log no longer shows ugly floating-point artifacts like `0.22000000000000006`. Values are now cleanly rounded to two decimal places.
 
 #### Fixed
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
