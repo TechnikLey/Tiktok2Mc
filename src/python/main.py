@@ -67,6 +67,8 @@ class BotContext:
         # Comment commands
         self.comment_cmd_enable = False
         self.comment_cmd_groups = []
+        self.comment_cmd_last_global = {}
+        self.comment_cmd_last_user = {}
 
         # Queues
         self.trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -162,6 +164,7 @@ def load_config():
         raw_groups = comment_cmd_cfg.get("groups", None)
         if raw_groups is None:
             raw_groups = [{
+                "enabled": True,
                 "prefix": comment_cmd_cfg.get("prefix", "#"),
                 "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
                 "mode": comment_cmd_cfg.get("mode", "deny-all"),
@@ -174,6 +177,10 @@ def load_config():
         seen_prefixes = set()
         for g in raw_groups:
             prefix = str(g.get("prefix", "#"))
+            enabled = bool(g.get("enabled", True))
+            if not enabled:
+                print(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
+                continue
             if prefix in seen_prefixes:
                 print(f"[WARN] comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
                 continue
@@ -185,6 +192,10 @@ def load_config():
             commands = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
             handler = str(g.get("handler", "rcon")).lower()
             url = str(g.get("url", ""))
+            spotify_port = config.get("spotify", {}).get("port", 29194)
+            url = url.replace("{spotify_port}", str(spotify_port))
+            cooldown = max(0, int(g.get("cooldown", 0)))
+            user_cooldown = max(0, int(g.get("user_cooldown", 0)))
             if mode == "allow-all" and not commands and handler == "rcon":
                 print(f"[WARN] comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
             ctx.comment_cmd_groups.append({
@@ -194,6 +205,8 @@ def load_config():
                 "commands": commands,
                 "handler": handler,
                 "url": url,
+                "cooldown": cooldown,
+                "user_cooldown": user_cooldown,
             })
 
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
@@ -982,7 +995,26 @@ def create_client(user):
                         print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
                         continue
 
+                now = time.time()
+                cd = group["cooldown"]
+                ucd = group["user_cooldown"]
+                if cd > 0:
+                    last = ctx.comment_cmd_last_global.get(prefix, 0)
+                    if now - last < cd:
+                        remaining = cd - (now - last)
+                        print(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                        continue
+                if ucd > 0:
+                    last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
+                    if now - last_user < ucd:
+                        remaining = ucd - (now - last_user)
+                        print(f"[COMMENT CMD] {username} blocked by user cooldown ({remaining:.1f}s left)")
+                        continue
+
                 print(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {group['handler']})")
+
+                ctx.comment_cmd_last_global[prefix] = now
+                ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
 
                 if group["handler"] == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))

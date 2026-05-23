@@ -128,32 +128,31 @@ tiktok:
 # ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
 # or "superfan".
 comment_commands:
-  # Set to true to enable this feature.
+  # Master switch — set to true to let viewers send commands via chat.
+  # When enabled, each group below processes matching comments independently.
   enabled: false
 
-  # Multiple command groups with individual prefixes.
-  # Each group supports:
-  #   prefix        — Character that must appear at the start of a comment.
-  #                   "#" works reliably across all environments. Some characters
-  #                   like "!" may not work in all streaming software.
-  #   allowed_roles — Who may use these commands: all, moderator, superfan, fanclub
-  #   mode          — "deny-all" (only listed commands) or "allow-all" (all except listed)
-  #   commands      — List of base commands to allow or block
-  #   handler       — "rcon" (send to Minecraft RCON, default) or "http" (POST to URL)
-  #   url           — URL for HTTP handler. Use {user} and {text} as placeholders
-  #
-  # Example with HTTP handler (for plugin or custom webhooks):
-  # Note: Some characters like "!" may not work reliably as prefixes
-  # in all streaming software due to how TikTok handles certain symbols.
-  # "#" is recommended for reliable operation.
-  #   - prefix: "$"
-  #     allowed_roles: [all]
-  #     mode: allow-all
-  #     commands: []
-  #     handler: http
-  #     url: "http://127.0.0.1:29194/comment?user={user}&text={text}"
+  # Define one or more command groups. Each group has its own prefix,
+  # role requirements, allow/deny rules, dispatch target, and cooldowns.
+  # All comments starting with the group's prefix are checked against it.
   groups:
-    - prefix: "#"
+      # ──────────────────────────────────────────────
+      #  Minecraft Commands (RCON)
+      # ──────────────────────────────────────────────
+      # Viewers type #say Hello or #give PlayerName diamond
+      # to run commands on your Minecraft server.
+      #
+      #   enabled       — true/false to turn this group on/off
+      #   prefix        — The character that triggers this group ("#")
+      #   allowed_roles — Who can use it: all, moderator, superfan, fanclub
+      #   mode          — "deny-all" = only listed commands work
+      #                   "allow-all" = everything works except listed commands
+      #   commands      — List of base command names to allow or block
+      #   handler       — "rcon" sends to Minecraft, "http" sends to a URL
+      #   cooldown      — Seconds to wait between ANY command in this group (0 = off)
+      #   user_cooldown — Seconds the SAME viewer must wait before next command (0 = off)
+    - enabled: true
+      prefix: "#"
       allowed_roles:
         - moderator
         - superfan
@@ -162,6 +161,30 @@ comment_commands:
         - say
         - give
       handler: rcon
+      cooldown: 0
+      user_cooldown: 0
+
+      # ──────────────────────────────────────────────
+      #  Spotify Control (HTTP)
+      # ──────────────────────────────────────────────
+      # Viewers type $play, $pause, $skip, $volume 50, etc.
+      # to control Spotify playback. Requires the Spotify plugin
+      # to be configured (see spotify section below).
+      #
+      #   url — HTTP endpoint that receives the command.
+      #         {user} = viewer's TikTok name
+      #         {text} = command text (without the $ prefix)
+      #         {spotify_port} = resolved from spotify.port below
+    - enabled: true
+      prefix: "$"
+      allowed_roles:
+        - all
+      mode: allow-all
+      commands: []
+      handler: http
+      url: "http://127.0.0.1:{spotify_port}/comment?user={user}&text={text}"
+      cooldown: 0
+      user_cooldown: 0
 
 # ===========================================================================
 #  RANDOM TRIGGER FILTER ($random)
@@ -331,33 +354,51 @@ gui:
   port: 29185
 
 # --- SPOTIFY CONTROL ---
-# Allows viewers to control your Spotify playback via TikTok chat commands
-# and events. Uses the Spotify Web API.
+# Lets viewers control your Spotify playback via chat ($play, $pause, etc.)
+# and stream events (gifts, follows, likes). Displays the current track
+# as an OBS overlay with album art.
 #
 # SETUP:
 #   1. Go to https://developer.spotify.com/dashboard and create an app
 #   2. Note your Client ID and Client Secret
 #   3. Add http://127.0.0.1:29194/callback as a Redirect URI in the app
 #   4. Enter the credentials below
-#   5. On first start, your browser will open for Spotify login
+#   5. On first start, your browser opens for Spotify login
+#
+# CHAT COMMANDS:
+#   The $ group in comment_commands (see above) forwards chat messages
+#   like "$play" to this plugin. The {spotify_port} placeholder in that
+#   URL resolves to whatever port you set here.
+#
+# OBS OVERLAY:
+#   Add a Browser Source with URL http://localhost:29194
+#   The overlay automatically scales to your browser source size.
 spotify:
+  # Set to false to disable the Spotify plugin entirely (overlay + controls).
   enabled: true
 
-  # Port for the Spotify control web server and OBS overlay.
+  # Port for the web server. Also used for the OBS overlay URL
+  # and the chat command HTTP endpoint.
   port: 29194
 
-  # Your Spotify Developer App credentials
+  # Your Spotify Developer App credentials.
+  # Get them at https://developer.spotify.com/dashboard
   client_id: ""
   client_secret: ""
 
-  # Redirect URI (must be set in your Spotify Developer App)
+  # Redirect URI — must exactly match what you entered in your
+  # Spotify Developer App settings. Only change this if you
+  # also changed the port above.
   redirect_uri: "http://127.0.0.1:29194/callback"
 
-  # If multiple devices are active, set a specific device ID here.
-  # Leave empty = active device is used automatically.
+  # Target a specific Spotify device by ID.
+  # Leave empty to use whatever device is currently active.
+  # You can find device IDs by checking /api/player/devices
+  # while Spotify is playing on your target device.
   device_id: ""
 
-  # Step size for !spotify volup / !spotify voldown (in percent)
+  # How much the volume changes per $volume up / $volume down command (percent).
+  # E.g., 10 means each command changes volume by 10%.
   volume_step: 10
 
 # --- AUTO-UPDATER ---

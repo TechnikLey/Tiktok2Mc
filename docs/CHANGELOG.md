@@ -17,9 +17,21 @@ Each version is split into two sections:
 * **Spotify Integration** — A brand new Spotify plugin! Connect your Spotify account and trigger playback controls (play, pause, skip, volume, shuffle, repeat, save) directly from stream events. Comment commands, gift events, follows — whatever works for you. Comes with a sleek overlay showing album art and track info.
 * **Multiple Comment Command Groups** — You can now define several independent comment command groups, each with its own prefix, role restrictions, and command list. Handy if you want different permission levels for different commands — moderators get one set, everyone else another.
 * **HTTP-based Command Handlers** — Comment commands can now forward to an HTTP endpoint instead of sending RCON commands. Useful for triggering external services (like the new Spotify plugin) directly from chat.
+* **Per-group on/off switch** — Each comment command group can now be enabled or disabled individually via `enabled: true/false`. Disable the Spotify `$` group without touching the `#` group.
+* **Spotify chat commands** — The `$` group for Spotify is now pre-configured in the default `config.yaml`. Viewers can type `$play`, `$pause`, `$skip` and more directly in chat.
+* **Smart port resolution** — The Spotify URL in comment commands uses `{spotify_port}` and automatically picks up your configured port. No more hardcoded ports.
+* **Cooldown system for comment commands** — Each group can have a global cooldown (`cooldown`) and a per-user cooldown (`user_cooldown`) in seconds. Set `cooldown: 3` to force a 3s wait between any commands, or `user_cooldown: 10` so the same viewer can't spam commands faster than every 10 seconds.
+
+#### Changed
+* **Spotify overlay updates live** — The overlay now polls Spotify every 2 seconds, so track changes show up automatically without refreshing the page. The progress bar runs smoothly between updates.
+* **Progress bar stops when paused** — No more jumping up and down. The bar stays still when the track is paused.
+* **Overlay scales with window** — The overlay resizes smoothly whether you're using pywebview or OBS. Set your browser source to any size and it fits.
+* **Track info stays after long pause** — If Spotify's been paused for a while, the last known track name, artist, and cover stay on screen instead of disappearing to "Unknown".
 
 #### Fixed
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
+* **Spotify track shows immediately after login** — No more staring at "Spotify connected!" while a track is already playing. The overlay shows the current track right after authentication.
+* **Chat commands for Spotify work now** — The plugin previously had no endpoint for chat commands. `$play` and friends now actually do something.
 
 ---
 

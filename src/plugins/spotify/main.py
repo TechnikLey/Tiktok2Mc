@@ -454,6 +454,55 @@ def cmd_save():
     return jsonify({"status": "ok"})
 
 
+@app.route("/comment", methods=["POST"])
+def cmd_comment():
+    user = request.args.get("user", "Unknown")
+    text = request.args.get("text", "").strip().lower()
+    if not text:
+        return jsonify({"error": "missing text"}), 400
+    parts = text.split(maxsplit=1)
+    command = parts[0]
+    arg = parts[1] if len(parts) > 1 else None
+
+    if command == "play":
+        spotify.play()
+        _notify_overlay()
+    elif command == "pause":
+        spotify.pause()
+        _notify_overlay()
+    elif command in ("skip", "next"):
+        spotify.next_track()
+        time.sleep(0.5)
+        _notify_overlay()
+    elif command in ("prev", "previous", "back"):
+        spotify.previous_track()
+        time.sleep(0.5)
+        _notify_overlay()
+    elif command == "volume" and arg:
+        try:
+            spotify.set_volume(int(arg))
+        except ValueError:
+            return jsonify({"error": "invalid level"}), 400
+    elif command == "save":
+        spotify.save_current()
+    elif command == "shuffle":
+        playback = spotify.get_playback()
+        current = playback.get("shuffle_state", False) if playback else False
+        spotify.toggle_shuffle(not current)
+        _notify_overlay()
+    elif command in ("repeat", "loop"):
+        playback = spotify.get_playback()
+        current = playback.get("repeat_state", "off") if playback else "off"
+        order = ["off", "context", "track"]
+        next_idx = (order.index(current) + 1) % len(order) if current in order else 1
+        spotify.set_repeat(order[next_idx])
+    elif command in ("current", "song", "track"):
+        return current_track()
+    else:
+        return jsonify({"error": "unknown_command"}), 400
+    return jsonify({"status": "ok"})
+
+
 # --- Overlay (SSE + HTML) ---
 class OverlayClients:
     def __init__(self):
@@ -490,7 +539,9 @@ def _notify_overlay():
         if playback and playback.get("item"):
             data = playback
         else:
-            overlay_clients.notify({"type": "track", "error": "no_track"})
+            if _last_track_id:
+                return
+            overlay_clients.notify({"type": "no_track"})
             return
     track = _format_track(data)
     track["type"] = "track"
@@ -555,25 +606,27 @@ HTML_OVERLAY = """<!DOCTYPE html>
         background: transparent;
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         overflow: hidden;
-        width: 420px;
-        height: 120px;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: stretch;
     }
     #player {
         display: none;
         align-items: center;
-        gap: 14px;
-        padding: 12px 16px;
+        gap: min(11vh, 28px);
+        padding: min(10vh, 24px) min(3.8vw, 32px);
         background: rgba(0,0,0,0.75);
-        border-radius: 12px;
+        border-radius: min(10vh, 24px);
         border: 1px solid rgba(255,255,255,0.08);
         backdrop-filter: blur(8px);
-        height: 100%;
+        width: 100%;
     }
     #player.visible { display: flex; }
     #cover {
-        width: 80px;
-        height: 80px;
-        border-radius: 6px;
+        width: min(66.7vh, 200px);
+        height: min(66.7vh, 200px);
+        border-radius: min(5vh, 12px);
         object-fit: cover;
         flex-shrink: 0;
         box-shadow: 0 2px 12px rgba(0,0,0,0.4);
@@ -581,7 +634,7 @@ HTML_OVERLAY = """<!DOCTYPE html>
     #info { flex: 1; min-width: 0; }
     #track-name {
         color: #fff;
-        font-size: 18px;
+        font-size: min(15vh, 48px);
         font-weight: 700;
         white-space: nowrap;
         overflow: hidden;
@@ -589,15 +642,15 @@ HTML_OVERLAY = """<!DOCTYPE html>
     }
     #track-artist {
         color: rgba(255,255,255,0.7);
-        font-size: 14px;
-        margin-top: 2px;
+        font-size: min(12vh, 36px);
+        margin-top: 0.15em;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     #progress-wrap {
-        margin-top: 8px;
-        height: 4px;
+        margin-top: min(6.7vh, 16px);
+        height: min(3.3vh, 8px);
         background: rgba(255,255,255,0.15);
         border-radius: 2px;
         overflow: hidden;
@@ -611,13 +664,11 @@ HTML_OVERLAY = """<!DOCTYPE html>
     }
     #status-text {
         color: rgba(255,255,255,0.5);
-        font-size: 14px;
+        font-size: min(12vh, 36px);
         text-align: center;
-        padding: 20px;
+        padding: 2vh;
+        width: 100%;
     }
-    .pause-icon { display: none; }
-    .playing .pause-icon { display: inline; }
-    .playing .play-icon { display: none; }
 </style>
 </head>
 <body>
@@ -667,6 +718,12 @@ evtSource.onmessage = function(e) {
             updateProgress();
         } else if (data.type === 'auth' && data.success) {
             statusText.textContent = 'Spotify connected!';
+        } else if (data.type === 'no_track' && !player.classList.contains('visible')) {
+            if (data.authenticated !== false) {
+                statusText.textContent = 'No active track';
+            } else {
+                statusText.textContent = 'Spotify not connected – open /login';
+            }
         } else if (data.type === 'connected' && !player.classList.contains('visible')) {
             if (data.authenticated) {
                 statusText.textContent = 'No active track';
@@ -733,7 +790,7 @@ if __name__ == "__main__":
             import webview
             window = webview.create_window(
                 "Spotify Control",
-                f"http://127.0.0.1:{SPOTIFY_PORT}",
+                f"http://127.0.0.1:{SPOTIFY_PORT}/",
                 width=440,
                 height=160,
                 on_top=True,

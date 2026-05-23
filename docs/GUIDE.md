@@ -48,6 +48,10 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
     - [Like Goal](#like-goal)
     - [Stream Timer](#stream-timer)
     - [Overlay Text](#overlay-text)
+    - [Spotify Control](#spotify-control)
+      - [Setup](#setup)
+      - [Chat Commands via comment\_commands](#chat-commands-via-comment_commands)
+      - [Direct Trigger Actions (for actions.mca)](#direct-trigger-actions-for-actionsmca)
     - [Multiple Overlays](#multiple-overlays)
     - [VS Code Extension for .mca Files](#vs-code-extension-for-mca-files)
   - [Maintenance](#maintenance)
@@ -388,53 +392,16 @@ See `config/config.yaml` for the full configuration options and examples.
 
 ### Comment Commands
 
-The `comment_commands` feature lets viewers send commands via TikTok chat by writing a comment that starts with a configurable prefix character (e.g., `#` or `!`).
+The `comment_commands` feature lets viewers send commands via TikTok chat. Viewers type a prefix (e.g., `#` or `$`) followed by a command, and the tool forwards it to Minecraft (via RCON) or to an HTTP endpoint (for plugins like Spotify).
 
-Commands are organized into **groups**, each with its own prefix, role requirements, allow/deny rules, and dispatch handler.
+Commands are organized into **groups** — each with its own prefix, role requirements, allowed commands list, and optional cooldowns.
 
 **Example:** A moderator writes `#say Hello` → the command `say Hello` is sent to the Minecraft server via RCON.
 
 > [!WARNING]
-> Some prefix characters like `!` may not work reliably in all streaming software due to how TikTok handles certain symbols. The `#` character is recommended for reliable operation.
+> Some prefix characters like `!` may not work reliably in all streaming software. The `#` character is recommended for reliable operation.
 
-#### Features
-
-- **Multiple groups** — define different prefixes for different purposes (e.g., `#` for Minecraft, `$` for plugins)
-- **Per-group role-based access** — restrict each group to moderators, superfans, fanclub members, or everyone
-- **Per-group allow/deny rules** — each group has its own `deny-all` or `allow-all` mode with its own command list
-- **Handler system** — dispatch commands via RCON (default) or HTTP (for plugins)
-
-#### Handlers
-
-| Handler | Description |
-|---------|-------------|
-| `rcon` | Sends the command to the Minecraft server via RCON (default) |
-| `http` | Sends an HTTP POST request to the configured URL. Use `{user}` and `{text}` as placeholders |
-
-#### Configuration
-
-All settings are configured in `config/config.yaml` under `comment_commands`. The file contains detailed inline comments. The new multi-group format looks like this:
-
-```yaml
-comment_commands:
-  enabled: true
-  groups:
-    - prefix: "#"
-      allowed_roles: [moderator, superfan]
-      mode: deny-all
-      commands: [say, give]
-      handler: rcon
-    - prefix: "$"
-      allowed_roles: [all]
-      mode: allow-all
-      commands: []
-      handler: http
-      url: "http://127.0.0.1:29194/comment?user={user}&text={text}"
-```
-
-> [!WARNING]
-> RCON handlers send raw commands to your Minecraft server. Always use `deny-all` mode when allowing access to `all`, `fanclub`, or `superfan`.
-> Some characters like `!` may not work reliably as prefixes in all streaming software.
+All settings are configured in `config/config.yaml` under `comment_commands` — the file has detailed inline comments explaining every option.
 
 > [!NOTE]
 > Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.
@@ -615,21 +582,7 @@ Lets viewers control Spotify playback through TikTok chat comments and events. D
 
 #### Chat Commands via comment_commands
 
-Chat-based Spotify control is handled through the `comment_commands` system with an HTTP handler. Configure a group in `config/config.yaml`:
-
-```yaml
-comment_commands:
-  enabled: true
-  groups:
-    - prefix: "$"
-      allowed_roles: [all]
-      mode: allow-all
-      commands: []
-      handler: http
-      url: "http://127.0.0.1:29194/comment?user={user}&text={text}"
-```
-
-Viewers then type `$play`, `$pause`, `$skip`, `$volume 50`, `$save`, `$shuffle`, `$current`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for full details.
+The default `config.yaml` includes a `$` group for Spotify chat control (see `comment_commands` section). Viewers type `$play`, `$pause`, `$skip`, `$next`, `$prev`, `$volume 50`, `$save`, `$shuffle`, `$repeat`, `$current`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for details.
 
 #### Direct Trigger Actions (for actions.mca)
 
@@ -647,21 +600,9 @@ follow:$spotify_current              # Shows current song on follow
 'Tom the Tomato':$spotify_shuffle    # Toggle shuffle
 ```
 
-#### Configuration
-
-All options in `config/config.yaml` under `spotify:`:
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `enabled` | `true` | Enable/disable the plugin |
-| `port` | `29194` | Port for web server and OBS overlay |
-| `client_id` | `""` | Spotify Developer Client ID |
-| `client_secret` | `""` | Spotify Developer Client Secret |
-| `redirect_uri` | `http://127.0.0.1:29194/callback` | Redirect URI (must match your Spotify app settings) |
-| `device_id` | `""` | Target a specific device (empty = active device) |
-| `volume_step` | `10` | Step size for volup/voldown in percent |
-
 - **OBS URL:** `http://localhost:29194`
+
+All options are configured in `config/config.yaml` under `spotify:` — the file has detailed inline comments for each setting.
 
 ---
 
