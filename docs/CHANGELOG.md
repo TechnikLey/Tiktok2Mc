@@ -11,6 +11,18 @@ Each version is split into two sections:
 
 ---
 
+## [Unreleased]
+
+#### Added
+* **Spotify Integration** — A brand new Spotify plugin! Connect your Spotify account and trigger playback controls (play, pause, skip, volume, shuffle, repeat, save) directly from stream events. Comment commands, gift events, follows — whatever works for you. Comes with a sleek overlay showing album art and track info.
+* **Multiple Comment Command Groups** — You can now define several independent comment command groups, each with its own prefix, role restrictions, and command list. Handy if you want different permission levels for different commands — moderators get one set, everyone else another.
+* **HTTP-based Command Handlers** — Comment commands can now forward to an HTTP endpoint instead of sending RCON commands. Useful for triggering external services (like the new Spotify plugin) directly from chat.
+
+#### Fixed
+* **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
+
+---
+
 ## [v0.4.0] - 2026-05-22
 
 > [!WARNING]

@@ -72,6 +72,7 @@ WHITELIST_DIRS = {
     "plugins/overlaytxt",
     "plugins/timer",
     "plugins/wincounter",
+    "plugins/spotify",
 }
 
 WHITELIST_FILES = {

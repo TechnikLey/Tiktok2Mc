@@ -16,7 +16,7 @@ from typing import Callable, Optional
 HOOK_ACTIONS: dict[str, Callable] = {}
 
 # Built-in $-commands handled directly by main.py — cannot be overridden by hooks
-_RESERVED_NAMES: frozenset[str] = frozenset({"random"})
+_RESERVED_NAMES: frozenset[str] = frozenset()
 
 # Maximum trigger chain depth before enqueue_trigger blocks (prevents infinite loops)
 MAX_CHAIN_DEPTH: int = 3

@@ -1,4 +1,4 @@
-config_version: 6
+config_version: 7
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
@@ -119,12 +119,11 @@ tiktok:
 # ===========================================================================
 #  COMMENT COMMANDS
 # ===========================================================================
-# Let viewers send Minecraft commands by writing comments with a prefix.
-# Example: If prefix is "#" and a viewer writes "#say Hello", the command
-# "say Hello" is sent to your Minecraft server via RCON.
+# Let viewers send commands via TikTok chat. Each group defines its own
+# prefix character, access roles, allow/deny rules, and dispatch handler.
 #
 # !!! SECURITY WARNING !!!
-# This sends RAW commands to your Minecraft server. Anyone with the
+# RCON handlers send RAW commands to your Minecraft server. Anyone with the
 # required role can execute any command.
 # ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
 # or "superfan".
@@ -132,34 +131,37 @@ comment_commands:
   # Set to true to enable this feature.
   enabled: false
 
-  # The character that must appear at the start of a comment.
-  # "#" works reliably across all environments. Some characters like
-  # "!" may not work in all streaming software.
-  # Example: "#" → a comment "#say Hello" triggers the "say" command.
-  prefix: "#"
-
-  # Who is allowed to use comment commands.
-  # Available roles: all, moderator, superfan, fanclub
-  # You can list multiple roles (a viewer needs to match only one).
-  allowed_roles:
-    - moderator
-    - superfan
-
-  # --- ALLOW / DENY RULES ---
-  # Only the FIRST WORD of the comment is checked (e.g., "say" from "say Hello").
+  # Multiple command groups with individual prefixes.
+  # Each group supports:
+  #   prefix        — Character that must appear at the start of a comment.
+  #                   "#" works reliably across all environments. Some characters
+  #                   like "!" may not work in all streaming software.
+  #   allowed_roles — Who may use these commands: all, moderator, superfan, fanclub
+  #   mode          — "deny-all" (only listed commands) or "allow-all" (all except listed)
+  #   commands      — List of base commands to allow or block
+  #   handler       — "rcon" (send to Minecraft RCON, default) or "http" (POST to URL)
+  #   url           — URL for HTTP handler. Use {user} and {text} as placeholders
   #
-  # mode:
-  #   "deny-all"  — Only commands in the list are allowed
-  #   "allow-all" — All commands are allowed EXCEPT those in the list
-  #
-  # Example:
-  #   deny-all  + [say, give]  → only "say" and "give" work
-  #   allow-all + [op, stop]   → everything works except "op" and "stop"
-  #   deny-all  + []           → nothing works
-  mode: deny-all
-  commands:
-    - say
-    - give
+  # Example with HTTP handler (for plugin or custom webhooks):
+  # Note: Some characters like "!" may not work reliably as prefixes
+  # in all streaming software due to how TikTok handles certain symbols.
+  # "#" is recommended for reliable operation.
+  #   - prefix: "$"
+  #     allowed_roles: [all]
+  #     mode: allow-all
+  #     commands: []
+  #     handler: http
+  #     url: "http://127.0.0.1:29194/comment?user={user}&text={text}"
+  groups:
+    - prefix: "#"
+      allowed_roles:
+        - moderator
+        - superfan
+      mode: deny-all
+      commands:
+        - say
+        - give
+      handler: rcon
 
 # ===========================================================================
 #  RANDOM TRIGGER FILTER ($random)
@@ -327,6 +329,36 @@ win_counter:
 gui:
   enabled: false
   port: 29185
+
+# --- SPOTIFY CONTROL ---
+# Allows viewers to control your Spotify playback via TikTok chat commands
+# and events. Uses the Spotify Web API.
+#
+# SETUP:
+#   1. Go to https://developer.spotify.com/dashboard and create an app
+#   2. Note your Client ID and Client Secret
+#   3. Add http://127.0.0.1:29194/callback as a Redirect URI in the app
+#   4. Enter the credentials below
+#   5. On first start, your browser will open for Spotify login
+spotify:
+  enabled: true
+
+  # Port for the Spotify control web server and OBS overlay.
+  port: 29194
+
+  # Your Spotify Developer App credentials
+  client_id: ""
+  client_secret: ""
+
+  # Redirect URI (must be set in your Spotify Developer App)
+  redirect_uri: "http://127.0.0.1:29194/callback"
+
+  # If multiple devices are active, set a specific device ID here.
+  # Leave empty = active device is used automatically.
+  device_id: ""
+
+  # Step size for !spotify volup / !spotify voldown (in percent)
+  volume_step: 10
 
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.

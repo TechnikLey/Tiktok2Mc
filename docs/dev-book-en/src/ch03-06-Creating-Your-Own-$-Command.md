@@ -457,19 +457,4 @@ There is also a safety net during loading:
 
 ---
 
-### Built-in Commands Cannot Be Overridden
-
-> [!WARNING]
-> Certain $-commands are built into the system and cannot be overridden by your own hooks.
-> 
-> Currently reserved names:
-> - `random`
-> 
-> If you try to register one of these names with `api.register_action("random", ...)`, you will see this error at load time:
-> ```
-> [HOOK] [ERROR] 'random' is a reserved built-in command — cannot be overridden by a hook.
-> ```
-> 
-> These commands are handled internally by main.py and are blocked for custom hooks.
-
 → [Next Chapter: RCON and Its Limitations](./ch03-07-Rcon-and-Its-Limitations.md)

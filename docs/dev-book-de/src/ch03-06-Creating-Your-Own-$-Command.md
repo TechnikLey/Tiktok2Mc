@@ -458,19 +458,4 @@ Auch beim Laden gibt es ein Sicherheitsnetz:
 
 ---
 
-### Build-in Commands können nicht überschrieben werden
-
-> [!WARNING]
-> Bestimmte $-Commands sind fest im System eingebaut und können nicht durch eigene Hooks überschrieben werden.
-> 
-> Aktuell reservierte Namen:
-> - `random`
-> 
-> Wenn du versuchst, einen dieser Namen mit `api.register_action("random", ...)` zu registrieren, erscheint beim Laden folgende Fehlermeldung:
-> ```
-> [HOOK] [ERROR] 'random' is a reserved built-in command — cannot be overridden by a hook.
-> ```
-> 
-> Diese Commands werden intern von main.py behandelt und sind für eigene Hooks gesperrt.
-
 → [Nächstes Kapitel: RCON und seine Grenzen](./ch03-07-Rcon-and-Its-Limitations.md)

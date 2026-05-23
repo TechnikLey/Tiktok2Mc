@@ -19,7 +19,6 @@ import subprocess
 import threading
 import logging
 import traceback
-import random
 import time
 import datetime
 import json
@@ -67,14 +66,7 @@ class BotContext:
 
         # Comment commands
         self.comment_cmd_enable = False
-        self.comment_cmd_prefix = "!"
-        self.comment_cmd_roles = ["moderator"]
-        self.comment_cmd_mode = "deny-all"
-        self.comment_cmd_list = []
-
-        # Random triggers
-        self.random_trigger_mode = "deny-all"
-        self.random_trigger_list = []
+        self.comment_cmd_groups = []
 
         # Queues
         self.trigger_queue = asyncio.Queue(maxsize=10_000)
@@ -91,7 +83,6 @@ class BotContext:
         self.valid_functions = set()
         self.vanilla_functions = set()
         self.http_actions_cache = {}
-        self.possible_random_actions = []
         self.script_actions = {}
         self.overlay_actions = {}
         self.rcon_only_actions = {}
@@ -151,6 +142,8 @@ def load_config():
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
+        ctx.config = config
+
         ctx.mc_host = config.get("server_host", "127.0.0.1")
         ctx.mc_pass = config.get("rcon", {}).get("password", "")
         ctx.mc_port = config.get("rcon", {}).get("port", 25575)
@@ -162,26 +155,46 @@ def load_config():
         ctx.like_goal_port = config.get("like_goal", {}).get("port", 29193)
         ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
-        random_cfg = config.get("random_triggers", {})
-        ctx.random_trigger_mode = str(random_cfg.get("mode", "deny-all")).lower()
-        raw_list = random_cfg.get("triggers", [])
-        ctx.random_trigger_list = [str(t).strip() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []
-
         ctx.like_triggers = validate_like_triggers(config.get("like_goal", {}).get("triggers", []))
 
         comment_cmd_cfg = config.get("comment_commands", {})
         ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
-        ctx.comment_cmd_prefix = str(comment_cmd_cfg.get("prefix", "#"))
-        raw_roles = comment_cmd_cfg.get("allowed_roles", ["moderator"])
-        if isinstance(raw_roles, list):
-            ctx.comment_cmd_roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()]
-        else:
-            ctx.comment_cmd_roles = ["moderator"]
-        ctx.comment_cmd_mode = str(comment_cmd_cfg.get("mode", "deny-all")).lower()
-        raw_commands = comment_cmd_cfg.get("commands", [])
-        ctx.comment_cmd_list = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
-        if ctx.comment_cmd_enable and ctx.comment_cmd_mode == "allow-all" and not ctx.comment_cmd_list:
-            print("[WARN] comment_commands: Mode is 'allow-all' with an empty list — ALL Minecraft commands are allowed!")
+        raw_groups = comment_cmd_cfg.get("groups", None)
+        if raw_groups is None:
+            raw_groups = [{
+                "prefix": comment_cmd_cfg.get("prefix", "#"),
+                "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
+                "mode": comment_cmd_cfg.get("mode", "deny-all"),
+                "commands": comment_cmd_cfg.get("commands", []),
+                "handler": "rcon",
+                "url": "",
+            }]
+            print("[CONFIG] comment_commands: using legacy single-group format")
+        ctx.comment_cmd_groups = []
+        seen_prefixes = set()
+        for g in raw_groups:
+            prefix = str(g.get("prefix", "#"))
+            if prefix in seen_prefixes:
+                print(f"[WARN] comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
+                continue
+            seen_prefixes.add(prefix)
+            raw_roles = g.get("allowed_roles", ["moderator"])
+            roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()] if isinstance(raw_roles, list) else ["moderator"]
+            mode = str(g.get("mode", "deny-all")).lower()
+            raw_commands = g.get("commands", [])
+            commands = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
+            handler = str(g.get("handler", "rcon")).lower()
+            url = str(g.get("url", ""))
+            if mode == "allow-all" and not commands and handler == "rcon":
+                print(f"[WARN] comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
+            ctx.comment_cmd_groups.append({
+                "prefix": prefix,
+                "roles": roles,
+                "mode": mode,
+                "commands": commands,
+                "handler": handler,
+                "url": url,
+            })
 
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
         return ctx.datapack_root.exists() and ctx.datapack_root.is_dir()
@@ -212,7 +225,6 @@ def generate_datapack():
     ctx.vanilla_functions = set()
     ctx.script_actions = {}
     ctx.overlay_actions = {}
-    ctx.possible_random_actions = []
 
     # Prepare filesystem
     try:
@@ -311,24 +323,6 @@ def generate_datapack():
         with meta_file.open("w", encoding="utf-8") as f:
             f.write('{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}')
 
-        # =============================================================
-        # === Build possible_random_actions (safe pool for $random) ===
-        # =============================================================
-        random_sources = {n for n, acts in ctx.script_actions.items() if "random" in acts}
-        exclude = set(random_sources)
-        base_random_actions = [cmd for cmd in sorted(ctx.valid_functions) if cmd not in exclude]
-        for cmd in base_random_actions:
-            if ctx.random_trigger_mode == "deny-all":
-                if cmd in ctx.random_trigger_list:
-                    ctx.possible_random_actions.append(cmd)
-                else:
-                    print(f"[RANDOM] {cmd} is not in the list, excluding from $random pool (deny-all).")
-            else:  # allow-all
-                if cmd in ctx.random_trigger_list:
-                    print(f"[RANDOM] {cmd} is in the list, excluding from $random pool (allow-all).")
-                else:
-                    ctx.possible_random_actions.append(cmd)
-
         # Create ZIP archive
         zip_path = Path(ctx.datapack_root) / ctx.datapack_name
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
@@ -419,15 +413,9 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
 
     commands_to_send = []
 
-    # When you add a built-in command also add it to _RESERVED_NAMES in hook_api.py to prevent overrides by other hooks
     if name in ctx.script_actions:
         for action in ctx.script_actions[name]:
-            if action == "random" and ctx.possible_random_actions:
-                chosen = random.choice(ctx.possible_random_actions)
-                await execute_global_command(chosen, source_user, chain_depth)
-            elif action == "random" and not ctx.possible_random_actions:
-                print(f"[HOOK] [WARN] No possible actions available for $random trigger.")
-            elif action in HOOK_ACTIONS:
+            if action in HOOK_ACTIONS:
                 try:
                     ctx.hook_api._current_depth = chain_depth
                     HOOK_ACTIONS[action](source_user, action, {})
@@ -924,6 +912,17 @@ def create_client(user):
     # =========================
     # COMMENT events
     # =========================
+    def _dispatch_comment_http(url_template, username, cmd_text):
+        import urllib.request
+        import urllib.parse
+        try:
+            url = url_template.replace("{user}", urllib.parse.quote(username, safe=""))
+            url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+            req = urllib.request.Request(url, method="POST")
+            urllib.request.urlopen(req, timeout=5)
+        except Exception as e:
+            print(f"[COMMENT CMD] HTTP dispatch failed: {e}")
+
     @client.on(CommentEvent)
     def on_comment(event):
         if _connect_time[0] is None or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS:
@@ -950,35 +949,49 @@ def create_client(user):
         print(f"  Fanclub-Mitglied: {in_fanclub}")
         print(f"  Moderator: {is_moderator}")
 
-        if ctx.comment_cmd_enable and ctx.comment_cmd_prefix and comment_text.startswith(ctx.comment_cmd_prefix):
-            cmd_text = comment_text[len(ctx.comment_cmd_prefix):].strip()
-            if cmd_text:
+        if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
+            for group in ctx.comment_cmd_groups:
+                prefix = group["prefix"]
+                if not prefix or not comment_text.startswith(prefix):
+                    continue
+                cmd_text = comment_text[len(prefix):].strip()
+                if not cmd_text:
+                    continue
+
                 allowed = False
-                if "all" in ctx.comment_cmd_roles:
+                if "all" in group["roles"]:
                     allowed = True
-                elif "moderator" in ctx.comment_cmd_roles and is_moderator:
+                elif "moderator" in group["roles"] and is_moderator:
                     allowed = True
-                elif "superfan" in ctx.comment_cmd_roles and is_super_fan:
+                elif "superfan" in group["roles"] and is_super_fan:
                     allowed = True
-                elif "fanclub" in ctx.comment_cmd_roles and in_fanclub:
+                elif "fanclub" in group["roles"] and in_fanclub:
                     allowed = True
 
-                if allowed:
-                    base_cmd = cmd_text.split()[0].lower()
-                    if ctx.comment_cmd_mode == "deny-all":
-                        if base_cmd in ctx.comment_cmd_list:
-                            print(f"[COMMENT CMD] {username} -> {cmd_text}")
-                            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
-                        else:
-                            print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' not allowed (deny-all)")
-                    else:  # allow-all
-                        if base_cmd in ctx.comment_cmd_list:
-                            print(f"[COMMENT CMD] {username} tried '{cmd_text}' — '{base_cmd}' blocked (allow-all)")
-                        else:
-                            print(f"[COMMENT CMD] {username} -> {cmd_text}")
-                            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                if not allowed:
+                    print(f"[COMMENT CMD] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                    continue
+
+                base_cmd = cmd_text.split()[0].lower()
+                if group["mode"] == "deny-all":
+                    if base_cmd not in group["commands"]:
+                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                        continue
                 else:
-                    print(f"[COMMENT CMD] {username} has no permission (roles: {ctx.comment_cmd_roles})")
+                    if base_cmd in group["commands"]:
+                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                        continue
+
+                print(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {group['handler']})")
+
+                if group["handler"] == "rcon":
+                    ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                elif group["handler"] == "http" and group["url"]:
+                    threading.Thread(
+                        target=_dispatch_comment_http,
+                        args=(group["url"], username, cmd_text),
+                        daemon=True
+                    ).start()
 
         if "comment" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
@@ -1050,7 +1063,7 @@ async def run_bot():
     load_http_actions()
 
     EVENT_HOOKS_DIR = (BASE_DIR / ".." / "event_hooks").resolve()
-    ctx.hook_api = HookAPI(ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop, {}, ctx.valid_functions)
+    ctx.hook_api = HookAPI(ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop, ctx.config, ctx.valid_functions)
     load_event_hooks(ctx.hook_api, EVENT_HOOKS_DIR)
 
     asyncio.create_task(trigger_worker())

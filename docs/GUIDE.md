@@ -388,19 +388,53 @@ See `config/config.yaml` for the full configuration options and examples.
 
 ### Comment Commands
 
-The `comment_commands` feature lets viewers send Minecraft commands directly to your server by writing a comment that starts with a configurable prefix character (e.g., `#`).
+The `comment_commands` feature lets viewers send commands via TikTok chat by writing a comment that starts with a configurable prefix character (e.g., `#` or `!`).
 
-For example, if the prefix is `#` and a moderator writes `#say Hello`, the command `say Hello` is sent to the Minecraft server via RCON.
+Commands are organized into **groups**, each with its own prefix, role requirements, allow/deny rules, and dispatch handler.
 
-The feature supports:
-- **Role-based access control** — restrict to moderators, superfans, fanclub members, or everyone
-- **deny-all mode** — only specific base commands are allowed
-- **allow-all mode** — all commands are allowed except those blocked
-
-All settings, including the prefix character, allowed roles, mode, and command list, are configured in `config/config.yaml` under `comment_commands`. The file contains detailed inline comments explaining every option.
+**Example:** A moderator writes `#say Hello` → the command `say Hello` is sent to the Minecraft server via RCON.
 
 > [!WARNING]
-> This sends raw commands to your Minecraft server via RCON. Always use `deny-all` mode when allowing access to `all`, `fanclub`, or `superfan`.
+> Some prefix characters like `!` may not work reliably in all streaming software due to how TikTok handles certain symbols. The `#` character is recommended for reliable operation.
+
+#### Features
+
+- **Multiple groups** — define different prefixes for different purposes (e.g., `#` for Minecraft, `$` for plugins)
+- **Per-group role-based access** — restrict each group to moderators, superfans, fanclub members, or everyone
+- **Per-group allow/deny rules** — each group has its own `deny-all` or `allow-all` mode with its own command list
+- **Handler system** — dispatch commands via RCON (default) or HTTP (for plugins)
+
+#### Handlers
+
+| Handler | Description |
+|---------|-------------|
+| `rcon` | Sends the command to the Minecraft server via RCON (default) |
+| `http` | Sends an HTTP POST request to the configured URL. Use `{user}` and `{text}` as placeholders |
+
+#### Configuration
+
+All settings are configured in `config/config.yaml` under `comment_commands`. The file contains detailed inline comments. The new multi-group format looks like this:
+
+```yaml
+comment_commands:
+  enabled: true
+  groups:
+    - prefix: "#"
+      allowed_roles: [moderator, superfan]
+      mode: deny-all
+      commands: [say, give]
+      handler: rcon
+    - prefix: "$"
+      allowed_roles: [all]
+      mode: allow-all
+      commands: []
+      handler: http
+      url: "http://127.0.0.1:29194/comment?user={user}&text={text}"
+```
+
+> [!WARNING]
+> RCON handlers send raw commands to your Minecraft server. Always use `deny-all` mode when allowing access to `all`, `fanclub`, or `superfan`.
+> Some characters like `!` may not work reliably as prefixes in all streaming software.
 
 > [!NOTE]
 > Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.
@@ -555,6 +589,82 @@ Displays custom text notifications on stream.
 
 ---
 
+### Spotify Control
+
+Lets viewers control Spotify playback through TikTok chat comments and events. Displays the current track as an OBS overlay.
+
+#### Setup
+
+1. **Create a Spotify Developer App:**
+   - Go to [https://developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+   - Click **Create App** and choose a name (e.g. "TikTok2Mc Spotify")
+   - Under **Redirect URIs**, add: `http://127.0.0.1:29194/callback`
+   - Copy the **Client ID** and **Client Secret**
+
+2. **Add to config.yaml:**
+   ```yaml
+   spotify:
+     enabled: true
+     client_id: "YOUR_CLIENT_ID"
+     client_secret: "YOUR_CLIENT_SECRET"
+   ```
+
+3. **Start the plugin & log in:**
+   - When the tool starts, your browser opens automatically for Spotify login
+   - Alternatively: open `http://localhost:29194/login` in your browser
+
+#### Chat Commands via comment_commands
+
+Chat-based Spotify control is handled through the `comment_commands` system with an HTTP handler. Configure a group in `config/config.yaml`:
+
+```yaml
+comment_commands:
+  enabled: true
+  groups:
+    - prefix: "$"
+      allowed_roles: [all]
+      mode: allow-all
+      commands: []
+      handler: http
+      url: "http://127.0.0.1:29194/comment?user={user}&text={text}"
+```
+
+Viewers then type `$play`, `$pause`, `$skip`, `$volume 50`, `$save`, `$shuffle`, `$current`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for full details.
+
+#### Direct Trigger Actions (for actions.mca)
+
+Events (gifts, follows, likes) can also trigger Spotify actions:
+
+```
+follow:$spotify_current              # Shows current song on follow
+5655:$spotify_play                   # Plays on gift
+5655:$spotify_pause                  # Pauses on gift
+8913:$spotify_next                   # Next track on gift
+16071:$spotify_previous              # Previous track
+6267:$spotify_volume_up              # Volume up
+7168:$spotify_volume_down            # Volume down
+18508:$spotify_save                  # Save song
+'Tom the Tomato':$spotify_shuffle    # Toggle shuffle
+```
+
+#### Configuration
+
+All options in `config/config.yaml` under `spotify:`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Enable/disable the plugin |
+| `port` | `29194` | Port for web server and OBS overlay |
+| `client_id` | `""` | Spotify Developer Client ID |
+| `client_secret` | `""` | Spotify Developer Client Secret |
+| `redirect_uri` | `http://127.0.0.1:29194/callback` | Redirect URI (must match your Spotify app settings) |
+| `device_id` | `""` | Target a specific device (empty = active device) |
+| `volume_step` | `10` | Step size for volup/voldown in percent |
+
+- **OBS URL:** `http://localhost:29194`
+
+---
+
 ### Multiple Overlays
 
 You can run several overlay windows simultaneously — each as a separate OBS Browser Source pointing to a different named overlay. Configure the list of overlay names in `config/config.yaml` under `overlay_text.overlays`.
@@ -627,6 +737,7 @@ Copy them to a safe location outside the tool folder.
 | 29191 | Win Counter Overlay |
 | 29186 | Overlay Text |
 | 29193 | Like Goal Overlay |
+| 29194 | Spotify Control |
 
 Under normal circumstances, you do not need to change any ports. Only change a port if you get an "Address already in use" error.
 

@@ -2,7 +2,7 @@
 
 ### What Is `$random`?
 
-`$random` is a **built-in special command** that **randomly executes another trigger**.
+`$random` is an **event hook command included with the Streaming Tool** that **randomly executes another trigger**.
 
 Example:
 
@@ -28,23 +28,39 @@ likes:$random         # Every like event has a RANDOM effect!
 
 ### How Does `$random` Work Internally?
 
+`$random` is implemented as an event hook in `src/event_hooks/random.py`. At startup, the hook registers a handler via `api.register_action("random", random_handler)`. When a TikTok event triggers `$random`:
+
 ```python
 # 1. Parser sees: "likes:$random"
-# → Saves: kind = "built_in", body = "random"
+# → Registers "random" as a $-command linked to its hook
 
-# 2. Like event occurs at runtime:
-actions = ACTIONS["likes"]
-for action in actions:
-    if action["kind"] == "script":
-        if action["body"] == "random":
-            # Collect all possible triggers
-            possible_triggers = get_all_triggers_except("likes")
-            
-            # Pick ONE at random
-            chosen = random.choice(possible_triggers)
-            
-            # Execute THIS one
-            execute_trigger(chosen)
+# 2. At startup, event_hooks/random.py registers the handler:
+api.register_action("random", random_handler)
+
+# 3. Like event occurs at runtime → handler is called:
+def random_handler(user, trigger, context):
+    # Get all valid triggers from the current context
+    all_valid = api.get_valid_functions()
+    
+    # Read the random_triggers config section
+    cfg = api.config.get("random_triggers", {})
+    mode = cfg.get("mode", "deny-all")
+    configured = cfg.get("triggers", [])
+    
+    # Build the candidate pool based on the filter mode
+    candidates = []
+    for func in all_valid:
+        if mode == "deny-all":
+            if func not in configured:  # Deny only the listed triggers
+                candidates.append(func)
+        else:
+            if func in configured:  # Allow only the listed triggers
+                candidates.append(func)
+    
+    # Pick ONE at random and enqueue it
+    if candidates:
+        chosen = random.choice(candidates)
+        api.enqueue_trigger(chosen, user)
 ```
 
 ---
@@ -69,17 +85,16 @@ likes:$random  ← Starts the random selection
 > The command `/say Welcome!` will never be executed,
 > since `follow` is in the exclusion list by default.
 > Which triggers are excluded is configurable in `config.yaml` under
-> `random_triggers`. Use `mode: deny-all` to allow only the listed triggers,
-> or `Mode: allow-all` to exclude only the listed triggers.
-> Triggers that contain `$random` themselves are **always** excluded automatically.
+> `random_triggers`. Use `mode: deny-all` to exclude only the listed triggers,
+> or `mode: allow-all` to allow only the listed triggers.
 
 ---
 
 ### Special Features
 
-**1. Self-recursion avoided**
+**1. Loop protection**
 
-Triggers that contain `$random` themselves are **always** automatically removed from the pool — regardless of configuration.
+If `$random` picks a trigger that itself contains `$random` (or another hook that calls back), the system's chain depth limit (3 levels) prevents infinite loops. After exceeding the limit, the trigger is permanently banned for the current session.
 
 **2. Trigger filter is configurable**
 
@@ -123,10 +138,8 @@ Every trigger has the **same chance** of being selected.
 - Is evaluated at runtime (not at startup!)
 
 > [!NOTE]
-> More `$` commands are expected to be added in the future.
-> However, these will no longer be described in the developer documentation,
-> but only briefly mentioned in the user documentation.
-> If you're interested in how they work, you'll have to read and understand the code yourself.
+> Since v0.5.0 `$random` is now implemented as a standard event hook, you can study its
+> source code at `src/event_hooks/random.py` as a real-world example of the hook API.
 
 **Next chapter:** How do you write your own `$` command?
 
