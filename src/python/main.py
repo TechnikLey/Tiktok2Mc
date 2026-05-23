@@ -43,8 +43,6 @@ CONFIG_FILE = (BASE_DIR / ".." / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR / ".." / "data" / "actions.mca").resolve()
 HTTP_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "http_actions.txt").resolve()
 
-
-
 class BotContext:
     """Central state container for the TikTok-to-Minecraft bridge."""
     def __init__(self):
@@ -551,7 +549,6 @@ def handle_minecraft_events():
 
     return {"status": "processed"}, 200
 
-
 def _dispatch_comment_http(url_template, username, cmd_text):
     import urllib.request
     import urllib.parse
@@ -562,7 +559,6 @@ def _dispatch_comment_http(url_template, username, cmd_text):
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:
         print(f"[COMMENT CMD] HTTP dispatch failed: {e}")
-
 
 # ==========================================
 # Custom trigger + test comment endpoints
@@ -1170,6 +1166,17 @@ async def run_bot():
     if not load_config():
         print("Error in load_config")
         sys.exit(0)
+
+    # TikTok username check: ask user if still default
+    default_user = "your_tiktok_username"
+    if ctx.tiktok_user == default_user:
+        print(f"\n[TIKTOK] Your TikTok username is still the default '{default_user}'.")
+        inp = input("  Enter your TikTok username (press Enter to keep the default): ").strip()
+        if inp:
+            ctx.tiktok_user = inp
+            print(f"[TIKTOK] Username set to @{ctx.tiktok_user} (session only).")
+        else:
+            print(f"[TIKTOK] No input – using default '{default_user}'.")
 
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)
