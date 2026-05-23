@@ -293,6 +293,7 @@ def callback():
         return "Missing authorization code", 400
     if spotify.exchange_code(code):
         overlay_clients.notify_auth(True)
+        _notify_overlay()
         return "<html><body><h2>Connected to Spotify!</h2><p>You can close this window.</p></body></html>"
     return "Authorization failed", 400
 
@@ -478,7 +479,11 @@ class OverlayClients:
 overlay_clients = OverlayClients()
 
 
+_last_track_id = None
+
+
 def _notify_overlay():
+    global _last_track_id
     data = spotify.get_current_track()
     if not data or not data.get("item"):
         playback = spotify.get_playback()
@@ -489,7 +494,26 @@ def _notify_overlay():
             return
     track = _format_track(data)
     track["type"] = "track"
+    if track["id"] and track["id"] != _last_track_id:
+        _last_track_id = track["id"]
+        progress_ms = track.get("progress_ms", 0)
+        track["progress_ms"] = 0
+        track["progress_sec"] = 0
+        pct = progress_ms / track["duration_ms"] * 100 if track.get("duration_ms") else 0
+        if pct < 90:
+            track["progress_ms"] = progress_ms
+            track["progress_sec"] = progress_ms // 1000
     overlay_clients.notify(track)
+
+
+def _poll_spotify():
+    while True:
+        time.sleep(2)
+        try:
+            if spotify.is_authenticated:
+                _notify_overlay()
+        except Exception:
+            pass
 
 
 @app.route("/")
@@ -509,7 +533,7 @@ def overlay_stream():
                     track = _format_track(data)
                     track["type"] = "track"
                     yield f"data: {json.dumps(track)}\n\n"
-            yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+            yield f"data: {json.dumps({'type': 'connected', 'authenticated': spotify.is_authenticated})}\n\n"
             while True:
                 data = q.get()
                 yield f"data: {json.dumps(data)}\n\n"
@@ -614,6 +638,19 @@ const trackName = document.getElementById('track-name');
 const trackArtist = document.getElementById('track-artist');
 const progressBar = document.getElementById('progress-bar');
 const evtSource = new EventSource('/stream');
+
+let progressStart = 0, durationMs = 0, lastUpdate = 0, isPlaying = false;
+
+function updateProgress() {
+    if (!durationMs) return;
+    if (isPlaying) {
+        const elapsed = Date.now() - lastUpdate;
+        const current = Math.min(progressStart + elapsed, durationMs);
+        const pct = (current / durationMs) * 100;
+        progressBar.style.width = pct + '%';
+    }
+}
+
 evtSource.onmessage = function(e) {
     try {
         const data = JSON.parse(e.data);
@@ -623,12 +660,19 @@ evtSource.onmessage = function(e) {
             cover.src = data.image || '';
             trackName.textContent = data.name || 'Unknown';
             trackArtist.textContent = data.artists || '';
-            const pct = data.duration_ms ? (data.progress_ms / data.duration_ms * 100) : 0;
-            progressBar.style.width = pct + '%';
+            durationMs = data.duration_ms || 0;
+            progressStart = data.progress_ms || 0;
+            lastUpdate = Date.now();
+            isPlaying = data.is_playing || false;
+            updateProgress();
         } else if (data.type === 'auth' && data.success) {
             statusText.textContent = 'Spotify connected!';
         } else if (data.type === 'connected' && !player.classList.contains('visible')) {
-            statusText.textContent = 'No active track';
+            if (data.authenticated) {
+                statusText.textContent = 'No active track';
+            } else {
+                statusText.textContent = 'Spotify not connected – open /login';
+            }
         }
     } catch(e) {}
 };
@@ -637,6 +681,8 @@ evtSource.onerror = function() {
         statusText.textContent = 'Connection lost...';
     }
 };
+
+setInterval(updateProgress, 1000);
 </script>
 </body>
 </html>"""
@@ -669,6 +715,9 @@ if __name__ == "__main__":
 
     server_thread = threading.Thread(target=run_flask, daemon=True)
     server_thread.start()
+
+    polling_thread = threading.Thread(target=_poll_spotify, daemon=True)
+    polling_thread.start()
 
     if spotify.is_authenticated:
         print(f"[SPOTIFY] Already authenticated. Starting on port {SPOTIFY_PORT}")
