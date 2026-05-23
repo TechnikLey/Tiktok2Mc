@@ -119,6 +119,8 @@ def main():
                 sf = input("Superfan (y/n): ").strip().lower() == "y"
                 fc = input("Fanclub (y/n): ").strip().lower() == "y"
                 send_comment(user, text, mod, sf, fc)
+            elif trigger.lower() == "tiktok":
+                send_trigger(trigger, "System")
             else:
                 user_input = input("User (optional, Enter = System): ").strip()
                 user = user_input if user_input else "System"

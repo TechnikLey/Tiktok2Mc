@@ -113,6 +113,9 @@ def main():
                 # Skip __pycache__ directories
                 if "__pycache__" in str(py_file):
                     continue
+                # Skip test plugins (dev-only, not for user release)
+                if "test" in py_file.parts:
+                    continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
                 all_build_tasks.append({
@@ -262,7 +265,7 @@ def main():
         sync_folder("assets",          OUT_DIR / "core" / "assets")
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
-        sync_folder("src/event_hooks", OUT_DIR / "event_hooks")
+        sync_folder("src/event_hooks", OUT_DIR / "event_hooks", exclude=["example_hook.py"])
         sync_folder("docs",            OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [

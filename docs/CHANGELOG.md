@@ -25,6 +25,7 @@ Each version is split into two sections:
 * **Startup prompt for TikTok username** — If your config still has the default `your_tiktok_username`, the tool will ask you to enter your real username on startup. Press Enter to keep the default and continue.
 
 #### Changed
+* **Test plugin and example hook excluded from release** — The `plugins/test/` folder and `event_hooks/example_hook.py` are no longer included in the release build. These are development-only files and don't belong in the user package.
 * **Spotify overlay updates live** — The overlay now polls Spotify every 2 seconds, so track changes show up automatically without refreshing the page. The progress bar runs smoothly between updates.
 * **Progress bar stops when paused** — No more jumping up and down. The bar stays still when the track is paused.
 * **Overlay scales with window** — The overlay resizes smoothly whether you're using pywebview or OBS. Set your browser source to any size and it fits.
