@@ -688,6 +688,18 @@ Copy them to a safe location outside the tool folder.
 
 Under normal circumstances, you do not need to change any ports. Only change a port if you get an "Address already in use" error.
 
+### Log Files
+
+The tool creates several log files during operation. Here's what each contains:
+
+| File | Purpose |
+|------|---------|
+| `logs/update_logs/updater_*.log` | Update check logs — one file per update attempt |
+| `data/revenue_log.jsonl` | Gift revenue tracking (USD value per day) |
+| `data/window_state_*.json` | Window size/position for plugin overlays (not logs, but stored here) |
+
+**Cleaning up:** Old update logs are automatically removed based on `max_update_logs` in `config.yaml` (default keeps recent ones, deletes older). Revenue logs and window state files are safe to delete manually if you want a fresh start.
+
 ### Replacing the Minecraft Server Version
 
 See [Replacing the Server Version](#replacing-the-server-version) in the Minecraft Server section.

@@ -550,9 +550,13 @@ async def command_loop():
             "\nType 'exit' to stop all programs: "
         )
         cmd = cmd.strip().lower()
-        if cmd == "exit":
+        if cmd == "help":
+            print("\nAvailable commands:")
+            print("  exit  - Stop all programs and close")
+            print("  stop  - Cancel active shutdown countdown")
+        elif cmd == "exit":
             break
-        if cmd == "stop":
+        elif cmd == "stop":
             shutdown_cancel_event.set()
 
 # =============================================================================

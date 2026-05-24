@@ -23,9 +23,14 @@ Each version is split into two sections:
 * **Cooldown system for comment commands** — Each group can have a global cooldown (`cooldown`) and a per-user cooldown (`user_cooldown`) in seconds. Set `cooldown: 3` to force a 3s wait between any commands, or `user_cooldown: 10` so the same viewer can't spam commands faster than every 10 seconds.
 * **Test comment mode** — The test tool (`test/test_trigger.exe`) now supports simulating chat comments. Just enter `comment` as the trigger and you can test prefixes, role checks, cooldowns, and command dispatch — exactly as if a viewer typed it in chat.
 * **Startup prompt for TikTok username** — If your config still has the default `your_tiktok_username`, the tool will ask you to enter your real username on startup. Press Enter to keep the default and continue.
+* **Overlay URLs shown at startup** — When the tool starts, it now prints a list of all overlay URLs ready for OBS Browser Sources. No more guessing which port goes where.
+* **Help command in console** — Type `help` in the start console to see available commands (`exit`, `stop`).
+* **RCON timeout increased** — The RCON connection timeout was raised from 0.5s to 3.0s, making remote Minecraft servers more reliable.
+* **Log files documentation** — A new "Log Files" section in GUIDE.md explains what each log file contains and how to clean them up.
 
 #### Changed
 * **Test plugin and example hook excluded from release** — The `plugins/test/` folder and `event_hooks/example_hook.py` are no longer included in the release build. These are development-only files and don't belong in the user package.
+* **Spotify config banner only shows when needed** — Setup instructions are no longer printed every startup if you're already authenticated. First-time users still get the full guide.
 * **Spotify overlay updates live** — The overlay now polls Spotify every 2 seconds, so track changes show up automatically without refreshing the page. The progress bar runs smoothly between updates.
 * **Progress bar stops when paused** — No more jumping up and down. The bar stays still when the track is paused.
 * **Overlay scales with window** — The overlay resizes smoothly whether you're using pywebview or OBS. Set your browser source to any size and it fits.
@@ -33,10 +38,12 @@ Each version is split into two sections:
 * **Revenue rounded to 2 decimals** — The daily revenue log no longer shows ugly floating-point artifacts like `0.22000000000000006`. Values are now cleanly rounded to two decimal places.
 
 #### Fixed
+* **Timer now works as OBS Browser Source** — The countdown timer no longer requires the pywebview window. In `gui_hidden` mode, add it as an OBS Browser Source at `http://localhost:29189` and it responds to death/respawn events via webhook.
 * **Linux start command now includes `sudo`** — All references to `./start.bin` in the docs now correctly show `sudo ./start.bin`, since the tool requires root privileges on Linux for updates and permission-sensitive paths.
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
 * **Spotify track shows immediately after login** — No more staring at "Spotify connected!" while a track is already playing. The overlay shows the current track right after authentication.
 * **Chat commands for Spotify work now** — The plugin previously had no endpoint for chat commands. `$play` and friends now actually do something.
+* **Fixed outdated config path in actions.mca comment** — The `$random` comment now correctly points to `random_triggers > triggers` instead of the old `Gifts > random_exclude`.
 
 ---
 
@@ -80,6 +87,7 @@ Each version is split into two sections:
 #### Fixed
 * **Revenue logging shows wrong daily values** — Fixed a bug where the daily revenue log (`revenue_log.jsonl`) showed the **cumulative** earnings since bot start instead of only the current day's revenue. The bot now correctly resets its baseline at the start of each calendar day.
 * **Webhook endpoint returns 400 on invalid JSON** — The internal webhook endpoint no longer silently returns `200 OK` when it receives malformed JSON. It now correctly returns `400 Bad Request` and logs the error.
+* **Timer now works as OBS Browser Source** — The countdown timer no longer requires the pywebview window. In `gui_hidden` mode, you can add it as an OBS Browser Source at `http://localhost:29189` and it will respond to death/respawn events via webhook.
 * **Test tool works with more action types** - Fixed a bug where the test tool was unable to test actions that are stored separately from the main action list.
 * **Like goal connection problems now visible** — Errors when connecting to the like goal overlay are now shown in the console instead of being silently ignored. This makes it easier to notice and fix connection issues.
 * **Like trigger race condition on startup** — Fixed a race condition where the first like event could be silently dropped if two like events arrived simultaneously during initialization.

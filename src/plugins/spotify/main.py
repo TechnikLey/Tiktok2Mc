@@ -755,7 +755,7 @@ def run_flask():
 
 
 if __name__ == "__main__":
-    if not CLIENT_ID or not CLIENT_SECRET:
+    if not spotify.is_authenticated and (not CLIENT_ID or not CLIENT_SECRET):
         print("=" * 60)
         print("  SPOTIFY PLUGIN — CONFIGURATION REQUIRED")
         print("=" * 60)
