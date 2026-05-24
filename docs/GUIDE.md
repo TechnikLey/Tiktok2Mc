@@ -439,10 +439,8 @@ GiftID:ShellCommand
 - HTTP actions are **gift-only** — not supported for `follow`, `join`, `comment`, or like triggers.
 - Both `actions.mca` and `http_actions.txt` are checked for every gift. If the same gift ID appears in both, **both run independently** — they do not conflict.
 - Lines starting with `#` are comments.
+- Lines starting with `//define name = value` define variables that are replaced in all following commands with `{name}`.
 - The command runs directly on your computer. Only use commands you trust.
-
-> [!TIP]
-> The WinCounter plugin runs on `http://localhost:29191`. You can call its endpoints directly: `/add?amount=N` and `/remove?amount=N`.
 
 ---
 

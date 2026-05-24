@@ -509,6 +509,7 @@ async def trigger_worker():
 def load_http_actions(file_path=HTTP_ACTIONS_FILE):
     """Loads all HTTP actions into memory at startup."""
     ctx.http_actions_cache = {}
+    variables = {}
 
     if not file_path.exists():
         print(f"[ERROR] File not found: {file_path}")
@@ -517,10 +518,27 @@ def load_http_actions(file_path=HTTP_ACTIONS_FILE):
     with file_path.open("r", encoding="utf-8") as f:
         for line in f:
             line_clean = line.split("#", 1)[0].strip()
-            if not line_clean or ":" not in line_clean:
+            if not line_clean:
+                continue
+
+            # Variable definition: //define varname = value
+            if line_clean.startswith("//define"):
+                parts = line_clean[len("//define"):].strip().split("=", 1)
+                if len(parts) == 2:
+                    var_name = parts[0].strip()
+                    var_value = parts[1].strip()
+                    if var_name and var_value:
+                        variables[var_name] = var_value
+                        print(f"[HTTP] Defined variable '{var_name}' = '{var_value}'")
+                continue
+
+            if ":" not in line_clean:
                 continue
 
             trigger_id, cmd = map(str.strip, line_clean.split(":", 1))
+            # Resolve variables in command
+            for var_name, var_value in variables.items():
+                cmd = cmd.replace(f"{{{var_name}}}", var_value)
             ctx.http_actions_cache[trigger_id] = cmd
 
     print(f"[INFO] HTTP actions loaded: {len(ctx.http_actions_cache)} entries")
