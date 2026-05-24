@@ -557,7 +557,7 @@ async def command_loop():
     while True:
         cmd = await asyncio.to_thread(
             input,
-            "\nType 'exit' to stop all programs: "
+            "\nType 'exit' to stop all programs ('help' for commands): "
         )
         cmd = cmd.strip().lower()
         if cmd == "help":
