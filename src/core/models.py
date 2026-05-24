@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any
 
 REQUIRED_KEYS = {"name", "path", "enable", "level", "ics"}
-OPTIONAL_KEYS = {"port"}
 
 @dataclass(slots=True)
 class AppConfig:
@@ -57,7 +56,3 @@ def validate_config_dict(config: dict[str, Any]) -> None:
     missing = REQUIRED_KEYS - set(config.keys())
     if missing:
         raise ValueError(f"Missing required key(s): {', '.join(sorted(missing))}")
-
-    unknown = set(config.keys()) - REQUIRED_KEYS - OPTIONAL_KEYS
-    if unknown:
-        raise ValueError(f"Unknown key(s): {', '.join(sorted(unknown))}")
