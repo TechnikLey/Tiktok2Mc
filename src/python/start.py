@@ -483,6 +483,16 @@ for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
                     hidden=get_visibility(app.level)
                 )
 
+# Show overlay URLs for OBS browser sources
+overlay_ports = []
+for app in PLUGIN_REGISTRY:
+    if app.port > 0:
+        overlay_ports.append((app.name, app.port))
+if overlay_ports:
+    print("\n[OVERLAYS] Add these URLs as OBS Browser Sources:")
+    for name, port in sorted(overlay_ports, key=lambda x: x[1]):
+        print(f"  {name}: http://localhost:{port}")
+
 # =============================================================================
 # STATE
 # =============================================================================

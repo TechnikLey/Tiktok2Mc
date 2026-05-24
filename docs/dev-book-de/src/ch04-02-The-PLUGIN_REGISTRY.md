@@ -19,9 +19,10 @@ class AppConfig:
     enable: bool   # Soll das Plugin starten?
     level: int     # Log-Level für Sichtbarkeit
     ics: bool      # Hat GUI? (Interface Control System)
+    port: int = 0  # Netzwerk-Port für Overlays/API (0 = keiner)
 ```
 
-### Die fünf Parameter
+### Die Parameter
 
 | Parameter | Typ | Beispiel | Funktion |
 |-----------|-----|---------|----------|
@@ -30,9 +31,10 @@ class AppConfig:
 | `enable` | bool | `True` | Startet Plugin beim Boot? |
 | `level` | int | `4` | Log-Level für Terminal-Sichtbarkeit |
 | `ics` | bool | `True` | Unterstützt GUI-Fenster (pywebview)? |
+| `port` | int | `29189` | Netzwerk-Port (0 = kein Webserver) |
 
 > [!IMPORTANT]
-> Alle fünf Parameter sind **Pflicht**. Fehlt einer oder ist ein unbekannter Key vorhanden, wird ein `ValueError` geworfen.
+> `name`, `path`, `enable`, `level` und `ics` sind **Pflicht**. `port` ist optional (Standard 0).
 
 ### Log-Level Bedeutung
 
@@ -82,14 +84,16 @@ Plugins werden in `PLUGIN_REGISTRY.json` gespeichert. Diese Datei wird automatis
     "path": "C:\\...\\plugins\\timer\\main.exe",
     "enable": true,
     "level": 4,
-    "ics": true
+    "ics": true,
+    "port": 29189
   },
   {
     "name": "Death Counter",
     "path": "C:\\...\\plugins\\deathcounter\\main.exe",
     "enable": true,
     "level": 4,
-    "ics": true
+    "ics": true,
+    "port": 29190
   }
 ]
 ```
@@ -126,7 +130,8 @@ if args.register_only:
         path=get_base_file(),
         enable=cfg.get("timer", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=29189
     ))
     sys.exit(0)
 
@@ -176,7 +181,7 @@ Um den Registrierungsprozess zu beschleunigen, nutzt `registry.py` einen **Scan-
 
 | Komponente | Datei | Inhalt |
 |-----------|-------|--------|
-| **AppConfig** | `core/models.py` | Dataclass mit 5 Pflichtfeldern |
+| **AppConfig** | `core/models.py` | Dataclass mit 5 Pflichtfeldern + optionalem `port` |
 | **BUILDIN_REGISTRY** | `start.py` | Fest definierte Core-Module |
 | **PLUGIN_REGISTRY** | `PLUGIN_REGISTRY.json` | Dynamisch registrierte Plugins |
 | **Registrierung** | `registry.py` | Scannt Plugins mit `--register-only` |

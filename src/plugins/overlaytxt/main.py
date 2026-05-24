@@ -66,7 +66,8 @@ if register_only:
         path=OVERLAYTXT_EXE_PATH,
         enable=full_config.get("overlay_text", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=APP_PORT,
     ))
     sys.exit(0)
 

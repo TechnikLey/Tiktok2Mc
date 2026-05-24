@@ -66,7 +66,8 @@ if register_only:
         path=LIKEGOAL_EXE_PATH,
         enable=cfg.get("like_goal", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=LIKE_GOAL_PORT,
     ))
     sys.exit(0)
 

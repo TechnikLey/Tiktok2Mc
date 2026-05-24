@@ -1167,17 +1167,6 @@ async def run_bot():
         print("Error in load_config")
         sys.exit(0)
 
-    # Show overlay URLs for OBS browser sources
-    host = ctx.config.get("server_host", "127.0.0.1")
-    print("\n[OVERLAYS] Add these URLs as OBS Browser Sources:")
-    print(f"  Overlay Text:  http://{host}:{ctx.config.get('overlay_text', {}).get('port', 29186)}/?overlay=default")
-    print(f"  Death Counter: http://{host}:{ctx.config.get('death_counter', {}).get('port', 29190)}")
-    print(f"  Win Counter:   http://{host}:{ctx.config.get('win_counter', {}).get('port', 29191)}")
-    print(f"  Timer:         http://{host}:{ctx.config.get('timer', {}).get('port', 29189)}")
-    print(f"  Like Goal:     http://{host}:{ctx.config.get('like_goal', {}).get('port', 29193)}")
-    print(f"  Spotify:       http://{host}:{ctx.config.get('spotify', {}).get('port', 29194)}")
-    print()
-
     # TikTok username check: ask user if still default
     default_user = "your_tiktok_username"
     if ctx.tiktok_user == default_user:

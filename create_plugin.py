@@ -41,7 +41,8 @@ if register_only:
         path=MAIN_FILE,
         enable=cfg.get("enabled", True),
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 '''

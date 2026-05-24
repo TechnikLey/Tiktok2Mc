@@ -23,7 +23,8 @@ Each version is split into two sections:
 * **Cooldown system for comment commands** — Each group can have a global cooldown (`cooldown`) and a per-user cooldown (`user_cooldown`) in seconds. Set `cooldown: 3` to force a 3s wait between any commands, or `user_cooldown: 10` so the same viewer can't spam commands faster than every 10 seconds.
 * **Test comment mode** — The test tool (`test/test_trigger.exe`) now supports simulating chat comments. Just enter `comment` as the trigger and you can test prefixes, role checks, cooldowns, and command dispatch — exactly as if a viewer typed it in chat.
 * **Startup prompt for TikTok username** — If your config still has the default `your_tiktok_username`, the tool will ask you to enter your real username on startup. Press Enter to keep the default and continue.
-* **Overlay URLs shown at startup** — When the tool starts, it now prints a list of all overlay URLs ready for OBS Browser Sources. No more guessing which port goes where.
+* **Plugins register their port** — All overlay plugins now pass their port number during registration. The port is stored in `PLUGIN_REGISTRY.json` and displayed at startup as OBS Browser Source URLs.
+* **Overlay URLs shown at startup** — When the tool starts, it now prints a list of all overlay URLs from the registry ready for OBS Browser Sources. No more guessing which port goes where.
 * **Help command in console** — Type `help` in the start console to see available commands (`exit`, `stop`).
 * **RCON timeout increased** — The RCON connection timeout was raised from 0.5s to 3.0s, making remote Minecraft servers more reliable.
 * **Log files documentation** — A new "Log Files" section in GUIDE.md explains what each log file contains and how to clean them up.

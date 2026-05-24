@@ -62,7 +62,8 @@ if register_only:
         path=DEATH_COUNTER_EXE_PATH,
         enable=DEATH_COUNTER_ENABLED,
         level=4,
-        ics=True
+        ics=True,
+        port=WEB_SERVER_PORT,
     ))
     sys.exit(0)
 

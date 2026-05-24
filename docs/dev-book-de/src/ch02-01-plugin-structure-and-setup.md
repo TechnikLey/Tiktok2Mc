@@ -61,7 +61,8 @@ if register_only:
         path=MAIN_FILE,
         enable=cfg.get("Enable", True),
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 ```
@@ -108,7 +109,8 @@ if register_only:
         path=MAIN_FILE,
         enable=True,
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 ```
@@ -135,6 +137,9 @@ Wenn das Plugin nur registriert werden soll, passiert folgendes:
 - **`ics`**: **I**nterface **C**ontrol **S**ystem – gibt an, ob die GUI unterstützt wird
   - `True` = GUI wird unterstützt
   - `False` = GUI wird NICHT unterstützt (Direct Control System / DCS)
+
+- **`port`**: Der Netzwerk-Port deines Plugin-Webservers (Standard `0` = kein Port / keine Web-Oberfläche).  
+  Falls dein Plugin ein Overlay oder eine API bereitstellt, setze hier die Port-Nummer. Das Tool zeigt die URL (`http://localhost:<port>`) beim Start an, damit Nutzer sie als OBS-Browserquelle einbinden können.
 
 Nach der Registrierung endet das Programm mit `sys.exit(0)`.
 
@@ -173,7 +178,8 @@ Nach der Registrierung endet das Programm mit `sys.exit(0)`.
 >         path=MAIN_FILE,
 >         enable=True,
 >         level=4,
->         ics=False
+>         ics=False,
+>         port=0
 >     ))
 >     sys.exit(0)
 > ```

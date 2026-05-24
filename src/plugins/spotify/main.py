@@ -74,7 +74,8 @@ if register_only:
         path=SPOTIFY_EXE_PATH,
         enable=SPOTIFY_CFG.get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=SPOTIFY_PORT,
     ))
     sys.exit(0)
 

@@ -63,7 +63,8 @@ if register_only:
         path=WINCOUNTER_EXE_PATH,
         enable=cfg.get("win_counter", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=PORT,
     ))
     sys.exit(0)
 

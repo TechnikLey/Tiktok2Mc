@@ -61,7 +61,8 @@ if register_only:
         path=MAIN_FILE,
         enable=cfg.get("Enable", True),
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 ```
@@ -109,7 +110,8 @@ if register_only:
         path=MAIN_FILE,
         enable=True,
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 ```
@@ -136,6 +138,9 @@ If the plugin just needs to be registered, the following happens:
 - **`ics`**: **I**nterface **C**ontrol **S**ystem – indicates whether the GUI is supported
   - `True` = GUI is supported
   - `False` = GUI is NOT supported (Direct Control System / DCS)
+
+- **`port`**: The network port your plugin's web server listens on (default `0` = no port / no web UI).  
+  If your plugin serves an overlay or API, set this to its port number. The tool will show the URL (`http://localhost:<port>`) at startup so users can add it as an OBS Browser Source.
 
 After registration, the program ends with `sys.exit(0)`.
 
@@ -174,7 +179,8 @@ After registration, the program ends with `sys.exit(0)`.
 >         path=MAIN_FILE,
 >         enable=True,
 >         level=4,
->         ics=False
+>         ics=False,
+>         port=0
 >     ))
 >     sys.exit(0)
 > ```

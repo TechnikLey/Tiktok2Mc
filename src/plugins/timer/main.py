@@ -47,7 +47,8 @@ if register_only:
         path=TIMER_EXE_PATH,
         enable=cfg.get("timer", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=WEB_PORT,
     ))
     sys.exit(0)
 
