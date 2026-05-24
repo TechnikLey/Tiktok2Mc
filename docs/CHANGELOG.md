@@ -37,6 +37,8 @@ Each version is split into two sections:
 * **Overlay scales with window** — The overlay resizes smoothly whether you're using pywebview or OBS. Set your browser source to any size and it fits.
 * **Track info stays after long pause** — If Spotify's been paused for a while, the last known track name, artist, and cover stay on screen instead of disappearing to "Unknown".
 * **Revenue rounded to 2 decimals** — The daily revenue log no longer shows ugly floating-point artifacts like `0.22000000000000006`. Values are now cleanly rounded to two decimal places.
+* **http_actions.txt fixed** — `curl -X Post` corrected to `curl -X POST` and added header with port documentation. If you use a custom win_counter port, update the URL in this file.
+* **Double-fire behavior documented** — The GUIDE.md now explains that when a comment matches a command prefix, both the Comment Command AND the `comment` trigger in `actions.mca` fire simultaneously.
 
 #### Fixed
 * **Timer now works as OBS Browser Source** — The countdown timer no longer requires the pywebview window. In `gui_hidden` mode, add it as an OBS Browser Source at `http://localhost:29189` and it responds to death/respawn events via webhook.
