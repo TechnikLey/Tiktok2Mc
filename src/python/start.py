@@ -587,9 +587,7 @@ async def main():
 if ALLOW_CLOSE:
     print("\nAll programs have been started.")
 
-    asyncio.run(main())
-
-    # Show active sessions on Linux
+    # Show active sessions on Linux immediately (not after exit)
     if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
         print(f"\n--- Active {SESSION_TOOL} sessions ---")
         for s in linux_sessions:
@@ -598,6 +596,8 @@ if ALLOW_CLOSE:
             elif SESSION_TOOL == "screen":
                 print(f"  screen -r {s}")
         print("-----------------------------------")
+
+    asyncio.run(main())
 
 else:
     # AllowClose=False -> script exits itself, EXEs continue running quietly
