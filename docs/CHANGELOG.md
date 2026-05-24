@@ -32,6 +32,7 @@ Each version is split into two sections:
 #### Changed
 * **Test plugin and example hook excluded from release** — The `plugins/test/` folder and `event_hooks/example_hook.py` are no longer included in the release build. These are development-only files and don't belong in the user package.
 * **Spotify config banner only shows when needed** — Setup instructions are no longer printed every startup if you're already authenticated. First-time users still get the full guide.
+* **Spotify no longer forces re-auth dialog** — Changed `show_dialog` from `"true"` to `"false"`. Existing users won't be prompted to re-authorize every time they log in.
 * **Spotify overlay updates live** — The overlay now polls Spotify every 2 seconds, so track changes show up automatically without refreshing the page. The progress bar runs smoothly between updates.
 * **Progress bar stops when paused** — No more jumping up and down. The bar stays still when the track is paused.
 * **Overlay scales with window** — The overlay resizes smoothly whether you're using pywebview or OBS. Set your browser source to any size and it fits.

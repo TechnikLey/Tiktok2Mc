@@ -130,7 +130,7 @@ class SpotifyClient:
             "redirect_uri": self.redirect_uri,
             "scope": SCOPES,
             "state": state,
-            "show_dialog": "true",
+            "show_dialog": "false",
         }
         return f"{SPOTIFY_AUTH}?{urlencode(params)}", state
 
