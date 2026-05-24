@@ -196,6 +196,7 @@ def load_config():
             user_cooldown = max(0, int(g.get("user_cooldown", 0)))
             if mode == "allow-all" and not commands and handler == "rcon":
                 print(f"[WARN] comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
+            trigger_comment = g.get("trigger_comment_event", True)
             ctx.comment_cmd_groups.append({
                 "prefix": prefix,
                 "roles": roles,
@@ -205,6 +206,7 @@ def load_config():
                 "url": url,
                 "cooldown": cooldown,
                 "user_cooldown": user_cooldown,
+                "trigger_comment_event": trigger_comment,
             })
 
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
@@ -1052,6 +1054,7 @@ def create_client(user):
         print(f"  Fanclub-Mitglied: {in_fanclub}")
         print(f"  Moderator: {is_moderator}")
 
+        suppress_comment_trigger = False
         if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
             for group in ctx.comment_cmd_groups:
                 prefix = group["prefix"]
@@ -1073,16 +1076,22 @@ def create_client(user):
 
                 if not allowed:
                     print(f"[COMMENT CMD] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                    if not group.get("trigger_comment_event", True):
+                        suppress_comment_trigger = True
                     continue
 
                 base_cmd = cmd_text.split()[0].lower()
                 if group["mode"] == "deny-all":
                     if base_cmd not in group["commands"]:
                         print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
                         continue
                 else:
                     if base_cmd in group["commands"]:
                         print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
                         continue
 
                 now = time.time()
@@ -1093,12 +1102,16 @@ def create_client(user):
                     if now - last < cd:
                         remaining = cd - (now - last)
                         print(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
                         continue
                 if ucd > 0:
                     last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
                     if now - last_user < ucd:
                         remaining = ucd - (now - last_user)
                         print(f"[COMMENT CMD] {username} blocked by user cooldown ({remaining:.1f}s left)")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
                         continue
 
                 print(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {group['handler']})")
@@ -1115,7 +1128,10 @@ def create_client(user):
                         daemon=True
                     ).start()
 
-        if "comment" in ctx.valid_functions:
+                if not group.get("trigger_comment_event", True):
+                    suppress_comment_trigger = True
+
+        if "comment" in ctx.valid_functions and not suppress_comment_trigger:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
 
     # =========================

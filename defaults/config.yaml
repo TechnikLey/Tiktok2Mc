@@ -148,8 +148,9 @@ comment_commands:
       #                   "allow-all" = everything works except listed commands
       #   commands      — List of base command names to allow or block
       #   handler       — "rcon" sends to Minecraft, "http" sends to a URL
-      #   cooldown      — Seconds to wait between ANY command in this group (0 = off)
-      #   user_cooldown — Seconds the SAME viewer must wait before next command (0 = off)
+      #   cooldown              — Seconds to wait between ANY command in this group (0 = off)
+      #   user_cooldown         — Seconds the SAME viewer must wait before next command (0 = off)
+      #   trigger_comment_event — Also fire the 'comment' trigger in actions.mca? (default: true)
     - enabled: true
       prefix: "#"
       allowed_roles:
@@ -162,6 +163,7 @@ comment_commands:
       handler: rcon
       cooldown: 0
       user_cooldown: 0
+      trigger_comment_event: true
 
       # ──────────────────────────────────────────────
       #  Spotify Control (HTTP)
@@ -184,6 +186,7 @@ comment_commands:
       url: "http://127.0.0.1:{spotify_port}/comment?user={user}&text={text}"
       cooldown: 0
       user_cooldown: 0
+      trigger_comment_event: true
 
 # ===========================================================================
 #  RANDOM TRIGGER FILTER ($random)

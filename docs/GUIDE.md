@@ -241,7 +241,7 @@ Lines starting with `#` are treated as comments and ignored.
 > [!WARNING]
 > The `comment` and `join` triggers fire for **every** event. On active streams this can be very frequent. Avoid complex or expensive commands here to prevent overwhelming your server.
 >
-> **Note:** If `comment_commands` is enabled and a comment matches a command prefix (e.g., `#say hello`), **both** the comment_commands handler AND the `comment` trigger in `actions.mca` fire. Keep this in mind if you have actions mapped to `comment` — they'll run alongside the chat command.
+> **Note:** If `comment_commands` is enabled and a comment matches a command prefix (e.g., `#say hello`), **both** the comment_commands handler AND the `comment` trigger in `actions.mca` fire by default. You can disable this per group with `trigger_comment_event: false` in `config.yaml`.
 
 ---
 
@@ -409,6 +409,8 @@ All settings are configured in `config/config.yaml` under `comment_commands` —
 > Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.
 >
 > When a comment matches a command prefix, **both** systems fire — the Comment Command AND the `comment` trigger in `actions.mca`. If you have actions mapped to `comment`, they will execute in addition to the chat command.
+>
+> You can control this per group with `trigger_comment_event: true/false` in `config.yaml`. Set it to `false` to prevent the `comment` trigger from firing when a command matches that group.
 
 ---
 
