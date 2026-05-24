@@ -699,7 +699,7 @@ The tool creates several log files during operation. Here's what each contains:
 | File | Purpose |
 |------|---------|
 | `logs/update_logs/updater_*.log` | Update check logs — one file per update attempt |
-| `data/revenue_log.jsonl` | Gift revenue tracking (gross USD estimate — diamonds × 0.005, before TikTok's ~50% cut) |
+| `data/revenue_log.jsonl` | Gift revenue tracking — **gross estimate** (diamonds × 0.005 USD). TikTok pays out only a portion of this amount to the streamer (typically around 50%, varies by region and agreement). The actual net revenue is **not** tracked by this tool. |
 | `data/window_state_*.json` | Window size/position for plugin overlays (not logs, but stored here) |
 
 **Cleaning up:** Old update logs are automatically removed based on `max_update_logs` in `config.yaml` (default keeps recent ones, deletes older). Revenue logs and window state files are safe to delete manually if you want a fresh start.
