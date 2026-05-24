@@ -33,6 +33,7 @@ Each version is split into two sections:
 * **Revenue rounded to 2 decimals** — The daily revenue log no longer shows ugly floating-point artifacts like `0.22000000000000006`. Values are now cleanly rounded to two decimal places.
 
 #### Fixed
+* **Linux start command now includes `sudo`** — All references to `./start.bin` in the docs now correctly show `sudo ./start.bin`, since the tool requires root privileges on Linux for updates and permission-sensitive paths.
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
 * **Spotify track shows immediately after login** — No more staring at "Spotify connected!" while a track is already playing. The overlay shows the current track right after authentication.
 * **Chat commands for Spotify work now** — The plugin previously had no endpoint for chat commands. `$play` and friends now actually do something.

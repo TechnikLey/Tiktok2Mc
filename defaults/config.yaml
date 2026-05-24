@@ -11,7 +11,7 @@ config_version: 7
 #   1. Set tiktok.user to your TikTok username (without @)
 #   2. Change rcon.password to something secure
 #   3. Optionally adjust java.xms / java.xmx if RAM is limited
-#   4. Save the file and run start.exe (Windows) or ./start.bin (Linux)
+#   4. Save the file and run start.exe (Windows) or sudo ./start.bin (Linux)
 #
 # FORMATTING RULES (important!):
 #   - Use SPACES only — never use the Tab key

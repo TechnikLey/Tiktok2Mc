@@ -125,9 +125,9 @@ No manual Java installation is required — the bundled Java runtime is used aut
 
 1. Download the latest release.
 2. Extract the archive.
-3. Run `./start.bin` from the terminal.
+3. Run `sudo ./start.bin` from the terminal.
 
-The tool will detect your system Java or prompt you to install it if missing. Running with `sudo` may be required for certain features (updates, permission-sensitive paths).
+The tool will detect your system Java or prompt you to install it if missing. Running with `sudo` is required for updates and permission-sensitive paths.
 
 > [!TIP]
 > The tool shows a sudo warning on Linux. You can disable it by setting `show_sudo_warning: false` in `config.yaml`.
@@ -157,7 +157,7 @@ The tool will detect your system Java or prompt you to install it if missing. Ru
 3. **Launch the tool**
 
    - **Windows:** Double-click `start.exe`
-   - **Linux:** Run `./start.bin` in a terminal
+   - **Linux:** Run `sudo ./start.bin` in a terminal
 
    The tool will:
    - Start the Minecraft server
@@ -475,7 +475,7 @@ The Minecraft server starts automatically when you launch the tool. The server i
 
 ### Joining Locally
 
-1. Start the tool with `start.exe` (Windows) or `./start.bin` (Linux).
+1. Start the tool with `start.exe` (Windows) or `sudo ./start.bin` (Linux).
 2. Open Minecraft Java Edition.
 3. Go to **Multiplayer > Add Server**.
 4. Enter `localhost:25565`.
