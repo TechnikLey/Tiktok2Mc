@@ -28,6 +28,7 @@ Each version is split into two sections:
 * **Help command in console** — Type `help` in the start console to see available commands (`exit`, `stop`).
 * **RCON timeout increased** — The RCON connection timeout was raised from 0.5s to 3.0s, making remote Minecraft servers more reliable.
 * **Log files documentation** — A new "Log Files" section in GUIDE.md explains what each log file contains and how to clean them up.
+* **tmux sessions shown before command loop** — On Linux, active tmux/screen sessions are now displayed right after startup, not after typing `exit`.
 
 #### Changed
 * **Test plugin and example hook excluded from release** — The `plugins/test/` folder and `event_hooks/example_hook.py` are no longer included in the release build. These are development-only files and don't belong in the user package.
