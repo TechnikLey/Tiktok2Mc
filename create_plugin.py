@@ -7,7 +7,7 @@ import sys
 import re
 from pathlib import Path
 import logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
 

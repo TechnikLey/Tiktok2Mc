@@ -25,7 +25,7 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-7s] %(message)s', datefmt='%H:%M:%S')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-7s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
 

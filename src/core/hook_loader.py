@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 ALLOWED_IMPORTS: frozenset[str] = frozenset({
     # standard library — safe utilities
-    "time", "random",
+    "time", "random", "logging",
     # third-party — used by Spotify hook
     "requests",
 })
