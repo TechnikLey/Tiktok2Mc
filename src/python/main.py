@@ -191,7 +191,7 @@ def load_config():
 
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+            config = yaml.safe_load(f) or {}
 
         ctx.config = config
 
@@ -474,7 +474,14 @@ async def rcon_worker():
         commands, source_user = await ctx.rcon_queue.get()
         try:
             if not ctx.queue_active:
-                await ctx.rcon_queue.put((commands, source_user))
+                retry_key = f"queue_active_{repr((commands, source_user))}"
+                retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
+                if retries <= ctx.max_rcon_retries:
+                    ctx.rcon_queue_retries[retry_key] = retries
+                    await ctx.rcon_queue.put((commands, source_user))
+                else:
+                    print(f"[RCON] Dropping commands after queue inactive for {retries} attempts: {commands}")
+                    ctx.rcon_queue_retries.pop(retry_key, None)
                 await asyncio.sleep(1)
                 continue
 
@@ -506,7 +513,7 @@ async def rcon_worker():
                             asyncio.to_thread(ctx.rcon_connection.connect),
                             timeout=3.0
                         )
-                    except (asyncio.TimeoutError, Exception) as e:
+                    except Exception as e:
                         ctx.rcon_connection = None
                         raise ConnectionError(f"Server unreachable: {e}")
 
@@ -525,8 +532,8 @@ async def rcon_worker():
                 ctx.rcon_queue_retries[retry_key] = retries
                 try:
                     await ctx.rcon_queue.put((commands, source_user))
-                except Exception:
-                    print("RCON Queue Error")
+                except Exception as e:
+                    print(f"RCON Queue Error: {e}")
             else:
                 print(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
                 ctx.rcon_queue_retries.pop(retry_key, None)
@@ -885,7 +892,7 @@ def handle_test_comment():
                     url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
                     threading.Thread(
                         target=_dispatch_comment_http,
-                        args=(cmd_url, username, cmd_text),
+                        args=(url, username, cmd_text),
                         daemon=True
                     ).start()
 
@@ -985,6 +992,7 @@ def execute_gift_action(gift_id: str):
         print(f"[HTTP] Action for gift {gift_id} started")
     except Exception as e:
         print(f"[HTTP ERROR] {e}")
+        traceback.print_exc()
 
 # ==========================================
 # User-friendly name extraction
@@ -1269,7 +1277,7 @@ def create_client(user):
                     ctx.last_likegoal_sent = total_since_start
                     ctx.last_likegoal_time = now
                 except asyncio.QueueFull:
-                    pass
+                    print("[LIKEGOAL] Queue full, like delta dropped")
         except Exception as e:
             print(f"[EVENT ERROR] Error in like handling: {e}")
 
@@ -1557,7 +1565,7 @@ async def run_bot():
             error_str = str(e)
             print(f"[..] Connection lost: {error_str}")
 
-            if "DEVICE_BLOCKED" in error_str or bool(re.search(r"\b(err_code|code|status)\b.*?\b200\b", error_str, re.IGNORECASE)):
+            if "DEVICE_BLOCKED" in error_str or bool(re.search(r"\berr_code\b.*?\b200\b", error_str, re.IGNORECASE)):
                 print("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 print("[TIP] Wait 15 minutes or restart your router.")
                 await asyncio.sleep(900)

@@ -340,15 +340,11 @@ def start_UPDATE_EXE_PATH():
         print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
         max_logs = 20
     if max_logs < 0:
-        pass
-    elif max_logs == 0:
-        logs = list(log_dir.glob("updater_*.log"))
-        for old_log in logs:
-            try:
-                old_log.unlink()
-            except Exception as e:
-                print(f"[WARN] Failed to delete old log {old_log}: {e}")
-    else:
+        if max_logs != -1:
+            print(f"[WARN] Negative max_update_logs ({max_logs}), treating as -1 (keep all).")
+        max_logs = -1
+
+    if max_logs >= 0:
         logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
         for old_log in logs[max_logs:]:
             try:

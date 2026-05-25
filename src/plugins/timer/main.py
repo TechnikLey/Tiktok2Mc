@@ -154,14 +154,22 @@ def load_win_size():
 
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
-    with STATE_FILE.open("w") as f:
-        json.dump(request.json, f)
+    try:
+        with STATE_FILE.open("w") as f:
+            json.dump(request.json, f)
+    except Exception as e:
+        print(f"[TIMER] Failed to save dimensions: {e}")
     return "OK"
 
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    ev = request.json.get("event") if request.json else None
+    try:
+        data = request.json
+    except Exception as e:
+        print(f"[TIMER] Invalid JSON in webhook: {e}")
+        return "OK"
+    ev = data.get("event") if data else None
     if ev == "player_death":
         timer_state.pause()
         timer_state.reset()

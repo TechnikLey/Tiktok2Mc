@@ -53,7 +53,7 @@ class OverlayManager:
 
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
-                full_config = yaml.safe_load(f)
+                full_config = yaml.safe_load(f) or {}
                 conf = full_config.get("overlay_text", {})
         except Exception as e:
             log.error(f"YAML Error: {e}")
@@ -66,6 +66,9 @@ class OverlayManager:
         # Overlays aus dem Unterpunkt laden
         for item in conf.get("overlays", []):
             name = item.get("name")
+            if not name:
+                log.warning(f"Skipping overlay with missing name: {item}")
+                continue
             self.clients[name] = OverlayClient(
                 name=name,
                 global_port=global_port,
@@ -103,7 +106,7 @@ class OverlayManager:
                 return True
             client.mark_failure()
         except Exception as e:
-            print(f"[OVERLAY] POST to {client.url} failed: {e}")
+            log.error(f"[OVERLAY] POST to {client.url} failed: {e}")
             client.mark_failure()
         return False
 

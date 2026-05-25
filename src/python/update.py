@@ -143,7 +143,7 @@ def download_with_progress(url, target):
     target = Path(target) if isinstance(target, str) else target
     with requests.get(url, headers=HEADERS_ASSET, stream=True) as r:
         r.raise_for_status()
-        total = int(r.headers.get("Content-Length", 0))
+        total = int(r.headers.get("Content-Length", 0) or 0)
         done = 0
         with target.open("wb") as f:
             for chunk in r.iter_content(8192):

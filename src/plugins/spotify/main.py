@@ -210,11 +210,7 @@ class SpotifyClient:
             if resp.status_code == 204:
                 return {}
             if resp.status_code == 200:
-                try:
-                    return resp.json()
-        except Exception as e:
-            print(f"[SPOTIFY] JSON parse error (status {resp.status_code}): {e}")
-            return {}
+                return resp.json()
             if resp.status_code == 404:
                 return None
             print(f"[SPOTIFY] API error {resp.status_code}: {resp.text[:200]}")
