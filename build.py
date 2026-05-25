@@ -118,7 +118,7 @@ def main():
                 if "__pycache__" in str(py_file):
                     continue
                 # Skip test plugins (dev-only, not for user release)
-                if "test" in py_file.parts:
+                if "test" == py_file.parent.name and py_file.parent.parent.name == "plugins":
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"

@@ -131,6 +131,7 @@ class BotContext:
         self.main_loop = None
         self.hook_api = None
         self.queue_active = True
+        self.config = {}
         self.runtime_path_shutdown = (BASE_DIR / "runtime" / "shutdown").resolve()
 
         # RCON retry tracking (keyed by repr(commands) to limit re-queue loops)
@@ -852,7 +853,6 @@ def handle_test_comment():
                         log.info(f"[TEST COMMENT] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
                         continue
 
-                now = time.time()
                 cd = ccfg.get("cooldown", group["cooldown"])
                 ucd = ccfg.get("user_cooldown", group["user_cooldown"])
                 if cd > 0:
@@ -1400,7 +1400,6 @@ def create_client(user):
                             suppress_comment_trigger = True
                         continue
 
-                now = time.time()
                 cd = ccfg.get("cooldown", group["cooldown"])
                 ucd = ccfg.get("user_cooldown", group["user_cooldown"])
                 if cd > 0:

@@ -287,6 +287,69 @@ app = Flask(__name__)
 
 auth_state = None
 
+# --- Overlay (SSE + HTML) ---
+class OverlayClients:
+    def __init__(self):
+        self.listeners = []
+
+    def add(self, q):
+        self.listeners.append(q)
+
+    def remove(self, q):
+        try:
+            self.listeners.remove(q)
+        except ValueError:
+            pass
+
+    def notify(self, data):
+        for q in self.listeners:
+            q.put(data)
+
+    def notify_auth(self, success):
+        self.notify({"type": "auth", "success": success})
+
+
+overlay_clients = OverlayClients()
+
+
+_last_track_id = None
+
+
+def _notify_overlay():
+    global _last_track_id
+    data = spotify.get_current_track()
+    if not data or not data.get("item"):
+        playback = spotify.get_playback()
+        if playback and playback.get("item"):
+            data = playback
+        else:
+            if _last_track_id:
+                return
+            overlay_clients.notify({"type": "no_track"})
+            return
+    track = _format_track(data)
+    track["type"] = "track"
+    if track["id"] and track["id"] != _last_track_id:
+        _last_track_id = track["id"]
+        progress_ms = track.get("progress_ms", 0)
+        track["progress_ms"] = 0
+        track["progress_sec"] = 0
+        pct = progress_ms / track["duration_ms"] * 100 if track.get("duration_ms") else 0
+        if pct < 90:
+            track["progress_ms"] = progress_ms
+            track["progress_sec"] = progress_ms // 1000
+    overlay_clients.notify(track)
+
+
+def _poll_spotify():
+    while True:
+        time.sleep(2)
+        try:
+            if spotify.is_authenticated:
+                _notify_overlay()
+        except Exception as e:
+            log.info(f"[SPOTIFY-POLL] Error polling overlay: {e}")
+
 
 @app.route("/login")
 def login():
@@ -515,70 +578,6 @@ def cmd_comment():
     else:
         return jsonify({"error": "unknown_command"}), 400
     return jsonify({"status": "ok"})
-
-
-# --- Overlay (SSE + HTML) ---
-class OverlayClients:
-    def __init__(self):
-        self.listeners = []
-
-    def add(self, q):
-        self.listeners.append(q)
-
-    def remove(self, q):
-        try:
-            self.listeners.remove(q)
-        except ValueError:
-            pass
-
-    def notify(self, data):
-        for q in self.listeners:
-            q.put(data)
-
-    def notify_auth(self, success):
-        self.notify({"type": "auth", "success": success})
-
-
-overlay_clients = OverlayClients()
-
-
-_last_track_id = None
-
-
-def _notify_overlay():
-    global _last_track_id
-    data = spotify.get_current_track()
-    if not data or not data.get("item"):
-        playback = spotify.get_playback()
-        if playback and playback.get("item"):
-            data = playback
-        else:
-            if _last_track_id:
-                return
-            overlay_clients.notify({"type": "no_track"})
-            return
-    track = _format_track(data)
-    track["type"] = "track"
-    if track["id"] and track["id"] != _last_track_id:
-        _last_track_id = track["id"]
-        progress_ms = track.get("progress_ms", 0)
-        track["progress_ms"] = 0
-        track["progress_sec"] = 0
-        pct = progress_ms / track["duration_ms"] * 100 if track.get("duration_ms") else 0
-        if pct < 90:
-            track["progress_ms"] = progress_ms
-            track["progress_sec"] = progress_ms // 1000
-    overlay_clients.notify(track)
-
-
-def _poll_spotify():
-    while True:
-        time.sleep(2)
-        try:
-            if spotify.is_authenticated:
-                _notify_overlay()
-        except Exception as e:
-            log.info(f"[SPOTIFY-POLL] Error polling overlay: {e}")
 
 
 @app.route("/")

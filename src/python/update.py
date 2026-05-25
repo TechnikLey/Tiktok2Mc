@@ -23,6 +23,8 @@ from packaging import version
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
+from core.paths import get_base_dir
+from core.utils import load_config
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
@@ -45,14 +47,19 @@ DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
 CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
 
-cfg = load_config(CONFIG_FILE)
-
 def wait_for_key(msg="Press Enter to exit..."):
     if not AUTO_MODE:
         try:
             input(msg)
         except EOFError:
             log.info("\nNo input available.")
+
+try:
+    cfg = load_config(CONFIG_FILE)
+except (FileNotFoundError, ValueError, RuntimeError) as e:
+    log.error(f"{e}")
+    wait_for_key()
+    sys.exit(1)
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:

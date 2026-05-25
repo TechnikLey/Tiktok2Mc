@@ -50,7 +50,12 @@ update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 # -----------------------------
 # Load configuration
 # -----------------------------
-cfg = load_config(CONFIG_FILE)
+try:
+    cfg = load_config(CONFIG_FILE)
+except (FileNotFoundError, ValueError, RuntimeError) as e:
+    log.error(f"{e}")
+    input("Press Enter to exit...")
+    sys.exit(1)
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:

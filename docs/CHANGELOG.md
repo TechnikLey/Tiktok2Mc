@@ -105,7 +105,12 @@ Each version is split into two sections:
 * **Queue overloads are now actually caught** — When the command queue overflows, the error is properly handled instead of crashing silently in the background.
 * **Bracket validation skips strings** — The actions file validator no longer falsely reports unbalanced brackets when they appear inside text strings (e.g. JSON data or selectors in quotes).
 * **Spotify login handles unexpected server responses** — If Spotify returns something other than valid JSON during authentication, the tool now shows a clear error instead of crashing.
-* **Console output switched to structured logging** — All console messages now use proper log levels (info, warning, error) instead of plain print statements. This makes it easier to filter and understand what's happening at a glance.
+ * **Console output switched to structured logging** — All console messages now use proper log levels (info, warning, error) instead of plain print statements. This makes it easier to filter and understand what's happening at a glance.
+ * **Updater no longer crashes on startup** — Fixed a critical bug where the auto-updater could crash immediately with a startup error due to missing internal references.
+ * **Cooldown timing more consistent** — Comment command cooldowns now use a single consistent timestamp per request, preventing edge cases where timing could drift.
+ * **Config loading errors are now properly reported** — If the configuration file cannot be loaded, the tool now shows a clear error message instead of silently closing. This applies to the main launcher, updater, and all plugin tools.
+ * **Validators no longer block on formatting preferences** — The actions file validator now treats spaces after the colon as a friendly warning instead of a blocking error. The preferred format is `trigger:command` (no space), but `trigger: command` will still work.
+ * **Test plugin builds no longer accidentally exclude similar-named folders** — The build system now only excludes the `test` plugin itself and no longer accidentally skips other plugins whose folder names happen to contain "test".
 
 ---
 

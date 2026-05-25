@@ -76,14 +76,14 @@ def validate_text(text: str) -> List[Diagnostic]:
         colon_index_rel = line_no_comment.index(":")
         colon_index_global = base_offset + colon_index_rel
 
-        # B: no space directly after ':'
+        # B: space directly after ':'
         if colon_index_rel + 1 < len(line_no_comment):
             char_after = line_no_comment[colon_index_rel + 1]
             if char_after in (" ", "\t"):
                 diagnostics.append(_make_diag(
                     line_number, colon_index_global + 1, colon_index_global + 2,
-                    "Formatting error: no space is allowed after the colon.",
-                    Severity.ERROR, "no_space_after_colon"
+                    "Space after colon is unusual in this format (trigger:command without space).",
+                    Severity.WARNING, "space_after_colon"
                 ))
         else:
             # ":" is the last character -> no content after ':'
