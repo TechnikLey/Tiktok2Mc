@@ -33,6 +33,8 @@ Each version is split into two sections:
 * **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
 
 #### Changed
+* **Duplicate command detection in `commands` list** — If a command appears multiple times in a group's `commands` list, the tool now warns you. Max 5 warnings per group, then "N further" suppressed. No crash, the program keeps running.
+* **Duplicate key detection in `commands_config`** — Duplicate entries in `commands_config` (e.g. two `op:` blocks) are now caught on startup and trigger an error with "Press Enter to exit". Detects 2+ duplicates, always reports the first occurrence's line number.
 * **Per-command settings separated from command list** — Each command can now have its own `points_cost`, cooldown, and roles in a separate `commands_config` block. The `commands` list stays clean — just names, no clutter.
 * **Channel points integrated into `$` commands** — No more confusing `!` prefix. Points costs are set directly on any command like `skip: { points_cost: 50 }`. Viewers earn points by simply interacting with the stream.
 * **All interactions count toward points** — Liking, following, gifting, sharing, joining, and commenting all keep viewers in the active points window. Pure lurkers don't earn, but anyone who interacts does.
