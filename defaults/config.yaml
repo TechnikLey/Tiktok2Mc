@@ -150,6 +150,12 @@ comment_commands:
   # When enabled, each group below processes matching comments independently.
   enabled: false
 
+  # Global cooldown — applies ACROSS all groups. If set to 10, someone who
+  # runs $skip must wait 10 seconds before ANY command works (#op, !points, etc).
+  # Each group still has its own cooldown/user_cooldown that applies on top.
+  # Set to 0 to disable.
+  cooldown: 0
+
   # Define one or more command groups. Each group has its own prefix,
   # role requirements, allow/deny rules, dispatch target, and cooldowns.
   # All comments starting with the group's prefix are checked against it.
