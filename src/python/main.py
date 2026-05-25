@@ -141,8 +141,8 @@ ctx = BotContext()
 
 app = Flask(__name__)
 
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.WARNING)
+werkzeug_log = logging.getLogger('werkzeug')
+werkzeug_log.setLevel(logging.WARNING)
 
 # ==========================================
 # SETUP & HELPER FUNCTIONS
