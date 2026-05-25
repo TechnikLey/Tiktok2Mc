@@ -249,12 +249,23 @@ def load_config():
             mode = str(g.get("mode", "deny-all")).lower()
             raw_commands = g.get("commands", [])
             commands = []
+            seen_cmd = set()
+            dup_warn_count = 0
+            dup_warn_max = 5
             if isinstance(raw_commands, list):
                 for item in raw_commands:
                     if isinstance(item, str):
                         cname = item.strip().lower()
                         if cname:
+                            if cname in seen_cmd:
+                                dup_warn_count += 1
+                                if dup_warn_count <= dup_warn_max:
+                                    print(f"[WARN] comment_commands group '{prefix}': '{cname}' listed multiple times in commands")
+                            seen_cmd.add(cname)
                             commands.append(cname)
+            if dup_warn_count > dup_warn_max:
+                remaining = dup_warn_count - dup_warn_max
+                print(f"[WARN] comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed")
             commands_config = {}
             raw_config = g.get("commands_config", {})
             if isinstance(raw_config, dict):
