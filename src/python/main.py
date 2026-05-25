@@ -141,11 +141,43 @@ log.setLevel(logging.ERROR)
 # SETUP & HELPER FUNCTIONS
 # ==========================================
 
+def _check_dup_cmd_config():
+    """Check raw YAML for duplicate keys in commands_config sections."""
+    try:
+        text = CONFIG_FILE.read_text(encoding="utf-8")
+    except Exception:
+        return
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("commands_config:"):
+            continue
+        base_indent = len(line) - len(line.lstrip())
+        seen = {}
+        j = i + 1
+        while j < len(lines):
+            cline = lines[j]
+            if not cline.strip() or cline.strip().startswith("#"):
+                j += 1
+                continue
+            indent = len(cline) - len(cline.lstrip())
+            if indent <= base_indent:
+                break
+            if ":" in cline and indent == base_indent + 2:
+                key = cline.strip().split(":")[0].strip().lower()
+                if key in seen:
+                    print(f"[ERROR] command_config: Command '{key}' is configured twice! (line {j+1}, first at line {seen[key]})")
+                seen[key] = j + 1
+            j += 1
+
+
 def load_config():
     """Loads configuration values from the YAML config file."""
     if not CONFIG_FILE.exists():
         print(f"[ERROR] Config not found: {CONFIG_FILE}")
         return False
+
+    _check_dup_cmd_config()
 
     try:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
