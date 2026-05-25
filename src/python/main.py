@@ -167,7 +167,7 @@ def _check_dup_cmd_config():
             if ":" in cline and indent == base_indent + 2:
                 key = cline.strip().split(":")[0].strip().lower()
                 if key in seen:
-                    print(f"[ERROR] command_config: Command '{key}' is configured mehrfach! (line {j+1}, erstes Vorkommen in line {seen[key]})")
+                    print(f"[ERROR] command_config: Command '{key}' configured multiple times! (line {j+1}, first at line {seen[key]})")
                     found = True
                 else:
                     seen[key] = j + 1
