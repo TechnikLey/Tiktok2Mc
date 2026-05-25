@@ -253,7 +253,7 @@ HTML_TEMPLATE = """
     <style>
         body {
             margin: 0; padding: 20px;
-            background: transparent;
+            background: #000;
             color: #fff;
             font-family: 'Segoe UI', sans-serif;
         }
@@ -265,17 +265,18 @@ HTML_TEMPLATE = """
         th {
             text-align: left;
             padding: 8px 12px;
-            border-bottom: 2px solid rgba(255,255,255,0.3);
+            border-bottom: 2px solid #FFD700;
             font-size: 1em;
+            color: #00BFFF;
         }
         td {
             padding: 6px 12px;
         }
         .pos { color: #FFD700; font-weight: bold; width: 30px; }
         .name { }
-        .points { text-align: right; font-weight: bold; color: #89CFF0; }
+        .points { text-align: right; font-weight: bold; color: #40E0D0; }
         .top1 { font-size: 1.4em; }
-        .top1 .points { font-size: 1.2em; color: #FFD700; }
+        .top1 .points { font-size: 1.2em; color: #FF4500; }
         .top2 { font-size: 1.2em; }
         .top3 { font-size: 1.1em; }
     </style>
