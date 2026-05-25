@@ -6,6 +6,26 @@ _LOG_FORMAT = "%(asctime)s [%(levelname)-7s] %(message)s"
 _LOG_DATE = "%H:%M:%S"
 
 
+def configure_root_logger(level: int = logging.INFO, log_format: str = _LOG_FORMAT, log_file: Path = None):
+    root = logging.getLogger()
+    if root.handlers:
+        return
+
+    root.setLevel(level)
+    fmt = logging.Formatter(log_format, _LOG_DATE)
+
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(fmt)
+    sh.setLevel(level)
+    root.addHandler(sh)
+
+    if log_file:
+        fh = logging.FileHandler(log_file, encoding="utf-8")
+        fh.setFormatter(fmt)
+        fh.setLevel(level)
+        root.addHandler(fh)
+
+
 def setup_logger(name: str = None, level: int = logging.INFO, log_file: Path = None) -> logging.Logger:
     logger = logging.getLogger(name or __name__)
 

@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 import yaml
 import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-7s] %(message)s', datefmt='%H:%M:%S')
 
 log = logging.getLogger(__name__)
 

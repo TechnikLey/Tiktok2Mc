@@ -23,9 +23,9 @@ from packaging import version
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
-from core.paths import get_base_dir
-from core.utils import load_config
+
 import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-7s] %(message)s', datefmt='%H:%M:%S')
 
 log = logging.getLogger(__name__)
 
