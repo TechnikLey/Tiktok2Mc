@@ -65,6 +65,7 @@ Each version is split into two sections:
 * **Revenue is gross** — The log entry `estimated_revenue_usd` is a gross estimate (diamonds × 0.005), not the net payout after TikTok's cut. A note has been added to the docs.
 * **http_actions.txt now supports variables** — Use `//define name = value` at the top of the file and reference it with `{name}` in commands. The default file now uses `{port}` instead of hardcoded `29191`.
 * **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
+* **Improved command execution safety** — Internal commands (HTTP actions and process management) no longer run through the system shell. This reduces the risk of injection and makes the tool more reliable across different platforms.
 
 ### Fixed
 * **Shutdown now fully terminates all programs** — When the auto-shutdown timer runs out, the tool now properly stops the Minecraft server and all plugins before exiting. No more orphan processes left behind.

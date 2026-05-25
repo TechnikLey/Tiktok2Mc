@@ -285,7 +285,7 @@ def stop_all_processes():
         if proc is not None and proc.poll() is None:
             try:
                 if IS_WINDOWS:
-                    subprocess.run(f"taskkill /F /PID {proc.pid} /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["taskkill", "/F", "/PID", str(proc.pid), "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
                     proc.terminate()
                 log.info(f"{name} terminated.")

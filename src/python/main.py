@@ -16,6 +16,7 @@ import aiohttp
 import re
 import shutil
 import subprocess
+import shlex
 import threading
 import logging
 import traceback
@@ -976,7 +977,8 @@ def run_signal_server():
 
 def execute_http_command_sync(cmd: str):
     try:
-        subprocess.run(cmd, shell=True, check=True)
+        args = shlex.split(cmd)
+        subprocess.run(args, check=True)
         log.info(f"Success: {cmd}")
     except subprocess.CalledProcessError as e:
         log.info(f"[FAIL] Error: {cmd} ({e})")
