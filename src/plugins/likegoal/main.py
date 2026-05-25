@@ -124,7 +124,7 @@ class LikeManager:
             "percent": percent
         }
 
-like_manager = LikeManager(initial_goal=INITIAL_GOAL, multiplier=GOAL_MULTIPLIER)
+like_manager = LikeManager(initial_goal=max(INITIAL_GOAL, 1), multiplier=GOAL_MULTIPLIER)
 
 # =========================
 # HTML overlay template

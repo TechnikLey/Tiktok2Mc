@@ -1504,7 +1504,7 @@ async def run_bot():
     
     if not load_config():
         print("Error in load_config")
-        sys.exit(0)
+        sys.exit(1)
 
     # TikTok username check: ask user if still default
     default_user = "your_tiktok_username"
@@ -1524,7 +1524,11 @@ async def run_bot():
             print_diagnostics(diags)
         if any(d.severity.name == "ERROR" for d in diags):
             print("[STOP] Errors found. Please fix actions.mca and restart.")
-            input("Press Enter to exit...\n\n\n")
+            if sys.stdin.isatty():
+                try:
+                    input("Press Enter to exit...\n\n\n")
+                except (EOFError, OSError):
+                    pass
             return
     except FileNotFoundError as e:
         print(f"[ERROR] {e}")

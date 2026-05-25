@@ -405,7 +405,16 @@ def run_update():
     time.sleep(5)  # pause to let the start script exit
 
     print(f"[..] Installing files...")
-    for root, dirs, files in (extracted_root_path).walk():
+    walk_method = getattr(extracted_root_path, "walk", None)
+    if walk_method is not None:
+        walk_iter = walk_method()
+    else:
+        import os as _os
+        def _fallback_walk():
+            for root, dirs, files in _os.walk(extracted_root_path):
+                yield Path(root), dirs, files
+        walk_iter = _fallback_walk()
+    for root, dirs, files in walk_iter:
         rel_path = root.relative_to(extracted_root_path)
         rel_path_str = str(rel_path).replace("\\", "/")
         if rel_path_str != "." and not any(

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import time
+import threading
 import requests
 import yaml
 import logging
@@ -111,9 +112,12 @@ class OverlayManager:
         return False
 
 _manager = None
+_manager_lock = threading.Lock()
 
 def send_overlay_text(title, subtitle, duration=3, overlay_name="default"):
     global _manager
     if _manager is None:
-        _manager = OverlayManager()
+        with _manager_lock:
+            if _manager is None:
+                _manager = OverlayManager()
     return _manager.dispatch(title, subtitle, duration, overlay_name)

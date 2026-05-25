@@ -520,7 +520,8 @@ async def shutdown_countdown():
         )
         await asyncio.sleep(1)
     print("\nShutting down now!")
-    os._exit(0)
+    stop_all_processes()
+    sys.exit(0)
 
 # =============================================================================
 # FILE WATCHER

@@ -54,6 +54,13 @@ Each version is split into two sections:
 * **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
 
 ### Fixed
+* **Shutdown now fully terminates all programs** — When the auto-shutdown timer runs out, the tool now properly stops the Minecraft server and all plugins before exiting. No more orphan processes left behind.
+* **Graceful handling of no-terminal environments** — The tool no longer blocks waiting for keyboard input when running in non-interactive environments (Docker, CI, systemd). Validation errors simply show the message and exit cleanly.
+* **Correct exit code on config errors** — If the configuration fails to load, the tool now reports a non-zero exit code so that monitoring systems and scripts can detect the failure.
+* **Overlay text race condition fixed** — On rare occasion during rapid startup, multiple overlay messages could trigger a race condition. The overlay manager is now fully thread-safe.
+* **Like goal protection against invalid configuration** — If `initial_goal` is accidentally set to 0 or a negative value, it is now automatically treated as 1, preventing an infinite loop.
+* **Update system compatible with Python 3.10+** — The file installer now works correctly on Python versions older than 3.12. No more crashes when extracting update packages.
+* **Hook API no longer exposes modifiable config** — Event hooks receive a read-only copy of the configuration. Accidental changes from within a hook no longer affect the running tool.
 * **Empty config file no longer crashes on startup** — If your `config.yaml` is empty, the tool now loads it as an empty config instead of crashing with an error.
 * **Overlay text config is now optional** — If your overlay settings section is missing or empty, the overlay manager handles it gracefully instead of crashing.
 * **Comment command URL now correctly substituted** — When using `{user}` or `{text}` placeholders in HTTP comment command URLs, the substituted URL is now actually sent instead of the raw template.

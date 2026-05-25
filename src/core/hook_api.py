@@ -15,9 +15,6 @@ from typing import Callable, Optional
 # Global registry: action_name -> handler callable
 HOOK_ACTIONS: dict[str, Callable] = {}
 
-# Built-in $-commands handled directly by main.py — cannot be overridden by hooks
-_RESERVED_NAMES: frozenset[str] = frozenset()
-
 # Maximum trigger chain depth before enqueue_trigger blocks (prevents infinite loops)
 MAX_CHAIN_DEPTH: int = 3
 
@@ -57,7 +54,8 @@ class HookAPI:
     @property
     def config(self) -> dict:
         """Read-only access to the loaded config.yaml values."""
-        return self._config
+        from copy import deepcopy
+        return deepcopy(self._config)
 
     def register_action(self, name: str, fn: Callable) -> None:
         """
@@ -67,9 +65,6 @@ class HookAPI:
         """
         if not isinstance(name, str) or not name.strip():
             print(f"[HOOK] register_action: invalid name: {name!r}")
-            return
-        if name in _RESERVED_NAMES:
-            print(f"[HOOK] [ERROR] '{name}' is a reserved built-in command — cannot be overridden by a hook.")
             return
         if name in HOOK_ACTIONS:
             print(f"[HOOK] [WARN] Duplicate action '{name}' — first registration kept.")

@@ -20,6 +20,12 @@ class Diagnostic:
     code: Optional[str] = None
 
 # --- Helper functions -------------------------------------------------------
+_RE_TRAILING_COLONS = re.compile(r":[:\s]*$")
+_RE_TRAILING_SEMICOLON = re.compile(r";\s*$")
+_RE_OVERLAY_PREFIX = re.compile(r"@(\w+)>>")
+_RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
+_RE_INVALID_MULTIPLIER = re.compile(r"\s+x([^\s]+)\s*$")
+
 def _make_diag(line, start, end, msg, severity, code=None) -> Diagnostic:
     return Diagnostic(line=line, start_char=start, end_char=end, message=msg, severity=severity, code=code)
 
@@ -86,7 +92,7 @@ def validate_text(text: str) -> List[Diagnostic]:
             continue
 
         # C: trailing colons (e.g. "trigger::" or "trigger:   :")
-        if re.search(r":[:\s]*$", line_no_comment):
+        if _RE_TRAILING_COLONS.search(line_no_comment):
             last_colon = base_offset + line_no_comment.rindex(":")
             diagnostics.append(_make_diag(
                 line_number, last_colon, base_offset + len(line_no_comment),
@@ -95,7 +101,7 @@ def validate_text(text: str) -> List[Diagnostic]:
             ))
 
         # D: unnecessary semicolon at the end (info)
-        if re.search(r";\s*$", line_no_comment):
+        if _RE_TRAILING_SEMICOLON.search(line_no_comment):
             last_sc = base_offset + line_no_comment.rindex(";")
             diagnostics.append(_make_diag(
                 line_number, last_sc, last_sc + 1,
@@ -187,7 +193,7 @@ def validate_text(text: str) -> List[Diagnostic]:
                 continue
 
             # Check prefix: '/', '$', '!' or '>>' or '@NAME>>'
-            _overlay_re = re.match(r"@(\w+)>>", cmd_trim)
+            _overlay_re = _RE_OVERLAY_PREFIX.match(cmd_trim)
             if cmd_trim.startswith(">>") or _overlay_re:
                 # Overlay command — check for {comment} placeholder
                 if "{comment}" in cmd_trim and trigger.lower() != "comment":
@@ -215,7 +221,7 @@ def validate_text(text: str) -> List[Diagnostic]:
                 ))
 
             # Check multiplier: " xN" at the end
-            mm = re.search(r"\s+x(\d+)\s*$", cmd_trim)
+            mm = _RE_MULTIPLIER.search(cmd_trim)
             if mm:
                 amount = int(mm.group(1))
                 # Warning for very high values (performance)
@@ -228,7 +234,7 @@ def validate_text(text: str) -> List[Diagnostic]:
                         Severity.WARNING, "high_multi"
                     ))
             else:
-                maybe_x = re.search(r"\s+x([^\s]+)\s*$", cmd_trim)
+                maybe_x = _RE_INVALID_MULTIPLIER.search(cmd_trim)
                 if maybe_x and not maybe_x.group(1).isdigit():
                     token_str = f"x{maybe_x.group(1)}"
                     token_pos = cmd_start_global + cmd_trim.rfind(token_str)
