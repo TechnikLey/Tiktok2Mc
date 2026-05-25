@@ -69,6 +69,11 @@ Each version is split into two sections:
 * **Improved command execution safety** — Internal commands (HTTP actions and process management) no longer run through the system shell. This reduces the risk of injection and makes the tool more reliable across different platforms.
 
 ### Fixed
+* **GUI module no longer crashes on startup** — Fixed a missing import that prevented the configuration GUI from loading at all.
+* **Upload script messages now visible** — The upload script's progress messages are now actually displayed in the console instead of being silently discarded.
+* **Updater no longer crashes on config or permission errors** — Fixed a potential crash when the configuration fails to load or root permissions are missing during an update.
+* **Death Counter handles empty save requests** — Fixed a rare crash in the Death Counter plugin when saving window dimensions with an empty request body.
+* **Hook API internal naming cleaned up** — Fixed a naming conflict in the Hook API that could cause unexpected behavior when sending overlay text from event hooks.
 * **Start script no longer crashes on launch** — Fixed a critical startup error that prevented the tool from running at all.
 * **Download progress shown as a single line** — During updates, the download progress percentage now stays on one line instead of flooding the log with thousands of entries.
 * **Webhook server starts only when bot is ready** — The internal webhook server no longer accepts requests before the bot is fully initialized, preventing random crashes during startup.

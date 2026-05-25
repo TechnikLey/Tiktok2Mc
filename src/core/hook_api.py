@@ -125,8 +125,8 @@ class HookAPI:
         Display overlay text on stream overlays. Returns True if successful.
         """
         try:
-            from core.overlay_utils import send_overlay_text
-            return send_overlay_text(title, subtitle, duration, overlay_name)
+            from core.overlay_utils import send_overlay_text as _send_overlay
+            return _send_overlay(title, subtitle, duration, overlay_name)
         except Exception as e:
             log.error(f"[HOOK] send_overlay_text failed: {e}")
             return False

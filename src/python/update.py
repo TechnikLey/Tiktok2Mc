@@ -47,6 +47,8 @@ DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
 CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
 
+AUTO_MODE = "--auto" in sys.argv
+
 def wait_for_key(msg="Press Enter to exit..."):
     if not AUTO_MODE:
         try:
@@ -106,8 +108,6 @@ WHITELIST_FILES = {
 GITHUB_USER = "TechnikLey"
 GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
-
-AUTO_MODE = "--auto" in sys.argv
 
 try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f:
