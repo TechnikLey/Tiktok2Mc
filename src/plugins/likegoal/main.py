@@ -22,6 +22,8 @@ import yaml
 from core import parse_args, AppConfig, get_base_dir, get_base_file, get_root_dir
 from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # =========================
 # Paths & configuration
@@ -37,7 +39,7 @@ cfg = {}
 
 try:
     if not CONFIG_FILE.exists():
-        print("Config not found")
+        log.info("Config not found")
         sys.exit(1)
     else:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
@@ -49,7 +51,7 @@ try:
         # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
-    print(f"Config error: {e}")
+    log.error(f"Config error: {e}")
     LIKE_GOAL_PORT = 29193
     CUSTOM_TEXT = "Like Goal"
     INITIAL_GOAL = 100_000
@@ -289,5 +291,5 @@ if __name__ == "__main__":
         )
         webview.start(debug=False)
     else:
-        print("GUI hidden, running server only.")
+        log.info("GUI hidden, running server only.")
         server_thread.join()

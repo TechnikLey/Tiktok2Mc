@@ -19,6 +19,9 @@ import threading
 from typing import Any
 from core.paths import get_base_dir
 from core.models import AppConfig, validate_config_dict
+import logging
+
+log = logging.getLogger(__name__)
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
@@ -143,13 +146,13 @@ def register_plugin(config: dict[str, Any] | AppConfig) -> AppConfig:
         validate_config_dict(config)
         app = AppConfig.from_dict(config)
 
-    print("REGISTER_PLUGIN:", json.dumps(app.to_dict(), ensure_ascii=False), flush=True)
+    log.info("REGISTER_PLUGIN: %s", json.dumps(app.to_dict(), ensure_ascii=False))
 
     if app.level in (0, 5):
-        print(f"[ERROR] Plugin '{app.name}' uses level {app.level}, which is reserved for the system and must not be used by plugins. Registration aborted.")
+        log.error(f"Plugin '{app.name}' uses level {app.level}, which is reserved for the system and must not be used by plugins. Registration aborted.")
         raise ValueError(f"Level {app.level} is not allowed for plugins.")
     if app.level not in (1, 2, 3, 4):
-        print(f"[ERROR] Plugin '{app.name}' uses unknown level {app.level}. Valid levels are 1-4. Registration aborted.")
+        log.error(f"Plugin '{app.name}' uses unknown level {app.level}. Valid levels are 1-4. Registration aborted.")
         raise ValueError(f"Unknown level: {app.level}")
 
     load_app_registry()
@@ -158,7 +161,7 @@ def register_plugin(config: dict[str, Any] | AppConfig) -> AppConfig:
         existing = PLUGIN_REGISTRY_BY_NAME.get(app.name)
 
         if existing is not None and existing.to_dict() == app.to_dict():
-            print(f"[SKIP] Already registered: {app.name}")
+            log.info(f"[SKIP] Already registered: {app.name}")
             return existing
 
         if existing is not None:
@@ -166,10 +169,10 @@ def register_plugin(config: dict[str, Any] | AppConfig) -> AppConfig:
                 if item.name == app.name:
                     PLUGIN_REGISTRY[idx] = app
                     break
-            print(f"[UPDATE] Re-registered: {app.name}")
+            log.info(f"[UPDATE] Re-registered: {app.name}")
         else:
             PLUGIN_REGISTRY.append(app)
-            print(f"[OK] Registered: {app.name}")
+            log.info(f"Registered: {app.name}")
 
         PLUGIN_REGISTRY_BY_NAME[app.name] = app
         _save_registry_file()
@@ -259,7 +262,7 @@ def load_or_scan_executable(exe_path: Path, timeout: float = 10.0) -> tuple[Path
                     validate_config_dict(config)
                     return exe_path, config
                 except Exception as e:
-                    print(f"[REGISTRY] Cache validation failed for {exe_path}: {e}")
+                    log.info(f"[REGISTRY] Cache validation failed for {exe_path}: {e}")
 
     data = run_and_capture_registration(exe_path, timeout=timeout)
     if data is not None:
@@ -277,11 +280,11 @@ def load_or_scan_executable(exe_path: Path, timeout: float = 10.0) -> tuple[Path
 # ==================================================
 
 def run_registry_scan() -> None:
-    print(f"[INFO] Scanning: {BASE_DIR}")
+    log.info(f"Scanning: {BASE_DIR}")
 
     executables = find_main_executables(BASE_DIR)
     if not executables:
-        print("[INFO] No executables found")
+        log.info("No executables found")
         return
 
     max_workers = min(4, max(1, (os.cpu_count() or 1)))
@@ -289,15 +292,15 @@ def run_registry_scan() -> None:
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for exe_path, data in executor.map(load_or_scan_executable, executables):
-            print(f"[INFO] Processing: {exe_path}")
+            log.info(f"Processing: {exe_path}")
 
             if data is None:
-                print(f"[WARN] No valid response from: {exe_path}")
+                log.warning(f"No valid response from: {exe_path}")
                 continue
 
             app_name = data.get("name")
             if isinstance(app_name, str) and app_name in seen_names:
-                print(f"[SKIP] Duplicate app in this run: {app_name}")
+                log.info(f"[SKIP] Duplicate app in this run: {app_name}")
                 continue
 
             try:
@@ -305,12 +308,12 @@ def run_registry_scan() -> None:
                 if isinstance(app_name, str):
                     seen_names.add(app_name)
             except Exception as e:
-                print(f"[ERROR] {exe_path}: {e}")
+                log.error(f"{exe_path}: {e}")
 
     with _CACHE_LOCK:
         _save_scan_cache_file()
 
-    print("[INFO] Done")
+    log.info("Done")
 
 if __name__ == "__main__":
     run_registry_scan()

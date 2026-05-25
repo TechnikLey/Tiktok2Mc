@@ -12,6 +12,9 @@ import uuid
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
+
+log = logging.getLogger(__name__)
 
 # ---- Colors (ANSI, works on modern Windows 10+ and Linux) ----
 class Color:
@@ -23,7 +26,7 @@ class Color:
     RESET = "\033[0m"
 
 def cprint(msg, color=Color.RESET):
-    print(f"{color}{msg}{Color.RESET}")
+    log.info(f"{color}{msg}{Color.RESET}")
 
 # Enable ANSI colors on Windows
 if sys.platform == "win32":
@@ -328,6 +331,9 @@ def main():
             'import sys\n'
             'import os\n'
             'from pathlib import Path\n'
+            'import logging\n'
+            '\n'
+            'log = logging.getLogger(__name__)\n'
             '\n'
             f'TOOL_VERSION = "{TOOL_VERSION}"\n'
             '\n'
@@ -340,11 +346,11 @@ def main():
             'X = "\\033[0m"\n'
             '\n'
             'def run(cmd, check=True):\n'
-            '    print(f"{C}> {\' \'.join(cmd)}{X}")\n'
+            '    log.info(f"{C}> {\' \'.join(cmd)}{X}")\n'
             '    return subprocess.run(cmd, check=check, capture_output=False)\n'
             '\n'
             '# 1. Stage all changes\n'
-            'print(f"\\n{C}Staging changes...{X}")\n'
+            'log.info(f"\\n{C}Staging changes...{X}")\n'
             'run(["git", "add", "-A"])\n'
             '\n'
             '# 2. Commit (ask for message)\n'
@@ -353,21 +359,21 @@ def main():
             f'    msg = "Release {TOOL_VERSION}"\n'
             'result = run(["git", "commit", "-m", msg], check=False)\n'
             'if result.returncode != 0:\n'
-            '    print(f"{Y}No changes to commit, continuing...{X}")\n'
+            '    log.info(f"{Y}No changes to commit, continuing...{X}")\n'
             '\n'
             '# 3. Push\n'
-            'print(f"\\n{C}Pushing to remote...{X}")\n'
+            'log.info(f"\\n{C}Pushing to remote...{X}")\n'
             'run(["git", "push"])\n'
             '\n'
             '# 4. Create and push tag\n'
-            f'print(f"\\n{{C}}Creating tag {TOOL_VERSION}...{{X}}")\n'
+            f'log.info(f"\\n{{C}}Creating tag {TOOL_VERSION}...{{X}}")\n'
             f'run(["git", "tag", "-d", "{TOOL_VERSION}"], check=False)\n'
             f'run(["git", "push", "origin", "--delete", "{TOOL_VERSION}"], check=False)\n'
             f'run(["git", "tag", "{TOOL_VERSION}"])\n'
             f'run(["git", "push", "origin", "{TOOL_VERSION}"])\n'
             '\n'
-            f'print(f"\\n{{G}}Done! GitHub Actions will now build & release {TOOL_VERSION}{{X}}")\n'
-            'print(f"{C}   Check progress: https://github.com/<OWNER>/<REPO>/actions{X}")\n'
+            f'log.info(f"\\n{{G}}Done! GitHub Actions will now build & release {TOOL_VERSION}{{X}}")\n'
+            'log.info(f"{C}   Check progress: https://github.com/<OWNER>/<REPO>/actions{X}")\n'
             '\n'
             'input("\\nPress Enter to exit...")\n'
         )

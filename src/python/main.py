@@ -34,6 +34,8 @@ from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
 from core.paths import get_root_dir
 
+log = logging.getLogger(__name__)
+
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
@@ -171,7 +173,7 @@ def _check_dup_cmd_config():
             if ":" in cline and indent == base_indent + 2:
                 key = cline.strip().split(":")[0].strip().lower()
                 if key in seen:
-                    print(f"[ERROR] command_config: Command '{key}' configured multiple times! (line {j+1}, first at line {seen[key]})")
+                    log.error(f"command_config: Command '{key}' configured multiple times! (line {j+1}, first at line {seen[key]})")
                     found = True
                 else:
                     seen[key] = j + 1
@@ -184,7 +186,7 @@ def _check_dup_cmd_config():
 def load_config():
     """Loads configuration values from the YAML config file."""
     if not CONFIG_FILE.exists():
-        print(f"[ERROR] Config not found: {CONFIG_FILE}")
+        log.error(f"Config not found: {CONFIG_FILE}")
         return False
 
     _check_dup_cmd_config()
@@ -214,11 +216,11 @@ def load_config():
         if ctx.follow_tracking_file.exists():
             with open(ctx.follow_tracking_file, "r") as f:
                 ctx._followed_cache = set(line.strip().lower() for line in f if line.strip())
-            print(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
+            log.info(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
         if ctx.follow_tracking_mode == "per_stream":
             ctx.follow_tracking_file.write_text("")
             ctx._followed_cache.clear()
-            print("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
+            log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
 
         ctx.like_triggers = validate_like_triggers(config.get("like_goal", {}).get("triggers", []))
 
@@ -237,17 +239,17 @@ def load_config():
                 "handler": "rcon",
                 "url": "",
             }]
-            print("[CONFIG] comment_commands: using legacy single-group format")
+            log.info("[CONFIG] comment_commands: using legacy single-group format")
         ctx.comment_cmd_groups = []
         seen_prefixes = set()
         for g in raw_groups:
             prefix = str(g.get("prefix", "#"))
             enabled = bool(g.get("enabled", True))
             if not enabled:
-                print(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
+                log.info(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
                 continue
             if prefix in seen_prefixes:
-                print(f"[WARN] comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
+                log.warning(f"comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
                 continue
             seen_prefixes.add(prefix)
             raw_roles = g.get("allowed_roles", ["moderator"])
@@ -266,12 +268,12 @@ def load_config():
                             if cname in seen_cmd:
                                 dup_warn_count += 1
                                 if dup_warn_count <= dup_warn_max:
-                                    print(f"[WARN] comment_commands group '{prefix}': '{cname}' listed multiple times in commands")
+                                    log.warning(f"comment_commands group '{prefix}': '{cname}' listed multiple times in commands")
                             seen_cmd.add(cname)
                             commands.append(cname)
             if dup_warn_count > dup_warn_max:
                 remaining = dup_warn_count - dup_warn_max
-                print(f"[WARN] comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed")
+                log.warning(f"comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed")
             commands_config = {}
             raw_config = g.get("commands_config", {})
             if isinstance(raw_config, dict):
@@ -296,7 +298,7 @@ def load_config():
             cooldown = max(0, int(g.get("cooldown", 0)))
             user_cooldown = max(0, int(g.get("user_cooldown", 0)))
             if mode == "allow-all" and not commands and handler == "rcon":
-                print(f"[WARN] comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
+                log.warning(f"comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
             trigger_comment = g.get("trigger_comment_event", True)
 
             # Warn about commands_config entries that can never be used
@@ -306,14 +308,14 @@ def load_config():
                 if mode == "deny-all" and cname not in commands:
                     cmd_warn_count += 1
                     if cmd_warn_count <= cmd_warn_max:
-                        print(f"[WARN] comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match")
+                        log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match")
                 elif mode == "allow-all" and cname in commands:
                     cmd_warn_count += 1
                     if cmd_warn_count <= cmd_warn_max:
-                        print(f"[WARN] comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode")
+                        log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode")
             if cmd_warn_count > cmd_warn_max:
                 remaining = cmd_warn_count - cmd_warn_max
-                print(f"[WARN] comment_commands group '{prefix}': {remaining} further command config warnings suppressed")
+                log.warning(f"comment_commands group '{prefix}': {remaining} further command config warnings suppressed")
 
             ctx.comment_cmd_groups.append({
                 "prefix": prefix,
@@ -331,7 +333,7 @@ def load_config():
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
         return ctx.datapack_root.exists() and ctx.datapack_root.is_dir()
     except Exception as e:
-        print(f"[ERROR] Config error: {e}")
+        log.error(f"Config error: {e}")
         return False
 
 def sanitize_filename(name):
@@ -345,7 +347,7 @@ def generate_datapack():
     Supported command prefixes: '!' (RCON), '$' (script), '/' (vanilla).
     Multiplier ' xN' applies to all types.
     """
-    print(f"\n[BUILD] Generating datapack in: {ctx.datapack_root}")
+    log.info(f"\n[BUILD] Generating datapack in: {ctx.datapack_root}")
 
     full_dp_path = ctx.datapack_root / ctx.datapack_name
     functions_path = full_dp_path / "data" / ctx.namespace / "function"
@@ -364,7 +366,7 @@ def generate_datapack():
             shutil.rmtree(full_dp_path)
         functions_path.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        print(f"[ERROR] Failed to create datapack directory: {e}")
+        log.error(f"Failed to create datapack directory: {e}")
         return
 
     try:
@@ -409,7 +411,7 @@ def generate_datapack():
                             kind = "vanilla"
                             body = cmd[1:].strip()
                         else:
-                            print(f"[ERROR] Invalid command without prefix on line {line_num}: {cmd}")
+                            log.error(f"Invalid command without prefix on line {line_num}: {cmd}")
                             continue
 
                         # Parse multiplier (e.g. "command x3")
@@ -461,7 +463,7 @@ def generate_datapack():
 
     except Exception as e:
         traceback.print_exc()
-        print(f"[ERROR] Datapack build failed: {e}")
+        log.error(f"Datapack build failed: {e}")
 
 # ================================
 # RCON WORKER
@@ -469,7 +471,7 @@ def generate_datapack():
 
 async def rcon_worker():
     """Background worker that dequeues RCON commands and sends them to the Minecraft server."""
-    print("[RCON-QUEUE] Worker started.")
+    log.info("[RCON-QUEUE] Worker started.")
     while True:
         commands, source_user = await ctx.rcon_queue.get()
         try:
@@ -480,7 +482,7 @@ async def rcon_worker():
                     ctx.rcon_queue_retries[retry_key] = retries
                     await ctx.rcon_queue.put((commands, source_user))
                 else:
-                    print(f"[RCON] Dropping commands after queue inactive for {retries} attempts: {commands}")
+                    log.info(f"[RCON] Dropping commands after queue inactive for {retries} attempts: {commands}")
                     ctx.rcon_queue_retries.pop(retry_key, None)
                 await asyncio.sleep(1)
                 continue
@@ -523,7 +525,7 @@ async def rcon_worker():
                         await asyncio.sleep(inner_pause)
 
         except Exception as e:
-            print(f"[RCON OFFLINE] {e}")
+            log.info(f"[RCON OFFLINE] {e}")
             ctx.rcon_connection = None
             await asyncio.sleep(5)
             retry_key = repr((commands, source_user))
@@ -533,9 +535,9 @@ async def rcon_worker():
                 try:
                     await ctx.rcon_queue.put((commands, source_user))
                 except Exception as e:
-                    print(f"RCON Queue Error: {e}")
+                    log.info(f"RCON Queue Error: {e}")
             else:
-                print(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
+                log.info(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
                 ctx.rcon_queue_retries.pop(retry_key, None)
             await asyncio.sleep(wait_time)
             continue
@@ -559,9 +561,9 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                     ctx.hook_api._current_depth = chain_depth
                     HOOK_ACTIONS[action](source_user, action, {})
                 except Exception as e:
-                    print(f"[HOOK] [WARN] Error in action '{action}': {e}")
+                    log.warning(f"[HOOK] Error in action '{action}': {e}")
             elif action:
-                print(f"[HOOK] [WARN] Unknown script action: '{action}'") 
+                log.warning(f"[HOOK] Unknown script action: '{action}'") 
 
     # --- 0. OVERLAY TEXT ---
     comment_text = None
@@ -601,17 +603,17 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
         try:
             ctx.rcon_queue.put_nowait((commands_to_send, source_user))
         except asyncio.QueueFull:
-            print(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
+            log.info(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
     ctx.main_loop.call_soon_threadsafe(_enqueue)
     if ctx.rcon_queue.qsize() < 10: 
-        print(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
+        log.info(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
 
 # ================================
 # TRIGGER WORKER
 # ================================
 async def trigger_worker():
     """Processes TikTok events from the trigger queue and converts them into RCON commands."""
-    print("[TRIGGER-QUEUE] Worker started.")
+    log.info("[TRIGGER-QUEUE] Worker started.")
     while True:
         try:
             item = await ctx.trigger_queue.get()
@@ -623,11 +625,11 @@ async def trigger_worker():
             try:
                 await execute_global_command(trigger, source_user, chain_depth)
             except Exception as e:
-                print(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
+                log.info(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
             finally:
                 ctx.trigger_queue.task_done()
         except Exception as e_outer:
-            print(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
+            log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             await asyncio.sleep(0.1)  
 
 # ==========================================
@@ -640,7 +642,7 @@ def load_http_actions(file_path=HTTP_ACTIONS_FILE):
     variables = {}
 
     if not file_path.exists():
-        print(f"[ERROR] File not found: {file_path}")
+        log.error(f"File not found: {file_path}")
         return
 
     with file_path.open("r", encoding="utf-8") as f:
@@ -657,7 +659,7 @@ def load_http_actions(file_path=HTTP_ACTIONS_FILE):
                     var_value = parts[1].strip()
                     if var_name and var_value:
                         variables[var_name] = var_value
-                        print(f"[HTTP] Defined variable '{var_name}' = '{var_value}'")
+                        log.info(f"[HTTP] Defined variable '{var_name}' = '{var_value}'")
                 continue
 
             if ":" not in line_clean:
@@ -669,7 +671,7 @@ def load_http_actions(file_path=HTTP_ACTIONS_FILE):
                 cmd = cmd.replace(f"{{{var_name}}}", var_value)
             ctx.http_actions_cache[trigger_id] = cmd
 
-    print(f"[INFO] HTTP actions loaded: {len(ctx.http_actions_cache)} entries")
+    log.info(f"HTTP actions loaded: {len(ctx.http_actions_cache)} entries")
 
 # ==========================================
 # Webhook endpoint for MinecraftServerAPI
@@ -679,7 +681,7 @@ def handle_minecraft_events():
     try:
         data = request.json
     except Exception as e:
-        print(f"[ERROR] Webhook invalid JSON: {e}")
+        log.error(f"Webhook invalid JSON: {e}")
         return {"status": "invalid json"}, 400
 
     if not data:
@@ -689,11 +691,11 @@ def handle_minecraft_events():
 
     if event == "player_death":
         ctx.queue_active = False
-        print("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
+        log.info("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
     
     elif event == "player_respawn":
         ctx.queue_active = True
-        print("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
+        log.info("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
 
     return {"status": "processed"}, 200
 
@@ -706,7 +708,7 @@ def _dispatch_comment_http(url_template, username, cmd_text):
         req = urllib.request.Request(url, method="POST")
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:
-        print(f"[COMMENT CMD] HTTP dispatch failed: {e}")
+        log.info(f"[COMMENT CMD] HTTP dispatch failed: {e}")
 
 
 def _ping_channel_points(user):
@@ -723,7 +725,7 @@ def _ping_channel_points(user):
         req.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req, timeout=2)
     except Exception as e:
-        print(f"[CHANNEL POINTS] Ping failed for {user}: {e}")
+        log.info(f"[CHANNEL POINTS] Ping failed for {user}: {e}")
 
 
 def _get_channel_points_port():
@@ -742,7 +744,7 @@ def _get_user_points(user):
         data = json.loads(resp.read())
         return data.get("points", 0)
     except Exception as e:
-        print(f"[CHANNEL POINTS] Failed to get points for {user}: {e}")
+        log.info(f"[CHANNEL POINTS] Failed to get points for {user}: {e}")
         return 0
 
 
@@ -759,7 +761,7 @@ def _deduct_user_points(user, amount):
         resp = urllib.request.urlopen(req, timeout=3)
         return json.loads(resp.read()).get("success", False)
     except Exception as e:
-        print(f"[CHANNEL POINTS] Failed to deduct points for {user}: {e}")
+        log.info(f"[CHANNEL POINTS] Failed to deduct points for {user}: {e}")
         return False
 
 
@@ -780,22 +782,22 @@ def handle_test_comment():
         is_super_fan = bool(data.get("superfan", False))
         in_fanclub = bool(data.get("fanclub", False))
 
-        print(f"[TEST COMMENT] {username}: {comment_text}")
-        print(f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}")
+        log.info(f"[TEST COMMENT] {username}: {comment_text}")
+        log.info(f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}")
 
         if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
             now = time.time()
             gcd = ctx.comment_cmd_global_cooldown
             if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
                 remaining = gcd - (now - ctx.comment_cmd_global_last)
-                print(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                log.info(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
                 return {"status": "ok", "message": "Blocked by global cooldown"}
             gucd = ctx.comment_cmd_global_user_cooldown
             if gucd > 0:
                 last_user = ctx.comment_cmd_global_user_last.get(username, 0)
                 if now - last_user < gucd:
                     remaining = gucd - (now - last_user)
-                    print(f"[TEST COMMENT] {username} blocked by global user cooldown ({remaining:.1f}s left)")
+                    log.info(f"[TEST COMMENT] {username} blocked by global user cooldown ({remaining:.1f}s left)")
                     return {"status": "ok", "message": "Blocked by global user cooldown"}
             for group in ctx.comment_cmd_groups:
                 prefix = group["prefix"]
@@ -816,17 +818,17 @@ def handle_test_comment():
                     allowed = True
 
                 if not allowed:
-                    print(f"[TEST COMMENT] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                    log.info(f"[TEST COMMENT] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
                     continue
 
                 base_cmd = cmd_text.split()[0].lower()
                 if group["mode"] == "deny-all":
                     if base_cmd not in group["commands"]:
-                        print(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                        log.info(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
                         continue
                 else:
                     if base_cmd in group["commands"]:
-                        print(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                        log.info(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
                         continue
 
                 ccfg = group.get("commands_config", {}).get(base_cmd, {})
@@ -844,7 +846,7 @@ def handle_test_comment():
                     elif "fanclub" in cmd_roles and in_fanclub:
                         cmd_allowed = True
                     if not cmd_allowed:
-                        print(f"[TEST COMMENT] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                        log.info(f"[TEST COMMENT] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
                         continue
 
                 now = time.time()
@@ -854,13 +856,13 @@ def handle_test_comment():
                     last = ctx.comment_cmd_last_global.get(prefix, 0)
                     if now - last < cd:
                         remaining = cd - (now - last)
-                        print(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                        log.info(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
                         continue
                 if ucd > 0:
                     last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
                     if now - last_user < ucd:
                         remaining = ucd - (now - last_user)
-                        print(f"[TEST COMMENT] {username} blocked by user cooldown ({remaining:.1f}s left)")
+                        log.info(f"[TEST COMMENT] {username} blocked by user cooldown ({remaining:.1f}s left)")
                         continue
 
                 # Points check & deduction
@@ -868,16 +870,16 @@ def handle_test_comment():
                 if points_cost > 0:
                     balance = _get_user_points(username)
                     if balance < points_cost:
-                        print(f"[TEST COMMENT] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
+                        log.info(f"[TEST COMMENT] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
                         continue
                     if not _deduct_user_points(username, points_cost):
-                        print(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
+                        log.info(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
                         continue
-                    print(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
+                    log.info(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
 
                 cmd_url = ccfg.get("url", group["url"])
                 cmd_handler = ccfg.get("handler", group["handler"])
-                print(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
+                log.info(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
 
                 ctx.comment_cmd_last_global[prefix] = now
                 ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
@@ -899,7 +901,7 @@ def handle_test_comment():
         return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
 
     except Exception as e:
-        print(f"[TEST COMMENT] Error: {e}")
+        log.info(f"[TEST COMMENT] Error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
 
@@ -933,7 +935,7 @@ def handle_custom_trigger():
             with ctx.tiktok_lock:
                 ctx.disable_tiktok_connect = not ctx.disable_tiktok_connect
                 new_state = ctx.disable_tiktok_connect
-            print(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
+            log.info(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
             return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}"}, 200
 
         if ctx.main_loop is None:
@@ -944,7 +946,7 @@ def handle_custom_trigger():
                 ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (sanitized, user))
             except asyncio.QueueFull:
                 return {"status": "error", "message": "Trigger queue is full. Try again later."}, 503
-            print(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
+            log.info(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         raw_trigger = str(data.get("trigger", "")).strip()
@@ -954,7 +956,7 @@ def handle_custom_trigger():
                 asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
             except Exception as e:
                 return {"status": "error", "message": str(e)}, 500
-            print(f"[CUSTOM TRIGGER] HTTP action for '{raw_trigger}' executed")
+            log.info(f"[CUSTOM TRIGGER] HTTP action for '{raw_trigger}' executed")
             return {"status": "ok", "trigger": raw_trigger, "user": user}, 200
 
         return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
@@ -974,9 +976,9 @@ def run_signal_server():
 def execute_http_command_sync(cmd: str):
     try:
         subprocess.run(cmd, shell=True, check=True)
-        print(f"[OK] Success: {cmd}")
+        log.info(f"Success: {cmd}")
     except subprocess.CalledProcessError as e:
-        print(f"[FAIL] Error: {cmd} ({e})")
+        log.info(f"[FAIL] Error: {cmd} ({e})")
 
 async def execute_http_command(cmd: str):
     await asyncio.to_thread(execute_http_command_sync, cmd)
@@ -989,9 +991,9 @@ def execute_gift_action(gift_id: str):
 
     try:
         asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
-        print(f"[HTTP] Action for gift {gift_id} started")
+        log.info(f"[HTTP] Action for gift {gift_id} started")
     except Exception as e:
-        print(f"[HTTP ERROR] {e}")
+        log.info(f"[HTTP ERROR] {e}")
         traceback.print_exc()
 
 # ==========================================
@@ -1006,7 +1008,7 @@ def get_safe_username(user):
 # =========================================
 async def likegoal_worker():
     timeout = aiohttp.ClientTimeout(total=2)
-    print("[LIKEGOAL-QUEUE] Worker started.")
+    log.info("[LIKEGOAL-QUEUE] Worker started.")
     async with aiohttp.ClientSession(timeout=timeout) as session:
         while True:
             delta_val = await ctx.likegoal_queue.get()
@@ -1016,7 +1018,7 @@ async def likegoal_worker():
                     if resp.status == 200:
                         pass
             except Exception as e:
-                print(f"[LIKEGOAL ERROR] {e}")
+                log.info(f"[LIKEGOAL ERROR] {e}")
             finally:
                 ctx.likegoal_queue.task_done()
 
@@ -1041,24 +1043,24 @@ def validate_like_triggers(raw_triggers):
 
     for i, rule in enumerate(raw_triggers):
         if not isinstance(rule, dict):
-            print(f"[CONFIG ERROR] Entry #{i} is not an object: {rule}")
+            log.info(f"[CONFIG ERROR] Entry #{i} is not an object: {rule}")
             continue
 
         # --- ID ---
         rule_id = rule.get("id")
         if not isinstance(rule_id, str) or not rule_id.strip():
-            print(f"[CONFIG ERROR] Invalid or missing 'id': {rule}")
+            log.info(f"[CONFIG ERROR] Invalid or missing 'id': {rule}")
             continue
 
         if rule_id in seen_ids:
-            print(f"[CONFIG ERROR] Duplicate id '{rule_id}'")
+            log.info(f"[CONFIG ERROR] Duplicate id '{rule_id}'")
             continue
         seen_ids.add(rule_id)
 
         # --- EVERY (trigger interval) ---
         raw_every = rule.get("every")
         if raw_every is None:
-            print(f"[CONFIG ERROR] 'every' missing for {rule_id}")
+            log.info(f"[CONFIG ERROR] 'every' missing for {rule_id}")
             continue
 
         try:
@@ -1070,19 +1072,19 @@ def validate_like_triggers(raw_triggers):
                 raise ValueError()
 
         except Exception:
-            print(f"[CONFIG ERROR] Invalid 'every' value for {rule_id}: {raw_every}")
+            log.info(f"[CONFIG ERROR] Invalid 'every' value for {rule_id}: {raw_every}")
             continue
 
         # --- FUNCTION (action to execute) ---
         function_name = rule.get("function")
         if not isinstance(function_name, str) or not function_name.strip():
-            print(f"[CONFIG ERROR] Invalid or missing 'function' for {rule_id}")
+            log.info(f"[CONFIG ERROR] Invalid or missing 'function' for {rule_id}")
             continue
 
         # --- PAYLOAD (user label, optional) ---
         payload = rule.get("payload", "Community")
         if not isinstance(payload, str):
-            print(f"[CONFIG ERROR] 'payload' must be a string for {rule_id}")
+            log.info(f"[CONFIG ERROR] 'payload' must be a string for {rule_id}")
             continue
 
         # --- ENABLE (on/off toggle, optional) ---
@@ -1115,7 +1117,7 @@ def prepare_like_triggers(raw_triggers):
             continue
 
         if rule["function"] not in ctx.valid_functions:
-            print(f"[CONFIG ERROR] Unknown function: {rule['function']}")
+            log.info(f"[CONFIG ERROR] Unknown function: {rule['function']}")
             continue
 
         prepared.append({
@@ -1214,10 +1216,10 @@ def create_client(user):
                 ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (target, username))
 
         except Exception:
-            print("\n" + "!"*30)
-            print("ERROR IN ON_GIFT EVENT:")
+            log.error("\n" + "!"*30)
+            log.error("ERROR IN ON_GIFT EVENT:")
             traceback.print_exc()
-            print("!"*30 + "\n")
+            log.error("!"*30 + "\n")
 
     # =========================
     # FOLLOW events
@@ -1228,14 +1230,14 @@ def create_client(user):
         _ping_channel_points(username)
         user_lower = username.lower()
         if user_lower in ctx._followed_cache:
-            print(f"[FOLLOW] {username} already tracked — follow trigger skipped")
+            log.info(f"[FOLLOW] {username} already tracked — follow trigger skipped")
             return
         ctx._followed_cache.add(user_lower)
         try:
             with open(ctx.follow_tracking_file, "a") as f:
                 f.write(user_lower + "\n")
         except Exception as e:
-            print(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
+            log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
         if "follow" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
 
@@ -1250,7 +1252,7 @@ def create_client(user):
         with ctx.like_lock:
             if ctx.start_likes is None:
                 ctx.start_likes = event.total
-                print(f"[LIKE] Initial count set: {ctx.start_likes}")
+                log.info(f"[LIKE] Initial count set: {ctx.start_likes}")
                 return
             total_since_start = event.total - ctx.start_likes
         try:
@@ -1263,7 +1265,7 @@ def create_client(user):
                     if current_blocks > last_blocks:
                         diff = current_blocks - last_blocks
                         rule["last_blocks"] = current_blocks
-                        print(f"[LIKE] Trigger '{rule['id']}' -> +{diff}")
+                        log.info(f"[LIKE] Trigger '{rule['id']}' -> +{diff}")
                         for _ in range(diff):
                             ctx.main_loop.call_soon_threadsafe(
                                 ctx.trigger_queue.put_nowait,
@@ -1277,9 +1279,9 @@ def create_client(user):
                     ctx.last_likegoal_sent = total_since_start
                     ctx.last_likegoal_time = now
                 except asyncio.QueueFull:
-                    print("[LIKEGOAL] Queue full, like delta dropped")
+                    log.info("[LIKEGOAL] Queue full, like delta dropped")
         except Exception as e:
-            print(f"[EVENT ERROR] Error in like handling: {e}")
+            log.info(f"[EVENT ERROR] Error in like handling: {e}")
 
     # ========================
     # Join events
@@ -1316,10 +1318,10 @@ def create_client(user):
 
         is_moderator = getattr(event.user, 'is_moderator', None)
 
-        print(f"[COMMENT] {username}: {comment_text}")
-        print(f"  Superfan: {is_super_fan}")
-        print(f"  Fanclub-Mitglied: {in_fanclub}")
-        print(f"  Moderator: {is_moderator}")
+        log.info(f"[COMMENT] {username}: {comment_text}")
+        log.info(f"  Superfan: {is_super_fan}")
+        log.info(f"  Fanclub-Mitglied: {in_fanclub}")
+        log.info(f"  Moderator: {is_moderator}")
 
         suppress_comment_trigger = False
         if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
@@ -1327,7 +1329,7 @@ def create_client(user):
             gcd = ctx.comment_cmd_global_cooldown
             if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
                 remaining = gcd - (now - ctx.comment_cmd_global_last)
-                print(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                log.info(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
                 suppress_comment_trigger = True
                 return
             gucd = ctx.comment_cmd_global_user_cooldown
@@ -1335,7 +1337,7 @@ def create_client(user):
                 last_user = ctx.comment_cmd_global_user_last.get(username, 0)
                 if now - last_user < gucd:
                     remaining = gucd - (now - last_user)
-                    print(f"[COMMENT CMD] {username} blocked by global user cooldown ({remaining:.1f}s left)")
+                    log.info(f"[COMMENT CMD] {username} blocked by global user cooldown ({remaining:.1f}s left)")
                     suppress_comment_trigger = True
                     return
             for group in ctx.comment_cmd_groups:
@@ -1357,7 +1359,7 @@ def create_client(user):
                     allowed = True
 
                 if not allowed:
-                    print(f"[COMMENT CMD] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                    log.info(f"[COMMENT CMD] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
                     if not group.get("trigger_comment_event", True):
                         suppress_comment_trigger = True
                     continue
@@ -1365,13 +1367,13 @@ def create_client(user):
                 base_cmd = cmd_text.split()[0].lower()
                 if group["mode"] == "deny-all":
                     if base_cmd not in group["commands"]:
-                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                        log.info(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
                 else:
                     if base_cmd in group["commands"]:
-                        print(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                        log.info(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
@@ -1391,7 +1393,7 @@ def create_client(user):
                     elif "fanclub" in cmd_roles and in_fanclub:
                         cmd_allowed = True
                     if not cmd_allowed:
-                        print(f"[COMMENT CMD] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                        log.info(f"[COMMENT CMD] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
@@ -1403,7 +1405,7 @@ def create_client(user):
                     last = ctx.comment_cmd_last_global.get(prefix, 0)
                     if now - last < cd:
                         remaining = cd - (now - last)
-                        print(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                        log.info(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
@@ -1411,7 +1413,7 @@ def create_client(user):
                     last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
                     if now - last_user < ucd:
                         remaining = ucd - (now - last_user)
-                        print(f"[COMMENT CMD] {username} blocked by user cooldown ({remaining:.1f}s left)")
+                        log.info(f"[COMMENT CMD] {username} blocked by user cooldown ({remaining:.1f}s left)")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
@@ -1421,20 +1423,20 @@ def create_client(user):
                 if points_cost > 0:
                     balance = _get_user_points(username)
                     if balance < points_cost:
-                        print(f"[COMMENT CMD] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
+                        log.info(f"[COMMENT CMD] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
                     if not _deduct_user_points(username, points_cost):
-                        print(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
+                        log.info(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
-                    print(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
+                    log.info(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
 
                 cmd_url = ccfg.get("url", group["url"])
                 cmd_handler = ccfg.get("handler", group["handler"])
-                print(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
+                log.info(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
 
                 ctx.comment_cmd_last_global[prefix] = now
                 ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
@@ -1472,7 +1474,7 @@ def create_client(user):
     @client.on(LiveEndEvent)
     def on_live_end(_):
         update_daily_revenue()
-        print(f"[STATUS] Live ended for @{user}.")
+        log.info(f"Live ended for @{user}.")
         ctx.runtime_path_shutdown.touch(exist_ok=True)
 
     # =========================
@@ -1481,7 +1483,7 @@ def create_client(user):
     @client.on(ConnectEvent)
     def on_connect(_):
         _connect_time[0] = time.time()
-        print(f"[OK] Live connection established: @{user}")
+        log.info(f"Live connection established: @{user}")
 
     return client
 
@@ -1503,27 +1505,27 @@ async def run_bot():
     ctx.main_loop = asyncio.get_running_loop()
     
     if not load_config():
-        print("Error in load_config")
+        log.info("Error in load_config")
         sys.exit(1)
 
     # TikTok username check: ask user if still default
     default_user = "your_tiktok_username"
     if ctx.tiktok_user == default_user:
-        print(f"\n[TIKTOK] Your TikTok username is still the default '{default_user}'.")
+        log.info(f"\n[TIKTOK] Your TikTok username is still the default '{default_user}'.")
         inp = input("  Enter your TikTok username (press Enter to keep the default): ").strip()
         if inp:
             ctx.tiktok_user = inp
-            print(f"[TIKTOK] Username set to @{ctx.tiktok_user} (session only).")
+            log.info(f"[TIKTOK] Username set to @{ctx.tiktok_user} (session only).")
         else:
-            print(f"[TIKTOK] No input – using default '{default_user}'.")
+            log.info(f"[TIKTOK] No input – using default '{default_user}'.")
 
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)
         if diags:
-            print("[VALIDATOR] Validation result for actions.mca:")
+            log.info("[VALIDATOR] Validation result for actions.mca:")
             print_diagnostics(diags)
         if any(d.severity.name == "ERROR" for d in diags):
-            print("[STOP] Errors found. Please fix actions.mca and restart.")
+            log.info("[STOP] Errors found. Please fix actions.mca and restart.")
             if sys.stdin.isatty():
                 try:
                     input("Press Enter to exit...\n\n\n")
@@ -1531,7 +1533,7 @@ async def run_bot():
                     pass
             return
     except FileNotFoundError as e:
-        print(f"[ERROR] {e}")
+        log.error(f"{e}")
         return
 
     generate_datapack()
@@ -1557,31 +1559,31 @@ async def run_bot():
         client = create_client(ctx.tiktok_user)
 
         try:
-            print(f"[*] Connecting to @{ctx.tiktok_user}...")
+            log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
             await asyncio.to_thread(client.run)
 
         except Exception as e:
-            print("\n" + "="*50)
-            print("CRITICAL ERROR IN TIKTOK CLIENT:")
+            log.info("\n" + "="*50)
+            log.info("CRITICAL ERROR IN TIKTOK CLIENT:")
             traceback.print_exc() 
-            print("="*50 + "\n")
+            log.info("="*50 + "\n")
 
             error_str = str(e)
-            print(f"[..] Connection lost: {error_str}")
+            log.info(f"[..] Connection lost: {error_str}")
 
             if "DEVICE_BLOCKED" in error_str or bool(re.search(r"\berr_code\b.*?\b200\b", error_str, re.IGNORECASE)):
-                print("[FAIL] TikTok block active (DEVICE_BLOCKED).")
-                print("[TIP] Wait 15 minutes or restart your router.")
+                log.info("[FAIL] TikTok block active (DEVICE_BLOCKED).")
+                log.info("[TIP] Wait 15 minutes or restart your router.")
                 await asyncio.sleep(900)
             else:
-                print(f"[..] Reconnect in {ctx.reconnect_delay}s...")
+                log.info(f"[..] Reconnect in {ctx.reconnect_delay}s...")
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
             try:
                 client.stop()
             except Exception as e:
-                print(f"[TIKTOK] Error stopping client: {e}")
+                log.info(f"[TIKTOK] Error stopping client: {e}")
             await asyncio.sleep(2)
 
 if __name__ == "__main__":
@@ -1592,4 +1594,4 @@ if __name__ == "__main__":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
     except KeyboardInterrupt:
-        print("\n[STOP] Script stopped manually.")
+        log.info("\n[STOP] Script stopped manually.")

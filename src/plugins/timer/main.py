@@ -23,6 +23,7 @@ DATA_DIR = (ROOT_DIR / "data").resolve()
 STATE_FILE = (DATA_DIR / "window_state_timer.json").resolve()
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 
+log = logging.getLogger(__name__)
 logging.getLogger('werkzeug').setLevel(logging.INFO)
 
 args = parse_args()
@@ -127,11 +128,11 @@ def timer_tick_loop():
     while True:
         hit_zero = timer_state.tick()
         if hit_zero:
-            print(f"[ACTION] Timer reached 0. Sending POST to {ADD_URL}")
+            log.info(f"[ACTION] Timer reached 0. Sending POST to {ADD_URL}")
             try:
                 requests.post(ADD_URL, timeout=2)
             except Exception as e:
-                print(f"[ERROR] Could not reach counter: {e}")
+                log.error(f"Could not reach counter: {e}")
             threading.Timer(2.0, timer_state.reset).start()
         overlay_clients.notify(timer_state.get_state())
         time.sleep(1)
@@ -148,7 +149,7 @@ def load_win_size():
             with STATE_FILE.open("r") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"[TIMER] Failed to load state: {e}")
+            log.info(f"[TIMER] Failed to load state: {e}")
     return {"width": 400, "height": 200}
 
 
@@ -158,7 +159,7 @@ def save_dims():
         with STATE_FILE.open("w") as f:
             json.dump(request.json, f)
     except Exception as e:
-        print(f"[TIMER] Failed to save dimensions: {e}")
+        log.info(f"[TIMER] Failed to save dimensions: {e}")
     return "OK"
 
 
@@ -167,7 +168,7 @@ def webhook():
     try:
         data = request.json
     except Exception as e:
-        print(f"[TIMER] Invalid JSON in webhook: {e}")
+        log.info(f"[TIMER] Invalid JSON in webhook: {e}")
         return "OK"
     ev = data.get("event") if data else None
     if ev == "player_death":
@@ -308,5 +309,5 @@ if __name__ == '__main__':
         )
         webview.start()
     else:
-        print(f"[TIMER] Running in gui_hidden mode. Open http://{SERVER_HOST}:{WEB_PORT} in OBS as a Browser Source.")
+        log.info(f"[TIMER] Running in gui_hidden mode. Open http://{SERVER_HOST}:{WEB_PORT} in OBS as a Browser Source.")
         server_thread.join()

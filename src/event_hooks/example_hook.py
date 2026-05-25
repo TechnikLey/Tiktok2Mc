@@ -20,6 +20,8 @@
 # Import for type hints and IntelliSense in your editor.
 # This import is only used for development (autocomplete, docstrings) and has no effect at runtime.
 from core.hook_api import HookAPI
+import logging
+log = logging.getLogger(__name__)
 
 def register(api: HookAPI):
     def superjump(user, trigger, context):

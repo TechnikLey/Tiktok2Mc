@@ -16,6 +16,9 @@ import sys
 from pathlib import Path
 
 from core.hook_api import HookAPI
+import logging
+
+log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Allowed top-level module names for event hook scripts.
@@ -65,15 +68,15 @@ def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
     """
     if not hooks_dir.exists():
         hooks_dir.mkdir(parents=True, exist_ok=True)
-        print(f"[HOOK] Created event_hooks folder: {hooks_dir}")
+        log.info(f"[HOOK] Created event_hooks folder: {hooks_dir}")
         return
 
     hook_files = sorted(hooks_dir.glob("*.py"))
     if not hook_files:
-        print("[HOOK] No event hooks found.")
+        log.info("[HOOK] No event hooks found.")
         return
 
-    print(f"[HOOK] Loading {len(hook_files)} hook(s) from: {hooks_dir}")
+    log.info(f"[HOOK] Loading {len(hook_files)} hook(s) from: {hooks_dir}")
 
     for path in hook_files:
         _load_single_hook(api, path)
@@ -90,8 +93,8 @@ def _load_single_hook(api: HookAPI, path: Path) -> None:
         pass
     if disallowed:
         for name in disallowed:
-            print(
-                f"[HOOK] [ERROR] {path.name} uses disallowed import: "
+            log.error(
+                f"[HOOK] {path.name} uses disallowed import: "
                 f"'{name}' — hook skipped. "
             )
         return
@@ -100,7 +103,7 @@ def _load_single_hook(api: HookAPI, path: Path) -> None:
     try:
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
-            print(f"[HOOK] [WARN] Could not create spec for: {path.name}")
+            log.warning(f"[HOOK] Could not create spec for: {path.name}")
             return
 
         module = importlib.util.module_from_spec(spec)
@@ -108,16 +111,16 @@ def _load_single_hook(api: HookAPI, path: Path) -> None:
         spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
     except SyntaxError as e:
-        print(f"[HOOK] [WARN] Syntax error in {path.name}: {e}")
+        log.warning(f"[HOOK] Syntax error in {path.name}: {e}")
         return
     except Exception as e:
-        print(f"[HOOK] [WARN] Failed to load {path.name}: {e}")
+        log.warning(f"[HOOK] Failed to load {path.name}: {e}")
         return
 
     if hasattr(module, "register") and callable(module.register):
         try:
             module.register(api)
         except Exception as e:
-            print(f"[HOOK] [WARN] register() failed in {path.name}: {e}")
+            log.warning(f"[HOOK] register() failed in {path.name}: {e}")
     else:
-        print(f"[HOOK] [ERROR] {path.name} has no register() function — skipped.")
+        log.error(f"[HOOK] {path.name} has no register() function — skipped.")

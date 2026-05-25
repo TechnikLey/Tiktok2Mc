@@ -15,6 +15,8 @@ from queue import Queue
 from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
 from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # --- Paths & configuration ---
 args = parse_args()
@@ -31,7 +33,7 @@ def load_win_size():
         try:
             with STATE_FILE.open("r") as f: return json.load(f)
         except Exception as e:
-            print(f"[DEATHCOUNTER] Failed to load state: {e}")
+            log.info(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}
 
 cfg = {}
@@ -42,10 +44,10 @@ if CONFIG_FILE.exists():
             cfg = yaml.safe_load(f) or {}
             WEB_SERVER_PORT = cfg.get("death_counter", {}).get("port", 29190)
     except Exception as e:
-        print(f"Config error: {e}")
+        log.info(f"Config error: {e}")
         cfg = {}
 else:
-    print(f"Config file not found: {CONFIG_FILE}")
+    log.info(f"Config file not found: {CONFIG_FILE}")
     sys.exit(1)
 
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
@@ -156,7 +158,7 @@ def add():
         if data and data.get("event") == "player_death":
             death_manager.add_death()
     except Exception as e:
-        print(f"[DEATHCOUNTER] Webhook error: {e}")
+        log.info(f"[DEATHCOUNTER] Webhook error: {e}")
     return "OK"
 
 @app.route("/stream")
@@ -182,5 +184,5 @@ if __name__ == "__main__":
         webview.create_window('Death Counter', f'http://127.0.0.1:{WEB_SERVER_PORT}', width=win['width'], height=win['height'], on_top=True, background_color=BG_COLOR)
         webview.start()
     else:
-        print("GUI hidden, running server only.")
+        log.info("GUI hidden, running server only.")
         server_thread.join()

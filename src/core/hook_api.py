@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import asyncio
 from typing import Callable, Optional
+import logging
+
+log = logging.getLogger(__name__)
 
 # Global registry: action_name -> handler callable
 HOOK_ACTIONS: dict[str, Callable] = {}
@@ -64,13 +67,13 @@ class HookAPI:
         First registration wins — duplicates are ignored with a warning.
         """
         if not isinstance(name, str) or not name.strip():
-            print(f"[HOOK] register_action: invalid name: {name!r}")
+            log.info(f"[HOOK] register_action: invalid name: {name!r}")
             return
         if name in HOOK_ACTIONS:
-            print(f"[HOOK] [WARN] Duplicate action '{name}' — first registration kept.")
+            log.warning(f"[HOOK] Duplicate action '{name}' — first registration kept.")
             return
         HOOK_ACTIONS[name] = fn
-        print(f"[HOOK] Registered action: {name}")
+        log.info(f"[HOOK] Registered action: {name}")
 
     def rcon_enqueue(self, commands: list[str]) -> None:
         """
@@ -84,7 +87,7 @@ class HookAPI:
                 self._rcon_queue.put_nowait, (commands, "hook")
             )
         except asyncio.QueueFull:
-            print("[HOOK] [WARN] RCON queue full — commands dropped.")
+            log.warning("[HOOK] RCON queue full — commands dropped.")
 
     def enqueue_trigger(self, action_name: str, user: str = "hook") -> None:
         """
@@ -92,13 +95,13 @@ class HookAPI:
         Useful for chaining actions.
         """
         if action_name in self._banned_triggers:
-            print(f"[HOOK] [ERROR] enqueue_trigger('{action_name}') permanently blocked "
+            log.error(f"[HOOK] enqueue_trigger('{action_name}') permanently blocked "
                   f"— trigger was banned after loop detection.")
             return
         depth = self._current_depth + 1
         if depth > MAX_CHAIN_DEPTH:
             self._banned_triggers.add(action_name)
-            print(f"[HOOK] [ERROR] enqueue_trigger('{action_name}') blocked — "
+            log.error(f"[HOOK] enqueue_trigger('{action_name}') blocked — "
                   f"chain depth {depth} exceeds maximum ({MAX_CHAIN_DEPTH}). "
                   f"Trigger '{action_name}' is now permanently banned for this session. "
                   f"Possible infinite loop.")
@@ -108,11 +111,11 @@ class HookAPI:
                 self._trigger_queue.put_nowait, (action_name, user, depth)
             )
         except asyncio.QueueFull:
-            print(f"[HOOK] [WARN] Trigger queue full — '{action_name}' dropped.")
+            log.warning(f"[HOOK] Trigger queue full — '{action_name}' dropped.")
 
     def log(self, msg: str) -> None:
         """Print a message with [HOOK] prefix."""
-        print(f"[HOOK] {msg}")
+        log.info(f"[HOOK] {msg}")
 
     def send_overlay_text(self, title: str, subtitle: Optional[str] = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
         """
@@ -122,7 +125,7 @@ class HookAPI:
             from core.overlay_utils import send_overlay_text
             return send_overlay_text(title, subtitle, duration, overlay_name)
         except Exception as e:
-            print(f"[HOOK] [ERROR] send_overlay_text failed: {e}")
+            log.error(f"[HOOK] send_overlay_text failed: {e}")
             return False
     
     def get_valid_functions(self) -> set[str]:

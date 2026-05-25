@@ -13,6 +13,19 @@ Each version is split into two sections:
 
 ## [Unreleased]
 
+> [!IMPORTANT]
+> ### Looking Ahead: v1.0.0
+>
+> The next major release will be **v1.0.0** — and it's going to be a big one. Version **v0.5.0** lays the groundwork for this milestone by introducing structural changes, new subsystems, and foundational features that v1.0.0 will fully capitalize on.
+>
+> **What to expect from v1.0.0:**
+> - A fully functional **Graphical User Interface (GUI)** that lets you manage every aspect of the tool — configuration, plugins, overlays, comment commands, triggers, and more — without ever needing to open a file directly. Everything will be configurable through the interface.
+> - Many new features and quality-of-life improvements.
+> - Significant internal restructuring and cleanup, which means some existing configurations and workflows may need to be updated.
+>
+> **Timeline:**
+> Because of the sheer scope of changes, the v1.0.0 release will take some time to complete. The goal is to get it right rather than rush it out. If any critical bugs are found in v0.5.0 in the meantime, a **v0.5.1 hotfix release** may be published to address them before the major release arrives.
+
 ### Added
 * **Spotify Integration** — A brand new Spotify plugin! Connect your Spotify account and trigger playback controls (play, pause, skip, volume, shuffle, repeat, save) directly from stream events. Comment commands, gift events, follows — whatever works for you. Comes with a sleek overlay showing album art and track info.
 * **Multiple Comment Command Groups** — You can now define several independent comment command groups, each with its own prefix, role restrictions, and command list. Handy if you want different permission levels for different commands — moderators get one set, everyone else another.
@@ -83,6 +96,9 @@ Each version is split into two sections:
 * **More reliable updates on Linux** — Fixed a crash that could occur when running the updater without root permissions.
 * **Timer webhook no longer crashes on bad input** — The countdown timer now properly handles POST requests with missing or malformed JSON data.
 * **Queue overloads are now actually caught** — When the command queue overflows, the error is properly handled instead of crashing silently in the background.
+* **Bracket validation skips strings** — The actions file validator no longer falsely reports unbalanced brackets when they appear inside text strings (e.g. JSON data or selectors in quotes).
+* **Spotify login handles unexpected server responses** — If Spotify returns something other than valid JSON during authentication, the tool now shows a clear error instead of crashing.
+* **Console output switched to structured logging** — All console messages now use proper log levels (info, warning, error) instead of plain print statements. This makes it easier to filter and understand what's happening at a glance.
 
 ---
 

@@ -19,12 +19,15 @@ from queue import Queue
 from urllib.parse import urlencode, parse_qs
 from pathlib import Path
 
+import logging
 import yaml
 import requests
 from flask import Flask, Response, request, jsonify, redirect
 from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
 from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+
+log = logging.getLogger(__name__)
 
 # =========================
 # Paths & configuration
@@ -41,7 +44,7 @@ cfg = {}
 
 try:
     if not CONFIG_FILE.exists():
-        print("Config not found")
+        log.info("Config not found")
         sys.exit(1)
     else:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
@@ -55,7 +58,7 @@ try:
         VOLUME_STEP = SPOTIFY_CFG.get("volume_step", 10)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
-    print(f"Config error: {e}")
+    log.info(f"Config error: {e}")
     SPOTIFY_PORT = 29194
     CLIENT_ID = ""
     CLIENT_SECRET = ""
@@ -113,7 +116,7 @@ class SpotifyClient:
                 self.refresh_token = data.get("refresh_token")
                 self.expires_at = data.get("expires_at", 0)
             except Exception as e:
-                print(f"[SPOTIFY] Failed to load tokens: {e}")
+                log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
         TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -150,14 +153,18 @@ class SpotifyClient:
         }
         resp = requests.post(SPOTIFY_TOKEN, data=data, timeout=10)
         if resp.status_code != 200:
-            print(f"[SPOTIFY] Token exchange failed: {resp.text}")
+            log.info(f"[SPOTIFY] Token exchange failed: {resp.text}")
             return False
-        token_data = resp.json()
+        try:
+            token_data = resp.json()
+        except ValueError as e:
+            log.info(f"[SPOTIFY] Invalid JSON in token response: {e}")
+            return False
         self.access_token = token_data["access_token"]
         self.refresh_token = token_data.get("refresh_token", self.refresh_token)
         self.expires_at = time.time() + token_data["expires_in"]
         self._save_tokens()
-        print("[SPOTIFY] Authentication successful")
+        log.info("[SPOTIFY] Authentication successful")
         return True
 
     def refresh_access_token(self):
@@ -172,7 +179,7 @@ class SpotifyClient:
         try:
             resp = requests.post(SPOTIFY_TOKEN, data=data, timeout=10)
             if resp.status_code != 200:
-                print(f"[SPOTIFY] Token refresh failed: {resp.text}")
+                log.info(f"[SPOTIFY] Token refresh failed: {resp.text}")
                 return False
             token_data = resp.json()
             self.access_token = token_data["access_token"]
@@ -182,7 +189,7 @@ class SpotifyClient:
             self._save_tokens()
             return True
         except Exception as e:
-            print(f"[SPOTIFY] Token refresh error: {e}")
+            log.info(f"[SPOTIFY] Token refresh error: {e}")
             return False
 
     def _ensure_token(self):
@@ -213,10 +220,10 @@ class SpotifyClient:
                 return resp.json()
             if resp.status_code == 404:
                 return None
-            print(f"[SPOTIFY] API error {resp.status_code}: {resp.text[:200]}")
+            log.info(f"[SPOTIFY] API error {resp.status_code}: {resp.text[:200]}")
             return None
         except Exception as e:
-            print(f"[SPOTIFY] Request error: {e}")
+            log.info(f"[SPOTIFY] Request error: {e}")
             return None
 
     def get_playback(self):
@@ -571,7 +578,7 @@ def _poll_spotify():
             if spotify.is_authenticated:
                 _notify_overlay()
         except Exception as e:
-            print(f"[SPOTIFY-POLL] Error polling overlay: {e}")
+            log.info(f"[SPOTIFY-POLL] Error polling overlay: {e}")
 
 
 @app.route("/")
@@ -764,22 +771,19 @@ def run_flask():
 
 if __name__ == "__main__":
     if not spotify.is_authenticated and (not CLIENT_ID or not CLIENT_SECRET):
-        print("=" * 60)
-        print("  SPOTIFY PLUGIN — CONFIGURATION REQUIRED")
-        print("=" * 60)
-        print()
-        print("  To use the Spotify plugin you need:")
-        print("  1. A Spotify Developer account (https://developer.spotify.com)")
-        print("  2. An app with Client ID and Client Secret")
-        print("  3. Redirect URI set to: http://127.0.0.1:29194/callback")
-        print()
-        print("  Then add to config/config.yaml:")
-        print("    spotify:")
-        print("      client_id: \"YOUR_CLIENT_ID\"")
-        print("      client_secret: \"YOUR_CLIENT_SECRET\"")
-        print()
-        print("  On first start, your browser will open for Spotify login.")
-        print("=" * 60)
+        log.info("=" * 60)
+        log.info("  SPOTIFY PLUGIN — CONFIGURATION REQUIRED")
+        log.info("=" * 60)
+        log.info("  To use the Spotify plugin you need:")
+        log.info("  1. A Spotify Developer account (https://developer.spotify.com)")
+        log.info("  2. An app with Client ID and Client Secret")
+        log.info("  3. Redirect URI set to: http://127.0.0.1:29194/callback")
+        log.info("  Then add to config/config.yaml:")
+        log.info("    spotify:")
+        log.info('      client_id: "YOUR_CLIENT_ID"')
+        log.info('      client_secret: "YOUR_CLIENT_SECRET"')
+        log.info("  On first start, your browser will open for Spotify login.")
+        log.info("=" * 60)
 
     server_thread = threading.Thread(target=run_flask, daemon=True)
     server_thread.start()
@@ -788,9 +792,9 @@ if __name__ == "__main__":
     polling_thread.start()
 
     if spotify.is_authenticated:
-        print(f"[SPOTIFY] Already authenticated. Starting on port {SPOTIFY_PORT}")
+        log.info(f"[SPOTIFY] Already authenticated. Starting on port {SPOTIFY_PORT}")
     else:
-        print(f"[SPOTIFY] Not authenticated. Open http://127.0.0.1:{SPOTIFY_PORT}/login in your browser")
+        log.info(f"[SPOTIFY] Not authenticated. Open http://127.0.0.1:{SPOTIFY_PORT}/login in your browser")
         if CLIENT_ID and CLIENT_SECRET:
             url, _ = spotify.get_auth_url()
             webbrowser.open(url)
@@ -811,5 +815,5 @@ if __name__ == "__main__":
         except ImportError:
             server_thread.join()
     else:
-        print(f"[SPOTIFY] GUI hidden, running server only.")
+        log.info(f"[SPOTIFY] GUI hidden, running server only.")
         server_thread.join()

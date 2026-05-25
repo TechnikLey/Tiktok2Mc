@@ -20,6 +20,8 @@ from datetime import datetime
 from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
+import logging
+log = logging.getLogger(__name__)
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -51,7 +53,7 @@ cfg = load_config(CONFIG_FILE)
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
-        print("[ERROR] This script must be run as root on Linux to start the tool.")
+        log.error("This script must be run as root on Linux to start the tool.")
         input("Press Enter to exit...")
         sys.exit(1)
 
@@ -75,68 +77,65 @@ if not IS_WINDOWS:
     elif SCREEN_PATH:
         SESSION_TOOL = "screen"
     else:
-        print()
-        print("[WARN] Neither tmux or screen found!")
-        print("Without one of these, all processes will share this terminal.")
-        print()
-        print("  [1] Install tmux (recommended)")
-        print("  [2] Install screen")
-        print("  [3] Continue (all in one terminal)")
-        print("  [4] Abort")
-        print()
+        log.warning("Neither tmux or screen found!")
+        log.info("Without one of these, all processes will share this terminal.")
+        log.info("  [1] Install tmux (recommended)")
+        log.info("  [2] Install screen")
+        log.info("  [3] Continue (all in one terminal)")
+        log.info("  [4] Abort")
 
         choice = input("Choice [1/2/3/4]: ").strip()
         tmux_cmd, screen_cmd = _detect_package_manager()
 
         if choice == "1":
             if tmux_cmd:
-                print(f"\n=> {tmux_cmd}")
+                log.info(f"\n=> {tmux_cmd}")
                 ret = os.system(tmux_cmd)
                 if ret == 0:
                     TMUX_PATH = shutil.which("tmux")
                     if TMUX_PATH:
                         SESSION_TOOL = "tmux"
-                        print("[OK] tmux installed successfully.\n")
+                        log.info("tmux installed successfully.\n")
                     else:
-                        print("[FAIL] tmux was installed but could not be found.")
+                        log.info("[FAIL] tmux was installed but could not be found.")
                         sys.exit(1)
                 else:
-                    print("[FAIL] Installation failed. Please install manually.")
+                    log.info("[FAIL] Installation failed. Please install manually.")
                     sys.exit(1)
             else:
-                print("[FAIL] No package manager detected. Please install manually:")
-                print("         Ubuntu/Debian : sudo apt install tmux")
-                print("         Fedora/RHEL   : sudo dnf install tmux")
-                print("         Arch Linux    : sudo pacman -S tmux")
+                log.info("[FAIL] No package manager detected. Please install manually:")
+                log.info("         Ubuntu/Debian : sudo apt install tmux")
+                log.info("         Fedora/RHEL   : sudo dnf install tmux")
+                log.info("         Arch Linux    : sudo pacman -S tmux")
                 sys.exit(1)
 
         elif choice == "2":
             if screen_cmd:
-                print(f"\n=> {screen_cmd}")
+                log.info(f"\n=> {screen_cmd}")
                 ret = os.system(screen_cmd)
                 if ret == 0:
                     SCREEN_PATH = shutil.which("screen")
                     if SCREEN_PATH:
                         SESSION_TOOL = "screen"
-                        print("[OK] screen installed successfully.\n")
+                        log.info("screen installed successfully.\n")
                     else:
-                        print("[FAIL] screen was installed but could not be found.")
+                        log.info("[FAIL] screen was installed but could not be found.")
                         sys.exit(1)
                 else:
-                    print("[FAIL] Installation failed. Please install manually.")
+                    log.info("[FAIL] Installation failed. Please install manually.")
                     sys.exit(1)
             else:
-                print("[FAIL] No package manager detected. Please install manually:")
-                print("         Ubuntu/Debian : sudo apt install screen")
-                print("         Fedora/RHEL   : sudo dnf install screen")
-                print("         Arch Linux    : sudo pacman -S screen")
+                log.info("[FAIL] No package manager detected. Please install manually:")
+                log.info("         Ubuntu/Debian : sudo apt install screen")
+                log.info("         Fedora/RHEL   : sudo dnf install screen")
+                log.info("         Arch Linux    : sudo pacman -S screen")
                 sys.exit(1)
 
         elif choice == "3":
-            print("\n[OK] Continuing without tmux/screen...\n")
+            log.info("\n[OK] Continuing without tmux/screen...\n")
 
         else:
-            print("\nAborted.")
+            log.info("\nAborted.")
             sys.exit(0)
 
 # -----------------------------
@@ -202,7 +201,7 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
     """Starts an executable in its own window (Windows) or tmux/screen session (Linux)."""
     if not path.exists():
         if ALLOW_CLOSE:
-            print(f"[-] Houston, we have a problem: {path} is missing. Did it run away?")
+            log.info(f"[-] Houston, we have a problem: {path} is missing. Did it run away?")
         return
     try:
         cmd = [str(path)]
@@ -249,19 +248,19 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
 
         if ALLOW_CLOSE:
             if SESSION_TOOL and not IS_WINDOWS:
-                print(f"{name} started in {SESSION_TOOL} session: {_sanitize_session_name(f'mc-{name}')}")
+                log.info(f"{name} started in {SESSION_TOOL} session: {_sanitize_session_name(f'mc-{name}')}")
             else:
-                print(f"{name} started{' (hidden)' if hidden else ''}, gui_hidden={gui_hidden}.")
+                log.info(f"{name} started{' (hidden)' if hidden else ''}, gui_hidden={gui_hidden}.")
     except Exception as e:
         if ALLOW_CLOSE:
-            print(f"Error starting {name}: {e}")
+            log.info(f"Error starting {name}: {e}")
 
 def stop_all_processes():
     """Terminates all started processes including child processes (only when allow_close=True)."""
     if not ALLOW_CLOSE:
         return  # In background mode, do not stop anything
 
-    print("\nTerminating all started processes...")
+    log.info("\nTerminating all started processes...")
 
     # Kill tmux/screen sessions on Linux
     if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
@@ -277,9 +276,9 @@ def stop_all_processes():
                         ["screen", "-X", "-S", session_name, "quit"],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                     )
-                print(f"{session_name} session terminated.")
+                log.info(f"{session_name} session terminated.")
             except Exception as e:
-                print(f"Failed to terminate session {session_name}: {e}")
+                log.info(f"Failed to terminate session {session_name}: {e}")
         linux_sessions.clear()
 
     # Kill Windows processes / fallback Linux processes
@@ -290,11 +289,11 @@ def stop_all_processes():
                     subprocess.run(f"taskkill /F /PID {proc.pid} /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
                     proc.terminate()
-                print(f"{name} terminated.")
+                log.info(f"{name} terminated.")
             except Exception as e:
-                print(f"Failed to terminate process {name}: {e}")
+                log.info(f"Failed to terminate process {name}: {e}")
     processes.clear()
-    print("\nSnap! All processes have been dusted... (Thanos style).")
+    log.info("\nSnap! All processes have been dusted... (Thanos style).")
 
 # -----------------------------
 # Register cleanup on exit
@@ -306,13 +305,13 @@ atexit.register(stop_all_processes)
 # =============================================================================
 def replace_updater_if_exists():
     if update_new.exists():
-        print("[..] New updater found. Installing...")
+        log.info("[..] New updater found. Installing...")
         try:
             update_new.replace(UPDATE_EXE_PATH)
-            print("[OK] Updater successfully updated.")
+            log.info("Updater successfully updated.")
             time.sleep(0.5)
         except PermissionError:
-            print(f"[FAIL] Error: {UPDATE_EXE_PATH.name} is still locked.")
+            log.info(f"[FAIL] Error: {UPDATE_EXE_PATH.name} is still locked.")
 
 def start_UPDATE_EXE_PATH():
     """Run updater synchronously — must wait for exit code, so no tmux/screen here."""
@@ -321,7 +320,7 @@ def start_UPDATE_EXE_PATH():
     if IS_WINDOWS:
         proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
     else:
-        print("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
+        log.info("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
         log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
@@ -337,11 +336,11 @@ def start_UPDATE_EXE_PATH():
     try:
         max_logs = int(max_logs)
     except Exception as e:
-        print(f"[WARN] Invalid max_update_logs value: {e}. Using default 20.")
+        log.warning(f"Invalid max_update_logs value: {e}. Using default 20.")
         max_logs = 20
     if max_logs < 0:
         if max_logs != -1:
-            print(f"[WARN] Negative max_update_logs ({max_logs}), treating as -1 (keep all).")
+            log.warning(f"Negative max_update_logs ({max_logs}), treating as -1 (keep all).")
         max_logs = -1
 
     if max_logs >= 0:
@@ -350,13 +349,13 @@ def start_UPDATE_EXE_PATH():
             try:
                 old_log.unlink()
             except Exception as e:
-                print(f"[WARN] Failed to delete old log {old_log}: {e}")
+                log.warning(f"Failed to delete old log {old_log}: {e}")
 
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
         if update_signal.exists():
             update_signal.unlink()
-            print("Please restart the application.")
+            log.info("Please restart the application.")
             time.sleep(2)
             return "kill"
         time.sleep(1)
@@ -367,7 +366,7 @@ replace_updater_if_exists()
 
 if UPDATE_ENABLED:
     time.sleep(0.5)
-    print("Automatic updates are enabled.")
+    log.info("Automatic updates are enabled.")
 
     while True:
         result = start_UPDATE_EXE_PATH()
@@ -379,17 +378,17 @@ if UPDATE_ENABLED:
             sys.exit(0)
 
         if result == 5:
-            print("Continuing...")
+            log.info("Continuing...")
             break
 
         else:
-            print("\nUpdate has been installed.")
-            print("Please restart the program now to apply the changes.")
+            log.info("\nUpdate has been installed.")
+            log.info("Please restart the program now to apply the changes.")
             input("Press Enter to exit...")
             sys.exit(0)
 
 else:
-    print("Automatic updates are disabled.")
+    log.info("Automatic updates are disabled.")
 
 # =============================================================================
 # REGISTRY LOGIC — scan and register all plugins
@@ -397,11 +396,11 @@ else:
 try:
     result = subprocess.run([REGISTRY_EXE_PATH])
     if result.returncode == 0:
-        print("All apps registered.")
+        log.info("All apps registered.")
     else:
-        print("Error")
+        log.info("Error")
 except FileNotFoundError:
-    print("File not found")
+    log.info("File not found")
 
 # -------------------------------------------------------------------------
 # Plugin Update Check (optional — skips if plugin_updater exe is missing)
@@ -410,14 +409,14 @@ if PLUGIN_UPDATER_EXE_PATH.exists():
     try:
         subprocess.run([PLUGIN_UPDATER_EXE_PATH])
     except Exception as e:
-        print(f"[WARN] Plugin updater failed: {e}")
+        log.warning(f"Plugin updater failed: {e}")
 # =============================================================================
 
 # -----------------------------
 # Startup notice
 # -----------------------------
 if ALLOW_CLOSE:
-    print("\nStarting programs... (start script visible)")
+    log.info("\nStarting programs... (start script visible)")
 
 # -----------------------------
 # Launch programs (modular system with visibility levels)
@@ -485,9 +484,9 @@ for app in PLUGIN_REGISTRY:
     if app.port > 0:
         overlay_ports.append((app.name, app.port))
 if overlay_ports:
-    print("\n[OVERLAYS] Add these URLs as OBS Browser Sources:")
+    log.info("\n[OVERLAYS] Add these URLs as OBS Browser Sources:")
     for name, port in sorted(overlay_ports, key=lambda x: x[1]):
-        print(f"  {name}: http://localhost:{port}")
+        log.info(f"  {name}: http://localhost:{port}")
 
 # =============================================================================
 # STATE
@@ -511,15 +510,13 @@ async def shutdown_countdown():
         if shutdown_cancel_event.is_set():
             shutdown_cancel_event.clear()
             shutdown_pending = False
-            print("\nCancelled shutdown.")
+            log.info("\nCancelled shutdown.")
             return
-        print(
-            f"\rShutdown in {remaining} seconds... Press 'stop' to cancel.",
-            end="",
-            flush=True
+        log.info(
+            f"\rShutdown in {remaining} seconds... Press 'stop' to cancel."
         )
         await asyncio.sleep(1)
-    print("\nShutting down now!")
+    log.info("\nShutting down now!")
     stop_all_processes()
     sys.exit(0)
 
@@ -538,11 +535,11 @@ async def check_and_run():
             file.unlink(missing_ok=True)
             if name == "shutdown":
                 if not AUTO_SHUTDOWN_ENABLED:
-                    print("Shutdown signal detected, but Auto shutdown is disabled.")
+                    log.info("Shutdown signal detected, but Auto shutdown is disabled.")
                     continue
                 if not shutdown_pending:
                     shutdown_pending = True
-                    print(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
+                    log.info(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
                     asyncio.create_task(shutdown_countdown())
         await asyncio.sleep(5)
 
@@ -558,9 +555,9 @@ async def command_loop():
         )
         cmd = cmd.strip().lower()
         if cmd == "help":
-            print("\nAvailable commands:")
-            print("  exit  - Stop all programs and close")
-            print("  stop  - Cancel active shutdown countdown")
+            log.info("\nAvailable commands:")
+            log.info("  exit  - Stop all programs and close")
+            log.info("  stop  - Cancel active shutdown countdown")
         elif cmd == "exit":
             break
         elif cmd == "stop":
@@ -582,17 +579,17 @@ async def main():
 # =============================================================================
 
 if ALLOW_CLOSE:
-    print("\nAll programs have been started.")
+    log.info("\nAll programs have been started.")
 
     # Show active sessions on Linux immediately (not after exit)
     if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
-        print(f"\n--- Active {SESSION_TOOL} sessions ---")
+        log.info(f"\n--- Active {SESSION_TOOL} sessions ---")
         for s in linux_sessions:
             if SESSION_TOOL == "tmux":
-                print(f"  tmux attach -t {s}")
+                log.info(f"  tmux attach -t {s}")
             elif SESSION_TOOL == "screen":
-                print(f"  screen -r {s}")
-        print("-----------------------------------")
+                log.info(f"  screen -r {s}")
+        log.info("-----------------------------------")
 
     asyncio.run(main())
 

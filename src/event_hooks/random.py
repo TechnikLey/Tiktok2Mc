@@ -10,7 +10,10 @@
 # ==================================================
 
 import random
+import logging
 from core.hook_api import HookAPI
+
+log = logging.getLogger(__name__)
 
 
 def register(api: HookAPI):
@@ -18,7 +21,7 @@ def register(api: HookAPI):
         all_valid = sorted(api.get_valid_functions())
 
         if not all_valid:
-            print("[RANDOM-HOOK] No valid functions available for $random.")
+            log.info("[RANDOM-HOOK] No valid functions available for $random.")
             return
 
         random_cfg = api.config.get("random_triggers", {})
@@ -36,7 +39,7 @@ def register(api: HookAPI):
                     candidates.append(func)
 
         if not candidates:
-            print("[RANDOM-HOOK] No eligible actions in $random pool.")
+            log.info("[RANDOM-HOOK] No eligible actions in $random pool.")
             return
 
         chosen = random.choice(candidates)
@@ -47,4 +50,4 @@ def register(api: HookAPI):
         api.enqueue_trigger(chosen, username)
 
     api.register_action("random", random_handler)
-    print("[RANDOM-HOOK] $random action registered")
+    log.info("[RANDOM-HOOK] $random action registered")

@@ -18,6 +18,8 @@ from flask import Flask, request, Response, jsonify
 from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
 from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
@@ -34,7 +36,7 @@ try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
 except Exception as e:
-    print(f"[CHANNEL POINTS] Config load error: {e}")
+    log.info(f"[CHANNEL POINTS] Config load error: {e}")
     cfg = {}
 
 cp_cfg = cfg.get("channel_points", {})
@@ -128,7 +130,7 @@ def award_loop():
             db.close()
             overlay_clients.notify(get_leaderboard_data())
         except Exception as e:
-            print(f"[CHANNEL POINTS] Award loop error: {e}")
+            log.info(f"[CHANNEL POINTS] Award loop error: {e}")
 
 # --- Helpers ---
 def get_leaderboard_data():
@@ -233,7 +235,7 @@ def handle_comment():
 
     if cmd == "points":
         pts = get_user_points(user)
-        print(f"[CHANNEL POINTS] {user} has {pts} points")
+        log.info(f"[CHANNEL POINTS] {user} has {pts} points")
         return jsonify({"user": user, "points": pts})
 
     if cmd == "redeem" and len(parts) >= 2:
@@ -242,10 +244,10 @@ def handle_comment():
         reward = db.execute("SELECT cost FROM rewards WHERE name = ?", (reward_name,)).fetchone()
         db.close()
         if not reward:
-            print(f"[CHANNEL POINTS] Unknown reward '{reward_name}'")
+            log.info(f"[CHANNEL POINTS] Unknown reward '{reward_name}'")
             return jsonify({"error": "Unknown reward"}), 400
         if spend_points(user, reward[0], reward_name):
-            print(f"[CHANNEL POINTS] {user} redeemed '{reward_name}' for {reward[0]} points")
+            log.info(f"[CHANNEL POINTS] {user} redeemed '{reward_name}' for {reward[0]} points")
             return jsonify({"success": True, "user": user, "reward": reward_name, "cost": reward[0]})
         return jsonify({"error": "Not enough points"}), 400
 
@@ -341,5 +343,5 @@ if __name__ == "__main__":
         )
         webview.start()
     else:
-        print(f"[CHANNEL POINTS] Running. Leaderboard at http://{SERVER_HOST}:{PORT}")
+        log.info(f"[CHANNEL POINTS] Running. Leaderboard at http://{SERVER_HOST}:{PORT}")
         server_thread.join()

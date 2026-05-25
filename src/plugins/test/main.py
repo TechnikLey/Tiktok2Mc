@@ -2,6 +2,8 @@
 from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
 from python.registry import register_plugin
 import sys
+import logging
+log = logging.getLogger(__name__)
 
 PLUGIN_DIR = get_plugin_dir()
 CONFIG_FILE = get_plugin_config_file()

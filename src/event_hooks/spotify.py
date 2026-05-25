@@ -22,6 +22,8 @@
 # ==================================================
 
 from core.hook_api import HookAPI
+import logging
+log = logging.getLogger(__name__)
 
 PLUGIN_PORT = 29194
 PLUGIN_BASE = f"http://127.0.0.1:{PLUGIN_PORT}"
@@ -37,7 +39,7 @@ def _request(method, path, **kwargs):
     except requests.ConnectionError:
         return None
     except Exception as e:
-        print(f"[SPOTIFY-HOOK] Request error: {e}")
+        log.info(f"[SPOTIFY-HOOK] Request error: {e}")
         return None
 
 
@@ -98,4 +100,4 @@ def register(api: HookAPI):
 
     api.register_action("spotify_current", current_handler)
 
-    print("[SPOTIFY-HOOK] Direct-trigger actions loaded (chat commands handled by comment_commands)")
+    log.info("[SPOTIFY-HOOK] Direct-trigger actions loaded (chat commands handled by comment_commands)")

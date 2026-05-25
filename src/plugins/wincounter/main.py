@@ -16,6 +16,8 @@ from queue import Queue
 from core import parse_args, AppConfig, get_base_file, get_base_dir, get_root_dir
 from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
@@ -42,7 +44,7 @@ def load_win_size():
                     "height": max(size.get("height", 300), 100)
                 }
         except Exception as e:
-            print(f"[WINCOUNTER] Failed to load window size: {e}")
+            log.info(f"[WINCOUNTER] Failed to load window size: {e}")
     return {"width": 600, "height": 300}
 
 # --- Configuration ---
@@ -92,14 +94,14 @@ class WinManager:
                     self.needed = d.get("needed", 10)
                     self.record = d.get("record", 0)
             except Exception as e:
-                print(f"[WINCOUNTER] Failed to load stats: {e}")
+                log.info(f"[WINCOUNTER] Failed to load stats: {e}")
 
     def save_stats(self):
         try:
             with STATS_FILE.open("w") as f:
                 json.dump({"wins": self.wins, "record": self.record, "needed": self.needed}, f, indent=4)
         except Exception as e:
-            print(f"[WINCOUNTER] Failed to save stats: {e}")
+            log.info(f"[WINCOUNTER] Failed to save stats: {e}")
 
     def _notify(self):
         self.save_stats()
@@ -224,10 +226,10 @@ def handle_minecraft_events():
 
         if event == "player_death":
             win_manager_instance.remove_win(1)
-            print("\n[STATUS] [DEAD] Player died! Win removed.")
+            log.info("\n[DEAD] Player died! Win removed.")
 
     except Exception as e:
-        print(f"[ERROR] Webhook error: {e}")
+        log.error(f"Webhook error: {e}")
 
     return {"status": "processed"}, 200
 
@@ -270,5 +272,5 @@ if __name__ == "__main__":
         )
         webview.start()
     else:
-        print("GUI hidden, running server only.")
+        log.info("GUI hidden, running server only.")
         server_thread.join()

@@ -24,6 +24,9 @@ import requests
 import sys
 from pathlib import Path
 import yaml
+import logging
+
+log = logging.getLogger(__name__)
 
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).resolve().parent
@@ -33,7 +36,7 @@ else:
     CONFIG_FILE = BASE_DIR.parent / "defaults" / "config.yaml"
 
 if not CONFIG_FILE.exists():
-    print(f"[ERROR] Configuration file not found at {CONFIG_FILE}")
+    log.error(f"Configuration file not found at {CONFIG_FILE}")
     sys.exit(1)
 
 with open(CONFIG_FILE, "r") as f:
@@ -54,20 +57,20 @@ def send_trigger(trigger: str, user: str = "System"):
         if trigger.strip().lower() == "tiktok" and data.get("status") == "ok":
             state = data.get("message", "").lower()
             if "true" in state:
-                print("[INFO] TikTok connection is now DISABLED.")
+                log.info("TikTok connection is now DISABLED.")
             else:
-                print("[INFO] TikTok connection is now ENABLED.")
+                log.info("TikTok connection is now ENABLED.")
             return
         if data.get("status") == "ok":
-            print(f"[OK] Trigger '{data['trigger']}' for user '{data['user']}' sent successfully.")
+            log.info(f"Trigger '{data['trigger']}' for user '{data['user']}' sent successfully.")
         else:
-            print(f"[ERROR] {data.get('message', 'Unknown error.')}")
+            log.error(f"{data.get('message', 'Unknown error.')}")
     except requests.exceptions.ConnectionError:
-        print(f"[ERROR] Connection to {TRIGGER_URL} failed. Is the bot running?")
+        log.error(f"Connection to {TRIGGER_URL} failed. Is the bot running?")
     except requests.exceptions.Timeout:
-        print("[ERROR] Timeout - Bot did not respond.")
+        log.error("Timeout - Bot did not respond.")
     except Exception as e:
-        print(f"[ERROR] {e}")
+        log.error(f"{e}")
 
 
 def send_comment(user: str, text: str, moderator: bool = False, superfan: bool = False, fanclub: bool = False):
@@ -82,30 +85,29 @@ def send_comment(user: str, text: str, moderator: bool = False, superfan: bool =
         response = requests.post(COMMENT_URL, json=payload, timeout=5)
         data = response.json()
         if data.get("status") == "ok":
-            print(f"[OK] Comment '{text}' from '{user}' processed.")
+            log.info(f"Comment '{text}' from '{user}' processed.")
         else:
-            print(f"[ERROR] {data.get('message', 'Unknown error.')}")
+            log.error(f"{data.get('message', 'Unknown error.')}")
     except requests.exceptions.ConnectionError:
-        print(f"[ERROR] Connection to {COMMENT_URL} failed. Is the bot running?")
+        log.error(f"Connection to {COMMENT_URL} failed. Is the bot running?")
     except requests.exceptions.Timeout:
-        print("[ERROR] Timeout - Bot did not respond.")
+        log.error("Timeout - Bot did not respond.")
     except Exception as e:
-        print(f"[ERROR] {e}")
+        log.error(f"{e}")
 
 
 def main():
-    print("=" * 50)
-    print("  Custom Trigger & Comment Simulator")
-    print(f"  Bot address: {TRIGGER_URL}")
-    print("  Ctrl+C to exit")
-    print("=" * 50)
-    print()
+    log.info("=" * 50)
+    log.info("  Custom Trigger & Comment Simulator")
+    log.info(f"  Bot address: {TRIGGER_URL}")
+    log.info("  Ctrl+C to exit")
+    log.info("=" * 50)
 
     while True:
         try:
             trigger = input("Trigger (or 'comment'): ").strip()
             if not trigger:
-                print("[INFO] No trigger entered, please try again.")
+                log.info("No trigger entered, please try again.")
                 continue
 
             if trigger.lower() == "comment":
@@ -113,7 +115,7 @@ def main():
                 user = user_input if user_input else "TestUser"
                 text = input("Comment text: ").strip()
                 if not text:
-                    print("[INFO] No comment text entered.")
+                    log.info("No comment text entered.")
                     continue
                 mod = input("Moderator (y/n): ").strip().lower() == "y"
                 sf = input("Superfan (y/n): ").strip().lower() == "y"
@@ -126,10 +128,8 @@ def main():
                 user = user_input if user_input else "System"
                 send_trigger(trigger, user)
 
-            print()
-
         except KeyboardInterrupt:
-            print("\n[STOP] Script exited.")
+            log.info("\n[STOP] Script exited.")
             sys.exit(0)
 
 

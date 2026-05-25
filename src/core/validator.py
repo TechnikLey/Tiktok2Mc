@@ -4,6 +4,9 @@ import re
 from enum import Enum
 from dataclasses import dataclass
 from typing import List, Optional, Set
+import logging
+
+log = logging.getLogger(__name__)
 
 class Severity(Enum):
     ERROR = "ERROR"
@@ -33,13 +36,13 @@ def _make_diag(line, start, end, msg, severity, code=None) -> Diagnostic:
 def print_diagnostics(diags: List[Diagnostic]) -> None:
     """Clean console output (1-based line numbers)."""
     if not diags:
-        print("[VALIDATOR] No errors found.")
+        log.info("[VALIDATOR] No errors found.")
         return
 
     for d in diags:
         lvl = d.severity.value
         ln = d.line + 1
-        print(f"[{lvl}] Line {ln}: chars {d.start_char}-{d.end_char} | {d.message} (code={d.code})")
+        log.info(f"[{lvl}] Line {ln}: chars {d.start_char}-{d.end_char} | {d.message} (code={d.code})")
 
 
     # --- Validation logic ----------------------------------------------------
@@ -109,18 +112,31 @@ def validate_text(text: str) -> List[Diagnostic]:
                 Severity.INFO, "trailing_semicolon"
             ))
 
-        # E: check bracket balance [] and {}
+        # E: check bracket balance [] and {} (skipping strings)
         square = 0
         curly = 0
-        for ch in line_no_comment:
-            if ch == "[":
-                square += 1
-            elif ch == "]":
-                square -= 1
-            elif ch == "{":
-                curly += 1
-            elif ch == "}":
-                curly -= 1
+        in_single_quote = False
+        in_double_quote = False
+        i = 0
+        while i < len(line_no_comment):
+            ch = line_no_comment[i]
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif ch == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+            elif not in_single_quote and not in_double_quote:
+                if ch == "[":
+                    square += 1
+                elif ch == "]":
+                    square -= 1
+                elif ch == "{":
+                    curly += 1
+                elif ch == "}":
+                    curly -= 1
+            i += 1
         if square != 0:
             diagnostics.append(_make_diag(
                 line_number, 0, base_offset + len(line_no_comment),
@@ -264,7 +280,7 @@ def validate_file(file_path: str, raise_on_error: bool = True) -> List[Diagnosti
     errors = [d for d in diags if d.severity == Severity.ERROR]
     if errors and raise_on_error:
         # Print for users and raise exception with all messages
-        print("[VALIDATOR] Errors found:")
+        log.info("[VALIDATOR] Errors found:")
         print_diagnostics(diags)
         raise ValueError("Validation failed: actions file contains errors. See output above.")
     return diags

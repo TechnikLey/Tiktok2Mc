@@ -14,6 +14,8 @@ from collections import defaultdict
 from core import parse_args, AppConfig, get_root_dir, get_base_dir, get_base_file
 from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # ==========================================
 # Paths & configuration
@@ -52,7 +54,7 @@ if CONFIG_FILE.exists():
             SERVER_HOST = full_config.get("server_host", "127.0.0.1")
             
     except Exception as e:
-        print(f"[!] Config error: {e}")
+        log.info(f"[!] Config error: {e}")
 
 if not OVERLAYS_CONFIG:
     OVERLAYS_CONFIG = [{"name": "default"}]
@@ -246,5 +248,5 @@ if __name__ == '__main__':
             )
         webview.start()
     else:
-        print(f"GUI hidden, running server on port {APP_PORT} only.")
+        log.info(f"GUI hidden, running server on port {APP_PORT} only.")
         server_thread.join()
