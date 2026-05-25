@@ -52,14 +52,24 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
       - [Setup](#setup)
       - [Chat Commands via comment\_commands](#chat-commands-via-comment_commands)
       - [Direct Trigger Actions (for actions.mca)](#direct-trigger-actions-for-actionsmca)
+    - [Channel Points](#channel-points)
+      - [Setup](#setup-1)
+      - [How Viewers Earn Points](#how-viewers-earn-points)
+      - [Overlay](#overlay)
+      - [Per-Command Points Cost, Cooldown \& Roles](#per-command-points-cost-cooldown--roles)
     - [Multiple Overlays](#multiple-overlays)
     - [VS Code Extension for .mca Files](#vs-code-extension-for-mca-files)
   - [Maintenance](#maintenance)
     - [Updating the Tool](#updating-the-tool)
     - [Backing Up Your Data](#backing-up-your-data)
     - [Ports Used by the Tool](#ports-used-by-the-tool)
+    - [Log Files](#log-files)
     - [Replacing the Minecraft Server Version](#replacing-the-minecraft-server-version)
   - [FAQ](#faq)
+  - [AI Prompt File](#ai-prompt-file)
+    - [What it does](#what-it-does)
+    - [How to use it](#how-to-use-it)
+    - [Who this is for](#who-this-is-for)
   - [Additional Resources](#additional-resources)
 
 ---
@@ -613,6 +623,101 @@ follow:$spotify_current              # Shows current song on follow
 - **OBS URL:** `http://localhost:29194`
 
 All options are configured in `config/config.yaml` under `spotify:` — the file has detailed inline comments for each setting.
+
+### Channel Points
+
+Awards loyalty points to active viewers automatically. Points are deducted automatically when a viewer uses a command that has `points_cost` set — no separate commands needed.
+
+#### Setup
+
+No additional setup is needed beyond enabling it in `config.yaml`:
+
+```yaml
+channel_points:
+  enabled: true
+  port: 29195
+  award_amount: 10
+  award_interval_seconds: 60
+  ping_timeout_minutes: 10
+  leaderboard_count: 10
+```
+
+- **`award_amount`** — points earned per interval by each active viewer
+- **`award_interval_seconds`** — how often points are awarded (e.g. 60 = every minute)
+- **`ping_timeout_minutes`** — viewer's `last_seen` must be within this window to receive points. Resets on every interaction.
+- **`leaderboard_count`** — number of top viewers shown on the overlay
+
+#### How Viewers Earn Points
+
+Viewers are tracked via TikTok Live events — each interaction updates their `last_seen` timestamp, keeping them in the active window:
+
+| Event | Triggers ping | Notes |
+|-------|--------------|-------|
+| Joining the stream | ✅ | Fires once when viewer enters |
+| Writing a comment | ✅ | Every comment (e.g. `$skip`) |
+| Liking | ✅ | Each like event from that user |
+| Sending a gift | ✅ | Each gift sent |
+| Following | ✅ | Once per unique follow (tracked) |
+| Sharing | ✅ | Each share event |
+
+Every `award_interval_seconds`, all viewers whose `last_seen` is within `ping_timeout_minutes` get `award_amount` points. A viewer who types `$skip`, sends a gift, likes, or follows is immediately marked active — no manual claiming needed.
+
+> [!NOTE]
+> **Pure lurkers** (watching without any interaction) are **not** tracked — TikTok does not expose passive viewership data. Viewers must join, comment, or otherwise interact to accumulate points.
+
+#### Overlay
+
+- **OBS URL:** `http://localhost:29195`
+- Shows a live leaderboard that updates every 10 seconds via SSE.
+
+#### Per-Command Points Cost, Cooldown & Roles
+
+Per-command settings go in a separate `commands_config` block — the `commands` list stays clean with just names:
+
+```yaml
+commands:
+  - play
+  - pause
+  - skip
+  - prev
+  - volume
+  - save
+  - repeat
+  - shuffle
+  - current
+
+commands_config:
+  skip:
+    points_cost: 50        # viewer needs 50 points
+    cooldown: 30           # 30s between any $skip
+  prev:
+    points_cost: 20
+  volume:
+    roles: [moderator]     # only moderators
+```
+
+When a viewer uses `$skip`, the system checks their balance, deducts the cost, applies the cooldown, and dispatches the command.
+
+---
+
+### Follow Tracking
+
+Prevents viewers from repeatedly unfollowing and refollowing to farm the follow trigger. Each unique follower is written to a file — subsequent follows from the same user are ignored.
+
+Configured in `config/config.yaml` under `tiktok.follow_tracking`:
+
+```yaml
+tiktok:
+  follow_tracking:
+    mode: "all_time"    # or "per_stream"
+    file: "data/followed_users.txt"
+```
+
+- **`all_time`** (default) — Follows are tracked across all streams. Once a user is recorded, their future follows are ignored, even after restarting the tool.
+- **`per_stream`** — The tracked list resets every time the tool starts. Each stream starts fresh.
+
+> [!IMPORTANT]
+> Only new follows that happen **while the tool is running** are tracked. Users who already followed before the tool was started **cannot** be detected — they will trigger the follow action the first time they follow during a tracked stream. This is a limitation of TikTok's event system: we only see follow events that occur while connected.
 
 ---
 

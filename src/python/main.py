@@ -32,6 +32,7 @@ from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
+from core.paths import get_root_dir
 
 # ==========================================
 # CONFIGURATION & PATHS
@@ -42,6 +43,9 @@ BASE_DIR = get_base_dir()
 CONFIG_FILE = (BASE_DIR / ".." / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR / ".." / "data" / "actions.mca").resolve()
 HTTP_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "http_actions.txt").resolve()
+
+ROOT_DIR = get_root_dir()
+FOLLOWED_USERS_FILE = (ROOT_DIR / "data" / "followed_users.txt").resolve()
 
 class BotContext:
     """Central state container for the TikTok-to-Minecraft bridge."""
@@ -61,6 +65,11 @@ class BotContext:
         self.overlaytxt_port = 29186
         self.like_triggers = []
         self.autosave_interval_seconds = 60
+
+        # Follow tracking
+        self.follow_tracking_mode = "all_time"
+        self.follow_tracking_file = FOLLOWED_USERS_FILE
+        self._followed_cache = set()
 
         # Comment commands
         self.comment_cmd_enable = False
@@ -155,6 +164,20 @@ def load_config():
         ctx.like_goal_port = config.get("like_goal", {}).get("port", 29193)
         ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
+        ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
+        ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
+        raw_path = str(ft_cfg.get("file", "data/followed_users.txt"))
+        ctx.follow_tracking_file = (ROOT_DIR / raw_path).resolve()
+        ctx._followed_cache = set()
+        if ctx.follow_tracking_file.exists():
+            with open(ctx.follow_tracking_file, "r") as f:
+                ctx._followed_cache = set(line.strip().lower() for line in f if line.strip())
+            print(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
+        if ctx.follow_tracking_mode == "per_stream":
+            ctx.follow_tracking_file.write_text("")
+            ctx._followed_cache.clear()
+            print("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
+
         ctx.like_triggers = validate_like_triggers(config.get("like_goal", {}).get("triggers", []))
 
         comment_cmd_cfg = config.get("comment_commands", {})
@@ -187,21 +210,62 @@ def load_config():
             roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()] if isinstance(raw_roles, list) else ["moderator"]
             mode = str(g.get("mode", "deny-all")).lower()
             raw_commands = g.get("commands", [])
-            commands = [str(c).strip() for c in raw_commands if str(c).strip()] if isinstance(raw_commands, list) else []
+            commands = []
+            if isinstance(raw_commands, list):
+                for item in raw_commands:
+                    if isinstance(item, str):
+                        cname = item.strip().lower()
+                        if cname:
+                            commands.append(cname)
+            commands_config = {}
+            raw_config = g.get("commands_config", {})
+            if isinstance(raw_config, dict):
+                for cname, ccfg in raw_config.items():
+                    cname = cname.strip().lower()
+                    if cname and isinstance(ccfg, dict):
+                        # Resolve port vars in per-command url
+                        if "url" in ccfg:
+                            url_tpl = str(ccfg["url"])
+                            spotify_port = config.get("spotify", {}).get("port", 29194)
+                            url_tpl = url_tpl.replace("{spotify_port}", str(spotify_port))
+                            cp_port = config.get("channel_points", {}).get("port", 29195)
+                            url_tpl = url_tpl.replace("{channel_points_port}", str(cp_port))
+                            ccfg = {**ccfg, "url": url_tpl}
+                        commands_config[cname] = ccfg
             handler = str(g.get("handler", "rcon")).lower()
             url = str(g.get("url", ""))
             spotify_port = config.get("spotify", {}).get("port", 29194)
             url = url.replace("{spotify_port}", str(spotify_port))
+            cp_port = config.get("channel_points", {}).get("port", 29195)
+            url = url.replace("{channel_points_port}", str(cp_port))
             cooldown = max(0, int(g.get("cooldown", 0)))
             user_cooldown = max(0, int(g.get("user_cooldown", 0)))
             if mode == "allow-all" and not commands and handler == "rcon":
                 print(f"[WARN] comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
             trigger_comment = g.get("trigger_comment_event", True)
+
+            # Warn about commands_config entries that can never be used
+            cmd_warn_count = 0
+            cmd_warn_max = 5
+            for cname in commands_config:
+                if mode == "deny-all" and cname not in commands:
+                    cmd_warn_count += 1
+                    if cmd_warn_count <= cmd_warn_max:
+                        print(f"[WARN] comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match")
+                elif mode == "allow-all" and cname in commands:
+                    cmd_warn_count += 1
+                    if cmd_warn_count <= cmd_warn_max:
+                        print(f"[WARN] comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode")
+            if cmd_warn_count > cmd_warn_max:
+                remaining = cmd_warn_count - cmd_warn_max
+                print(f"[WARN] comment_commands group '{prefix}': {remaining} further command config warnings suppressed")
+
             ctx.comment_cmd_groups.append({
                 "prefix": prefix,
                 "roles": roles,
                 "mode": mode,
                 "commands": commands,
+                "commands_config": commands_config,
                 "handler": handler,
                 "url": url,
                 "cooldown": cooldown,
@@ -580,6 +644,59 @@ def _dispatch_comment_http(url_template, username, cmd_text):
     except Exception as e:
         print(f"[COMMENT CMD] HTTP dispatch failed: {e}")
 
+
+def _ping_channel_points(user):
+    """Pings the channel points plugin to mark a user as active."""
+    if not ctx.config.get("channel_points", {}).get("enabled", False):
+        return
+    port = ctx.config.get("channel_points", {}).get("port", 29195)
+    import urllib.request
+    import json
+    try:
+        url = f"http://127.0.0.1:{port}/ping"
+        data = json.dumps({"user": user}).encode()
+        req = urllib.request.Request(url, data=data, method="POST")
+        req.add_header("Content-Type", "application/json")
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass
+
+
+def _get_channel_points_port():
+    return ctx.config.get("channel_points", {}).get("port", 29195)
+
+
+def _get_user_points(user):
+    """Returns the point balance for a user, or 0 on error."""
+    port = _get_channel_points_port()
+    import urllib.request
+    import urllib.parse
+    import json
+    try:
+        url = f"http://127.0.0.1:{port}/points?user={urllib.parse.quote(user)}"
+        resp = urllib.request.urlopen(url, timeout=3)
+        data = json.loads(resp.read())
+        return data.get("points", 0)
+    except Exception:
+        return 0
+
+
+def _deduct_user_points(user, amount):
+    """Deducts points from a user. Returns True on success."""
+    port = _get_channel_points_port()
+    import urllib.request
+    import json
+    try:
+        url = f"http://127.0.0.1:{port}/spend"
+        data = json.dumps({"user": user, "amount": amount}).encode()
+        req = urllib.request.Request(url, data=data, method="POST")
+        req.add_header("Content-Type", "application/json")
+        resp = urllib.request.urlopen(req, timeout=3)
+        return json.loads(resp.read()).get("success", False)
+    except Exception:
+        return False
+
+
 # ==========================================
 # Custom trigger + test comment endpoints
 # ==========================================
@@ -633,9 +750,27 @@ def handle_test_comment():
                         print(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
                         continue
 
+                ccfg = group.get("commands_config", {}).get(base_cmd, {})
+
+                # Per-command role override
+                cmd_roles = ccfg.get("roles")
+                if cmd_roles:
+                    cmd_allowed = False
+                    if "all" in cmd_roles:
+                        cmd_allowed = True
+                    elif "moderator" in cmd_roles and is_moderator:
+                        cmd_allowed = True
+                    elif "superfan" in cmd_roles and is_super_fan:
+                        cmd_allowed = True
+                    elif "fanclub" in cmd_roles and in_fanclub:
+                        cmd_allowed = True
+                    if not cmd_allowed:
+                        print(f"[TEST COMMENT] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                        continue
+
                 now = time.time()
-                cd = group["cooldown"]
-                ucd = group["user_cooldown"]
+                cd = ccfg.get("cooldown", group["cooldown"])
+                ucd = ccfg.get("user_cooldown", group["user_cooldown"])
                 if cd > 0:
                     last = ctx.comment_cmd_last_global.get(prefix, 0)
                     if now - last < cd:
@@ -649,20 +784,34 @@ def handle_test_comment():
                         print(f"[TEST COMMENT] {username} blocked by user cooldown ({remaining:.1f}s left)")
                         continue
 
-                print(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {group['handler']})")
+                # Points check & deduction
+                points_cost = ccfg.get("points_cost", 0)
+                if points_cost > 0:
+                    balance = _get_user_points(username)
+                    if balance < points_cost:
+                        print(f"[TEST COMMENT] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
+                        continue
+                    if not _deduct_user_points(username, points_cost):
+                        print(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
+                        continue
+                    print(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
+
+                cmd_url = ccfg.get("url", group["url"])
+                cmd_handler = ccfg.get("handler", group["handler"])
+                print(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
 
                 ctx.comment_cmd_last_global[prefix] = now
                 ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
 
-                if group["handler"] == "rcon":
+                if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
-                elif group["handler"] == "http" and group["url"]:
+                elif cmd_handler == "http" and cmd_url:
                     import urllib.request, urllib.parse
-                    url = group["url"].replace("{user}", urllib.parse.quote(username, safe=""))
+                    url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
                     url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
                     threading.Thread(
                         target=_dispatch_comment_http,
-                        args=(group["url"], username, cmd_text),
+                        args=(cmd_url, username, cmd_text),
                         daemon=True
                     ).start()
 
@@ -966,6 +1115,9 @@ def create_client(user):
 
             execute_gift_action(gift_id)
 
+            username = get_safe_username(event.user)
+            _ping_channel_points(username)
+
             target = None
             if gift_name in ctx.valid_functions:
                 target = gift_name
@@ -974,8 +1126,6 @@ def create_client(user):
 
             if not target:
                 return
-
-            username = get_safe_username(event.user)
 
             for _ in range(count):
                 ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (target, username))
@@ -992,6 +1142,17 @@ def create_client(user):
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
         username = get_safe_username(event.user)
+        _ping_channel_points(username)
+        user_lower = username.lower()
+        if user_lower in ctx._followed_cache:
+            print(f"[FOLLOW] {username} already tracked — follow trigger skipped")
+            return
+        ctx._followed_cache.add(user_lower)
+        try:
+            with open(ctx.follow_tracking_file, "a") as f:
+                f.write(user_lower + "\n")
+        except Exception as e:
+            print(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
         if "follow" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
 
@@ -1000,6 +1161,9 @@ def create_client(user):
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
+        username = get_safe_username(event.user) if hasattr(event, 'user') else None
+        if username:
+            _ping_channel_points(username)
         with ctx.like_lock:
             if ctx.start_likes is None:
                 ctx.start_likes = event.total
@@ -1040,6 +1204,7 @@ def create_client(user):
     @client.on(JoinEvent)
     def on_join(event):
         username = get_safe_username(event.user)
+        _ping_channel_points(username)
         if "join" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("join", username))
 
@@ -1052,6 +1217,7 @@ def create_client(user):
             return
 
         username = get_safe_username(event.user)
+        _ping_channel_points(username)
         comment_text = getattr(event, 'comment', '')
 
         is_super_fan = getattr(event, 'user_is_super_fan', None)
@@ -1112,9 +1278,29 @@ def create_client(user):
                             suppress_comment_trigger = True
                         continue
 
+                ccfg = group.get("commands_config", {}).get(base_cmd, {})
+
+                # Per-command role override
+                cmd_roles = ccfg.get("roles")
+                if cmd_roles:
+                    cmd_allowed = False
+                    if "all" in cmd_roles:
+                        cmd_allowed = True
+                    elif "moderator" in cmd_roles and is_moderator:
+                        cmd_allowed = True
+                    elif "superfan" in cmd_roles and is_super_fan:
+                        cmd_allowed = True
+                    elif "fanclub" in cmd_roles and in_fanclub:
+                        cmd_allowed = True
+                    if not cmd_allowed:
+                        print(f"[COMMENT CMD] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
+                        continue
+
                 now = time.time()
-                cd = group["cooldown"]
-                ucd = group["user_cooldown"]
+                cd = ccfg.get("cooldown", group["cooldown"])
+                ucd = ccfg.get("user_cooldown", group["user_cooldown"])
                 if cd > 0:
                     last = ctx.comment_cmd_last_global.get(prefix, 0)
                     if now - last < cd:
@@ -1132,17 +1318,35 @@ def create_client(user):
                             suppress_comment_trigger = True
                         continue
 
-                print(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {group['handler']})")
+                # Points check & deduction
+                points_cost = ccfg.get("points_cost", 0)
+                if points_cost > 0:
+                    balance = _get_user_points(username)
+                    if balance < points_cost:
+                        print(f"[COMMENT CMD] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
+                        continue
+                    if not _deduct_user_points(username, points_cost):
+                        print(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
+                        if not group.get("trigger_comment_event", True):
+                            suppress_comment_trigger = True
+                        continue
+                    print(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
+
+                cmd_url = ccfg.get("url", group["url"])
+                cmd_handler = ccfg.get("handler", group["handler"])
+                print(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
 
                 ctx.comment_cmd_last_global[prefix] = now
                 ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
 
-                if group["handler"] == "rcon":
+                if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
-                elif group["handler"] == "http" and group["url"]:
+                elif cmd_handler == "http" and cmd_url:
                     threading.Thread(
                         target=_dispatch_comment_http,
-                        args=(group["url"], username, cmd_text),
+                        args=(cmd_url, username, cmd_text),
                         daemon=True
                     ).start()
 
@@ -1158,6 +1362,7 @@ def create_client(user):
     @client.on(ShareEvent)
     def on_share(event):
         username = get_safe_username(event.user)
+        _ping_channel_points(username)
         if "share" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("share", username))
 

@@ -29,8 +29,15 @@ Each version is split into two sections:
 * **RCON timeout increased** — The RCON connection timeout was raised from 0.5s to 3.0s, making remote Minecraft servers more reliable.
 * **Log files documentation** — A new "Log Files" section in GUIDE.md explains what each log file contains and how to clean them up.
 * **tmux sessions shown before command loop** — On Linux, active tmux/screen sessions are now displayed right after startup, not after typing `exit`.
+* **Channel Points plugin** — Brand new loyalty system! Viewers earn points automatically by doing stuff in chat — joining, commenting, liking, gifting, following, sharing. Comes with an OBS overlay showing the leaderboard.
+* **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
 
 #### Changed
+* **Per-command settings separated from command list** — Each command can now have its own `points_cost`, cooldown, and roles in a separate `commands_config` block. The `commands` list stays clean — just names, no clutter.
+* **Channel points integrated into `$` commands** — No more confusing `!` prefix. Points costs are set directly on any command like `skip: { points_cost: 50 }`. Viewers earn points by simply interacting with the stream.
+* **All interactions count toward points** — Liking, following, gifting, sharing, joining, and commenting all keep viewers in the active points window. Pure lurkers don't earn, but anyone who interacts does.
+* **Follow spam protection** — Once someone follows, they're saved to a file and won't trigger the follow action again. Choose between `all_time` (never repeats) or `per_stream` (resets each stream) in config.
+* **Smart config warnings** — If you accidentally put a command in `commands_config` that can never be used (wrong mode, not in the commands list), the tool will tell you. Stops after 5 warnings so your console doesn't flood.
 * **Test plugin and example hook excluded from release** — The `plugins/test/` folder and `event_hooks/example_hook.py` are no longer included in the release build. These are development-only files and don't belong in the user package.
 * **Spotify config banner only shows when needed** — Setup instructions are no longer printed every startup if you're already authenticated. First-time users still get the full guide.
 * **Spotify no longer forces re-auth dialog** — Changed `show_dialog` from `"true"` to `"false"`. Existing users won't be prompted to re-authorize every time they log in.

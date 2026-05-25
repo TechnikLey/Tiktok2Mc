@@ -115,6 +115,25 @@ tiktok:
   # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
 
+  # Follow tracking — prevents viewers from farming the follow trigger
+  # by repeatedly unfollowing and refollowing.
+  #
+  #   mode: "all_time"  — Tracks follows across ALL streams (default).
+  #                        Once a user is recorded, their future follows
+  #                        are ignored — even after restarting the tool.
+  #         "per_stream" — Resets the tracked list every time the tool starts.
+  #                        Each stream starts fresh.
+  #
+  #   file: Path to the tracked-followers file (default: data/followed_users.txt)
+  #
+  # NOTE: Only new follows that happen while the tool is running AND
+  # connected to a live stream are tracked. Users who already followed
+  # before the tool was running cannot be detected — they will trigger
+  # a follow action the first time they follow during a tracked stream.
+  follow_tracking:
+    mode: "all_time"
+    file: "data/followed_users.txt"
+
 # ===========================================================================
 #  COMMENT COMMANDS
 # ===========================================================================
@@ -146,8 +165,9 @@ comment_commands:
       #   allowed_roles — Who can use it: all, moderator, superfan, fanclub
       #   mode          — "deny-all" = only listed commands work
       #                   "allow-all" = everything works except listed commands
-      #   commands      — List of base command names to allow or block
-      #   handler       — "rcon" sends to Minecraft, "http" sends to a URL
+      #   commands         — List of base command names to allow or block
+      #   commands_config  — Per-command overrides (points_cost, cooldown, roles, url, handler)
+      #   handler          — "rcon" sends to Minecraft, "http" sends to a URL
       #   cooldown              — Seconds to wait between ANY command in this group (0 = off)
       #   user_cooldown         — Seconds the SAME viewer must wait before next command (0 = off)
       #   trigger_comment_event — Also fire the 'comment' trigger in actions.mca? (default: true)
@@ -180,8 +200,35 @@ comment_commands:
       prefix: "$"
       allowed_roles:
         - all
-      mode: allow-all
-      commands: []
+      mode: deny-all
+      # Plain list of command names. Used by mode (allow-all / deny-all)
+      # to decide which commands are allowed or blocked.
+      commands:
+        - play
+        - pause
+        - skip
+        - prev
+        - volume
+        - save
+        - repeat
+        - shuffle
+        - current
+
+      # Per-command overrides. Only commands listed here need an entry.
+      # Each key matches a command name from the commands list above.
+      commands_config:
+        skip:
+          # Points cost — viewer needs this many channel points to use this command.
+          # Set to 0 (or omit) to make the command free.
+          points_cost: 50
+          # Per-command cooldown in seconds (overrides group cooldown below).
+          cooldown: 30
+        prev:
+          points_cost: 20
+        volume:
+          # Per-command role override (overrides group allowed_roles).
+          roles:
+            - moderator
       handler: http
       url: "http://127.0.0.1:{spotify_port}/comment?user={user}&text={text}"
       cooldown: 0
@@ -402,6 +449,28 @@ spotify:
   # How much the volume changes per $volume up / $volume down command (percent).
   # E.g., 10 means each command changes volume by 10%.
   volume_step: 10
+
+# --- CHANNEL POINTS ---
+# Awards loyalty points to active viewers. Viewers can check !points
+# and redeem rewards with !redeem <name>. Points are awarded every
+# award_interval_seconds to viewers who joined or commented recently.
+channel_points:
+  enabled: true
+
+  # Port for the web server, overlay, and chat command HTTP endpoint.
+  port: 29195
+
+  # How many points are awarded per interval to each active viewer.
+  award_amount: 10
+
+  # How often (in seconds) points are awarded.
+  award_interval_seconds: 60
+
+  # How many minutes after last activity a viewer is considered inactive.
+  ping_timeout_minutes: 10
+
+  # Number of top viewers shown on the leaderboard overlay.
+  leaderboard_count: 10
 
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
