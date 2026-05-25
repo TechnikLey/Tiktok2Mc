@@ -21,7 +21,7 @@ Each version is split into two sections:
 > **What to expect from v1.0.0:**
 > - A fully functional **Graphical User Interface (GUI)** that lets you manage every aspect of the tool — configuration, plugins, overlays, comment commands, triggers, and more — without ever needing to open a file directly. Everything will be configurable through the interface.
 > - Many new features and quality-of-life improvements.
-> - Significant internal restructuring and cleanup, which means some existing configurations and workflows may need to be updated.
+> - Significant internal restructuring and cleanup, which means some existing configurations and workflows may need to be updated or otherwise can break.
 >
 > **Timeline:**
 > Because of the sheer scope of changes, the v1.0.0 release will take some time to complete. The goal is to get it right rather than rush it out. If any critical bugs are found in v0.5.0 in the meantime, a **v0.5.1 hotfix release** may be published to address them before the major release arrives.

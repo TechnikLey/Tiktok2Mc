@@ -33,7 +33,6 @@ from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
-from core.paths import get_root_dir
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -44,12 +43,10 @@ log = logging.getLogger(__name__)
 
 BASE_DIR = get_base_dir()
 
-CONFIG_FILE = (BASE_DIR / ".." / "config" / "config.yaml").resolve()
-ACTIONS_FILE = (BASE_DIR / ".." / "data" / "actions.mca").resolve()
-SHELL_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "shell_actions.txt").resolve()
-
-ROOT_DIR = get_root_dir()
-FOLLOWED_USERS_FILE = (ROOT_DIR / "data" / "followed_users.txt").resolve()
+CONFIG_FILE = (BASE_DIR.parent / "config" / "config.yaml").resolve()
+ACTIONS_FILE = (BASE_DIR.parent / "data" / "actions.mca").resolve()
+SHELL_ACTIONS_FILE = (BASE_DIR.parent / "data" / "shell_actions.txt").resolve()
+FOLLOWED_USERS_FILE = (BASE_DIR.parent / "data" / "followed_users.txt").resolve()
 
 class BotContext:
     """Central state container for the TikTok-to-Minecraft bridge."""
@@ -214,7 +211,7 @@ def load_config():
         ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
         ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
         raw_path = str(ft_cfg.get("file", "data/followed_users.txt"))
-        ctx.follow_tracking_file = (ROOT_DIR / raw_path).resolve()
+        ctx.follow_tracking_file = (BASE_DIR.parent / raw_path).resolve()
         ctx._followed_cache = set()
         if ctx.follow_tracking_file.exists():
             with open(ctx.follow_tracking_file, "r") as f:
@@ -1518,7 +1515,7 @@ async def run_bot():
             ctx.tiktok_user = inp
             log.info(f"[TIKTOK] Username set to @{ctx.tiktok_user} (session only).")
         else:
-            log.info(f"[TIKTOK] No input – using default '{default_user}'.")
+            log.info(f"[TIKTOK] No input - using default '{default_user}'.")
 
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)

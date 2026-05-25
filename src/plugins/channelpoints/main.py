@@ -26,7 +26,7 @@ BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
 DATA_DIR = (ROOT_DIR / "data").resolve()
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
-CHANNEL_POINTS_DIR = (BASE_DIR / ".." / "data").resolve()
+CHANNEL_POINTS_DIR = (ROOT_DIR / "data").resolve()
 DB_PATH = (CHANNEL_POINTS_DIR / "channel_points.db").resolve()
 
 args = parse_args()
