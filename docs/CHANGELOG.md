@@ -30,6 +30,7 @@ Each version is split into two sections:
 * **Log files documentation** — A new "Log Files" section in GUIDE.md explains what each log file contains and how to clean them up.
 * **tmux sessions shown before command loop** — On Linux, active tmux/screen sessions are now displayed right after startup, not after typing `exit`.
 * **Channel Points plugin** — Brand new loyalty system! Viewers earn points automatically by doing stuff in chat — joining, commenting, liking, gifting, following, sharing. Comes with an OBS overlay showing the leaderboard.
+* **Customizable overlay colors** — All overlays (Like Goal, Timer, Death Counter, Win Counter, Spotify, Channel Points, Overlay Text) now read their colors from the new `theme:` section in `config.yaml`. Change backgrounds, text colors, and accent colors for each plugin individually — no more hardcoded defaults.
 * **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
 
 ### Changed
@@ -53,6 +54,18 @@ Each version is split into two sections:
 * **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
 
 ### Fixed
+* **Empty config file no longer crashes on startup** — If your `config.yaml` is empty, the tool now loads it as an empty config instead of crashing with an error.
+* **Overlay text config is now optional** — If your overlay settings section is missing or empty, the overlay manager handles it gracefully instead of crashing.
+* **Comment command URL now correctly substituted** — When using `{user}` or `{text}` placeholders in HTTP comment command URLs, the substituted URL is now actually sent instead of the raw template.
+* **Like goal queue full is now logged** — When the like goal queue is full and a delta is dropped, a message now appears in the console so you know it happened.
+* **RCON inactive queue no longer loops forever** — If the RCON queue is paused, commands are now discarded after a maximum number of retries instead of being re-queued indefinitely.
+* **Timer webhook handles bad input** — The countdown timer now handles POST requests with missing or malformed JSON data without crashing.
+* **Overlay names must be valid** — If an overlay in the config has no name, it is now skipped with a warning instead of being silently stored without one.
+* **Overlay connection errors are properly logged** — Connection failures to overlay clients now appear in the log output instead of plain console prints.
+* **Device block detection no longer triggers on false positives** — The TikTok reconnection logic no longer mistakes ordinary error messages containing words like "code" or "status" for a device block.
+* **Spotify API error handling fixed** — Fixed a syntax error in the Spotify plugin that prevented the entire plugin module from loading. API errors are now handled correctly.
+* **Update logs with negative values handled** — If `max_update_logs` is set to a negative value other than `-1`, it is now treated as `-1` (keep all logs) with a warning.
+* **Downloads with missing file size handled** — Downloads (updates, etc.) no longer crash if the server doesn't send a `Content-Length` header or sends an empty one.
 * **Timer now works as OBS Browser Source** — The countdown timer no longer requires the pywebview window. In `gui_hidden` mode, add it as an OBS Browser Source at `http://localhost:29189` and it responds to death/respawn events via webhook.
 * **Linux start command now includes `sudo`** — All references to `./start.bin` in the docs now correctly show `sudo ./start.bin`, since the tool requires root privileges on Linux for updates and permission-sensitive paths.
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
