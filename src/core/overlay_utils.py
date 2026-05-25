@@ -8,9 +8,6 @@ import sys
 from pathlib import Path
 
 log = logging.getLogger(__name__)
-if not logging.getLogger().hasHandlers():
-    log.addHandler(logging.StreamHandler())
-    log.setLevel(logging.INFO)
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):

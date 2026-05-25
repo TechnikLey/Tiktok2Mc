@@ -47,8 +47,8 @@ class HookAPI:
         self._main_loop = main_loop
         self._config = config
         self._valid_functions = valid_functions
-        self._current_depth: int = 0  # Set by main.py before each handler call
-        self._banned_triggers: set[str] = set()  # Triggers blocked after loop detection
+        self._current_depth: int = 0
+        self._banned_triggers: set[str] = set()
 
     # --------------------------------------------------
     # Public API
@@ -59,6 +59,9 @@ class HookAPI:
         """Read-only access to the loaded config.yaml values."""
         from copy import deepcopy
         return deepcopy(self._config)
+
+    def set_depth(self, depth: int) -> None:
+        self._current_depth = depth
 
     def register_action(self, name: str, fn: Callable) -> None:
         """

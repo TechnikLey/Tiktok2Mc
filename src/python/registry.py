@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import json
 import os
@@ -291,8 +291,16 @@ def run_registry_scan() -> None:
     seen_names: set[str] = set()
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for exe_path, data in executor.map(load_or_scan_executable, executables):
+        futures = {executor.submit(load_or_scan_executable, exe): exe for exe in executables}
+        for future in as_completed(futures):
+            exe_path = futures[future]
             log.info(f"Processing: {exe_path}")
+
+            try:
+                exe_path, data = future.result()
+            except Exception as e:
+                log.error(f"{exe_path}: Scan failed with exception: {e}")
+                continue
 
             if data is None:
                 log.warning(f"No valid response from: {exe_path}")

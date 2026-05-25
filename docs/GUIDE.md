@@ -33,7 +33,7 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
     - [The $random Action](#the-random-action)
     - [Like Triggers](#like-triggers)
     - [Comment Commands](#comment-commands)
-    - [HTTP Actions (http\_actions.txt)](#http-actions-http_actionstxt)
+    - [Shell Actions (shell\_actions.txt)](#shell-actions-shell_actionstxt)
     - [Testing Triggers Without TikTok](#testing-triggers-without-tiktok)
   - [Minecraft Server](#minecraft-server)
     - [Starting the Server](#starting-the-server)
@@ -424,9 +424,9 @@ All settings are configured in `config/config.yaml` under `comment_commands` —
 
 ---
 
-### HTTP Actions (http_actions.txt)
+### Shell Actions (shell_actions.txt)
 
-The file `data/http_actions.txt` runs shell commands on your computer when a gift is received.
+The file `data/shell_actions.txt` runs shell commands on your computer when a gift is received.
 
 **Format:**
 
@@ -447,7 +447,7 @@ GiftID:ShellCommand
 **Important notes:**
 
 - HTTP actions are **gift-only** — not supported for `follow`, `join`, `comment`, or like triggers.
-- Both `actions.mca` and `http_actions.txt` are checked for every gift. If the same gift ID appears in both, **both run independently** — they do not conflict.
+- Both `actions.mca` and `shell_actions.txt` are checked for every gift. If the same gift ID appears in both, **both run independently** — they do not conflict.
 - Lines starting with `#` are comments.
 - Lines starting with `//define name = value` define variables that are replaced in all following commands with `{name}`.
 - The command runs directly on your computer. Only use commands you trust.
@@ -797,7 +797,7 @@ Before updating or making major changes, save copies of these items:
 
 - `server/mc/` — Your Minecraft world and server data
 - `data/actions.mca` — Your custom action mappings
-- `data/http_actions.txt` — Your HTTP action mappings
+- `data/shell_actions.txt` — Your shell action mappings
 - `config/config.yaml` — Your configuration
 
 Copy them to a safe location outside the tool folder.

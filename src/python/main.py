@@ -46,7 +46,7 @@ BASE_DIR = get_base_dir()
 
 CONFIG_FILE = (BASE_DIR / ".." / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR / ".." / "data" / "actions.mca").resolve()
-HTTP_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "http_actions.txt").resolve()
+SHELL_ACTIONS_FILE = (BASE_DIR / ".." / "data" / "shell_actions.txt").resolve()
 
 ROOT_DIR = get_root_dir()
 FOLLOWED_USERS_FILE = (ROOT_DIR / "data" / "followed_users.txt").resolve()
@@ -99,7 +99,7 @@ class BotContext:
         self.start_likes = None
         self.valid_functions = set()
         self.vanilla_functions = set()
-        self.http_actions_cache = {}
+        self.shell_actions_cache = {}
         self.script_actions = {}
         self.overlay_actions = {}
         self.rcon_only_actions = {}
@@ -547,12 +547,19 @@ async def rcon_worker():
             ctx.rcon_queue.task_done()
             await asyncio.sleep(wait_time)
 
-async def execute_global_command(trigger_name: str, source_user: str, chain_depth: int = 0):
+async def execute_global_command(trigger_name: str, source_user: str | dict, chain_depth: int = 0):
     """Resolves a trigger name into RCON commands and enqueues them."""
     name = sanitize_filename(trigger_name)
     
     if name not in ctx.valid_functions:
         return
+
+    if isinstance(source_user, dict):
+        comment_text = source_user.get('comment', '')
+        user_display = source_user.get('user', '')
+    else:
+        comment_text = None
+        user_display = source_user
 
     commands_to_send = []
 
@@ -560,7 +567,7 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
         for action in ctx.script_actions[name]:
             if action in HOOK_ACTIONS:
                 try:
-                    ctx.hook_api._current_depth = chain_depth
+                    ctx.hook_api.set_depth(chain_depth)
                     HOOK_ACTIONS[action](source_user, action, {})
                 except Exception as e:
                     log.warning(f"[HOOK] Error in action '{action}': {e}")
@@ -568,12 +575,6 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
                 log.warning(f"[HOOK] Unknown script action: '{action}'") 
 
     # --- 0. OVERLAY TEXT ---
-    comment_text = None
-    if isinstance(source_user, dict):
-        comment_text = source_user.get('comment', '')
-        user_display = source_user.get('user', '')
-    else:
-        user_display = source_user
 
     if name in ctx.overlay_actions:
         for overlay_name, raw_body in ctx.overlay_actions[name]:
@@ -638,9 +639,9 @@ async def trigger_worker():
 # HTTP actions loader
 # ==========================================
 
-def load_http_actions(file_path=HTTP_ACTIONS_FILE):
+def load_shell_actions(file_path=SHELL_ACTIONS_FILE):
     """Loads all HTTP actions into memory at startup."""
-    ctx.http_actions_cache = {}
+    ctx.shell_actions_cache = {}
     variables = {}
 
     if not file_path.exists():
@@ -671,9 +672,9 @@ def load_http_actions(file_path=HTTP_ACTIONS_FILE):
             # Resolve variables in command
             for var_name, var_value in variables.items():
                 cmd = cmd.replace(f"{{{var_name}}}", var_value)
-            ctx.http_actions_cache[trigger_id] = cmd
+            ctx.shell_actions_cache[trigger_id] = cmd
 
-    log.info(f"HTTP actions loaded: {len(ctx.http_actions_cache)} entries")
+    log.info(f"Shell actions loaded: {len(ctx.shell_actions_cache)} entries")
 
 # ==========================================
 # Webhook endpoint for MinecraftServerAPI
@@ -952,7 +953,7 @@ def handle_custom_trigger():
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         raw_trigger = str(data.get("trigger", "")).strip()
-        cmd = ctx.http_actions_cache.get(raw_trigger) or ctx.http_actions_cache.get(sanitized)
+        cmd = ctx.shell_actions_cache.get(raw_trigger) or ctx.shell_actions_cache.get(sanitized)
         if cmd:
             try:
                 asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
@@ -969,7 +970,7 @@ def handle_custom_trigger():
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
-    app.run(host=ctx.server_host, port=ctx.mcserver_api_port, debug=False, use_reloader=False)
+    app.run(host=ctx.server_host, port=ctx.mcserver_api_port, threaded=True, debug=False, use_reloader=False)
 
 # ==========================================
 # HTTP command executor
@@ -988,7 +989,7 @@ async def execute_http_command(cmd: str):
 
 def execute_gift_action(gift_id: str):
     """Executes an HTTP action for a gift asynchronously."""
-    cmd = ctx.http_actions_cache.get(gift_id)
+    cmd = ctx.shell_actions_cache.get(gift_id)
     if not cmd:
         return
 
@@ -1333,7 +1334,6 @@ def create_client(user):
             if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
                 remaining = gcd - (now - ctx.comment_cmd_global_last)
                 log.info(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
-                suppress_comment_trigger = True
                 return
             gucd = ctx.comment_cmd_global_user_cooldown
             if gucd > 0:
@@ -1341,7 +1341,6 @@ def create_client(user):
                 if now - last_user < gucd:
                     remaining = gucd - (now - last_user)
                     log.info(f"[COMMENT CMD] {username} blocked by global user cooldown ({remaining:.1f}s left)")
-                    suppress_comment_trigger = True
                     return
             for group in ctx.comment_cmd_groups:
                 prefix = group["prefix"]
@@ -1541,11 +1540,13 @@ async def run_bot():
 
     generate_datapack()
     ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
-    load_http_actions()
+    load_shell_actions()
 
     EVENT_HOOKS_DIR = (BASE_DIR / ".." / "event_hooks").resolve()
     ctx.hook_api = HookAPI(ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop, ctx.config, ctx.valid_functions)
     load_event_hooks(ctx.hook_api, EVENT_HOOKS_DIR)
+
+    threading.Thread(target=run_signal_server, daemon=True).start()
 
     asyncio.create_task(trigger_worker())
     asyncio.create_task(rcon_worker())
@@ -1574,7 +1575,8 @@ async def run_bot():
             error_str = str(e)
             log.info(f"[..] Connection lost: {error_str}")
 
-            if "DEVICE_BLOCKED" in error_str or bool(re.search(r"\berr_code\b.*?\b200\b", error_str, re.IGNORECASE)):
+            _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
+            if "DEVICE_BLOCKED" in error_str or bool(_RE_ERR_CODE_200.search(error_str)):
                 log.info("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 log.info("[TIP] Wait 15 minutes or restart your router.")
                 await asyncio.sleep(900)
@@ -1590,8 +1592,6 @@ async def run_bot():
             await asyncio.sleep(2)
 
 if __name__ == "__main__":
-    threading.Thread(target=run_signal_server, daemon=True).start()
-
     try:
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

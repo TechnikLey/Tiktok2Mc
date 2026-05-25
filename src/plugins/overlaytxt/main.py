@@ -225,7 +225,7 @@ HTML_TEMPLATE = """
 gui_hidden = getattr(args, 'gui_hidden', False)
 
 def start_flask():
-    app.run(host=SERVER_HOST, port=APP_PORT, debug=False, use_reloader=False)
+    app.run(host=SERVER_HOST, port=APP_PORT, threaded=True, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
     server_thread = threading.Thread(target=start_flask, daemon=True)

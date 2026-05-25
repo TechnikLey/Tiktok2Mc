@@ -47,6 +47,7 @@ Each version is split into two sections:
 * **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
 
 ### Changed
+* **Gift-triggered file renamed** — The file that runs custom commands when receiving TikTok gifts has been renamed from `shell_actions.txt` to `shell_actions.txt` to better reflect what it does. If you have your own entries in `data/shell_actions.txt`, rename it to `data/shell_actions.txt` manually.
 * **Duplicate command detection in `commands` list** — If a command appears multiple times in a group's `commands` list, the tool now warns you. Max 5 warnings per group, then "N further" suppressed. No crash, the program keeps running.
 * **Duplicate key detection in `commands_config`** — Duplicate entries in `commands_config` (e.g. two `op:` blocks) are now caught on startup and trigger an error with "Press Enter to exit". Detects 2+ duplicates, always reports the first occurrence's line number.
 * **Per-command settings separated from command list** — Each command can now have its own `points_cost`, cooldown, and roles in a separate `commands_config` block. The `commands` list stays clean — just names, no clutter.
@@ -63,11 +64,16 @@ Each version is split into two sections:
 * **Track info stays after long pause** — If Spotify's been paused for a while, the last known track name, artist, and cover stay on screen instead of disappearing to "Unknown".
 * **Revenue rounded to 2 decimals** — The daily revenue log no longer shows ugly floating-point artifacts like `0.22000000000000006`. Values are now cleanly rounded to two decimal places.
 * **Revenue is gross** — The log entry `estimated_revenue_usd` is a gross estimate (diamonds × 0.005), not the net payout after TikTok's cut. A note has been added to the docs.
-* **http_actions.txt now supports variables** — Use `//define name = value` at the top of the file and reference it with `{name}` in commands. The default file now uses `{port}` instead of hardcoded `29191`.
+* **shell_actions.txt now supports variables** — Use `//define name = value` at the top of the file and reference it with `{name}` in commands. The default file now uses `{port}` instead of hardcoded `29191`.
 * **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
 * **Improved command execution safety** — Internal commands (HTTP actions and process management) no longer run through the system shell. This reduces the risk of injection and makes the tool more reliable across different platforms.
 
 ### Fixed
+* **Start script no longer crashes on launch** — Fixed a critical startup error that prevented the tool from running at all.
+* **Download progress shown as a single line** — During updates, the download progress percentage now stays on one line instead of flooding the log with thousands of entries.
+* **Webhook server starts only when bot is ready** — The internal webhook server no longer accepts requests before the bot is fully initialized, preventing random crashes during startup.
+* **Webhook and overlay servers handle multiple requests** — Both the main webhook server and the overlay text server now handle concurrent connections reliably instead of blocking on each request.
+* **Plugin scanning no longer stops at the first error** — If one plugin fails to scan, the remaining plugins are still registered correctly.
 * **Shutdown now fully terminates all programs** — When the auto-shutdown timer runs out, the tool now properly stops the Minecraft server and all plugins before exiting. No more orphan processes left behind.
 * **Graceful handling of no-terminal environments** — The tool no longer blocks waiting for keyboard input when running in non-interactive environments (Docker, CI, systemd). Validation errors simply show the message and exit cleanly.
 * **Correct exit code on config errors** — If the configuration fails to load, the tool now reports a non-zero exit code so that monitoring systems and scripts can detect the failure.
@@ -260,7 +266,7 @@ Each version is split into two sections:
 #### Changed
 - **Documentation (`README` / `GUIDE.md`)** — updated to reflect Linux support, platform-specific start commands, and Java availability per OS.
 - **`data/actions.mca`** — rewritten with fewer examples, clear comments explaining each line, and a compact header summarizing the format.
-- **`GUIDE.md`** — documented `comment` and `join` triggers, `CommentCommands` config options, and updated `http_actions.txt` section.
+- **`GUIDE.md`** — documented `comment` and `join` triggers, `CommentCommands` config options, and updated `shell_actions.txt` section.
 
 ### Developer
 

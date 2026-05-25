@@ -24,6 +24,8 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
 
+IS_WINDOWS = sys.platform == "win32"
+
 # -----------------------------
 # Base directory
 # -----------------------------
@@ -34,7 +36,7 @@ CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 # -----------------------------
 # Executable paths
 # -----------------------------
-SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
+SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
 GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()

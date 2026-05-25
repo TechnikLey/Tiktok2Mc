@@ -154,7 +154,8 @@ def download_with_progress(url, target):
                     f.write(chunk)
                     done += len(chunk)
                     if total:
-                        log.info(f">> Downloading: {done / total * 100:5.1f}%")
+                        sys.stdout.write(f"\r>> Downloading: {done / total * 100:5.1f}%")
+                        sys.stdout.flush()
     log.info("\nDownload complete.")
 
 # =========================

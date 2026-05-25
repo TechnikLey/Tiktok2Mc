@@ -279,7 +279,7 @@ def main():
             ("LICENSE",                             "LICENSE"),
             ("README.md",                           "README.md"),
             ("defaults/actions.mca",                "data/actions.mca"),
-            ("defaults/http_actions.txt",           "data/http_actions.txt"),
+            ("defaults/shell_actions.txt",           "data/shell_actions.txt"),
             ("defaults/configServerAPI.yml",        "server/mc/plugins/MinecraftServerAPI/config.yml"),
             ("defaults/DelayedTNTconfig.yml",       "server/mc/plugins/DelayedTNT/config.yml"),
             ("tools/MinecraftServerAPI-1.21.x.jar", "server/mc/plugins/MinecraftServerAPI-1.21.x.jar"),

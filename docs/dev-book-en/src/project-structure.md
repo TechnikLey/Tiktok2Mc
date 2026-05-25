@@ -111,7 +111,7 @@ The development structure contains everything needed to build the project.
 │   ├── configServerAPI.yml
 │   ├── DelayedTNTconfig.yml
 │   ├── gifts.json
-│   ├── http_actions.txt
+│   ├── shell_actions.txt
 │   └── pack.mcmeta
 ├── docs
 │   └── dev-book
@@ -168,7 +168,7 @@ Important files include:
 * `DelayedTNTconfig.yml`
 * `gifts.json`
 * `actions.mca`
-* `http_actions.txt`
+* `shell_actions.txt`
 * `pack.mcmeta`
 
 This folder is particularly important because it defines the initial state.
@@ -272,7 +272,7 @@ After the build process, the finished project version is created in the `build/r
 │   └── window.exe
 ├── data
 │   ├── actions.mca
-│   └── http_actions.txt
+│   └── shell_actions.txt
 ├── LICENSE
 ├── logs
 ├── README.md
@@ -335,7 +335,7 @@ Data needed at runtime or for certain features is stored here.
 Unlike the `runtime/` folder, `data/` is never overwritten.
 
 * `actions.mca`
-* `http_actions.txt`
+* `shell_actions.txt`
 
 ### `logs/`
 
