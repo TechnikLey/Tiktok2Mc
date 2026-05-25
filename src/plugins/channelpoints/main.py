@@ -32,7 +32,8 @@ args = parse_args()
 try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
-except Exception:
+except Exception as e:
+    print(f"[CHANNEL POINTS] Config load error: {e}")
     cfg = {}
 
 cp_cfg = cfg.get("channel_points", {})

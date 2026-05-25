@@ -100,8 +100,8 @@ def _download_and_extract(plugin_dir: Path, download_url: str) -> bool:
         if config_file.exists():
             try:
                 config_backup = config_file.read_text(encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[PLUGIN-UPDATE] Failed to read config backup: {e}")
 
         for item in source_root.iterdir():
             name = item.name
@@ -119,8 +119,8 @@ def _download_and_extract(plugin_dir: Path, download_url: str) -> bool:
         if config_backup:
             try:
                 config_file.write_text(config_backup, encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[PLUGIN-UPDATE] Failed to restore config: {e}")
 
     return True
 

@@ -44,6 +44,13 @@ START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
 
 cfg = load_config(CONFIG_FILE)
 
+def wait_for_key(msg="Press Enter to exit..."):
+    if not AUTO_MODE:
+        try:
+            input(msg)
+        except EOFError:
+            print("\n[INFO] No input available.")
+
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         print("[ERROR] This script must be run as root on Linux to perform updates.")
@@ -91,13 +98,6 @@ GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
 
 AUTO_MODE = "--auto" in sys.argv
-
-def wait_for_key(msg="Press Enter to exit..."):
-    if not AUTO_MODE:
-        try:
-            input(msg)
-        except EOFError:
-            print("\n[INFO] No input available.")
 
 try:
     with CONFIG_FILE.open("r", encoding="utf-8") as f:

@@ -278,8 +278,8 @@ def stop_all_processes():
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                     )
                 print(f"{session_name} session terminated.")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Failed to terminate session {session_name}: {e}")
         linux_sessions.clear()
 
     # Kill Windows processes / fallback Linux processes
@@ -291,8 +291,8 @@ def stop_all_processes():
                 else:
                     proc.terminate()
                 print(f"{name} terminated.")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Failed to terminate process {name}: {e}")
     processes.clear()
     print("\nSnap! All processes have been dusted... (Thanos style).")
 

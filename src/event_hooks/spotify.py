@@ -36,7 +36,8 @@ def _request(method, path, **kwargs):
         return None
     except requests.ConnectionError:
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[SPOTIFY-HOOK] Request error: {e}")
         return None
 
 

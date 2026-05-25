@@ -106,8 +106,8 @@ class SpotifyClient:
                 self.access_token = data.get("access_token")
                 self.refresh_token = data.get("refresh_token")
                 self.expires_at = data.get("expires_at", 0)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
         TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -206,8 +206,9 @@ class SpotifyClient:
             if resp.status_code == 200:
                 try:
                     return resp.json()
-                except Exception:
-                    return {}
+        except Exception as e:
+            print(f"[SPOTIFY] JSON parse error (status {resp.status_code}): {e}")
+            return {}
             if resp.status_code == 404:
                 return None
             print(f"[SPOTIFY] API error {resp.status_code}: {resp.text[:200]}")
@@ -567,8 +568,8 @@ def _poll_spotify():
         try:
             if spotify.is_authenticated:
                 _notify_overlay()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[SPOTIFY-POLL] Error polling overlay: {e}")
 
 
 @app.route("/")

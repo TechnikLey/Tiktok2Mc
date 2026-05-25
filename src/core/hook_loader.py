@@ -78,7 +78,6 @@ def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
     for path in hook_files:
         _load_single_hook(api, path)
 
-
 def _load_single_hook(api: HookAPI, path: Path) -> None:
     # ------------------------------------------------------------------
     # Import whitelist check — runs before the module is loaded

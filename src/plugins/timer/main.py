@@ -156,7 +156,7 @@ def save_dims():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    ev = request.json.get("event")
+    ev = request.json.get("event") if request.json else None
     if ev == "player_death":
         timer_state.pause()
         timer_state.reset()

@@ -13,7 +13,7 @@ Each version is split into two sections:
 
 ## [Unreleased]
 
-#### Added
+### Added
 * **Spotify Integration** — A brand new Spotify plugin! Connect your Spotify account and trigger playback controls (play, pause, skip, volume, shuffle, repeat, save) directly from stream events. Comment commands, gift events, follows — whatever works for you. Comes with a sleek overlay showing album art and track info.
 * **Multiple Comment Command Groups** — You can now define several independent comment command groups, each with its own prefix, role restrictions, and command list. Handy if you want different permission levels for different commands — moderators get one set, everyone else another.
 * **HTTP-based Command Handlers** — Comment commands can now forward to an HTTP endpoint instead of sending RCON commands. Useful for triggering external services (like the new Spotify plugin) directly from chat.
@@ -32,7 +32,7 @@ Each version is split into two sections:
 * **Channel Points plugin** — Brand new loyalty system! Viewers earn points automatically by doing stuff in chat — joining, commenting, liking, gifting, following, sharing. Comes with an OBS overlay showing the leaderboard.
 * **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
 
-#### Changed
+### Changed
 * **Duplicate command detection in `commands` list** — If a command appears multiple times in a group's `commands` list, the tool now warns you. Max 5 warnings per group, then "N further" suppressed. No crash, the program keeps running.
 * **Duplicate key detection in `commands_config`** — Duplicate entries in `commands_config` (e.g. two `op:` blocks) are now caught on startup and trigger an error with "Press Enter to exit". Detects 2+ duplicates, always reports the first occurrence's line number.
 * **Per-command settings separated from command list** — Each command can now have its own `points_cost`, cooldown, and roles in a separate `commands_config` block. The `commands` list stays clean — just names, no clutter.
@@ -52,13 +52,17 @@ Each version is split into two sections:
 * **http_actions.txt now supports variables** — Use `//define name = value` at the top of the file and reference it with `{name}` in commands. The default file now uses `{port}` instead of hardcoded `29191`.
 * **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
 
-#### Fixed
+### Fixed
 * **Timer now works as OBS Browser Source** — The countdown timer no longer requires the pywebview window. In `gui_hidden` mode, add it as an OBS Browser Source at `http://localhost:29189` and it responds to death/respawn events via webhook.
 * **Linux start command now includes `sudo`** — All references to `./start.bin` in the docs now correctly show `sudo ./start.bin`, since the tool requires root privileges on Linux for updates and permission-sensitive paths.
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
 * **Spotify track shows immediately after login** — No more staring at "Spotify connected!" while a track is already playing. The overlay shows the current track right after authentication.
 * **Chat commands for Spotify work now** — The plugin previously had no endpoint for chat commands. `$play` and friends now actually do something.
 * **Fixed outdated config path in actions.mca comment** — The `$random` comment now correctly points to `random_triggers > triggers` instead of the old `Gifts > random_exclude`.
+* **Better error messages everywhere** — Errors that were previously swallowed without a trace (failed points lookups, connection issues, plugin problems) are now shown in the console. Makes debugging issues way easier — the tool tells you what went wrong instead of silently failing.
+* **More reliable updates on Linux** — Fixed a crash that could occur when running the updater without root permissions.
+* **Timer webhook no longer crashes on bad input** — The countdown timer now properly handles POST requests with missing or malformed JSON data.
+* **Queue overloads are now actually caught** — When the command queue overflows, the error is properly handled instead of crashing silently in the background.
 
 ---
 

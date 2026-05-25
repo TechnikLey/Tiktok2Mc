@@ -139,7 +139,7 @@ ctx = BotContext()
 app = Flask(__name__)
 
 log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+log.setLevel(logging.WARNING)
 
 # ==========================================
 # SETUP & HELPER FUNCTIONS
@@ -590,12 +590,14 @@ async def execute_global_command(trigger_name: str, source_user: str, chain_dept
         return
 
     # --- 3. ENQUEUE ---
-    try:
-        ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, (commands_to_send, source_user))
-        if ctx.rcon_queue.qsize() < 10: 
-            print(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
-    except asyncio.QueueFull:
-        print(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
+    def _enqueue():
+        try:
+            ctx.rcon_queue.put_nowait((commands_to_send, source_user))
+        except asyncio.QueueFull:
+            print(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
+    ctx.main_loop.call_soon_threadsafe(_enqueue)
+    if ctx.rcon_queue.qsize() < 10: 
+        print(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
 
 # ================================
 # TRIGGER WORKER
@@ -713,8 +715,8 @@ def _ping_channel_points(user):
         req = urllib.request.Request(url, data=data, method="POST")
         req.add_header("Content-Type", "application/json")
         urllib.request.urlopen(req, timeout=2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[CHANNEL POINTS] Ping failed for {user}: {e}")
 
 
 def _get_channel_points_port():
@@ -732,7 +734,8 @@ def _get_user_points(user):
         resp = urllib.request.urlopen(url, timeout=3)
         data = json.loads(resp.read())
         return data.get("points", 0)
-    except Exception:
+    except Exception as e:
+        print(f"[CHANNEL POINTS] Failed to get points for {user}: {e}")
         return 0
 
 
@@ -748,7 +751,8 @@ def _deduct_user_points(user, amount):
         req.add_header("Content-Type", "application/json")
         resp = urllib.request.urlopen(req, timeout=3)
         return json.loads(resp.read()).get("success", False)
-    except Exception:
+    except Exception as e:
+        print(f"[CHANNEL POINTS] Failed to deduct points for {user}: {e}")
         return False
 
 
@@ -1564,8 +1568,8 @@ async def run_bot():
         finally:
             try:
                 client.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[TIKTOK] Error stopping client: {e}")
             await asyncio.sleep(2)
 
 if __name__ == "__main__":

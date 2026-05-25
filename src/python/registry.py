@@ -258,8 +258,8 @@ def load_or_scan_executable(exe_path: Path, timeout: float = 10.0) -> tuple[Path
                 try:
                     validate_config_dict(config)
                     return exe_path, config
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[REGISTRY] Cache validation failed for {exe_path}: {e}")
 
     data = run_and_capture_registration(exe_path, timeout=timeout)
     if data is not None:
