@@ -16,6 +16,7 @@ from queue import Queue
 from pathlib import Path
 from flask import Flask, request, Response, jsonify
 from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 
 # --- Paths ---
@@ -43,6 +44,11 @@ AWARD_INTERVAL = cp_cfg.get("award_interval_seconds", 60)
 PING_TIMEOUT = cp_cfg.get("ping_timeout_minutes", 10)
 TOP_COUNT = cp_cfg.get("leaderboard_count", 10)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
+THEME = load_plugin_theme(cfg, "channel_points")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
+
 CP_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
@@ -252,10 +258,11 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <style>
+{THEME_STYLE}
         body {
             margin: 0; padding: 20px;
-            background: #000;
-            color: #fff;
+            background: var(--background);
+            color: var(--text);
             font-family: 'Segoe UI', sans-serif;
         }
         table {
@@ -266,24 +273,24 @@ HTML_TEMPLATE = """
         th {
             text-align: left;
             padding: 8px 12px;
-            border-bottom: 2px solid #FFD700;
+            border-bottom: 2px solid var(--accent);
             font-size: 1em;
-            color: #00BFFF;
+            color: var(--accent2);
         }
         td {
             padding: 6px 12px;
         }
-        .pos { color: #FFD700; font-weight: bold; width: 30px; }
+        .pos { color: var(--accent); font-weight: bold; width: 30px; }
         .name { }
-        .points { text-align: right; font-weight: bold; color: #40E0D0; }
+        .points { text-align: right; font-weight: bold; color: var(--accent3); }
         .top1 { font-size: 1.4em; }
-        .top1 .points { font-size: 1.2em; color: #FF4500; }
+        .top1 .points { font-size: 1.2em; color: var(--danger); }
         .top2 { font-size: 1.2em; }
         .top3 { font-size: 1.1em; }
     </style>
 </head>
 <body>
-    <h2 style="margin:0 0 10px 0; color: #FFD700;">Leaderboard</h2>
+    <h2 style="margin:0 0 10px 0; color: var(--accent);">Leaderboard</h2>
     <table id="board">
         <thead><tr><th></th><th>Viewer</th><th style="text-align:right;">Points</th></tr></thead>
         <tbody id="tbody"></tbody>

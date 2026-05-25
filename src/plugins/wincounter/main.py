@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Flask, render_template_string, Response, request
 from queue import Queue
 from core import parse_args, AppConfig, get_base_file, get_base_dir, get_root_dir
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 
 # --- Paths ---
@@ -52,6 +53,10 @@ except Exception: cfg = {}
 PORT = cfg.get("win_counter", {}).get("port", 29191)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
+THEME = load_plugin_theme(cfg, "win_counter")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 WINCOUNTER_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
@@ -118,7 +123,7 @@ class WinManager:
             "wins": self.wins, 
             "needed": self.needed, 
             "record": self.record, 
-            "win_color": "#ff4d4d" if self.wins < 0 else "white"
+            "win_color": THEME["danger"] if self.wins < 0 else THEME["text"]
         }
 
 win_manager_instance = WinManager()
@@ -129,8 +134,9 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <style>
+{THEME_STYLE}
         body { 
-            background-color: #000000; color: white; 
+            background-color: var(--background); color: var(--text); 
             font-family: 'Consolas', monospace; margin: 0; 
             display: flex; flex-direction: column; 
             justify-content: center; align-items: center;
@@ -140,7 +146,7 @@ HTML_TEMPLATE = """
         .container { 
             display: flex; align-items: center; 
             gap: 3vw; 
-            font-size: 25vmin; /* Scaled up */
+            font-size: 25vmin;
             font-weight: bold; 
             white-space: nowrap;
             line-height: 1;
@@ -148,13 +154,13 @@ HTML_TEMPLATE = """
         .record-section { 
             margin-top: 1vh; 
             font-size: 10vmin; 
-            color: #666; 
+            color: var(--muted); 
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <span>Wins:</span><span id="wins">0</span><span style="color: #333;">|</span><span id="needed">10</span>
+        <span>Wins:</span><span id="wins">0</span><span style="color: var(--separator);">|</span><span id="needed">10</span>
     </div>
     <div class="record-section">Record: <span id="record">0</span></div>
     
@@ -260,7 +266,7 @@ if __name__ == "__main__":
             width=size['width'] + 30, 
             height=size['height'] + 30, 
             on_top=True,
-            background_color='#000000'
+            background_color=BG_COLOR
         )
         webview.start()
     else:

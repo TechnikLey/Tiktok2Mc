@@ -13,6 +13,7 @@ from flask import Flask, Response, request, render_template_string
 from flask_cors import CORS
 from queue import Queue
 from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 
 # --- Paths & configuration ---
@@ -49,6 +50,10 @@ else:
 
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
+THEME = load_plugin_theme(cfg, "death_counter")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", True)
 DEATH_COUNTER_EXE_PATH = get_base_file()
@@ -89,11 +94,12 @@ HTML_TEMPLATE = """
 <head>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap');
+{THEME_STYLE}
         body, html { 
-            background: #000000; margin: 0; padding: 0;
+            background: var(--background); margin: 0; padding: 0;
             width: 100%; height: 100%; display: flex;
             flex-direction: column; justify-content: center; align-items: center;
-            overflow: hidden; font-family: 'Inter', sans-serif; color: #8ef3ff;
+            overflow: hidden; font-family: 'Inter', sans-serif; color: var(--text);
             user-select: none;
         }
         .label { font-size: 12vh; font-weight: 700; opacity: 0.7; letter-spacing: 1.5vw; margin-bottom: -2vh; }
@@ -173,7 +179,7 @@ if __name__ == "__main__":
     server_thread.start()
 
     if not gui_hidden:
-        webview.create_window('Death Counter', f'http://127.0.0.1:{WEB_SERVER_PORT}', width=win['width'], height=win['height'], on_top=True, background_color='#000000')
+        webview.create_window('Death Counter', f'http://127.0.0.1:{WEB_SERVER_PORT}', width=win['width'], height=win['height'], on_top=True, background_color=BG_COLOR)
         webview.start()
     else:
         print("GUI hidden, running server only.")

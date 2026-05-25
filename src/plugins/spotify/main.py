@@ -23,6 +23,7 @@ import yaml
 import requests
 from flask import Flask, Response, request, jsonify, redirect
 from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 
 # =========================
@@ -64,6 +65,11 @@ except Exception as e:
     SERVER_HOST = "127.0.0.1"
 
 SPOTIFY_EXE_PATH = get_base_file()
+
+_theme_cfg = cfg if isinstance(cfg, dict) else {}
+THEME = load_plugin_theme(_theme_cfg, "spotify")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 # --- Plugin self-registration ---
 register_only = args.register_only
@@ -606,6 +612,7 @@ HTML_OVERLAY = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="color-scheme" content="dark">
 <style>
+""" + THEME_STYLE + """
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
         background: transparent;
@@ -638,7 +645,7 @@ HTML_OVERLAY = """<!DOCTYPE html>
     }
     #info { flex: 1; min-width: 0; }
     #track-name {
-        color: #fff;
+        color: var(--text);
         font-size: min(15vh, 48px);
         font-weight: 700;
         white-space: nowrap;
@@ -646,7 +653,8 @@ HTML_OVERLAY = """<!DOCTYPE html>
         text-overflow: ellipsis;
     }
     #track-artist {
-        color: rgba(255,255,255,0.7);
+        color: var(--text);
+        opacity: 0.7;
         font-size: min(12vh, 36px);
         margin-top: 0.15em;
         white-space: nowrap;
@@ -656,19 +664,21 @@ HTML_OVERLAY = """<!DOCTYPE html>
     #progress-wrap {
         margin-top: min(6.7vh, 16px);
         height: min(3.3vh, 8px);
-        background: rgba(255,255,255,0.15);
+        background: var(--text);
+        opacity: 0.15;
         border-radius: 2px;
         overflow: hidden;
     }
     #progress-bar {
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, #1db954, #1ed760);
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
         border-radius: 2px;
         transition: width 0.5s ease;
     }
     #status-text {
-        color: rgba(255,255,255,0.5);
+        color: var(--text);
+        opacity: 0.5;
         font-size: min(12vh, 36px);
         text-align: center;
         padding: 2vh;
@@ -799,7 +809,7 @@ if __name__ == "__main__":
                 width=440,
                 height=160,
                 on_top=True,
-                background_color="#000000"
+                background_color=BG_COLOR
             )
             webview.start(debug=False)
         except ImportError:

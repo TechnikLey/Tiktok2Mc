@@ -11,6 +11,7 @@
 import webview, threading, requests, json, sys, yaml, logging, time
 from flask import Flask, request, Response
 from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 from queue import Queue
 
@@ -37,6 +38,10 @@ WEB_PORT = cfg.get("timer", {}).get("port", 29189)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 ADD_URL = f"http://127.0.0.1:{WIN_PORT}/add?amount=1"
 TIMER_EXE_PATH = get_base_file()
+
+THEME = load_plugin_theme(cfg, "timer")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 # --- Plugin self-registration ---
 register_only = args.register_only
@@ -192,8 +197,9 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <style>
+{THEME_STYLE}
         body {
-            background-color: #000000; color: #89CFF0; margin: 0;
+            background-color: var(--background); color: var(--text); margin: 0;
             display: flex; justify-content: center; align-items: center;
             height: 100vh; overflow: hidden; font-family: 'Segoe UI', sans-serif;
             -webkit-app-region: drag; user-select: none;
@@ -202,13 +208,13 @@ HTML_TEMPLATE = """
             font-size: 70vh; font-weight: bold;
             font-variant-numeric: tabular-nums; white-space: nowrap;
         }
-        .warning { color: #FFD700; }
+        .warning { color: var(--warning); }
         .blink {
-            color: #FF8C00;
+            color: var(--blink);
             animation: syncFlash 1s infinite steps(1);
         }
         .critical {
-            color: #FF0000 !important;
+            color: var(--danger) !important;
             animation: pulse 0.5s infinite ease-in-out;
         }
         @keyframes syncFlash {
@@ -290,6 +296,7 @@ if __name__ == '__main__':
             width=size['width'],
             height=size['height'],
             on_top=True,
+            background_color=BG_COLOR,
         )
         webview.start()
     else:

@@ -20,6 +20,7 @@ from flask import Flask, Response, request, jsonify
 import sys
 import yaml
 from core import parse_args, AppConfig, get_base_dir, get_base_file, get_root_dir
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 
 # =========================
@@ -54,6 +55,10 @@ except Exception as e:
     INITIAL_GOAL = 100_000
     GOAL_MULTIPLIER = 2
     SERVER_HOST = "127.0.0.1"
+
+THEME = load_plugin_theme(cfg, "like_goal")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 LIKEGOAL_EXE_PATH = get_base_file()
 
@@ -130,18 +135,12 @@ HTML_TEMPLATE = f"""
 <head>
 <meta charset="UTF-8">
 <style>
-    :root {{
-        /* RESTORED OLD COLORS */
-        --neon-blue: #00f5ff;
-        --neon-purple: #8a2be2;
-        --neon-red: #ff4d4d;
-        --bg-color: #050505;
-    }}
+{THEME_STYLE}
 
     body {{
         margin: 0;
         padding: 0 20px;
-        background: var(--bg-color);
+        background: var(--background);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -158,18 +157,16 @@ HTML_TEMPLATE = f"""
         align-items: center;
     }}
 
-    /* Small and subtle text */
     .milestone-command {{
         font-size: clamp(14px, 3vw, 20px);
         font-weight: 700;
-        color: #fff;
-        text-shadow: 0 0 10px var(--neon-red);
+        color: var(--text);
+        text-shadow: 0 0 10px var(--danger);
         margin-bottom: 10px;
         letter-spacing: 1px;
         opacity: 0.9;
     }}
 
-    /* Keep the bar as the main focus */
     .bar-bg {{
         width: 100%;
         height: 60px;
@@ -183,10 +180,9 @@ HTML_TEMPLATE = f"""
     .bar-fill {{
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
-        /* Smooth width transition only, no animations */
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
         transition: width 0.5s ease-out;
-        box-shadow: 0 0 20px var(--neon-blue);
+        box-shadow: 0 0 20px var(--accent);
     }}
 
     .text-overlay {{
@@ -195,15 +191,13 @@ HTML_TEMPLATE = f"""
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        color: #fff;
+        color: var(--text);
         font-size: 22px;
         font-weight: 900;
         text-align: center;
         text-shadow: 2px 2px 4px #000;
         z-index: 10;
     }}
-
-    /* REMOVED ALL ANIMATIONS AND GLITCHES */
 </style>
 </head>
 <body id="body">
@@ -291,7 +285,7 @@ if __name__ == "__main__":
             width=600,
             height=150,
             on_top=True,
-            background_color="#050505"
+            background_color=BG_COLOR
         )
         webview.start(debug=False)
     else:

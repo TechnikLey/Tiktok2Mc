@@ -12,6 +12,7 @@ import json
 from queue import Queue
 from collections import defaultdict
 from core import parse_args, AppConfig, get_root_dir, get_base_dir, get_base_file
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
 
 # ==========================================
@@ -56,6 +57,10 @@ if CONFIG_FILE.exists():
 if not OVERLAYS_CONFIG:
     OVERLAYS_CONFIG = [{"name": "default"}]
 
+THEME = load_plugin_theme(full_config, "overlay_text")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
+
 OVERLAYTXT_EXE_PATH = get_base_file()
 
 register_only = args.register_only
@@ -89,7 +94,9 @@ def index():
         fade_in=FADE_IN, 
         fade_out=FADE_OUT, 
         chroma=chroma,
-        overlay_name=overlay_name
+        overlay_name=overlay_name,
+        theme_style=THEME_STYLE,
+        chroma_color=THEME["background"]
     )
 
 @app.route("/stream/<overlay_name>")
@@ -132,14 +139,15 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <style>
+{{ theme_style }}
         body {
             margin: 0; padding: 0; overflow: hidden;
-            background-color: {% if chroma %}#00FF00{% else %}transparent{% endif %};
+            background-color: {% if chroma %}{{ chroma_color }}{% else %}transparent{% endif %};
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: white;
+            color: var(--text);
             font-family: 'Segoe UI', Arial, sans-serif;
             text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000;
         }
@@ -148,8 +156,8 @@ HTML_TEMPLATE = """
             opacity: 0;
             transition: opacity {{ fade_in }}ms ease-in-out;
         }
-        h1 { font-size: 70px; margin: 0; color: #FFFFFF; }
-        p { font-size: 30px; margin: 0; color: #FFFFFF; }
+        h1 { font-size: 70px; margin: 0; color: var(--text); }
+        p { font-size: 30px; margin: 0; color: var(--text); }
         .show { opacity: 1 !important; }
     </style>
 </head>
@@ -234,7 +242,7 @@ if __name__ == '__main__':
                 height=300,
                 x=100 + (idx * 50), # Leicht versetzt auf dem Bildschirm
                 y=100 + (idx * 50),
-                background_color='#00FF00'
+                background_color=BG_COLOR
             )
         webview.start()
     else:

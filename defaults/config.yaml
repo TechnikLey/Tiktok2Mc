@@ -484,6 +484,49 @@ channel_points:
   # Number of top viewers shown on the leaderboard overlay.
   leaderboard_count: 10
 
+# ===========================================================================
+#  THEME — Customize overlay colors
+# ===========================================================================
+# Customize colors for each plugin overlay. All values are CSS hex codes.
+# Omit any key to keep the default. Changes take effect after restart.
+theme:
+  like_goal:
+    background: "#050505"
+    text: "#ffffff"
+    accent: "#00f5ff"
+    accent2: "#8a2be2"
+    danger: "#ff4d4d"
+  death_counter:
+    background: "#000000"
+    text: "#8ef3ff"
+  win_counter:
+    background: "#000000"
+    text: "#ffffff"
+    danger: "#ff4d4d"
+    muted: "#666666"
+    separator: "#333333"
+  timer:
+    background: "#000000"
+    text: "#89CFF0"
+    warning: "#FFD700"
+    blink: "#FF8C00"
+    danger: "#FF0000"
+  overlay_text:
+    background: "#00FF00"
+    text: "#ffffff"
+  spotify:
+    background: "#000000"
+    text: "#ffffff"
+    accent: "#1db954"
+    accent2: "#1ed760"
+  channel_points:
+    background: "#000000"
+    text: "#ffffff"
+    accent: "#FFD700"
+    accent2: "#00BFFF"
+    accent3: "#40E0D0"
+    danger: "#FF4500"
+
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.
