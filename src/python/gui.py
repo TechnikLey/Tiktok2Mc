@@ -15,7 +15,7 @@ from flask import Flask, render_template, request
 from core.paths import get_base_dir
 from core.cli import parse_args
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-7s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
 

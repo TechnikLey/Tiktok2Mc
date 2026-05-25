@@ -21,7 +21,7 @@ from core.models import AppConfig, validate_config_dict
 from core.utils import load_config
 from core.paths import get_base_dir
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-7s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
 
 # -----------------------------

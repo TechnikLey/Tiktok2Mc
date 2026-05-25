@@ -2,7 +2,7 @@ import logging
 import sys
 from pathlib import Path
 
-_LOG_FORMAT = "%(asctime)s [%(levelname)-7s] %(message)s"
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 _LOG_DATE = "%H:%M:%S"
 
 
