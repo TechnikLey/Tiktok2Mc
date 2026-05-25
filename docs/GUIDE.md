@@ -700,12 +700,16 @@ When a viewer uses `$skip`, the system checks their balance, deducts the cost, a
 
 #### Global Cooldown (Cross-Group)
 
-A global cooldown lives at the top of the `comment_commands` section, **outside** any group, and applies across **all** groups. When set to `10`, a viewer who triggers `$skip` must wait 10 seconds before ANY command works — even commands from other groups like `#op` or `!points`.
+Global cooldowns live at the top of the `comment_commands` section, **outside** any group, and apply across **all** groups.
+
+- **`cooldown`** — When set to `10`, a viewer who triggers `$skip` must wait 10 seconds before ANY command works (even `#op` or `!points`) from ANY viewer.
+- **`user_cooldown`** — When set to `30`, a viewer who triggers `$skip` must wait 30 seconds before THEIR next command works in any group. Other viewers are not affected.
 
 ```yaml
 comment_commands:
   enabled: true
-  cooldown: 10              # 10s global cooldown across ALL groups
+  cooldown: 10              # 10s global cooldown across ALL groups (any user)
+  user_cooldown: 30         # 30s per-user global cooldown across all groups
   groups:
     - prefix: "$"
       cooldown: 0            # per-group cooldown still works on top
@@ -715,7 +719,7 @@ comment_commands:
       ...
 ```
 
-Each group keeps its own `cooldown` and `user_cooldown` — those still apply in addition to the global one. Set the global value to `0` to disable.
+Each group keeps its own `cooldown` and `user_cooldown` — those still apply in addition to the global ones. Set a global value to `0` to disable.
 
 ---
 

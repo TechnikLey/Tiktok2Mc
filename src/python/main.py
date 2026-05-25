@@ -76,6 +76,8 @@ class BotContext:
         self.comment_cmd_groups = []
         self.comment_cmd_global_cooldown = 0
         self.comment_cmd_global_last = 0.0
+        self.comment_cmd_global_user_cooldown = 0
+        self.comment_cmd_global_user_last = {}
         self.comment_cmd_last_global = {}
         self.comment_cmd_last_user = {}
 
@@ -223,6 +225,7 @@ def load_config():
         comment_cmd_cfg = config.get("comment_commands", {})
         ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
         ctx.comment_cmd_global_cooldown = max(0, int(comment_cmd_cfg.get("cooldown", 0)))
+        ctx.comment_cmd_global_user_cooldown = max(0, int(comment_cmd_cfg.get("user_cooldown", 0)))
         raw_groups = comment_cmd_cfg.get("groups", None)
         if raw_groups is None:
             raw_groups = [{
@@ -770,13 +773,19 @@ def handle_test_comment():
         print(f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}")
 
         if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
+            now = time.time()
             gcd = ctx.comment_cmd_global_cooldown
-            if gcd > 0:
-                now = time.time()
-                if now - ctx.comment_cmd_global_last < gcd:
-                    remaining = gcd - (now - ctx.comment_cmd_global_last)
-                    print(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
-                    return {"status": "ok", "message": "Blocked by global cooldown"}
+            if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
+                remaining = gcd - (now - ctx.comment_cmd_global_last)
+                print(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
+                return {"status": "ok", "message": "Blocked by global cooldown"}
+            gucd = ctx.comment_cmd_global_user_cooldown
+            if gucd > 0:
+                last_user = ctx.comment_cmd_global_user_last.get(username, 0)
+                if now - last_user < gucd:
+                    remaining = gucd - (now - last_user)
+                    print(f"[TEST COMMENT] {username} blocked by global user cooldown ({remaining:.1f}s left)")
+                    return {"status": "ok", "message": "Blocked by global user cooldown"}
             for group in ctx.comment_cmd_groups:
                 prefix = group["prefix"]
                 if not prefix or not comment_text.startswith(prefix):
@@ -862,6 +871,7 @@ def handle_test_comment():
                 ctx.comment_cmd_last_global[prefix] = now
                 ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
                 ctx.comment_cmd_global_last = now
+                ctx.comment_cmd_global_user_last[username] = now
 
                 if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
@@ -876,6 +886,7 @@ def handle_test_comment():
                     ).start()
 
         return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
+
     except Exception as e:
         print(f"[TEST COMMENT] Error: {e}")
         return {"status": "error", "message": str(e)}, 500
@@ -1307,6 +1318,14 @@ def create_client(user):
                 print(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
                 suppress_comment_trigger = True
                 return
+            gucd = ctx.comment_cmd_global_user_cooldown
+            if gucd > 0:
+                last_user = ctx.comment_cmd_global_user_last.get(username, 0)
+                if now - last_user < gucd:
+                    remaining = gucd - (now - last_user)
+                    print(f"[COMMENT CMD] {username} blocked by global user cooldown ({remaining:.1f}s left)")
+                    suppress_comment_trigger = True
+                    return
             for group in ctx.comment_cmd_groups:
                 prefix = group["prefix"]
                 if not prefix or not comment_text.startswith(prefix):
@@ -1408,6 +1427,7 @@ def create_client(user):
                 ctx.comment_cmd_last_global[prefix] = now
                 ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
                 ctx.comment_cmd_global_last = now
+                ctx.comment_cmd_global_user_last[username] = now
 
                 if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))

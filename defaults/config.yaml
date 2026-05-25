@@ -156,6 +156,11 @@ comment_commands:
   # Set to 0 to disable.
   cooldown: 0
 
+  # Global user cooldown — like global cooldown, but per user. If set to 30, a
+  # viewer who runs $skip must wait 30 seconds before THEIR NEXT command works
+  # in any group. Other viewers are not affected. Set to 0 to disable.
+  user_cooldown: 0
+
   # Define one or more command groups. Each group has its own prefix,
   # role requirements, allow/deny rules, dispatch target, and cooldowns.
   # All comments starting with the group's prefix are checked against it.
