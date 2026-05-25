@@ -148,6 +148,7 @@ def _check_dup_cmd_config():
     except Exception:
         return
     lines = text.split("\n")
+    found = False
     for i, line in enumerate(lines):
         stripped = line.strip()
         if not stripped.startswith("commands_config:"):
@@ -167,8 +168,12 @@ def _check_dup_cmd_config():
                 key = cline.strip().split(":")[0].strip().lower()
                 if key in seen:
                     print(f"[ERROR] command_config: Command '{key}' is configured twice! (line {j+1}, first at line {seen[key]})")
+                    found = True
                 seen[key] = j + 1
             j += 1
+    if found:
+        input("Press Enter to exit...")
+        sys.exit(1)
 
 
 def load_config():
