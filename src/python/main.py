@@ -749,6 +749,23 @@ def _ping_channel_points(user):
         log.info(f"[CHANNEL POINTS] Ping failed for {user}: {e}")
 
 
+def _process_follow(username: str, persist: bool = True):
+    """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user."""
+    user_lower = username.lower()
+    if user_lower in ctx._followed_cache:
+        log.info(f"[FOLLOW] {username} already tracked — follow trigger skipped")
+        return
+    ctx._followed_cache.add(user_lower)
+    if persist:
+        try:
+            with open(ctx.follow_tracking_file, "a") as f:
+                f.write(user_lower + "\n")
+        except Exception as e:
+            log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
+    if "follow" in ctx.valid_functions:
+        ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
+
+
 def _get_channel_points_port():
     return ctx.config.get("channel_points", {}).get("port", 29195)
 
@@ -996,6 +1013,12 @@ def handle_custom_trigger():
                 new_state = ctx.disable_tiktok_connect
             log.info(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
             return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}"}, 200
+
+        # Route 'follow' through the shared dedup logic so custom_trigger respects _followed_cache
+        # persist=False damit Test-User nicht in followed_users.txt landen
+        if sanitized == "follow":
+            _process_follow(user, persist=False)
+            return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         if ctx.main_loop is None:
             return {"status": "error", "message": "Bot event loop not ready yet."}, 503
@@ -1288,18 +1311,7 @@ def create_client(user):
     def on_follow(event: FollowEvent):
         username = get_safe_username(event.user)
         _ping_channel_points(username)
-        user_lower = username.lower()
-        if user_lower in ctx._followed_cache:
-            log.info(f"[FOLLOW] {username} already tracked — follow trigger skipped")
-            return
-        ctx._followed_cache.add(user_lower)
-        try:
-            with open(ctx.follow_tracking_file, "a") as f:
-                f.write(user_lower + "\n")
-        except Exception as e:
-            log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
-        if "follow" in ctx.valid_functions:
-            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
+        _process_follow(username)
 
     # =========================
     # LIKE events
