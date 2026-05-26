@@ -211,13 +211,20 @@ def validate_text(text: str) -> List[Diagnostic]:
             # Check prefix: '/', '$', '!' or '>>' or '@NAME>>'
             _overlay_re = _RE_OVERLAY_PREFIX.match(cmd_trim)
             if cmd_trim.startswith(">>") or _overlay_re:
-                # Overlay command — check for {comment} placeholder
                 if "{comment}" in cmd_trim and trigger.lower() != "comment":
                     ph_pos = cmd_start_global + cmd_trim.find("{comment}")
                     diagnostics.append(_make_diag(
                         line_number, ph_pos, ph_pos + len("{comment}"),
                         "'{comment}' is only resolved for the 'comment' trigger. It will not be replaced for any other trigger.",
                         Severity.ERROR, "comment_placeholder_wrong_trigger"
+                    ))
+                mm_overlay = _RE_MULTIPLIER.search(cmd_trim)
+                if mm_overlay:
+                    token_pos = cmd_start_global + cmd_trim.rfind(f"x{mm_overlay.group(1)}")
+                    diagnostics.append(_make_diag(
+                        line_number, token_pos, token_pos + len(f"x{mm_overlay.group(1)}"),
+                        "Multiplier is not allowed on overlay commands (>> or @name>>).",
+                        Severity.ERROR, "overlay_multiplier"
                     ))
             elif cmd_trim[0] not in ("/", "$", "!"):
                 diagnostics.append(_make_diag(

@@ -15,6 +15,7 @@ import time
 import json
 import shutil
 import os
+import shlex
 import asyncio
 from datetime import datetime
 from core.models import AppConfig, validate_config_dict
@@ -96,7 +97,7 @@ if not IS_WINDOWS:
         if choice == "1":
             if tmux_cmd:
                 log.info(f"\n=> {tmux_cmd}")
-                ret = os.system(tmux_cmd)
+                ret = subprocess.run(shlex.split(tmux_cmd)).returncode
                 if ret == 0:
                     TMUX_PATH = shutil.which("tmux")
                     if TMUX_PATH:
@@ -118,7 +119,7 @@ if not IS_WINDOWS:
         elif choice == "2":
             if screen_cmd:
                 log.info(f"\n=> {screen_cmd}")
-                ret = os.system(screen_cmd)
+                ret = subprocess.run(shlex.split(screen_cmd)).returncode
                 if ret == 0:
                     SCREEN_PATH = shutil.which("screen")
                     if SCREEN_PATH:

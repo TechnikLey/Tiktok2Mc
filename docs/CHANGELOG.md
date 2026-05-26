@@ -46,6 +46,8 @@ Each version is split into two sections:
 * **Customizable overlay colors** — All overlays (Like Goal, Timer, Death Counter, Win Counter, Spotify, Channel Points, Overlay Text) now read their colors from the new `theme:` section in `config.yaml`. Change backgrounds, text colors, and accent colors for each plugin individually — no more hardcoded defaults.
 * **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
 * **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
+* **Spotify OAuth CSRF protection** — The Spotify authorization callback now verifies the state parameter to prevent cross-site request forgery attacks.
+* **Event hooks included in updates** — The built-in event hooks (`random.py` and `spotify.py`) are now updated automatically. Any custom event hooks you may have created are not affected.
 
 ### Changed
 * **Gift-triggered file renamed** — The file that runs custom commands when receiving TikTok gifts has been renamed from `http_actions.txt` to `shell_actions.txt` to better reflect what it does. If you have your own entries in `data/shell_actions.txt`, rename it to `data/shell_actions.txt` manually.
@@ -68,6 +70,7 @@ Each version is split into two sections:
 * **shell_actions.txt now supports variables** — Use `//define name = value` at the top of the file and reference it with `{name}` in commands. The default file now uses `{port}` instead of hardcoded `29191`.
 * **Improved command execution safety** — Internal commands (HTTP actions and process management) no longer run through the system shell. This reduces the risk of injection and makes the tool more reliable across different platforms.
 * **Console output switched to structured logging** — All console messages now use proper log levels (info, warning, error) instead of plain print statements. This makes it easier to filter and understand what's happening at a glance.
+* **Datapack root validation** — The datapack generator now checks whether the target folder exists and is a directory before building. If the path is invalid, you get a clear error message instead of a silent failure.
 
 ### Fixed
 * **GUI module no longer crashes on startup** — Fixed a missing import that prevented the configuration GUI from loading at all.
@@ -109,6 +112,11 @@ Each version is split into two sections:
 * **Config loading errors are now properly reported** — If the configuration file cannot be loaded, the tool now shows a clear error message instead of silently closing. This applies to the main launcher, updater, and all plugin tools.
 * **Validators no longer block on formatting preferences** — The actions file validator now treats spaces after the colon as a friendly warning instead of a blocking error. The preferred format is `trigger:command` (no space), but `trigger: command` will still work.
 * **Test plugin builds no longer accidentally exclude similar-named folders** — The build system now only excludes the `test` plugin itself and no longer accidentally skips other plugins whose folder names happen to contain "test".
+* **Overlay multiplier detection** — The actions file validator now shows an error if you try to use a multiplier (`xN`) on an overlay command (`>>` or `@Name>>`). Multipliers don't work for overlays, so the validator catches this early.
+* **Comment commands no longer match wrong prefix** — Fixed a bug where a command with a shorter prefix (e.g. `!test`) could trigger when a longer one was typed (e.g. `!test123`). Commands are now correctly matched longest-first.
+* **Like goal no longer starts duplicate web servers** — Fixed a potential issue where the like goal overlay could accidentally start two Flask instances.
+* **Various plugins no longer crash on special characters** — Fixed missing UTF-8 encoding in file operations across death counter, timer, win counter, and the test tool. Player names or content with special characters no longer cause crashes.
+* **Config loader no longer returns failure when datapacks folder is missing** — Fixed a bug where the configuration loader could report an error even though everything else was fine, just because the Minecraft datapacks directory didn't exist yet.
 
 ---
 

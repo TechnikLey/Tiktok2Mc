@@ -1,12 +1,13 @@
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 _LOG_DATE = "%H:%M:%S"
 
 
-def configure_root_logger(level: int = logging.INFO, log_format: str = _LOG_FORMAT, log_file: Path = None):
+def configure_root_logger(level: int = logging.INFO, log_format: str = _LOG_FORMAT, log_file: Optional[Path] = None):
     root = logging.getLogger()
     if root.handlers:
         return
@@ -26,7 +27,7 @@ def configure_root_logger(level: int = logging.INFO, log_format: str = _LOG_FORM
         root.addHandler(fh)
 
 
-def setup_logger(name: str = None, level: int = logging.INFO, log_file: Path = None) -> logging.Logger:
+def setup_logger(name: Optional[str] = None, level: int = logging.INFO, log_file: Optional[Path] = None) -> logging.Logger:
     logger = logging.getLogger(name or __name__)
 
     if logger.handlers:

@@ -17,6 +17,8 @@ from python.registry import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
+_listeners_lock = threading.Lock()
+
 # ==========================================
 # Paths & configuration
 # ==========================================
@@ -104,15 +106,17 @@ def index():
 @app.route("/stream/<overlay_name>")
 def stream(overlay_name):
     q = Queue()
-    listeners[overlay_name].append(q)
+    with _listeners_lock:
+        listeners[overlay_name].append(q)
     def event_stream():
         try:
             while True:
                 data = q.get()
                 yield f"data: {json.dumps(data)}\n\n"
         finally:
-            if q in listeners[overlay_name]:
-                listeners[overlay_name].remove(q)
+            with _listeners_lock:
+                if q in listeners[overlay_name]:
+                    listeners[overlay_name].remove(q)
     return Response(event_stream(), mimetype="text/event-stream")
 
 @app.route('/display/<overlay_name>', methods=['POST'])
@@ -127,8 +131,9 @@ def display(overlay_name):
         "duration": content.get("duration", 3)
     }
     
-    for q in listeners[overlay_name]:
-        q.put(data)
+    with _listeners_lock:
+        for q in list(listeners[overlay_name]):
+            q.put(data)
         
     return f"Angezeigt auf {overlay_name}", 200
 

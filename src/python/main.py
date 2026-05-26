@@ -334,7 +334,7 @@ def load_config():
             })
 
         ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
-        return ctx.datapack_root.exists() and ctx.datapack_root.is_dir()
+        return True
     except Exception as e:
         log.error(f"Config error: {e}")
         return False
@@ -351,6 +351,10 @@ def generate_datapack():
     Multiplier ' xN' applies to all types.
     """
     log.info(f"\n[BUILD] Generating datapack in: {ctx.datapack_root}")
+
+    if not ctx.datapack_root.exists() or not ctx.datapack_root.is_dir():
+        log.error(f"[BUILD] Datapack root does not exist or is not a directory: {ctx.datapack_root}")
+        return
 
     full_dp_path = ctx.datapack_root / ctx.datapack_name
     functions_path = full_dp_path / "data" / ctx.namespace / "function"
@@ -428,10 +432,9 @@ def generate_datapack():
                         if times < 1:
                             times = 1
 
-                        # Sort into the appropriate action list
+                        overlay_body = body[:multi_match.start()] if multi_match else body
                         if kind == "overlay":
-                            # Store (overlay_name, raw body) — no multiplier
-                            ctx.overlay_actions.setdefault(name, []).append((overlay_name, body))
+                            ctx.overlay_actions.setdefault(name, []).append((overlay_name, overlay_body))
                             ctx.valid_functions.add(name)
                         else:
                             for _ in range(times):
@@ -825,7 +828,7 @@ def handle_test_comment():
 
         if ctx.comment_cmd_all_prefixes:
             matched_prefix = None
-            for p in ctx.comment_cmd_all_prefixes:
+            for p in sorted(ctx.comment_cmd_all_prefixes, key=len, reverse=True):
                 if comment_text.startswith(p):
                     matched_prefix = p
                     break
@@ -1397,7 +1400,7 @@ def create_client(user):
 
         if ctx.comment_cmd_all_prefixes:
             matched_prefix = None
-            for p in ctx.comment_cmd_all_prefixes:
+            for p in sorted(ctx.comment_cmd_all_prefixes, key=len, reverse=True):
                 if comment_text.startswith(p):
                     matched_prefix = p
                     break

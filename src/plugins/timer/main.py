@@ -156,7 +156,7 @@ def load_win_size():
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
     try:
-        with STATE_FILE.open("w") as f:
+        with STATE_FILE.open("w", encoding="utf-8") as f:
             json.dump(request.json, f)
     except Exception as e:
         log.info(f"[TIMER] Failed to save dimensions: {e}")

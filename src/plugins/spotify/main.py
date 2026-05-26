@@ -402,6 +402,9 @@ def callback():
         return f"Spotify auth error: {error}", 400
     if not code:
         return "Missing authorization code", 400
+    if auth_state is None or state != auth_state:
+        log.info(f"[SPOTIFY] State mismatch in OAuth callback — possible CSRF attack")
+        return "Authorization failed: state mismatch", 400
     if spotify.exchange_code(code):
         overlay_clients.notify_auth(True)
         _notify_overlay()

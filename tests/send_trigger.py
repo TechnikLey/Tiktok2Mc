@@ -40,7 +40,7 @@ if not CONFIG_FILE.exists():
     log.error(f"Configuration file not found at {CONFIG_FILE}")
     sys.exit(1)
 
-with open(CONFIG_FILE, "r") as f:
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
     cfg = yaml.safe_load(f)
 
 BOT_HOST = "http://127.0.0.1"

@@ -268,7 +268,7 @@ def stream():
     return Response(event_stream(), mimetype="text/event-stream")
 
 def run_flask():
-    app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True)
+    app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True, debug=False, use_reloader=False)
 
 gui_hidden = args.gui_hidden
 

@@ -81,7 +81,7 @@ win_manager_instance = None  # Initialized below
 class WinManager:
     """Tracks wins, losses, and the escalating win target. Persists state to disk."""
     def __init__(self):
-        self.wins, self.needed, self.record = 0, 10, 0
+        self.wins, self.needed, self.record_low = 0, 10, 0
         self.listeners = []
         self.load_stats()
 
@@ -92,14 +92,14 @@ class WinManager:
                     d = json.load(f)
                     self.wins = d.get("wins", 0)
                     self.needed = d.get("needed", 10)
-                    self.record = d.get("record", 0)
+                    self.record_low = d.get("record_low", d.get("record", 0))
             except Exception as e:
                 log.info(f"[WINCOUNTER] Failed to load stats: {e}")
 
     def save_stats(self):
         try:
-            with STATS_FILE.open("w") as f:
-                json.dump({"wins": self.wins, "record": self.record, "needed": self.needed}, f, indent=4)
+            with STATS_FILE.open("w", encoding="utf-8") as f:
+                json.dump({"wins": self.wins, "record_low": self.record_low, "needed": self.needed}, f, indent=4)
         except Exception as e:
             log.info(f"[WINCOUNTER] Failed to save stats: {e}")
 
@@ -117,14 +117,15 @@ class WinManager:
 
     def remove_win(self, amount=1):
         self.wins -= amount
-        if self.wins < self.record: self.record = self.wins
+        if self.wins < self.record_low:
+            self.record_low = self.wins
         self._notify()
 
     def get_data(self):
         return {
-            "wins": self.wins, 
-            "needed": self.needed, 
-            "record": self.record, 
+            "wins": self.wins,
+            "needed": self.needed,
+            "record_low": self.record_low,
             "win_color": THEME["danger"] if self.wins < 0 else THEME["text"]
         }
 
@@ -164,7 +165,7 @@ HTML_TEMPLATE = """
     <div class="container">
         <span>Wins:</span><span id="wins">0</span><span style="color: var(--separator);">|</span><span id="needed">10</span>
     </div>
-    <div class="record-section">Record: <span id="record">0</span></div>
+    <div class="record-section">Record Low: <span id="record_low">0</span></div>
     
     <script>
         const es = new EventSource("/stream");
@@ -173,7 +174,7 @@ HTML_TEMPLATE = """
             document.getElementById('wins').innerText = d.wins;
             document.getElementById('wins').style.color = d.win_color;
             document.getElementById('needed').innerText = d.needed;
-            document.getElementById('record').innerText = d.record;
+            document.getElementById('record_low').innerText = d.record_low;
         };
 
         // Window resize: save outer dimensions for state persistence.
@@ -201,7 +202,7 @@ def index(): return render_template_string(HTML_TEMPLATE)
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
     data = request.json
-    with STATE_FILE.open("w") as f: json.dump(data, f)
+    with STATE_FILE.open("w", encoding="utf-8") as f: json.dump(data, f)
     return "OK"
 
 @app.route("/add", methods=["POST"])

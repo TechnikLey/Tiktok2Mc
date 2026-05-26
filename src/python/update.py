@@ -94,6 +94,12 @@ WHITELIST_DIRS = {
     "plugins/spotify",
 }
 
+# Individual files in subdirectories that may be overwritten.
+WHITELIST_DIR_FILES = {
+    "event_hooks/random.py",
+    "event_hooks/spotify.py",
+}
+
 WHITELIST_FILES = {
     "version.txt",
     "README.md",
@@ -428,10 +434,18 @@ def run_update():
         rel_path_str = str(rel_path).replace("\\", "/")
         if rel_path_str != "." and not any(
             rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
+        ) and not any(
+            f.startswith(rel_path_str + "/") for f in WHITELIST_DIR_FILES
         ): continue
 
         for file in files:
             if rel_path_str == "." and file not in WHITELIST_FILES: continue
+            # For subdirectories not covered by WHITELIST_DIRS, only copy whitelisted files
+            if rel_path_str != ".":
+                dir_whitelisted = any(
+                    rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
+                )
+                if not dir_whitelisted and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES: continue
             if file.lower() == f"update{SUFFIX}".lower(): continue
             if file.lower() == "config.yaml": continue
             

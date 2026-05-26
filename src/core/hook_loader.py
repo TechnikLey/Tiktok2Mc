@@ -32,6 +32,9 @@ ALLOWED_IMPORTS: frozenset[str] = frozenset({
     "requests",
 })
 
+# Modules explicitly allowed for IntelliSense/type-checking only.
+ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({"core.hook_api"})
+
 def _check_imports(path: Path) -> list[str]:
     """
     Parse the hook file with the AST and return a list of disallowed
@@ -41,20 +44,26 @@ def _check_imports(path: Path) -> list[str]:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
     except (SyntaxError, OSError):
-        return []  # let the normal loader handle these errors
+        return []
 
     disallowed: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                top = alias.name.split(".")[0]
+                full_name = alias.name
+                if full_name in ALLOWED_HOOK_MODULES:
+                    continue
+                top = full_name.split(".")[0]
                 if top not in ALLOWED_IMPORTS:
-                    disallowed.append(alias.name)
+                    disallowed.append(full_name)
         elif isinstance(node, ast.ImportFrom):
             if node.module:
-                top = node.module.split(".")[0]
+                full_module = node.module
+                if full_module in ALLOWED_HOOK_MODULES:
+                    continue
+                top = full_module.split(".")[0]
                 if top not in ALLOWED_IMPORTS:
-                    disallowed.append(node.module)
+                    disallowed.append(full_module)
     return disallowed
 
 def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
@@ -82,15 +91,7 @@ def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
         _load_single_hook(api, path)
 
 def _load_single_hook(api: HookAPI, path: Path) -> None:
-    # ------------------------------------------------------------------
-    # Import whitelist check — runs before the module is loaded
-    # ------------------------------------------------------------------
     disallowed = _check_imports(path)
-    try:
-        disallowed.remove("core.hook_api")
-        disallowed.remove("HookAPI")
-    except ValueError:
-        pass
     if disallowed:
         for name in disallowed:
             log.error(

@@ -149,7 +149,7 @@ def index(): return render_template_string(HTML_TEMPLATE)
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
     data = request.json or {}
-    with STATE_FILE.open("w") as f: json.dump(data, f)
+    with STATE_FILE.open("w", encoding="utf-8") as f: json.dump(data, f)
     return "OK"
 
 @app.route("/webhook", methods=["POST"])
