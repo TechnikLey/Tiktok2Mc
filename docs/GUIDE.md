@@ -158,7 +158,7 @@ The tool will detect your system Java or prompt you to install it if missing. Ru
      Password: ABC1234            # Replace with any password you like
    ```
 
-   > [!IMPORTANT]
+> [!IMPORTANT]
 > Do not use Tab for indentation — always use spaces. Keep a space after colons (e.g., `User: myname`, not `User:myname`).
 
 2. **Set up actions (optional)**
