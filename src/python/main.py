@@ -201,7 +201,7 @@ def load_config():
 
         ctx.config = config
 
-        ctx.mc_host = config.get("rcon", {}).get("host", "localhost")
+        ctx.mc_host = config.get("server_host", "127.0.0.1")
         ctx.mc_pass = config.get("rcon", {}).get("password", "")
         ctx.mc_port = config.get("rcon", {}).get("port", 25575)
         ctx.server_host = config.get("server_host", "127.0.0.1")
