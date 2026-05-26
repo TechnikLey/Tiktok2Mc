@@ -118,7 +118,7 @@ The tool bundles:
 | **RAM** | 12 GB minimum recommended (Minecraft server uses up to 4 GB by default — adjustable) |
 | **TikTok Account** | Required for live streaming |
 | **Minecraft** | Java Edition (any version that supports datapacks and RCON, 1.13+) |
-| **Streaming Software** | OBS Studio, vMix, Streamlabs Desktop (recommended), or TikTok Live Studio / Twitch Studio |
+| **Streaming Software** | OBS Studio, vMix, Streamlabs Desktop, or TikTok Live Studio / Twitch Studio |
 
 ---
 
