@@ -45,9 +45,10 @@ Each version is split into two sections:
 * **Channel Points plugin** — Brand new loyalty system! Viewers earn points automatically by doing stuff in chat — joining, commenting, liking, gifting, following, sharing. Comes with an OBS overlay showing the leaderboard.
 * **Customizable overlay colors** — All overlays (Like Goal, Timer, Death Counter, Win Counter, Spotify, Channel Points, Overlay Text) now read their colors from the new `theme:` section in `config.yaml`. Change backgrounds, text colors, and accent colors for each plugin individually — no more hardcoded defaults.
 * **Config variable resolution for comment groups** — Comment command URLs now support `{channel_points_port}` in addition to `{spotify_port}`, resolved at startup from their respective config sections.
+* **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
 
 ### Changed
-* **Gift-triggered file renamed** — The file that runs custom commands when receiving TikTok gifts has been renamed from `shell_actions.txt` to `shell_actions.txt` to better reflect what it does. If you have your own entries in `data/shell_actions.txt`, rename it to `data/shell_actions.txt` manually.
+* **Gift-triggered file renamed** — The file that runs custom commands when receiving TikTok gifts has been renamed from `http_actions.txt` to `shell_actions.txt` to better reflect what it does. If you have your own entries in `data/shell_actions.txt`, rename it to `data/shell_actions.txt` manually.
 * **Duplicate command detection in `commands` list** — If a command appears multiple times in a group's `commands` list, the tool now warns you. Max 5 warnings per group, then "N further" suppressed. No crash, the program keeps running.
 * **Duplicate key detection in `commands_config`** — Duplicate entries in `commands_config` (e.g. two `op:` blocks) are now caught on startup and trigger an error with "Press Enter to exit". Detects 2+ duplicates, always reports the first occurrence's line number.
 * **Per-command settings separated from command list** — Each command can now have its own `points_cost`, cooldown, and roles in a separate `commands_config` block. The `commands` list stays clean — just names, no clutter.
@@ -65,8 +66,8 @@ Each version is split into two sections:
 * **Revenue rounded to 2 decimals** — The daily revenue log no longer shows ugly floating-point artifacts like `0.22000000000000006`. Values are now cleanly rounded to two decimal places.
 * **Revenue is gross** — The log entry `estimated_revenue_usd` is a gross estimate (diamonds × 0.005), not the net payout after TikTok's cut. A note has been added to the docs.
 * **shell_actions.txt now supports variables** — Use `//define name = value` at the top of the file and reference it with `{name}` in commands. The default file now uses `{port}` instead of hardcoded `29191`.
-* **`trigger_comment_event` option** — Each comment command group can now control whether the `comment` trigger in `actions.mca` also fires. Set `trigger_comment_event: false` to suppress the trigger for that group.
 * **Improved command execution safety** — Internal commands (HTTP actions and process management) no longer run through the system shell. This reduces the risk of injection and makes the tool more reliable across different platforms.
+* **Console output switched to structured logging** — All console messages now use proper log levels (info, warning, error) instead of plain print statements. This makes it easier to filter and understand what's happening at a glance.
 
 ### Fixed
 * **GUI module no longer crashes on startup** — Fixed a missing import that prevented the configuration GUI from loading at all.
@@ -91,31 +92,23 @@ Each version is split into two sections:
 * **Comment command URL now correctly substituted** — When using `{user}` or `{text}` placeholders in HTTP comment command URLs, the substituted URL is now actually sent instead of the raw template.
 * **Like goal queue full is now logged** — When the like goal queue is full and a delta is dropped, a message now appears in the console so you know it happened.
 * **RCON inactive queue no longer loops forever** — If the RCON queue is paused, commands are now discarded after a maximum number of retries instead of being re-queued indefinitely.
-* **Timer webhook handles bad input** — The countdown timer now handles POST requests with missing or malformed JSON data without crashing.
 * **Overlay names must be valid** — If an overlay in the config has no name, it is now skipped with a warning instead of being silently stored without one.
 * **Overlay connection errors are properly logged** — Connection failures to overlay clients now appear in the log output instead of plain console prints.
 * **Device block detection no longer triggers on false positives** — The TikTok reconnection logic no longer mistakes ordinary error messages containing words like "code" or "status" for a device block.
-* **Spotify API error handling fixed** — Fixed a syntax error in the Spotify plugin that prevented the entire plugin module from loading. API errors are now handled correctly.
 * **Update logs with negative values handled** — If `max_update_logs` is set to a negative value other than `-1`, it is now treated as `-1` (keep all logs) with a warning.
 * **Downloads with missing file size handled** — Downloads (updates, etc.) no longer crash if the server doesn't send a `Content-Length` header or sends an empty one.
 * **Timer now works as OBS Browser Source** — The countdown timer no longer requires the pywebview window. In `gui_hidden` mode, add it as an OBS Browser Source at `http://localhost:29189` and it responds to death/respawn events via webhook.
 * **Linux start command now includes `sudo`** — All references to `./start.bin` in the docs now correctly show `sudo ./start.bin`, since the tool requires root privileges on Linux for updates and permission-sensitive paths.
 * **`$random` deny-all mode** — If you use `deny-all` mode for your random trigger filter, it now correctly **excludes** the listed triggers instead of accidentally only allowing them. The `allow-all` mode was not affected.
-* **Spotify track shows immediately after login** — No more staring at "Spotify connected!" while a track is already playing. The overlay shows the current track right after authentication.
-* **Chat commands for Spotify work now** — The plugin previously had no endpoint for chat commands. `$play` and friends now actually do something.
 * **Fixed outdated config path in actions.mca comment** — The `$random` comment now correctly points to `random_triggers > triggers` instead of the old `Gifts > random_exclude`.
 * **Better error messages everywhere** — Errors that were previously swallowed without a trace (failed points lookups, connection issues, plugin problems) are now shown in the console. Makes debugging issues way easier — the tool tells you what went wrong instead of silently failing.
-* **More reliable updates on Linux** — Fixed a crash that could occur when running the updater without root permissions.
 * **Timer webhook no longer crashes on bad input** — The countdown timer now properly handles POST requests with missing or malformed JSON data.
 * **Queue overloads are now actually caught** — When the command queue overflows, the error is properly handled instead of crashing silently in the background.
 * **Bracket validation skips strings** — The actions file validator no longer falsely reports unbalanced brackets when they appear inside text strings (e.g. JSON data or selectors in quotes).
-* **Spotify login handles unexpected server responses** — If Spotify returns something other than valid JSON during authentication, the tool now shows a clear error instead of crashing.
- * **Console output switched to structured logging** — All console messages now use proper log levels (info, warning, error) instead of plain print statements. This makes it easier to filter and understand what's happening at a glance.
- * **Updater no longer crashes on startup** — Fixed a critical bug where the auto-updater could crash immediately with a startup error due to missing internal references.
- * **Cooldown timing more consistent** — Comment command cooldowns now use a single consistent timestamp per request, preventing edge cases where timing could drift.
- * **Config loading errors are now properly reported** — If the configuration file cannot be loaded, the tool now shows a clear error message instead of silently closing. This applies to the main launcher, updater, and all plugin tools.
- * **Validators no longer block on formatting preferences** — The actions file validator now treats spaces after the colon as a friendly warning instead of a blocking error. The preferred format is `trigger:command` (no space), but `trigger: command` will still work.
- * **Test plugin builds no longer accidentally exclude similar-named folders** — The build system now only excludes the `test` plugin itself and no longer accidentally skips other plugins whose folder names happen to contain "test".
+* **Updater no longer crashes on startup** — Fixed a critical bug where the auto-updater could crash immediately with a startup error due to missing internal references.
+* **Config loading errors are now properly reported** — If the configuration file cannot be loaded, the tool now shows a clear error message instead of silently closing. This applies to the main launcher, updater, and all plugin tools.
+* **Validators no longer block on formatting preferences** — The actions file validator now treats spaces after the colon as a friendly warning instead of a blocking error. The preferred format is `trigger:command` (no space), but `trigger: command` will still work.
+* **Test plugin builds no longer accidentally exclude similar-named folders** — The build system now only excludes the `test` plugin itself and no longer accidentally skips other plugins whose folder names happen to contain "test".
 
 ---
 
