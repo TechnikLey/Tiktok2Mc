@@ -416,8 +416,13 @@ def run_update():
     # 2. TOOL UPDATE (copy files)
     # ==========================================
     # Signal the start script to shut down so files are unlocked
-    with (BASE_DIR / "update_signal.tmp").open("w") as f: f.write("kill")
-    time.sleep(5)  # pause to let the start script exit
+    signal_file = BASE_DIR / "update_signal.tmp"
+    signal_file.write_text("kill")
+    # Wait for start script to consume the signal (file deleted) or timeout
+    for _ in range(30):
+        if not signal_file.exists():
+            break
+        time.sleep(1)
 
     log.info("[..] Installing files...")
     walk_method = getattr(extracted_root_path, "walk", None)

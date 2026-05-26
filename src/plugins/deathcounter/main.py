@@ -144,7 +144,7 @@ HTML_TEMPLATE = """
 """
 
 @app.route("/")
-def index(): return render_template_string(HTML_TEMPLATE)
+def index(): return render_template_string(HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE))
 
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
@@ -168,7 +168,14 @@ def stream():
     def event_stream():
         try:
             yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
-            while True: yield f"data: {json.dumps({'deaths': q.get()})}\n\n"
+            while True:
+                try:
+                    deaths = q.get(timeout=1)
+                    yield f"data: {json.dumps({'deaths': deaths})}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
+        except GeneratorExit:
+            pass
         finally:
             try: death_manager.listeners.remove(q)
             except ValueError: pass

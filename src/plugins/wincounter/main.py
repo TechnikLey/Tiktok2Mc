@@ -197,11 +197,11 @@ HTML_TEMPLATE = """
 """
 
 @app.route("/")
-def index(): return render_template_string(HTML_TEMPLATE)
+def index(): return render_template_string(HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE))
 
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
-    data = request.json
+    data = request.json or {}
     with STATE_FILE.open("w", encoding="utf-8") as f: json.dump(data, f)
     return "OK"
 
@@ -242,11 +242,15 @@ def stream():
     
     def event_stream():
         try:
-            # Send initial state immediately on connect
             yield f"data: {json.dumps(win_manager_instance.get_data())}\n\n"
             while True:
-                result = q.get()  # Blocks until a new update arrives
-                yield f"data: {json.dumps(result)}\n\n"
+                try:
+                    result = q.get(timeout=1)
+                    yield f"data: {json.dumps(result)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps(win_manager_instance.get_data())}\n\n"
+        except GeneratorExit:
+            pass
         finally:
             try: win_manager_instance.listeners.remove(q)
             except ValueError: pass

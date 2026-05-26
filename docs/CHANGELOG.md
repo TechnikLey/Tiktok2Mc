@@ -117,6 +117,17 @@ Each version is split into two sections:
 * **Like goal no longer starts duplicate web servers** — Fixed a potential issue where the like goal overlay could accidentally start two Flask instances.
 * **Various plugins no longer crash on special characters** — Fixed missing UTF-8 encoding in file operations across death counter, timer, win counter, and the test tool. Player names or content with special characters no longer cause crashes.
 * **Config loader no longer returns failure when datapacks folder is missing** — Fixed a bug where the configuration loader could report an error even though everything else was fine, just because the Minecraft datapacks directory didn't exist yet.
+* **Follow tracking with special characters** — Fixed a crash on Windows when usernames containing emojis or accented letters were followed. The tracking file now handles all characters correctly.
+* **Follow events safer under load** — Fixed a rare issue where multiple follow events arriving at the exact same moment could interfere with each other. The tool now keeps everything in order.
+* **Update shutdown wait improved** — The updater no longer relies on a fixed timer when waiting for the application to close. It now actively checks whether everything has shut down before installing files, preventing file-lock errors on slower systems.
+* **Update signal made more reliable** — Fixed a corner case where the start script could occasionally miss the shutdown signal during an update, potentially leaving the process running.
+* **Overlay cleanup on disconnect** — When a browser source or OBS overlay disconnects, it is now properly cleaned up behind the scenes. Previously, these could pile up over long streams.
+* **MinecraftServerAPI config preserved** — The tool no longer removes comments and custom formatting from the MinecraftServerAPI plugin's config file every time it starts.
+* **Spotify overlay now shows for all successful commands** — Fixed an issue where some successful Spotify actions (like play or pause) didn't display the on-screen notification.
+* **Slightly faster reconnection** — Cleaned up a repeated calculation that happened on every reconnect attempt, making reconnections a tiny bit snappier.
+* **Like events no longer vanish silently** — If the command queue fills up during a burst of likes, the tool now logs a message instead of dropping events without telling you.
+* **Window state save fixed for Timer and Win Counter** — Saving window dimensions with an empty or invalid request no longer corrupts the saved state file in these two plugins.
+* **Role checks more reliable** — Fixed an edge case where moderator and superfan permission checks could behave unexpectedly when role information was missing from a viewer event.
 
 ---
 

@@ -706,8 +706,11 @@ def overlay_stream():
                     yield f"data: {json.dumps(track)}\n\n"
             yield f"data: {json.dumps({'type': 'connected', 'authenticated': spotify.is_authenticated})}\n\n"
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    pass
         except GeneratorExit:
             pass
         finally:
@@ -880,7 +883,7 @@ setInterval(updateProgress, 1000);
 # Server + Main
 # =========================
 def run_flask():
-    app.run(host=SERVER_HOST, port=SPOTIFY_PORT, threaded=True)
+    app.run(host=SERVER_HOST, port=SPOTIFY_PORT, threaded=True, use_reloader=False)
 
 
 if __name__ == "__main__":

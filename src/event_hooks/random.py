@@ -43,9 +43,10 @@ def register(api: HookAPI):
             return
 
         chosen = random.choice(candidates)
-        username = str(user)
         if isinstance(user, dict):
             username = user.get("user", str(user))
+        else:
+            username = str(user)
 
         api.enqueue_trigger(chosen, username)
 

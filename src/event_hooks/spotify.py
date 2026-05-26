@@ -33,8 +33,8 @@ def _request(method, path, **kwargs):
     try:
         import requests
         resp = requests.request(method, f"{PLUGIN_BASE}{path}", timeout=5, **kwargs)
-        if resp.status_code == 200:
-            return resp.json()
+        if resp.status_code in (200, 204):
+            return resp.json() if resp.status_code == 200 else {}
         return None
     except requests.ConnectionError:
         return None

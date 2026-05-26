@@ -106,6 +106,7 @@ class BotContext:
         self.like_lock = threading.Lock()
         self.tiktok_lock = threading.Lock()
         self.gift_lock = threading.Lock()
+        self.follow_lock = threading.Lock()
         self.rcon_pool_lock = asyncio.Lock()
 
         # RCON state
@@ -143,6 +144,8 @@ app = Flask(__name__)
 
 werkzeug_log = logging.getLogger('werkzeug')
 werkzeug_log.setLevel(logging.WARNING)
+
+_RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
 
 # ==========================================
 # SETUP & HELPER FUNCTIONS
@@ -215,7 +218,7 @@ def load_config():
         ctx.follow_tracking_file = (BASE_DIR.parent / raw_path).resolve()
         ctx._followed_cache = set()
         if ctx.follow_tracking_file.exists():
-            with open(ctx.follow_tracking_file, "r") as f:
+            with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
                 ctx._followed_cache = set(line.strip().lower() for line in f if line.strip())
             log.info(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
         if ctx.follow_tracking_mode == "per_stream":
@@ -755,13 +758,14 @@ def _ping_channel_points(user):
 def _process_follow(username: str, persist: bool = True):
     """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user."""
     user_lower = username.lower()
-    if user_lower in ctx._followed_cache:
-        log.info(f"[FOLLOW] {username} already tracked — follow trigger skipped")
-        return
-    ctx._followed_cache.add(user_lower)
+    with ctx.follow_lock:
+        if user_lower in ctx._followed_cache:
+            log.info(f"[FOLLOW] {username} already tracked — follow trigger skipped")
+            return
+        ctx._followed_cache.add(user_lower)
     if persist:
         try:
-            with open(ctx.follow_tracking_file, "a") as f:
+            with open(ctx.follow_tracking_file, "a", encoding="utf-8") as f:
                 f.write(user_lower + "\n")
         except Exception as e:
             log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
@@ -1342,10 +1346,13 @@ def create_client(user):
                         rule["last_blocks"] = current_blocks
                         log.info(f"[LIKE] Trigger '{rule['id']}' -> +{diff}")
                         for _ in range(diff):
-                            ctx.main_loop.call_soon_threadsafe(
-                                ctx.trigger_queue.put_nowait,
-                                (rule["function"], rule["payload"])
-                            )
+                            try:
+                                ctx.main_loop.call_soon_threadsafe(
+                                    ctx.trigger_queue.put_nowait,
+                                    (rule["function"], rule["payload"])
+                                )
+                            except asyncio.QueueFull:
+                                log.info(f"[LIKE] Queue full, trigger '{rule['id']}' dropped")
             now = time.time()
             delta = total_since_start - ctx.last_likegoal_sent
             if delta > 0 and (now - ctx.last_likegoal_time) >= ctx.likegoal_interval:
@@ -1380,7 +1387,7 @@ def create_client(user):
         _ping_channel_points(username)
         comment_text = getattr(event, 'comment', '')
 
-        is_super_fan = getattr(event, 'user_is_super_fan', None)
+        is_super_fan = bool(getattr(event, 'user_is_super_fan', None))
 
         in_fanclub = False
         fan_ticket_count = getattr(event.user, 'fan_ticket_count', None)
@@ -1391,7 +1398,7 @@ def create_client(user):
         elif hasattr(fans_club, 'club_name') or hasattr(fans_club_info, 'club_name'):
             in_fanclub = True
 
-        is_moderator = getattr(event.user, 'is_moderator', None)
+        is_moderator = bool(getattr(event.user, 'is_moderator', None))
 
         log.info(f"[COMMENT] {username}: {comment_text}")
         log.info(f"  Superfan: {is_super_fan}")
@@ -1684,7 +1691,6 @@ async def run_bot():
             error_str = str(e)
             log.info(f"[..] Connection lost: {error_str}")
 
-            _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
             if "DEVICE_BLOCKED" in error_str or bool(_RE_ERR_CODE_200.search(error_str)):
                 log.info("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 log.info("[TIP] Wait 15 minutes or restart your router.")

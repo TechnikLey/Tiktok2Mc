@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import subprocess
-import yaml
 import sys
 import shutil
 import platform
@@ -9,6 +8,8 @@ import urllib.request
 from pathlib import Path
 from core.paths import get_base_dir
 import logging
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
@@ -128,19 +129,27 @@ except Exception as e:
     input("Press Enter to continue...")
     sys.exit(1)
 
-with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
-    cfg_api = yaml.safe_load(f) or {}
+yaml_obj = YAML(typ="rt")
+yaml_obj.preserve_quotes = True
+yaml_obj.indent(mapping=2, sequence=4, offset=2)
+yaml_obj.width = 120
 
-    webhook = cfg_api.setdefault("webhooks", {})
-    webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
+try:
+    with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
+        cfg_api = yaml_obj.load(f) or CommentedMap()
+except Exception:
+    cfg_api = CommentedMap()
 
-    if APIPORT != cfg_api.get("port", 29187):
-        cfg_api["port"] = int(APIPORT)
-    else:
-        log.info("API Port is up to date.")
+webhook = cfg_api.setdefault("webhooks", {})
+webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
+
+if APIPORT != cfg_api.get("port", 29187):
+    cfg_api["port"] = int(APIPORT)
+else:
+    log.info("API Port is up to date.")
 
 with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
-    yaml.safe_dump(cfg_api, f, sort_keys=False)
+    yaml_obj.dump(cfg_api, f)
 
 # === Enable / disable MinecraftServerAPI plugin ===
 plugin_name = "MinecraftServerAPI-1.21.x.jar"

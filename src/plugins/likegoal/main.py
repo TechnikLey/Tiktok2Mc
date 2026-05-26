@@ -260,8 +260,13 @@ def stream():
         try:
             yield f"data: {json.dumps(like_manager.get_data())}\n\n"
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps(like_manager.get_data())}\n\n"
+        except GeneratorExit:
+            pass
         finally:
             try: like_manager.listeners.remove(q)
             except ValueError: pass

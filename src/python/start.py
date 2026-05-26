@@ -361,10 +361,15 @@ def start_UPDATE_EXE_PATH():
     while proc.poll() is None:
         update_signal = BASE_DIR / "update_signal.tmp"
         if update_signal.exists():
-            update_signal.unlink()
-            log.info("Please restart the application.")
-            time.sleep(2)
-            return "kill"
+            try:
+                content = update_signal.read_text().strip()
+                if content == "kill":
+                    update_signal.unlink()
+                    log.info("Please restart the application.")
+                    time.sleep(2)
+                    return "kill"
+            except (OSError, IOError):
+                pass
         time.sleep(1)
 
     return proc.returncode

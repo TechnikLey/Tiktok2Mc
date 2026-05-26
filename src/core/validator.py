@@ -3,7 +3,7 @@
 import re
 from enum import Enum
 from dataclasses import dataclass
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Union
 import logging
 
 log = logging.getLogger(__name__)
@@ -270,7 +270,7 @@ def validate_text(text: str) -> List[Diagnostic]:
     return diagnostics
 
 
-def validate_file(file_path: str, raise_on_error: bool = True) -> List[Diagnostic]:
+def validate_file(file_path: Union[str, "Path"], raise_on_error: bool = True) -> List[Diagnostic]:
     """
     Validates a file and returns a list of diagnostics.
     If raise_on_error=True and at least one ERROR exists, ValueError is raised.

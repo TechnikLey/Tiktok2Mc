@@ -111,8 +111,13 @@ def stream(overlay_name):
     def event_stream():
         try:
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    pass
+        except GeneratorExit:
+            pass
         finally:
             with _listeners_lock:
                 if q in listeners[overlay_name]:

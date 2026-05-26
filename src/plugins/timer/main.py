@@ -157,7 +157,7 @@ def load_win_size():
 def save_dims():
     try:
         with STATE_FILE.open("w", encoding="utf-8") as f:
-            json.dump(request.json, f)
+            json.dump(request.json or {}, f)
     except Exception as e:
         log.info(f"[TIMER] Failed to save dimensions: {e}")
     return "OK"
@@ -187,8 +187,11 @@ def stream():
     def generate():
         try:
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps(timer_state.get_state())}\n\n"
         except GeneratorExit:
             overlay_clients.remove(q)
 
@@ -197,7 +200,7 @@ def stream():
 
 @app.route("/")
 def index():
-    return HTML_TEMPLATE
+    return HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE)
 
 
 # --- HTML / CSS / JS (timer overlay) ---

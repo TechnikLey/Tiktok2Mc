@@ -212,8 +212,11 @@ def stream():
     def generate():
         try:
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps(get_leaderboard_data())}\n\n"
         except GeneratorExit:
             overlay_clients.remove(q)
 
@@ -221,7 +224,7 @@ def stream():
 
 @app.route("/")
 def index():
-    return HTML_TEMPLATE
+    return HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE)
 
 @app.route("/comment", methods=["POST"])
 def handle_comment():

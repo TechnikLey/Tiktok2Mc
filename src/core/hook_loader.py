@@ -102,6 +102,11 @@ def _load_single_hook(api: HookAPI, path: Path) -> None:
 
     module_name = f"event_hooks.{path.stem}"
     try:
+        # Ensure parent package exists in sys.modules
+        if "event_hooks" not in sys.modules:
+            import types
+            sys.modules["event_hooks"] = types.ModuleType("event_hooks")
+
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
             log.warning(f"[HOOK] Could not create spec for: {path.name}")
