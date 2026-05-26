@@ -2,7 +2,6 @@
 
 Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, follow you, or hit like milestones, Minecraft commands are triggered in real-time on your server.
 
-> **Version:** v0.3.0 — [Changelog](./CHANGELOG.md)  
 > **Author:** TechnikLey — [GitHub](https://github.com/TechnikLey/Tiktok2Mc)  
 > **License:** PolyForm Noncommercial 1.0.0 (with creator exception)
 
