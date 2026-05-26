@@ -83,6 +83,7 @@ class WinManager:
     def __init__(self):
         self.wins, self.needed, self.record_low = 0, 10, 0
         self.listeners = []
+        self._lock = threading.Lock()
         self.load_stats()
 
     def load_stats(self):
@@ -106,7 +107,9 @@ class WinManager:
     def _notify(self):
         self.save_stats()
         data = self.get_data()
-        for q in list(self.listeners): q.put(data)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(data)
 
     def add_win(self, amount=1):
         self.wins += amount
@@ -238,7 +241,8 @@ def handle_minecraft_events():
 def stream():
     # Create a queue for this specific browser tab (SSE listener)
     q = Queue()
-    win_manager_instance.listeners.append(q)
+    with win_manager_instance._lock:
+        win_manager_instance.listeners.append(q)
     
     def event_stream():
         try:
@@ -252,8 +256,9 @@ def stream():
         except GeneratorExit:
             pass
         finally:
-            try: win_manager_instance.listeners.remove(q)
-            except ValueError: pass
+            with win_manager_instance._lock:
+                try: win_manager_instance.listeners.remove(q)
+                except ValueError: pass
             
     return Response(event_stream(), mimetype="text/event-stream")
 

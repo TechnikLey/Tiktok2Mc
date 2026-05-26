@@ -83,9 +83,12 @@ class DeathManager:
     def __init__(self):
         self.count = 0
         self.listeners = []
+        self._lock = threading.Lock()
     def add_death(self):
         self.count += 1
-        for q in list(self.listeners): q.put(self.count)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(self.count)
 
 death_manager = DeathManager()
 
@@ -164,7 +167,9 @@ def add():
 
 @app.route("/stream")
 def stream():
-    q = Queue(); death_manager.listeners.append(q)
+    q = Queue()
+    with death_manager._lock:
+        death_manager.listeners.append(q)
     def event_stream():
         try:
             yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
@@ -177,8 +182,9 @@ def stream():
         except GeneratorExit:
             pass
         finally:
-            try: death_manager.listeners.remove(q)
-            except ValueError: pass
+            with death_manager._lock:
+                try: death_manager.listeners.remove(q)
+                except ValueError: pass
     return Response(event_stream(), mimetype="text/event-stream")
 
 gui_hidden = args.gui_hidden

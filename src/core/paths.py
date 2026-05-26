@@ -24,8 +24,11 @@ def get_config_file() -> Path:
 def get_plugin_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    import __main__
-    return Path(__main__.__file__).resolve().parent
+    try:
+        import __main__
+        return Path(__main__.__file__).resolve().parent
+    except (AttributeError, ImportError):
+        return Path(sys.executable).resolve().parent
 
 def get_plugin_config_file() -> Path:
     return get_plugin_dir() / "config.yaml"

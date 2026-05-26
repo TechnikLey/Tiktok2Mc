@@ -482,6 +482,7 @@ async def rcon_worker():
     """Background worker that dequeues RCON commands and sends them to the Minecraft server."""
     log.info("[RCON-QUEUE] Worker started.")
     while True:
+        wait_time = ctx.throttle_time
         commands, source_user = await ctx.rcon_queue.get()
         try:
             if not ctx.queue_active:
@@ -810,6 +811,176 @@ def _deduct_user_points(user, amount):
         return False
 
 
+def _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[COMMENT CMD]"):
+    """Shared comment command processing. Returns True if 'comment' event trigger should be suppressed."""
+    suppress = False
+    if not ctx.comment_cmd_enable or not ctx.comment_cmd_groups:
+        return suppress
+
+    now = time.time()
+    gcd = ctx.comment_cmd_global_cooldown
+    if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
+        remaining = gcd - (now - ctx.comment_cmd_global_last)
+        log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
+        return True
+
+    gucd = ctx.comment_cmd_global_user_cooldown
+    if gucd > 0:
+        last_user = ctx.comment_cmd_global_user_last.get(username, 0)
+        if now - last_user < gucd:
+            remaining = gucd - (now - last_user)
+            log.info(f"{log_prefix} {username} blocked by global user cooldown ({remaining:.1f}s left)")
+            return True
+
+    for group in ctx.comment_cmd_groups:
+        prefix = group["prefix"]
+        if not prefix or not comment_text.startswith(prefix):
+            continue
+        cmd_text = comment_text[len(prefix):].strip()
+        if not cmd_text:
+            continue
+
+        allowed = False
+        if "all" in group["roles"]:
+            allowed = True
+        elif "moderator" in group["roles"] and is_moderator:
+            allowed = True
+        elif "superfan" in group["roles"] and is_super_fan:
+            allowed = True
+        elif "fanclub" in group["roles"] and in_fanclub:
+            allowed = True
+
+        if not allowed:
+            log.info(f"{log_prefix} {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+            if not group.get("trigger_comment_event", True):
+                suppress = True
+            continue
+
+        base_cmd = cmd_text.split()[0].lower()
+        if group["mode"] == "deny-all":
+            if base_cmd not in group["commands"]:
+                log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+        else:
+            if base_cmd in group["commands"]:
+                log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+
+        ccfg = group.get("commands_config", {}).get(base_cmd, {})
+
+        cmd_roles = ccfg.get("roles")
+        if cmd_roles:
+            cmd_allowed = False
+            if "all" in cmd_roles:
+                cmd_allowed = True
+            elif "moderator" in cmd_roles and is_moderator:
+                cmd_allowed = True
+            elif "superfan" in cmd_roles and is_super_fan:
+                cmd_allowed = True
+            elif "fanclub" in cmd_roles and in_fanclub:
+                cmd_allowed = True
+            if not cmd_allowed:
+                log.info(f"{log_prefix} {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+
+        cd = ccfg.get("cooldown", group["cooldown"])
+        ucd = ccfg.get("user_cooldown", group["user_cooldown"])
+        if cd > 0:
+            last = ctx.comment_cmd_last_global.get(prefix, 0)
+            if now - last < cd:
+                remaining = cd - (now - last)
+                log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+        if ucd > 0:
+            last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
+            if now - last_user < ucd:
+                remaining = ucd - (now - last_user)
+                log.info(f"{log_prefix} {username} blocked by user cooldown ({remaining:.1f}s left)")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+
+        points_cost = ccfg.get("points_cost", 0)
+        conditional = ccfg.get("conditional", False)
+
+        if points_cost > 0:
+            balance = _get_user_points(username)
+            if balance < points_cost:
+                log.info(f"{log_prefix} {username} → not enough points for '{base_cmd}' (has {balance}, needs {points_cost})")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+            if not conditional:
+                if not _deduct_user_points(username, points_cost):
+                    log.info(f"{log_prefix} {username} points deduction failed for '{base_cmd}'")
+                    if not group.get("trigger_comment_event", True):
+                        suppress = True
+                    continue
+                log.info(f"{log_prefix} {username} spent {points_cost} points on '{base_cmd}'")
+
+        cmd_url = ccfg.get("url", group["url"])
+        cmd_handler = ccfg.get("handler", group["handler"])
+        log.info(f"{log_prefix} {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
+
+        if not conditional:
+            ctx.comment_cmd_last_global[prefix] = now
+            ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+            ctx.comment_cmd_global_last = now
+            ctx.comment_cmd_global_user_last[username] = now
+
+        if len(ctx.comment_cmd_last_global) > 1000:
+            cutoff = now - 3600
+            ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
+        if len(ctx.comment_cmd_last_user) > 1000:
+            cutoff = now - 3600
+            ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
+
+        if cmd_handler == "rcon":
+            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+        elif cmd_handler == "http" and cmd_url:
+            if conditional:
+                resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
+                if resp_data and resp_data.get("found", False):
+                    ctx.comment_cmd_last_global[prefix] = now
+                    ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                    ctx.comment_cmd_global_last = now
+                    ctx.comment_cmd_global_user_last[username] = now
+                    if points_cost > 0:
+                        if _deduct_user_points(username, points_cost):
+                            log.info(f"{log_prefix} {username} spent {points_cost} points on '{base_cmd}'")
+                        else:
+                            log.info(f"{log_prefix} {username} points deduction failed for '{base_cmd}'")
+                    mode_label = resp_data.get("mode", "replace")
+                    if mode_label == "queue":
+                        log.info(f"{log_prefix} {username} → '{base_cmd}' successful — song added to queue")
+                    else:
+                        log.info(f"{log_prefix} {username} → '{base_cmd}' successful — song found and played")
+                else:
+                    log.info(f"{log_prefix} {username} → '{base_cmd}' song not found — no points deducted, no cooldown triggered")
+            else:
+                import urllib.request, urllib.parse
+                url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
+                url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+                threading.Thread(
+                    target=_dispatch_comment_http,
+                    args=(url, username, cmd_text),
+                    daemon=True
+                ).start()
+
+        if not group.get("trigger_comment_event", True):
+            suppress = True
+
+    return suppress
+
+
 # ==========================================
 # Custom trigger + test comment endpoints
 # ==========================================
@@ -845,148 +1016,7 @@ def handle_test_comment():
                     elif not group_enabled:
                         log.info(f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled")
 
-        if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
-            now = time.time()
-            gcd = ctx.comment_cmd_global_cooldown
-            if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
-                remaining = gcd - (now - ctx.comment_cmd_global_last)
-                log.info(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
-                return {"status": "ok", "message": "Blocked by global cooldown"}
-            gucd = ctx.comment_cmd_global_user_cooldown
-            if gucd > 0:
-                last_user = ctx.comment_cmd_global_user_last.get(username, 0)
-                if now - last_user < gucd:
-                    remaining = gucd - (now - last_user)
-                    log.info(f"[TEST COMMENT] {username} blocked by global user cooldown ({remaining:.1f}s left)")
-                    return {"status": "ok", "message": "Blocked by global user cooldown"}
-            for group in ctx.comment_cmd_groups:
-                prefix = group["prefix"]
-                if not prefix or not comment_text.startswith(prefix):
-                    continue
-                cmd_text = comment_text[len(prefix):].strip()
-                if not cmd_text:
-                    continue
-
-                allowed = False
-                if "all" in group["roles"]:
-                    allowed = True
-                elif "moderator" in group["roles"] and is_moderator:
-                    allowed = True
-                elif "superfan" in group["roles"] and is_super_fan:
-                    allowed = True
-                elif "fanclub" in group["roles"] and in_fanclub:
-                    allowed = True
-
-                if not allowed:
-                    log.info(f"[TEST COMMENT] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
-                    continue
-
-                base_cmd = cmd_text.split()[0].lower()
-                if group["mode"] == "deny-all":
-                    if base_cmd not in group["commands"]:
-                        log.info(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
-                        continue
-                else:
-                    if base_cmd in group["commands"]:
-                        log.info(f"[TEST COMMENT] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
-                        continue
-
-                ccfg = group.get("commands_config", {}).get(base_cmd, {})
-
-                # Per-command role override
-                cmd_roles = ccfg.get("roles")
-                if cmd_roles:
-                    cmd_allowed = False
-                    if "all" in cmd_roles:
-                        cmd_allowed = True
-                    elif "moderator" in cmd_roles and is_moderator:
-                        cmd_allowed = True
-                    elif "superfan" in cmd_roles and is_super_fan:
-                        cmd_allowed = True
-                    elif "fanclub" in cmd_roles and in_fanclub:
-                        cmd_allowed = True
-                    if not cmd_allowed:
-                        log.info(f"[TEST COMMENT] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
-                        continue
-
-                cd = ccfg.get("cooldown", group["cooldown"])
-                ucd = ccfg.get("user_cooldown", group["user_cooldown"])
-                if cd > 0:
-                    last = ctx.comment_cmd_last_global.get(prefix, 0)
-                    if now - last < cd:
-                        remaining = cd - (now - last)
-                        log.info(f"[TEST COMMENT] {username} blocked by global cooldown ({remaining:.1f}s left)")
-                        continue
-                if ucd > 0:
-                    last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
-                    if now - last_user < ucd:
-                        remaining = ucd - (now - last_user)
-                        log.info(f"[TEST COMMENT] {username} blocked by user cooldown ({remaining:.1f}s left)")
-                        continue
-
-                # Points check & deduction
-                points_cost = ccfg.get("points_cost", 0)
-                conditional = ccfg.get("conditional", False)
-
-                if points_cost > 0:
-                    balance = _get_user_points(username)
-                    if balance < points_cost:
-                        log.info(f"[TEST COMMENT] {username} → not enough points for '{base_cmd}' (has {balance}, needs {points_cost})")
-                        continue
-                    if not conditional:
-                        if not _deduct_user_points(username, points_cost):
-                            log.info(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
-                            continue
-                        log.info(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
-
-                cmd_url = ccfg.get("url", group["url"])
-                cmd_handler = ccfg.get("handler", group["handler"])
-                log.info(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
-
-                if not conditional:
-                    ctx.comment_cmd_last_global[prefix] = now
-                    ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                    ctx.comment_cmd_global_last = now
-                    ctx.comment_cmd_global_user_last[username] = now
-
-                if len(ctx.comment_cmd_last_global) > 1000:
-                    cutoff = now - 3600
-                    ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
-                if len(ctx.comment_cmd_last_user) > 1000:
-                    cutoff = now - 3600
-                    ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
-
-                if cmd_handler == "rcon":
-                    ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
-                elif cmd_handler == "http" and cmd_url:
-                    if conditional:
-                        resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
-                        if resp_data and resp_data.get("found", False):
-                            ctx.comment_cmd_last_global[prefix] = now
-                            ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                            ctx.comment_cmd_global_last = now
-                            ctx.comment_cmd_global_user_last[username] = now
-                            if points_cost > 0:
-                                if _deduct_user_points(username, points_cost):
-                                    log.info(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
-                                else:
-                                    log.info(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
-                            mode_label = resp_data.get("mode", "replace")
-                            if mode_label == "queue":
-                                log.info(f"[TEST COMMENT] {username} → '{base_cmd}' successful — song added to queue")
-                            else:
-                                log.info(f"[TEST COMMENT] {username} → '{base_cmd}' successful — song found and played")
-                        else:
-                            log.info(f"[TEST COMMENT] {username} → '{base_cmd}' song not found — no points deducted, no cooldown triggered")
-                    else:
-                        import urllib.request, urllib.parse
-                        url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
-                        url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
-                        threading.Thread(
-                            target=_dispatch_comment_http,
-                            args=(url, username, cmd_text),
-                            daemon=True
-                        ).start()
+        _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[TEST COMMENT]")
 
         return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
 
@@ -1430,165 +1460,7 @@ def create_client(user):
                     elif not group_enabled:
                         log.info(f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled")
 
-        suppress_comment_trigger = False
-        if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
-            now = time.time()
-            gcd = ctx.comment_cmd_global_cooldown
-            if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
-                remaining = gcd - (now - ctx.comment_cmd_global_last)
-                log.info(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
-                return
-            gucd = ctx.comment_cmd_global_user_cooldown
-            if gucd > 0:
-                last_user = ctx.comment_cmd_global_user_last.get(username, 0)
-                if now - last_user < gucd:
-                    remaining = gucd - (now - last_user)
-                    log.info(f"[COMMENT CMD] {username} blocked by global user cooldown ({remaining:.1f}s left)")
-                    return
-            for group in ctx.comment_cmd_groups:
-                prefix = group["prefix"]
-                if not prefix or not comment_text.startswith(prefix):
-                    continue
-                cmd_text = comment_text[len(prefix):].strip()
-                if not cmd_text:
-                    continue
-
-                allowed = False
-                if "all" in group["roles"]:
-                    allowed = True
-                elif "moderator" in group["roles"] and is_moderator:
-                    allowed = True
-                elif "superfan" in group["roles"] and is_super_fan:
-                    allowed = True
-                elif "fanclub" in group["roles"] and in_fanclub:
-                    allowed = True
-
-                if not allowed:
-                    log.info(f"[COMMENT CMD] {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
-                    if not group.get("trigger_comment_event", True):
-                        suppress_comment_trigger = True
-                    continue
-
-                base_cmd = cmd_text.split()[0].lower()
-                if group["mode"] == "deny-all":
-                    if base_cmd not in group["commands"]:
-                        log.info(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-                else:
-                    if base_cmd in group["commands"]:
-                        log.info(f"[COMMENT CMD] {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-
-                ccfg = group.get("commands_config", {}).get(base_cmd, {})
-
-                # Per-command role override
-                cmd_roles = ccfg.get("roles")
-                if cmd_roles:
-                    cmd_allowed = False
-                    if "all" in cmd_roles:
-                        cmd_allowed = True
-                    elif "moderator" in cmd_roles and is_moderator:
-                        cmd_allowed = True
-                    elif "superfan" in cmd_roles and is_super_fan:
-                        cmd_allowed = True
-                    elif "fanclub" in cmd_roles and in_fanclub:
-                        cmd_allowed = True
-                    if not cmd_allowed:
-                        log.info(f"[COMMENT CMD] {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-
-                cd = ccfg.get("cooldown", group["cooldown"])
-                ucd = ccfg.get("user_cooldown", group["user_cooldown"])
-                if cd > 0:
-                    last = ctx.comment_cmd_last_global.get(prefix, 0)
-                    if now - last < cd:
-                        remaining = cd - (now - last)
-                        log.info(f"[COMMENT CMD] {username} blocked by global cooldown ({remaining:.1f}s left)")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-                if ucd > 0:
-                    last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
-                    if now - last_user < ucd:
-                        remaining = ucd - (now - last_user)
-                        log.info(f"[COMMENT CMD] {username} blocked by user cooldown ({remaining:.1f}s left)")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-
-                # Points check & deduction
-                points_cost = ccfg.get("points_cost", 0)
-                conditional = ccfg.get("conditional", False)
-
-                if points_cost > 0:
-                    balance = _get_user_points(username)
-                    if balance < points_cost:
-                        log.info(f"[COMMENT CMD] {username} → not enough points for '{base_cmd}' (has {balance}, needs {points_cost})")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-                    if not conditional:
-                        if not _deduct_user_points(username, points_cost):
-                            log.info(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
-                            if not group.get("trigger_comment_event", True):
-                                suppress_comment_trigger = True
-                            continue
-                        log.info(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
-
-                cmd_url = ccfg.get("url", group["url"])
-                cmd_handler = ccfg.get("handler", group["handler"])
-                log.info(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
-
-                if not conditional:
-                    ctx.comment_cmd_last_global[prefix] = now
-                    ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                    ctx.comment_cmd_global_last = now
-                    ctx.comment_cmd_global_user_last[username] = now
-
-                if len(ctx.comment_cmd_last_global) > 1000:
-                    cutoff = now - 3600
-                    ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
-                if len(ctx.comment_cmd_last_user) > 1000:
-                    cutoff = now - 3600
-                    ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
-
-                if cmd_handler == "rcon":
-                    ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
-                elif cmd_handler == "http" and cmd_url:
-                    if conditional:
-                        resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
-                        if resp_data and resp_data.get("found", False):
-                            ctx.comment_cmd_last_global[prefix] = now
-                            ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                            ctx.comment_cmd_global_last = now
-                            ctx.comment_cmd_global_user_last[username] = now
-                            if points_cost > 0:
-                                if _deduct_user_points(username, points_cost):
-                                    log.info(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
-                                else:
-                                    log.info(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
-                            mode_label = resp_data.get("mode", "replace")
-                            if mode_label == "queue":
-                                log.info(f"[COMMENT CMD] {username} → '{base_cmd}' successful — song added to queue")
-                            else:
-                                log.info(f"[COMMENT CMD] {username} → '{base_cmd}' successful — song found and played")
-                        else:
-                            log.info(f"[COMMENT CMD] {username} → '{base_cmd}' song not found — no points deducted, no cooldown triggered")
-                    else:
-                        threading.Thread(
-                            target=_dispatch_comment_http,
-                            args=(cmd_url, username, cmd_text),
-                            daemon=True
-                        ).start()
-
-                if not group.get("trigger_comment_event", True):
-                    suppress_comment_trigger = True
+        suppress_comment_trigger = _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[COMMENT CMD]")
 
         if "comment" in ctx.valid_functions and not suppress_comment_trigger:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
@@ -1693,6 +1565,7 @@ async def run_bot():
             await asyncio.sleep(ctx.reconnect_delay)
             continue
 
+        ctx.start_likes = None
         client = create_client(ctx.tiktok_user)
 
         try:

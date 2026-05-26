@@ -13,6 +13,7 @@ import shutil
 import zipfile
 import tarfile
 import requests
+import subprocess
 import re
 import time
 import io
@@ -114,14 +115,6 @@ WHITELIST_FILES = {
 GITHUB_USER = "TechnikLey"
 GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
-
-try:
-    with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-except Exception as e:
-    log.info(f"Error loading config: {e}")
-    wait_for_key()
-    sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
 
@@ -361,7 +354,7 @@ def run_update():
             log.error("[FAIL] No matching release asset found for this platform.")
             sys.exit(5)
 
-        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR)
+        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
         TEMP_DIR.mkdir(parents=True)
         archive_path = TEMP_DIR / archive_name
         download_with_progress(asset["url"], archive_path)
@@ -407,8 +400,11 @@ def run_update():
             log.info("Starting new updater and resuming tool update...")
             # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
-            os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
-            sys.exit(0)  # Safety fallback
+            if sys.platform == "win32":
+                subprocess.Popen([str(new_up_dest), "--resume", str(extracted_root_path)])
+            else:
+                os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
+            sys.exit(0)
 
     log.info(f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update...")
 
@@ -417,7 +413,10 @@ def run_update():
     # ==========================================
     # Signal the start script to shut down so files are unlocked
     signal_file = BASE_DIR / "update_signal.tmp"
-    signal_file.write_text("kill")
+    try:
+        signal_file.write_text("kill")
+    except Exception as e:
+        log.warning(f"Could not write signal file: {e}")
     # Wait for start script to consume the signal (file deleted) or timeout
     for _ in range(30):
         if not signal_file.exists():
@@ -480,8 +479,11 @@ def run_update():
     if CONFIG_UPDATE_ENABLE: 
         migrate_config_if_needed()
 
-    if (BASE_DIR / "update_signal.tmp").exists():
-        (BASE_DIR / "update_signal.tmp").unlink()
+    try:
+        if (BASE_DIR / "update_signal.tmp").exists():
+            (BASE_DIR / "update_signal.tmp").unlink()
+    except Exception as e:
+        log.warning(f"Could not remove signal file: {e}")
 
     log.info("\nUpdate complete.")
     wait_for_key()

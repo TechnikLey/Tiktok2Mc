@@ -328,19 +328,23 @@ auth_state = None
 class OverlayClients:
     def __init__(self):
         self.listeners = []
+        self._lock = threading.Lock()
 
     def add(self, q):
-        self.listeners.append(q)
+        with self._lock:
+            self.listeners.append(q)
 
     def remove(self, q):
-        try:
-            self.listeners.remove(q)
-        except ValueError:
-            pass
+        with self._lock:
+            try:
+                self.listeners.remove(q)
+            except ValueError:
+                pass
 
     def notify(self, data):
-        for q in self.listeners:
-            q.put(data)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(data)
 
     def notify_auth(self, success):
         self.notify({"type": "auth", "success": success})
@@ -350,6 +354,7 @@ overlay_clients = OverlayClients()
 
 
 _last_track_id = None
+_last_track_lock = threading.Lock()
 
 
 def _notify_overlay():
@@ -366,15 +371,16 @@ def _notify_overlay():
             return
     track = _format_track(data)
     track["type"] = "track"
-    if track["id"] and track["id"] != _last_track_id:
-        _last_track_id = track["id"]
-        progress_ms = track.get("progress_ms", 0)
-        track["progress_ms"] = 0
-        track["progress_sec"] = 0
-        pct = progress_ms / track["duration_ms"] * 100 if track.get("duration_ms") else 0
-        if pct < 90:
-            track["progress_ms"] = progress_ms
-            track["progress_sec"] = progress_ms // 1000
+    with _last_track_lock:
+        if track["id"] and track["id"] != _last_track_id:
+            _last_track_id = track["id"]
+            progress_ms = track.get("progress_ms", 0)
+            track["progress_ms"] = 0
+            track["progress_sec"] = 0
+            pct = progress_ms / track["duration_ms"] * 100 if track.get("duration_ms") else 0
+            if pct < 90:
+                track["progress_ms"] = progress_ms
+                track["progress_sec"] = progress_ms // 1000
     overlay_clients.notify(track)
 
 

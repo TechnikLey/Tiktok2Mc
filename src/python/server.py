@@ -8,6 +8,7 @@ import urllib.request
 from pathlib import Path
 from core.paths import get_base_dir
 import logging
+import yaml
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)

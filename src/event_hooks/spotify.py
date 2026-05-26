@@ -25,14 +25,17 @@ from core.hook_api import HookAPI
 import logging
 log = logging.getLogger(__name__)
 
-PLUGIN_PORT = 29194
-PLUGIN_BASE = f"http://127.0.0.1:{PLUGIN_PORT}"
+
+def _get_plugin_base(api):
+    port = api.config.get("spotify", {}).get("port", 29194)
+    return f"http://127.0.0.1:{port}"
 
 
-def _request(method, path, **kwargs):
+def _request(api, method, path, **kwargs):
     try:
         import requests
-        resp = requests.request(method, f"{PLUGIN_BASE}{path}", timeout=5, **kwargs)
+        base = _get_plugin_base(api)
+        resp = requests.request(method, f"{base}{path}", timeout=5, **kwargs)
         if resp.status_code in (200, 204):
             return resp.json() if resp.status_code == 200 else {}
         return None
@@ -44,7 +47,7 @@ def _request(method, path, **kwargs):
 
 
 def _cmd_post(api, user, path, action_name):
-    result = _request("POST", path)
+    result = _request(api, "POST", path)
     if result is not None:
         api.send_overlay_text(
             title="Spotify",
@@ -54,7 +57,7 @@ def _cmd_post(api, user, path, action_name):
 
 
 def _cmd_current(api, user):
-    track = _request("GET", "/current")
+    track = _request(api, "GET", "/current")
     if track and "name" in track:
         progress = track.get("progress_sec", 0)
         duration = track.get("duration_sec", 0)

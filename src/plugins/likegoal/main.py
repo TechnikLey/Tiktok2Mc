@@ -92,29 +92,28 @@ class LikeManager:
         self.goal = initial_goal
         self.previous_goal = 0
         self.listeners = []
+        self._lock = threading.Lock()
 
     def add_likes(self, amount=1):
         self.likes += amount
         while self.likes >= self.goal:
             if self.multiplier == 0:
-                # Reset mode: start over from zero
                 self.likes = 0
                 self.goal = self.initial_goal
                 self.previous_goal = 0
             elif self.multiplier == 1:
-                # Step mode: increase goal by InitialGoal
                 self.previous_goal = self.goal
                 self.goal += self.initial_goal
             else:
-                # Multiply mode: multiply goal
                 self.previous_goal = self.goal
                 self.goal = int(self.goal * self.multiplier)
         self._notify()
 
     def _notify(self):
         data = self.get_data()
-        for q in self.listeners:
-            q.put(data)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(data)
 
     def get_data(self):
         segment_size = self.goal - self.previous_goal
@@ -255,7 +254,8 @@ def update_likes():
 @app.route("/stream")
 def stream():
     q = Queue()
-    like_manager.listeners.append(q)
+    with like_manager._lock:
+        like_manager.listeners.append(q)
     def event_stream():
         try:
             yield f"data: {json.dumps(like_manager.get_data())}\n\n"
@@ -268,8 +268,9 @@ def stream():
         except GeneratorExit:
             pass
         finally:
-            try: like_manager.listeners.remove(q)
-            except ValueError: pass
+            with like_manager._lock:
+                try: like_manager.listeners.remove(q)
+                except ValueError: pass
     return Response(event_stream(), mimetype="text/event-stream")
 
 def run_flask():

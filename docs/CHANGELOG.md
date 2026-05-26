@@ -75,13 +75,18 @@ Each version is split into two sections:
 * **Datapack root validation** — The datapack generator now checks whether the target folder exists and is a directory before building. If the path is invalid, you get a clear error message instead of a silent failure.
 
 ### Fixed
+* **Plugin overlays more stable under load** — Fixed rare crashes in Death Counter, Like Goal, Win Counter, and Spotify overlays when multiple browser tabs or OBS sources connected at the same time. SSE streams now handle concurrent connections reliably.
+* **Spotify event hook now respects your configured port** — The Spotify hook no longer hardcodes port `29194`. It reads your actual port from `config.yaml`, so custom port setups work correctly again.
+* **Comment command fixes** — HTTP-based comment commands now send the right data to external services instead of garbled parameters. Denied command logs also now show the correct command text instead of an empty placeholder.
+* **Better updater reliability on Windows** — The updater now uses the correct process mechanism on Windows instead of a Unix-only approach that silently failed. Signal file errors during updates are also handled gracefully instead of crashing.
+* **Validator error messages improved** — Bracket mismatch errors now point to the exact position of the problem instead of vaguely marking the whole line. Error messages are now consistently in English. Colons inside commands like `/say hello:world` are no longer falsely flagged.
+* **Graceful fallbacks for edge cases** — Fixed cases where the tool could crash on plugin directory detection in certain Python environments, when a hook file fails to parse, or when `wait_time` wasn't properly initialized.
 * **Like goal no longer skips or duplicates during like bursts** — Fixed a timing issue where rapid like events could interfere with each other, causing triggered actions to be missed or sent twice.
 * **Gift revenue saving no longer slows everything down** — The bot now saves revenue data in the background without blocking chat, likes, or other live interactions.
 * **Special characters no longer cause crashes** — Fixed missing text encoding in death counter, timer, and win counter plugins. Usernames and content with emojis or accented letters now save and load correctly.
 * **Like goal config values with quotes handled correctly** — If the like goal settings contain numbers stored as text (e.g. `"100000"` instead of `100000`), the tool now handles them properly instead of throwing an error.
 * **Timer plugin uses fewer system resources** — The countdown reset now manages its background tasks more efficiently when the timer repeatedly hits zero.
 * **Build system exclusions now reliable** — The release build script correctly excludes files using all glob patterns, not just simple ones.
-
 * **Validation results checked more robustly** — Fixed internal comparisons in validation checks to use proper type-safe comparisons instead of string matching.
 * **GUI module no longer crashes on startup** — Fixed a missing import that prevented the configuration GUI from loading at all.
 * **Upload script messages now visible** — The upload script's progress messages are now actually displayed in the console instead of being silently discarded.
@@ -140,7 +145,12 @@ Each version is split into two sections:
 * **Role checks more reliable** — Fixed an edge case where moderator and superfan permission checks could behave unexpectedly when role information was missing from a viewer event.
 * **Validator no longer complains about `!` in normal text** — The actions file validator sometimes flagged commands like `/say Hello!` as errors because it thought the `!` was a misplaced command prefix. This has been cleaned up – `!` is now only treated as a prefix when it's the very first character of a command, exactly as intended.
 * **Validator no longer mistakes trailing whitespace for extra colons** — If a line in your actions file had a harmless trailing space after the command, the validator could show a confusing "trailing colons" error. That false alarm is gone.
+* **Validator no longer flags colons inside commands** — If a command legitimately contained a colon (e.g. `/say hello:world`), the validator could wrongly report it as a trailing colon error. That's been cleaned up — colons inside commands are now ignored.
+* **Better bracket mismatch detection** — When brackets don't match up, the validator now points to the exact position of the problem instead of vaguely marking the whole line. Makes it much easier to spot where a `]` or `}` is out of place.
+* **Validator error messages now fully in English** — Removed a mixed-language error message that previously showed German text alongside English. All validator messages are now consistently in English.
 * **Random trigger fallback more robust** — When the `$random` hook couldn't find a username, it could show a garbled internal representation instead of a clean fallback. Now it reliably falls back to `"Unknown"`.
+* **Updater works with installation paths containing spaces on Windows** — Fixed an issue where the updater could fail to complete a self-update when the tool was installed in a directory with spaces (like `Program Files`).
+* **More robust update cleanup** — The updater now handles locked temporary files and update signal errors gracefully instead of crashing during cleanup.
 
 ---
 
