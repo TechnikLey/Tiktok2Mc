@@ -57,6 +57,8 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
       - [How Viewers Earn Points](#how-viewers-earn-points)
       - [Overlay](#overlay)
       - [Per-Command Points Cost, Cooldown \& Roles](#per-command-points-cost-cooldown--roles)
+      - [Global Cooldown (Cross-Group)](#global-cooldown-cross-group)
+    - [Follow Tracking](#follow-tracking)
     - [Multiple Overlays](#multiple-overlays)
     - [VS Code Extension for .mca Files](#vs-code-extension-for-mca-files)
   - [Maintenance](#maintenance)
@@ -594,6 +596,7 @@ Lets viewers control Spotify playback through TikTok chat comments and events. D
      enabled: true
      client_id: "YOUR_CLIENT_ID"
      client_secret: "YOUR_CLIENT_SECRET"
+     playtrack_mode: "replace"     # "replace" — play immediately, "queue" — add to queue
    ```
 
 3. **Start the plugin & log in:**
@@ -602,7 +605,12 @@ Lets viewers control Spotify playback through TikTok chat comments and events. D
 
 #### Chat Commands via comment_commands
 
-The default `config.yaml` includes a `$` group for Spotify chat control (see `comment_commands` section). Viewers type `$play`, `$pause`, `$skip`, `$prev`, `$volume 50`, `$save`, `$shuffle`, `$repeat`, `$current`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for details.
+The default `config.yaml` includes a `$` group for Spotify chat control (see `comment_commands` section). Viewers type `$play`, `$pause`, `$skip`, `$prev`, `$volume 50`, `$save`, `$shuffle`, `$repeat`, `$current`, `$playtrack Artist - Song`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for details.
+
+- **`$playtrack`** — Searches Spotify for the given artist and song, then either plays it immediately or adds it to the queue (configured via `spotify.playtrack_mode` in `config.yaml`). Unlike other commands, if the song is not found, no channel points are deducted and no cooldowns are triggered. Requires `comment_commands.commands_config.playtrack.conditional: true` to enable this safe-fail behavior.
+
+> [!IMPORTANT]
+> **Viewer feedback limitations** — TikTok chat is a one-way input: the tool can receive commands but cannot reply directly to a viewer. This means there is currently no built-in way to tell a viewer whether their `$playtrack` succeeded, why their points weren't deducted, or how many points they have left. While you could build custom overlay feedback using `>>` in `actions.mca`, this approach does not scale well — on busy streams with frequent commands, overlays can pile up or get overwritten, causing viewer confusion rather than clarity. A per-user notification system (whisper-style) is not feasible within TikTok's event model. For now there is no optimal solution that works across all stream sizes.
 
 #### Direct Trigger Actions (for actions.mca)
 
@@ -685,6 +693,7 @@ commands:
   - repeat
   - shuffle
   - current
+  - playtrack
 
 commands_config:
   skip:
@@ -692,11 +701,19 @@ commands_config:
     cooldown: 30           # 30s between any $skip
   prev:
     points_cost: 20
+  playtrack:
+    points_cost: 50
+    cooldown: 30
+    conditional: true      # points & cooldowns only apply if song is found
+    url: "http://127.0.0.1:{spotify_port}/playtrack?user={user}&text={text}"
+    handler: http
   volume:
     roles: [moderator]     # only moderators
 ```
 
 When a viewer uses `$skip`, the system checks their balance, deducts the cost, applies the cooldown, and dispatches the command.
+
+**Conditional commands** (like `$playtrack`) behave differently: the system first sends the request to the plugin, waits for the response, and only deducts points and applies cooldowns if the song was found. If the song could not be found, nothing is deducted and no cooldown fires — the viewer can try again immediately.
 
 #### Global Cooldown (Cross-Group)
 

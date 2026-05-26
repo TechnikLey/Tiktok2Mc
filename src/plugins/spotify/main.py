@@ -56,6 +56,7 @@ try:
         REDIRECT_URI = SPOTIFY_CFG.get("redirect_uri", f"http://127.0.0.1:{SPOTIFY_PORT}/callback")
         DEVICE_ID = SPOTIFY_CFG.get("device_id", "")
         VOLUME_STEP = SPOTIFY_CFG.get("volume_step", 10)
+        PLAYTRACK_MODE = SPOTIFY_CFG.get("playtrack_mode", "replace")
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
     log.info(f"Config error: {e}")
@@ -65,6 +66,7 @@ except Exception as e:
     REDIRECT_URI = f"http://127.0.0.1:{SPOTIFY_PORT}/callback"
     DEVICE_ID = ""
     VOLUME_STEP = 10
+    PLAYTRACK_MODE = "replace"
     SERVER_HOST = "127.0.0.1"
 
 SPOTIFY_EXE_PATH = get_base_file()
@@ -276,6 +278,38 @@ class SpotifyClient:
                 return self._request("PUT", "/me/player", json={"device_ids": [did]})
             return None
         return self._request("PUT", "/me/player", json={"device_ids": [DEVICE_ID]})
+
+    def search_track(self, query):
+        params = {"q": query, "type": "track", "limit": 1}
+        url = f"{SPOTIFY_API}/search"
+        if not self._ensure_token():
+            return None
+        try:
+            resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
+            if resp.status_code == 200:
+                return resp.json()
+            if resp.status_code == 401 and self.refresh_access_token():
+                resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
+                if resp.status_code == 200:
+                    return resp.json()
+            log.info(f"[SPOTIFY] Search API error {resp.status_code}: {resp.text[:200]}")
+            return None
+        except Exception as e:
+            log.info(f"[SPOTIFY] Search error: {e}")
+            return None
+
+    def play_specific(self, track_uri):
+        kwargs = {"json": {"uris": [track_uri]}}
+        if DEVICE_ID:
+            kwargs["json"]["device_ids"] = [DEVICE_ID]
+        return self._request("PUT", "/me/player/play", **kwargs)
+
+    def queue_track(self, track_uri):
+        import urllib.parse
+        params = f"uri={urllib.parse.quote(track_uri, safe='')}"
+        if DEVICE_ID:
+            params += f"&device_id={urllib.parse.quote(DEVICE_ID, safe='')}"
+        return self._request("POST", f"/me/player/queue?{params}")
 
 
 spotify = SpotifyClient(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI)
@@ -531,6 +565,74 @@ def cmd_save():
     return jsonify({"status": "ok"})
 
 
+@app.route("/playtrack", methods=["POST"])
+def cmd_playtrack():
+    if not spotify.is_authenticated:
+        log.info(f"[PLAYTRACK] Cannot search — Spotify not authenticated")
+        return jsonify({"error": "not_authenticated", "found": False}), 401
+    text = request.args.get("text", "").strip()
+    if not text:
+        log.info(f"[PLAYTRACK] Missing search text")
+        return jsonify({"error": "missing text", "found": False}), 400
+
+    if text.lower().startswith("playtrack"):
+        text = text[len("playtrack"):].strip()
+
+    parts = text.split(" - ", maxsplit=1)
+    if len(parts) < 2:
+        artist = ""
+        song = text
+    else:
+        artist = parts[0].strip()
+        song = parts[1].strip()
+
+    log.info(f"[PLAYTRACK] Searching — artist: '{artist}', song: '{song}'")
+
+    query_parts = []
+    if artist:
+        query_parts.append(f"artist:{artist}")
+    if song:
+        query_parts.append(f"track:{song}")
+    query = " ".join(query_parts)
+
+    result = spotify.search_track(query)
+    if not result:
+        query = f"{artist} - {song}" if artist else song
+        log.info(f"[PLAYTRACK] Structured search returned nothing, retrying with plain text: '{query}'")
+        result = spotify.search_track(query)
+
+    if not result or not result.get("tracks", {}).get("items"):
+        log.info(f"[PLAYTRACK] No results found for '{artist} - {song}'")
+        return jsonify({"status": "not_found", "found": False})
+
+    track = result["tracks"]["items"][0]
+    track_name = track["name"]
+    track_artists = ", ".join(a["name"] for a in track["artists"])
+    track_uri = track["uri"]
+    log.info(f"[PLAYTRACK] Found track — '{track_name}' by {track_artists}")
+
+    if PLAYTRACK_MODE == "queue":
+        log.info(f"[PLAYTRACK] Queuing track (playtrack_mode=queue)")
+        spotify.queue_track(track_uri)
+    else:
+        log.info(f"[PLAYTRACK] Playing track now (playtrack_mode=replace)")
+        spotify.play_specific(track_uri)
+
+    time.sleep(0.5)
+    _notify_overlay()
+
+    return jsonify({
+        "status": "ok",
+        "found": True,
+        "mode": PLAYTRACK_MODE,
+        "track": {
+            "name": track_name,
+            "artists": track_artists,
+            "uri": track_uri,
+        }
+    })
+
+
 @app.route("/comment", methods=["POST"])
 def cmd_comment():
     user = request.args.get("user", "Unknown")
@@ -575,6 +677,8 @@ def cmd_comment():
         spotify.set_repeat(order[next_idx])
     elif command in ("current", "song", "track"):
         return current_track()
+    elif command == "playtrack":
+        return cmd_playtrack()
     else:
         return jsonify({"error": "unknown_command"}), 400
     return jsonify({"status": "ok"})
@@ -666,12 +770,20 @@ HTML_OVERLAY = """<!DOCTYPE html>
     #progress-wrap {
         margin-top: min(6.7vh, 16px);
         height: min(3.3vh, 8px);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+    }
+    #progress-wrap::before {
+        content: '';
+        position: absolute;
+        inset: 0;
         background: var(--text);
         opacity: 0.15;
         border-radius: 2px;
-        overflow: hidden;
     }
     #progress-bar {
+        position: relative;
         height: 100%;
         width: 0%;
         background: linear-gradient(90deg, var(--accent), var(--accent2));

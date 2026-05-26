@@ -75,6 +75,7 @@ class BotContext:
         # Comment commands
         self.comment_cmd_enable = False
         self.comment_cmd_groups = []
+        self.comment_cmd_all_prefixes = set()
         self.comment_cmd_global_cooldown = 0
         self.comment_cmd_global_last = 0.0
         self.comment_cmd_global_user_cooldown = 0
@@ -241,9 +242,11 @@ def load_config():
             }]
             log.info("[CONFIG] comment_commands: using legacy single-group format")
         ctx.comment_cmd_groups = []
+        ctx.comment_cmd_all_prefixes = set()
         seen_prefixes = set()
         for g in raw_groups:
             prefix = str(g.get("prefix", "#"))
+            ctx.comment_cmd_all_prefixes.add(prefix)
             enabled = bool(g.get("enabled", True))
             if not enabled:
                 log.info(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
@@ -712,6 +715,23 @@ def _dispatch_comment_http(url_template, username, cmd_text):
         log.info(f"[COMMENT CMD] HTTP dispatch failed: {e}")
 
 
+def _dispatch_comment_http_sync(url_template, username, cmd_text):
+    """Sends a conditional HTTP command and returns the JSON response.
+    Returns None on failure."""
+    import urllib.request
+    import urllib.parse
+    import json
+    try:
+        url = url_template.replace("{user}", urllib.parse.quote(username, safe=""))
+        url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+        req = urllib.request.Request(url, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        log.info(f"[COMMENT CMD] Conditional HTTP dispatch failed: {e}")
+        return None
+
+
 def _ping_channel_points(user):
     """Pings the channel points plugin to mark a user as active."""
     if not ctx.config.get("channel_points", {}).get("enabled", False):
@@ -785,6 +805,21 @@ def handle_test_comment():
 
         log.info(f"[TEST COMMENT] {username}: {comment_text}")
         log.info(f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}")
+
+        if ctx.comment_cmd_all_prefixes:
+            matched_prefix = None
+            for p in ctx.comment_cmd_all_prefixes:
+                if comment_text.startswith(p):
+                    matched_prefix = p
+                    break
+            if matched_prefix:
+                cmd_part = comment_text[len(matched_prefix):].strip()
+                if cmd_part:
+                    group_enabled = any(g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups)
+                    if not ctx.comment_cmd_enable:
+                        log.info(f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally")
+                    elif not group_enabled:
+                        log.info(f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled")
 
         if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
             now = time.time()
@@ -867,36 +902,60 @@ def handle_test_comment():
 
                 # Points check & deduction
                 points_cost = ccfg.get("points_cost", 0)
+                conditional = ccfg.get("conditional", False)
+
                 if points_cost > 0:
                     balance = _get_user_points(username)
                     if balance < points_cost:
-                        log.info(f"[TEST COMMENT] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
+                        log.info(f"[TEST COMMENT] {username} → not enough points for '{base_cmd}' (has {balance}, needs {points_cost})")
                         continue
-                    if not _deduct_user_points(username, points_cost):
-                        log.info(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
-                        continue
-                    log.info(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
+                    if not conditional:
+                        if not _deduct_user_points(username, points_cost):
+                            log.info(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
+                            continue
+                        log.info(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
 
                 cmd_url = ccfg.get("url", group["url"])
                 cmd_handler = ccfg.get("handler", group["handler"])
                 log.info(f"[TEST COMMENT] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
 
-                ctx.comment_cmd_last_global[prefix] = now
-                ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                ctx.comment_cmd_global_last = now
-                ctx.comment_cmd_global_user_last[username] = now
+                if not conditional:
+                    ctx.comment_cmd_last_global[prefix] = now
+                    ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                    ctx.comment_cmd_global_last = now
+                    ctx.comment_cmd_global_user_last[username] = now
 
                 if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
                 elif cmd_handler == "http" and cmd_url:
-                    import urllib.request, urllib.parse
-                    url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
-                    url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
-                    threading.Thread(
-                        target=_dispatch_comment_http,
-                        args=(url, username, cmd_text),
-                        daemon=True
-                    ).start()
+                    if conditional:
+                        resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
+                        if resp_data and resp_data.get("found", False):
+                            ctx.comment_cmd_last_global[prefix] = now
+                            ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                            ctx.comment_cmd_global_last = now
+                            ctx.comment_cmd_global_user_last[username] = now
+                            if points_cost > 0:
+                                if _deduct_user_points(username, points_cost):
+                                    log.info(f"[TEST COMMENT] {username} spent {points_cost} points on '{base_cmd}'")
+                                else:
+                                    log.info(f"[TEST COMMENT] {username} points deduction failed for '{base_cmd}'")
+                            mode_label = resp_data.get("mode", "replace")
+                            if mode_label == "queue":
+                                log.info(f"[TEST COMMENT] {username} → '{base_cmd}' successful — song added to queue")
+                            else:
+                                log.info(f"[TEST COMMENT] {username} → '{base_cmd}' successful — song found and played")
+                        else:
+                            log.info(f"[TEST COMMENT] {username} → '{base_cmd}' song not found — no points deducted, no cooldown triggered")
+                    else:
+                        import urllib.request, urllib.parse
+                        url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
+                        url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+                        threading.Thread(
+                            target=_dispatch_comment_http,
+                            args=(url, username, cmd_text),
+                            daemon=True
+                        ).start()
 
         return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
 
@@ -1324,6 +1383,21 @@ def create_client(user):
         log.info(f"  Fanclub-Mitglied: {in_fanclub}")
         log.info(f"  Moderator: {is_moderator}")
 
+        if ctx.comment_cmd_all_prefixes:
+            matched_prefix = None
+            for p in ctx.comment_cmd_all_prefixes:
+                if comment_text.startswith(p):
+                    matched_prefix = p
+                    break
+            if matched_prefix:
+                cmd_part = comment_text[len(matched_prefix):].strip()
+                if cmd_part:
+                    group_enabled = any(g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups)
+                    if not ctx.comment_cmd_enable:
+                        log.info(f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally")
+                    elif not group_enabled:
+                        log.info(f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled")
+
         suppress_comment_trigger = False
         if ctx.comment_cmd_enable and ctx.comment_cmd_groups:
             now = time.time()
@@ -1418,37 +1492,61 @@ def create_client(user):
 
                 # Points check & deduction
                 points_cost = ccfg.get("points_cost", 0)
+                conditional = ccfg.get("conditional", False)
+
                 if points_cost > 0:
                     balance = _get_user_points(username)
                     if balance < points_cost:
-                        log.info(f"[COMMENT CMD] {username} needs {points_cost} points for '{base_cmd}', has {balance}")
+                        log.info(f"[COMMENT CMD] {username} → not enough points for '{base_cmd}' (has {balance}, needs {points_cost})")
                         if not group.get("trigger_comment_event", True):
                             suppress_comment_trigger = True
                         continue
-                    if not _deduct_user_points(username, points_cost):
-                        log.info(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
-                        if not group.get("trigger_comment_event", True):
-                            suppress_comment_trigger = True
-                        continue
-                    log.info(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
+                    if not conditional:
+                        if not _deduct_user_points(username, points_cost):
+                            log.info(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
+                            if not group.get("trigger_comment_event", True):
+                                suppress_comment_trigger = True
+                            continue
+                        log.info(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
 
                 cmd_url = ccfg.get("url", group["url"])
                 cmd_handler = ccfg.get("handler", group["handler"])
                 log.info(f"[COMMENT CMD] {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
 
-                ctx.comment_cmd_last_global[prefix] = now
-                ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                ctx.comment_cmd_global_last = now
-                ctx.comment_cmd_global_user_last[username] = now
+                if not conditional:
+                    ctx.comment_cmd_last_global[prefix] = now
+                    ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                    ctx.comment_cmd_global_last = now
+                    ctx.comment_cmd_global_user_last[username] = now
 
                 if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
                 elif cmd_handler == "http" and cmd_url:
-                    threading.Thread(
-                        target=_dispatch_comment_http,
-                        args=(cmd_url, username, cmd_text),
-                        daemon=True
-                    ).start()
+                    if conditional:
+                        resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
+                        if resp_data and resp_data.get("found", False):
+                            ctx.comment_cmd_last_global[prefix] = now
+                            ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                            ctx.comment_cmd_global_last = now
+                            ctx.comment_cmd_global_user_last[username] = now
+                            if points_cost > 0:
+                                if _deduct_user_points(username, points_cost):
+                                    log.info(f"[COMMENT CMD] {username} spent {points_cost} points on '{base_cmd}'")
+                                else:
+                                    log.info(f"[COMMENT CMD] {username} points deduction failed for '{base_cmd}'")
+                            mode_label = resp_data.get("mode", "replace")
+                            if mode_label == "queue":
+                                log.info(f"[COMMENT CMD] {username} → '{base_cmd}' successful — song added to queue")
+                            else:
+                                log.info(f"[COMMENT CMD] {username} → '{base_cmd}' successful — song found and played")
+                        else:
+                            log.info(f"[COMMENT CMD] {username} → '{base_cmd}' song not found — no points deducted, no cooldown triggered")
+                    else:
+                        threading.Thread(
+                            target=_dispatch_comment_http,
+                            args=(cmd_url, username, cmd_text),
+                            daemon=True
+                        ).start()
 
                 if not group.get("trigger_comment_event", True):
                     suppress_comment_trigger = True

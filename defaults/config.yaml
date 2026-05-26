@@ -225,6 +225,7 @@ comment_commands:
         - repeat
         - shuffle
         - current
+        - playtrack
 
       # Per-command overrides. Only commands listed here need an entry.
       # Each key matches a command name from the commands list above.
@@ -237,6 +238,18 @@ comment_commands:
           cooldown: 30
         prev:
           points_cost: 20
+        playtrack:
+          # Points cost — viewer needs this many channel points.
+          points_cost: 50
+          # Per-command cooldown in seconds.
+          cooldown: 30
+          # When true: points & cooldowns only apply if the song is found.
+          # If the song can't be found, nothing is deducted and no cooldown fires.
+          conditional: true
+          # Direct URL to the playtrack endpoint (bypasses /comment).
+          # The response includes {"found": true/false} for conditional handling.
+          url: "http://127.0.0.1:{spotify_port}/playtrack?user={user}&text={text}"
+          handler: http
         volume:
           # Per-command role override (overrides group allowed_roles).
           roles:
@@ -461,6 +474,11 @@ spotify:
   # How much the volume changes per $volume up / $volume down command (percent).
   # E.g., 10 means each command changes volume by 10%.
   volume_step: 10
+
+  # How $playtrack commands are handled:
+  #   "replace" — Plays the requested song immediately, replacing the current track.
+  #   "queue"   — Adds the requested song to the Spotify queue (plays after current track).
+  playtrack_mode: "replace"
 
 # --- CHANNEL POINTS ---
 # Awards loyalty points to active viewers. Viewers can check !points
