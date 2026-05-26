@@ -50,6 +50,8 @@ Each version is split into two sections:
 * **Event hooks included in updates** — The built-in event hooks (`random.py` and `spotify.py`) are now updated automatically. Any custom event hooks you may have created are not affected.
 
 ### Changed
+* **Spotify tokens now stored safely** — Token data is protected during simultaneous access, preventing potential file corruption when multiple actions try to save at the same time.
+* **Channel points viewer names cleaned up** — Viewer names in the leaderboard overlay are now displayed safely, preventing any display issues from unusual characters.
 * **Gift-triggered file renamed** — The file that runs custom commands when receiving TikTok gifts has been renamed from `http_actions.txt` to `shell_actions.txt` to better reflect what it does. If you have your own entries in `data/shell_actions.txt`, rename it to `data/shell_actions.txt` manually.
 * **Duplicate command detection in `commands` list** — If a command appears multiple times in a group's `commands` list, the tool now warns you. Max 5 warnings per group, then "N further" suppressed. No crash, the program keeps running.
 * **Duplicate key detection in `commands_config`** — Duplicate entries in `commands_config` (e.g. two `op:` blocks) are now caught on startup and trigger an error with "Press Enter to exit". Detects 2+ duplicates, always reports the first occurrence's line number.
@@ -73,6 +75,14 @@ Each version is split into two sections:
 * **Datapack root validation** — The datapack generator now checks whether the target folder exists and is a directory before building. If the path is invalid, you get a clear error message instead of a silent failure.
 
 ### Fixed
+* **Like goal no longer skips or duplicates during like bursts** — Fixed a timing issue where rapid like events could interfere with each other, causing triggered actions to be missed or sent twice.
+* **Gift revenue saving no longer slows everything down** — The bot now saves revenue data in the background without blocking chat, likes, or other live interactions.
+* **Special characters no longer cause crashes** — Fixed missing text encoding in death counter, timer, and win counter plugins. Usernames and content with emojis or accented letters now save and load correctly.
+* **Like goal config values with quotes handled correctly** — If the like goal settings contain numbers stored as text (e.g. `"100000"` instead of `100000`), the tool now handles them properly instead of throwing an error.
+* **Timer plugin uses fewer system resources** — The countdown reset now manages its background tasks more efficiently when the timer repeatedly hits zero.
+* **Build system exclusions now reliable** — The release build script correctly excludes files using all glob patterns, not just simple ones.
+
+* **Validation results checked more robustly** — Fixed internal comparisons in validation checks to use proper type-safe comparisons instead of string matching.
 * **GUI module no longer crashes on startup** — Fixed a missing import that prevented the configuration GUI from loading at all.
 * **Upload script messages now visible** — The upload script's progress messages are now actually displayed in the console instead of being silently discarded.
 * **Updater no longer crashes on config or permission errors** — Fixed a potential crash when the configuration fails to load or root permissions are missing during an update.
