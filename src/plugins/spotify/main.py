@@ -107,27 +107,30 @@ class SpotifyClient:
         self.access_token = None
         self.refresh_token = None
         self.expires_at = 0
+        self._token_lock = threading.Lock()
         self._load_tokens()
 
     def _load_tokens(self):
-        if TOKEN_FILE.exists():
-            try:
-                with TOKEN_FILE.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self.access_token = data.get("access_token")
-                self.refresh_token = data.get("refresh_token")
-                self.expires_at = data.get("expires_at", 0)
-            except Exception as e:
-                log.info(f"[SPOTIFY] Failed to load tokens: {e}")
+        with self._token_lock:
+            if TOKEN_FILE.exists():
+                try:
+                    with TOKEN_FILE.open("r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    self.access_token = data.get("access_token")
+                    self.refresh_token = data.get("refresh_token")
+                    self.expires_at = data.get("expires_at", 0)
+                except Exception as e:
+                    log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
-        TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with TOKEN_FILE.open("w", encoding="utf-8") as f:
-            json.dump({
-                "access_token": self.access_token,
-                "refresh_token": self.refresh_token,
-                "expires_at": self.expires_at,
-            }, f, indent=2)
+        with self._token_lock:
+            TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with TOKEN_FILE.open("w", encoding="utf-8") as f:
+                json.dump({
+                    "access_token": self.access_token,
+                    "refresh_token": self.refresh_token,
+                    "expires_at": self.expires_at,
+                }, f, indent=2)
 
     @property
     def is_authenticated(self):

@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import uuid
 import time
+import fnmatch
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
@@ -251,7 +252,7 @@ def main():
                         if base in rel.parents or rel == base:
                             return True
                     # einfache Glob-Patterns (*.md etc.)
-                    elif rel.match(pattern):
+                    elif fnmatch.fnmatch(str(rel), pattern):
                         return True
                 return False
             all_files = [

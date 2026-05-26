@@ -36,7 +36,7 @@ args = parse_args()
 def load_win_size():
     if STATE_FILE.exists():
         try:
-            with STATE_FILE.open("r") as f:
+            with STATE_FILE.open("r", encoding="utf-8") as f:
                 size = json.load(f)
                 # Validate that dimensions are not accidentally too small
                 return {
@@ -88,7 +88,7 @@ class WinManager:
     def load_stats(self):
         if STATS_FILE.exists():
             try:
-                with STATS_FILE.open("r") as f:
+                with STATS_FILE.open("r", encoding="utf-8") as f:
                     d = json.load(f)
                     self.wins = d.get("wins", 0)
                     self.needed = d.get("needed", 10)

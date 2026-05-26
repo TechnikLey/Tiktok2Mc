@@ -216,7 +216,7 @@ def validate_text(text: str) -> List[Diagnostic]:
                     diagnostics.append(_make_diag(
                         line_number, ph_pos, ph_pos + len("{comment}"),
                         "'{comment}' is only resolved for the 'comment' trigger. It will not be replaced for any other trigger.",
-                        Severity.ERROR, "comment_placeholder_wrong_trigger"
+                        Severity.WARNING, "comment_placeholder_wrong_trigger"
                     ))
                 mm_overlay = _RE_MULTIPLIER.search(cmd_trim)
                 if mm_overlay:

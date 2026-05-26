@@ -249,7 +249,7 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
             log_dir = BASE_DIR / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"{_sanitize_session_name(name)}.log"
-            with open(log_file, "w") as lf:
+            with open(log_file, "w", encoding="utf-8") as lf:
                 proc = subprocess.Popen(cmd, stdout=lf, stderr=lf)
             processes[name] = proc
 
@@ -331,7 +331,7 @@ def start_UPDATE_EXE_PATH():
         log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
-        with open(log_file, "a") as lf:
+        with open(log_file, "a", encoding="utf-8") as lf:
             proc = subprocess.Popen(
                 cmd,
                 stdout=lf,

@@ -31,7 +31,7 @@ WEB_SERVER_PORT = 29190
 def load_win_size():
     if STATE_FILE.exists():
         try:
-            with STATE_FILE.open("r") as f: return json.load(f)
+            with STATE_FILE.open("r", encoding="utf-8") as f: return json.load(f)
         except Exception as e:
             log.info(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}

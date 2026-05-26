@@ -133,7 +133,7 @@ def timer_tick_loop():
                 requests.post(ADD_URL, timeout=2)
             except Exception as e:
                 log.error(f"Could not reach counter: {e}")
-            threading.Timer(2.0, timer_state.reset).start()
+            threading.Thread(target=timer_state.reset, daemon=True).start()
         overlay_clients.notify(timer_state.get_state())
         time.sleep(1)
 
@@ -146,7 +146,7 @@ window = None
 def load_win_size():
     if STATE_FILE.exists():
         try:
-            with STATE_FILE.open("r") as f:
+            with STATE_FILE.open("r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             log.info(f"[TIMER] Failed to load state: {e}")

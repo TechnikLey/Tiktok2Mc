@@ -11,6 +11,7 @@ import json
 import threading
 import time
 import sys
+import html
 import yaml
 from queue import Queue
 from pathlib import Path
@@ -312,7 +313,7 @@ HTML_TEMPLATE = """
                 if (i === 0) tr.className = 'top1';
                 else if (i === 1) tr.className = 'top2';
                 else if (i === 2) tr.className = 'top3';
-                tr.innerHTML = '<td class="pos">#' + (i+1) + '</td><td class="name">' + entry.user + '</td><td class="points">' + entry.points + '</td>';
+                tr.innerHTML = '<td class="pos">#' + (i+1) + '</td><td class="name">' + html.escape(entry.user) + '</td><td class="points">' + html.escape(str(entry.points)) + '</td>';
                 tbody.appendChild(tr);
             });
         };

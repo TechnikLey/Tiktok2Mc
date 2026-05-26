@@ -28,7 +28,7 @@ from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
 from mcrcon import MCRcon
 from flask import Flask, request
-from core.validator import validate_file, print_diagnostics
+from core.validator import validate_file, print_diagnostics, Severity
 from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
@@ -949,6 +949,13 @@ def handle_test_comment():
                     ctx.comment_cmd_global_last = now
                     ctx.comment_cmd_global_user_last[username] = now
 
+                if len(ctx.comment_cmd_last_global) > 1000:
+                    cutoff = now - 3600
+                    ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
+                if len(ctx.comment_cmd_last_user) > 1000:
+                    cutoff = now - 3600
+                    ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
+
                 if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
                 elif cmd_handler == "http" and cmd_url:
@@ -1356,15 +1363,15 @@ def create_client(user):
                                 )
                             except asyncio.QueueFull:
                                 log.info(f"[LIKE] Queue full, trigger '{rule['id']}' dropped")
-            now = time.time()
-            delta = total_since_start - ctx.last_likegoal_sent
-            if delta > 0 and (now - ctx.last_likegoal_time) >= ctx.likegoal_interval:
-                try:
-                    ctx.main_loop.call_soon_threadsafe(ctx.likegoal_queue.put_nowait, delta)
-                    ctx.last_likegoal_sent = total_since_start
-                    ctx.last_likegoal_time = now
-                except asyncio.QueueFull:
-                    log.info("[LIKEGOAL] Queue full, like delta dropped")
+                now = time.time()
+                delta = total_since_start - ctx.last_likegoal_sent
+                if delta > 0 and (now - ctx.last_likegoal_time) >= ctx.likegoal_interval:
+                    try:
+                        ctx.main_loop.call_soon_threadsafe(ctx.likegoal_queue.put_nowait, delta)
+                        ctx.last_likegoal_sent = total_since_start
+                        ctx.last_likegoal_time = now
+                    except asyncio.QueueFull:
+                        log.info("[LIKEGOAL] Queue full, like delta dropped")
         except Exception as e:
             log.info(f"[EVENT ERROR] Error in like handling: {e}")
 
@@ -1544,6 +1551,13 @@ def create_client(user):
                     ctx.comment_cmd_global_last = now
                     ctx.comment_cmd_global_user_last[username] = now
 
+                if len(ctx.comment_cmd_last_global) > 1000:
+                    cutoff = now - 3600
+                    ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
+                if len(ctx.comment_cmd_last_user) > 1000:
+                    cutoff = now - 3600
+                    ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
+
                 if cmd_handler == "rcon":
                     ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
                 elif cmd_handler == "http" and cmd_url:
@@ -1614,7 +1628,7 @@ def create_client(user):
 async def gift_revenue_counter():
     while True:
         await asyncio.sleep(ctx.autosave_interval_seconds)
-        update_daily_revenue()
+        await asyncio.to_thread(update_daily_revenue)
 
 # ==========================================
 # MAIN ENTRY POINT
@@ -1645,7 +1659,7 @@ async def run_bot():
         if diags:
             log.info("[VALIDATOR] Validation result for actions.mca:")
             print_diagnostics(diags)
-        if any(d.severity.name == "ERROR" for d in diags):
+        if any(d.severity == Severity.ERROR for d in diags):
             log.info("[STOP] Errors found. Please fix actions.mca and restart.")
             if sys.stdin.isatty():
                 try:

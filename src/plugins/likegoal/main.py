@@ -46,8 +46,8 @@ try:
             cfg = yaml.safe_load(f) or {}
         LIKE_GOAL_PORT = cfg.get("like_goal", {}).get("port", 29193)
         CUSTOM_TEXT = cfg.get("like_goal", {}).get("display_text", "Like Goal")
-        INITIAL_GOAL = cfg.get("like_goal", {}).get("initial_goal", 100_000)
-        GOAL_MULTIPLIER = cfg.get("like_goal", {}).get("goal_multiplier", 2)
+        INITIAL_GOAL = int(cfg.get("like_goal", {}).get("initial_goal", 100_000))
+        GOAL_MULTIPLIER = int(cfg.get("like_goal", {}).get("goal_multiplier", 2))
         # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
