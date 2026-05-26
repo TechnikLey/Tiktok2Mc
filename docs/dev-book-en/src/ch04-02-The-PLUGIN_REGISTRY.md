@@ -19,9 +19,10 @@ class AppConfig:
     enable: bool   # Should the plugin start?
     level: int     # Log level for visibility
     ics: bool      # Has GUI? (Interface Control System)
+    port: int = 0  # Network port for overlays/API (0 = none)
 ```
 
-### The Five Parameters
+### The Parameters
 
 | Parameter | Type | Example | Function |
 |-----------|------|---------|----------|
@@ -30,9 +31,10 @@ class AppConfig:
 | `enable` | bool | `True` | Start plugin at boot? |
 | `level` | int | `4` | Log level for terminal visibility |
 | `ics` | bool | `True` | Supports GUI window (pywebview)? |
+| `port` | int | `29189` | Network port (0 = no web server) |
 
 > [!IMPORTANT]
-> All five parameters are **mandatory**. If one is missing or an unknown key is present, a `ValueError` is thrown.
+> `name`, `path`, `enable`, `level`, and `ics` are **mandatory**. `port` is optional (defaults to 0).
 
 ### Log Level Meaning
 
@@ -82,14 +84,16 @@ Plugins are stored in `PLUGIN_REGISTRY.json`. This file is automatically loaded 
     "path": "C:\\...\\plugins\\timer\\main.exe",
     "enable": true,
     "level": 4,
-    "ics": true
+    "ics": true,
+    "port": 29189
   },
   {
     "name": "Death Counter",
     "path": "C:\\...\\plugins\\deathcounter\\main.exe",
     "enable": true,
     "level": 4,
-    "ics": true
+    "ics": true,
+    "port": 29190
   }
 ]
 ```
@@ -126,7 +130,8 @@ if args.register_only:
         path=get_base_file(),
         enable=cfg.get("timer", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=29189
     ))
     sys.exit(0)
 
@@ -176,7 +181,7 @@ To speed up the registration process, `registry.py` uses a **scan cache** (`plug
 
 | Component | File | Content |
 |-----------|------|---------|
-| **AppConfig** | `core/models.py` | Dataclass with 5 mandatory fields |
+| **AppConfig** | `core/models.py` | Dataclass with 5 mandatory fields + optional `port` |
 | **BUILDIN_REGISTRY** | `start.py` | Firmly defined core modules |
 | **PLUGIN_REGISTRY** | `PLUGIN_REGISTRY.json` | Dynamically registered plugins |
 | **Registration** | `registry.py` | Scans plugins with `--register-only` |

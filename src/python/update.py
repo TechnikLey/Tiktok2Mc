@@ -13,6 +13,7 @@ import shutil
 import zipfile
 import tarfile
 import requests
+import subprocess
 import re
 import time
 import io
@@ -25,6 +26,11 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 from core.paths import get_base_dir
 from core.utils import load_config
+
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+
+log = logging.getLogger(__name__)
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -42,11 +48,25 @@ DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
 CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
 
-cfg = load_config(CONFIG_FILE)
+AUTO_MODE = "--auto" in sys.argv
+
+def wait_for_key(msg="Press Enter to exit..."):
+    if not AUTO_MODE:
+        try:
+            input(msg)
+        except EOFError:
+            log.info("\nNo input available.")
+
+try:
+    cfg = load_config(CONFIG_FILE)
+except (FileNotFoundError, ValueError, RuntimeError) as e:
+    log.error(f"{e}")
+    wait_for_key()
+    sys.exit(1)
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
-        print("[ERROR] This script must be run as root on Linux to perform updates.")
+        log.error("This script must be run as root on Linux to perform updates.")
         wait_for_key()
         sys.exit(1)
 
@@ -72,6 +92,13 @@ WHITELIST_DIRS = {
     "plugins/overlaytxt",
     "plugins/timer",
     "plugins/wincounter",
+    "plugins/spotify",
+}
+
+# Individual files in subdirectories that may be overwritten.
+WHITELIST_DIR_FILES = {
+    "event_hooks/random.py",
+    "event_hooks/spotify.py",
 }
 
 WHITELIST_FILES = {
@@ -88,23 +115,6 @@ WHITELIST_FILES = {
 GITHUB_USER = "TechnikLey"
 GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
-
-AUTO_MODE = "--auto" in sys.argv
-
-def wait_for_key(msg="Press Enter to exit..."):
-    if not AUTO_MODE:
-        try:
-            input(msg)
-        except EOFError:
-            print("\n[INFO] No input available.")
-
-try:
-    with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-except Exception as e:
-    print(f"Error loading config: {e}")
-    wait_for_key()
-    sys.exit(1)
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
 
@@ -128,7 +138,7 @@ def get_versions(path):
                     if "toolversion" in k.lower(): v["tool"] = extract_version(val)
                     elif "updaterversion" in k.lower(): v["updater"] = extract_version(val)
     else:
-        print(f"[ERROR] Version file not found: {path}")
+        log.error(f"Version file not found: {path}")
         wait_for_key()
 
     return v
@@ -142,7 +152,7 @@ def download_with_progress(url, target):
     target = Path(target) if isinstance(target, str) else target
     with requests.get(url, headers=HEADERS_ASSET, stream=True) as r:
         r.raise_for_status()
-        total = int(r.headers.get("Content-Length", 0))
+        total = int(r.headers.get("Content-Length", 0) or 0)
         done = 0
         with target.open("wb") as f:
             for chunk in r.iter_content(8192):
@@ -150,15 +160,16 @@ def download_with_progress(url, target):
                     f.write(chunk)
                     done += len(chunk)
                     if total:
-                        print(f"\r>> Downloading: {done / total * 100:5.1f}%", end="")
-    print("\n[OK] Download complete.")
+                        sys.stdout.write(f"\r>> Downloading: {done / total * 100:5.1f}%")
+                        sys.stdout.flush()
+    log.info("\nDownload complete.")
 
 # =========================
 # Config migration
 # =========================
 def migrate_config_if_needed() -> bool:
     if not DEFAULT_CONFIG_FILE.exists():
-        print(f"[ERROR] Master template missing: {DEFAULT_CONFIG_FILE}")
+        log.error(f"Master template missing: {DEFAULT_CONFIG_FILE}")
         return False
 
     yaml_obj = YAML(typ="rt")
@@ -170,10 +181,10 @@ def migrate_config_if_needed() -> bool:
     if not CONFIG_FILE.exists():
         try:
             shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
-            print(f"[INFO] No config found. Created new config from template.")
+            log.info(f"No config found. Created new config from template.")
             return True
         except Exception as e:
-            print(f"[ERROR] Failed to copy template: {e}")
+            log.error(f"Failed to copy template: {e}")
             return False
 
     # Load Template
@@ -194,22 +205,22 @@ def migrate_config_if_needed() -> bool:
         default_version = int(template_data.get("config_version", 0))
         user_version = int(user_data.get("config_version", 0))
     except (ValueError, TypeError):
-        print("[WARNING] Version keys are invalid. Forcing migration...")
+        log.warning("Version keys are invalid. Forcing migration...")
         default_version, user_version = 1, 0
 
     if user_version >= default_version:
-        print(f"[INFO] Config is up to date (v{user_version}).")
+        log.info(f"Config is up to date (v{user_version}).")
         return False
 
-    print(f"[INFO] Migrating config: v{user_version} -> v{default_version}")
+    log.info(f"Migrating config: v{user_version} -> v{default_version}")
 
     # Backup
     backup_path = CONFIG_FILE.with_suffix(".yaml.bak")
     try:
         shutil.copy2(CONFIG_FILE, backup_path)
-        print(f"[INFO] Backup created at: {backup_path}")
+        log.info(f"Backup created at: {backup_path}")
     except Exception as e:
-        print(f"[ERROR] Migration aborted. Could not create backup: {e}")
+        log.error(f"Migration aborted. Could not create backup: {e}")
         return False
 
     # Perform strict injection
@@ -221,21 +232,21 @@ def migrate_config_if_needed() -> bool:
     try:
         with CONFIG_FILE.open("w", encoding="utf-8") as f:
             yaml_obj.dump(template_data, f)
-        print(f"[SUCCESS] Config migrated successfully to v{default_version}.")
+        log.info(f"[SUCCESS] Config migrated successfully to v{default_version}.")
         return True
     except Exception as e:
-        print(f"[FAIL] Error writing migrated config: {e}")
+        log.error(f"[FAIL] Error writing migrated config: {e}")
         return False
 
 def _inject_values_strictly(template, user_source, path=""):
     # 1. BASE GUARD: If user_source is None or not a dictionary-like object
     if user_source is None:
         if path:
-            print(f"[WARNING] Configuration path '{path}' is empty in user config. Skipping.")
+            log.warning(f"Configuration path '{path}' is empty in user config. Skipping.")
         return
     if not isinstance(user_source, (dict, CommentedMap)):
         if path:
-            print(f"[WARNING] Expected a section at '{path}', but found {type(user_source).__name__}. Skipping.")
+            log.warning(f"Expected a section at '{path}', but found {type(user_source).__name__}. Skipping.")
         return
     # 2. ITERATE: Only if user_source is guaranteed to be a dict
     for key in template:
@@ -250,20 +261,18 @@ def _inject_values_strictly(template, user_source, path=""):
                     _inject_values_strictly(template_value, user_value, current_path)
                 elif user_value is None:
                     # User left a whole category empty (e.g., 'Java: ')
-                    print(f"[WARNING] Section '{current_path}' is empty in user config. Keeping defaults.")
+                    log.warning(f"Section '{current_path}' is empty in user config. Keeping defaults.")
                 else:
-                    # User put a single value where a dictionary was expected
-                    print(f"[WARNING] Type mismatch at '{current_path}': Expected a section, got a value. Skipping.")
+                    log.warning(f"Type mismatch at '{current_path}': Expected a section, got a value. Skipping.")
             # CASE B: Template expects a simple value (String, Int, Bool, List)
             else:
                 if user_value is not None:
                     template[key] = user_value
-                    print(f"[DEBUG] Migrated: {current_path}")
+                    log.debug(f"Migrated: {current_path}")
                 else:
-                    print(f"[DEBUG] Value for '{current_path}' is null/empty. Using default.")
+                    log.debug(f"Value for '{current_path}' is null/empty. Using default.")
         else:
-            # Key doesn't exist in user config at all
-            print(f"[DEBUG] Key '{current_path}' missing in user config. Using default.")
+            log.debug(f"Key '{current_path}' missing in user config. Using default.")
 
 def load_yaml_with_debug(path, yaml_obj, label):
     try:
@@ -273,18 +282,18 @@ def load_yaml_with_debug(path, yaml_obj, label):
                 return CommentedMap()
             return data
     except YAMLError as e:
-        print(f"[FAIL] YAML error in {label}: {path}")
+        log.error(f"[FAIL] YAML error in {label}: {path}")
 
         # Print line / column if available
         if hasattr(e, "problem_mark") and e.problem_mark is not None:
             mark = e.problem_mark
-            print(f"[FAIL] Line: {mark.line + 1}, Column: {mark.column + 1}")
+            log.error(f"[FAIL] Line: {mark.line + 1}, Column: {mark.column + 1}")
 
-        print(f"[FAIL] Details: {e}")
+        log.error(f"[FAIL] Details: {e}")
         return None
     except Exception as e:
-        print(f"[FAIL] Unexpected error while loading {label}: {path}")
-        print(f"[FAIL] Details: {e}")
+        log.error(f"[FAIL] Unexpected error while loading {label}: {path}")
+        log.error(f"[FAIL] Details: {e}")
         return None
 
 # =========================
@@ -300,21 +309,21 @@ def run_update():
         try:
             idx = sys.argv.index("--resume")
             extracted_root = sys.argv[idx + 1]
-            print(f"[>] Resume: Using extracted files from {extracted_root}")
+            log.info(f"[>] Resume: Using extracted files from {extracted_root}")
         except (ValueError, IndexError) as e:
-            print(f"[ERROR] Failed to parse --resume argument: {e}\n sys.argv: {sys.argv}")
+            log.error(f"Failed to parse --resume argument: {e}\n sys.argv: {sys.argv}")
 
     local = get_versions(VERSION_FILE)
 
     # If no resume, then normal API check and download
     if not extracted_root:
-        print("[..] Checking for new version via GitHub...")
+        log.info("[..] Checking for new version via GitHub...")
         try:
             response = requests.get(API_URL, headers=HEADERS_API, timeout=10)
             response.raise_for_status()
             release = response.json()
         except Exception as e:
-            print(f"[FAIL] API error: {e}")
+            log.error(f"[FAIL] API error: {e}")
             wait_for_key()
             sys.exit(5)
 
@@ -322,7 +331,7 @@ def run_update():
         online_tool_v = extract_version(online_tag)
 
         if not (version.parse(online_tool_v) > version.parse(local["tool"])):
-            print(f"[OK] Tool is up to date ({local['tool']}).")
+            log.info(f"Tool is up to date ({local['tool']}).")
             wait_for_key()
             sys.exit(5)
 
@@ -333,7 +342,7 @@ def run_update():
             if choice != 'y': sys.exit(5)
 
         # Download & extract
-        print(f"[>>] Downloading package...")
+        log.info("[>>] Downloading package...")
         if sys.platform == "win32":
             asset = next((a for a in release.get("assets", []) if "Windows" in a["name"] and a["name"].endswith(".zip")), None)
             archive_name = "release.zip"
@@ -342,10 +351,10 @@ def run_update():
             archive_name = "release.tar.gz"
 
         if not asset:
-            print("[FAIL] No matching release asset found for this platform.")
+            log.error("[FAIL] No matching release asset found for this platform.")
             sys.exit(5)
 
-        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR)
+        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
         TEMP_DIR.mkdir(parents=True)
         archive_path = TEMP_DIR / archive_name
         download_with_progress(asset["url"], archive_path)
@@ -377,7 +386,7 @@ def run_update():
     # 1. UPDATER SELF-UPDATE (via execv)
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
-        print(f"[UPDATE] New updater found ({zip_v['updater']}).")
+        log.info(f"[UPDATE] New updater found ({zip_v['updater']}).")
         new_up_src = extracted_root_path / f"update{SUFFIX}"
         
         if new_up_src.exists():
@@ -388,31 +397,59 @@ def run_update():
             # Set executable permissions on Linux/Mac
             if sys.platform != "win32":
                 os.chmod(new_up_dest, 0o755)
-            print("[INFO] Starting new updater and resuming tool update...")
+            log.info("Starting new updater and resuming tool update...")
             # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
-            os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
-            sys.exit(0)  # Safety fallback
+            if sys.platform == "win32":
+                subprocess.Popen([str(new_up_dest), "--resume", str(extracted_root_path)])
+            else:
+                os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
+            sys.exit(0)
 
-    print(f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update...")
+    log.info(f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update...")
 
     # ==========================================
     # 2. TOOL UPDATE (copy files)
     # ==========================================
     # Signal the start script to shut down so files are unlocked
-    with (BASE_DIR / "update_signal.tmp").open("w") as f: f.write("kill")
-    time.sleep(5)  # pause to let the start script exit
+    signal_file = BASE_DIR / "update_signal.tmp"
+    try:
+        signal_file.write_text("kill")
+    except Exception as e:
+        log.warning(f"Could not write signal file: {e}")
+    # Wait for start script to consume the signal (file deleted) or timeout
+    for _ in range(30):
+        if not signal_file.exists():
+            break
+        time.sleep(1)
 
-    print(f"[..] Installing files...")
-    for root, dirs, files in (extracted_root_path).walk():
+    log.info("[..] Installing files...")
+    walk_method = getattr(extracted_root_path, "walk", None)
+    if walk_method is not None:
+        walk_iter = walk_method()
+    else:
+        import os as _os
+        def _fallback_walk():
+            for root, dirs, files in _os.walk(extracted_root_path):
+                yield Path(root), dirs, files
+        walk_iter = _fallback_walk()
+    for root, dirs, files in walk_iter:
         rel_path = root.relative_to(extracted_root_path)
         rel_path_str = str(rel_path).replace("\\", "/")
         if rel_path_str != "." and not any(
             rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
+        ) and not any(
+            f.startswith(rel_path_str + "/") for f in WHITELIST_DIR_FILES
         ): continue
 
         for file in files:
             if rel_path_str == "." and file not in WHITELIST_FILES: continue
+            # For subdirectories not covered by WHITELIST_DIRS, only copy whitelisted files
+            if rel_path_str != ".":
+                dir_whitelisted = any(
+                    rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
+                )
+                if not dir_whitelisted and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES: continue
             if file.lower() == f"update{SUFFIX}".lower(): continue
             if file.lower() == "config.yaml": continue
             
@@ -432,9 +469,9 @@ def run_update():
                 if not os.path.splitext(fname)[1] or fname.endswith('.bin'):
                     try:
                         os.chmod(fpath, 0o755)
-                        print(f"[PERM] Set executable: {fpath}")
+                        log.info(f"[PERM] Set executable: {fpath}")
                     except Exception as e:
-                        print(f"[PERM] Failed to set executable for {fpath}: {e}")
+                        log.info(f"[PERM] Failed to set executable for {fpath}: {e}")
 
     save_versions(zip_v["tool"], zip_v["updater"])
     if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
@@ -442,10 +479,13 @@ def run_update():
     if CONFIG_UPDATE_ENABLE: 
         migrate_config_if_needed()
 
-    if (BASE_DIR / "update_signal.tmp").exists():
-        (BASE_DIR / "update_signal.tmp").unlink()
+    try:
+        if (BASE_DIR / "update_signal.tmp").exists():
+            (BASE_DIR / "update_signal.tmp").unlink()
+    except Exception as e:
+        log.warning(f"Could not remove signal file: {e}")
 
-    print("\n[OK] Update complete.")
+    log.info("\nUpdate complete.")
     wait_for_key()
 
     sys.exit(0)

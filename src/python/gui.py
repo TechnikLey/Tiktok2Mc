@@ -7,6 +7,7 @@
 # ==================================================
 
 import json
+import sys
 import threading
 import time
 import yaml
@@ -14,6 +15,10 @@ import webview
 from flask import Flask, render_template, request
 from core.paths import get_base_dir
 from core.cli import parse_args
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+
+log = logging.getLogger(__name__)
 
 # --- Base directory ---
 BASE_DIR = get_base_dir()
@@ -99,7 +104,7 @@ if __name__ == "__main__":
         )
         webview.start()
     else:
-        print("GUI hidden, server running in background.")
+        log.info("GUI hidden, server running in background.")
         flask_thread.join()
 
-    print("GUI closed, program terminated.")
+    log.info("GUI closed, program terminated.")

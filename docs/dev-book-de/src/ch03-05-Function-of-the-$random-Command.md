@@ -2,7 +2,7 @@
 
 ### Was ist `$random`?
 
-`$random` ist ein **eingebauter spezieller Command**, der **zufällig einen anderen Trigger ausführt**.
+`$random` ist ein **Event-Hook-Command, der mit dem Streaming Tool ausgeliefert wird**, und **zufällig einen anderen Trigger ausführt**.
 
 Beispiel:
 
@@ -28,23 +28,39 @@ likes:$random         # Jedes Like-Event einen ZUFÄLLIGEN Effekt!
 
 ### Wie funktioniert `$random` intern?
 
+`$random` ist als Event-Hook in `src/event_hooks/random.py` implementiert. Beim Start registriert der Hook einen Handler via `api.register_action("random", random_handler)`. Wenn ein TikTok-Event `$random` auslöst:
+
 ```python
 # 1. Parser sieht: "likes:$random"
-# → Speichert: kind = "built_in", body = "random"
+# → Registriert "random" als $-Command, der mit seinem Hook verknüpft ist
 
-# 2. Zur Laufzeit kommt Like-Event:
-actions = ACTIONS["likes"]
-for action in actions:
-    if action["kind"] == "script":
-        if action["body"] == "random":
-            # Sammle alle möglichen Trigger
-            possible_triggers = get_all_triggers_except("likes")
-            
-            # Wähle EINEN zufällig aus
-            chosen = random.choice(possible_triggers)
-            
-            # Führe DIESEN aus
-            execute_trigger(chosen)
+# 2. Beim Start registriert event_hooks/random.py den Handler:
+api.register_action("random", random_handler)
+
+# 3. Zur Laufzeit kommt Like-Event → Handler wird aufgerufen:
+def random_handler(user, trigger, context):
+    # Sammle alle gültigen Trigger des aktuellen Kontexts
+    all_valid = api.get_valid_functions()
+    
+    # Lese den random_triggers-Konfigurationsabschnitt
+    cfg = api.config.get("random_triggers", {})
+    mode = cfg.get("mode", "deny-all")
+    configured = cfg.get("triggers", [])
+    
+    # Baue den Kandidatenpool basierend auf dem Filtermodus
+    candidates = []
+    for func in all_valid:
+        if mode == "deny-all":
+            if func not in configured:  # Nur die gelisteten Trigger ausschließen
+                candidates.append(func)
+        else:
+            if func in configured:  # Nur die gelisteten Trigger erlauben
+                candidates.append(func)
+    
+    # Wähle EINEN zufällig aus und stelle ihn in die Queue
+    if candidates:
+        chosen = random.choice(candidates)
+        api.enqueue_trigger(chosen, user)
 ```
 
 ---
@@ -70,17 +86,16 @@ likes:$random  ← Startet die Random auswahl
 > da `follow` standardmäßig in der Ausschlussliste steht.
 > Welche Trigger ausgeschlossen werden, ist in `config.yaml` unter
 > `random_triggers` konfigurierbar. Mit `mode: deny-all` werden nur die
-> gelisteten Trigger ausgeschlossen, mit `Mode: allow-all` werden alle
+> gelisteten Trigger ausgeschlossen, mit `mode: allow-all` werden alle
 > außer den gelisteten ausgeschlossen.
-> Trigger, die selbst `$random` enthalten, werden **immer** automatisch ausgeschlossen.
 
 ---
 
 ### Besonderheiten
 
-**1. Selbst-Rekursion vermieden**
+**1. Loop-Schutz**
 
-Trigger, die selbst `$random` enthalten, werden **immer** automatisch aus dem Pool entfernt — unabhängig von der Konfiguration.
+Wenn `$random` einen Trigger wählt, der selbst `$random` enthält (oder einen anderen Hook, der zurückruft), verhindert die Ketten-Tiefenbegrenzung (3 Ebenen) Endlosschleifen. Nach Überschreiten des Limits wird der Trigger für die aktuelle Sitzung dauerhaft gesperrt.
 
 **2. Trigger-Filter konfigurierbar**
 
@@ -124,10 +139,8 @@ Jeder Trigger hat die **gleiche Chance** gewählt zu werden.
 - Zur Laufzeit evaluiert wird (nicht beim Start!)
 
 > [!NOTE]
-> In Zukunft werden voraussichtlich weitere `$`-Commands hinzugefügt.
-> Diese werden jedoch nicht mehr in der Entwicklerdokumentation beschrieben,
-> sondern nur noch kurz in der Nutzerdokumentation erwähnt.
-> Wenn du dich für ihre Funktionsweise interessierst, musst du den Code selbst einsehen und nachvollziehen.
+> Da `$random` seit v0.5.0 als Standard-Event-Hook implementiert ist, kannst du seinen
+> Quellcode unter `src/event_hooks/random.py` als praxisnahes Beispiel für die Hook-API studieren.
 
 **Nächstes Kapitel:** Wie schreibst du deinen eigenen `$`-Command?
 

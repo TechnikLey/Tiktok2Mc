@@ -90,7 +90,7 @@ like_2:/clear @a *; /kill @a
 # $random picks one random action from all defined triggers
 # and executes it. Triggers containing $random are always excluded.
 # Additional exclusions are configurable in config.yaml under:
-#   Gifts > random_exclude (default: likes, like_2, follow, join, comment)
+#   random_triggers > triggers (default: likes, like_2, follow, join, comment)
 16071:$random
 
 # =====================================================================

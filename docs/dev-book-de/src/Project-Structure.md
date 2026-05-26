@@ -111,7 +111,7 @@ Die Entwicklungsstruktur enthält alles, was für den Aufbau des Projekts gebrau
 │   ├── configServerAPI.yml
 │   ├── DelayedTNTconfig.yml
 │   ├── gifts.json
-│   ├── http_actions.txt
+│   ├── shell_actions.txt
 │   └── pack.mcmeta
 ├── docs
 │   └── dev-book
@@ -168,7 +168,7 @@ Wichtige Dateien sind unter anderem:
 * `DelayedTNTconfig.yml`
 * `gifts.json`
 * `actions.mca`
-* `http_actions.txt`
+* `shell_actions.txt`
 * `pack.mcmeta`
 
 Dieser Ordner ist besonders wichtig, weil er den definierten Startzustand beschreibt.
@@ -272,7 +272,7 @@ Nach dem Build-Prozess entsteht im Ordner `build/release/` die fertige Projektve
 │   └── window.exe
 ├── data
 │   ├── actions.mca
-│   └── http_actions.txt
+│   └── shell_actions.txt
 ├── LICENSE
 ├── logs
 ├── README.md
@@ -335,7 +335,7 @@ Hier werden Daten abgelegt, die zur Laufzeit oder für bestimmte Funktionen gebr
 Anders als der `runtime/`-Ordner wird `data/` niemals überschrieben.
 
 * `actions.mca`
-* `http_actions.txt`
+* `shell_actions.txt`
 
 ### `logs/`
 

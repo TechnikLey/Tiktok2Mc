@@ -96,12 +96,32 @@ if __name__ == '__main__':
 
 ### Logging Best Practices
 
+**Standard-Muster (nur Konsole) – wird von allen eingebauten Modulen verwendet:**
+```python
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S',
+    stream=sys.stdout
+)
+log = logging.getLogger(__name__)
+
+# Nutzung:
+log.info("Plugin erfolgreich gestartet")
+log.warning("Config fehlt, verwende Standard")
+log.error("HTTP-Request fehlgeschlagen", exc_info=True)
+log.debug("Debug-Informationen für Entwickler")
+```
+
+**Datei + Konsolen-Logging (für dauerhafte Logs):**
 ```python
 import logging
 from pathlib import Path
 
-# Setup
-LOGS_DIR = Root_DIR / "logs"
+LOGS_DIR = ROOT_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
 logging.basicConfig(

@@ -20,7 +20,10 @@ from flask import Flask, Response, request, jsonify
 import sys
 import yaml
 from core import parse_args, AppConfig, get_base_dir, get_base_file, get_root_dir
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # =========================
 # Paths & configuration
@@ -36,24 +39,28 @@ cfg = {}
 
 try:
     if not CONFIG_FILE.exists():
-        print("Config not found")
+        log.info("Config not found")
         sys.exit(1)
     else:
         with CONFIG_FILE.open("r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
         LIKE_GOAL_PORT = cfg.get("like_goal", {}).get("port", 29193)
         CUSTOM_TEXT = cfg.get("like_goal", {}).get("display_text", "Like Goal")
-        INITIAL_GOAL = cfg.get("like_goal", {}).get("initial_goal", 100_000)
-        GOAL_MULTIPLIER = cfg.get("like_goal", {}).get("goal_multiplier", 2)
+        INITIAL_GOAL = int(cfg.get("like_goal", {}).get("initial_goal", 100_000))
+        GOAL_MULTIPLIER = int(cfg.get("like_goal", {}).get("goal_multiplier", 2))
         # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 except Exception as e:
-    print(f"Config error: {e}")
+    log.error(f"Config error: {e}")
     LIKE_GOAL_PORT = 29193
     CUSTOM_TEXT = "Like Goal"
     INITIAL_GOAL = 100_000
     GOAL_MULTIPLIER = 2
     SERVER_HOST = "127.0.0.1"
+
+THEME = load_plugin_theme(cfg, "like_goal")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 LIKEGOAL_EXE_PATH = get_base_file()
 
@@ -66,7 +73,8 @@ if register_only:
         path=LIKEGOAL_EXE_PATH,
         enable=cfg.get("like_goal", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=LIKE_GOAL_PORT,
     ))
     sys.exit(0)
 
@@ -84,29 +92,28 @@ class LikeManager:
         self.goal = initial_goal
         self.previous_goal = 0
         self.listeners = []
+        self._lock = threading.Lock()
 
     def add_likes(self, amount=1):
         self.likes += amount
         while self.likes >= self.goal:
             if self.multiplier == 0:
-                # Reset mode: start over from zero
                 self.likes = 0
                 self.goal = self.initial_goal
                 self.previous_goal = 0
             elif self.multiplier == 1:
-                # Step mode: increase goal by InitialGoal
                 self.previous_goal = self.goal
                 self.goal += self.initial_goal
             else:
-                # Multiply mode: multiply goal
                 self.previous_goal = self.goal
                 self.goal = int(self.goal * self.multiplier)
         self._notify()
 
     def _notify(self):
         data = self.get_data()
-        for q in self.listeners:
-            q.put(data)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(data)
 
     def get_data(self):
         segment_size = self.goal - self.previous_goal
@@ -118,7 +125,7 @@ class LikeManager:
             "percent": percent
         }
 
-like_manager = LikeManager(initial_goal=INITIAL_GOAL, multiplier=GOAL_MULTIPLIER)
+like_manager = LikeManager(initial_goal=max(INITIAL_GOAL, 1), multiplier=GOAL_MULTIPLIER)
 
 # =========================
 # HTML overlay template
@@ -129,18 +136,12 @@ HTML_TEMPLATE = f"""
 <head>
 <meta charset="UTF-8">
 <style>
-    :root {{
-        /* RESTORED OLD COLORS */
-        --neon-blue: #00f5ff;
-        --neon-purple: #8a2be2;
-        --neon-red: #ff4d4d;
-        --bg-color: #050505;
-    }}
+{THEME_STYLE}
 
     body {{
         margin: 0;
         padding: 0 20px;
-        background: var(--bg-color);
+        background: var(--background);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -157,18 +158,16 @@ HTML_TEMPLATE = f"""
         align-items: center;
     }}
 
-    /* Small and subtle text */
     .milestone-command {{
         font-size: clamp(14px, 3vw, 20px);
         font-weight: 700;
-        color: #fff;
-        text-shadow: 0 0 10px var(--neon-red);
+        color: var(--text);
+        text-shadow: 0 0 10px var(--danger);
         margin-bottom: 10px;
         letter-spacing: 1px;
         opacity: 0.9;
     }}
 
-    /* Keep the bar as the main focus */
     .bar-bg {{
         width: 100%;
         height: 60px;
@@ -182,10 +181,9 @@ HTML_TEMPLATE = f"""
     .bar-fill {{
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
-        /* Smooth width transition only, no animations */
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
         transition: width 0.5s ease-out;
-        box-shadow: 0 0 20px var(--neon-blue);
+        box-shadow: 0 0 20px var(--accent);
     }}
 
     .text-overlay {{
@@ -194,15 +192,13 @@ HTML_TEMPLATE = f"""
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        color: #fff;
+        color: var(--text);
         font-size: 22px;
         font-weight: 900;
         text-align: center;
         text-shadow: 2px 2px 4px #000;
         z-index: 10;
     }}
-
-    /* REMOVED ALL ANIMATIONS AND GLITCHES */
 </style>
 </head>
 <body id="body">
@@ -258,20 +254,27 @@ def update_likes():
 @app.route("/stream")
 def stream():
     q = Queue()
-    like_manager.listeners.append(q)
+    with like_manager._lock:
+        like_manager.listeners.append(q)
     def event_stream():
         try:
             yield f"data: {json.dumps(like_manager.get_data())}\n\n"
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps(like_manager.get_data())}\n\n"
+        except GeneratorExit:
+            pass
         finally:
-            try: like_manager.listeners.remove(q)
-            except ValueError: pass
+            with like_manager._lock:
+                try: like_manager.listeners.remove(q)
+                except ValueError: pass
     return Response(event_stream(), mimetype="text/event-stream")
 
 def run_flask():
-    app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True)
+    app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True, debug=False, use_reloader=False)
 
 gui_hidden = args.gui_hidden
 
@@ -290,9 +293,9 @@ if __name__ == "__main__":
             width=600,
             height=150,
             on_top=True,
-            background_color="#050505"
+            background_color=BG_COLOR
         )
         webview.start(debug=False)
     else:
-        print("GUI hidden, running server only.")
+        log.info("GUI hidden, running server only.")
         server_thread.join()

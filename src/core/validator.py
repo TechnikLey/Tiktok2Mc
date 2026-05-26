@@ -1,264 +1,469 @@
 #!/usr/bin/env python3
-# validator.py
+"""Validator for trigger/command definition files (.mca format).
+
+Provides line-level validation of trigger syntax, bracket balance,
+command prefixes, multipliers, and duplicate detection.
+"""
+
 import re
+import logging
 from enum import Enum
 from dataclasses import dataclass
-from typing import List, Optional, Set
+from pathlib import Path
+from typing import List, Optional, Set, Union
+
+log = logging.getLogger(__name__)
+
+__all__ = [
+    "Severity",
+    "Diagnostic",
+    "print_diagnostics",
+    "validate_text",
+    "validate_file",
+]
+
 
 class Severity(Enum):
     ERROR = "ERROR"
     WARNING = "WARNING"
     INFO = "INFO"
 
+
 @dataclass
 class Diagnostic:
-    line: int                
+    line: int
     start_char: int
     end_char: int
     message: str
     severity: Severity
     code: Optional[str] = None
 
-# --- Helper functions -------------------------------------------------------
-def _make_diag(line, start, end, msg, severity, code=None) -> Diagnostic:
-    return Diagnostic(line=line, start_char=start, end_char=end, message=msg, severity=severity, code=code)
+
+# -- Regex patterns -----------------------------------------------------------
+
+_RE_TRAILING_SEMICOLON = re.compile(r";\s*$")
+_RE_OVERLAY_PREFIX = re.compile(r"@(\w+)>>")
+_RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
+_RE_INVALID_MULTIPLIER = re.compile(r"\s+x([^\s]+)\s*$")
+
+
+# -- Helpers ------------------------------------------------------------------
+
+
+def _make_diag(
+    line: int,
+    start_char: int,
+    end_char: int,
+    msg: str,
+    severity: Severity,
+    code: Optional[str] = None,
+) -> Diagnostic:
+    return Diagnostic(
+        line=line,
+        start_char=start_char,
+        end_char=end_char,
+        message=msg,
+        severity=severity,
+        code=code,
+    )
+
+
+# -- Output -------------------------------------------------------------------
 
 
 def print_diagnostics(diags: List[Diagnostic]) -> None:
-    """Clean console output (1-based line numbers)."""
+    """Log all diagnostics in a human-readable format (1-based line numbers)."""
     if not diags:
-        print("[VALIDATOR] No errors found.")
+        log.info("[VALIDATOR] No errors found.")
         return
 
     for d in diags:
-        lvl = d.severity.value
-        ln = d.line + 1
-        print(f"[{lvl}] Line {ln}: chars {d.start_char}-{d.end_char} | {d.message} (code={d.code})")
+        level = d.severity.value
+        line_num = d.line + 1
+        log.info(
+            "[%s] Line %d: chars %d-%d | %s (code=%s)",
+            level,
+            line_num,
+            d.start_char,
+            d.end_char,
+            d.message,
+            d.code,
+        )
 
 
-    # --- Validation logic ----------------------------------------------------
+# -- Core validation ----------------------------------------------------------
+
+
 def validate_text(text: str) -> List[Diagnostic]:
+    """Validate trigger/command definition text and return diagnostics.
+
+    Args:
+        text: Raw text content of a trigger definition file.
+
+    Returns:
+        A list of Diagnostic objects (empty if no issues found).
+    """
+
     diagnostics: List[Diagnostic] = []
     seen_triggers: Set[str] = set()
 
     lines = text.splitlines()
     for line_number, raw_line in enumerate(lines):
-        # 1) Cut off comment part (everything after '#')
+        # Strip everything after the first '#' (comments).
         line_no_comment = raw_line.split("#", 1)[0]
 
-        # if comment-only / empty => skip
+        # Skip empty / comment-only lines.
         if line_no_comment.strip() == "":
             continue
 
-        # base offset: index in raw_line where code-part starts
+        # Determine where the code part starts in the raw line.
         base_offset = raw_line.find(line_no_comment)
         if base_offset < 0:
             base_offset = 0
 
-        # A: Check colon
+        # ------------------------------------------------------------------
+        # A. Missing colon
+        # ------------------------------------------------------------------
         if ":" not in line_no_comment:
             diagnostics.append(_make_diag(
-                line_number, 0, max(1, len(raw_line)),
+                line_number,
+                0,
+                max(1, len(raw_line)),
                 "Missing colon: each line must define a trigger.",
-                Severity.ERROR, "missing_colon"
+                Severity.ERROR,
+                "missing_colon",
             ))
             continue
 
         colon_index_rel = line_no_comment.index(":")
         colon_index_global = base_offset + colon_index_rel
 
-        # B: no space directly after ':'
+        # ------------------------------------------------------------------
+        # B. Space directly after the colon
+        # ------------------------------------------------------------------
         if colon_index_rel + 1 < len(line_no_comment):
             char_after = line_no_comment[colon_index_rel + 1]
             if char_after in (" ", "\t"):
                 diagnostics.append(_make_diag(
-                    line_number, colon_index_global + 1, colon_index_global + 2,
-                    "Formatting error: no space is allowed after the colon.",
-                    Severity.ERROR, "no_space_after_colon"
+                    line_number,
+                    colon_index_global + 1,
+                    colon_index_global + 2,
+                    "Space after colon is unusual "
+                    "(expected 'trigger:command' without space).",
+                    Severity.WARNING,
+                    "space_after_colon",
                 ))
         else:
-            # ":" is the last character -> no content after ':'
             diagnostics.append(_make_diag(
-                line_number, colon_index_global, colon_index_global + 1,
-                "Syntax error: no content after ':' (no commands).",
-                Severity.ERROR, "no_content_after_colon"
+                line_number,
+                colon_index_global,
+                colon_index_global + 1,
+                "No content after ':' (no commands).",
+                Severity.ERROR,
+                "no_content_after_colon",
             ))
             continue
 
-        # C: trailing colons (e.g. "trigger::" or "trigger:   :")
-        if re.search(r":[:\s]*$", line_no_comment):
-            last_colon = base_offset + line_no_comment.rindex(":")
+        # ------------------------------------------------------------------
+        # C. Trailing colons  (e.g. "trigger::" or "trigger:cmd:")
+        # ------------------------------------------------------------------
+        colon_count = line_no_comment.count(":")
+        if colon_count > 1 and line_no_comment.rstrip().endswith(":"):
+            last_colon_global = base_offset + line_no_comment.rindex(":")
             diagnostics.append(_make_diag(
-                line_number, last_colon, base_offset + len(line_no_comment),
-                "Syntax error: trailing colons at the end of the command.",
-                Severity.ERROR, "trailing_colons"
+                line_number,
+                last_colon_global,
+                base_offset + len(line_no_comment),
+                "Trailing colon at end of command.",
+                Severity.ERROR,
+                "trailing_colons",
             ))
 
-        # D: unnecessary semicolon at the end (info)
-        if re.search(r";\s*$", line_no_comment):
-            last_sc = base_offset + line_no_comment.rindex(";")
+        # ------------------------------------------------------------------
+        # D. Trailing semicolon  (info-level)
+        # ------------------------------------------------------------------
+        if _RE_TRAILING_SEMICOLON.search(line_no_comment):
+            last_sc_global = base_offset + line_no_comment.rindex(";")
             diagnostics.append(_make_diag(
-                line_number, last_sc, last_sc + 1,
-                "Unnecessary semicolon at the end of the line.",
-                Severity.INFO, "trailing_semicolon"
+                line_number,
+                last_sc_global,
+                last_sc_global + 1,
+                "Unnecessary semicolon at end of line.",
+                Severity.INFO,
+                "trailing_semicolon",
             ))
 
-        # E: check bracket balance [] and {}
+        # ------------------------------------------------------------------
+        # E. Bracket balance  (skip over quoted strings)
+        # ------------------------------------------------------------------
         square = 0
         curly = 0
-        for ch in line_no_comment:
-            if ch == "[":
-                square += 1
-            elif ch == "]":
-                square -= 1
-            elif ch == "{":
-                curly += 1
-            elif ch == "}":
-                curly -= 1
-        if square != 0:
+        in_single_quote = False
+        in_double_quote = False
+        i = 0
+
+        while i < len(line_no_comment):
+            ch = line_no_comment[i]
+
+            # Skip escaped character (e.g. \' or \")
+            if ch == "\\" and i + 1 < len(line_no_comment):
+                i += 2
+                continue
+
+            # Toggle quote state.
+            if ch == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif ch == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+            elif not in_single_quote and not in_double_quote:
+                if ch == "[":
+                    square += 1
+                elif ch == "]":
+                    square -= 1
+                    if square < 0:
+                        diagnostics.append(_make_diag(
+                            line_number,
+                            base_offset + i,
+                            base_offset + i + 1,
+                            "Unmatched closing square bracket ']'.",
+                            Severity.ERROR,
+                            "unmatched_close_square",
+                        ))
+                        square = 0
+                elif ch == "{":
+                    curly += 1
+                elif ch == "}":
+                    curly -= 1
+                    if curly < 0:
+                        diagnostics.append(_make_diag(
+                            line_number,
+                            base_offset + i,
+                            base_offset + i + 1,
+                            "Unmatched closing curly bracket '}'.",
+                            Severity.ERROR,
+                            "unmatched_close_curly",
+                        ))
+                        curly = 0
+            i += 1
+
+        if square > 0:
             diagnostics.append(_make_diag(
-                line_number, 0, base_offset + len(line_no_comment),
-                "Unbalanced square brackets [] (check selectors!).",
-                Severity.ERROR, "unbalanced_square"
+                line_number,
+                0,
+                base_offset + len(line_no_comment),
+                "Unbalanced opening square bracket '[' (check selectors!).",
+                Severity.ERROR,
+                "unbalanced_square",
             ))
-        if curly != 0:
+        if curly > 0:
             diagnostics.append(_make_diag(
-                line_number, 0, base_offset + len(line_no_comment),
-                "Unbalanced curly brackets {} (check NBT data!).",
-                Severity.ERROR, "unbalanced_curly"
+                line_number,
+                0,
+                base_offset + len(line_no_comment),
+                "Unbalanced opening curly bracket '{' (check NBT data!).",
+                Severity.ERROR,
+                "unbalanced_curly",
             ))
 
-        # F: trigger validation (name & duplicates)
-
+        # ------------------------------------------------------------------
+        # F. Trigger name validation & duplicate detection
+        # ------------------------------------------------------------------
         trigger_raw = line_no_comment[:colon_index_rel]
         trigger = trigger_raw.strip()
-        # compute where trigger starts in global coordinates
-        trigger_rel_index = line_no_comment.find(trigger_raw)
-        trigger_global_start = base_offset + trigger_rel_index + trigger_raw.find(trigger) if trigger_raw.strip() != "" else base_offset
+
+        # Compute where the stripped trigger starts in global coordinates.
+        leading_whitespace = len(trigger_raw) - len(trigger_raw.lstrip())
+        trigger_global_start = base_offset + leading_whitespace
 
         is_quoted = trigger.startswith("'") and trigger.endswith("'")
+
         if is_quoted:
             valid = re.fullmatch(r"'[A-Za-z0-9_ ]+'", trigger)
         else:
             valid = re.fullmatch(r"[A-Za-z0-9_]+", trigger)
+
         if not valid:
             if is_quoted:
-                msg = f"Invalid quoted trigger {trigger!r} (allowed: A-Z, 0-9, _, space, in single quotes)."
+                msg = (
+                    f"Invalid quoted trigger {trigger!r} "
+                    "(allowed: A-Z, a-z, 0-9, _, space, inside single quotes)."
+                )
             else:
-                msg = f"Invalid trigger name '{trigger}' (allowed: A-Z, 0-9, _). Für Leerzeichen: Trigger in einfache Anführungszeichen setzen."
+                msg = (
+                    f"Invalid trigger name '{trigger}' "
+                    "(allowed: A-Z, a-z, 0-9, _). "
+                    "For spaces, wrap the trigger in single quotes."
+                )
             diagnostics.append(_make_diag(
-                line_number, trigger_global_start, trigger_global_start + len(trigger),
+                line_number,
+                trigger_global_start,
+                trigger_global_start + len(trigger),
                 msg,
-                Severity.ERROR, "invalid_trigger_name"
+                Severity.ERROR,
+                "invalid_trigger_name",
             ))
 
         if trigger in seen_triggers:
             diagnostics.append(_make_diag(
-                line_number, trigger_global_start, trigger_global_start + len(trigger),
-                f"Critical error: trigger '{trigger}' defined multiple times.",
-                Severity.ERROR, "duplicate_trigger"
+                line_number,
+                trigger_global_start,
+                trigger_global_start + len(trigger),
+                f"Duplicate trigger: '{trigger}' defined multiple times.",
+                Severity.ERROR,
+                "duplicate_trigger",
             ))
         seen_triggers.add(trigger)
 
-        # G: parse commands (semicolon-separated)
+        # ------------------------------------------------------------------
+        # G. Command parsing (semicolon-separated)
+        # ------------------------------------------------------------------
         commands_part_rel = line_no_comment[colon_index_rel + 1:]
         commands = commands_part_rel.split(";")
-        # compute starting search offset in raw_line for commands
         current_offset_global = base_offset + colon_index_rel + 1
 
         for idx, cmd_raw in enumerate(commands):
             cmd_trim = cmd_raw.strip()
-            # find start position in raw_line (best-effort)
-            cmd_start_global = raw_line.find(cmd_trim, current_offset_global) if cmd_trim else current_offset_global
-            if cmd_start_global == -1:
+
+            # Best-effort: find where this trimmed command starts in raw_line.
+            if cmd_trim:
+                cmd_start_global = raw_line.find(cmd_trim, current_offset_global)
+                if cmd_start_global == -1:
+                    cmd_start_global = current_offset_global
+            else:
                 cmd_start_global = current_offset_global
 
-            # update offset for next search (approx)
-            current_offset_global = cmd_start_global + max(len(cmd_trim), len(cmd_raw)) + 1
+            # Advance past this command (approximate, used for next find).
+            advance_by = max(len(cmd_trim), len(cmd_raw))
+            current_offset_global = cmd_start_global + advance_by + 1
 
-            # empty command block (double semicolon)
+            # Empty command block (double semicolon).
             if cmd_trim == "":
                 if idx < len(commands) - 1:
                     diagnostics.append(_make_diag(
-                        line_number, cmd_start_global, cmd_start_global + 1,
-                        "Empty command block detected (double semicolon?).",
-                        Severity.WARNING, "empty_command_block"
+                        line_number,
+                        cmd_start_global,
+                        cmd_start_global + 1,
+                        "Empty command block (double semicolon?).",
+                        Severity.WARNING,
+                        "empty_command_block",
                     ))
                 continue
 
-            # Check prefix: '/', '$', '!' or '>>' or '@NAME>>'
-            _overlay_re = re.match(r"@(\w+)>>", cmd_trim)
-            if cmd_trim.startswith(">>") or _overlay_re:
-                # Overlay command — check for {comment} placeholder
+            # --- Prefix validation ---
+            is_overlay = (
+                cmd_trim.startswith(">>")
+                or _RE_OVERLAY_PREFIX.match(cmd_trim) is not None
+            )
+
+            if is_overlay:
+                # '{comment}' placeholder outside the 'comment' trigger.
                 if "{comment}" in cmd_trim and trigger.lower() != "comment":
                     ph_pos = cmd_start_global + cmd_trim.find("{comment}")
                     diagnostics.append(_make_diag(
-                        line_number, ph_pos, ph_pos + len("{comment}"),
-                        "'{comment}' is only resolved for the 'comment' trigger. It will not be replaced for any other trigger.",
-                        Severity.ERROR, "comment_placeholder_wrong_trigger"
+                        line_number,
+                        ph_pos,
+                        ph_pos + len("{comment}"),
+                        "'{comment}' is only resolved for the 'comment' trigger."
+                        " It will not be replaced for other triggers.",
+                        Severity.ERROR,
+                        "comment_placeholder_wrong_trigger",
                     ))
+
+                # Multiplier is not allowed on overlay commands.
+                mm_overlay = _RE_MULTIPLIER.search(cmd_trim)
+                if mm_overlay:
+                    token = f"x{mm_overlay.group(1)}"
+                    token_pos = cmd_start_global + cmd_trim.rfind(token)
+                    diagnostics.append(_make_diag(
+                        line_number,
+                        token_pos,
+                        token_pos + len(token),
+                        "Multiplier is not allowed on overlay commands "
+                        "(>> or @name>>).",
+                        Severity.ERROR,
+                        "overlay_multiplier",
+                    ))
+
             elif cmd_trim[0] not in ("/", "$", "!"):
                 diagnostics.append(_make_diag(
-                    line_number, cmd_start_global, cmd_start_global + len(cmd_trim),
-                    f"Each command must start with '/', '$', '!' or '>>' (found: '{cmd_trim[0]}').",
-                    Severity.ERROR, "invalid_prefix"
+                    line_number,
+                    cmd_start_global,
+                    cmd_start_global + len(cmd_trim),
+                    f"Each command must start with '/', '$', '!' or '>>' "
+                    f"(found: '{cmd_trim[0]}').",
+                    Severity.ERROR,
+                    "invalid_prefix",
                 ))
 
-            # '!' may only appear at the beginning (skip for >> and @NAME>> overlay commands)
-            idx_bang = cmd_trim.find("!")
-            if idx_bang > 0 and not cmd_trim.startswith(">>") and not re.match(r"@\w+>>", cmd_trim):
-                # position of the bad '!' relative to line
-                diagnostics.append(_make_diag(
-                    line_number, cmd_start_global + idx_bang, cmd_start_global + idx_bang + 1,
-                    "'!' is only allowed at the start of a plugin command",
-                    Severity.ERROR, "bang_in_middle"
-                ))
-
-            # Check multiplier: " xN" at the end
-            mm = re.search(r"\s+x(\d+)\s*$", cmd_trim)
+            # --- Multiplier validation ---
+            mm = _RE_MULTIPLIER.search(cmd_trim)
             if mm:
                 amount = int(mm.group(1))
-                # Warning for very high values (performance)
                 if amount > 50 and "# ignore-lag" not in raw_line:
                     x_token = f"x{amount}"
                     token_pos = cmd_start_global + cmd_trim.rfind(x_token)
                     diagnostics.append(_make_diag(
-                        line_number, token_pos, token_pos + len(x_token),
+                        line_number,
+                        token_pos,
+                        token_pos + len(x_token),
                         f"Performance warning: x{amount} is very high.",
-                        Severity.WARNING, "high_multi"
+                        Severity.WARNING,
+                        "high_multi",
                     ))
             else:
-                maybe_x = re.search(r"\s+x([^\s]+)\s*$", cmd_trim)
+                maybe_x = _RE_INVALID_MULTIPLIER.search(cmd_trim)
                 if maybe_x and not maybe_x.group(1).isdigit():
                     token_str = f"x{maybe_x.group(1)}"
                     token_pos = cmd_start_global + cmd_trim.rfind(token_str)
                     diagnostics.append(_make_diag(
-                        line_number, token_pos, token_pos + len(token_str),
+                        line_number,
+                        token_pos,
+                        token_pos + len(token_str),
                         f"Invalid multiplier '{maybe_x.group(1)}' (use xNumber).",
-                        Severity.ERROR, "invalid_multiplier"
+                        Severity.ERROR,
+                        "invalid_multiplier",
                     ))
 
     return diagnostics
 
 
-def validate_file(file_path: str, raise_on_error: bool = True) -> List[Diagnostic]:
+# -- File-level validation ----------------------------------------------------
+
+
+def validate_file(
+    file_path: Union[str, Path],
+    raise_on_error: bool = True,
+) -> List[Diagnostic]:
+    """Read and validate a trigger/command file.
+
+    Args:
+        file_path: Path to the file.
+        raise_on_error:
+            If True and at least one ERROR-level diagnostic exists, raise
+            ValueError with a summary.
+
+    Returns:
+        List of Diagnostic objects.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If ``raise_on_error`` is True and errors are found.
     """
-    Validates a file and returns a list of diagnostics.
-    If raise_on_error=True and at least one ERROR exists, ValueError is raised.
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as fh:
-            text = fh.read()
-    except FileNotFoundError:
+    path = Path(file_path)
+
+    if not path.is_file():
         raise FileNotFoundError(f"Actions file not found: {file_path}")
 
+    text = path.read_text(encoding="utf-8")
     diags = validate_text(text)
 
-    # separate errors/warnings/info
     errors = [d for d in diags if d.severity == Severity.ERROR]
     if errors and raise_on_error:
-        # Print for users and raise exception with all messages
-        print("[VALIDATOR] Errors found:")
+        log.info("[VALIDATOR] Errors found:")
         print_diagnostics(diags)
-        raise ValueError("Validation failed: actions file contains errors. See output above.")
+        raise ValueError(
+            "Validation failed: actions file contains errors. "
+            "See output above."
+        )
+
     return diags

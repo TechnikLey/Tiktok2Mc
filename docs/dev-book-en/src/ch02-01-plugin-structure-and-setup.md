@@ -41,9 +41,13 @@ The new folder will be created at `src/plugins/` with the name you specified dur
 This is the most important file! This is where you write the actual logic of your plugin. If you create a plugin with `create_plugin.py`, you automatically get base code inserted. It looks something like this:
 
 ```python
+import logging
+import sys
 from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
 from python.registry import register_plugin
-import sys
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+log = logging.getLogger(__name__)
 
 PLUGIN_DIR = get_plugin_dir()
 CONFIG_FILE = get_plugin_config_file()
@@ -61,7 +65,8 @@ if register_only:
         path=MAIN_FILE,
         enable=cfg.get("Enable", True),
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 ```
@@ -80,6 +85,29 @@ You import functions and classes from the `core` module. This saves you a lot of
 - `get_base_file`: Determines important file paths
 - `register_plugin`: Registers your plugin (from `python.registry`)
 - `AppConfig`: A class that stores the plugin configuration
+
+**Setting Up Logging**  
+```python
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+log = logging.getLogger(__name__)
+```
+
+The logging module is your primary tool for runtime diagnostics. This setup configures the root logger with:
+- **`level=logging.INFO`**: Messages at INFO level and above (`INFO`, `WARNING`, `ERROR`, `CRITICAL`) are shown. Change to `logging.DEBUG` during development for more detail.
+- **`format`**: Each log line includes a timestamp, severity level, and the message. Example: `14:32:07 [INFO] Plugin started successfully`
+- **`stream=sys.stdout`**: Output goes to the console (stdout) so it appears in the plugin's terminal window.
+
+After setup, use the logger throughout your plugin:
+```python
+log.info("Plugin started successfully")
+log.warning("Config key missing, using default")
+log.error("Something went wrong: %s", error_msg)
+log.debug("Detailed debug info (only visible at DEBUG level)")
+```
+
+> [!TIP]
+> This is the same logging pattern used across all built-in modules (`src/python/*.py`).  
+> For file-based logging (writing to a `logs/` folder), see [Error Handling & Best Practices](./ch02-06-error-handling-and-best-practices.md).
 
 **Setting Up Important Paths**  
 ```python
@@ -109,7 +137,8 @@ if register_only:
         path=MAIN_FILE,
         enable=True,
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 ```
@@ -136,6 +165,9 @@ If the plugin just needs to be registered, the following happens:
 - **`ics`**: **I**nterface **C**ontrol **S**ystem – indicates whether the GUI is supported
   - `True` = GUI is supported
   - `False` = GUI is NOT supported (Direct Control System / DCS)
+
+- **`port`**: The network port your plugin's web server listens on (default `0` = no port / no web UI).  
+  If your plugin serves an overlay or API, set this to its port number. The tool will show the URL (`http://localhost:<port>`) at startup so users can add it as an OBS Browser Source.
 
 After registration, the program ends with `sys.exit(0)`.
 
@@ -174,7 +206,8 @@ After registration, the program ends with `sys.exit(0)`.
 >         path=MAIN_FILE,
 >         enable=True,
 >         level=4,
->         ics=False
+>         ics=False,
+>         port=0
 >     ))
 >     sys.exit(0)
 > ```

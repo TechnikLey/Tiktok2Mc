@@ -12,7 +12,12 @@ import json
 from queue import Queue
 from collections import defaultdict
 from core import parse_args, AppConfig, get_root_dir, get_base_dir, get_base_file
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
+
+_listeners_lock = threading.Lock()
 
 # ==========================================
 # Paths & configuration
@@ -51,10 +56,14 @@ if CONFIG_FILE.exists():
             SERVER_HOST = full_config.get("server_host", "127.0.0.1")
             
     except Exception as e:
-        print(f"[!] Config error: {e}")
+        log.info(f"[!] Config error: {e}")
 
 if not OVERLAYS_CONFIG:
     OVERLAYS_CONFIG = [{"name": "default"}]
+
+THEME = load_plugin_theme(full_config, "overlay_text")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 OVERLAYTXT_EXE_PATH = get_base_file()
 
@@ -66,7 +75,8 @@ if register_only:
         path=OVERLAYTXT_EXE_PATH,
         enable=full_config.get("overlay_text", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=APP_PORT,
     ))
     sys.exit(0)
 
@@ -88,21 +98,30 @@ def index():
         fade_in=FADE_IN, 
         fade_out=FADE_OUT, 
         chroma=chroma,
-        overlay_name=overlay_name
+        overlay_name=overlay_name,
+        theme_style=THEME_STYLE,
+        chroma_color=THEME["background"]
     )
 
 @app.route("/stream/<overlay_name>")
 def stream(overlay_name):
     q = Queue()
-    listeners[overlay_name].append(q)
+    with _listeners_lock:
+        listeners[overlay_name].append(q)
     def event_stream():
         try:
             while True:
-                data = q.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    data = q.get(timeout=1)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception:
+                    pass
+        except GeneratorExit:
+            pass
         finally:
-            if q in listeners[overlay_name]:
-                listeners[overlay_name].remove(q)
+            with _listeners_lock:
+                if q in listeners[overlay_name]:
+                    listeners[overlay_name].remove(q)
     return Response(event_stream(), mimetype="text/event-stream")
 
 @app.route('/display/<overlay_name>', methods=['POST'])
@@ -117,8 +136,9 @@ def display(overlay_name):
         "duration": content.get("duration", 3)
     }
     
-    for q in listeners[overlay_name]:
-        q.put(data)
+    with _listeners_lock:
+        for q in list(listeners[overlay_name]):
+            q.put(data)
         
     return f"Angezeigt auf {overlay_name}", 200
 
@@ -131,14 +151,15 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <style>
+{{ theme_style }}
         body {
             margin: 0; padding: 0; overflow: hidden;
-            background-color: {% if chroma %}#00FF00{% else %}transparent{% endif %};
+            background-color: {% if chroma %}{{ chroma_color }}{% else %}transparent{% endif %};
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: white;
+            color: var(--text);
             font-family: 'Segoe UI', Arial, sans-serif;
             text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000;
         }
@@ -147,8 +168,8 @@ HTML_TEMPLATE = """
             opacity: 0;
             transition: opacity {{ fade_in }}ms ease-in-out;
         }
-        h1 { font-size: 70px; margin: 0; color: #FFFFFF; }
-        p { font-size: 30px; margin: 0; color: #FFFFFF; }
+        h1 { font-size: 70px; margin: 0; color: var(--text); }
+        p { font-size: 30px; margin: 0; color: var(--text); }
         .show { opacity: 1 !important; }
     </style>
 </head>
@@ -214,7 +235,7 @@ HTML_TEMPLATE = """
 gui_hidden = getattr(args, 'gui_hidden', False)
 
 def start_flask():
-    app.run(host=SERVER_HOST, port=APP_PORT, debug=False, use_reloader=False)
+    app.run(host=SERVER_HOST, port=APP_PORT, threaded=True, debug=False, use_reloader=False)
 
 if __name__ == '__main__':
     server_thread = threading.Thread(target=start_flask, daemon=True)
@@ -233,9 +254,9 @@ if __name__ == '__main__':
                 height=300,
                 x=100 + (idx * 50), # Leicht versetzt auf dem Bildschirm
                 y=100 + (idx * 50),
-                background_color='#00FF00'
+                background_color=BG_COLOR
             )
         webview.start()
     else:
-        print(f"GUI hidden, running server on port {APP_PORT} only.")
+        log.info(f"GUI hidden, running server on port {APP_PORT} only.")
         server_thread.join()

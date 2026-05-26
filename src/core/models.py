@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,7 @@ class AppConfig:
     enable: bool
     level: int
     ics: bool
+    port: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip():
@@ -26,6 +27,8 @@ class AppConfig:
             raise ValueError("level must be a non-negative int.")
         if not isinstance(self.ics, bool):
             raise TypeError("ics must be a bool.")
+        if not isinstance(self.port, int) or self.port < 0:
+            raise ValueError("port must be a non-negative int.")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +37,7 @@ class AppConfig:
             "enable": self.enable,
             "level": self.level,
             "ics": self.ics,
+            "port": self.port,
         }
 
     @classmethod
@@ -44,6 +48,7 @@ class AppConfig:
             enable=data["enable"],
             level=data["level"],
             ics=data["ics"],
+            port=data.get("port", 0),
         )
 
 
@@ -51,7 +56,3 @@ def validate_config_dict(config: dict[str, Any]) -> None:
     missing = REQUIRED_KEYS - set(config.keys())
     if missing:
         raise ValueError(f"Missing required key(s): {', '.join(sorted(missing))}")
-
-    unknown = set(config.keys()) - REQUIRED_KEYS
-    if unknown:
-        raise ValueError(f"Unknown key(s): {', '.join(sorted(unknown))}")

@@ -6,6 +6,10 @@
 import sys
 import re
 from pathlib import Path
+import logging
+logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
+
+log = logging.getLogger(__name__)
 
 PLUGINS_DIR = Path("src/plugins")
 VERSION = "v1.0.0"
@@ -21,9 +25,13 @@ enabled: true
 '''
 
 MAIN_PY_TEMPLATE = '''\
+import logging
+import sys
 from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
 from python.registry import register_plugin
-import sys
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+log = logging.getLogger(__name__)
 
 PLUGIN_DIR = get_plugin_dir()
 CONFIG_FILE = get_plugin_config_file()
@@ -41,7 +49,8 @@ if register_only:
         path=MAIN_FILE,
         enable=cfg.get("enabled", True),
         level=4,
-        ics=False
+        ics=False,
+        port=0
     ))
     sys.exit(0)
 '''
@@ -51,9 +60,9 @@ def get_valid_plugin_name():
         name = input("Please enter module name (only a-z and 0-9): ").strip()
 
         if not re.match(r'^[a-z0-9]+$', name):
-            print("\033[91mInvalid name! Only a-z and 0-9 allowed.\033[0m")
+            log.info("\033[91mInvalid name! Only a-z and 0-9 allowed.\033[0m")
         elif (PLUGINS_DIR / name).exists():
-            print("\033[91mFolder already exists! Please choose another name.\033[0m")
+            log.info("\033[91mFolder already exists! Please choose another name.\033[0m")
         else:
             return name
 
@@ -74,11 +83,11 @@ def main():
 
     plugin_path = PLUGINS_DIR / plugin_name
     plugin_path.mkdir(parents=True, exist_ok=True)
-    print(f"Folder '{plugin_name}' created.")
+    log.info(f"Folder '{plugin_name}' created.")
 
     # Create main.py
     (plugin_path / "main.py").write_text(MAIN_PY_TEMPLATE.format(name=plugin_name), encoding="utf-8")
-    print("File 'main.py' created.")
+    log.info("File 'main.py' created.")
 
     # Ask for update URL
     update_url = get_update_url()
@@ -86,16 +95,16 @@ def main():
     # Create version.txt
     version_content = f"version: {VERSION}\nupdate_url: {update_url}\n"
     (plugin_path / "version.txt").write_text(version_content, encoding="utf-8")
-    print(f"File 'version.txt' created.")
+    log.info(f"File 'version.txt' created.")
 
     # Create README.md
     readme = f"# {plugin_name}\n\nVersion: {VERSION}\n\nDescription: \n"
     (plugin_path / "README.md").write_text(readme, encoding="utf-8")
-    print("File 'README.md' created.")
+    log.info("File 'README.md' created.")
 
     # Create config.yaml
     (plugin_path / "config.yaml").write_text(CONFIG_YAML_TEMPLATE, encoding="utf-8")
-    print("File 'config.yaml' created.")
+    log.info("File 'config.yaml' created.")
 
     input("\nPress Enter to exit...")
 

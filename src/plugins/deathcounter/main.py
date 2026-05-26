@@ -13,7 +13,10 @@ from flask import Flask, Response, request, render_template_string
 from flask_cors import CORS
 from queue import Queue
 from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # --- Paths & configuration ---
 args = parse_args()
@@ -28,9 +31,9 @@ WEB_SERVER_PORT = 29190
 def load_win_size():
     if STATE_FILE.exists():
         try:
-            with STATE_FILE.open("r") as f: return json.load(f)
+            with STATE_FILE.open("r", encoding="utf-8") as f: return json.load(f)
         except Exception as e:
-            print(f"[DEATHCOUNTER] Failed to load state: {e}")
+            log.info(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}
 
 cfg = {}
@@ -41,14 +44,18 @@ if CONFIG_FILE.exists():
             cfg = yaml.safe_load(f) or {}
             WEB_SERVER_PORT = cfg.get("death_counter", {}).get("port", 29190)
     except Exception as e:
-        print(f"Config error: {e}")
+        log.info(f"Config error: {e}")
         cfg = {}
 else:
-    print(f"Config file not found: {CONFIG_FILE}")
+    log.info(f"Config file not found: {CONFIG_FILE}")
     sys.exit(1)
 
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
+THEME = load_plugin_theme(cfg, "death_counter")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 
 DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", True)
 DEATH_COUNTER_EXE_PATH = get_base_file()
@@ -62,7 +69,8 @@ if register_only:
         path=DEATH_COUNTER_EXE_PATH,
         enable=DEATH_COUNTER_ENABLED,
         level=4,
-        ics=True
+        ics=True,
+        port=WEB_SERVER_PORT,
     ))
     sys.exit(0)
 
@@ -75,9 +83,12 @@ class DeathManager:
     def __init__(self):
         self.count = 0
         self.listeners = []
+        self._lock = threading.Lock()
     def add_death(self):
         self.count += 1
-        for q in list(self.listeners): q.put(self.count)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(self.count)
 
 death_manager = DeathManager()
 
@@ -88,11 +99,12 @@ HTML_TEMPLATE = """
 <head>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap');
+{THEME_STYLE}
         body, html { 
-            background: #000000; margin: 0; padding: 0;
+            background: var(--background); margin: 0; padding: 0;
             width: 100%; height: 100%; display: flex;
             flex-direction: column; justify-content: center; align-items: center;
-            overflow: hidden; font-family: 'Inter', sans-serif; color: #8ef3ff;
+            overflow: hidden; font-family: 'Inter', sans-serif; color: var(--text);
             user-select: none;
         }
         .label { font-size: 12vh; font-weight: 700; opacity: 0.7; letter-spacing: 1.5vw; margin-bottom: -2vh; }
@@ -135,11 +147,12 @@ HTML_TEMPLATE = """
 """
 
 @app.route("/")
-def index(): return render_template_string(HTML_TEMPLATE)
+def index(): return render_template_string(HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE))
 
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
-    with STATE_FILE.open("w") as f: json.dump(request.json, f)
+    data = request.json or {}
+    with STATE_FILE.open("w", encoding="utf-8") as f: json.dump(data, f)
     return "OK"
 
 @app.route("/webhook", methods=["POST"])
@@ -149,19 +162,29 @@ def add():
         if data and data.get("event") == "player_death":
             death_manager.add_death()
     except Exception as e:
-        print(f"[DEATHCOUNTER] Webhook error: {e}")
+        log.info(f"[DEATHCOUNTER] Webhook error: {e}")
     return "OK"
 
 @app.route("/stream")
 def stream():
-    q = Queue(); death_manager.listeners.append(q)
+    q = Queue()
+    with death_manager._lock:
+        death_manager.listeners.append(q)
     def event_stream():
         try:
             yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
-            while True: yield f"data: {json.dumps({'deaths': q.get()})}\n\n"
+            while True:
+                try:
+                    deaths = q.get(timeout=1)
+                    yield f"data: {json.dumps({'deaths': deaths})}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
+        except GeneratorExit:
+            pass
         finally:
-            try: death_manager.listeners.remove(q)
-            except ValueError: pass
+            with death_manager._lock:
+                try: death_manager.listeners.remove(q)
+                except ValueError: pass
     return Response(event_stream(), mimetype="text/event-stream")
 
 gui_hidden = args.gui_hidden
@@ -172,8 +195,8 @@ if __name__ == "__main__":
     server_thread.start()
 
     if not gui_hidden:
-        webview.create_window('Death Counter', f'http://127.0.0.1:{WEB_SERVER_PORT}', width=win['width'], height=win['height'], on_top=True, background_color='#000000')
+        webview.create_window('Death Counter', f'http://127.0.0.1:{WEB_SERVER_PORT}', width=win['width'], height=win['height'], on_top=True, background_color=BG_COLOR)
         webview.start()
     else:
-        print("GUI hidden, running server only.")
+        log.info("GUI hidden, running server only.")
         server_thread.join()

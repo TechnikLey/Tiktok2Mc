@@ -14,7 +14,10 @@ from pathlib import Path
 from flask import Flask, render_template_string, Response, request
 from queue import Queue
 from core import parse_args, AppConfig, get_base_file, get_base_dir, get_root_dir
+from core.theme import load_plugin_theme, theme_css
 from python.registry import register_plugin
+import logging
+log = logging.getLogger(__name__)
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
@@ -33,7 +36,7 @@ args = parse_args()
 def load_win_size():
     if STATE_FILE.exists():
         try:
-            with STATE_FILE.open("r") as f:
+            with STATE_FILE.open("r", encoding="utf-8") as f:
                 size = json.load(f)
                 # Validate that dimensions are not accidentally too small
                 return {
@@ -41,7 +44,7 @@ def load_win_size():
                     "height": max(size.get("height", 300), 100)
                 }
         except Exception as e:
-            print(f"[WINCOUNTER] Failed to load window size: {e}")
+            log.info(f"[WINCOUNTER] Failed to load window size: {e}")
     return {"width": 600, "height": 300}
 
 # --- Configuration ---
@@ -52,6 +55,10 @@ except Exception: cfg = {}
 PORT = cfg.get("win_counter", {}).get("port", 29191)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
+THEME = load_plugin_theme(cfg, "win_counter")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
 WINCOUNTER_EXE_PATH = get_base_file()
 
 # --- Plugin self-registration ---
@@ -63,7 +70,8 @@ if register_only:
         path=WINCOUNTER_EXE_PATH,
         enable=cfg.get("win_counter", {}).get("enabled", True),
         level=4,
-        ics=True
+        ics=True,
+        port=PORT,
     ))
     sys.exit(0)
 
@@ -73,32 +81,35 @@ win_manager_instance = None  # Initialized below
 class WinManager:
     """Tracks wins, losses, and the escalating win target. Persists state to disk."""
     def __init__(self):
-        self.wins, self.needed, self.record = 0, 10, 0
+        self.wins, self.needed, self.record_low = 0, 10, 0
         self.listeners = []
+        self._lock = threading.Lock()
         self.load_stats()
 
     def load_stats(self):
         if STATS_FILE.exists():
             try:
-                with STATS_FILE.open("r") as f:
+                with STATS_FILE.open("r", encoding="utf-8") as f:
                     d = json.load(f)
                     self.wins = d.get("wins", 0)
                     self.needed = d.get("needed", 10)
-                    self.record = d.get("record", 0)
+                    self.record_low = d.get("record_low", d.get("record", 0))
             except Exception as e:
-                print(f"[WINCOUNTER] Failed to load stats: {e}")
+                log.info(f"[WINCOUNTER] Failed to load stats: {e}")
 
     def save_stats(self):
         try:
-            with STATS_FILE.open("w") as f:
-                json.dump({"wins": self.wins, "record": self.record, "needed": self.needed}, f, indent=4)
+            with STATS_FILE.open("w", encoding="utf-8") as f:
+                json.dump({"wins": self.wins, "record_low": self.record_low, "needed": self.needed}, f, indent=4)
         except Exception as e:
-            print(f"[WINCOUNTER] Failed to save stats: {e}")
+            log.info(f"[WINCOUNTER] Failed to save stats: {e}")
 
     def _notify(self):
         self.save_stats()
         data = self.get_data()
-        for q in list(self.listeners): q.put(data)
+        with self._lock:
+            for q in list(self.listeners):
+                q.put(data)
 
     def add_win(self, amount=1):
         self.wins += amount
@@ -109,15 +120,16 @@ class WinManager:
 
     def remove_win(self, amount=1):
         self.wins -= amount
-        if self.wins < self.record: self.record = self.wins
+        if self.wins < self.record_low:
+            self.record_low = self.wins
         self._notify()
 
     def get_data(self):
         return {
-            "wins": self.wins, 
-            "needed": self.needed, 
-            "record": self.record, 
-            "win_color": "#ff4d4d" if self.wins < 0 else "white"
+            "wins": self.wins,
+            "needed": self.needed,
+            "record_low": self.record_low,
+            "win_color": THEME["danger"] if self.wins < 0 else THEME["text"]
         }
 
 win_manager_instance = WinManager()
@@ -128,8 +140,9 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <style>
+{THEME_STYLE}
         body { 
-            background-color: #000000; color: white; 
+            background-color: var(--background); color: var(--text); 
             font-family: 'Consolas', monospace; margin: 0; 
             display: flex; flex-direction: column; 
             justify-content: center; align-items: center;
@@ -139,7 +152,7 @@ HTML_TEMPLATE = """
         .container { 
             display: flex; align-items: center; 
             gap: 3vw; 
-            font-size: 25vmin; /* Scaled up */
+            font-size: 25vmin;
             font-weight: bold; 
             white-space: nowrap;
             line-height: 1;
@@ -147,15 +160,15 @@ HTML_TEMPLATE = """
         .record-section { 
             margin-top: 1vh; 
             font-size: 10vmin; 
-            color: #666; 
+            color: var(--muted); 
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <span>Wins:</span><span id="wins">0</span><span style="color: #333;">|</span><span id="needed">10</span>
+        <span>Wins:</span><span id="wins">0</span><span style="color: var(--separator);">|</span><span id="needed">10</span>
     </div>
-    <div class="record-section">Record: <span id="record">0</span></div>
+    <div class="record-section">Record Low: <span id="record_low">0</span></div>
     
     <script>
         const es = new EventSource("/stream");
@@ -164,7 +177,7 @@ HTML_TEMPLATE = """
             document.getElementById('wins').innerText = d.wins;
             document.getElementById('wins').style.color = d.win_color;
             document.getElementById('needed').innerText = d.needed;
-            document.getElementById('record').innerText = d.record;
+            document.getElementById('record_low').innerText = d.record_low;
         };
 
         // Window resize: save outer dimensions for state persistence.
@@ -187,12 +200,12 @@ HTML_TEMPLATE = """
 """
 
 @app.route("/")
-def index(): return render_template_string(HTML_TEMPLATE)
+def index(): return render_template_string(HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE))
 
 @app.route("/save_dims", methods=["POST"])
 def save_dims():
-    data = request.json
-    with STATE_FILE.open("w") as f: json.dump(data, f)
+    data = request.json or {}
+    with STATE_FILE.open("w", encoding="utf-8") as f: json.dump(data, f)
     return "OK"
 
 @app.route("/add", methods=["POST"])
@@ -217,10 +230,10 @@ def handle_minecraft_events():
 
         if event == "player_death":
             win_manager_instance.remove_win(1)
-            print("\n[STATUS] [DEAD] Player died! Win removed.")
+            log.info("\n[DEAD] Player died! Win removed.")
 
     except Exception as e:
-        print(f"[ERROR] Webhook error: {e}")
+        log.error(f"Webhook error: {e}")
 
     return {"status": "processed"}, 200
 
@@ -228,18 +241,24 @@ def handle_minecraft_events():
 def stream():
     # Create a queue for this specific browser tab (SSE listener)
     q = Queue()
-    win_manager_instance.listeners.append(q)
+    with win_manager_instance._lock:
+        win_manager_instance.listeners.append(q)
     
     def event_stream():
         try:
-            # Send initial state immediately on connect
             yield f"data: {json.dumps(win_manager_instance.get_data())}\n\n"
             while True:
-                result = q.get()  # Blocks until a new update arrives
-                yield f"data: {json.dumps(result)}\n\n"
+                try:
+                    result = q.get(timeout=1)
+                    yield f"data: {json.dumps(result)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps(win_manager_instance.get_data())}\n\n"
+        except GeneratorExit:
+            pass
         finally:
-            try: win_manager_instance.listeners.remove(q)
-            except ValueError: pass
+            with win_manager_instance._lock:
+                try: win_manager_instance.listeners.remove(q)
+                except ValueError: pass
             
     return Response(event_stream(), mimetype="text/event-stream")
 
@@ -259,9 +278,9 @@ if __name__ == "__main__":
             width=size['width'] + 30, 
             height=size['height'] + 30, 
             on_top=True,
-            background_color='#000000'
+            background_color=BG_COLOR
         )
         webview.start()
     else:
-        print("GUI hidden, running server only.")
+        log.info("GUI hidden, running server only.")
         server_thread.join()

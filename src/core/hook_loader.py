@@ -16,6 +16,9 @@ import sys
 from pathlib import Path
 
 from core.hook_api import HookAPI
+import logging
+
+log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Allowed top-level module names for event hook scripts.
@@ -24,8 +27,13 @@ from core.hook_api import HookAPI
 # ---------------------------------------------------------------------------
 ALLOWED_IMPORTS: frozenset[str] = frozenset({
     # standard library — safe utilities
-    "time", "random"
+    "time", "random", "logging",
+    # third-party — used by Spotify hook
+    "requests",
 })
+
+# Modules explicitly allowed for IntelliSense/type-checking only.
+ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({"core.hook_api"})
 
 def _check_imports(path: Path) -> list[str]:
     """
@@ -36,20 +44,26 @@ def _check_imports(path: Path) -> list[str]:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
     except (SyntaxError, OSError):
-        return []  # let the normal loader handle these errors
+        return []
 
     disallowed: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                top = alias.name.split(".")[0]
+                full_name = alias.name
+                if full_name in ALLOWED_HOOK_MODULES:
+                    continue
+                top = full_name.split(".")[0]
                 if top not in ALLOWED_IMPORTS:
-                    disallowed.append(alias.name)
+                    disallowed.append(full_name)
         elif isinstance(node, ast.ImportFrom):
             if node.module:
-                top = node.module.split(".")[0]
+                full_module = node.module
+                if full_module in ALLOWED_HOOK_MODULES:
+                    continue
+                top = full_module.split(".")[0]
                 if top not in ALLOWED_IMPORTS:
-                    disallowed.append(node.module)
+                    disallowed.append(full_module)
     return disallowed
 
 def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
@@ -63,43 +77,39 @@ def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
     """
     if not hooks_dir.exists():
         hooks_dir.mkdir(parents=True, exist_ok=True)
-        print(f"[HOOK] Created event_hooks folder: {hooks_dir}")
+        log.info(f"[HOOK] Created event_hooks folder: {hooks_dir}")
         return
 
     hook_files = sorted(hooks_dir.glob("*.py"))
     if not hook_files:
-        print("[HOOK] No event hooks found.")
+        log.info("[HOOK] No event hooks found.")
         return
 
-    print(f"[HOOK] Loading {len(hook_files)} hook(s) from: {hooks_dir}")
+    log.info(f"[HOOK] Loading {len(hook_files)} hook(s) from: {hooks_dir}")
 
     for path in hook_files:
         _load_single_hook(api, path)
 
-
 def _load_single_hook(api: HookAPI, path: Path) -> None:
-    # ------------------------------------------------------------------
-    # Import whitelist check — runs before the module is loaded
-    # ------------------------------------------------------------------
     disallowed = _check_imports(path)
-    try:
-        disallowed.remove("core.hook_api")
-        disallowed.remove("HookAPI")
-    except ValueError:
-        pass
     if disallowed:
         for name in disallowed:
-            print(
-                f"[HOOK] [ERROR] {path.name} uses disallowed import: "
+            log.error(
+                f"[HOOK] {path.name} uses disallowed import: "
                 f"'{name}' — hook skipped. "
             )
         return
 
     module_name = f"event_hooks.{path.stem}"
     try:
+        # Ensure parent package exists in sys.modules
+        if "event_hooks" not in sys.modules:
+            import types
+            sys.modules["event_hooks"] = types.ModuleType("event_hooks")
+
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
-            print(f"[HOOK] [WARN] Could not create spec for: {path.name}")
+            log.warning(f"[HOOK] Could not create spec for: {path.name}")
             return
 
         module = importlib.util.module_from_spec(spec)
@@ -107,16 +117,16 @@ def _load_single_hook(api: HookAPI, path: Path) -> None:
         spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
     except SyntaxError as e:
-        print(f"[HOOK] [WARN] Syntax error in {path.name}: {e}")
+        log.warning(f"[HOOK] Syntax error in {path.name}: {e}")
         return
     except Exception as e:
-        print(f"[HOOK] [WARN] Failed to load {path.name}: {e}")
+        log.warning(f"[HOOK] Failed to load {path.name}: {e}")
         return
 
     if hasattr(module, "register") and callable(module.register):
         try:
             module.register(api)
         except Exception as e:
-            print(f"[HOOK] [WARN] register() failed in {path.name}: {e}")
+            log.warning(f"[HOOK] register() failed in {path.name}: {e}")
     else:
-        print(f"[HOOK] [ERROR] {path.name} has no register() function — skipped.")
+        log.error(f"[HOOK] {path.name} has no register() function — skipped.")

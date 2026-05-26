@@ -18,6 +18,10 @@ import requests
 from pathlib import Path
 from packaging import version
 from core.paths import get_base_dir
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+
+log = logging.getLogger(__name__)
 
 SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 BASE_DIR = get_base_dir()
@@ -62,7 +66,7 @@ def _download_and_extract(plugin_dir: Path, download_url: str) -> bool:
         resp = requests.get(download_url, stream=True, timeout=30)
         resp.raise_for_status()
     except Exception as e:
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Download failed: {e}")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Download failed: {e}")
         return False
 
     is_zip = download_url.lower().endswith(".zip") or "application/zip" in resp.headers.get("Content-Type", "")
@@ -86,7 +90,7 @@ def _download_and_extract(plugin_dir: Path, download_url: str) -> bool:
                 with tarfile.open(archive_path, "r:gz") as t:
                     t.extractall(extract_dir)
         except Exception as e:
-            print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Extraction failed: {e}")
+            log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Extraction failed: {e}")
             return False
 
         source_root = extract_dir
@@ -100,8 +104,8 @@ def _download_and_extract(plugin_dir: Path, download_url: str) -> bool:
         if config_file.exists():
             try:
                 config_backup = config_file.read_text(encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                log.info(f"[PLUGIN-UPDATE] Failed to read config backup: {e}")
 
         for item in source_root.iterdir():
             name = item.name
@@ -114,13 +118,13 @@ def _download_and_extract(plugin_dir: Path, download_url: str) -> bool:
                 elif item.is_dir():
                     shutil.copytree(item, dst, dirs_exist_ok=True)
             except Exception as e:
-                print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Failed to copy {name}: {e}")
+                log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Failed to copy {name}: {e}")
 
         if config_backup:
             try:
                 config_file.write_text(config_backup, encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                log.info(f"[PLUGIN-UPDATE] Failed to restore config: {e}")
 
     return True
 
@@ -131,17 +135,17 @@ def _check_github(plugin_dir: Path, local_ver: str, update_url: str) -> bool:
         resp.raise_for_status()
         release = resp.json()
     except Exception as e:
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: GitHub API error: {e}")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: GitHub API error: {e}")
         return False
 
     remote_tag = release.get("tag_name", "")
     remote_ver = extract_version(remote_tag)
     if not remote_ver:
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: No valid version in GitHub release")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: No valid version in GitHub release")
         return False
 
     if version.parse(remote_ver) <= version.parse(local_ver):
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Already up to date ({local_ver})")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Already up to date ({local_ver})")
         return False
 
     is_win = sys.platform == "win32"
@@ -152,12 +156,12 @@ def _check_github(plugin_dir: Path, local_ver: str, update_url: str) -> bool:
         asset = next((a for a in assets if "Linux" in a["name"] and a["name"].endswith(".tar.gz")), None)
 
     if not asset:
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: No matching asset for this platform")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: No matching asset for this platform")
         return False
 
-    print(f"[PLUGIN-UPDATE] {plugin_dir.name}: {local_ver} -> {remote_ver}")
+    log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: {local_ver} -> {remote_ver}")
     if _download_and_extract(plugin_dir, asset["browser_download_url"]):
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Updated to {remote_ver}")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Updated to {remote_ver}")
         return True
     return False
 
@@ -168,7 +172,7 @@ def _check_custom_url(plugin_dir: Path, local_ver: str, update_url: str) -> bool
         resp = requests.get(remote_url, timeout=10)
         resp.raise_for_status()
     except Exception as e:
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Could not fetch {remote_url}: {e}")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Could not fetch {remote_url}: {e}")
         return False
 
     remote_info = {}
@@ -182,18 +186,18 @@ def _check_custom_url(plugin_dir: Path, local_ver: str, update_url: str) -> bool
 
     remote_ver = extract_version(remote_version_str)
     if not remote_ver or not download_url:
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Invalid remote version info")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Invalid remote version info")
         return False
 
     if version.parse(remote_ver) <= version.parse(local_ver):
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Already up to date ({local_ver})")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Already up to date ({local_ver})")
         return False
 
-    print(f"[PLUGIN-UPDATE] {plugin_dir.name}: {local_ver} -> {remote_ver}")
-    print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Downloading...")
+    log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: {local_ver} -> {remote_ver}")
+    log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Downloading...")
 
     if _download_and_extract(plugin_dir, download_url):
-        print(f"[PLUGIN-UPDATE] {plugin_dir.name}: Updated to {remote_ver}")
+        log.info(f"[PLUGIN-UPDATE] {plugin_dir.name}: Updated to {remote_ver}")
         return True
     return False
 
@@ -217,11 +221,11 @@ def check_and_update_plugin(plugin_dir: Path) -> bool:
 
 
 def run_plugin_update():
-    print("[PLUGIN-UPDATE] Checking for plugin updates...")
+    log.info("[PLUGIN-UPDATE] Checking for plugin updates...")
 
     plugin_dirs = find_plugin_dirs()
     if not plugin_dirs:
-        print("[PLUGIN-UPDATE] No plugins found")
+        log.info("[PLUGIN-UPDATE] No plugins found")
         return
 
     updated = 0
@@ -230,9 +234,9 @@ def run_plugin_update():
             updated += 1
 
     if updated:
-        print(f"[PLUGIN-UPDATE] {updated} plugin(s) updated")
+        log.info(f"[PLUGIN-UPDATE] {updated} plugin(s) updated")
     else:
-        print("[PLUGIN-UPDATE] All plugins are up to date")
+        log.info("[PLUGIN-UPDATE] All plugins are up to date")
 
 
 if __name__ == "__main__":

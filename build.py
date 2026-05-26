@@ -10,8 +10,13 @@ import shutil
 import subprocess
 import uuid
 import time
+import fnmatch
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
+log = logging.getLogger(__name__)
 
 # ---- Colors (ANSI, works on modern Windows 10+ and Linux) ----
 class Color:
@@ -23,7 +28,7 @@ class Color:
     RESET = "\033[0m"
 
 def cprint(msg, color=Color.RESET):
-    print(f"{color}{msg}{Color.RESET}")
+    log.info(f"{color}{msg}{Color.RESET}")
 
 # Enable ANSI colors on Windows
 if sys.platform == "win32":
@@ -36,8 +41,8 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.4.0"
-        UPDATER_VERSION = "v1.3.0"
+        TOOL_VERSION = "v0.5.0"
+        UPDATER_VERSION = "v1.4.0"
 
         IS_WINDOWS = sys.platform == "win32"
         SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -112,6 +117,9 @@ def main():
             for py_file in src_plugins_root.rglob("*.py"):
                 # Skip __pycache__ directories
                 if "__pycache__" in str(py_file):
+                    continue
+                # Skip test plugins (dev-only, not for user release)
+                if "test" == py_file.parent.name and py_file.parent.parent.name == "plugins":
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
@@ -244,7 +252,7 @@ def main():
                         if base in rel.parents or rel == base:
                             return True
                     # einfache Glob-Patterns (*.md etc.)
-                    elif rel.match(pattern):
+                    elif fnmatch.fnmatch(str(rel), pattern):
                         return True
                 return False
             all_files = [
@@ -262,7 +270,7 @@ def main():
         sync_folder("assets",          OUT_DIR / "core" / "assets")
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
-        sync_folder("src/event_hooks", OUT_DIR / "event_hooks")
+        sync_folder("src/event_hooks", OUT_DIR / "event_hooks", exclude=["example_hook.py"])
         sync_folder("docs",            OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [
@@ -272,7 +280,7 @@ def main():
             ("LICENSE",                             "LICENSE"),
             ("README.md",                           "README.md"),
             ("defaults/actions.mca",                "data/actions.mca"),
-            ("defaults/http_actions.txt",           "data/http_actions.txt"),
+            ("defaults/shell_actions.txt",           "data/shell_actions.txt"),
             ("defaults/configServerAPI.yml",        "server/mc/plugins/MinecraftServerAPI/config.yml"),
             ("defaults/DelayedTNTconfig.yml",       "server/mc/plugins/DelayedTNT/config.yml"),
             ("tools/MinecraftServerAPI-1.21.x.jar", "server/mc/plugins/MinecraftServerAPI-1.21.x.jar"),
@@ -325,6 +333,10 @@ def main():
             'import sys\n'
             'import os\n'
             'from pathlib import Path\n'
+            'import logging\n'
+            '\n'
+            'logging.basicConfig(level=logging.INFO, format=\'%(message)s\', stream=sys.stdout)\n'
+            'log = logging.getLogger(__name__)\n'
             '\n'
             f'TOOL_VERSION = "{TOOL_VERSION}"\n'
             '\n'
@@ -337,11 +349,11 @@ def main():
             'X = "\\033[0m"\n'
             '\n'
             'def run(cmd, check=True):\n'
-            '    print(f"{C}> {\' \'.join(cmd)}{X}")\n'
+            '    log.info(f"{C}> {\' \'.join(cmd)}{X}")\n'
             '    return subprocess.run(cmd, check=check, capture_output=False)\n'
             '\n'
             '# 1. Stage all changes\n'
-            'print(f"\\n{C}Staging changes...{X}")\n'
+            'log.info(f"\\n{C}Staging changes...{X}")\n'
             'run(["git", "add", "-A"])\n'
             '\n'
             '# 2. Commit (ask for message)\n'
@@ -350,21 +362,21 @@ def main():
             f'    msg = "Release {TOOL_VERSION}"\n'
             'result = run(["git", "commit", "-m", msg], check=False)\n'
             'if result.returncode != 0:\n'
-            '    print(f"{Y}No changes to commit, continuing...{X}")\n'
+            '    log.info(f"{Y}No changes to commit, continuing...{X}")\n'
             '\n'
             '# 3. Push\n'
-            'print(f"\\n{C}Pushing to remote...{X}")\n'
+            'log.info(f"\\n{C}Pushing to remote...{X}")\n'
             'run(["git", "push"])\n'
             '\n'
             '# 4. Create and push tag\n'
-            f'print(f"\\n{{C}}Creating tag {TOOL_VERSION}...{{X}}")\n'
+            f'log.info(f"\\n{{C}}Creating tag {TOOL_VERSION}...{{X}}")\n'
             f'run(["git", "tag", "-d", "{TOOL_VERSION}"], check=False)\n'
             f'run(["git", "push", "origin", "--delete", "{TOOL_VERSION}"], check=False)\n'
             f'run(["git", "tag", "{TOOL_VERSION}"])\n'
             f'run(["git", "push", "origin", "{TOOL_VERSION}"])\n'
             '\n'
-            f'print(f"\\n{{G}}Done! GitHub Actions will now build & release {TOOL_VERSION}{{X}}")\n'
-            'print(f"{C}   Check progress: https://github.com/<OWNER>/<REPO>/actions{X}")\n'
+            f'log.info(f"\\n{{G}}Done! GitHub Actions will now build & release {TOOL_VERSION}{{X}}")\n'
+            'log.info(f"{C}   Check progress: https://github.com/<OWNER>/<REPO>/actions{X}")\n'
             '\n'
             'input("\\nPress Enter to exit...")\n'
         )

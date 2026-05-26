@@ -1,4 +1,4 @@
-config_version: 6
+config_version: 7
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
@@ -11,7 +11,7 @@ config_version: 6
 #   1. Set tiktok.user to your TikTok username (without @)
 #   2. Change rcon.password to something secure
 #   3. Optionally adjust java.xms / java.xmx if RAM is limited
-#   4. Save the file and run start.exe (Windows) or ./start.bin (Linux)
+#   4. Save the file and run start.exe (Windows) or sudo ./start.bin (Linux)
 #
 # FORMATTING RULES (important!):
 #   - Use SPACES only — never use the Tab key
@@ -106,7 +106,6 @@ rcon:
 # ===========================================================================
 tiktok:
   # Your TikTok username — without the @ symbol.
-  # Example: "TechnikLey"  (not "@TechnikLey")
   user: your_tiktok_username
 
   # Seconds to wait before attempting to reconnect after a connection loss.
@@ -116,50 +115,150 @@ tiktok:
   # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
 
+  # Follow tracking — prevents viewers from farming the follow trigger
+  # by repeatedly unfollowing and refollowing.
+  #
+  #   mode: "all_time"  — Tracks follows across ALL streams (default).
+  #                        Once a user is recorded, their future follows
+  #                        are ignored — even after restarting the tool.
+  #         "per_stream" — Resets the tracked list every time the tool starts.
+  #                        Each stream starts fresh.
+  #
+  #   file: Path to the tracked-followers file (default: data/followed_users.txt)
+  #
+  # NOTE: Only new follows that happen while the tool is running AND
+  # connected to a live stream are tracked. Users who already followed
+  # before the tool was running cannot be detected — they will trigger
+  # a follow action the first time they follow during a tracked stream.
+  follow_tracking:
+    mode: "all_time"
+    file: "data/followed_users.txt"
+
 # ===========================================================================
 #  COMMENT COMMANDS
 # ===========================================================================
-# Let viewers send Minecraft commands by writing comments with a prefix.
-# Example: If prefix is "#" and a viewer writes "#say Hello", the command
-# "say Hello" is sent to your Minecraft server via RCON.
+# Let viewers send commands via TikTok chat. Each group defines its own
+# prefix character, access roles, allow/deny rules, and dispatch handler.
 #
 # !!! SECURITY WARNING !!!
-# This sends RAW commands to your Minecraft server. Anyone with the
+# RCON handlers send RAW commands to your Minecraft server. Anyone with the
 # required role can execute any command.
 # ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
 # or "superfan".
 comment_commands:
-  # Set to true to enable this feature.
+  # Master switch — set to true to let viewers send commands via chat.
+  # When enabled, each group below processes matching comments independently.
   enabled: false
 
-  # The character that must appear at the start of a comment.
-  # "#" works reliably across all environments. Some characters like
-  # "!" may not work in all streaming software.
-  # Example: "#" → a comment "#say Hello" triggers the "say" command.
-  prefix: "#"
+  # Global cooldown — applies ACROSS all groups. If set to 10, someone who
+  # runs $skip must wait 10 seconds before ANY command works (#op, !points, etc).
+  # Each group still has its own cooldown/user_cooldown that applies on top.
+  # Set to 0 to disable.
+  cooldown: 0
 
-  # Who is allowed to use comment commands.
-  # Available roles: all, moderator, superfan, fanclub
-  # You can list multiple roles (a viewer needs to match only one).
-  allowed_roles:
-    - moderator
-    - superfan
+  # Global user cooldown — like global cooldown, but per user. If set to 30, a
+  # viewer who runs $skip must wait 30 seconds before THEIR NEXT command works
+  # in any group. Other viewers are not affected. Set to 0 to disable.
+  user_cooldown: 0
 
-  # --- ALLOW / DENY RULES ---
-  # Only the FIRST WORD of the comment is checked (e.g., "say" from "say Hello").
-  #
-  # mode:
-  #   "deny-all"  — Only commands in the list are allowed
-  #   "allow-all" — All commands are allowed EXCEPT those in the list
-  #
-  # Example:
-  #   deny-all  + [say, give]  → only "say" and "give" work
-  #   allow-all + [op, stop]   → everything works except "op" and "stop"
-  #   deny-all  + []           → nothing works
-  mode: deny-all
-  commands:
-    - say
-    - give
+  # Define one or more command groups. Each group has its own prefix,
+  # role requirements, allow/deny rules, dispatch target, and cooldowns.
+  # All comments starting with the group's prefix are checked against it.
+  groups:
+      # ──────────────────────────────────────────────
+      #  Minecraft Commands (RCON)
+      # ──────────────────────────────────────────────
+      # Viewers type #say Hello or #give PlayerName diamond
+      # to run commands on your Minecraft server.
+      #
+      #   enabled       — true/false to turn this group on/off
+      #   prefix        — The character that triggers this group ("#")
+      #   allowed_roles — Who can use it: all, moderator, superfan, fanclub
+      #   mode          — "deny-all" = only listed commands work
+      #                   "allow-all" = everything works except listed commands
+      #   commands         — List of base command names to allow or block
+      #   commands_config  — Per-command overrides (points_cost, cooldown, roles, url, handler)
+      #   handler          — "rcon" sends to Minecraft, "http" sends to a URL
+      #   cooldown              — Seconds to wait between ANY command in this group (0 = off)
+      #   user_cooldown         — Seconds the SAME viewer must wait before next command (0 = off)
+      #   trigger_comment_event — Also fire the 'comment' trigger in actions.mca? (default: true)
+    - enabled: true
+      prefix: "#"
+      allowed_roles:
+        - moderator
+        - superfan
+      mode: deny-all
+      commands:
+        - say
+        - give
+      commands_config: []
+      handler: rcon
+      cooldown: 0
+      user_cooldown: 0
+      trigger_comment_event: true
+
+      # ──────────────────────────────────────────────
+      #  Spotify Control (HTTP)
+      # ──────────────────────────────────────────────
+      # Viewers type $play, $pause, $skip, $volume 50, etc.
+      # to control Spotify playback. Requires the Spotify plugin
+      # to be configured (see spotify section below).
+      #
+      #   url — HTTP endpoint that receives the command.
+      #         {user} = viewer's TikTok name
+      #         {text} = command text (without the $ prefix)
+      #         {spotify_port} = resolved from spotify.port below
+    - enabled: true
+      prefix: "$"
+      allowed_roles:
+        - all
+      mode: deny-all
+      # Plain list of command names. Used by mode (allow-all / deny-all)
+      # to decide which commands are allowed or blocked.
+      commands:
+        - play
+        - pause
+        - skip
+        - prev
+        - volume
+        - save
+        - repeat
+        - shuffle
+        - current
+        - playtrack
+
+      # Per-command overrides. Only commands listed here need an entry.
+      # Each key matches a command name from the commands list above.
+      commands_config:
+        skip:
+          # Points cost — viewer needs this many channel points to use this command.
+          # Set to 0 (or omit) to make the command free.
+          points_cost: 50
+          # Per-command cooldown in seconds (overrides group cooldown below).
+          cooldown: 30
+        prev:
+          points_cost: 20
+        playtrack:
+          # Points cost — viewer needs this many channel points.
+          points_cost: 50
+          # Per-command cooldown in seconds.
+          cooldown: 30
+          # When true: points & cooldowns only apply if the song is found.
+          # If the song can't be found, nothing is deducted and no cooldown fires.
+          conditional: true
+          # Direct URL to the playtrack endpoint (bypasses /comment).
+          # The response includes {"found": true/false} for conditional handling.
+          url: "http://127.0.0.1:{spotify_port}/playtrack?user={user}&text={text}"
+          handler: http
+        volume:
+          # Per-command role override (overrides group allowed_roles).
+          roles:
+            - moderator
+      handler: http
+      url: "http://127.0.0.1:{spotify_port}/comment?user={user}&text={text}"
+      cooldown: 0
+      user_cooldown: 0
+      trigger_comment_event: true
 
 # ===========================================================================
 #  RANDOM TRIGGER FILTER ($random)
@@ -327,6 +426,124 @@ win_counter:
 gui:
   enabled: false
   port: 29185
+
+# --- SPOTIFY CONTROL ---
+# Lets viewers control your Spotify playback via chat ($play, $pause, etc.)
+# and stream events (gifts, follows, likes). Displays the current track
+# as an OBS overlay with album art.
+#
+# SETUP:
+#   1. Go to https://developer.spotify.com/dashboard and create an app
+#   2. Note your Client ID and Client Secret
+#   3. Add http://127.0.0.1:29194/callback as a Redirect URI in the app
+#   4. Enter the credentials below
+#   5. On first start, your browser opens for Spotify login
+#
+# CHAT COMMANDS:
+#   The $ group in comment_commands (see above) forwards chat messages
+#   like "$play" to this plugin. The {spotify_port} placeholder in that
+#   URL resolves to whatever port you set here.
+#
+# OBS OVERLAY:
+#   Add a Browser Source with URL http://localhost:29194
+#   The overlay automatically scales to your browser source size.
+spotify:
+  # Set to false to disable the Spotify plugin entirely (overlay + controls).
+  enabled: true
+
+  # Port for the web server. Also used for the OBS overlay URL
+  # and the chat command HTTP endpoint.
+  port: 29194
+
+  # Your Spotify Developer App credentials.
+  # Get them at https://developer.spotify.com/dashboard
+  client_id: ""
+  client_secret: ""
+
+  # Redirect URI — must exactly match what you entered in your
+  # Spotify Developer App settings. Only change this if you
+  # also changed the port above.
+  redirect_uri: "http://127.0.0.1:29194/callback"
+
+  # Target a specific Spotify device by ID.
+  # Leave empty to use whatever device is currently active.
+  # You can find device IDs by checking /api/player/devices
+  # while Spotify is playing on your target device.
+  device_id: ""
+
+  # How much the volume changes per $volume up / $volume down command (percent).
+  # E.g., 10 means each command changes volume by 10%.
+  volume_step: 10
+
+  # How $playtrack commands are handled:
+  #   "replace" — Plays the requested song immediately, replacing the current track.
+  #   "queue"   — Adds the requested song to the Spotify queue (plays after current track).
+  playtrack_mode: "replace"
+
+# --- CHANNEL POINTS ---
+# Awards loyalty points to active viewers. Viewers can check !points
+# and redeem rewards with !redeem <name>. Points are awarded every
+# award_interval_seconds to viewers who joined or commented recently.
+channel_points:
+  enabled: true
+
+  # Port for the web server, overlay, and chat command HTTP endpoint.
+  port: 29195
+
+  # How many points are awarded per interval to each active viewer.
+  award_amount: 10
+
+  # How often (in seconds) points are awarded.
+  award_interval_seconds: 60
+
+  # How many minutes after last activity a viewer is considered inactive.
+  ping_timeout_minutes: 10
+
+  # Number of top viewers shown on the leaderboard overlay.
+  leaderboard_count: 10
+
+# ===========================================================================
+#  THEME — Customize overlay colors
+# ===========================================================================
+# Customize colors for each plugin overlay. All values are CSS hex codes.
+# Omit any key to keep the default. Changes take effect after restart.
+theme:
+  like_goal:
+    background: "#050505"
+    text: "#ffffff"
+    accent: "#00f5ff"
+    accent2: "#8a2be2"
+    danger: "#ff4d4d"
+  death_counter:
+    background: "#000000"
+    text: "#8ef3ff"
+  win_counter:
+    background: "#000000"
+    text: "#ffffff"
+    danger: "#ff4d4d"
+    muted: "#666666"
+    separator: "#333333"
+  timer:
+    background: "#000000"
+    text: "#89CFF0"
+    warning: "#FFD700"
+    blink: "#FF8C00"
+    danger: "#FF0000"
+  overlay_text:
+    background: "#00FF00"
+    text: "#ffffff"
+  spotify:
+    background: "#000000"
+    text: "#ffffff"
+    accent: "#1db954"
+    accent2: "#1ed760"
+  channel_points:
+    background: "#000000"
+    text: "#ffffff"
+    accent: "#FFD700"
+    accent2: "#00BFFF"
+    accent3: "#40E0D0"
+    danger: "#FF4500"
 
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
