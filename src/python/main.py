@@ -201,7 +201,7 @@ def load_config():
 
         ctx.config = config
 
-        ctx.mc_host = config.get("server_host", "127.0.0.1")
+        ctx.mc_host = config.get("rcon", {}).get("host", "localhost")
         ctx.mc_pass = config.get("rcon", {}).get("password", "")
         ctx.mc_port = config.get("rcon", {}).get("port", 25575)
         ctx.server_host = config.get("server_host", "127.0.0.1")
@@ -1303,7 +1303,10 @@ def create_client(user):
                 return
 
             for _ in range(count):
-                ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (target, username))
+                try:
+                    ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (target, username))
+                except asyncio.QueueFull:
+                    log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
 
         except Exception:
             log.error("\n" + "!"*30)

@@ -23,7 +23,7 @@ class Diagnostic:
     code: Optional[str] = None
 
 # --- Helper functions -------------------------------------------------------
-_RE_TRAILING_COLONS = re.compile(r":[:\s]*$")
+_RE_TRAILING_COLONS = re.compile(r":.*:\s*$")
 _RE_TRAILING_SEMICOLON = re.compile(r";\s*$")
 _RE_OVERLAY_PREFIX = re.compile(r"@(\w+)>>")
 _RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
@@ -231,16 +231,6 @@ def validate_text(text: str) -> List[Diagnostic]:
                     line_number, cmd_start_global, cmd_start_global + len(cmd_trim),
                     f"Each command must start with '/', '$', '!' or '>>' (found: '{cmd_trim[0]}').",
                     Severity.ERROR, "invalid_prefix"
-                ))
-
-            # '!' may only appear at the beginning (skip for >> and @NAME>> overlay commands)
-            idx_bang = cmd_trim.find("!")
-            if idx_bang > 0 and not cmd_trim.startswith(">>") and not re.match(r"@\w+>>", cmd_trim):
-                # position of the bad '!' relative to line
-                diagnostics.append(_make_diag(
-                    line_number, cmd_start_global + idx_bang, cmd_start_global + idx_bang + 1,
-                    "'!' is only allowed at the start of a plugin command",
-                    Severity.ERROR, "bang_in_middle"
                 ))
 
             # Check multiplier: " xN" at the end

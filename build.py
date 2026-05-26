@@ -334,6 +334,7 @@ def main():
             'from pathlib import Path\n'
             'import logging\n'
             '\n'
+            'logging.basicConfig(level=logging.INFO, format=\'%(message)s\', stream=sys.stdout)\n'
             'log = logging.getLogger(__name__)\n'
             '\n'
             f'TOOL_VERSION = "{TOOL_VERSION}"\n'

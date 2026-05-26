@@ -128,6 +128,9 @@ Each version is split into two sections:
 * **Like events no longer vanish silently** — If the command queue fills up during a burst of likes, the tool now logs a message instead of dropping events without telling you.
 * **Window state save fixed for Timer and Win Counter** — Saving window dimensions with an empty or invalid request no longer corrupts the saved state file in these two plugins.
 * **Role checks more reliable** — Fixed an edge case where moderator and superfan permission checks could behave unexpectedly when role information was missing from a viewer event.
+* **Validator no longer complains about `!` in normal text** — The actions file validator sometimes flagged commands like `/say Hello!` as errors because it thought the `!` was a misplaced command prefix. This has been cleaned up – `!` is now only treated as a prefix when it's the very first character of a command, exactly as intended.
+* **Validator no longer mistakes trailing whitespace for extra colons** — If a line in your actions file had a harmless trailing space after the command, the validator could show a confusing "trailing colons" error. That false alarm is gone.
+* **Random trigger fallback more robust** — When the `$random` hook couldn't find a username, it could show a garbled internal representation instead of a clean fallback. Now it reliably falls back to `"Unknown"`.
 
 ---
 
