@@ -1,5 +1,33 @@
 # TikTok to Minecraft Integration
 
+> [!IMPORTANT]
+> # v1.0.0 — Coming Soon
+>
+> A major rewrite is in active development. v1.0.0 will ship:
+>
+> - **Graphical User Interface** — manage everything through a GUI. 
+>   No more editing YAML, actions files, or configs by hand.
+> - **Plugin overhaul** — each plugin becomes a true standalone module.
+>   Enable only what you need (opt-in). Timer, Death Counter, and Win
+>   Counter are no longer hardwired together.
+> - **Unified API server** — one central backend instead of a dozen
+>   separate executables. Drastically fewer ports and better stability.
+> - **Quality of Life** — first-run setup wizard, live log viewer,
+>   overlay previews, theme editor with color pickers, Spotify setup
+>   assistant, and integrated trigger testing.
+>
+> **⚠️ Breaking Change:** v1.0.0 will **not** be compatible with v0.x
+> configurations, plugins, or workflows. This is intentional — the v0.x
+> line was an experimental phase, and v1.0.0 is the first stable release
+> built on a clean foundation.
+>
+> If you are a new user, start with the latest **v0.5.0**.
+> Existing users can continue using v0.5.0 — it remains
+> stable and supported for day-to-day streaming.
+>
+> **Release date:** Unknown. Quality over speed.
+> See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for current progress.
+
 Connect your TikTok Live stream to a Minecraft server. Gifts, follows, and likes from your viewers trigger real-time commands in the game.
 
 The tool includes a ready-to-use Minecraft server (1.21.11). On Windows, Java is automatically downloaded and set up if not already present, no manual installation required. On Linux, the tool will locate or install Java automatically.

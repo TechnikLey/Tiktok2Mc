@@ -11,7 +11,7 @@ Each version is split into two sections:
 
 ---
 
-## [Unreleased]
+## [v0.5.0] - 2026-05-26
 
 > [!IMPORTANT]
 > ### Looking Ahead: v1.0.0
