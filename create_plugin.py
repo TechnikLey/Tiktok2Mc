@@ -25,9 +25,13 @@ enabled: true
 '''
 
 MAIN_PY_TEMPLATE = '''\
+import logging
+import sys
 from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
 from python.registry import register_plugin
-import sys
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+log = logging.getLogger(__name__)
 
 PLUGIN_DIR = get_plugin_dir()
 CONFIG_FILE = get_plugin_config_file()
