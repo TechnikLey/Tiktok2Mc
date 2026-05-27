@@ -22,11 +22,20 @@ class ApiService:
 
     def __init__(self) -> None:
         self.root_dir: Path = get_root_dir()
+        self._start_time: datetime = datetime.now()
+
+        # Config path with fallback:
+        # 1. Standard location (used in builds):   root/config/config.yaml
+        # 2. Fallback (dev mode):                   root/defaults/config.yaml
         self.config_path: Path = get_config_file()
+        if not self.config_path.exists():
+            fallback = self.root_dir / "defaults" / "config.yaml"
+            if fallback.exists():
+                self.config_path = fallback
+
         self.registry_path: Path = (
             self.root_dir / "plugins" / "PLUGIN_REGISTRY.json"
         )
-        self._start_time: datetime = datetime.now()
 
     # ------------------------------------------------------------------
     # Uptime

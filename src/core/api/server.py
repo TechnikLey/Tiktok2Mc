@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import api_router
+from .eventbus import event_bus
 
 log = logging.getLogger(__name__)
 
@@ -15,7 +16,9 @@ DEFAULT_PORT = 29185
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("API server v%s starting up ...", API_VERSION)
+    await event_bus.publish("server.started", {"version": API_VERSION})
     yield
+    await event_bus.publish("server.stopping", {})
     log.info("API server shutting down ...")
 
 
