@@ -49,7 +49,7 @@ try:
     register_plugin(AppConfig(
         name="Timer",
         path=TIMER_EXE_PATH,
-        enable=cfg.get("timer", {}).get("enabled", True),
+        enable=cfg.get("timer", {}).get("enabled", False),
         level=4,
         ics=True,
         port=WEB_PORT,

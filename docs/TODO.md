@@ -126,20 +126,23 @@
 
 ## 4. Konfiguration & Schema
 
-- [ ] **Kritisch** — Config-Schema für v1.0.0 einfrieren
-  - `config_version: v1.0.0`. Breaking Changes nur mit Major-Sprung.
-  - Alle Keys final benennen und dokumentieren.
+- [ ] **Erledigt** ✓ — Config-Schema für v1.0.0 eingefroren
+  - `config_version: v1.0.0` (String statt Int). Breaking Changes nur mit Major-Sprung.
+  - Alle Keys abschließend in `_CONFIG_SCHEMA` in `services.py` definiert.
 
-- [ ] **Kritisch** — Alle Plugins standardmäßig deaktivieren (opt-in)
+- [ ] **Erledigt** ✓ — Alle Plugins standardmäßig deaktiviert (opt-in)
   - Jedes Plugin `enabled: false` in der Default-Config.
-  - Setup-Wizard führt durch die Auswahl.
+  - Fallback-Defaults in allen 8 Plugin-`main.py` von `True` auf `False` geändert.
+  - `minecraft_server_api` bleibt `true` (Core-Infrastruktur, kein Plugin).
 
-- [ ] **Hoch** — Config-Validierung in der API
-  - Schema-Validierung beim Speichern (Typen, Pflichtfelder, Port-Konflikte).
-  - **Warum:** Fehlerhafte Config soll schon in der GUI auffallen.
+- [ ] **Erledigt** ✓ — Config-Validierung in der API
+  - `_validate_config_schema()` in `services.py`: Typ-Prüfung, Pflichtfelder, `enabled`-Bool-Prüfung pro Plugin-Sektion, Warnung bei unbekannten Keys.
+  - Wird vor jedem `write_config()` aufgerufen.
+  - Fehlerhafte Configs werden mit `400 Bad Request` abgewiesen.
 
-- [ ] **Mittel** — Config-Backup versionieren
-  - `config.v7.bak`, `config.v8.bak` statt nur `.bak` überschreiben.
+- [ ] **Erledigt** ✓ — Config-Backup versioniert
+  - `config.yaml.v1.bak`, `config.yaml.v2.bak`, … (automatisch hochzählend).
+  - Überschreibt nicht mehr einfach `.bak`.
 
 - [ ] **Niedrig** — Hinweistext für v0.x-User (keine Migration)
   - v0.x-Configs/Plugins inkompatibel. Neuinstallation empfohlen.

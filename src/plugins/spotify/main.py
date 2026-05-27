@@ -81,7 +81,7 @@ try:
     register_plugin(AppConfig(
         name="Spotify Control",
         path=SPOTIFY_EXE_PATH,
-        enable=SPOTIFY_CFG.get("enabled", True),
+        enable=SPOTIFY_CFG.get("enabled", False),
         level=4,
         ics=True,
         port=SPOTIFY_PORT,

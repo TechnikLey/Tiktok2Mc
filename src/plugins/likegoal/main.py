@@ -69,7 +69,7 @@ try:
     register_plugin(AppConfig(
         name="Like Goal",
         path=LIKEGOAL_EXE_PATH,
-        enable=cfg.get("like_goal", {}).get("enabled", True),
+        enable=cfg.get("like_goal", {}).get("enabled", False),
         level=4,
         ics=True,
         port=LIKE_GOAL_PORT,

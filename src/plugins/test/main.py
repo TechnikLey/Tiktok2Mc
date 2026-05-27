@@ -20,7 +20,7 @@ try:
     register_plugin(AppConfig(
         name="test",
         path=MAIN_FILE,
-        enable=cfg.get("enabled", True),
+        enable=cfg.get("enabled", False),
         level=4,
         ics=False
     ))

@@ -59,7 +59,7 @@ try:
     register_plugin(AppConfig(
         name="Channel Points",
         path=CP_EXE_PATH,
-        enable=cp_cfg.get("enabled", True),
+        enable=cp_cfg.get("enabled", False),
         level=4,
         ics=True,
         port=PORT,

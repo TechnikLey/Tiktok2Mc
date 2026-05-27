@@ -1,4 +1,4 @@
-config_version: 7
+config_version: 1.0
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
@@ -319,7 +319,7 @@ minecraft_server_api:
 # Displays text notifications on stream (triggered via >> in actions.mca).
 # Works as an OBS Browser Source with transparent background.
 overlay_text:
-  enabled: true
+  enabled: false
   port: 29186
 
   # Display mode when a new message arrives while one is still shown:
@@ -351,7 +351,7 @@ overlay_text:
 # --- LIKE GOAL ---
 # A progress bar tracking likes toward a goal.
 like_goal:
-  enabled: true
+  enabled: false
 
   # Port for the Like Goal OBS overlay.
   port: 29193
@@ -404,20 +404,20 @@ like_goal:
 # A countdown timer for your stream. Pauses on player death, resumes on
 # respawn. When it reaches zero, a win is counted.
 timer:
-  enabled: true
+  enabled: false
   port: 29189
   start_time: 10   # Minutes
 
 # --- DEATH COUNTER ---
 # Displays the number of player deaths on stream.
 death_counter:
-  enabled: true
+  enabled: false
   port: 29190
 
 # --- WIN COUNTER OVERLAY ---
 # Tracks wins and losses. Decrements on death, increments on timer expiry.
 win_counter:
-  enabled: true
+  enabled: false
   port: 29191
 
 # --- WEB DASHBOARD (GUI) ---
@@ -449,7 +449,7 @@ gui:
 #   The overlay automatically scales to your browser source size.
 spotify:
   # Set to false to disable the Spotify plugin entirely (overlay + controls).
-  enabled: true
+  enabled: false
 
   # Port for the web server. Also used for the OBS overlay URL
   # and the chat command HTTP endpoint.
@@ -485,7 +485,7 @@ spotify:
 # and redeem rewards with !redeem <name>. Points are awarded every
 # award_interval_seconds to viewers who joined or commented recently.
 channel_points:
-  enabled: true
+  enabled: false
 
   # Port for the web server, overlay, and chat command HTTP endpoint.
   port: 29195

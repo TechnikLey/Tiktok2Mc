@@ -25,7 +25,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 from core.paths import get_base_dir
-from core.utils import load_config
+from core.utils import load_config, normalize_config_version
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
@@ -198,19 +198,24 @@ def migrate_config_if_needed() -> bool:
     if user_data is None:
         return False
 
-    # Version Check
+    # Version Check (supports "1.0", "0.7", legacy int 7, "v1.0.0")
     try:
-        default_version = int(template_data.get("config_version", 0))
-        user_version = int(user_data.get("config_version", 0))
-    except (ValueError, TypeError):
-        log.warning("Version keys are invalid. Forcing migration...")
-        default_version, user_version = 1, 0
+        raw_default_val = template_data.get("config_version", "0.0")
+        raw_user_val = user_data.get("config_version", "0.0")
+        raw_default = normalize_config_version(raw_default_val)
+        raw_user = normalize_config_version(raw_user_val)
+        default_ver = version.parse(raw_default)
+        user_ver = version.parse(raw_user)
+    except (ValueError, TypeError) as e:
+        log.warning("Version keys are invalid (%s). Forcing migration...", e)
+        default_ver, user_ver = version.parse("1.0"), version.parse("0.0")
+        raw_default = "1.0"
 
-    if user_version >= default_version:
-        log.info(f"Config is up to date (v{user_version}).")
+    if user_ver >= default_ver:
+        log.info(f"Config is up to date ({raw_user}).")
         return False
 
-    log.info(f"Migrating config: v{user_version} -> v{default_version}")
+    log.info(f"Migrating config: {raw_user} -> {raw_default}")
 
     # Backup
     backup_path = CONFIG_FILE.with_suffix(".yaml.bak")
@@ -225,12 +230,12 @@ def migrate_config_if_needed() -> bool:
     _inject_values_strictly(template_data, user_data)
 
     # Force the new version number
-    template_data["config_version"] = default_version
+    template_data["config_version"] = raw_default
 
     try:
         with CONFIG_FILE.open("w", encoding="utf-8") as f:
             yaml_obj.dump(template_data, f)
-        log.info(f"[SUCCESS] Config migrated successfully to v{default_version}.")
+        log.info(f"[SUCCESS] Config migrated successfully to {raw_default}.")
         return True
     except Exception as e:
         log.error(f"[FAIL] Error writing migrated config: {e}")

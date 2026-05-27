@@ -66,7 +66,7 @@ try:
     register_plugin(AppConfig(
         name="Win Counter",
         path=WINCOUNTER_EXE_PATH,
-        enable=cfg.get("win_counter", {}).get("enabled", True),
+        enable=cfg.get("win_counter", {}).get("enabled", False),
         level=4,
         ics=True,
         port=PORT,

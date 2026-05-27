@@ -72,7 +72,7 @@ try:
     register_plugin(AppConfig(
         name="Overlaytxt",
         path=OVERLAYTXT_EXE_PATH,
-        enable=full_config.get("overlay_text", {}).get("enabled", True),
+        enable=full_config.get("overlay_text", {}).get("enabled", False),
         level=4,
         ics=True,
         port=APP_PORT,

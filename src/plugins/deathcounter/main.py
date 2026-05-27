@@ -57,7 +57,7 @@ THEME = load_plugin_theme(cfg, "death_counter")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", True)
+DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", False)
 DEATH_COUNTER_EXE_PATH = get_base_file()
 
 # Register with central API
