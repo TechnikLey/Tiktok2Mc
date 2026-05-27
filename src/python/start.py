@@ -12,13 +12,12 @@ import sys
 import subprocess
 import atexit
 import time
-import json
 import shutil
 import os
 import shlex
 import asyncio
 from datetime import datetime
-from core.models import AppConfig, validate_config_dict
+from core.models import AppConfig
 from core.utils import load_config
 from core.paths import get_base_dir
 import logging
@@ -43,9 +42,6 @@ GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
-REGISTRY_EXE_PATH = (BASE_DIR / "plugins" / f"registry{SUFFIX}").resolve()
-PLUGIN_UPDATER_EXE_PATH = (BASE_DIR / "plugins" / f"plugin_updater{SUFFIX}").resolve()
-PLUGIN_REGISTRY_FILE = (BASE_DIR / "plugins" / "PLUGIN_REGISTRY.json").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------
@@ -403,25 +399,8 @@ else:
     log.info("Automatic updates are disabled.")
 
 # =============================================================================
-# REGISTRY LOGIC — scan and register all plugins
-# =============================================================================
-try:
-    result = subprocess.run([REGISTRY_EXE_PATH])
-    if result.returncode == 0:
-        log.info("All apps registered.")
-    else:
-        log.info("Error")
-except FileNotFoundError:
-    log.info("File not found")
-
-# -------------------------------------------------------------------------
-# Plugin Update Check (optional — skips if plugin_updater exe is missing)
-# -------------------------------------------------------------------------
-if PLUGIN_UPDATER_EXE_PATH.exists():
-    try:
-        subprocess.run([PLUGIN_UPDATER_EXE_PATH])
-    except Exception as e:
-        log.warning(f"Plugin updater failed: {e}")
+# Plugin discovery is handled by PluginLauncher (see below).
+# The old registry.exe scan and plugin_updater.exe are no longer used.
 # =============================================================================
 
 # -----------------------------
@@ -442,17 +421,10 @@ if ALLOW_CLOSE:
 # ICS = Interface Control System
 # DCS = Direct Control System
 
-PLUGIN_REGISTRY: list[AppConfig] = []
+from core.api.launcher import PluginLauncher
 
-if PLUGIN_REGISTRY_FILE.exists():
-    with PLUGIN_REGISTRY_FILE.open("r", encoding="utf-8") as f:
-        data = json.load(f) 
-
-    for item in data:
-        if not isinstance(item, dict):
-            raise ValueError("Each element in the registry must be a dict.")
-        validate_config_dict(item)    
-        PLUGIN_REGISTRY.append(AppConfig.from_dict(item))
+_launcher = PluginLauncher()
+PLUGIN_REGISTRY: list[AppConfig] = _launcher.get_plugins()
 
 BUILTIN_REGISTRY: list[AppConfig] = [
     AppConfig(name="App", path=APP_EXE_PATH, enable=True, level=2, ics=False),

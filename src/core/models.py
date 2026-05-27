@@ -3,8 +3,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-REQUIRED_KEYS = {"name", "path", "enable", "level", "ics"}
-
 @dataclass(slots=True)
 class AppConfig:
     name: str
@@ -51,8 +49,3 @@ class AppConfig:
             port=data.get("port", 0),
         )
 
-
-def validate_config_dict(config: dict[str, Any]) -> None:
-    missing = REQUIRED_KEYS - set(config.keys())
-    if missing:
-        raise ValueError(f"Missing required key(s): {', '.join(sorted(missing))}")

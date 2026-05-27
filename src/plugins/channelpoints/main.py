@@ -18,7 +18,7 @@ from pathlib import Path
 from flask import Flask, request, Response, jsonify
 from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
 from core.theme import load_plugin_theme, theme_css
-from python.registry import register_plugin
+from core.api.client import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
@@ -54,10 +54,8 @@ BG_COLOR = THEME["background"]
 
 CP_EXE_PATH = get_base_file()
 
-# --- Plugin self-registration ---
-register_only = args.register_only
-
-if register_only:
+# Register with central API
+try:
     register_plugin(AppConfig(
         name="Channel Points",
         path=CP_EXE_PATH,
@@ -66,7 +64,8 @@ if register_only:
         ics=True,
         port=PORT,
     ))
-    sys.exit(0)
+except Exception:
+    log.warning("[CHANNELPOINTS] Could not register with central API")
 
 # --- Database ---
 def init_db():

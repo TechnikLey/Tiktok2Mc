@@ -13,7 +13,7 @@ from queue import Queue
 from collections import defaultdict
 from core import parse_args, AppConfig, get_root_dir, get_base_dir, get_base_file
 from core.theme import load_plugin_theme, theme_css
-from python.registry import register_plugin
+from core.api.client import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
@@ -67,9 +67,8 @@ BG_COLOR = THEME["background"]
 
 OVERLAYTXT_EXE_PATH = get_base_file()
 
-register_only = args.register_only
-
-if register_only:
+# Register with central API
+try:
     register_plugin(AppConfig(
         name="Overlaytxt",
         path=OVERLAYTXT_EXE_PATH,
@@ -78,7 +77,8 @@ if register_only:
         ics=True,
         port=APP_PORT,
     ))
-    sys.exit(0)
+except Exception:
+    log.warning("[OVERLAYTXT] Could not register with central API")
 
 app = Flask(__name__)
 

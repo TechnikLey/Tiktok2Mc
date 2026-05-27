@@ -1,5 +1,4 @@
 from pathlib import Path
-import json
 import yaml
 import shutil
 import logging
@@ -12,16 +11,13 @@ log = logging.getLogger(__name__)
 
 
 class ApiService:
-    """Central business logic layer for the API server.
+    """Central business logic for the API server.
 
-    Encapsulates all filesystem operations (config read/write, plugin
-    registry access) so route handlers stay thin.  This is a stateless
-    singleton — safe to share across requests as long as file operations
-    are not interleaved (the GUI calls them sequentially).
+    Handles config read/write and uptime tracking.  Plugin registry
+    access is now delegated entirely to ``PluginRegistry``.
     """
 
     def __init__(self) -> None:
-        self.root_dir: Path = get_root_dir()
         self._start_time: datetime = datetime.now()
 
         # Config path with fallback:
@@ -29,13 +25,9 @@ class ApiService:
         # 2. Fallback (dev mode):                   root/defaults/config.yaml
         self.config_path: Path = get_config_file()
         if not self.config_path.exists():
-            fallback = self.root_dir / "defaults" / "config.yaml"
+            fallback = get_root_dir() / "defaults" / "config.yaml"
             if fallback.exists():
                 self.config_path = fallback
-
-        self.registry_path: Path = (
-            self.root_dir / "plugins" / "PLUGIN_REGISTRY.json"
-        )
 
     # ------------------------------------------------------------------
     # Uptime
@@ -87,16 +79,4 @@ class ApiService:
     def get_config_status(self) -> bool:
         return self.config_path.exists()
 
-    # ------------------------------------------------------------------
-    # Plugin registry
-    # ------------------------------------------------------------------
 
-    def read_plugin_registry(self) -> list[dict[str, Any]]:
-        """Return the list of registered plugins from the JSON registry."""
-        if not self.registry_path.exists():
-            return []
-        with self.registry_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            return []
-        return data

@@ -74,12 +74,6 @@ class PluginRegisterResponse(BaseModel):
     plugin: PluginRegistration
 
 
-class ImportLegacyResponse(BaseModel):
-    status: str
-    imported: int
-    total: int
-
-
 # ── Config models ────────────────────────────────────────────────────
 
 

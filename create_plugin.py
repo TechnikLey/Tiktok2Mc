@@ -28,7 +28,7 @@ MAIN_PY_TEMPLATE = '''\
 import logging
 import sys
 from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file, AppConfig
-from python.registry import register_plugin
+from core.api.client import register_plugin
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -41,9 +41,9 @@ args = parse_args()
 cfg = load_config(CONFIG_FILE)
 
 gui_hidden = args.gui_hidden
-register_only = args.register_only
 
-if register_only:
+# Register with central API
+try:
     register_plugin(AppConfig(
         name="{name}",
         path=MAIN_FILE,
@@ -52,7 +52,8 @@ if register_only:
         ics=False,
         port=0
     ))
-    sys.exit(0)
+except Exception:
+    log.warning("Could not register with central API")
 '''
 
 def get_valid_plugin_name():

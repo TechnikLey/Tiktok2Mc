@@ -13,7 +13,6 @@ from core.api.models import (
     PluginRegisterResponse,
     PluginRegistration,
     PluginUpdateRequest,
-    ImportLegacyResponse,
 )
 from core.api.registry import get_registry
 
@@ -111,32 +110,5 @@ async def unregister_plugin(name: str):
 
 
 # ── Import legacy ────────────────────────────────────────────────────
-
-
-@router.post(
-    "/plugins/import-legacy", response_model=ImportLegacyResponse
-)
-async def import_legacy():
-    """Bulk-import plugins from the old ``PLUGIN_REGISTRY.json`` file.
-
-    This is a one-shot migration helper.  Old entries are merged into
-    the new registry; existing entries keep their original
-    ``registered_at`` timestamp.
-    """
-    from core.api.services import ApiService
-
-    service = ApiService()
-    legacy = service.read_plugin_registry()
-    if not legacy:
-        raise HTTPException(
-            status_code=404,
-            detail="No legacy registry found or file is empty",
-        )
-
-    registry = get_registry()
-    count = registry.import_legacy(legacy)
-    total = len(registry.list())
-
-    return ImportLegacyResponse(
-        status="imported", imported=count, total=total
-    )
+# The ``POST /plugins/import-legacy`` endpoint has been removed.
+# Legacy PLUGIN_REGISTRY.json is no longer supported.

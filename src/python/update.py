@@ -108,8 +108,6 @@ WHITELIST_FILES = {
     f"update{SUFFIX}",
     f"server{SUFFIX}",
     f"start{SUFFIX}",
-    f"plugins/registry{SUFFIX}",
-    f"plugins/plugin_updater{SUFFIX}",
 }
 
 GITHUB_USER = "TechnikLey"

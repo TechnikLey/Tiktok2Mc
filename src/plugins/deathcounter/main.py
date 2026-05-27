@@ -14,7 +14,7 @@ from flask_cors import CORS
 from queue import Queue
 from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
 from core.theme import load_plugin_theme, theme_css
-from python.registry import register_plugin
+from core.api.client import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
@@ -60,10 +60,8 @@ BG_COLOR = THEME["background"]
 DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", True)
 DEATH_COUNTER_EXE_PATH = get_base_file()
 
-# --- Plugin self-registration ---
-register_only = args.register_only
-
-if register_only:
+# Register with central API
+try:
     register_plugin(AppConfig(
         name="Death Counter",
         path=DEATH_COUNTER_EXE_PATH,
@@ -72,7 +70,8 @@ if register_only:
         ics=True,
         port=WEB_SERVER_PORT,
     ))
-    sys.exit(0)
+except Exception:
+    log.warning("[DEATHCOUNTER] Could not register with central API")
 
 # --- Flask app & death tracking ---
 app = Flask(__name__)

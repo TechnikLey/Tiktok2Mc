@@ -3,6 +3,7 @@ from .services import ApiService
 from .eventbus import EventBus, event_bus
 from .registry import PluginRegistry, get_registry
 from .client import PluginAPIClient, register_plugin
+from .launcher import PluginLauncher
 
 __all__ = [
     "create_app",
@@ -13,4 +14,5 @@ __all__ = [
     "get_registry",
     "PluginAPIClient",
     "register_plugin",
+    "PluginLauncher",
 ]

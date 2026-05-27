@@ -1,9 +1,7 @@
 """API-managed plugin registry — single source of truth.
 
-Replaces the old file-based ``PLUGIN_REGISTRY.json`` that was written
-by ``python.registry.register_plugin()``.  The new registry lives in
-``data/api_plugin_registry.json`` and is served, validated, and
-persisted entirely by the API layer.
+The registry lives in ``data/api_plugin_registry.json`` and is served,
+validated, and persisted entirely by the API layer.
 """
 
 from __future__ import annotations
@@ -90,41 +88,6 @@ class PluginRegistry:
                 plugin.updated_at = time.time()
                 self._save()
             return plugin
-
-    # ------------------------------------------------------------------
-    # Legacy import
-    # ------------------------------------------------------------------
-
-    def import_legacy(self, items: list[dict[str, Any]]) -> int:
-        """Bulk-import plugins from the old ``PLUGIN_REGISTRY.json``
-        format.  Returns the number of imported entries."""
-        now = time.time()
-        count = 0
-        with self._lock:
-            for item in items:
-                name = item.get("name")
-                if not name:
-                    continue
-                existing = self._plugins.get(name)
-                entry = PluginRegistration(
-                    name=name,
-                    path=str(item.get("path", "")),
-                    version=item.get("version", "1.0.0"),
-                    enabled=bool(
-                        item.get("enable", item.get("enabled", False))
-                    ),
-                    level=int(item.get("level", 2)),
-                    port=int(item.get("port", 0)),
-                    ics=bool(item.get("ics", False)),
-                    registered_at=(
-                        existing.registered_at if existing else now
-                    ),
-                    updated_at=now,
-                )
-                self._plugins[name] = entry
-                count += 1
-            self._save()
-        return count
 
     # ------------------------------------------------------------------
     # Persistence

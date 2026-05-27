@@ -12,7 +12,7 @@ import webview, threading, requests, json, sys, yaml, logging, time
 from flask import Flask, request, Response
 from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
 from core.theme import load_plugin_theme, theme_css
-from python.registry import register_plugin
+from core.api.client import register_plugin
 from queue import Queue
 
 # --- Paths ---
@@ -44,10 +44,8 @@ THEME = load_plugin_theme(cfg, "timer")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-# --- Plugin self-registration ---
-register_only = args.register_only
-
-if register_only:
+# Register with central API
+try:
     register_plugin(AppConfig(
         name="Timer",
         path=TIMER_EXE_PATH,
@@ -56,7 +54,8 @@ if register_only:
         ics=True,
         port=WEB_PORT,
     ))
-    sys.exit(0)
+except Exception:
+    log.warning("[TIMER] Could not register with central API")
 
 # --- Timer State (Python-side, works with or without pywebview) ---
 class TimerState:
