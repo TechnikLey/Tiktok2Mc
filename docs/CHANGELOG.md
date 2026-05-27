@@ -11,6 +11,16 @@ Each version is split into two sections:
 
 ---
 
+[Unreleased]
+
+## Added
+
+## Changed
+
+## Fixed
+
+---
+
 ## [v0.5.0] - 2026-05-26
 
 > [!IMPORTANT]
