@@ -11,7 +11,17 @@ def get_base_dir() -> Path:
 
 def get_root_dir() -> Path:
     base = get_base_dir()
-    return (base.parent.parent).resolve()
+    # Walk up the directory tree looking for known project-root markers.
+    #   Dev marker:   src/core/paths.py
+    #   Rel marker:   config/config.yaml
+    # This works regardless of exe nesting depth (start.exe → 1 level,
+    # app.exe → 2 levels, plugins → 3 levels).
+    for parent in [base] + list(base.parents):
+        if (parent / "src" / "core" / "paths.py").exists():
+            return parent.resolve()
+        if (parent / "config" / "config.yaml").exists():
+            return parent.resolve()
+    return base.parent.parent.resolve()
 
 def get_base_file() -> Path:
     base = get_base_dir()
