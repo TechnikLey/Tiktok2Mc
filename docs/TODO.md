@@ -219,10 +219,13 @@
 - [ ] **Erledigt** ✓ — `services.py` ohne `read_plugin_registry()`
 - [ ] **Erledigt** ✓ — `models.py` ohne `ImportLegacyResponse`/`validate_config_dict`
 
-- [ ] **Hoch** — `gui.py` (alt) entfernen oder als Legacy markieren
-  - Kollisionsgefahr bei neuer GUI. Funktionale Obsolet.
+- [ ] **Erledigt** ✓ — `gui.py` (alt) entfernt
+  - Legacy, kollidiert mit neuer GUI. Funktionale Obsolet.
 
-- [ ] **Niedrig** — Totmodule identifizieren
+- [ ] **Erledigt** ✓ — `plugin_updater.py` entfernt (dead code, keine Runtime-Referenzen mehr)
+- [ ] **Erledigt** ✓ — `build.py` TOOL_VERSION auf `v1.0.0` aktualisiert
+
+- [ ] **Niedrig** — Weitere Totmodule identifizieren
   - Nach API-Migration: Welche Teile von `start.py`, `main.py`, `server.py` werden durch die API abgelöst?
 
 ---

@@ -41,7 +41,7 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v0.5.0"
+        TOOL_VERSION = "v1.0.0"
         UPDATER_VERSION = "v1.4.0"
 
         IS_WINDOWS = sys.platform == "win32"
@@ -60,7 +60,6 @@ def main():
         CORE_EXECUTABLES = [
             {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
             {"name": "update",         "src": "src/python/update.py",         "dest": ""},
-            {"name": "gui",            "src": "src/python/gui.py",            "dest": "core"},
             {"name": "server",         "src": "src/python/server.py",         "dest": "",},
             {"name": "start",          "src": "src/python/start.py",          "dest": ""},
 

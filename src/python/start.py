@@ -13,7 +13,10 @@ import subprocess
 import atexit
 import time
 import shutil
+import threading
 import os
+import urllib.error
+import urllib.request
 import shlex
 import asyncio
 from datetime import datetime
@@ -38,7 +41,6 @@ CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 # -----------------------------
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
-GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
@@ -144,8 +146,6 @@ if not IS_WINDOWS:
 # -----------------------------
 # Settings
 # -----------------------------
-gui_cfg = cfg.get("gui", {})
-GUI_ENABLED = gui_cfg.get("enabled", False)
 UPDATE_ENABLED = cfg.get("update", {}).get("enabled", True)
 
 console_cfg = cfg.get("console", {})
@@ -399,8 +399,50 @@ else:
     log.info("Automatic updates are disabled.")
 
 # =============================================================================
-# Plugin discovery is handled by PluginLauncher (see below).
-# The old registry.exe scan and plugin_updater.exe are no longer used.
+# API SERVER — start in background before anything needs it
+# =============================================================================
+
+_API_PORT = 29185
+_API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
+
+
+def _start_api_server():
+    """Run the FastAPI server in a background daemon thread."""
+    import uvicorn
+    from core.api import create_app
+
+    app = create_app()
+    uvicorn.run(app, host="127.0.0.1", port=_API_PORT, log_level="warning")
+
+
+_api_thread = threading.Thread(target=_start_api_server, daemon=True)
+_api_thread.start()
+log.info("API server starting on 127.0.0.1:%d ...", _API_PORT)
+
+# Wait for the API to become reachable (poll health endpoint, max ~10 s)
+_api_ready = False
+for _ in range(20):
+    try:
+        with urllib.request.urlopen(
+            f"{_API_BASE_URL}/health", timeout=1
+        ) as resp:
+            if resp.status == 200:
+                _api_ready = True
+                break
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+        pass
+    time.sleep(0.5)
+
+if _api_ready:
+    log.info("API server ready.")
+else:
+    log.warning(
+        "API server not reachable within 10 s — "
+        "continuing without plugin support"
+    )
+
+# =============================================================================
+# Plugin discovery via PluginLauncher
 # =============================================================================
 
 # -----------------------------
@@ -429,7 +471,6 @@ PLUGIN_REGISTRY: list[AppConfig] = _launcher.get_plugins()
 BUILTIN_REGISTRY: list[AppConfig] = [
     AppConfig(name="App", path=APP_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="Minecraft Server", path=SERVER_EXE_PATH, enable=True, level=2, ics=False),
-    AppConfig(name="GUI", path=GUI_EXE_PATH, enable=GUI_ENABLED, level=2, ics=False),
 ]
 
 for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
