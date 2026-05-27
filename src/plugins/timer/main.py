@@ -2,9 +2,10 @@
 # ==================================================
 # timer - Countdown timer overlay plugin
 # ==================================================
-# Displays a countdown timer that resets on player
-# death/respawn. When the timer hits zero it sends
-# a POST to the win counter to increment wins.
+# Standalone countdown timer.  Optional coupling:
+#   pause_on_death  — pause/reset on player death/respawn
+#   auto_win        — POST a win to WinCounter on expiry
+# Control via REST: POST /start, /pause, /reset
 # Works in pywebview AND as an OBS browser source.
 # ==================================================
 
@@ -39,6 +40,10 @@ WEB_PORT = cfg.get("timer", {}).get("port", 29189)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 ADD_URL = f"http://127.0.0.1:{WIN_PORT}/add?amount=1"
 TIMER_EXE_PATH = get_base_file()
+
+# Decoupling options
+AUTO_WIN = cfg.get("timer", {}).get("auto_win", False)
+PAUSE_ON_DEATH = cfg.get("timer", {}).get("pause_on_death", False)
 
 THEME = load_plugin_theme(cfg, "timer")
 THEME_STYLE = theme_css(THEME)
@@ -127,11 +132,14 @@ def timer_tick_loop():
     while True:
         hit_zero = timer_state.tick()
         if hit_zero:
-            log.info(f"[ACTION] Timer reached 0. Sending POST to {ADD_URL}")
-            try:
-                requests.post(ADD_URL, timeout=2)
-            except Exception as e:
-                log.error(f"Could not reach counter: {e}")
+            if AUTO_WIN:
+                log.info(f"[ACTION] Timer reached 0. Sending win to {ADD_URL}")
+                try:
+                    requests.post(ADD_URL, timeout=2)
+                except Exception as e:
+                    log.error(f"Could not reach win counter: {e}")
+            else:
+                log.info("[TIMER] Timer reached 0 (auto_win disabled)")
             threading.Thread(target=timer_state.reset, daemon=True).start()
         overlay_clients.notify(timer_state.get_state())
         time.sleep(1)
@@ -170,12 +178,38 @@ def webhook():
         log.info(f"[TIMER] Invalid JSON in webhook: {e}")
         return "OK"
     ev = data.get("event") if data else None
-    if ev == "player_death":
-        timer_state.pause()
-        timer_state.reset()
-    elif ev == "player_respawn":
-        timer_state.unpause()
+    if PAUSE_ON_DEATH:
+        if ev == "player_death":
+            timer_state.pause()
+            timer_state.reset()
+        elif ev == "player_respawn":
+            timer_state.unpause()
+    else:
+        log.debug("[TIMER] Ignoring webhook event %s (pause_on_death disabled)", ev)
     return "OK"
+
+
+@app.route("/start", methods=["POST"])
+def start_timer():
+    timer_state.unpause()
+    return "OK"
+
+
+@app.route("/pause", methods=["POST"])
+def pause_timer():
+    timer_state.pause()
+    return "OK"
+
+
+@app.route("/reset", methods=["POST"])
+def reset_timer():
+    timer_state.reset()
+    return "OK"
+
+
+@app.route("/status", methods=["GET"])
+def status_timer():
+    return json.dumps(timer_state.get_state())
 
 
 @app.route("/stream")

@@ -2,11 +2,11 @@
 # ==================================================
 # wincounter - Win/loss counter overlay plugin
 # ==================================================
-# Tracks wins and losses. Wins increase on timer
-# expiry (POST /add), deaths subtract via webhook.
-# When wins reach the "needed" threshold, the target
-# increases by 10 and wins reset. State is persisted
-# to stats.json.
+# Tracks wins and losses.  Wins via POST /add,
+# optional death decrement via webhook
+# (decrement_on_death).  Win escalation: when wins
+# reach "needed", target += 10 and wins reset.
+# State is persisted to stats.json.
 # ==================================================
 
 import webview, threading, json, sys, yaml
@@ -55,6 +55,7 @@ except Exception: cfg = {}
 PORT = cfg.get("win_counter", {}).get("port", 29191)
 # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
 SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+DECREMENT_ON_DEATH = cfg.get("win_counter", {}).get("decrement_on_death", False)
 
 THEME = load_plugin_theme(cfg, "win_counter")
 THEME_STYLE = theme_css(THEME)
@@ -228,8 +229,11 @@ def handle_minecraft_events():
         event = data.get("event")
 
         if event == "player_death":
-            win_manager_instance.remove_win(1)
-            log.info("\n[DEAD] Player died! Win removed.")
+            if DECREMENT_ON_DEATH:
+                win_manager_instance.remove_win(1)
+                log.info("[WINCOUNTER] Player died — win removed.")
+            else:
+                log.debug("[WINCOUNTER] Ignoring death event (decrement_on_death disabled)")
 
     except Exception as e:
         log.error(f"Webhook error: {e}")

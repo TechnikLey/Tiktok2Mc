@@ -401,12 +401,16 @@ like_goal:
   goal_multiplier: 1
 
 # --- STREAM TIMER ---
-# A countdown timer for your stream. Pauses on player death, resumes on
-# respawn. When it reaches zero, a win is counted.
+# A standalone countdown timer for your stream.  Optional coupling:
+#   pause_on_death  — auto-pause/reset on player death/respawn (needs MinecraftServerAPI)
+#   auto_win        — POST a win to WinCounter each time the timer reaches 0
+# Control via REST: POST /start, /pause, /reset, GET /status.
 timer:
   enabled: false
   port: 29189
-  start_time: 10   # Minutes
+  start_time: 10    # Minutes
+  auto_win: false   # Disabled by default — timer runs standalone
+  pause_on_death: false  # Disabled by default — no MinecraftServerAPI dependency
 
 # --- DEATH COUNTER ---
 # Displays the number of player deaths on stream.
@@ -415,10 +419,12 @@ death_counter:
   port: 29190
 
 # --- WIN COUNTER OVERLAY ---
-# Tracks wins and losses. Decrements on death, increments on timer expiry.
+# Tracks wins and losses.  POST /add for wins, optional death decrement
+# (decrement_on_death).  Win escalation: target += 10 when reached.
 win_counter:
   enabled: false
   port: 29191
+  decrement_on_death: false  # Disabled by default — standalone win tracking
 
 # --- WEB DASHBOARD (GUI) ---
 # A web-based gift browser and server dashboard.
