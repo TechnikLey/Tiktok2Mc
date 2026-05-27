@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from core.api.models import HealthResponse, StatusDetail
 from core.api.services import ApiService
+from core.api.registry import get_registry
 
 router = APIRouter(tags=["Health"])
 _service = ApiService()
@@ -16,8 +17,8 @@ async def health():
 
 @router.get("/status", response_model=StatusDetail)
 async def status():
-    plugins = _service.read_plugin_registry()
-    enabled = sum(1 for p in plugins if p.get("enable", False))
+    plugins = get_registry().list()
+    enabled = sum(1 for p in plugins if p.enabled)
     return StatusDetail(
         server="running",
         plugins_active=enabled,

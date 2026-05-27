@@ -1,27 +1,142 @@
-from fastapi import APIRouter
+"""Plugin registration & management endpoints.
 
-from core.api.models import PluginInfo, PluginListResponse
-from core.api.services import ApiService
+These replace the old file-based ``python.registry.register_plugin()``
+flow.  Plugins now register via the API, which persists to its own
+JSON store (``data/api_plugin_registry.json``).
+"""
+
+from fastapi import APIRouter, HTTPException
+
+from core.api.models import (
+    PluginListResponse,
+    PluginRegisterRequest,
+    PluginRegisterResponse,
+    PluginRegistration,
+    PluginUpdateRequest,
+    ImportLegacyResponse,
+)
+from core.api.registry import get_registry
 
 router = APIRouter(tags=["Plugins"])
-_service = ApiService()
+
+
+# ── Register ─────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/plugins/register",
+    response_model=PluginRegisterResponse,
+    status_code=201,
+)
+async def register_plugin(body: PluginRegisterRequest):
+    """Register or update a plugin in the central registry."""
+    registry = get_registry()
+    data = PluginRegistration(
+        name=body.name,
+        path=body.path,
+        version=body.version,
+        enabled=body.enabled,
+        level=body.level,
+        port=body.port,
+        ics=body.ics,
+        description=body.description,
+    )
+    result = registry.register(data)
+    return PluginRegisterResponse(status="registered", plugin=result)
+
+
+# ── List ─────────────────────────────────────────────────────────────
 
 
 @router.get("/plugins", response_model=PluginListResponse)
 async def list_plugins():
-    raw = _service.read_plugin_registry()
-    infos = [
-        PluginInfo(
-            name=p.get("name", "unknown"),
-            enabled=p.get("enable", False),
-            level=p.get("level", 1),
-            port=p.get("port", 0),
-            ics=p.get("ics", False),
-            path=p.get("path", ""),
-        )
-        for p in raw
-    ]
-    enabled_count = sum(1 for i in infos if i.enabled)
+    """Return every registered plugin."""
+    registry = get_registry()
+    plugins = registry.list()
+    enabled = sum(1 for p in plugins if p.enabled)
     return PluginListResponse(
-        total=len(infos), enabled=enabled_count, plugins=infos
+        total=len(plugins), enabled=enabled, plugins=plugins
+    )
+
+
+# ── Get single ───────────────────────────────────────────────────────
+
+
+@router.get("/plugins/{name}", response_model=PluginRegistration)
+async def get_plugin(name: str):
+    """Return a single plugin by name."""
+    registry = get_registry()
+    plugin = registry.get(name)
+    if plugin is None:
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+    return plugin
+
+
+# ── Update ────────────────────────────────────────────────────────────
+
+
+@router.put("/plugins/{name}", response_model=PluginRegistration)
+async def update_plugin(name: str, body: PluginUpdateRequest):
+    """Partially update a plugin's properties (e.g. enable/disable)."""
+    registry = get_registry()
+    plugin = registry.get(name)
+    if plugin is None:
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
+    result = registry.update(
+        name,
+        enabled=body.enabled,
+        level=body.level,
+        port=body.port,
+        ics=body.ics,
+        path=body.path,
+        version=body.version,
+        description=body.description,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+    return result
+
+
+# ── Unregister ───────────────────────────────────────────────────────
+
+
+@router.delete("/plugins/{name}")
+async def unregister_plugin(name: str):
+    """Remove a plugin from the registry."""
+    registry = get_registry()
+    if not registry.unregister(name):
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+    return {"status": "unregistered", "name": name}
+
+
+# ── Import legacy ────────────────────────────────────────────────────
+
+
+@router.post(
+    "/plugins/import-legacy", response_model=ImportLegacyResponse
+)
+async def import_legacy():
+    """Bulk-import plugins from the old ``PLUGIN_REGISTRY.json`` file.
+
+    This is a one-shot migration helper.  Old entries are merged into
+    the new registry; existing entries keep their original
+    ``registered_at`` timestamp.
+    """
+    from core.api.services import ApiService
+
+    service = ApiService()
+    legacy = service.read_plugin_registry()
+    if not legacy:
+        raise HTTPException(
+            status_code=404,
+            detail="No legacy registry found or file is empty",
+        )
+
+    registry = get_registry()
+    count = registry.import_legacy(legacy)
+    total = len(registry.list())
+
+    return ImportLegacyResponse(
+        status="imported", imported=count, total=total
     )
