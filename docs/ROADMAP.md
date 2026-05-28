@@ -25,7 +25,7 @@ connections between components. That is gone.
 - Plugins no longer depend on each other. Turning on the Timer
   will not accidentally trigger the Death Counter anymore.
 - The central backend that manages all plugins is tested
-  thoroughly. 155 automated checks run on every change to catch
+  thoroughly. **200 automated checks** run on every change to catch
   regressions early.
 - Trigger files (.mca) are validated when loaded. Mistakes like
   missing brackets or wrong command prefixes are caught before
@@ -34,20 +34,26 @@ connections between components. That is gone.
   wrong during a save, the last good version is still there.
 - The system warns you if you try to expose it to the internet
   accidentally (`0.0.0.0` is not the default).
+- **Plugin discovery is now manifest-driven.** Each plugin ships
+  with a `plugin.json` manifest that declares its name, version,
+  entry point, ports, capabilities, and update URL. The backend
+  discovers plugins by reading these files — no executable
+  scanning, no guessing.
+- **A plugin update checker is in place.** Every plugin with an
+  `update_url` can be checked for newer versions via
+  `GET /api/v1/plugins/updates`. Available updates are logged at
+  startup.
 
 ---
 
 ## What We Are Working On Now
 
 The focus is on completing the remaining pieces before the 1.0.0
-release. The core engine is done. What is left is mostly
-integration and safety.
+release. The core engine and plugin system are done. What is left
+is mostly integration and safety.
 
 **Current priorities:**
 
-- **Update system** — The auto-updater still uses a temporary file
-  to signal that an update is ready. We are replacing that with a
-  proper API-based approach so the status is visible and reliable.
 - **Security** — Adding an optional API key for users who need to
   access the backend from other devices. Also making the RCON
   default password warning more visible so nobody accidentally
@@ -56,9 +62,12 @@ integration and safety.
   That adds up (Minecraft, RCON, API, plugins — over 10 ports).
   We are routing plugin communication through the central backend
   to reduce this to just a handful.
-- **Plugin metadata** — Adding a small manifest file inside each
-  plugin folder so the backend knows what is available without
-  having to launch every plugin first.
+- **Update path testing** — The new API-based update signalling is
+  implemented; the next step is to test the full update flow
+  end-to-end (v1.0.0 → v1.0.1).
+- **Plugin smoke tests** — Start each plugin as a subprocess,
+  verify it responds on its declared port, and validate its
+  metadata matches the manifest.
 
 ---
 

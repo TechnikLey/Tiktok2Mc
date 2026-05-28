@@ -23,10 +23,8 @@ import logging
 import yaml
 import requests
 from flask import Flask, Response, request, jsonify, redirect
-from core import parse_args, AppConfig, get_base_dir, get_root_dir, get_base_file
+from core import parse_args, get_base_dir, get_root_dir, get_base_file
 from core.theme import load_plugin_theme, theme_css
-from core.api.client import register_plugin
-
 log = logging.getLogger(__name__)
 
 # =========================
@@ -76,18 +74,6 @@ THEME = load_plugin_theme(_theme_cfg, "spotify")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-# Register with central API
-try:
-    register_plugin(AppConfig(
-        name="Spotify Control",
-        path=SPOTIFY_EXE_PATH,
-        enable=SPOTIFY_CFG.get("enabled", False),
-        level=4,
-        ics=True,
-        port=SPOTIFY_PORT,
-    ))
-except Exception:
-    log.warning("[SPOTIFY] Could not register with central API")
 
 # =========================
 # Spotify API wrapper

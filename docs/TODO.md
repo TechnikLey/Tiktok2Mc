@@ -34,7 +34,7 @@
 - ✓ `build.py`/`upload.py` TOOL_VERSION → `v1.0.0`
 
 ### Testing & CI
-- ✓ Tests: `pytest.ini`, `conftest.py`, 155 Testfälle (44 Validator + 111 API/Core)
+- ✓ Tests: `pytest.ini`, `conftest.py`, 200 Testfälle (44 Validator + 156 API/Core/Manifest/Updater)
 - ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events
 - ✓ API-Fehlertests: Config 404 (missing), 500 (corrupt), Event-Validierung
 - ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
@@ -43,6 +43,9 @@
 - ✓ Core-Tests: Validator (44 Tests — Brackets, Colons, Prefixes, Multiplier, File-I/O)
 - ✓ Core-Tests: PluginRegistry Backup-Mechanismus, korrupte JSON-Wiederherstellung
 - ✓ Core-Tests: ApiService Fallback-Pfad, korrupte YAML-Konfig
+- ✓ Core-Tests: PluginManifest (18 Tests — Modell-Validierung, `from_manifest()`, Discovery, Integration)
+- ✓ Core-Tests: PluginUpdateChecker (22 Tests — Version-Extraktion, Remote-Parse, Check-Logik, Endpunkt)
+- ✓ Core-Tests: Signal-Endpunkt (5 Tests — GET/PUT/DELETE /api/v1/updater/signal)
 - ✓ CI-Workflow: `test.yml` (push/PR auf main, `pytest tests/`)
 - ✓ Produktions-Bug behoben: `write_config()` ruft jetzt `_validate_config_schema()` auf
 - ✓ Produktions-Bug behoben: `normalize_config_version()` verarbeitet einstellige Strings (`"7"` → `"0.7"`)
@@ -81,37 +84,50 @@
 - ✓ Versionierte Config-Backups (`config.yaml.v1.bak`, `.v2.bak`, …)
 - ✓ Warnung bei unbekannten Top-Level-Keys (Tippschutz)
 
+### Plugin-Manifest (plugin.json)
+- ✓ `plugin.json` für alle 8 Plugins (channelpoints, deathcounter, likegoal, overlaytxt, spotify, test, timer, wincounter)
+- ✓ `PluginManifest` Pydantic-Modell mit Validierung (kebab-case name, required entry_point/display_name, semver, ports)
+- ✓ `PluginRegistration.from_manifest()`-Factory für Manifest → Registry-Konvertierung
+- ✓ `PluginLauncher` liest Manifeste statt `.exe`-Scannen (kein Executable-Scan-Code mehr)
+- ✓ Discovery deterministisch und testbar vor Plugin-Execution
+- ✓ `update_url`-Feld für Plugin-Update-Prüfung
+- ✓ Zentrales Registrieren über `POST /api/v1/plugins/register`
+
+### Update-System (API-Integration)
+- ✓ `PluginUpdateChecker`-Service: Versionsvergleich über `update_url`, API-Endpunkt-Abfrage, Installationsroutine
+- ✓ `GET /api/v1/plugins/updates`-Endpunkt mit `PluginUpdatesResponse`/`PluginUpdateStatus`-Modellen
+- ✓ API-Kill-Signal-Endpunkte (`GET/PUT/DELETE /api/v1/updater/signal`) als Ersatz für `update_signal.tmp`
+- ✓ Plugin-Update-Check in `start.py`-Startup (loggt verfügbare Updates nach API-Health-Poll)
+- ✓ Duales Signaling in `update.py` (API + Datei) und `start.py` (API + Datei-Polling)
+- ✓ Route-Ordering gefixt: `/plugins/updates` vor `/plugins/{name}` (Path-Parameter-Capture verhindert)
+- ✓ 45 neue Tests: 18 Manifest + 22 Updater + 5 Signal-Endpunkt
+
 ---
 
 ## ❌ Noch offen (nach Priorität)
 
 ### 1. Kritisch — Testing & Stabilität
 
-> 155 Tests existieren (44 Validator + 111 API/Core).
-> SSE/WS-Tests sind noch nicht stabil (TestClient-Stream-Limit).
-> API-Finalisierung abgeschlossen: alle Routes haben Error-Handling,
-> PluginRegistry hat Backup-Mechanismus, Launcher fängt JSON-Fehler.
+> 200 Tests passen, 4 Skipped (SSE/WS-Streaming-Limit mit TestClient).
+> Manifest-Discovery und Update-Checker sind getestet und stabil.
 
 - [ ] **Hoch** — SSE/WS-Integrationstests stabilisieren
   - SSE-Stream-Read mit Timeout und explizitem Close.
   - **Blockiert durch:** TestClient unterstützt Streaming nur begrenzt.
 
 - [ ] **Hoch** — Plugin-Smoke-Tests
-  - Jedes Plugin starten, Flask-Server antwortet, API erreichbar.
+  - Jedes Plugin als Subprozess starten, manifest-basierte Discovery validieren, API-Responses prüfen.
+  - **Status:** Manifest-System ist implementiert und getestet — Smoke-Tests sind jetzt unblocked.
 
-### 2. Kritisch — Update-System
+### 2. Kritisch — Update-System (Integration)
 
-> `update.py` wurde auf semantische Versionierung umgestellt, aber
-> die Integration mit der API (Status, Update-Signal) fehlt.
-> Der Updater arbeitet noch rein dateibasiert.
-
-- [ ] **Kritisch** — Updater mit API kommunizieren lassen
-  - API-Endpunkt für Update-Status (`GET /api/v1/update/status`)
-  - Signal `update_signal.tmp` durch API-Call ersetzen
-  - **Warum:** Datei-basiertes Signaling ist brüchig und nicht beobachtbar.
+> `PluginUpdateChecker` und API-Signal-Endpunkte sind implementiert.
+> Der alte dateibasierte Pfad (`update_signal.tmp`) existiert noch als Fallback
+> für das kompilierte `update.exe`. Nächste Schritte:
 
 - [ ] **Hoch** — Update-Pfad v1.0.0 → v1.0.1 testen
-  - Config-Whitelist, Version-Check, Signal-Handling.
+  - Config-Whitelist, Version-Check, Signal-Handling (Datei + API).
+  - Prüfen ob compiled `update.exe` noch file-basiertes Signaling verwendet.
 
 ### 3. Kritisch — Sicherheit
 
@@ -146,22 +162,11 @@
   - Aktuell: 1 API + 7 Plugin + Minecraft + RCON = 10+ Ports.
   - Ziel: API als Router, Ausnahme Minecraft (25565), RCON (25575), API (29185).
 
-### 5. Hoch — Plugin-Manifest (plugin.json)
-
-> API und zukünftiger Plugin-Manager brauchen verlässliche Metadaten.
-> Aktuell werden Plugins nur über `.exe`-Scannen in `plugins/` entdeckt.
-
-- [ ] **Hoch** — Plugin-Manifest einführen
-  - `plugin.json` mit name, version, description, required_apis, ports.
-  - **Warum:** Erlaubt Metadaten *vor* dem Plugin-Start.
-
-- [ ] **Hoch** — Plugin-Discovery über Manifest
-  - `PluginLauncher` liest `plugin.json` statt `.exe`-Scannen.
-
-### 6. Mittel — GUI (frühestens nach stabiler API)
+### 5. Mittel — GUI (frühestens nach stabiler API)
 
 > GUI ist ein eigenes Projekt. Setzt stabile API, Plugin-Manifeste und
-> Config-Validierung voraus. Kein v1.0.0-Blocker.
+> Config-Validierung voraus. Manifeste sind jetzt implementiert.
+> Kein v1.0.0-Blocker.
 
 - [ ] **Mittel** — Tech-Stack festlegen
   - Tauri, Electron, pywebview — Entscheidung nach API-Stabilität.
@@ -176,7 +181,7 @@
 - [ ] **Niedrig** — Overlay-Vorschau + Theme-Editor
 - [ ] **Niedrig** — Minecraft-Server-Console (RCON)
 
-### 7. Niedrig — Build & Deployment
+### 6. Niedrig — Build & Deployment
 
 - [ ] **Niedrig** — Totmodule identifizieren
   - Welche Teile von `start.py`, `main.py`, `server.py` werden durch die API abgelöst?
@@ -186,7 +191,7 @@
 - [ ] **Niedrig** — Rollback-Mechanismus dokumentieren
 - [ ] **Niedrig** — Troubleshooting-Sektion erweitern
 
-### 8. Niedrig — Dokumentation (nach Feature-Freeze)
+### 7. Niedrig — Dokumentation (nach Feature-Freeze)
 
 - [ ] **Niedrig** — README.md + GUIDE.md für v1.0.0
 - [ ] **Niedrig** — Entwicklerdokumentation (dev-book EN+DE)

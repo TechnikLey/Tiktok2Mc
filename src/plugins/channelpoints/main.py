@@ -16,9 +16,8 @@ import yaml
 from queue import Queue
 from pathlib import Path
 from flask import Flask, request, Response, jsonify
-from core import parse_args, AppConfig, get_root_dir, get_base_file, get_base_dir
+from core import parse_args, get_root_dir, get_base_file, get_base_dir
 from core.theme import load_plugin_theme, theme_css
-from core.api.client import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
@@ -54,18 +53,6 @@ BG_COLOR = THEME["background"]
 
 CP_EXE_PATH = get_base_file()
 
-# Register with central API
-try:
-    register_plugin(AppConfig(
-        name="Channel Points",
-        path=CP_EXE_PATH,
-        enable=cp_cfg.get("enabled", False),
-        level=4,
-        ics=True,
-        port=PORT,
-    ))
-except Exception:
-    log.warning("[CHANNELPOINTS] Could not register with central API")
 
 # --- Database ---
 def init_db():

@@ -13,9 +13,8 @@ import webview, threading, json, sys, yaml
 from pathlib import Path
 from flask import Flask, render_template_string, Response, request
 from queue import Queue
-from core import parse_args, AppConfig, get_base_file, get_base_dir, get_root_dir
+from core import parse_args, get_base_file, get_base_dir, get_root_dir
 from core.theme import load_plugin_theme, theme_css
-from core.api.client import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
@@ -62,18 +61,6 @@ THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 WINCOUNTER_EXE_PATH = get_base_file()
 
-# Register with central API
-try:
-    register_plugin(AppConfig(
-        name="Win Counter",
-        path=WINCOUNTER_EXE_PATH,
-        enable=cfg.get("win_counter", {}).get("enabled", False),
-        level=4,
-        ics=True,
-        port=PORT,
-    ))
-except Exception:
-    log.warning("[WINCOUNTER] Could not register with central API")
 
 app = Flask(__name__)
 win_manager_instance = None  # Initialized below

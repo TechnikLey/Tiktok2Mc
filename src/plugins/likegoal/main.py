@@ -19,9 +19,8 @@ from queue import Queue
 from flask import Flask, Response, request, jsonify
 import sys
 import yaml
-from core import parse_args, AppConfig, get_base_dir, get_base_file, get_root_dir
+from core import parse_args, get_base_dir, get_base_file, get_root_dir
 from core.theme import load_plugin_theme, theme_css
-from core.api.client import register_plugin
 import logging
 log = logging.getLogger(__name__)
 
@@ -64,18 +63,6 @@ BG_COLOR = THEME["background"]
 
 LIKEGOAL_EXE_PATH = get_base_file()
 
-# Register with central API
-try:
-    register_plugin(AppConfig(
-        name="Like Goal",
-        path=LIKEGOAL_EXE_PATH,
-        enable=cfg.get("like_goal", {}).get("enabled", False),
-        level=4,
-        ics=True,
-        port=LIKE_GOAL_PORT,
-    ))
-except Exception:
-    log.warning("[LIKEGOAL] Could not register with central API")
 
 # =========================
 # Flask setup & like tracking
