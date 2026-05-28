@@ -15,6 +15,7 @@ import time
 import shutil
 import threading
 import os
+import json
 import urllib.error
 import urllib.request
 import shlex
@@ -367,6 +368,27 @@ def start_UPDATE_EXE_PATH():
                     return "kill"
             except (OSError, IOError):
                 pass
+
+        # Also check API-based kill signal
+        try:
+            with urllib.request.urlopen(
+                f"{_API_BASE_URL}/updater/signal", timeout=2
+            ) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if data.get("signal") == "kill":
+                        # Acknowledge by clearing the signal
+                        req = urllib.request.Request(
+                            f"{_API_BASE_URL}/updater/signal",
+                            method="DELETE",
+                        )
+                        urllib.request.urlopen(req, timeout=2)
+                        log.info("Please restart the application.")
+                        time.sleep(2)
+                        return "kill"
+        except Exception:
+            pass
+
         time.sleep(1)
 
     return proc.returncode
@@ -439,6 +461,29 @@ for _ in range(20):
 
 if _api_ready:
     log.info("API server ready.")
+
+    # Check for plugin updates
+    try:
+        with urllib.request.urlopen(
+            f"{_API_BASE_URL}/plugins/updates", timeout=5
+        ) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("updates_available", 0) > 0:
+                    log.info(
+                        "[UPDATES] %d plugin update(s) available:",
+                        data["updates_available"],
+                    )
+                    for p in data.get("plugins", []):
+                        if p.get("update_available") and p.get("display_name"):
+                            log.info(
+                                "  - %s: %s -> %s",
+                                p["display_name"],
+                                p.get("current_version", "?"),
+                                p.get("latest_version", "?"),
+                            )
+    except Exception:
+        pass
 else:
     log.warning(
         "API server not reachable within 10 s — "

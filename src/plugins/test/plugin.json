@@ -1,0 +1,18 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/test/main.py",
+  "display_name": "Test Plugin",
+  "description": "Internal development and testing plugin.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}

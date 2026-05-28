@@ -15,9 +15,12 @@ from core.api.models import (
     PluginRegisterRequest,
     PluginRegisterResponse,
     PluginRegistration,
+    PluginUpdatesResponse,
+    PluginUpdateStatus,
     PluginUpdateRequest,
 )
 from core.api.registry import get_registry
+from core.api.updater import PluginUpdateChecker
 
 log = logging.getLogger(__name__)
 
@@ -39,12 +42,20 @@ async def register_plugin(body: PluginRegisterRequest):
         data = PluginRegistration(
             name=body.name,
             path=body.path,
+            entry_point=body.entry_point,
+            display_name=body.display_name,
             version=body.version,
             enabled=body.enabled,
             level=body.level,
             port=body.port,
             ics=body.ics,
             description=body.description,
+            capabilities=body.capabilities,
+            depends_on=body.depends_on,
+            auto_enable=body.auto_enable,
+            update_url=body.update_url,
+            author=body.author,
+            homepage=body.homepage,
         )
         result = registry.register(data)
         return PluginRegisterResponse(status="registered", plugin=result)
@@ -70,6 +81,31 @@ async def list_plugins():
         )
     except Exception as e:
         log.exception("Failed to list plugins")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Updates ──────────────────────────────────────────────────────────
+
+_updater = PluginUpdateChecker()
+
+
+@router.get("/plugins/updates", response_model=PluginUpdatesResponse)
+async def check_plugin_updates():
+    """Check all registered plugins for available updates."""
+    try:
+        registry = get_registry()
+        plugins = [p.model_dump(mode="json") for p in registry.list()]
+        results = _updater.check_updates(plugins)
+        updates_available = sum(
+            1 for r in results if r.get("update_available")
+        )
+        return PluginUpdatesResponse(
+            plugins=[PluginUpdateStatus(**r) for r in results],
+            total=len(results),
+            updates_available=updates_available,
+        )
+    except Exception as e:
+        log.exception("Failed to check plugin updates")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -109,6 +145,14 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
             path=body.path,
             version=body.version,
             description=body.description,
+            entry_point=body.entry_point,
+            display_name=body.display_name,
+            capabilities=body.capabilities,
+            depends_on=body.depends_on,
+            auto_enable=body.auto_enable,
+            update_url=body.update_url,
+            author=body.author,
+            homepage=body.homepage,
         )
         if result is None:
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")

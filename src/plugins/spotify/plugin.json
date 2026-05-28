@@ -1,0 +1,24 @@
+{
+  "name": "spotify-control",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/spotify/main.py",
+  "display_name": "Spotify Control",
+  "description": "Allows viewers to control Spotify playback via TikTok comments. Supports play, skip, volume, and queue management through the Spotify Web API.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [
+      29194
+    ],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [
+    "spotify:playback",
+    "spotify:control",
+    "spotify:queue"
+  ],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}

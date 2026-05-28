@@ -1,0 +1,24 @@
+{
+  "name": "overlay-text",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/overlaytxt/main.py",
+  "display_name": "Overlay Text",
+  "description": "Displays scrolling or static text overlays on stream. Supports multiple overlay slots with configurable fade and timing.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [
+      29186
+    ],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [
+    "overlay:text",
+    "overlay:slot",
+    "overlay:timing"
+  ],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}

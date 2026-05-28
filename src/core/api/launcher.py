@@ -1,8 +1,13 @@
-"""API-only plugin discovery.
+"""Manifest-driven plugin discovery.
 
-The launcher fetches the plugin list from the central API
-(``GET /api/v1/plugins``).  If the API is unreachable the
-launcher returns an empty list — there is no legacy file fallback.
+The launcher discovers plugins by reading ``plugin.json`` manifest files
+from the plugins directory.  Each valid manifest is registered with the
+central API via ``POST /api/v1/plugins/register``, then the launcher
+fetches the complete list from ``GET /api/v1/plugins``.
+
+There is **no** file-scanning fallback.  If no manifests exist the
+plugin list is empty.  If the API is unreachable, discovery is deferred
+and an empty list is returned.
 
 Usage
 -----
@@ -10,9 +15,6 @@ Usage
 
     launcher = PluginLauncher()
     plugins = launcher.get_plugins()
-
-    print(launcher.source)      # "api" or "empty"
-    print(launcher.using_api)   # True when API responded
 """
 
 from __future__ import annotations
@@ -22,14 +24,17 @@ import logging
 import os
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 
+from core.api.models import PluginManifest, PluginRegistration
 from core.models import AppConfig
 
 log = logging.getLogger(__name__)
 
 _API_BASE = os.environ.get("API_BASE_URL", "http://127.0.0.1:29185/api/v1")
 _TIMEOUT = 5
+_PLUGINS_DIR_NAME = "plugins"
 
 
 # ── field mapping ────────────────────────────────────────────────────
@@ -37,19 +42,7 @@ _TIMEOUT = 5
 
 def _api_to_legacy_dict(api_entry: dict[str, Any]) -> dict[str, Any]:
     """Map API ``PluginRegistration`` keys to the dict format expected
-    by ``AppConfig``.
-
-    +------------------+------------------+
-    | API (new)        | Legacy (old)     |
-    +------------------+------------------+
-    | ``name``         | ``name``         |
-    | ``path``         | ``path``         |
-    | ``enabled``      | ``enable``       |
-    | ``level``        | ``level``        |
-    | ``ics``          | ``ics``          |
-    | ``port``         | ``port``         |
-    +------------------+------------------+
-    """
+    by ``AppConfig``."""
     return {
         "name": api_entry.get("name", ""),
         "path": api_entry.get("path", ""),
@@ -64,44 +57,60 @@ def _api_to_legacy_dict(api_entry: dict[str, Any]) -> dict[str, Any]:
 
 
 class PluginLauncher:
-    """Reads the plugin list from the central API.
-
-    There is **no** legacy file fallback.  If the API is unreachable
-    the launcher returns an empty list.
+    """Discovers plugins from ``plugin.json`` manifests and registers
+    them with the central API.
 
     Attributes
     ----------
     source : str
-        ``"api"`` when the API responded, ``"empty"`` otherwise.
+        ``"manifest"`` when manifests were found and registered,
+        ``"api"`` when the existing API registration was used,
+        ``"empty"`` otherwise.
     plugin_count : int
         Number of plugins returned by the last ``get_plugins()`` call.
     """
 
-    def __init__(self, api_base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_base_url: str | None = None,
+        plugins_dir: Path | None = None,
+    ) -> None:
         self._api_base = (api_base_url or _API_BASE).rstrip("/")
+        self._plugins_dir: Path | None = plugins_dir
         self.source: str = "empty"
         self.plugin_count: int = 0
 
     @property
     def using_api(self) -> bool:
-        return self.source == "api"
+        return self.source in ("manifest", "api")
 
     def get_plugins(self) -> list[AppConfig]:
-        """Fetch plugins from ``GET /api/v1/plugins``.
+        """Discover plugins from manifests and return the full list.
 
-        Returns an empty list when the API is unreachable.
+        1. Read ``plugin.json`` manifests from the plugins directory.
+        2. Register each valid manifest with the central API.
+        3. Fetch the complete plugin list from the API.
+
+        Returns an empty list when no manifests exist or the API is
+        unreachable.
         """
+        # Step 1 — discover from manifests
+        manifests = self._discover_from_manifests()
+        if manifests:
+            self._register_manifests(manifests)
+
+        # Step 2 — fetch from API
         plugins = self._fetch()
         if plugins is not None:
-            self.source = "api"
+            self.source = "manifest" if manifests else "api"
             self.plugin_count = len(plugins)
             if plugins:
                 log.info(
-                    "Plugin source: API (%d plugin(s))",
-                    self.plugin_count,
+                    "Plugin source: %s (%d plugin(s))",
+                    self.source, self.plugin_count,
                 )
             else:
-                log.info("Plugin source: API — 0 plugins registered")
+                log.info("Plugin source: %s — 0 plugins registered", self.source)
             return plugins
 
         self.source = "empty"
@@ -111,7 +120,95 @@ class PluginLauncher:
         )
         return []
 
-    # -- internals ----------------------------------------------------------
+    # -- manifest discovery ------------------------------------------------
+
+    def _plugins_directory(self) -> Path | None:
+        """Return the resolved plugins directory path, or None."""
+        if self._plugins_dir is not None:
+            return self._plugins_dir
+        try:
+            from core.paths import get_root_dir
+            return get_root_dir() / "src" / _PLUGINS_DIR_NAME
+        except Exception:
+            return None
+
+    def _discover_from_manifests(self) -> list[PluginManifest]:
+        """Scan the plugins directory for ``plugin.json`` files.
+
+        Returns a list of validated ``PluginManifest`` objects.
+        Invalid manifests are logged as warnings and skipped.
+        """
+        plugins_dir = self._plugins_directory()
+        if plugins_dir is None or not plugins_dir.is_dir():
+            return []
+
+        results: list[PluginManifest] = []
+        seen_names: set[str] = set()
+
+        for child in sorted(plugins_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            manifest_file = child / "plugin.json"
+            if not manifest_file.is_file():
+                continue
+
+            try:
+                with manifest_file.open("r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                manifest = PluginManifest(**raw)
+            except (json.JSONDecodeError, Exception) as exc:
+                log.warning(
+                    "Skipping invalid manifest %s: %s",
+                    manifest_file, exc,
+                )
+                continue
+
+            if manifest.name in seen_names:
+                log.warning(
+                    "Duplicate plugin name '%s' in %s — skipping",
+                    manifest.name, manifest_file,
+                )
+                continue
+            seen_names.add(manifest.name)
+            results.append(manifest)
+
+        return results
+
+    def _register_manifests(
+        self, manifests: list[PluginManifest]
+    ) -> None:
+        """Register each manifest with the central API."""
+        from core.paths import get_root_dir
+
+        root = get_root_dir()
+        for manifest in manifests:
+            entry_path = root / manifest.entry_point if manifest.entry_point else ""
+            registration = PluginRegistration.from_manifest(
+                manifest,
+                path=str(entry_path),
+                enabled=manifest.auto_enable,
+            )
+            self._register(registration)
+
+    def _register(self, plugin: PluginRegistration) -> bool:
+        """``POST /api/v1/plugins/register``.  Returns ``True`` on success."""
+        url = f"{self._api_base}/plugins/register"
+        body = plugin.model_dump(mode="json")
+        data = json.dumps(body).encode("utf-8")
+        try:
+            req = urllib.request.Request(
+                url, data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=_TIMEOUT):
+                log.debug("Registered plugin: %s", plugin.name)
+                return True
+        except Exception as exc:
+            log.warning("Failed to register plugin '%s': %s", plugin.name, exc)
+            return False
+
+    # -- API fetch ---------------------------------------------------------
 
     def _fetch(self) -> list[AppConfig] | None:
         """``GET /api/v1/plugins``.  Returns ``None`` on error."""

@@ -1,0 +1,24 @@
+{
+  "name": "channel-points",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/channelpoints/main.py",
+  "display_name": "Channel Points",
+  "description": "Awards loyalty points to active viewers. Viewers earn points over time and can spend them on rewards.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [
+      29195
+    ],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [
+    "channel_points:reward",
+    "channel_points:balance",
+    "channel_points:leaderboard"
+  ],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}

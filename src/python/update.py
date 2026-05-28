@@ -26,6 +26,7 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
 from core.paths import get_base_dir
 from core.utils import load_config, normalize_config_version
+from core.api.server import DEFAULT_PORT
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
@@ -420,10 +421,31 @@ def run_update():
         signal_file.write_text("kill")
     except Exception as e:
         log.warning(f"Could not write signal file: {e}")
+
+    # Also set API-based kill signal
+    try:
+        requests.put(
+            f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
+            json={"signal": "kill"},
+            timeout=5,
+        )
+    except Exception:
+        pass  # fallback to file-based signaling
+
     # Wait for start script to consume the signal (file deleted) or timeout
     for _ in range(30):
         if not signal_file.exists():
             break
+        # Also check API signal acknowledgment
+        try:
+            resp = requests.get(
+                f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
+                timeout=2,
+            )
+            if resp.status == 200 and resp.json().get("signal") is None:
+                break  # acknowledged via API
+        except Exception:
+            pass
         time.sleep(1)
 
     log.info("[..] Installing files...")
@@ -487,6 +509,15 @@ def run_update():
             (BASE_DIR / "update_signal.tmp").unlink()
     except Exception as e:
         log.warning(f"Could not remove signal file: {e}")
+
+    # Also clear API signal
+    try:
+        requests.delete(
+            f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
+            timeout=5,
+        )
+    except Exception:
+        pass  # API server may already be gone
 
     log.info("\nUpdate complete.")
     wait_for_key()

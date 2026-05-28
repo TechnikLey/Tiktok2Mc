@@ -1,0 +1,24 @@
+{
+  "name": "win-counter",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/wincounter/main.py",
+  "display_name": "Win Counter",
+  "description": "Tracks wins and losses with optional death decrement from Minecraft. Wins escalate the target automatically when reached.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [
+      29191
+    ],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [
+    "win_counter:track",
+    "win_counter:webhook",
+    "win_counter:escalation"
+  ],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}

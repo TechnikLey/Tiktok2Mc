@@ -1,0 +1,24 @@
+{
+  "name": "death-counter",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/deathcounter/main.py",
+  "display_name": "Death Counter",
+  "description": "Tracks in-game deaths and displays a real-time counter as an OBS browser source or pywebview overlay.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [
+      29190
+    ],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [
+    "deaths:track",
+    "deaths:webhook",
+    "deaths:reset"
+  ],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}

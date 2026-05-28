@@ -1,0 +1,25 @@
+{
+  "name": "timer",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/timer/main.py",
+  "display_name": "Timer",
+  "description": "A configurable countdown timer overlay. Can pause on player death, auto-post wins to Win Counter, and be controlled via REST endpoints.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [
+      29189
+    ],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [
+    "timer:schedule",
+    "timer:pause",
+    "timer:reset",
+    "timer:status"
+  ],
+  "depends_on": [],
+  "auto_enable": false,
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+}
