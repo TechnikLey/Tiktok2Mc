@@ -92,6 +92,12 @@
 - ✓ Versionierte Config-Backups
 - ✓ Warnung bei unbekannten Top-Level-Keys
 
+### Dokumentation
+- ✓ README.md für v1.0.0 neu geschrieben — Projektübersicht, Features, Installation, Quick Start, API-Übersicht, Plugin-System, Development
+- ✓ GUIDE.md für v1.0.0 neu geschrieben — Architektur, Ordnerstruktur, Plugin-System, API-Nutzung, Actions/Triggers, Update-System, Troubleshooting
+- ✓ CHANGELOG.md normalisiert — v1.0.0-Sektion mit Added/Changed/Removed/Fixed/Security, Keep-a-Changelog-Format
+- ✓ config.yaml Inline-Dokumentation verbessert — API-Server-Hinweis, GUI-Port-Klarstellung, Update-Check-Referenz
+
 ---
 
 ## 🔜 Für v1.0.0
@@ -102,13 +108,6 @@
 - [ ] **End-to-End-Update-Test** v1.0.0 → v1.0.1
   - Config-Whitelist, Version-Check, Signal-Handling (Datei + API).
   - Prüfen ob compiled `update.exe` noch file-basiertes Signaling verwendet.
-
-### 2. Dokumentation (Hoch)
-> Aktuelle README/GUIDE reflektieren noch v0.x-Architektur.
-
-- [ ] **README.md für v1.0.0 aktualisieren**
-- [ ] **GUIDE.md für v1.0.0 aktualisieren**
-- [ ] **CHANGELOG für v1.0.0 finalisieren**
 
 ---
 
