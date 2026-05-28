@@ -645,10 +645,43 @@ async def check_and_run():
                 stop_all_processes()
                 restart_exe = BASE_DIR / f"start{SUFFIX}"
                 if restart_exe.exists():
-                    subprocess.Popen([str(restart_exe)])
+                    if IS_WINDOWS:
+                        restart_bat = BASE_DIR / "_restart.bat"
+                        restart_bat.write_text(
+                            f'@echo off\n'
+                            f'timeout /t 2 /nobreak >nul\n'
+                            f'cd /d "{BASE_DIR}"\n'
+                            f'start "" "{restart_exe}"\n'
+                            f'del "%~f0"\n',
+                            encoding="utf-8",
+                        )
+                        subprocess.Popen(
+                            [str(restart_bat)],
+                            shell=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                        )
+                    else:
+                        restart_sh = BASE_DIR / "_restart.sh"
+                        restart_sh.write_text(
+                            f'#!/bin/sh\n'
+                            f'sleep 2\n'
+                            f'cd "{BASE_DIR}"\n'
+                            f'"{restart_exe}" &\n'
+                            f'rm "{restart_sh}"\n',
+                            encoding="utf-8",
+                        )
+                        restart_sh.chmod(0o755)
+                        subprocess.Popen(
+                            [str(restart_sh)],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
                 else:
                     log.error(f"Restart failed: {restart_exe} not found.")
-                sys.exit(0)
+                os._exit(0)
         await asyncio.sleep(5)
 
 # =============================================================================
