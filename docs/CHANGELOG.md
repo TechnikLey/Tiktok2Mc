@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v1.0.0] - 2026-05-28
+## [v1.0.0]
 
 > [!WARNING]
 > **Breaking changes.** v1.0.0 is a clean break from v0.x. Configuration files, plugins, and data from versions 0.x are not compatible. This is intentional — v1.0.0 is the first stable release built on a new foundation.

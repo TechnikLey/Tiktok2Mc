@@ -25,7 +25,7 @@ TikTok2Mc bundles a Minecraft server, a central API, and a plugin system that le
 |-------------|---------|
 | **OS** | Windows 10+ or Linux |
 | **RAM** | 12 GB minimum recommended (Minecraft server uses up to 4 GB by default) |
-| **Python** | 3.10+ (for development; release builds include a bundled runtime) |
+| **Python** | 3.12+ |
 | **TikTok** | Active TikTok Live stream required for event connection |
 | **Minecraft** | Java Edition 1.13+ (datapacks and RCON support required) |
 
@@ -67,8 +67,6 @@ python run.py              # starts the API server on 127.0.0.1:29185
    - **Linux:** `sudo ./start.bin`
 
 4. **Join the Minecraft server** — open Minecraft Java Edition, go to Multiplayer, add server `localhost:25565`.
-
-> You must be live on TikTok for the connection to work. The tool keeps trying to reconnect until your stream is live.
 
 ## Configuration
 
