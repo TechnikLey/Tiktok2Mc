@@ -437,7 +437,7 @@ win_counter:
 # and displayed in a pywebview window.
 # Set enabled: true to launch the dashboard on startup.
 gui:
-  enabled: false
+  enabled: true
 
 # --- SPOTIFY CONTROL ---
 # Lets viewers control your Spotify playback via chat ($play, $pause, etc.)

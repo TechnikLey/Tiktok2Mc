@@ -544,7 +544,7 @@ GUI_ENABLED = cfg.get("gui", {}).get("enabled", False)
 BUILTIN_REGISTRY: list[AppConfig] = [
     AppConfig(name="App", path=APP_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="Minecraft Server", path=SERVER_EXE_PATH, enable=True, level=2, ics=False),
-    AppConfig(name="GUI", path=GUI_EXE_PATH, enable=GUI_ENABLED, level=2, ics=True),
+    AppConfig(name="GUI", path=GUI_EXE_PATH, enable=GUI_ENABLED, level=2, ics=False),
 ]
 
 for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
