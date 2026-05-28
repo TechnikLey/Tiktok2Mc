@@ -33,7 +33,7 @@
 
 ### Security & Configuration
 - CORS restricted to local origins (was `["*"]`)
-- Warnings for default RCON password (`ABC1234`) and `server_host: 0.0.0.0`
+- RCON default password changed from `ABC1234` to empty string — setup wizard enforces secure password
 - Semantic config versioning (`config_version: 1.0`)
 - Config normalization, schema validation, and automatic backups
 - All plugins default to `enabled: false` (opt-in)
@@ -67,26 +67,44 @@
 > **These must be resolved before v1.0.0 can be tagged. No exceptions.**
 
 ### 1. GUI — HIGHEST PRIORITY / RELEASE BLOCKER
-> **Status: SCAFFOLDED — CORE SHELL EXISTS, FEATURES MISSING.**
+> **Status: PARTIALLY IMPLEMENTED.**
 >
-> A minimal GUI now exists:
+> A functional GUI now exists with the following features:
 > - `src/python/gui.py` — pywebview shell that opens the dashboard served by the API server
-> - `templates/gui/index.html` — minimal SPA dashboard (status, plugin list, config summary)
-> - API server mounts `/gui` static files
+> - `templates/gui/index.html` — SPA dashboard with system status, plugin list, config summary
+> - API server mounts `/gui` static files (dev + release layouts supported)
 > - `start.py` launches `gui.exe` when `gui.enabled: true`
-> - `build.py` compiles `gui.py` into the release package
+> - **First-Run Setup Wizard** — 3 steps: TikTok username, RCON password (with strength meter + validation), review & save. Auto-triggers when RCON password is empty.
+> - **Plugin Manager** — Enable/disable toggles in dashboard that persist to `config.yaml`
+> - **Overlay URL Helper** — Shows OBS Browser Source URLs for active plugins with copy-to-clipboard buttons
+> - **Restart System** — `POST /api/v1/restart` writes signal; `start.py` uses a background daemon thread that calls `os._exit(0)` to guarantee clean process termination before the new instance starts
 >
-> **Why it still blocks release:** The current dashboard is read-only and lacks the interactive features non-technical users need. The README promise of "No programming required" is not fully realized without a first-run wizard and visual editors.
+> **Why it still blocks release:** The dashboard is currently read-only for most settings. Users still need to edit `config.yaml` by hand for anything beyond the wizard basics.
 
+#### Completed GUI Features
 - [x] Tech stack decision and scaffolding (pywebview + API-served SPA)
 - [x] Graceful integration with existing `start.py` launcher
 - [x] Minimal live dashboard (connection status, plugin list, config summary)
-- [ ] **RELEASE BLOCKER** — First-run setup wizard (TikTok username, RCON password, feature selection)
-- [ ] **RELEASE BLOCKER** — `config.yaml` editor with live validation and inline help
-- [ ] **RELEASE BLOCKER** — `data/actions.mca` editor with syntax highlighting / validation
+- [x] First-run setup wizard (TikTok username, RCON password with strength validation)
+- [x] Plugin manager with enable/disable toggles that persist to config
+- [x] Overlay URL helper (copy-paste OBS browser sources)
+- [x] Restart system (background thread + os._exit for guaranteed clean restart)
+
+#### Remaining GUI Release Blockers
+- [ ] **RELEASE BLOCKER** — Full `config.yaml` editor (form-based editor for all sections, not just wizard basics)
+  - Java RAM settings (xms/xmx)
+  - Like goal triggers (add/remove/edit intervals)
+  - Comment commands (prefixes, roles, cooldowns)
+  - Theme color editor (hex pickers)
+  - Auto-update / shutdown settings
+- [ ] **RELEASE BLOCKER** — `data/actions.mca` editor with syntax validation
+  - Textarea with line numbers
+  - Real-time syntax validation (trigger names, command prefixes)
+  - Visual trigger list (what triggers exist, what commands they run)
 - [ ] **RELEASE BLOCKER** — Real-time log viewer
-- [ ] **RELEASE BLOCKER** — Plugin manager with enable/disable toggles that persist to config
-- [ ] **RELEASE BLOCKER** — Overlay URL helper (copy-paste OBS browser sources)
+  - Stream logs from `logs/` directory
+  - Filter by level (INFO/WARNING/ERROR)
+  - Auto-scroll to bottom
 
 ### 2. End-to-End Update Validation
 > **Status: IMPLEMENTED BUT NOT VALIDATED IN A REAL BUILD.**
