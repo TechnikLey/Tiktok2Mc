@@ -1,15 +1,5 @@
 # TikTok2Mc — Project Roadmap
 
-## Project Overview
-
-TikTok2Mc connects your TikTok Live stream to a Minecraft server. When viewers send gifts, follow, or hit like milestones, things happen in your game — automatically.
-
-Think of it as a bridge: TikTok events come in on one side, Minecraft commands go out on the other. Everything in between is handled by the tool. You just set up what you want to happen and go live.
-
-The project has been around for a while, but version 1.0.0 is a complete rebuild from the ground up. It is more reliable, better organised, and much easier to maintain going forward.
-
----
-
 ## Current Progress
 
 The core system works end to end. Here is what is stable right now:
@@ -61,16 +51,7 @@ Long term, TikTok2Mc aims to be a set-and-forget bridge between TikTok Live and 
 3. Write a few trigger rules (or use the built-in editor)
 4. Go live — everything else runs automatically
 
-There are no plans to support Twitch, YouTube, or other platforms. The project stays focused on TikTok. There will also not be a mobile app or cloud component — everything runs locally on your machine.
-
----
-
-## Fun Facts
-
-- The project runs **over 270 automated tests** on every change. That is more than one test for every plugin, every configuration option, and every trigger rule — combined.
-- Each plugin now ships with its own manifest file that describes what it does, what version it is, and how to update it. No more guesswork.
-- The entire backend was rebuilt from scratch for version 1.0.0. The old system relied on files and hard-wired connections between components. That is all gone.
-- Despite the rebuild, the core loop is surprisingly simple: TikTok event arrives → a trigger rule matches → a Minecraft command runs. Everything else is there to make that loop reliable and manageable.
+There are current no plans to support Twitch, YouTube, or other platforms. The project stays focused on TikTok.
 
 ---
 
