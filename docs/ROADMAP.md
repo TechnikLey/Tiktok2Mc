@@ -40,10 +40,14 @@ the gap between the API layer and the plugin communication model.
 
 | Area | Status |
 |------|--------|
-| API integration tests | 🔴 Not started |
+| API integration tests | ✅ Done (62 tests, CI-integrated) |
+| CORS lockdown (localhost-only default) | ✅ Done |
+| `0.0.0.0` security warning in `run.py` | ✅ Done |
+| Config validation on write (`_validate_config_schema`) | ✅ Done |
+| `normalize_config_version()` single-part string fix | ✅ Done |
 | Validator unit tests (.mca parsing) | 🔴 Not started |
 | Updater ↔ API integration (status, signaling) | 🔴 Not started |
-| API authentication (API key, `0.0.0.0` warnings) | 🔴 Not started |
+| API authentication (API key) | 🔴 Not started |
 | Port consolidation (API routes plugin traffic) | 🔴 Not started |
 | Plugin manifests (`plugin.json`) | 🔴 Not started |
 | Plugin communication via EventBus | 🔴 Not started |

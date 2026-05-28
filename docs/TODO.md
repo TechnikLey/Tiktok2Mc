@@ -33,6 +33,19 @@
 - ✓ `plugin_updater.py` entfernt (dead code)
 - ✓ `build.py`/`upload.py` TOOL_VERSION → `v1.0.0`
 
+### Testing & CI
+- ✓ Tests: `pytest.ini`, `conftest.py`, 62 Testfälle
+- ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events
+- ✓ Core-Tests: `normalize_config_version()`, `ApiService`, `PluginRegistry`, `PluginLauncher`, `load_config()`
+- ✓ CI-Workflow: `test.yml` (push/PR auf main, `pytest tests/`)
+- ✓ Produktions-Bug behoben: `write_config()` ruft jetzt `_validate_config_schema()` auf
+- ✓ Produktions-Bug behoben: `normalize_config_version()` verarbeitet einstellige Strings (`"7"` → `"0.7"`)
+
+### Security
+- ✓ CORS-Standard von `["*"]` auf `["http://127.0.0.1", "http://localhost"]` geändert
+- ✓ Security-Warning bei `--host 0.0.0.0` in `run.py`
+- ✓ CORS-Hinweis im API-Startup-Log
+
 ### Plugin-Entkopplung
 - ✓ Timer: REST-API (`/start`, `/pause`, `/reset`, `/status`)
 - ✓ Timer: `auto_win: false` (kein automatischer POST an WinCounter)
@@ -56,24 +69,20 @@
 
 ### 1. Kritisch — Testing & Stabilität
 
-> Die API ist der zentrale Vertrag des Systems. Ohne Integrationstests
-> ist jedes Release ein Blindflug. Validator-Logik ist aus v0.x übernommen
-> und muss übernommen werden.
+> 62 Tests existieren (API-Integration + Core-Services + Utils).
+> Test-Suite läuft in CI bei jedem Push/PR.
+> SSE/WS-Tests sind noch nicht stabil (TestClient-Stream-Limit).
 
-- [ ] **Kritisch** — API-Integrationstests
-  - Jeder Endpunkt: health, config CRUD, plugins CRUD, events, status.
-  - Test-Client gegen `create_app()` ohne Live-Server.
-  - **Warum:** API-Änderungen müssen sofort auffallen.
+- [ ] **Hoch** — SSE/WS-Integrationstests stabilisieren
+  - SSE-Stream-Read mit Timeout und explizitem Close.
+  - **Blockiert durch:** TestClient unterstützt Streaming nur begrenzt.
 
-- [ ] **Kritisch** — Validator-Tests (aus v0.5.0)
+- [ ] **Hoch** — Validator-Tests (aus v0.5.0)
   - Unit-Tests für die Validator-Logik (Brackets, Prefix, Placeholder).
   - Bestehender Code aus v0.x, aber nie systematisch getestet.
 
 - [ ] **Hoch** — Plugin-Smoke-Tests
   - Jedes Plugin starten, Flask-Server antwortet, API erreichbar.
-
-- [ ] **Hoch** — Config-Validierungs-Tests (v1.0.0-Schema)
-  - Gültige/ungültige Configs, Grenzfälle, Legacy-Versionen.
 
 ### 2. Kritisch — Update-System
 
