@@ -209,9 +209,9 @@
 
         .hidden { display: none !important; }
 
-        /* Config Editor */
+        /* Config Editor v2 */
         .editor-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            position: fixed; inset: 0; background: var(--bg);
             display: flex; flex-direction: column;
             z-index: 200; overflow: hidden;
         }
@@ -222,35 +222,38 @@
         }
         .editor-header h2 { margin: 0; font-size: 1.3rem; color: var(--accent); }
         .editor-body {
-            flex: 1; overflow-y: auto; padding: 2rem;
-            max-width: 900px; width: 100%; margin: 0 auto;
+            flex: 1; overflow-y: auto; padding: 1.5rem 2rem;
+            max-width: 960px; width: 100%; margin: 0 auto;
         }
         .editor-section {
             background: var(--card); border: 1px solid var(--border);
-            border-radius: 10px; margin-bottom: 1.5rem; overflow: hidden;
+            border-radius: 12px; margin-bottom: 1.2rem; overflow: hidden;
         }
         .section-header {
-            background: var(--input-bg); padding: 0.9rem 1.2rem;
+            background: linear-gradient(90deg, #2a2a2a 0%, #1e1e1e 100%);
+            padding: 0.85rem 1.3rem;
             cursor: pointer; display: flex;
             justify-content: space-between; align-items: center;
             font-weight: 600; font-size: 1rem;
             border-bottom: 1px solid transparent;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
         }
-        .section-header:hover { background: #3a3a3a; }
+        .section-header:hover { background: linear-gradient(90deg, #333 0%, #252525 100%); }
         .section-header.collapsed { border-bottom-color: var(--border); }
+        .section-header .section-icon { margin-right: 0.6rem; font-size: 1.1rem; }
         .section-toggle { font-size: 0.8rem; color: var(--muted); }
         .section-content {
-            padding: 1.2rem;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+            padding: 1.2rem 1.3rem;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem;
         }
         .section-content.hidden-section { display: none; }
         .form-row {
-            display: flex; flex-direction: column; gap: 0.3rem;
+            display: flex; flex-direction: column; gap: 0.35rem;
         }
         .form-row.full-width { grid-column: 1 / -1; }
         .form-row label {
-            font-size: 0.85rem; color: var(--muted); font-weight: 500;
+            font-size: 0.82rem; color: var(--muted); font-weight: 500;
+            display: flex; align-items: center; gap: 0.4rem;
         }
         .form-row input[type="text"],
         .form-row input[type="number"],
@@ -259,15 +262,15 @@
             padding: 0.6rem 0.8rem; background: var(--input-bg);
             border: 1px solid var(--border); color: var(--text);
             border-radius: 6px; font-size: 0.9rem; outline: none;
-            transition: border-color 0.2s; width: 100%;
+            transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
         }
-        .form-row input:focus, .form-row select:focus { border-color: var(--accent); }
+        .form-row input:focus, .form-row select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(255,213,79,0.15);
+        }
         .form-row input[type="checkbox"] {
-            width: 20px; height: 20px; accent-color: var(--accent);
+            width: 18px; height: 18px; accent-color: var(--accent);
             cursor: pointer;
-        }
-        .form-row .hint {
-            font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem;
         }
         .editor-actions {
             position: sticky; bottom: 0;
@@ -281,6 +284,49 @@
         }
         .save-status.ok { color: var(--success); }
         .save-status.err { color: var(--danger); }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative; display: inline-flex; align-items: center;
+            cursor: help;
+        }
+        .tooltip-icon {
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--border); color: var(--muted);
+            font-size: 0.7rem; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: background 0.2s, color 0.2s;
+        }
+        .tooltip:hover .tooltip-icon {
+            background: var(--accent); color: var(--bg);
+        }
+        .tooltip-text {
+            visibility: hidden; opacity: 0;
+            width: 280px;
+            background: #2d2d2d; color: var(--text);
+            text-align: left; padding: 0.7rem 0.9rem;
+            border-radius: 8px; border: 1px solid var(--border);
+            font-size: 0.82rem; font-weight: 400; line-height: 1.4;
+            position: absolute; z-index: 1000;
+            bottom: 135%; left: 50%; transform: translateX(-50%);
+            transition: opacity 0.2s;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute; top: 100%; left: 50%;
+            margin-left: -5px;
+            border-width: 5px; border-style: solid;
+            border-color: var(--border) transparent transparent transparent;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible; opacity: 1;
+        }
+        .section-desc {
+            font-size: 0.8rem; color: var(--muted); margin: 0 0 0.8rem 0;
+            grid-column: 1 / -1;
+        }
     </style>
 </head>
 <body>
@@ -759,7 +805,7 @@
             loadConfig();
         });
 
-        // ── Config Editor ──
+        // ── Config Editor v2 ──
         let editorConfig = {};
 
         const CONFIG_SECTION_ORDER = [
@@ -769,8 +815,134 @@
             'random_triggers', 'theme', 'update', 'shutdown'
         ];
 
+        const SECTION_ICONS = {
+            tiktok: '📱', rcon: '🔌', java: '☕', comment_commands: '💬', gui: '🖥️',
+            overlay_text: '📝', like_goal: '❤️', timer: '⏱️', death_counter: '💀',
+            win_counter: '🏆', spotify: '🎵', channel_points: '🪙',
+            minecraft_server_api: '🎮', console: '🖥️', random_triggers: '🎲',
+            theme: '🎨', update: '🔄', shutdown: '⏻️'
+        };
+
+        const CONFIG_DESCRIPTIONS = {
+            // Top-level
+            'config_version': 'Config file format version. Do not change manually.',
+            'auto_update_config': 'Automatically merge new config options when updating the tool.',
+            'show_sudo_warning': 'Show a warning on Linux if running without sudo.',
+            'server_host': 'Network address the API server binds to. Use 127.0.0.1 for local-only access.',
+            'control_method': 'DCS (Direct Control) is recommended. ICS is for older streaming software.',
+
+            // TikTok
+            'tiktok.user': 'Your TikTok username without the @ symbol. Required for live stream connection.',
+            'tiktok.reconnect_delay_seconds': 'Seconds to wait before reconnecting after a connection drop.',
+            'tiktok.autosave_interval_seconds': 'How often the gift revenue log is saved to disk.',
+            'tiktok.follow_tracking.mode': 'all_time = track followers forever. per_stream = reset every stream.',
+            'tiktok.follow_tracking.file': 'Path to the file storing tracked follower names.',
+
+            // RCON
+            'rcon.enabled': 'RCON must stay ON. It allows the tool to send commands to your Minecraft server.',
+            'rcon.password': 'Password for the Minecraft RCON connection. Anyone with this password can control your server.',
+            'rcon.port': 'RCON port. Default 25575. Only change if you changed it in server.properties.',
+
+            // Java
+            'java.xms': 'Initial RAM allocation for the Minecraft server. Same as xmx is recommended.',
+            'java.xmx': 'Maximum RAM allocation. Reduce to 2G or 1G if your PC has less than 8GB RAM.',
+            'java.port': 'Minecraft server port. Default 25565.',
+
+            // Console
+            'console.log_level': '0=Hide all, 1=Silent, 2=Standard, 3=Advanced, 4=Debug, 5=Override.',
+            'console.visible': 'Show or hide the main console window.',
+            'console.allow_close': 'If true, typing exit shuts everything down cleanly.',
+
+            // Minecraft Server API
+            'minecraft_server_api.enabled': 'Required for player death/respawn detection and datapack loading.',
+            'minecraft_server_api.api_port': 'Port for the internal Minecraft API bridge.',
+            'minecraft_server_api.web_server_port': 'Port for the webhook server that receives Minecraft events.',
+
+            // Overlay Text
+            'overlay_text.enabled': 'Display text notifications on your stream triggered by >> in actions.mca.',
+            'overlay_text.port': 'OBS Browser Source port for the overlay.',
+            'overlay_text.display_mode': 'overwrite = new message replaces current. queue = messages stack (can pile up!).',
+            'overlay_text.fade_in': 'Fade-in duration in milliseconds. 0 = instant.',
+            'overlay_text.fade_out': 'Fade-out duration in milliseconds. 0 = instant.',
+            'overlay_text.max_fails': 'After this many consecutive failures, stop retrying.',
+            'overlay_text.cooldown': 'Seconds to wait before retrying after max_fails.',
+
+            // Like Goal
+            'like_goal.enabled': 'Show a like progress bar on your stream.',
+            'like_goal.port': 'OBS Browser Source port for the like goal overlay.',
+            'like_goal.display_text': 'Text shown above the progress bar.',
+            'like_goal.initial_goal': 'Number of likes needed for the first goal.',
+            'like_goal.goal_multiplier': '0=reset, 1=add initial_goal, 2+=multiply goal each time.',
+
+            // Timer
+            'timer.enabled': 'Countdown timer for your stream. Can be controlled via REST API.',
+            'timer.port': 'OBS Browser Source port for the timer overlay.',
+            'timer.start_time': 'Starting minutes for the countdown.',
+            'timer.auto_win': 'POST a win to WinCounter when timer reaches 0.',
+            'timer.pause_on_death': 'Auto-pause timer when player dies (needs MinecraftServerAPI).',
+
+            // Death Counter
+            'death_counter.enabled': 'Display player death count on stream.',
+            'death_counter.port': 'OBS Browser Source port for the death counter overlay.',
+
+            // Win Counter
+            'win_counter.enabled': 'Track wins and losses on stream.',
+            'win_counter.port': 'OBS Browser Source port for the win counter overlay.',
+            'win_counter.decrement_on_death': 'Subtract a win when player dies.',
+
+            // Spotify
+            'spotify.enabled': 'Let viewers control your Spotify via chat commands.',
+            'spotify.port': 'Port for Spotify overlay and control endpoints.',
+            'spotify.client_id': 'Your Spotify Developer App Client ID.',
+            'spotify.client_secret': 'Your Spotify Developer App Client Secret.',
+            'spotify.redirect_uri': 'Must match exactly what you set in Spotify Developer Dashboard.',
+            'spotify.device_id': 'Target a specific Spotify device. Leave empty for active device.',
+            'spotify.volume_step': 'How much volume changes per $volume up/down command (percent).',
+            'spotify.playtrack_mode': 'replace = play immediately. queue = add to queue.',
+
+            // Channel Points
+            'channel_points.enabled': 'Award loyalty points to active viewers.',
+            'channel_points.port': 'Port for channel points overlay and API.',
+            'channel_points.award_amount': 'Points awarded per interval to each active viewer.',
+            'channel_points.award_interval_seconds': 'How often points are awarded.',
+            'channel_points.ping_timeout_minutes': 'Minutes of inactivity before a viewer stops earning points.',
+            'channel_points.leaderboard_count': 'Number of top viewers shown on the leaderboard overlay.',
+
+            // GUI
+            'gui.enabled': 'Launch the graphical dashboard on startup.',
+
+            // Random Triggers
+            'random_triggers.mode': 'deny-all = only listed triggers are eligible. allow-all = all except listed.',
+
+            // Update
+            'update.enabled': 'Check for new versions on startup and install automatically.',
+            'update.max_update_logs': 'Maximum update log files to keep. 0=delete all, -1=keep forever.',
+
+            // Shutdown
+            'shutdown.enabled': 'Auto-shutdown when the live stream ends.',
+            'shutdown.delay_seconds': 'Seconds to wait before shutting down (type stop to cancel).',
+
+            // Theme
+            'theme.like_goal.background': 'Like goal overlay background color (CSS hex).',
+            'theme.like_goal.text': 'Like goal overlay text color.',
+            'theme.like_goal.accent': 'Like goal primary accent color.',
+            'theme.like_goal.accent2': 'Like goal secondary accent color.',
+            'theme.like_goal.danger': 'Like goal danger/warning color.',
+        };
+
         function toTitle(str) {
             return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function getDesc(path) {
+            if (CONFIG_DESCRIPTIONS[path]) return CONFIG_DESCRIPTIONS[path];
+            // Try parent section fallback
+            const parts = path.split('.');
+            if (parts.length > 1) {
+                const parent = parts.slice(0, -1).join('.');
+                if (CONFIG_DESCRIPTIONS[parent]) return CONFIG_DESCRIPTIONS[parent];
+            }
+            return '';
         }
 
         function inferInputType(key, value) {
@@ -786,7 +958,6 @@
             if (key === 'mode' && typeof value === 'string') return 'select:deny-all,allow-all';
             if (key === 'display_mode') return 'select:overwrite,queue';
             if (key === 'playtrack_mode') return 'select:replace,queue';
-            if (key === 'follow_tracking_mode' || (key === 'mode' && typeof value === 'string')) return 'text';
             if (typeof value === 'number') return 'number';
             return 'text';
         }
@@ -795,17 +966,19 @@
             const type = inferInputType(key, value);
             const label = toTitle(key);
             const safeId = 'cfg_' + path.replace(/\./g, '_');
+            const desc = getDesc(path);
+            const tooltip = desc ? `<div class="tooltip"><span class="tooltip-icon">?</span><span class="tooltip-text">${escapeHtml(desc)}</span></div>` : '';
 
             if (type === 'checkbox') {
                 return `<div class="form-row">
-                    <label>${escapeHtml(label)}</label>
+                    <label>${escapeHtml(label)} ${tooltip}</label>
                     <input type="checkbox" id="${safeId}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool">
                 </div>`;
             }
             if (type.startsWith('select:')) {
                 const options = type.split(':')[1].split(',');
                 return `<div class="form-row">
-                    <label>${escapeHtml(label)}</label>
+                    <label>${escapeHtml(label)} ${tooltip}</label>
                     <select id="${safeId}" data-path="${path}" data-type="string">
                         ${options.map(o => `<option value="${o}" ${value === o ? 'selected' : ''}>${o}</option>`).join('')}
                     </select>
@@ -813,18 +986,18 @@
             }
             if (type === 'password') {
                 return `<div class="form-row">
-                    <label>${escapeHtml(label)}</label>
+                    <label>${escapeHtml(label)} ${tooltip}</label>
                     <input type="password" id="${safeId}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string">
                 </div>`;
             }
             if (type === 'number') {
                 return `<div class="form-row">
-                    <label>${escapeHtml(label)}</label>
+                    <label>${escapeHtml(label)} ${tooltip}</label>
                     <input type="number" id="${safeId}" value="${value !== undefined ? value : ''}" data-path="${path}" data-type="number">
                 </div>`;
             }
             return `<div class="form-row">
-                <label>${escapeHtml(label)}</label>
+                <label>${escapeHtml(label)} ${tooltip}</label>
                 <input type="text" id="${safeId}" value="${escapeHtml(value !== undefined ? String(value) : '')}" data-path="${path}" data-type="string">
             </div>`;
         }
@@ -832,16 +1005,19 @@
         function buildSection(sectionKey, sectionValue, pathPrefix) {
             if (sectionValue === null || sectionValue === undefined) return '';
             if (typeof sectionValue !== 'object') return '';
+
+            const icon = SECTION_ICONS[sectionKey] || '⚙️';
+            const title = toTitle(sectionKey);
+
             if (Array.isArray(sectionValue)) {
-                // Arrays are rendered as read-only text for now (complex structures)
                 return `<div class="editor-section">
                     <div class="section-header collapsed" onclick="toggleSection(this)">
-                        <span>${escapeHtml(toTitle(sectionKey))}</span>
+                        <span><span class="section-icon">${icon}</span>${escapeHtml(title)}</span>
                         <span class="section-toggle">Expand</span>
                     </div>
                     <div class="section-content hidden-section">
                         <div class="form-row full-width">
-                            <label>${escapeHtml(toTitle(sectionKey))} (Array — edit in YAML directly)</label>
+                            <label>${escapeHtml(title)} (Array — edit in YAML directly)</label>
                             <textarea readonly rows="6" style="width:100%;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:0.6rem;border-radius:6px;font-family:monospace;">${escapeHtml(JSON.stringify(sectionValue, null, 2))}</textarea>
                             <div class="hint">Array editing is not yet supported in the GUI. Use config.yaml for complex list changes.</div>
                         </div>
@@ -851,36 +1027,33 @@
 
             let rows = '';
             const keys = Object.keys(sectionValue).sort();
+            let hasVisible = false;
+
             for (const key of keys) {
                 const val = sectionValue[key];
                 const childPath = pathPrefix ? pathPrefix + '.' + key : key;
                 if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
-                    // Nested object — skip inline, show note
-                    rows += `<div class="form-row full-width"><div class="hint">Nested object <b>${escapeHtml(toTitle(key))}</b> — shown below.</div></div>`;
+                    rows += buildSection(key, val, childPath);
                 } else {
                     rows += buildFormRow(key, val, childPath);
+                    hasVisible = true;
                 }
             }
 
-            // Also add nested object sections inline
-            let nestedSections = '';
-            for (const key of keys) {
-                const val = sectionValue[key];
-                const childPath = pathPrefix ? pathPrefix + '.' + key : key;
-                if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
-                    nestedSections += buildSection(key, val, childPath);
-                }
-            }
+            if (!hasVisible && rows === '') return '';
+
+            // If this section only contains nested sections, render them inline without a duplicate wrapper
+            if (!hasVisible) return rows;
 
             return `<div class="editor-section">
                 <div class="section-header collapsed" onclick="toggleSection(this)">
-                    <span>${escapeHtml(toTitle(sectionKey))}</span>
+                    <span><span class="section-icon">${icon}</span>${escapeHtml(title)}</span>
                     <span class="section-toggle">Expand</span>
                 </div>
                 <div class="section-content hidden-section">
                     ${rows}
                 </div>
-            </div>` + nestedSections;
+            </div>`;
         }
 
         function toggleSection(header) {
@@ -934,7 +1107,6 @@
             status.className = 'save-status';
 
             try {
-                // Gather all inputs and update editorConfig
                 const inputs = document.querySelectorAll('#editor-body [data-path]');
                 for (const input of inputs) {
                     const path = input.getAttribute('data-path');
