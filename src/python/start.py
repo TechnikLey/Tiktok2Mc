@@ -653,20 +653,11 @@ async def check_and_run():
 # =============================================================================
 
 async def command_loop():
-    global restart_requested
     while True:
-        if restart_requested:
-            break
-        try:
-            cmd = await asyncio.wait_for(
-                asyncio.to_thread(
-                    input,
-                    "\nType 'exit' to stop all programs ('help' for commands): "
-                ),
-                timeout=1.0
-            )
-        except asyncio.TimeoutError:
-            continue
+        cmd = await asyncio.to_thread(
+            input,
+            "\nType 'exit' to stop all programs ('help' for commands): "
+        )
         cmd = cmd.strip().lower()
         if cmd == "help":
             log.info("\nAvailable commands:")
@@ -681,7 +672,63 @@ async def command_loop():
 # MAIN
 # =============================================================================
 
+def _restart_monitor_thread():
+    """Background thread that watches restart_requested and performs
+    a hard restart when the flag is set."""
+    import time as _time
+    while True:
+        _time.sleep(0.5)
+        if restart_requested:
+            _time.sleep(0.5)
+            log.info("\nPerforming restart...")
+            stop_all_processes()
+            restart_exe = BASE_DIR / f"start{SUFFIX}"
+            if restart_exe.exists():
+                if IS_WINDOWS:
+                    restart_bat = BASE_DIR / "_restart.bat"
+                    restart_bat.write_text(
+                        f'@echo off\n'
+                        f'timeout /t 5 /nobreak >nul\n'
+                        f'cd /d "{BASE_DIR}"\n'
+                        f'start "" "{restart_exe}"\n'
+                        f'del "%~f0"\n',
+                        encoding="utf-8",
+                    )
+                    subprocess.Popen(
+                        [str(restart_bat)],
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                    )
+                else:
+                    restart_sh = BASE_DIR / "_restart.sh"
+                    restart_sh.write_text(
+                        f'#!/bin/sh\n'
+                        f'sleep 5\n'
+                        f'cd "{BASE_DIR}"\n'
+                        f'"{restart_exe}" &\n'
+                        f'rm "{restart_sh}"\n',
+                        encoding="utf-8",
+                    )
+                    restart_sh.chmod(0o755)
+                    subprocess.Popen(
+                        [str(restart_sh)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                    )
+            else:
+                log.error(f"Restart failed: {restart_exe} not found.")
+            os._exit(0)
+
+
 async def main():
+    # Start background restart monitor so we can restart even while
+    # blocking on input() in the main thread.
+    import threading
+    threading.Thread(target=_restart_monitor_thread, daemon=True).start()
+
     watcher = asyncio.create_task(check_and_run())
     try:
         await command_loop()
@@ -706,50 +753,6 @@ if ALLOW_CLOSE:
         log.info("-----------------------------------")
 
     asyncio.run(main())
-
-    # After main() returns, check if restart was requested
-    if restart_requested:
-        log.info("\nPerforming restart...")
-        stop_all_processes()
-        restart_exe = BASE_DIR / f"start{SUFFIX}"
-        if restart_exe.exists():
-            if IS_WINDOWS:
-                restart_bat = BASE_DIR / "_restart.bat"
-                restart_bat.write_text(
-                    f'@echo off\n'
-                    f'timeout /t 5 /nobreak >nul\n'
-                    f'cd /d "{BASE_DIR}"\n'
-                    f'start "" "{restart_exe}"\n'
-                    f'del "%~f0"\n',
-                    encoding="utf-8",
-                )
-                subprocess.Popen(
-                    [str(restart_bat)],
-                    shell=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                )
-            else:
-                restart_sh = BASE_DIR / "_restart.sh"
-                restart_sh.write_text(
-                    f'#!/bin/sh\n'
-                    f'sleep 5\n'
-                    f'cd "{BASE_DIR}"\n'
-                    f'"{restart_exe}" &\n'
-                    f'rm "{restart_sh}"\n',
-                    encoding="utf-8",
-                )
-                restart_sh.chmod(0o755)
-                subprocess.Popen(
-                    [str(restart_sh)],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-        else:
-            log.error(f"Restart failed: {restart_exe} not found.")
-        sys.exit(0)
 
 else:
     # AllowClose=False -> script exits itself, EXEs continue running quietly
