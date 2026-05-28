@@ -5,3 +5,4 @@ dist/*
 upload.py
 __pycache__/
 *.pyc
+data/api_plugin_registry.json*
