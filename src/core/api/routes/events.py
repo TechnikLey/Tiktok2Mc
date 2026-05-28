@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from starlette.responses import StreamingResponse
 
 from core.api.eventbus import event_bus
@@ -60,7 +60,21 @@ async def inject_event(body: dict):
 
         {"type": "custom.event", "data": {"key": "value"}}
     """
-    event_type = body.get("type", "external.event")
-    data = body.get("data", {})
-    await event_bus.publish(event_type, data)
-    return {"status": "ok", "event": event_type}
+    try:
+        event_type = body.get("type", "external.event")
+        data = body.get("data", {})
+        if not isinstance(event_type, str):
+            raise HTTPException(
+                status_code=422, detail="'type' must be a string"
+            )
+        if not isinstance(data, dict):
+            raise HTTPException(
+                status_code=422, detail="'data' must be a dict"
+            )
+        await event_bus.publish(event_type, data)
+        return {"status": "ok", "event": event_type}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to inject event")
+        raise HTTPException(status_code=500, detail=str(e))

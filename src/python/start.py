@@ -23,6 +23,7 @@ from datetime import datetime
 from core.models import AppConfig
 from core.utils import load_config
 from core.paths import get_base_dir
+from core.api.server import DEFAULT_PORT
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -51,8 +52,8 @@ update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 # -----------------------------
 try:
     cfg = load_config(CONFIG_FILE)
-except (FileNotFoundError, ValueError, RuntimeError) as e:
-    log.error(f"{e}")
+except Exception as e:
+    log.error("Failed to load config: %s", e)
     input("Press Enter to exit...")
     sys.exit(1)
 
@@ -402,7 +403,7 @@ else:
 # API SERVER — start in background before anything needs it
 # =============================================================================
 
-_API_PORT = 29185
+_API_PORT = DEFAULT_PORT
 _API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
 
 
@@ -411,8 +412,11 @@ def _start_api_server():
     import uvicorn
     from core.api import create_app
 
-    app = create_app()
-    uvicorn.run(app, host="127.0.0.1", port=_API_PORT, log_level="warning")
+    try:
+        app = create_app()
+        uvicorn.run(app, host="127.0.0.1", port=_API_PORT, log_level="warning")
+    except Exception:
+        log.exception("API server failed to start")
 
 
 _api_thread = threading.Thread(target=_start_api_server, daemon=True)

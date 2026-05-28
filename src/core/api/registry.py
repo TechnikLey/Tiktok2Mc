@@ -7,6 +7,8 @@ validated, and persisted entirely by the API layer.
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import time
 import threading
 import logging
@@ -18,14 +20,15 @@ from core.api.models import PluginRegistration
 log = logging.getLogger(__name__)
 
 STORAGE_FILENAME = "api_plugin_registry.json"
+STORAGE_BACKUP_PATTERN = r"\.v(\d+)\.bak$"
 
 
 class PluginRegistry:
     """Thread-safe, file-persisted plugin registry.
 
-    This is the **canonical** registry for Phase 3+.  Old code that
-    writes to ``PLUGIN_REGISTRY.json`` can still coexist — use
-    :meth:`import_legacy` to absorb its data.
+    This is the **canonical** registry — the single source of truth
+    for all plugin metadata.  Backups of the registry JSON file are
+    created automatically on each save (``*.v1.bak``, ``*.v2.bak``, …).
     """
 
     def __init__(self, storage_dir: Path) -> None:
@@ -112,6 +115,18 @@ class PluginRegistry:
         data = [p.model_dump(mode="json") for p in self._plugins.values()]
         tmp = self._file.with_suffix(".json.tmp")
         try:
+            # Backup existing file before overwriting
+            if self._file.exists():
+                stem = self._file.stem  # "api_plugin_registry"
+                parent = self._file.parent
+                bak_num = 0
+                for p in parent.glob(f"{stem}.json.v*.bak"):
+                    m = re.search(STORAGE_BACKUP_PATTERN, p.name)
+                    if m:
+                        bak_num = max(bak_num, int(m.group(1)))
+                bak_path = parent / f"{stem}.json.v{bak_num + 1}.bak"
+                shutil.copy2(self._file, bak_path)
+
             with tmp.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
                 fh.flush()

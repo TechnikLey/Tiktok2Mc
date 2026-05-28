@@ -7,6 +7,7 @@ class TestHealthEndpoints:
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "ok"
+        assert body["version"] == "1.0.0"
         assert body["api_version"] == "1.0.0"
 
     def test_status_returns_running(self, client):

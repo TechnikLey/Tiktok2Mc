@@ -34,9 +34,15 @@
 - ✓ `build.py`/`upload.py` TOOL_VERSION → `v1.0.0`
 
 ### Testing & CI
-- ✓ Tests: `pytest.ini`, `conftest.py`, 62 Testfälle
+- ✓ Tests: `pytest.ini`, `conftest.py`, 155 Testfälle (44 Validator + 111 API/Core)
 - ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events
+- ✓ API-Fehlertests: Config 404 (missing), 500 (corrupt), Event-Validierung
+- ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
 - ✓ Core-Tests: `normalize_config_version()`, `ApiService`, `PluginRegistry`, `PluginLauncher`, `load_config()`
+- ✓ Core-Tests: EventBus (15 async), PluginAPIClient (14 HTTP-mocked), PluginLauncher (5 + 3 Bad-Response)
+- ✓ Core-Tests: Validator (44 Tests — Brackets, Colons, Prefixes, Multiplier, File-I/O)
+- ✓ Core-Tests: PluginRegistry Backup-Mechanismus, korrupte JSON-Wiederherstellung
+- ✓ Core-Tests: ApiService Fallback-Pfad, korrupte YAML-Konfig
 - ✓ CI-Workflow: `test.yml` (push/PR auf main, `pytest tests/`)
 - ✓ Produktions-Bug behoben: `write_config()` ruft jetzt `_validate_config_schema()` auf
 - ✓ Produktions-Bug behoben: `normalize_config_version()` verarbeitet einstellige Strings (`"7"` → `"0.7"`)
@@ -52,6 +58,18 @@
 - ✓ Timer: `pause_on_death: false` (keine MinecraftServerAPI-Abhängigkeit)
 - ✓ WinCounter: `decrement_on_death: false` (kein automatischer Death-Decrement)
 - ✓ Alle Plugins standalone mit `false`-Defaults
+
+### API-Finalisierung (Production Readiness)
+- ✓ Alle 12 API-Routes haben konsistentes Error-Handling (try/except mit log + HTTPException)
+- ✓ PluginRegistry: Versionierte JSON-Backups (`api_plugin_registry.json.v1.bak`, …)
+- ✓ PluginRegistry: Graceful Recovery bei korrupter JSON-Datei
+- ✓ PluginLauncher: JSONDecodeError + None-plugins-Feld abgesichert
+- ✓ Port-Konstanten-Vereinheitlichung: `DEFAULT_PORT` aus `server.py` importiert
+- ✓ `API_VERSION` in `models.py` zentral definiert (kein Circular Import mehr)
+- ✓ Dead Code entfernt: `ErrorResponse`, `WSMessage` (unused models)
+- ✓ Dead Code entfernt: `import_legacy`-Referenzen aus Registry-Docstring + Plugins-Route
+- ✓ `start.py`: Breitere Exception-Behandlung beim Config-Laden + API-Thread-Fehler-Logging
+- ✓ `PluginUpdateRequest`: level/port-Validierung (ge/le constraints)
 
 ### Konfiguration & Schema
 - ✓ `config_version: 1.0` (semantische Versionierung MAJOR.MINOR)
@@ -69,17 +87,14 @@
 
 ### 1. Kritisch — Testing & Stabilität
 
-> 62 Tests existieren (API-Integration + Core-Services + Utils).
-> Test-Suite läuft in CI bei jedem Push/PR.
+> 155 Tests existieren (44 Validator + 111 API/Core).
 > SSE/WS-Tests sind noch nicht stabil (TestClient-Stream-Limit).
+> API-Finalisierung abgeschlossen: alle Routes haben Error-Handling,
+> PluginRegistry hat Backup-Mechanismus, Launcher fängt JSON-Fehler.
 
 - [ ] **Hoch** — SSE/WS-Integrationstests stabilisieren
   - SSE-Stream-Read mit Timeout und explizitem Close.
   - **Blockiert durch:** TestClient unterstützt Streaming nur begrenzt.
-
-- [ ] **Hoch** — Validator-Tests (aus v0.5.0)
-  - Unit-Tests für die Validator-Logik (Brackets, Prefix, Placeholder).
-  - Bestehender Code aus v0.x, aber nie systematisch getestet.
 
 - [ ] **Hoch** — Plugin-Smoke-Tests
   - Jedes Plugin starten, Flask-Server antwortet, API erreichbar.

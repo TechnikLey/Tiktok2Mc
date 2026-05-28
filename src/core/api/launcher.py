@@ -120,11 +120,12 @@ class PluginLauncher:
             with urllib.request.urlopen(url, timeout=_TIMEOUT) as resp:
                 raw = json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError) as exc:
+                ConnectionResetError, TimeoutError, OSError,
+                json.JSONDecodeError, ValueError) as exc:
             log.debug("API GET /plugins failed: %s", exc)
             return None
 
-        plugins_raw = raw.get("plugins", [])
+        plugins_raw = raw.get("plugins") or []
         result: list[AppConfig] = []
         for entry in plugins_raw:
             try:

@@ -6,10 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import api_router
 from .eventbus import event_bus
+from .models import API_VERSION
 
 log = logging.getLogger(__name__)
 
-API_VERSION = "1.0.0"
 DEFAULT_PORT = 29185
 
 

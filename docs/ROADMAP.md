@@ -14,18 +14,22 @@ The v1.0.0 foundation is built and verified:
 |------|--------|
 | **FastAPI Backend** (`src/core/api/`) | ✅ Done |
 | REST endpoints (health, config, plugins CRUD, events) | ✅ Done |
-| PluginRegistry (thread-safe, JSON-persisted) | ✅ Done |
+| PluginRegistry (thread-safe, JSON-persisted, versioned backups) | ✅ Done |
 | EventBus (async pub/sub with SSE + WebSocket) | ✅ Done |
 | PluginAPIClient + `register_plugin()` (HTTP drop-in) | ✅ Done |
-| PluginLauncher (API-only, no legacy file fallback) | ✅ Done |
+| PluginLauncher (API-only, no legacy file fallback, JSON-error-safe) | ✅ Done |
 | **API lifecycle managed by `start.py`** | ✅ Done |
 | Daemon-thread API server + health-poll before plugin discovery | ✅ Done |
+| Route error handling (all 12 routes protected, Pydantic exceptions → 422) | ✅ Done |
+| API_VERSION constant centralized (`models.py`, no circular imports) | ✅ Done |
+| Port constant unified (`DEFAULT_PORT` from `server.py`) | ✅ Done |
 | Plugin decoupling (Timer REST API, `auto_win`, `pause_on_death`) | ✅ Done |
 | WinCounter decoupling (`decrement_on_death`) | ✅ Done |
 | All plugins default disabled (opt-in model) | ✅ Done |
 | Config schema freeze (`config_version: 1.0`, schema validation) | ✅ Done |
 | Semantic versioning (`normalize_config_version()`, cross-format) | ✅ Done |
 | Versioned config backups (`config.yaml.v1.bak`, …) | ✅ Done |
+| Plugin registry versioned backups (`api_plugin_registry.json.v1.bak`, …) | ✅ Done |
 | `get_root_dir()` robust für dev + release | ✅ Done |
 | Legacy registry removed (`python/registry.py`, `PLUGIN_REGISTRY.json`) | ✅ Done |
 | `--register-only`, `plugin_updater`, `gui.py` (old) removed | ✅ Done |
@@ -40,12 +44,17 @@ the gap between the API layer and the plugin communication model.
 
 | Area | Status |
 |------|--------|
-| API integration tests | ✅ Done (62 tests, CI-integrated) |
+| API integration tests (health, config CRUD, plugins CRUD, events) | ✅ Done (155 tests, CI-integrated) |
+| API error scenarios (config 404/500, event validation, plugin field validation) | ✅ Done |
+| Core service tests (ApiService, PluginRegistry, PluginLauncher, EventBus, Client) | ✅ Done |
+| Validator unit tests (.mca parsing — brackets, colons, prefixes, multipliers) | ✅ Done (44 tests) |
 | CORS lockdown (localhost-only default) | ✅ Done |
 | `0.0.0.0` security warning in `run.py` | ✅ Done |
 | Config validation on write (`_validate_config_schema`) | ✅ Done |
+| Plugin registry versioned backups + corrupt file recovery | ✅ Done |
 | `normalize_config_version()` single-part string fix | ✅ Done |
-| Validator unit tests (.mca parsing) | 🔴 Not started |
+| Route error handling completed (all 12 routes) | ✅ Done |
+| Dead code cleanup (ErrorResponse, WSMessage, import_legacy refs) | ✅ Done |
 | Updater ↔ API integration (status, signaling) | 🔴 Not started |
 | API authentication (API key) | 🔴 Not started |
 | Port consolidation (API routes plugin traffic) | 🔴 Not started |

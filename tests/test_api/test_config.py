@@ -54,3 +54,26 @@ class TestConfigEndpoints:
     def test_update_config_rejects_non_dict(self, client):
         resp = client.put("/api/v1/config", json={"config": "not_a_dict", "backup": False})
         assert resp.status_code == 422
+
+    def test_get_config_file_not_found_404(self, client, project_dir):
+        config_file = project_dir / "config.yaml"
+        backup_path = config_file.with_name("config.yaml.test_bak")
+        config_file.rename(backup_path)
+        try:
+            resp = client.get("/api/v1/config")
+            assert resp.status_code == 404
+        finally:
+            backup_path.rename(config_file)
+
+    def test_get_config_corrupt_500(self, client, project_dir):
+        config_file = project_dir / "config.yaml"
+        config_file.write_text(": broken yaml [", encoding="utf-8")
+        try:
+            resp = client.get("/api/v1/config")
+            assert resp.status_code == 500
+        finally:
+            from tests.conftest import MINIMAL_CONFIG
+            import yaml
+            config_file.write_text(
+                yaml.dump(MINIMAL_CONFIG), encoding="utf-8"
+            )

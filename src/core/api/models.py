@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
+API_VERSION = "1.0.0"
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -55,8 +57,8 @@ class PluginUpdateRequest(BaseModel):
     """Partial-update body for ``PUT /plugins/{name}``."""
 
     enabled: Optional[bool] = None
-    level: Optional[int] = None
-    port: Optional[int] = None
+    level: Optional[int] = Field(None, ge=1, le=4)
+    port: Optional[int] = Field(None, ge=0)
     ics: Optional[bool] = None
     path: Optional[str] = None
     version: Optional[str] = None
@@ -87,14 +89,3 @@ class ConfigUpdateRequest(BaseModel):
     backup: bool = True
 
 
-# ── Shared ───────────────────────────────────────────────────────────
-
-
-class ErrorResponse(BaseModel):
-    error: str
-    detail: Optional[str] = None
-
-
-class WSMessage(BaseModel):
-    type: str
-    data: dict[str, Any]
