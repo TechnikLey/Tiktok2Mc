@@ -100,9 +100,9 @@ java:
 rcon:
   enabled: true
 
-  # CHANGE THIS PASSWORD before using the server publicly.
-  # Anyone with this password can control your Minecraft server.
-  password: ABC1234
+  # Set a secure password. The tool will ask you to set one on first start
+  # if this is left empty.
+  password: ""
 
   # RCON port (default: 25575)
   port: 25575

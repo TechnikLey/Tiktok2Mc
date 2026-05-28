@@ -121,7 +121,7 @@
         }
         .wizard-card {
             background: var(--card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 2rem; width: 100%; max-width: 560px;
+            border-radius: 12px; padding: 2rem; width: 100%; max-width: 480px;
         }
         .wizard-card h2 { margin-top: 0; border-left: 3px solid var(--accent); padding-left: 0.6rem; }
         .wizard-steps { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
@@ -166,23 +166,6 @@
         .btn-primary { background: var(--accent); color: var(--bg); }
         .btn-secondary { background: var(--border); color: var(--text); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        .plugin-select-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 0.8rem;
-        }
-        .plugin-option {
-            background: var(--input-bg); border: 2px solid var(--border);
-            border-radius: 8px; padding: 1rem; cursor: pointer;
-            transition: border-color 0.2s;
-        }
-        .plugin-option:hover { border-color: var(--accent); }
-        .plugin-option.selected {
-            border-color: var(--success); background: rgba(76,175,80,0.08);
-        }
-        .plugin-option h4 { margin: 0 0 0.3rem 0; font-size: 1rem; }
-        .plugin-option p { margin: 0; font-size: 0.8rem; color: var(--muted); }
-        .plugin-option .port { font-size: 0.75rem; color: var(--accent); margin-top: 0.4rem; }
 
         /* Overlay URLs */
         .url-row {
@@ -250,6 +233,21 @@
             <div class="wizard-actions">
                 <button class="btn btn-secondary" id="wizard-back">Back</button>
                 <button class="btn btn-primary" id="wizard-next">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restart Dialog -->
+    <div id="restart-dialog" class="wizard-overlay hidden">
+        <div class="wizard-card" style="text-align:center;">
+            <h2 style="border:none;padding:0;">Setup Complete</h2>
+            <p class="muted" style="margin-bottom:1.5rem;">
+                Your settings have been saved.<br>
+                The tool must be restarted for changes to take effect.
+            </p>
+            <div style="display:flex;gap:1rem;justify-content:center;">
+                <button class="btn btn-primary" id="btn-restart-now">Restart Now</button>
+                <button class="btn btn-secondary" id="btn-restart-later">Later</button>
             </div>
         </div>
     </div>
@@ -428,7 +426,7 @@
         function isFirstRun(cfg) {
             const tiktok = cfg.tiktok || {};
             const rcon = cfg.rcon || {};
-            return tiktok.user === 'your_tiktok_username' || rcon.password === 'ABC1234';
+            return tiktok.user === 'your_tiktok_username' || !rcon.password;
         }
 
         function showWizard() {
@@ -437,20 +435,23 @@
             wizardStep = 0;
             wizardData = {
                 tiktok_user: (currentConfig.tiktok || {}).user || '',
-                server_host: currentConfig.server_host || '127.0.0.1',
-                rcon_password: (currentConfig.rcon || {}).password || '',
-                plugins: {}
+                rcon_password: (currentConfig.rcon || {}).password || ''
             };
-            // Pre-select plugins already enabled in config
-            Object.entries(PLUGIN_CONFIG_MAP).forEach(([apiName, configKey]) => {
-                const section = currentConfig[configKey];
-                wizardData.plugins[apiName] = section ? !!section.enabled : false;
-            });
             renderWizardStep();
         }
 
         function hideWizard() {
             document.getElementById('wizard').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function showRestartDialog() {
+            document.getElementById('restart-dialog').classList.remove('hidden');
+            document.getElementById('wizard').classList.add('hidden');
+        }
+
+        function hideRestartDialog() {
+            document.getElementById('restart-dialog').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
         }
 
@@ -460,105 +461,63 @@
             const backBtn = document.getElementById('wizard-back');
             const nextBtn = document.getElementById('wizard-next');
 
-            steps.innerHTML = [0,1,2,3].map(i =>
+            steps.innerHTML = [0,1,2].map(i =>
                 `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`
             ).join('');
 
             backBtn.disabled = wizardStep === 0;
             backBtn.style.visibility = wizardStep === 0 ? 'hidden' : 'visible';
-            nextBtn.textContent = wizardStep === 3 ? 'Finish' : 'Next';
-
-            const cfg = currentConfig;
-            const rcon = cfg.rcon || {};
+            nextBtn.textContent = wizardStep === 2 ? 'Save' : 'Next';
 
             switch (wizardStep) {
                 case 0:
                     content.innerHTML = `
-                        <p class="muted" style="margin-bottom:1.5rem;">Let's get your stream connected. Enter your TikTok username and server settings below.</p>
+                        <p class="muted" style="margin-bottom:1.5rem;">Welcome! Let's get your stream connected. Enter your TikTok username below.</p>
                         <div class="form-group">
                             <label>TikTok Username (without @)</label>
                             <input type="text" id="w-tiktok-user" value="${escapeHtml(wizardData.tiktok_user)}" placeholder="your_tiktok_username">
                             <div class="hint">The username you use when going live on TikTok.</div>
                         </div>
-                        <div class="form-group">
-                            <label>Server Host</label>
-                            <input type="text" id="w-server-host" value="${escapeHtml(wizardData.server_host)}" placeholder="127.0.0.1">
-                            <div class="hint">Use 127.0.0.1 for local-only. Use 0.0.0.0 only if you need network access.</div>
-                        </div>
                     `;
                     break;
                 case 1:
-                    const isDefault = wizardData.rcon_password === 'ABC1234' || !wizardData.rcon_password;
                     content.innerHTML = `
-                        <p class="muted" style="margin-bottom:1.5rem;">Set a secure password for the Minecraft RCON connection.</p>
-                        ${isDefault ? `<div class="warning-box">You are still using the default password. Change it before going live!</div>` : ''}
+                        <p class="muted" style="margin-bottom:1.5rem;">Set a secure password for the Minecraft RCON connection. This is required.</p>
                         <div class="form-group">
                             <label>RCON Password</label>
-                            <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Change from default">
-                            <div class="hint">Anyone with this password can control your Minecraft server.</div>
+                            <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Required">
+                            <div class="hint">Anyone with this password can control your Minecraft server. Choose something secure.</div>
                         </div>
                     `;
                     break;
                 case 2:
-                    content.innerHTML = `
-                        <p class="muted" style="margin-bottom:1.5rem;">Choose which features you want to enable. You can change these later in the dashboard.</p>
-                        <div class="plugin-select-grid">
-                            ${currentPlugins.map(p => {
-                                const configKey = PLUGIN_CONFIG_MAP[p.name];
-                                if (!configKey) return '';
-                                const selected = wizardData.plugins[p.name] ? 'selected' : '';
-                                return `<div class="plugin-option ${selected}" onclick="toggleWizardPlugin('${p.name}')" id="w-plugin-${p.name}">
-                                    <h4>${escapeHtml(p.display_name || p.name)}</h4>
-                                    <p>${escapeHtml(p.description || '')}</p>
-                                    ${p.port ? `<div class="port">Port: ${p.port}</div>` : ''}
-                                </div>`;
-                            }).join('')}
-                        </div>
-                    `;
-                    break;
-                case 3:
-                    const enabledPlugins = currentPlugins.filter(p => wizardData.plugins[p.name]);
+                    const enabledCount = currentPlugins.filter(p => p.enabled).length;
                     content.innerHTML = `
                         <p class="muted" style="margin-bottom:1.5rem;">Review your settings before saving.</p>
                         <div style="background:var(--input-bg);padding:1rem;border-radius:8px;margin-bottom:1rem;">
                             <div class="field-row"><span>TikTok User</span><span>${escapeHtml(wizardData.tiktok_user || '—')}</span></div>
-                            <div class="field-row"><span>Server Host</span><span>${escapeHtml(wizardData.server_host)}</span></div>
                             <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '••••••••' : 'Not set'}</span></div>
-                            <div class="field-row"><span>Plugins</span><span>${enabledPlugins.length} enabled</span></div>
                         </div>
-                        ${enabledPlugins.length > 0 ? `
-                            <p style="margin:0 0 0.5rem 0;font-size:0.85rem;color:var(--muted);">Your OBS Browser Source URLs:</p>
-                            ${enabledPlugins.filter(p => p.port > 0).map(p =>
-                                `<div class="url-row"><span style="font-size:0.85rem;min-width:120px;">${escapeHtml(p.display_name || p.name)}</span><code>http://localhost:${p.port}</code><button class="btn-copy" onclick="copyUrl(this,'http://localhost:${p.port}')">Copy</button></div>`
-                            ).join('')}
-                        ` : ''}
+                        <p class="muted" style="font-size:0.85rem;margin:0;">
+                            Plugins are disabled by default. You can enable them later from the dashboard.
+                        </p>
                     `;
                     break;
             }
         }
 
-        function toggleWizardPlugin(name) {
-            wizardData.plugins[name] = !wizardData.plugins[name];
-            const el = document.getElementById('w-plugin-' + name);
-            if (el) el.classList.toggle('selected');
-        }
-
         async function wizardNext() {
-            // Save current step data
             if (wizardStep === 0) {
                 const user = document.getElementById('w-tiktok-user').value.trim();
-                const host = document.getElementById('w-server-host').value.trim();
                 if (!user) { alert('Please enter your TikTok username.'); return; }
-                if (!host) { alert('Please enter a server host.'); return; }
                 wizardData.tiktok_user = user;
-                wizardData.server_host = host;
             } else if (wizardStep === 1) {
                 const pass = document.getElementById('w-rcon-password').value;
                 if (!pass) { alert('Please set an RCON password.'); return; }
                 wizardData.rcon_password = pass;
             }
 
-            if (wizardStep === 3) {
+            if (wizardStep === 2) {
                 await wizardSave();
                 return;
             }
@@ -580,42 +539,34 @@
                 if (!cfg.tiktok) cfg.tiktok = {};
                 cfg.tiktok.user = wizardData.tiktok_user;
 
-                // Update server host
-                cfg.server_host = wizardData.server_host;
-
                 // Update RCON
                 if (!cfg.rcon) cfg.rcon = {};
                 cfg.rcon.password = wizardData.rcon_password;
                 cfg.rcon.enabled = true;
 
-                // Update plugin enabled states
-                Object.entries(wizardData.plugins).forEach(([apiName, enabled]) => {
-                    const configKey = PLUGIN_CONFIG_MAP[apiName];
-                    if (configKey && cfg[configKey]) {
-                        cfg[configKey].enabled = enabled;
-                    }
-                });
-
-                // Also enable/disable in API registry
-                for (const [apiName, enabled] of Object.entries(wizardData.plugins)) {
-                    try {
-                        await postJSON(`/plugins/${apiName}/${enabled ? 'enable' : 'disable'}`, {});
-                    } catch (e) {
-                        log('Registry update failed for ' + apiName + ': ' + e.message, 'warn');
-                    }
-                }
-
                 await putJSON('/config', { config: cfg, backup: true });
                 log('Setup saved successfully.');
-                hideWizard();
-                await loadConfig();
-                await loadPlugins();
+                showRestartDialog();
             } catch (e) {
                 log('Failed to save setup: ' + e.message, 'err');
                 alert('Failed to save: ' + e.message);
             } finally {
                 nextBtn.disabled = false;
-                nextBtn.textContent = 'Finish';
+                nextBtn.textContent = 'Save';
+            }
+        }
+
+        async function triggerRestart() {
+            try {
+                const res = await fetch('/api/v1/restart', { method: 'POST' });
+                if (res.ok) {
+                    document.querySelector('#restart-dialog .wizard-card').innerHTML =
+                        '<h2 style="border:none;padding:0;">Restarting...</h2><p class="muted">Please wait while the tool restarts.</p>';
+                } else {
+                    alert('Restart signal failed. Please restart manually.');
+                }
+            } catch (e) {
+                alert('Restart signal failed. Please restart manually.');
             }
         }
 
@@ -623,6 +574,11 @@
             if (wizardStep > 0) { wizardStep--; renderWizardStep(); }
         });
         document.getElementById('wizard-next').addEventListener('click', wizardNext);
+        document.getElementById('btn-restart-now').addEventListener('click', triggerRestart);
+        document.getElementById('btn-restart-later').addEventListener('click', () => {
+            hideRestartDialog();
+            loadConfig();
+        });
 
         // ── Init ──
         function escapeHtml(text) {

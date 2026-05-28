@@ -69,13 +69,13 @@ if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
 # Security warnings
 # -----------------------------
 
-# Warn if RCON password is still default
+# Warn if RCON password is not set
 rcon_cfg = cfg.get("rcon", {})
-if rcon_cfg.get("enabled", False) and rcon_cfg.get("password", "") == "ABC1234":
+if rcon_cfg.get("enabled", False) and not rcon_cfg.get("password", ""):
     log.warning(
-        "RCON default password 'ABC1234' is still set — "
-        "anyone with network access can control your Minecraft server. "
-        "Change it in config.yaml under rcon.password"
+        "RCON password is not set — "
+        "the setup wizard will open so you can configure one. "
+        "Without a password the tool cannot control your Minecraft server."
     )
 
 # Warn if server_host exposes services to the network
@@ -640,6 +640,15 @@ async def check_and_run():
                     shutdown_pending = True
                     log.info(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
                     asyncio.create_task(shutdown_countdown())
+            elif name == "restart":
+                log.info("\nRestart signal detected. Restarting all programs...")
+                stop_all_processes()
+                restart_exe = BASE_DIR / f"start{SUFFIX}"
+                if restart_exe.exists():
+                    subprocess.Popen([str(restart_exe)])
+                else:
+                    log.error(f"Restart failed: {restart_exe} not found.")
+                sys.exit(0)
         await asyncio.sleep(5)
 
 # =============================================================================

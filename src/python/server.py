@@ -181,7 +181,7 @@ else:
 # === RCON settings ===
 RCON = cfg.get("rcon", {})
 RCON_ENABLED = RCON.get("enabled", False)
-RCON_PASSWORD = RCON.get("password", "ABC1234")
+RCON_PASSWORD = RCON.get("password", "")
 RCON_PORT = RCON.get("port", 25575)
 
 # === Pre-flight checks ===
@@ -252,9 +252,9 @@ set_server_property(SERVER_PROPERTIES, "rcon.port", RCON_PORT)
 set_server_property(SERVER_PROPERTIES, "server-port", MC_PORT)
 
 # === Password check ===
-if RCON_ENABLED and RCON_PASSWORD == "ABC1234":
-    log.info("\nWARNING: Your RCON password is still 'ABC1234'!")
-    log.info("Please change it in config.yaml before using the server.\n")
+if RCON_ENABLED and not RCON_PASSWORD:
+    log.info("\nWARNING: Your RCON password is not set!")
+    log.info("Please set it in config.yaml or use the setup wizard.\n")
     input("Press Enter to continue...")
 
 # === Start Minecraft server ===
