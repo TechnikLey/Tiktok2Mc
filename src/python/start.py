@@ -649,7 +649,7 @@ async def check_and_run():
                         restart_bat = BASE_DIR / "_restart.bat"
                         restart_bat.write_text(
                             f'@echo off\n'
-                            f'timeout /t 2 /nobreak >nul\n'
+                            f'timeout /t 5 /nobreak >nul\n'
                             f'cd /d "{BASE_DIR}"\n'
                             f'start "" "{restart_exe}"\n'
                             f'del "%~f0"\n',
@@ -666,7 +666,7 @@ async def check_and_run():
                         restart_sh = BASE_DIR / "_restart.sh"
                         restart_sh.write_text(
                             f'#!/bin/sh\n'
-                            f'sleep 2\n'
+                            f'sleep 5\n'
                             f'cd "{BASE_DIR}"\n'
                             f'"{restart_exe}" &\n'
                             f'rm "{restart_sh}"\n',
