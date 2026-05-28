@@ -25,7 +25,7 @@ connections between components. That is gone.
 - Plugins no longer depend on each other. Turning on the Timer
   will not accidentally trigger the Death Counter anymore.
 - The central backend that manages all plugins is tested
-  thoroughly. **200 automated checks** run on every change to catch
+  thoroughly. **274 automated checks** run on every change to catch
   regressions early.
 - Trigger files (.mca) are validated when loaded. Mistakes like
   missing brackets or wrong command prefixes are caught before
@@ -43,6 +43,12 @@ connections between components. That is gone.
   `update_url` can be checked for newer versions via
   `GET /api/v1/plugins/updates`. Available updates are logged at
   startup.
+- **Plugins can be enabled and disabled at runtime** via the API
+  (`POST /api/v1/plugins/{name}/enable` and
+  `POST /api/v1/plugins/{name}/disable`).
+- **A read-only plugin discovery endpoint** (`GET /api/v1/plugins/discover`)
+  scans `plugin.json` files on disk and merges registry state — no
+  side effects, no plugin loading.
 
 ---
 
@@ -52,22 +58,51 @@ The focus is on completing the remaining pieces before the 1.0.0
 release. The core engine and plugin system are done. What is left
 is mostly integration and safety.
 
+## Plugin Lifecycle
+
+A plugin passes through four distinct stages:
+
+1. **Discovered** — The `GET /api/v1/plugins/discover` endpoint finds
+   the plugin's `plugin.json` on disk. The discovery endpoint is
+   **read-only** — it never registers or modifies state.
+2. **Registered** — The launcher (or a manual API call) submits the
+   plugin to `POST /api/v1/plugins/register`. The plugin now appears
+   in `GET /api/v1/plugins` and the registry is the **source of truth**
+   for execution state.
+3. **Enabled** — The plugin's `enabled` flag is `true`
+   (via `POST /api/v1/plugins/{name}/enable`). Only enabled plugins
+   are started by the launcher.
+4. **Disabled** — The plugin's `enabled` flag is `false`
+   (via `POST /api/v1/plugins/{name}/disable`). Disabled plugins
+   remain registered but are not started.
+
+**What this means in practice:**
+- Discovery shows what is *installable*. The registry shows what is
+  *configured*.
+- Enable/disable toggle execution without losing configuration.
+- The discovery endpoint is safe to call at any time — zero side
+  effects.
+
+---
+
+## What We Are Working On Now
+
+The focus is on completing the remaining pieces before the 1.0.0
+release. The core engine, plugin system, and API surface are done.
+What is left is testing, safety, and documentation.
+
 **Current priorities:**
 
-- **Security** — Adding an optional API key for users who need to
-  access the backend from other devices. Also making the RCON
-  default password warning more visible so nobody accidentally
-  leaves `ABC1234` in place.
-- **Fewer ports** — Right now, each plugin runs on its own port.
-  That adds up (Minecraft, RCON, API, plugins — over 10 ports).
-  We are routing plugin communication through the central backend
-  to reduce this to just a handful.
+- **Tool update check** — `GET /api/v1/updates/check` endpoint to
+  check the main repository for new releases.
 - **Update path testing** — The new API-based update signalling is
   implemented; the next step is to test the full update flow
   end-to-end (v1.0.0 → v1.0.1).
-- **Plugin smoke tests** — Start each plugin as a subprocess,
-  verify it responds on its declared port, and validate its
-  metadata matches the manifest.
+- **RCON default password warning** is already logged at startup
+  (`docs/TODO.md`: ✅). API authentication is deferred to post-
+  v1.0.0 since the API binds to localhost by default.
+- **Documentation overhaul** — README, GUIDE, and CHANGELOG need to
+  reflect the v1.0.0 architecture.
 
 ---
 
@@ -113,4 +148,4 @@ locally on your machine.
 
 ---
 
-*Last updated: 2026-05-28*
+*Last updated: 2026-05-28* (plugin lifecycle, updated test count, discovery/enable/disable endpoints)
