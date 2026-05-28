@@ -20,7 +20,9 @@ from core.api.models import (
     PluginUpdateRequest,
 )
 from core.api.registry import get_registry
+from core.api.services.plugin_discovery import discover_plugins_from_manifests
 from core.api.updater import PluginUpdateChecker
+from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +109,41 @@ async def check_plugin_updates():
     except Exception as e:
         log.exception("Failed to check plugin updates")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Discover ──────────────────────────────────────────────────────────
+
+
+@router.get("/plugins/discover")
+async def discover_plugins():
+    """Scan filesystem manifests and merge with registry state.
+
+    Returns every plugin found in ``src/plugins/*/plugin.json`` with
+    its current ``enabled`` state from the registry.
+
+    This is a **read-only** operation — no plugins are registered
+    or loaded as a side effect.
+    """
+    try:
+        plugins_dir = str(get_root_dir() / "src" / "plugins")
+        discovered = discover_plugins_from_manifests(plugins_dir)
+    except Exception as e:
+        log.exception("Failed to discover plugins")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Merge registry state (read-only query, no side effects)
+    try:
+        registry = get_registry()
+        registry_plugins = {p.name: p for p in registry.list()}
+    except Exception:
+        registry_plugins = {}
+
+    for entry in discovered:
+        reg = registry_plugins.get(entry["name"])
+        entry["enabled"] = reg.enabled if reg is not None else False
+        entry.pop("enabled_by_registry", None)
+
+    return {"plugins": discovered}
 
 
 # ── Enable / Disable ─────────────────────────────────────────────────
