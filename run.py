@@ -16,6 +16,7 @@ Usage
 import sys
 import os
 import argparse
+import logging
 
 # Ensure src/ is on the path for development runs.
 _src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
@@ -26,6 +27,8 @@ import uvicorn
 
 from core.api import create_app
 from core.api.server import DEFAULT_PORT
+
+log = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -49,6 +52,12 @@ def main() -> None:
     args = parser.parse_args()
 
     app = create_app()
+
+    if args.host == "0.0.0.0":
+        log.warning(
+            "API bound to 0.0.0.0 — accessible from other network devices. "
+            "Use 127.0.0.1 to restrict to localhost."
+        )
 
     uvicorn.run(
         app,

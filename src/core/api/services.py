@@ -170,6 +170,8 @@ class ApiService:
         if "config_version" in data:
             data["config_version"] = EXPECTED_CONFIG_VERSION
 
+        _validate_config_schema(data)
+
         if backup and self.config_path.exists():
             stem = self.config_path.stem  # "config"
             parent = self.config_path.parent

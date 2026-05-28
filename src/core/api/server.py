@@ -16,6 +16,10 @@ DEFAULT_PORT = 29185
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("API server v%s starting up ...", API_VERSION)
+    log.info(
+        "CORS origin restricted to localhost — "
+        "use create_app(cors_origins=[\"*\"]) to open for development"
+    )
     await event_bus.publish("server.started", {"version": API_VERSION})
     yield
     await event_bus.publish("server.stopping", {})
@@ -51,7 +55,10 @@ def create_app(
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins or ["*"],
+        allow_origins=cors_origins or [
+            "http://127.0.0.1",
+            "http://localhost",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
