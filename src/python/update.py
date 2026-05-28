@@ -74,6 +74,8 @@ if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
 # =========================
 # HTTP headers for GitHub API
 # =========================
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
+
 HEADERS_API = {
     "Accept": "application/vnd.github+json",
     "User-Agent": "Streaming-Tool-Updater"
@@ -82,6 +84,10 @@ HEADERS_ASSET = {
     "Accept": "application/octet-stream",
     "User-Agent": "Streaming-Tool-Updater"
 }
+
+if GITHUB_TOKEN:
+    HEADERS_API["Authorization"] = f"token {GITHUB_TOKEN}"
+    HEADERS_ASSET["Authorization"] = f"token {GITHUB_TOKEN}"
 
 # Directories and individual files that may be overwritten by an update
 WHITELIST_DIRS = {
@@ -324,9 +330,20 @@ def run_update():
         log.info("[..] Checking for new version via GitHub...")
         try:
             response = requests.get(API_URL, headers=HEADERS_API, timeout=10)
+            if response.status_code == 403:
+                if "rate limit" in response.text.lower():
+                    log.error("[FAIL] GitHub API rate limit exceeded.")
+                    log.info("To increase the limit, set a GitHub token:")
+                    log.info("  - Environment variable: set GITHUB_TOKEN=your_token")
+                    log.info("  - Or in config.yaml: github_token: your_token")
+                    log.info("Create a token at: https://github.com/settings/tokens")
+                else:
+                    log.error(f"[FAIL] API error: 403 Forbidden")
+                wait_for_key()
+                sys.exit(5)
             response.raise_for_status()
             release = response.json()
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             log.error(f"[FAIL] API error: {e}")
             wait_for_key()
             sys.exit(5)

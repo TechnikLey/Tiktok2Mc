@@ -187,7 +187,7 @@ SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown", {}).get("delay_seconds", 30)
 # -----------------------------
 processes = {}
 linux_sessions = []  # Track tmux/screen session names
-restart_requested = False  # Set by file watcher when runtime/restart appears
+_restart_in_progress = False
 
 # -----------------------------
 # Process management (start, stop, visibility)
@@ -451,17 +451,30 @@ else:
 _API_PORT = DEFAULT_PORT
 _API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
 
+_uvicorn_server = None
+
 
 def _start_api_server():
     """Run the FastAPI server in a background daemon thread."""
+    global _uvicorn_server
     import uvicorn
     from core.api import create_app
 
     try:
         app = create_app()
-        uvicorn.run(app, host="127.0.0.1", port=_API_PORT, log_level="warning")
+        config = uvicorn.Config(app, host="127.0.0.1", port=_API_PORT, log_level="warning")
+        _uvicorn_server = uvicorn.Server(config)
+        _uvicorn_server.run()
     except Exception:
         log.exception("API server failed to start")
+
+
+def _stop_api_server():
+    """Stop the API server gracefully."""
+    global _uvicorn_server
+    if _uvicorn_server:
+        _uvicorn_server.should_exit = True
+        time.sleep(1)
 
 
 _api_thread = threading.Thread(target=_start_api_server, daemon=True)
@@ -643,9 +656,8 @@ async def check_and_run():
                     asyncio.create_task(shutdown_countdown())
             elif name == "restart":
                 log.info("\nRestart signal detected. Requesting clean restart...")
-                global restart_requested
-                restart_requested = True
-                return  # Exit the file watcher loop so main() can return cleanly
+                restart_app()
+                return
         await asyncio.sleep(5)
 
 # =============================================================================
@@ -672,63 +684,78 @@ async def command_loop():
 # MAIN
 # =============================================================================
 
-def _restart_monitor_thread():
-    """Background thread that watches restart_requested and performs
-    a hard restart when the flag is set."""
-    import time as _time
-    while True:
-        _time.sleep(0.5)
-        if restart_requested:
-            _time.sleep(0.5)
-            log.info("\nPerforming restart...")
-            stop_all_processes()
-            restart_exe = BASE_DIR / f"start{SUFFIX}"
-            if restart_exe.exists():
-                if IS_WINDOWS:
-                    restart_bat = BASE_DIR / "_restart.bat"
-                    restart_bat.write_text(
-                        f'@echo off\n'
-                        f'timeout /t 5 /nobreak >nul\n'
-                        f'cd /d "{BASE_DIR}"\n'
-                        f'start "" "{restart_exe}"\n'
-                        f'del "%~f0"\n',
-                        encoding="utf-8",
-                    )
-                    subprocess.Popen(
-                        [str(restart_bat)],
-                        shell=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                    )
-                else:
-                    restart_sh = BASE_DIR / "_restart.sh"
-                    restart_sh.write_text(
-                        f'#!/bin/sh\n'
-                        f'sleep 5\n'
-                        f'cd "{BASE_DIR}"\n'
-                        f'"{restart_exe}" &\n'
-                        f'rm "{restart_sh}"\n',
-                        encoding="utf-8",
-                    )
-                    restart_sh.chmod(0o755)
-                    subprocess.Popen(
-                        [str(restart_sh)],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        start_new_session=True,
-                    )
+def restart_app():
+    """Restart the application — cross-platform.
+
+    This implementation follows PyInstaller best practices and Python
+    standard patterns for process restart:
+
+    - Windows: Uses subprocess.Popen with CREATE_NEW_CONSOLE to spawn
+      a fully independent new process, then exits the current process.
+      This ensures the PyInstaller bootloader initializes correctly in
+      the new process.
+
+    - Linux: Uses os.execv to replace the current process image in-place,
+      which is the standard Unix pattern for process restart.
+
+    Both platforms preserve sys.argv and working directory.
+    """
+    global _restart_in_progress
+    if _restart_in_progress:
+        return
+    _restart_in_progress = True
+
+    log.info("\nPerforming restart...")
+    _stop_api_server()
+    stop_all_processes()
+    time.sleep(3)
+
+    if getattr(sys, "frozen", False):
+        executable = sys.executable
+        args = [executable] + sys.argv[1:]
+    else:
+        executable = sys.executable
+        args = [executable, os.path.abspath(__file__)] + sys.argv[1:]
+
+    if IS_WINDOWS:
+        try:
+            proc = subprocess.Popen(
+                args,
+                cwd=str(BASE_DIR),
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                close_fds=True,
+            )
+            time.sleep(3)
+            if proc.poll() is None:
+                os._exit(0)
             else:
-                log.error(f"Restart failed: {restart_exe} not found.")
-            os._exit(0)
+                log.error(f"New process exited immediately with code: {proc.returncode}")
+                _restart_in_progress = False
+                sys.exit(1)
+        except Exception as exc:
+            log.error("Restart failed: %s", exc)
+            _restart_in_progress = False
+            sys.exit(1)
+    else:
+        try:
+            os.chdir(str(BASE_DIR))
+            os.execv(executable, args)
+        except OSError:
+            try:
+                subprocess.Popen(
+                    args,
+                    cwd=str(BASE_DIR),
+                    start_new_session=True,
+                    close_fds=True,
+                )
+                os._exit(0)
+            except Exception as exc:
+                log.error("Restart failed: %s", exc)
+                _restart_in_progress = False
+                sys.exit(1)
 
 
 async def main():
-    # Start background restart monitor so we can restart even while
-    # blocking on input() in the main thread.
-    import threading
-    threading.Thread(target=_restart_monitor_thread, daemon=True).start()
-
     watcher = asyncio.create_task(check_and_run())
     try:
         await command_loop()
