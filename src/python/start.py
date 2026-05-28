@@ -65,6 +65,27 @@ if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
         sys.exit(1)
 
 # -----------------------------
+# Security warnings
+# -----------------------------
+
+# Warn if RCON password is still default
+rcon_cfg = cfg.get("rcon", {})
+if rcon_cfg.get("enabled", False) and rcon_cfg.get("password", "") == "ABC1234":
+    log.warning(
+        "RCON default password 'ABC1234' is still set — "
+        "anyone with network access can control your Minecraft server. "
+        "Change it in config.yaml under rcon.password"
+    )
+
+# Warn if server_host exposes services to the network
+if cfg.get("server_host") == "0.0.0.0":
+    log.warning(
+        "server_host is set to 0.0.0.0 — all services bind to all "
+        "network interfaces and are accessible from other devices. "
+        "Use 127.0.0.1 to restrict to localhost."
+    )
+
+# -----------------------------
 # Linux: Detect tmux/screen
 # -----------------------------
 TMUX_PATH = None if IS_WINDOWS else shutil.which("tmux")
