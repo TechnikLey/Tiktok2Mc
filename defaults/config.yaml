@@ -432,13 +432,12 @@ win_counter:
   port: 29191
   decrement_on_death: false  # Disabled by default — standalone win tracking
 
-# --- WEB DASHBOARD (GUI) ---
-# Reserved for the future graphical user interface (post-v1.0.0).
-# Port 29185 is currently used by the central API server.
-# This section will be activated when the GUI is implemented.
+# --- GUI ---
+# The graphical user interface is served by the central API server
+# and displayed in a pywebview window.
+# Set enabled: true to launch the dashboard on startup.
 gui:
   enabled: false
-  port: 29185
 
 # --- SPOTIFY CONTROL ---
 # Lets viewers control your Spotify playback via chat ($play, $pause, etc.)

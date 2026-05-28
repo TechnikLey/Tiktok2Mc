@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok2Mc Dashboard</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --card: #1e1e1e;
+            --input-bg: #2d2d2d;
+            --border: #333;
+            --text: #e0e0e0;
+            --muted: #aaa;
+            --accent: #ffd54f;
+            --accent-hover: #ffc107;
+            --danger: #ff4d4d;
+            --success: #4caf50;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            color: var(--accent);
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+        #status-pill {
+            padding: 0.35rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: var(--border);
+            color: var(--muted);
+        }
+        #status-pill.online { background: rgba(76,175,80,0.2); color: var(--success); }
+        #status-pill.offline { background: rgba(255,77,77,0.2); color: var(--danger); }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        .card h2 {
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+            font-weight: 500;
+            border-left: 3px solid var(--accent);
+            padding-left: 0.6rem;
+        }
+        .muted { color: var(--muted); font-size: 0.9rem; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-weight: 500; }
+        tr:last-child td { border-bottom: none; }
+
+        .toggle-btn {
+            padding: 0.3rem 0.7rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: opacity 0.2s;
+        }
+        .toggle-btn:hover { opacity: 0.85; }
+        .toggle-btn.on { background: var(--success); color: #fff; }
+        .toggle-btn.off { background: var(--danger); color: #fff; }
+        .toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .field-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.6rem;
+        }
+        .field-row span:first-child { color: var(--muted); }
+
+        #log-view { font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; }
+        .log-line { margin-bottom: 0.2rem; }
+        .log-info { color: var(--text); }
+        .log-warn { color: var(--accent-hover); }
+        .log-err { color: var(--danger); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>TikTok2Mc Dashboard</h1>
+        <div id="status-pill" class="offline">Connecting...</div>
+    </header>
+
+    <main>
+        <div class="card">
+            <h2>System Status</h2>
+            <div id="system-info" class="muted">Loading...</div>
+        </div>
+
+        <div class="card">
+            <h2>Plugins</h2>
+            <table>
+                <thead>
+                    <tr><th>Name</th><th>Version</th><th>Port</th><th>Status</th></tr>
+                </thead>
+                <tbody id="plugin-list">
+                    <tr><td colspan="4" class="muted">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Configuration</h2>
+            <div id="config-summary" class="muted">Loading...</div>
+        </div>
+
+        <div class="card">
+            <h2>Live Log</h2>
+            <div id="log-view" class="muted">Log streaming not yet implemented.</div>
+        </div>
+    </main>
+
+    <script>
+        const API = '/api/v1';
+
+        async function fetchJSON(path) {
+            const res = await fetch(API + path);
+            if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+            return res.json();
+        }
+
+        async function postJSON(path, body) {
+            const res = await fetch(API + path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+            return res.json();
+        }
+
+        async function togglePlugin(name, current) {
+            const action = current ? 'disable' : 'enable';
+            try {
+                await postJSON(`/plugins/${name}/${action}`, {});
+                loadPlugins();
+            } catch (e) {
+                log('Failed to toggle ' + name + ': ' + e.message, 'err');
+            }
+        }
+
+        function log(msg, level='info') {
+            const view = document.getElementById('log-view');
+            const line = document.createElement('div');
+            line.className = 'log-line log-' + level;
+            line.textContent = new Date().toLocaleTimeString() + '  ' + msg;
+            view.appendChild(line);
+            view.scrollTop = view.scrollHeight;
+        }
+
+        async function loadHealth() {
+            try {
+                const data = await fetchJSON('/health');
+                const pill = document.getElementById('status-pill');
+                pill.textContent = 'API v' + data.api_version;
+                pill.className = 'online';
+                log('API connected: v' + data.api_version);
+            } catch (e) {
+                const pill = document.getElementById('status-pill');
+                pill.textContent = 'Offline';
+                pill.className = 'offline';
+                log('API unreachable: ' + e.message, 'err');
+            }
+        }
+
+        async function loadPlugins() {
+            const tbody = document.getElementById('plugin-list');
+            try {
+                const data = await fetchJSON('/plugins');
+                if (!data.plugins || data.plugins.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="muted">No plugins found.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.plugins.map(p => {
+                    const btnClass = p.enabled ? 'on' : 'off';
+                    const btnText = p.enabled ? 'Enabled' : 'Disabled';
+                    return `<tr>
+                        <td>${p.display_name || p.name}</td>
+                        <td>${p.version || '-'}</td>
+                        <td>${p.port || '-'}</td>
+                        <td><button class="toggle-btn ${btnClass}" onclick="togglePlugin('${p.name}', ${p.enabled})">${btnText}</button></td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="4" class="muted">Failed to load plugins.</td></tr>';
+                log('Plugins load failed: ' + e.message, 'err');
+            }
+        }
+
+        async function loadConfig() {
+            const el = document.getElementById('config-summary');
+            try {
+                const data = await fetchJSON('/config');
+                const cfg = data.config || {};
+                const tiktok = cfg.tiktok || {};
+                const rcon = cfg.rcon || {};
+                el.innerHTML = `
+                    <div class="field-row"><span>TikTok User</span><span>${tiktok.user || '—'}</span></div>
+                    <div class="field-row"><span>Server Host</span><span>${cfg.server_host || '—'}</span></div>
+                    <div class="field-row"><span>RCON Enabled</span><span>${rcon.enabled ? 'Yes' : 'No'}</span></div>
+                    <div class="field-row"><span>Control Method</span><span>${cfg.control_method || '—'}</span></div>
+                `;
+            } catch (e) {
+                el.textContent = 'Failed to load configuration.';
+                log('Config load failed: ' + e.message, 'err');
+            }
+        }
+
+        async function init() {
+            await loadHealth();
+            await loadPlugins();
+            await loadConfig();
+            setInterval(loadHealth, 10000);
+            setInterval(loadPlugins, 5000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

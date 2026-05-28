@@ -1,154 +1,156 @@
-# v1.0.0 — Entwicklungstodo
+# TikTok2Mc — Release TODO (v1.0.0)
 
-> **Ziel:** Stabiler v1.0.0-Release mit zentraler FastAPI-Architektur, entkoppelten Plugins.
-> v1.0.0 bricht bewusst mit v0.x. Keine Kompatibilität.
+> **Goal:** Ship a stable v1.0.0 release with a working graphical user interface, a validated update path, and a polished out-of-the-box experience.
+> v1.0.0 is intentionally incompatible with v0.x.
 
 ---
 
-## ✅ Erledigt (aktueller Stand)
+## ✅ Completed (Current State)
 
-### API & Plugin-System
-- ✓ API-Server startet als Daemon-Thread in `start.py` vor Plugin-Discovery
-- ✓ Health-Poll (10 s Timeout) vor `PluginLauncher.get_plugins()`
-- ✓ Fallback-Modus bei API-Ausfall (startet ohne Plugins)
-- ✓ `PluginLauncher` API-only (kein Legacy-Fallback)
-- ✓ Alle 12 API-Routes haben konsistentes Error-Handling
-- ✓ Port-Konstanten-Vereinheitlichung: `DEFAULT_PORT` aus `server.py` importiert
-- ✓ `API_VERSION` in `models.py` zentral definiert (kein Circular Import mehr)
-- ✓ Route-Ordering gefixt: `/plugins/updates` vor `/plugins/{name}`
-- ✓ `start.py`: Breitere Exception-Behandlung beim Config-Laden + API-Thread-Fehler-Logging
-- ✓ Enable/Disable-Endpunkte — `POST /api/v1/plugins/{name}/enable|disable`
-- ✓ Plugin-Discovery-Endpunkt — `GET /api/v1/plugins/discover` (read-only, kein Registry-Seiteneffekt)
+### Core Bridge
+- TikTok Live connection (gifts, follows, likes, shares, comments, joins)
+- Minecraft command execution via RCON and datapacks
+- Action parser (`data/actions.mca`) with vanilla / RCON / script / overlay support
+- Webhook server for MinecraftServerAPI (death/respawn detection)
+- Comment commands with role-based permissions, cooldowns, and channel-points integration
 
-### Plugin-Manifest (plugin.json)
-- ✓ `plugin.json` für alle 8 Plugins
-- ✓ `PluginManifest` Pydantic-Modell mit Validierung (kebab-case name, semver, ports)
-- ✓ `PluginRegistration.from_manifest()`-Factory
-- ✓ `PluginLauncher` liest Manifeste statt `.exe`-Scannen
-- ✓ Discovery deterministisch und testbar vor Plugin-Execution
-- ✓ `update_url`-Feld für Plugin-Update-Prüfung
-- ✓ Zentrales Registrieren über `POST /api/v1/plugins/register`
-- ✓ Plugin-Self-Registration aus allen `main.py` entfernt
+### API & Plugin System
+- Central FastAPI server (`127.0.0.1:29185`) with 12 consistent REST routes
+- `API_VERSION` centrally defined; `DEFAULT_PORT` unified across codebase
+- Deterministic plugin discovery via `plugin.json` manifests (8 plugins)
+- `PluginLauncher` API-only (no legacy registry fallback)
+- Enable/disable endpoints: `POST /api/v1/plugins/{name}/enable|disable`
+- Discovery endpoint: `GET /api/v1/plugins/discover` (read-only, no side effects)
+- Health polling with 10 s timeout before plugin load
+- Fallback mode: continues without plugins if API fails to start
 
-### Discovery-Service
-- ✓ `core/api/services/plugin_discovery.py` — reiner Dateisystem-Scanner, kein Registry-Import
-- ✓ `services.py` in Package `services/` umgewandelt (abwärtskompatibel)
+### Update System
+- `PluginUpdateChecker` with semver comparison
+- `GET /api/v1/plugins/updates` endpoint
+- Tool update check: `GET /api/v1/updates/check` (GitHub Releases API)
+- Dual signaling (file-based `update_signal.tmp` + API `/updater/signal`)
+- `update.py` and `start.py` coordinated signal handling
 
-### Update-System
-- ✓ `PluginUpdateChecker`-Service: Versionsvergleich über `update_url`
-- ✓ `GET /api/v1/plugins/updates`-Endpunkt
-- ✓ API-Kill-Signal-Endpunkte (`GET/PUT/DELETE /api/v1/updater/signal`)
-- ✓ Plugin-Update-Check in `start.py`-Startup
-- ✓ Duales Signaling in `update.py` + `start.py` (API + Datei)
-- ✓ Tool-Update-Prüfung — `GET /api/v1/updates/check` (GitHub Releases API)
-- ✓ 56 Tests: 18 Manifest + 22 Updater + 5 Signal + 11 Tool-Update
+### Security & Configuration
+- CORS restricted to local origins (was `["*"]`)
+- Warnings for default RCON password (`ABC1234`) and `server_host: 0.0.0.0`
+- Semantic config versioning (`config_version: 1.0`)
+- Config normalization, schema validation, and automatic backups
+- All plugins default to `enabled: false` (opt-in)
+
+### Plugin Decoupling
+- Timer, DeathCounter, WinCounter, OverlayText, LikeGoal, Spotify, ChannelPoints — all standalone
+- Each plugin exposes its own REST API; no cross-plugin hard dependencies
+- Timer: `auto_win: false`, `pause_on_death: false`
+- WinCounter: `decrement_on_death: false`
 
 ### Testing & CI
-- ✓ Tests: `pytest.ini`, `conftest.py`, 285 Testfälle (4 Skipped SSE/WS)
-- ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events, Discovery
-- ✓ Discovery-Tests: 6 Tests — Vollständigkeit, Registry-Merge, leeres Verzeichnis, Determinismus, kein Seiteneffekt
-- ✓ Tool-Update-Tests: 11 Tests — API-Endpunkt + Direktaufruf mit gemocktem GitHub
-- ✓ API-Fehlertests: Config 404, 500, Event-Validierung
-- ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
-- ✓ Core-Tests: `normalize_config_version()`, EventBus, PluginAPIClient, PluginLauncher
-- ✓ Core-Tests: Validator (44 Tests), Registry Backup, korrupte JSON-Wiederherstellung
-- ✓ Core-Tests: Manifest (18 Tests), Updater (22 Tests), Signal (5 Tests)
-- ✓ Smoke-Tests: 62 Tests für Manifest-Struktur, Content, Discovery-Integration
-- ✓ CI-Workflow: `test.yml` (push/PR auf main)
-- ✓ Produktions-Bugs behoben: `write_config()`-Validierung, `normalize_config_version()`
+- 285 tests passing, 4 skipped (SSE/WS stability)
+- CI workflow `test.yml` on push/PR to `main`
+- Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation
 
-### Legacy-Cleanup
-- ✓ `python/registry.py` gelöscht
-- ✓ `client.py` ohne Fallback auf Datei-Registry
-- ✓ `--register-only` aus CLI entfernt
-- ✓ `get_root_dir()` für beliebige Exe-Tiefen gefixt
-- ✓ `build.py`/`update.py` ohne `registry`/`plugin_updater`
-- ✓ `services.py` ohne `read_plugin_registry()`
-- ✓ `models.py` ohne `ImportLegacyResponse`/`validate_config_dict`
-- ✓ `gui.py` (alt) entfernt
-- ✓ `plugin_updater.py` entfernt (dead code)
-- ✓ Dead Code entfernt: `ErrorResponse`, `WSMessage`
-- ✓ `build.py`/`upload.py` TOOL_VERSION → `v1.0.0`
+### Legacy Cleanup
+- `python/registry.py`, `client.py` legacy fallback, `--register-only` CLI flag removed
+- `gui.py` (legacy) removed; `plugin_updater.py` dead code removed
+- `build.py` / `upload.py` version bumped to `v1.0.0`
 
-### Sicherheit (non-blocking Warnings)
-- ✓ CORS-Standard von `["*"]` auf lokale Origins geändert
-- ✓ Security-Warning bei `--host 0.0.0.0` in `run.py` + `start.py`
-- ✓ CORS-Hinweis im API-Startup-Log
-- ✓ RCON-Warnung im Log bei Standard-Passwort `ABC1234`
-
-### Plugin-Entkopplung
-- ✓ Timer: REST-API (`/start`, `/pause`, `/reset`, `/status`)
-- ✓ Timer: `auto_win: false`, `pause_on_death: false`
-- ✓ WinCounter: `decrement_on_death: false`
-- ✓ Alle Plugins standalone mit `false`-Defaults
-
-### Konfiguration & Schema
-- ✓ `config_version: 1.0` (semantische Versionierung MAJOR.MINOR)
-- ✓ `normalize_config_version()` in `core/utils.py`
-- ✓ API normalisiert on Read, upgraded on Write
-- ✓ `update.py` verwendet `packaging.version.parse()`
-- ✓ Alle Plugins standardmäßig deaktiviert (opt-in)
-- ✓ Schema-Validierung in der API
-- ✓ Versionierte Config-Backups
-- ✓ Warnung bei unbekannten Top-Level-Keys
-
-### Dokumentation
-- ✓ README.md für v1.0.0 neu geschrieben — Projektübersicht, Features, Installation, Quick Start, API-Übersicht, Plugin-System, Development
-- ✓ GUIDE.md für v1.0.0 neu geschrieben — Architektur, Ordnerstruktur, Plugin-System, API-Nutzung, Actions/Triggers, Update-System, Troubleshooting
-- ✓ CHANGELOG.md normalisiert — v1.0.0-Sektion mit Added/Changed/Removed/Fixed/Security, Keep-a-Changelog-Format
-- ✓ config.yaml Inline-Dokumentation verbessert — API-Server-Hinweis, GUI-Port-Klarstellung, Update-Check-Referenz
+### Documentation
+- `README.md` rewritten for v1.0.0
+- `GUIDE.md` rewritten with architecture, plugin system, API usage, actions/triggers, update system, troubleshooting
+- `CHANGELOG.md` normalized with v1.0.0 section (Keep a Changelog format)
+- `config.yaml` inline documentation improved
 
 ---
 
-## 🔜 Für v1.0.0
+## v1.0.0 — REQUIRED (RELEASE BLOCKERS)
 
-### 1. Update-Pfad testen (Hoch)
-> `PluginUpdateChecker` und API-Signal-Endpunkte sind implementiert.
+> **These must be resolved before v1.0.0 can be tagged. No exceptions.**
 
-- [ ] **End-to-End-Update-Test** v1.0.0 → v1.0.1
-  - Config-Whitelist, Version-Check, Signal-Handling (Datei + API).
-  - Prüfen ob compiled `update.exe` noch file-basiertes Signaling verwendet.
+### 1. GUI — HIGHEST PRIORITY / RELEASE BLOCKER
+> **Status: SCAFFOLDED — CORE SHELL EXISTS, FEATURES MISSING.**
+>
+> A minimal GUI now exists:
+> - `src/python/gui.py` — pywebview shell that opens the dashboard served by the API server
+> - `templates/gui/index.html` — minimal SPA dashboard (status, plugin list, config summary)
+> - API server mounts `/gui` static files
+> - `start.py` launches `gui.exe` when `gui.enabled: true`
+> - `build.py` compiles `gui.py` into the release package
+>
+> **Why it still blocks release:** The current dashboard is read-only and lacks the interactive features non-technical users need. The README promise of "No programming required" is not fully realized without a first-run wizard and visual editors.
+
+- [x] Tech stack decision and scaffolding (pywebview + API-served SPA)
+- [x] Graceful integration with existing `start.py` launcher
+- [x] Minimal live dashboard (connection status, plugin list, config summary)
+- [ ] **RELEASE BLOCKER** — First-run setup wizard (TikTok username, RCON password, feature selection)
+- [ ] **RELEASE BLOCKER** — `config.yaml` editor with live validation and inline help
+- [ ] **RELEASE BLOCKER** — `data/actions.mca` editor with syntax highlighting / validation
+- [ ] **RELEASE BLOCKER** — Real-time log viewer
+- [ ] **RELEASE BLOCKER** — Plugin manager with enable/disable toggles that persist to config
+- [ ] **RELEASE BLOCKER** — Overlay URL helper (copy-paste OBS browser sources)
+
+### 2. End-to-End Update Validation
+> **Status: IMPLEMENTED BUT NOT VALIDATED IN A REAL BUILD.**
+>
+> The update subsystem has 56 unit/integration tests, but the compiled `update.exe` → `start.exe` → restart flow has never been exercised across actual version boundaries.
+
+- [ ] **RELEASE BLOCKER** — End-to-end update test: compiled v1.0.0 → v1.0.1
+  - Verify `update.exe` performs file-based signaling (`update_signal.tmp`) correctly
+  - Verify API-based kill signal fallback (`GET/PUT/DELETE /api/v1/updater/signal`) works
+  - Verify config whitelist preserves user settings across update
+  - Verify rollback / recovery behavior on interrupted update
+  - Verify Windows and Linux paths (tmux/screen session cleanup)
 
 ---
 
-## 🔮 Post-v1.0.0
+## v1.0.0 — IMPORTANT (NON-BLOCKING BUT REQUIRED)
 
-### Sicherheit (Mittel)
-> API läuft standardmäßig auf localhost. Authentifizierung ist erst
-> bei Netzwerk-Exposition nötig.
+> **These must be completed before release, but they do not block tagging on their own if the blockers above are resolved.**
 
-- [ ] **Mittel** — API-Authentifizierung (API-Key)
-  - Localhost-Binding (bereits Default) + optionaler API-Key.
-  - Wichtig bei `server_host: 0.0.0.0`, kein Release-Blocker.
-- [ ] **Niedrig** — Spotify `client_secret`-Validierung
+### Build & Deployment Finalization
+- [ ] **High** — Migration notice for v0.x users (config/plugins are incompatible)
+- [ ] **High** — Automated verification that `version.txt` matches `TOOL_VERSION` in `build.py`
+- [ ] **Medium** — Document minimum system requirements in release notes
+- [ ] **Medium** — Document manual rollback procedure
+- [ ] **Medium** — Final troubleshooting expansion (common first-start errors)
 
-### Port-Konsolidierung & EventBus (Mittel)
-> Plugins laufen noch als eigene Flask-Prozesse auf 7 Ports.
+### API & Plugin Hardening
+- [ ] **Medium** — Final consistency review of all 12 API routes (error messages, status codes, pagination)
+- [ ] **Medium** — Validate graceful degradation when individual plugin processes crash
+- [ ] **Low** — Verify CORS behavior is correct for all local-origin scenarios
 
-- [ ] **Mittel** — Plugin-Kommunikation über API zentralisieren
-- [ ] **Mittel** — EventBus in Plugin-Kommunikation einbinden
-- [ ] **Mittel** — Port-Manager (Port-Nutzung reduzieren)
+### Documentation Finalization
+- [ ] **Medium** — Final pass: ensure `GUIDE.md` matches actual v1.0.0 behavior exactly
+- [ ] **Medium** — Final pass: ensure `README.md` quick-start works on a clean Windows install without Python
+- [ ] **Low** — Document log file locations and safe cleanup procedures
 
-### GUI (Mittel)
-> GUI ist ein eigenes Projekt. Setzt stabile API voraus.
+---
 
-- [ ] **Mittel** — Tech-Stack festlegen (Tauri, Electron, pywebview)
-- [ ] **Mittel** — First-Run-Setup-Wizard
-- [ ] **Mittel** — Config-Editor (Formular)
-- [ ] **Mittel** — Actions-Editor (.mca)
-- [ ] **Mittel** — Dashboard (Status, Logs)
-- [ ] **Mittel** — Plugin-Manager (enable/disable)
-- [ ] **Niedrig** — Spotify-Setup-Assistent
-- [ ] **Niedrig** — Overlay-Vorschau + Theme-Editor
-- [ ] **Niedrig** — Minecraft-Server-Console (RCON)
+## POST v1.0.0
 
-### Build & Deployment (Niedrig)
-- [ ] **Niedrig** — Totmodule identifizieren
-- [ ] **Niedrig** — Hinweistext für v0.x-User
-- [ ] **Niedrig** — `version.txt` automatisch prüfen
-- [ ] **Niedrig** — Mindestanforderungen dokumentieren
-- [ ] **Niedrig** — Rollback-Mechanismus dokumentieren
-- [ ] **Niedrig** — Troubleshooting-Sektion erweitern
+> **Explicitly deferred. Do not work on these until v1.0.0 is shipped.**
 
-### Testing (Niedrig)
-- [ ] **Niedrig** — SSE/WS-Integrationstests stabilisieren (blockiert durch TestClient)
+### Security
+- [ ] **Medium** — API authentication (API-Key) for deployments using `server_host: 0.0.0.0`
+- [ ] **Low** — Spotify `client_secret` validation and encrypted storage
+
+### Architecture & Performance
+- [ ] **Medium** — Port consolidation: reduce 7+ plugin ports to fewer endpoints or reverse-proxy through API
+- [ ] **Medium** — EventBus integration into plugin-to-plugin communication
+- [ ] **Medium** — Centralized port manager to prevent collisions
+
+### Testing
+- [ ] **Low** — Stabilize SSE/WS integration tests (currently 4 skipped due to `TestClient` limitations)
+
+### GUI Enhancements (v1.1.0+)
+- [ ] **Low** — Spotify setup assistant (OAuth flow helper)
+- [ ] **Low** — Overlay preview + live theme editor
+- [ ] **Low** — Integrated Minecraft server console (RCON terminal)
+- [ ] **Low** — Mobile-responsive web dashboard variant
+
+### Build & Packaging
+- [ ] **Low** — Identify and strip dead modules from PyInstaller builds
+- [ ] **Low** — Automated release notes generation from CHANGELOG
+
+---
+
+*Last updated: 2026-05-28*

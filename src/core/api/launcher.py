@@ -128,7 +128,15 @@ class PluginLauncher:
             return self._plugins_dir
         try:
             from core.paths import get_root_dir
-            return get_root_dir() / "src" / _PLUGINS_DIR_NAME
+            root = get_root_dir()
+            # Dev layout: src/plugins/   Release layout: plugins/
+            dev_dir = root / "src" / _PLUGINS_DIR_NAME
+            if dev_dir.is_dir():
+                return dev_dir
+            rel_dir = root / _PLUGINS_DIR_NAME
+            if rel_dir.is_dir():
+                return rel_dir
+            return None
         except Exception:
             return None
 

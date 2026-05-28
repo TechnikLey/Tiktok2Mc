@@ -4,9 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi.staticfiles import StaticFiles
+
 from .routes import api_router
 from .eventbus import event_bus
 from .models import API_VERSION
+from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)
 
@@ -65,5 +68,14 @@ def create_app(
     )
 
     app.include_router(api_router)
+
+    # Serve the central GUI dashboard at /gui
+    gui_dir = get_root_dir() / "core" / "templates" / "gui"
+    if gui_dir.exists():
+        app.mount(
+            "/gui",
+            StaticFiles(directory=str(gui_dir), html=True),
+            name="gui",
+        )
 
     return app

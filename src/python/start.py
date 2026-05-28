@@ -46,6 +46,7 @@ SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
+GUI_EXE_PATH = (BASE_DIR / f"gui{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------
@@ -538,9 +539,12 @@ from core.api.launcher import PluginLauncher
 _launcher = PluginLauncher()
 PLUGIN_REGISTRY: list[AppConfig] = _launcher.get_plugins()
 
+GUI_ENABLED = cfg.get("gui", {}).get("enabled", False)
+
 BUILTIN_REGISTRY: list[AppConfig] = [
     AppConfig(name="App", path=APP_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="Minecraft Server", path=SERVER_EXE_PATH, enable=True, level=2, ics=False),
+    AppConfig(name="GUI", path=GUI_EXE_PATH, enable=GUI_ENABLED, level=2, ics=True),
 ]
 
 for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):

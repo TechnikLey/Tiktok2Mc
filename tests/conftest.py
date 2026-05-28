@@ -46,6 +46,7 @@ def project_dir():
         with config_file.open("w", encoding="utf-8") as f:
             yaml.dump(MINIMAL_CONFIG, f)
         (root / "data").mkdir()
+        (root / "plugins").mkdir()
         yield root
 
 

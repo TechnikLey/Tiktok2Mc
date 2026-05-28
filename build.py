@@ -59,6 +59,7 @@ def main():
         # Definition of main files
         CORE_EXECUTABLES = [
             {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
+            {"name": "gui",            "src": "src/python/gui.py",            "dest": ""},
             {"name": "update",         "src": "src/python/update.py",         "dest": ""},
             {"name": "server",         "src": "src/python/server.py",         "dest": "",},
             {"name": "start",          "src": "src/python/start.py",          "dest": ""},
@@ -128,7 +129,7 @@ def main():
                 })
 
                 # Also copy extra files if present in the same plugin folder
-                for extra_file in ["version.txt", "README.md", "config.yaml"]:
+                for extra_file in ["plugin.json", "version.txt", "README.md", "config.yaml"]:
                     extra_path = py_file.parent / extra_file
                     if extra_path.exists():
                         target_dir = OUT_DIR / dest

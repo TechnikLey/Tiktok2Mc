@@ -22,6 +22,7 @@ def normalize_config_version(value: Any) -> str:
     Input          Output
     ============== ===========
     ``int 7``      ``"0.7"``
+    ``float 1.0``  ``"1.0"``
     ``"7"``         ``"0.7"``
     ``"0.7"``       ``"0.7"``
     ``"v1.0.0"``    ``"1.0"``
@@ -31,6 +32,16 @@ def normalize_config_version(value: Any) -> str:
     """
     if isinstance(value, int):
         return f"0.{value}"
+
+    if isinstance(value, float):
+        # YAML parses "1.0" as float 1.0 — convert back to string safely
+        s = str(value)
+        if "." not in s:
+            s += ".0"
+        parts = s.split(".")
+        if parts[0].isdigit() and (len(parts) < 2 or parts[1].isdigit()):
+            return f"{int(parts[0])}.{int(parts[1]) if len(parts) > 1 else 0}"
+        raise ValueError(f"Unrecognised config version float: {value!r}")
 
     if isinstance(value, str):
         s = value.strip().lstrip("v")
@@ -47,7 +58,7 @@ def normalize_config_version(value: Any) -> str:
         )
 
     raise ValueError(
-        f"config_version must be int or str, "
+        f"config_version must be int, float or str, "
         f"got {type(value).__name__}: {value!r}"
     )
 
