@@ -208,6 +208,79 @@
         .copied { background: var(--success) !important; color: #fff !important; }
 
         .hidden { display: none !important; }
+
+        /* Config Editor */
+        .editor-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column;
+            z-index: 200; overflow: hidden;
+        }
+        .editor-header {
+            background: var(--card); border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+        .editor-header h2 { margin: 0; font-size: 1.3rem; color: var(--accent); }
+        .editor-body {
+            flex: 1; overflow-y: auto; padding: 2rem;
+            max-width: 900px; width: 100%; margin: 0 auto;
+        }
+        .editor-section {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; margin-bottom: 1.5rem; overflow: hidden;
+        }
+        .section-header {
+            background: var(--input-bg); padding: 0.9rem 1.2rem;
+            cursor: pointer; display: flex;
+            justify-content: space-between; align-items: center;
+            font-weight: 600; font-size: 1rem;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .section-header:hover { background: #3a3a3a; }
+        .section-header.collapsed { border-bottom-color: var(--border); }
+        .section-toggle { font-size: 0.8rem; color: var(--muted); }
+        .section-content {
+            padding: 1.2rem;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+        }
+        .section-content.hidden-section { display: none; }
+        .form-row {
+            display: flex; flex-direction: column; gap: 0.3rem;
+        }
+        .form-row.full-width { grid-column: 1 / -1; }
+        .form-row label {
+            font-size: 0.85rem; color: var(--muted); font-weight: 500;
+        }
+        .form-row input[type="text"],
+        .form-row input[type="number"],
+        .form-row input[type="password"],
+        .form-row select {
+            padding: 0.6rem 0.8rem; background: var(--input-bg);
+            border: 1px solid var(--border); color: var(--text);
+            border-radius: 6px; font-size: 0.9rem; outline: none;
+            transition: border-color 0.2s; width: 100%;
+        }
+        .form-row input:focus, .form-row select:focus { border-color: var(--accent); }
+        .form-row input[type="checkbox"] {
+            width: 20px; height: 20px; accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .form-row .hint {
+            font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem;
+        }
+        .editor-actions {
+            position: sticky; bottom: 0;
+            background: var(--card); border-top: 1px solid var(--border);
+            padding: 1rem 2rem; display: flex;
+            justify-content: space-between; align-items: center;
+        }
+        .editor-actions .btn { padding: 0.7rem 1.8rem; }
+        .save-status {
+            font-size: 0.9rem; font-weight: 500;
+        }
+        .save-status.ok { color: var(--success); }
+        .save-status.err { color: var(--danger); }
     </style>
 </head>
 <body>
@@ -238,6 +311,7 @@
         <div class="card">
             <h2>Configuration</h2>
             <div id="config-summary" class="muted">Loading...</div>
+            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="openConfigEditor()">Edit Configuration</button>
         </div>
 
         <div class="card">
@@ -270,6 +344,22 @@
             <div style="display:flex;gap:1rem;justify-content:center;">
                 <button class="btn btn-primary" id="btn-restart-now">Restart Now</button>
                 <button class="btn btn-secondary" id="btn-restart-later">Later</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Editor -->
+    <div id="config-editor" class="editor-overlay hidden">
+        <div class="editor-header">
+            <h2>Configuration Editor</h2>
+            <button class="btn btn-secondary" onclick="closeConfigEditor()">Close</button>
+        </div>
+        <div class="editor-body" id="editor-body"></div>
+        <div class="editor-actions">
+            <span id="save-status" class="save-status"></span>
+            <div>
+                <button class="btn btn-secondary" onclick="closeConfigEditor()" style="margin-right:0.5rem;">Cancel</button>
+                <button class="btn btn-primary" onclick="saveConfig()">Save Changes</button>
             </div>
         </div>
     </div>
@@ -668,6 +758,217 @@
             hideRestartDialog();
             loadConfig();
         });
+
+        // ── Config Editor ──
+        let editorConfig = {};
+
+        const CONFIG_SECTION_ORDER = [
+            'tiktok', 'rcon', 'java', 'comment_commands', 'gui',
+            'overlay_text', 'like_goal', 'timer', 'death_counter', 'win_counter',
+            'spotify', 'channel_points', 'minecraft_server_api', 'console',
+            'random_triggers', 'theme', 'update', 'shutdown'
+        ];
+
+        function toTitle(str) {
+            return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function inferInputType(key, value) {
+            if (key === 'enabled' || typeof value === 'boolean') return 'checkbox';
+            if (key.includes('password') || key.includes('secret')) return 'password';
+            if (key === 'port' || key.endsWith('_port') || key === 'log_level' || key === 'award_amount' ||
+                key === 'award_interval_seconds' || key === 'ping_timeout_minutes' || key === 'leaderboard_count' ||
+                key === 'max_update_logs' || key === 'delay_seconds' || key === 'volume_step' ||
+                key === 'cooldown' || key === 'user_cooldown' || key === 'max_fails' ||
+                key === 'reconnect_delay_seconds' || key === 'autosave_interval_seconds' ||
+                key === 'start_time' || key === 'goal_multiplier') return 'number';
+            if (key === 'control_method') return 'select:DCS,ICS';
+            if (key === 'mode' && typeof value === 'string') return 'select:deny-all,allow-all';
+            if (key === 'display_mode') return 'select:overwrite,queue';
+            if (key === 'playtrack_mode') return 'select:replace,queue';
+            if (key === 'follow_tracking_mode' || (key === 'mode' && typeof value === 'string')) return 'text';
+            if (typeof value === 'number') return 'number';
+            return 'text';
+        }
+
+        function buildFormRow(key, value, path) {
+            const type = inferInputType(key, value);
+            const label = toTitle(key);
+            const safeId = 'cfg_' + path.replace(/\./g, '_');
+
+            if (type === 'checkbox') {
+                return `<div class="form-row">
+                    <label>${escapeHtml(label)}</label>
+                    <input type="checkbox" id="${safeId}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool">
+                </div>`;
+            }
+            if (type.startsWith('select:')) {
+                const options = type.split(':')[1].split(',');
+                return `<div class="form-row">
+                    <label>${escapeHtml(label)}</label>
+                    <select id="${safeId}" data-path="${path}" data-type="string">
+                        ${options.map(o => `<option value="${o}" ${value === o ? 'selected' : ''}>${o}</option>`).join('')}
+                    </select>
+                </div>`;
+            }
+            if (type === 'password') {
+                return `<div class="form-row">
+                    <label>${escapeHtml(label)}</label>
+                    <input type="password" id="${safeId}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string">
+                </div>`;
+            }
+            if (type === 'number') {
+                return `<div class="form-row">
+                    <label>${escapeHtml(label)}</label>
+                    <input type="number" id="${safeId}" value="${value !== undefined ? value : ''}" data-path="${path}" data-type="number">
+                </div>`;
+            }
+            return `<div class="form-row">
+                <label>${escapeHtml(label)}</label>
+                <input type="text" id="${safeId}" value="${escapeHtml(value !== undefined ? String(value) : '')}" data-path="${path}" data-type="string">
+            </div>`;
+        }
+
+        function buildSection(sectionKey, sectionValue, pathPrefix) {
+            if (sectionValue === null || sectionValue === undefined) return '';
+            if (typeof sectionValue !== 'object') return '';
+            if (Array.isArray(sectionValue)) {
+                // Arrays are rendered as read-only text for now (complex structures)
+                return `<div class="editor-section">
+                    <div class="section-header collapsed" onclick="toggleSection(this)">
+                        <span>${escapeHtml(toTitle(sectionKey))}</span>
+                        <span class="section-toggle">Expand</span>
+                    </div>
+                    <div class="section-content hidden-section">
+                        <div class="form-row full-width">
+                            <label>${escapeHtml(toTitle(sectionKey))} (Array — edit in YAML directly)</label>
+                            <textarea readonly rows="6" style="width:100%;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:0.6rem;border-radius:6px;font-family:monospace;">${escapeHtml(JSON.stringify(sectionValue, null, 2))}</textarea>
+                            <div class="hint">Array editing is not yet supported in the GUI. Use config.yaml for complex list changes.</div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            let rows = '';
+            const keys = Object.keys(sectionValue).sort();
+            for (const key of keys) {
+                const val = sectionValue[key];
+                const childPath = pathPrefix ? pathPrefix + '.' + key : key;
+                if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
+                    // Nested object — skip inline, show note
+                    rows += `<div class="form-row full-width"><div class="hint">Nested object <b>${escapeHtml(toTitle(key))}</b> — shown below.</div></div>`;
+                } else {
+                    rows += buildFormRow(key, val, childPath);
+                }
+            }
+
+            // Also add nested object sections inline
+            let nestedSections = '';
+            for (const key of keys) {
+                const val = sectionValue[key];
+                const childPath = pathPrefix ? pathPrefix + '.' + key : key;
+                if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
+                    nestedSections += buildSection(key, val, childPath);
+                }
+            }
+
+            return `<div class="editor-section">
+                <div class="section-header collapsed" onclick="toggleSection(this)">
+                    <span>${escapeHtml(toTitle(sectionKey))}</span>
+                    <span class="section-toggle">Expand</span>
+                </div>
+                <div class="section-content hidden-section">
+                    ${rows}
+                </div>
+            </div>` + nestedSections;
+        }
+
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            const toggle = header.querySelector('.section-toggle');
+            const isHidden = content.classList.contains('hidden-section');
+            if (isHidden) {
+                content.classList.remove('hidden-section');
+                header.classList.remove('collapsed');
+                toggle.textContent = 'Collapse';
+            } else {
+                content.classList.add('hidden-section');
+                header.classList.add('collapsed');
+                toggle.textContent = 'Expand';
+            }
+        }
+
+        function openConfigEditor() {
+            editorConfig = JSON.parse(JSON.stringify(currentConfig));
+            const container = document.getElementById('editor-body');
+            let html = '';
+
+            // Render known sections in order
+            for (const key of CONFIG_SECTION_ORDER) {
+                if (key in editorConfig) {
+                    html += buildSection(key, editorConfig[key], key);
+                }
+            }
+
+            // Render any unknown top-level keys at the end
+            const known = new Set(CONFIG_SECTION_ORDER);
+            for (const key of Object.keys(editorConfig).sort()) {
+                if (!known.has(key)) {
+                    html += buildSection(key, editorConfig[key], key);
+                }
+            }
+
+            container.innerHTML = html;
+            document.getElementById('config-editor').classList.remove('hidden');
+            document.getElementById('save-status').textContent = '';
+            document.getElementById('save-status').className = 'save-status';
+        }
+
+        function closeConfigEditor() {
+            document.getElementById('config-editor').classList.add('hidden');
+        }
+
+        async function saveConfig() {
+            const status = document.getElementById('save-status');
+            status.textContent = 'Saving...';
+            status.className = 'save-status';
+
+            try {
+                // Gather all inputs and update editorConfig
+                const inputs = document.querySelectorAll('#editor-body [data-path]');
+                for (const input of inputs) {
+                    const path = input.getAttribute('data-path');
+                    const type = input.getAttribute('data-type');
+                    const keys = path.split('.');
+                    let target = editorConfig;
+                    for (let i = 0; i < keys.length - 1; i++) {
+                        if (!target[keys[i]]) target[keys[i]] = {};
+                        target = target[keys[i]];
+                    }
+                    const lastKey = keys[keys.length - 1];
+                    if (type === 'bool') {
+                        target[lastKey] = input.checked;
+                    } else if (type === 'number') {
+                        const val = input.value.trim();
+                        target[lastKey] = val === '' ? 0 : Number(val);
+                    } else {
+                        target[lastKey] = input.value;
+                    }
+                }
+
+                await putJSON('/config', { config: editorConfig, backup: true });
+                currentConfig = editorConfig;
+                await loadConfig();
+                status.textContent = 'Saved successfully!';
+                status.className = 'save-status ok';
+                log('Configuration saved via editor.');
+                setTimeout(() => { if (status.textContent === 'Saved successfully!') status.textContent = ''; }, 3000);
+            } catch (e) {
+                status.textContent = 'Save failed: ' + e.message;
+                status.className = 'save-status err';
+                log('Config save failed: ' + e.message, 'err');
+            }
+        }
 
         // ── Init ──
         function escapeHtml(text) {
