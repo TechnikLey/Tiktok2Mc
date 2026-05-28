@@ -40,7 +40,7 @@ Everything is controlled through simple text files. No programming required.
 
 **Step 1 — Set your TikTok username**
 
-Open `config/config.yaml` in any text editor (Notepad on Windows, any text editor on Linux).
+Open `config/config.yaml` in any text editor.
 
 Find this line:
 
