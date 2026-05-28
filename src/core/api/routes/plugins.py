@@ -109,6 +109,45 @@ async def check_plugin_updates():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Enable / Disable ─────────────────────────────────────────────────
+
+
+@router.post("/plugins/{name}/enable", response_model=PluginRegistration)
+async def enable_plugin(name: str):
+    """Enable a plugin by name."""
+    try:
+        registry = get_registry()
+        result = registry.update(name, enabled=True)
+        if result is None:
+            raise HTTPException(
+                status_code=404, detail=f"Plugin '{name}' not found"
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to enable plugin")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/plugins/{name}/disable", response_model=PluginRegistration)
+async def disable_plugin(name: str):
+    """Disable a plugin by name."""
+    try:
+        registry = get_registry()
+        result = registry.update(name, enabled=False)
+        if result is None:
+            raise HTTPException(
+                status_code=404, detail=f"Plugin '{name}' not found"
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to disable plugin")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Get single ───────────────────────────────────────────────────────
 
 

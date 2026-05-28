@@ -2,206 +2,142 @@
 
 > **Ziel:** Stabiler v1.0.0-Release mit zentraler FastAPI-Architektur, entkoppelten Plugins.
 > v1.0.0 bricht bewusst mit v0.x. Keine Kompatibilität.
->
-> | Prio | Bedeutung |
-> |------|-----------|
-> | **Kritisch** | Blockiert das Release. Muss vor v1.0.0 fertig sein. |
-> | **Hoch** | Sollte drin sein, ohne geht es mit Risiko. |
-> | **Mittel** | Wichtig, aber kein Release-Blocker. |
-> | **Niedrig** | Nice-to-have für v1.0.0. |
 
 ---
 
 ## ✅ Erledigt (aktueller Stand)
 
-### API-Integration
+### API & Plugin-System
 - ✓ API-Server startet als Daemon-Thread in `start.py` vor Plugin-Discovery
 - ✓ Health-Poll (10 s Timeout) vor `PluginLauncher.get_plugins()`
 - ✓ Fallback-Modus bei API-Ausfall (startet ohne Plugins)
+- ✓ `PluginLauncher` API-only (kein Legacy-Fallback)
+- ✓ Alle 12 API-Routes haben konsistentes Error-Handling
+- ✓ Port-Konstanten-Vereinheitlichung: `DEFAULT_PORT` aus `server.py` importiert
+- ✓ `API_VERSION` in `models.py` zentral definiert (kein Circular Import mehr)
+- ✓ Route-Ordering gefixt: `/plugins/updates` vor `/plugins/{name}`
+- ✓ `start.py`: Breitere Exception-Behandlung beim Config-Laden + API-Thread-Fehler-Logging
+
+### Plugin-Manifest (plugin.json)
+- ✓ `plugin.json` für alle 8 Plugins
+- ✓ `PluginManifest` Pydantic-Modell mit Validierung (kebab-case name, semver, ports)
+- ✓ `PluginRegistration.from_manifest()`-Factory
+- ✓ `PluginLauncher` liest Manifeste statt `.exe`-Scannen
+- ✓ Discovery deterministisch und testbar vor Plugin-Execution
+- ✓ `update_url`-Feld für Plugin-Update-Prüfung
+- ✓ Zentrales Registrieren über `POST /api/v1/plugins/register`
+- ✓ Plugin-Self-Registration aus allen `main.py` entfernt
+
+### Update-System
+- ✓ `PluginUpdateChecker`-Service: Versionsvergleich über `update_url`
+- ✓ `GET /api/v1/plugins/updates`-Endpunkt
+- ✓ API-Kill-Signal-Endpunkte (`GET/PUT/DELETE /api/v1/updater/signal`)
+- ✓ Plugin-Update-Check in `start.py`-Startup
+- ✓ Duales Signaling in `update.py` + `start.py` (API + Datei)
+- ✓ 45 Tests: 18 Manifest + 22 Updater + 5 Signal-Endpunkt
+
+### Testing & CI
+- ✓ Tests: `pytest.ini`, `conftest.py`, 204 Testfälle (4 Skipped SSE/WS)
+- ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events
+- ✓ API-Fehlertests: Config 404, 500, Event-Validierung
+- ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
+- ✓ Core-Tests: `normalize_config_version()`, EventBus, PluginAPIClient, PluginLauncher
+- ✓ Core-Tests: Validator (44 Tests), Registry Backup, korrupte JSON-Wiederherstellung
+- ✓ Core-Tests: Manifest (18 Tests), Updater (22 Tests), Signal (5 Tests)
+- ✓ Smoke-Tests: 62 Tests für Manifest-Struktur, Content, Discovery-Integration
+- ✓ CI-Workflow: `test.yml` (push/PR auf main)
+- ✓ Produktions-Bugs behoben: `write_config()`-Validierung, `normalize_config_version()`
 
 ### Legacy-Cleanup
 - ✓ `python/registry.py` gelöscht
-- ✓ `PluginLauncher` API-only (kein Legacy-Fallback)
 - ✓ `client.py` ohne Fallback auf Datei-Registry
 - ✓ `--register-only` aus CLI entfernt
-- ✓ Alle Plugin-`main.py`-Imports auf `core.api.client` umgestellt
 - ✓ `get_root_dir()` für beliebige Exe-Tiefen gefixt
 - ✓ `build.py`/`update.py` ohne `registry`/`plugin_updater`
 - ✓ `services.py` ohne `read_plugin_registry()`
 - ✓ `models.py` ohne `ImportLegacyResponse`/`validate_config_dict`
 - ✓ `gui.py` (alt) entfernt
 - ✓ `plugin_updater.py` entfernt (dead code)
+- ✓ Dead Code entfernt: `ErrorResponse`, `WSMessage`
 - ✓ `build.py`/`upload.py` TOOL_VERSION → `v1.0.0`
 
-### Testing & CI
-- ✓ Tests: `pytest.ini`, `conftest.py`, 200 Testfälle (44 Validator + 156 API/Core/Manifest/Updater)
-- ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events
-- ✓ API-Fehlertests: Config 404 (missing), 500 (corrupt), Event-Validierung
-- ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
-- ✓ Core-Tests: `normalize_config_version()`, `ApiService`, `PluginRegistry`, `PluginLauncher`, `load_config()`
-- ✓ Core-Tests: EventBus (15 async), PluginAPIClient (14 HTTP-mocked), PluginLauncher (5 + 3 Bad-Response)
-- ✓ Core-Tests: Validator (44 Tests — Brackets, Colons, Prefixes, Multiplier, File-I/O)
-- ✓ Core-Tests: PluginRegistry Backup-Mechanismus, korrupte JSON-Wiederherstellung
-- ✓ Core-Tests: ApiService Fallback-Pfad, korrupte YAML-Konfig
-- ✓ Core-Tests: PluginManifest (18 Tests — Modell-Validierung, `from_manifest()`, Discovery, Integration)
-- ✓ Core-Tests: PluginUpdateChecker (22 Tests — Version-Extraktion, Remote-Parse, Check-Logik, Endpunkt)
-- ✓ Core-Tests: Signal-Endpunkt (5 Tests — GET/PUT/DELETE /api/v1/updater/signal)
-- ✓ CI-Workflow: `test.yml` (push/PR auf main, `pytest tests/`)
-- ✓ Produktions-Bug behoben: `write_config()` ruft jetzt `_validate_config_schema()` auf
-- ✓ Produktions-Bug behoben: `normalize_config_version()` verarbeitet einstellige Strings (`"7"` → `"0.7"`)
-
-### Security
-- ✓ CORS-Standard von `["*"]` auf `["http://127.0.0.1", "http://localhost"]` geändert
-- ✓ Security-Warning bei `--host 0.0.0.0` in `run.py`
+### Sicherheit (non-blocking Warnings)
+- ✓ CORS-Standard von `["*"]` auf lokale Origins geändert
+- ✓ Security-Warning bei `--host 0.0.0.0` in `run.py` + `start.py`
 - ✓ CORS-Hinweis im API-Startup-Log
+- ✓ RCON-Warnung im Log bei Standard-Passwort `ABC1234`
 
 ### Plugin-Entkopplung
 - ✓ Timer: REST-API (`/start`, `/pause`, `/reset`, `/status`)
-- ✓ Timer: `auto_win: false` (kein automatischer POST an WinCounter)
-- ✓ Timer: `pause_on_death: false` (keine MinecraftServerAPI-Abhängigkeit)
-- ✓ WinCounter: `decrement_on_death: false` (kein automatischer Death-Decrement)
+- ✓ Timer: `auto_win: false`, `pause_on_death: false`
+- ✓ WinCounter: `decrement_on_death: false`
 - ✓ Alle Plugins standalone mit `false`-Defaults
-
-### API-Finalisierung (Production Readiness)
-- ✓ Alle 12 API-Routes haben konsistentes Error-Handling (try/except mit log + HTTPException)
-- ✓ PluginRegistry: Versionierte JSON-Backups (`api_plugin_registry.json.v1.bak`, …)
-- ✓ PluginRegistry: Graceful Recovery bei korrupter JSON-Datei
-- ✓ PluginLauncher: JSONDecodeError + None-plugins-Feld abgesichert
-- ✓ Port-Konstanten-Vereinheitlichung: `DEFAULT_PORT` aus `server.py` importiert
-- ✓ `API_VERSION` in `models.py` zentral definiert (kein Circular Import mehr)
-- ✓ Dead Code entfernt: `ErrorResponse`, `WSMessage` (unused models)
-- ✓ Dead Code entfernt: `import_legacy`-Referenzen aus Registry-Docstring + Plugins-Route
-- ✓ `start.py`: Breitere Exception-Behandlung beim Config-Laden + API-Thread-Fehler-Logging
-- ✓ `PluginUpdateRequest`: level/port-Validierung (ge/le constraints)
 
 ### Konfiguration & Schema
 - ✓ `config_version: 1.0` (semantische Versionierung MAJOR.MINOR)
-- ✓ `normalize_config_version()` in `core/utils.py` (legacy int → `"0.x"`)
+- ✓ `normalize_config_version()` in `core/utils.py`
 - ✓ API normalisiert on Read, upgraded on Write
-- ✓ `update.py` verwendet `packaging.version.parse()` für Cross-Format-Vergleiche
+- ✓ `update.py` verwendet `packaging.version.parse()`
 - ✓ Alle Plugins standardmäßig deaktiviert (opt-in)
-- ✓ Schema-Validierung in der API (Typen, Pflichtfelder, `enabled`-Bool)
-- ✓ Versionierte Config-Backups (`config.yaml.v1.bak`, `.v2.bak`, …)
-- ✓ Warnung bei unbekannten Top-Level-Keys (Tippschutz)
-
-### Plugin-Manifest (plugin.json)
-- ✓ `plugin.json` für alle 8 Plugins (channelpoints, deathcounter, likegoal, overlaytxt, spotify, test, timer, wincounter)
-- ✓ `PluginManifest` Pydantic-Modell mit Validierung (kebab-case name, required entry_point/display_name, semver, ports)
-- ✓ `PluginRegistration.from_manifest()`-Factory für Manifest → Registry-Konvertierung
-- ✓ `PluginLauncher` liest Manifeste statt `.exe`-Scannen (kein Executable-Scan-Code mehr)
-- ✓ Discovery deterministisch und testbar vor Plugin-Execution
-- ✓ `update_url`-Feld für Plugin-Update-Prüfung
-- ✓ Zentrales Registrieren über `POST /api/v1/plugins/register`
-
-### Update-System (API-Integration)
-- ✓ `PluginUpdateChecker`-Service: Versionsvergleich über `update_url`, API-Endpunkt-Abfrage, Installationsroutine
-- ✓ `GET /api/v1/plugins/updates`-Endpunkt mit `PluginUpdatesResponse`/`PluginUpdateStatus`-Modellen
-- ✓ API-Kill-Signal-Endpunkte (`GET/PUT/DELETE /api/v1/updater/signal`) als Ersatz für `update_signal.tmp`
-- ✓ Plugin-Update-Check in `start.py`-Startup (loggt verfügbare Updates nach API-Health-Poll)
-- ✓ Duales Signaling in `update.py` (API + Datei) und `start.py` (API + Datei-Polling)
-- ✓ Route-Ordering gefixt: `/plugins/updates` vor `/plugins/{name}` (Path-Parameter-Capture verhindert)
-- ✓ 45 neue Tests: 18 Manifest + 22 Updater + 5 Signal-Endpunkt
+- ✓ Schema-Validierung in der API
+- ✓ Versionierte Config-Backups
+- ✓ Warnung bei unbekannten Top-Level-Keys
 
 ---
 
-## ❌ Noch offen (nach Priorität)
+## 🔜 Für v1.0.0
 
-### 1. Kritisch — Testing & Stabilität
+### 1. API-Erweiterungen (Hoch)
+> Grundlegende Steuerbarkeit ohne GUI — einfache Ein-/Ausschalter und Discovery.
 
-> 200 Tests passen, 4 Skipped (SSE/WS-Streaming-Limit mit TestClient).
-> Manifest-Discovery und Update-Checker sind getestet und stabil.
+- [ ] **Enable/Disable-Endpunkte** — `POST /api/v1/plugins/{name}/enable` und `POST /api/v1/plugins/{name}/disable`
+  - Klare, idempotente API statt generischem PUT mit voller Config.
+  - Einfach: delegiert an `registry.update(name, enabled=True/False)`.
+- [ ] **Plugin-Discovery-Endpunkt** — `GET /api/v1/plugins/discover`
+  - Scannt `src/plugins/*/plugin.json`, listet verfügbare Plugins, ohne sie zu registrieren.
+  - Ermöglicht CLI/Tools die Plugin-Erkennung vor Registrierung.
+- [ ] **Tool-Update-Prüfung** — `GET /api/v1/updates/check`
+  - Prüft das Haupt-Repo (`TechnikLey/Tiktok2Mc`) auf neue Releases.
+  - Liefert `tag_name`, `version`, `release_url`, `published_at`.
 
-- [ ] **Hoch** — SSE/WS-Integrationstests stabilisieren
-  - SSE-Stream-Read mit Timeout und explizitem Close.
-  - **Blockiert durch:** TestClient unterstützt Streaming nur begrenzt.
-
-- [ ] **Hoch** — Plugin-Smoke-Tests
-  - Jedes Plugin als Subprozess starten, manifest-basierte Discovery validieren, API-Responses prüfen.
-  - **Status:** Manifest-System ist implementiert und getestet — Smoke-Tests sind jetzt unblocked.
-
-### 2. Kritisch — Update-System (Integration)
-
+### 2. Update-Pfad testen (Hoch)
 > `PluginUpdateChecker` und API-Signal-Endpunkte sind implementiert.
-> Der alte dateibasierte Pfad (`update_signal.tmp`) existiert noch als Fallback
-> für das kompilierte `update.exe`. Nächste Schritte:
 
-- [ ] **Hoch** — Update-Pfad v1.0.0 → v1.0.1 testen
+- [ ] **End-to-End-Update-Test** v1.0.0 → v1.0.1
   - Config-Whitelist, Version-Check, Signal-Handling (Datei + API).
   - Prüfen ob compiled `update.exe` noch file-basiertes Signaling verwendet.
 
-### 3. Kritisch — Sicherheit
+### 3. Dokumentation (Hoch)
+> Aktuelle README/GUIDE reflektieren noch v0.x-Architektur.
 
-> Die API steuert Minecraft-Server und RCON. Lokaler Zugriff
-> reicht fürs erste, aber absichern muss sein.
+- [ ] **README.md für v1.0.0 aktualisieren**
+- [ ] **GUIDE.md für v1.0.0 aktualisieren**
+- [ ] **CHANGELOG für v1.0.0 finalisieren**
 
-- [ ] **Kritisch** — API-Authentifizierung
+---
+
+## 🔮 Post-v1.0.0
+
+### Sicherheit (Mittel)
+> API läuft standardmäßig auf localhost. Authentifizierung ist erst
+> bei Netzwerk-Exposition nötig.
+
+- [ ] **Mittel** — API-Authentifizierung (API-Key)
   - Localhost-Binding (bereits Default) + optionaler API-Key.
-  - **Warum:** `server_host: 0.0.0.0` exponiert die API ins Netzwerk.
+  - Wichtig bei `server_host: 0.0.0.0`, kein Release-Blocker.
+- [ ] **Niedrig** — Spotify `client_secret`-Validierung
 
-- [ ] **Kritisch** — RCON-Passwort-Warnung prominent
-  - Warnung im Log beim Start, wenn Standard-Password `ABC1234` gesetzt ist.
-
-- [ ] **Hoch** — `server_host: 0.0.0.0`-Sicherheitshinweis
-- [ ] **Hoch** — Spotify `client_secret`-Validierung
-
-### 4. Hoch — Port-Konsolidierung & EventBus
-
+### Port-Konsolidierung & EventBus (Mittel)
 > Plugins laufen noch als eigene Flask-Prozesse auf 7 Ports.
-> Ziel: Plugin-Kommunikation über die API routen, Ports reduzieren.
 
-- [ ] **Hoch** — Plugin-Kommunikation über API zentralisieren
-  - Timer → WinCounter nicht per Direkt-HTTP, sondern über API-Proxy.
-  - REST/EventBus als Vermittler zwischen Plugins.
-  - **Warum:** Reduziert Port-Konflikte, entkoppelt Plugins.
+- [ ] **Mittel** — Plugin-Kommunikation über API zentralisieren
+- [ ] **Mittel** — EventBus in Plugin-Kommunikation einbinden
+- [ ] **Mittel** — Port-Manager (Port-Nutzung reduzieren)
 
-- [ ] **Hoch** — EventBus in Plugin-Kommunikation einbinden
-  - EventBus (async pub/sub) existiert, wird aber nur von der API selbst genutzt.
-  - Plugins sollen Events publizieren/abonnieren können (z.B. `timer.expired`).
+### GUI (Mittel)
+> GUI ist ein eigenes Projekt. Setzt stabile API voraus.
 
-- [ ] **Hoch** — Port-Manager (Port-Nutzung reduzieren)
-  - Aktuell: 1 API + 7 Plugin + Minecraft + RCON = 10+ Ports.
-  - Ziel: API als Router, Ausnahme Minecraft (25565), RCON (25575), API (29185).
-
-### 5. Hoch — API-Erweiterungen
-
-> Einige wichtige API-Funktionen fehlen noch für die volle
-> Steuerbarkeit ohne laufende GUI oder manuelle Konfiguration.
-
-- [ ] **Hoch** — API-Endpunkt für Plugin-Suche (offline)
-  - `GET /api/v1/plugins/discover` — Scannt `src/plugins/*/plugin.json`
-    und listet verfügbare Plugins auf, **ohne** sie zu registrieren.
-  - Ermöglicht CLI/Tools die Plugin-Erkennung, ohne dass der Launcher
-    oder die App gestartet sein muss.
-  - **Warum:** Ein externer Updater/Manager muss wissen, welche Plugins
-    installiert sind, bevor er sie aktiviert oder aktualisiert.
-
-- [ ] **Hoch** — API-Endpunkt für Tool-Update-Suche
-  - `GET /api/v1/updates/check` — Prüft das Haupt-Repo
-    (`TechnikLey/Tiktok2Mc`) auf neue Releases.
-  - Liefert `tag_name`, `version`, `release_url`, `published_at`.
-  - Unabhängig von den Plugin-`update_url`s (die nur Plugin-Updates prüfen).
-  - **Warum:** Bisher läuft die Update-Prüfung nur im compiled
-    `update.exe`. Ein API-Endpunkt erlaubt der GUI/CLI den Zugriff
-    ohne separaten Prozess.
-
-- [ ] **Hoch** — API-Endpunkt zum Aktivieren/Deaktivieren von Plugins
-  - `POST /api/v1/plugins/{name}/enable` — Setzt `enabled: true`
-  - `POST /api/v1/plugins/{name}/disable` — Setzt `enabled: false`
-  - Alternativ: `PATCH /api/v1/plugins/{name}/state` mit `{"enabled": bool}`
-  - Klarer und idempotenter als das generische `PUT /plugins/{name}`.
-  - **Warum:** Ein Plugin-Manager (GUI/CLI) braucht einfache
-    Ein-/Ausschalter ohne die restliche Plugin-Konfiguration mitzuschicken.
-
-### 7. Mittel — GUI (frühestens nach stabiler API)
-
-> GUI ist ein eigenes Projekt. Setzt stabile API, Plugin-Manifeste und
-> Config-Validierung voraus. Manifeste sind jetzt implementiert.
-> Kein v1.0.0-Blocker.
-
-- [ ] **Mittel** — Tech-Stack festlegen
-  - Tauri, Electron, pywebview — Entscheidung nach API-Stabilität.
-  - Bundle-Größe, Wartbarkeit, Update-Fähigkeit.
-
+- [ ] **Mittel** — Tech-Stack festlegen (Tauri, Electron, pywebview)
 - [ ] **Mittel** — First-Run-Setup-Wizard
 - [ ] **Mittel** — Config-Editor (Formular)
 - [ ] **Mittel** — Actions-Editor (.mca)
@@ -211,19 +147,13 @@
 - [ ] **Niedrig** — Overlay-Vorschau + Theme-Editor
 - [ ] **Niedrig** — Minecraft-Server-Console (RCON)
 
-### 8. Niedrig — Build & Deployment
-
+### Build & Deployment (Niedrig)
 - [ ] **Niedrig** — Totmodule identifizieren
-  - Welche Teile von `start.py`, `main.py`, `server.py` werden durch die API abgelöst?
-- [ ] **Niedrig** — Hinweistext für v0.x-User (keine Migration)
+- [ ] **Niedrig** — Hinweistext für v0.x-User
 - [ ] **Niedrig** — `version.txt` automatisch prüfen
-- [ ] **Niedrig** — Mindestanforderungen dokumentieren (Python 3.12+, RAM, Java)
+- [ ] **Niedrig** — Mindestanforderungen dokumentieren
 - [ ] **Niedrig** — Rollback-Mechanismus dokumentieren
 - [ ] **Niedrig** — Troubleshooting-Sektion erweitern
 
-### 9. Niedrig — Dokumentation (nach Feature-Freeze)
-
-- [ ] **Niedrig** — README.md + GUIDE.md für v1.0.0
-- [ ] **Niedrig** — Entwicklerdokumentation (dev-book EN+DE)
-- [ ] **Niedrig** — CHANGELOG für v1.0.0
-- [ ] **Niedrig** — API-Dokumentation (OpenAPI/Swagger)
+### Testing (Niedrig)
+- [ ] **Niedrig** — SSE/WS-Integrationstests stabilisieren (blockiert durch TestClient)

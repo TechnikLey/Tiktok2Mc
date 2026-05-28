@@ -109,3 +109,47 @@ class TestPluginEndpoints:
         resp = client.post("/api/v1/plugins/register", json=p2)
         assert resp.status_code == 201
         assert resp.json()["plugin"]["version"] == "2.0.0"
+
+    def test_enable_plugin(self, client):
+        p = dict(self.PLUGIN)
+        p["enabled"] = False
+        client.post("/api/v1/plugins/register", json=p)
+        resp = client.post("/api/v1/plugins/test-plugin/enable")
+        assert resp.status_code == 200
+        assert resp.json()["enabled"] is True
+
+    def test_disable_plugin(self, client):
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.post("/api/v1/plugins/test-plugin/disable")
+        assert resp.status_code == 200
+        assert resp.json()["enabled"] is False
+
+    def test_enable_plugin_not_found(self, client):
+        resp = client.post("/api/v1/plugins/nonexistent/enable")
+        assert resp.status_code == 404
+
+    def test_disable_plugin_not_found(self, client):
+        resp = client.post("/api/v1/plugins/nonexistent/disable")
+        assert resp.status_code == 404
+
+    def test_enable_disable_cycle(self, client):
+        p = dict(self.PLUGIN)
+        p["enabled"] = False
+        client.post("/api/v1/plugins/register", json=p)
+
+        resp = client.post("/api/v1/plugins/test-plugin/enable")
+        assert resp.json()["enabled"] is True
+
+        resp = client.post("/api/v1/plugins/test-plugin/disable")
+        assert resp.json()["enabled"] is False
+
+        resp = client.post("/api/v1/plugins/test-plugin/enable")
+        assert resp.json()["enabled"] is True
+
+    def test_enable_twice_is_idempotent(self, client):
+        p = dict(self.PLUGIN)
+        p["enabled"] = True
+        client.post("/api/v1/plugins/register", json=p)
+        resp = client.post("/api/v1/plugins/test-plugin/enable")
+        assert resp.status_code == 200
+        assert resp.json()["enabled"] is True
