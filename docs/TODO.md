@@ -40,12 +40,14 @@
 - ✓ API-Kill-Signal-Endpunkte (`GET/PUT/DELETE /api/v1/updater/signal`)
 - ✓ Plugin-Update-Check in `start.py`-Startup
 - ✓ Duales Signaling in `update.py` + `start.py` (API + Datei)
-- ✓ 45 Tests: 18 Manifest + 22 Updater + 5 Signal-Endpunkt
+- ✓ Tool-Update-Prüfung — `GET /api/v1/updates/check` (GitHub Releases API)
+- ✓ 56 Tests: 18 Manifest + 22 Updater + 5 Signal + 11 Tool-Update
 
 ### Testing & CI
-- ✓ Tests: `pytest.ini`, `conftest.py`, 274 Testfälle (4 Skipped SSE/WS)
+- ✓ Tests: `pytest.ini`, `conftest.py`, 285 Testfälle (4 Skipped SSE/WS)
 - ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events, Discovery
 - ✓ Discovery-Tests: 6 Tests — Vollständigkeit, Registry-Merge, leeres Verzeichnis, Determinismus, kein Seiteneffekt
+- ✓ Tool-Update-Tests: 11 Tests — API-Endpunkt + Direktaufruf mit gemocktem GitHub
 - ✓ API-Fehlertests: Config 404, 500, Event-Validierung
 - ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
 - ✓ Core-Tests: `normalize_config_version()`, EventBus, PluginAPIClient, PluginLauncher
@@ -94,19 +96,14 @@
 
 ## 🔜 Für v1.0.0
 
-### 1. Tool-Update-Prüfung (Hoch)
-- [ ] **Tool-Update-Prüfung** — `GET /api/v1/updates/check`
-  - Prüft das Haupt-Repo (`TechnikLey/Tiktok2Mc`) auf neue Releases.
-  - Liefert `tag_name`, `version`, `release_url`, `published_at`.
-
-### 2. Update-Pfad testen (Hoch)
+### 1. Update-Pfad testen (Hoch)
 > `PluginUpdateChecker` und API-Signal-Endpunkte sind implementiert.
 
 - [ ] **End-to-End-Update-Test** v1.0.0 → v1.0.1
   - Config-Whitelist, Version-Check, Signal-Handling (Datei + API).
   - Prüfen ob compiled `update.exe` noch file-basiertes Signaling verwendet.
 
-### 3. Dokumentation (Hoch)
+### 2. Dokumentation (Hoch)
 > Aktuelle README/GUIDE reflektieren noch v0.x-Architektur.
 
 - [ ] **README.md für v1.0.0 aktualisieren**

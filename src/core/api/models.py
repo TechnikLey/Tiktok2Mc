@@ -202,6 +202,17 @@ class PluginUpdatesResponse(BaseModel):
 # ── Config models ────────────────────────────────────────────────────
 
 
+class ToolUpdateCheckResponse(BaseModel):
+    """Response for ``GET /api/v1/updates/check``."""
+
+    current_version: str
+    latest_version: str | None = None
+    update_available: bool = False
+    release_url: str = ""
+    published_at: str = ""
+    error: str | None = None
+
+
 class ConfigResponse(BaseModel):
     path: str
     config: dict[str, Any]

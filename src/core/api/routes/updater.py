@@ -1,13 +1,17 @@
-"""Updater signal endpoints.
+"""Updater signal endpoints + tool update check.
 
 Provides a simple in-memory kill signal mechanism so the updater
 process can request that ``start.py`` shut down (for file replacement
 during updates) without relying solely on a temp file.
+Also provides ``GET /updates/check`` for tool version checking.
 """
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+
+from core.api.models import API_VERSION, ToolUpdateCheckResponse
+from core.api.updater import check_tool_update
 
 log = logging.getLogger(__name__)
 
@@ -36,3 +40,21 @@ async def clear_signal():
     global _kill_signal
     _kill_signal = None
     return {"signal": None}
+
+
+# ── Tool update check ────────────────────────────────────────────────
+
+
+@router.get("/updates/check", response_model=ToolUpdateCheckResponse)
+async def tool_update_check():
+    """Check the main repo for a newer tool release.
+
+    Queries ``TechnikLey/Tiktok2Mc`` via the GitHub Releases API
+    and compares the latest tag with the current ``API_VERSION``.
+    """
+    try:
+        result = check_tool_update(API_VERSION)
+        return ToolUpdateCheckResponse(**result)
+    except Exception as e:
+        log.exception("Failed to check tool updates")
+        raise HTTPException(status_code=500, detail=str(e))

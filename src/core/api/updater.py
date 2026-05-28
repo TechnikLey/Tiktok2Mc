@@ -105,6 +105,64 @@ def _download_update(url: str, target: Path) -> bool:
         return False
 
 
+# ── Tool update check ─────────────────────────────────────────────────
+
+_GITHUB_REPO = "TechnikLey/Tiktok2Mc"
+_TOOL_API_URL = f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest"
+
+
+def check_tool_update(current_version: str) -> dict[str, Any]:
+    """Check the main GitHub repo for a newer tool release.
+
+    ``current_version`` should be a semver string like ``"1.0.0"``.
+    GitHub tags (``v1.0.0``) are stripped of the leading ``v`` for
+    comparison.
+
+    Returns a dict with keys matching ``ToolUpdateCheckResponse``.
+    """
+    from core.api.models import API_VERSION
+
+    result: dict[str, Any] = {
+        "current_version": current_version,
+        "latest_version": None,
+        "update_available": False,
+        "release_url": "",
+        "published_at": "",
+        "error": None,
+    }
+
+    headers = {
+        "User-Agent": _USER_AGENT,
+        "Accept": "application/vnd.github+json",
+    }
+    req = urllib.request.Request(_TOOL_API_URL, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+            release = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        result["error"] = str(exc)
+        return result
+
+    tag_name = release.get("tag_name", "")
+    latest = _extract_version(tag_name)
+    if not latest:
+        result["error"] = "Could not extract version from release tag"
+        return result
+
+    result["latest_version"] = latest
+    result["release_url"] = release.get("html_url", "")
+    result["published_at"] = release.get("published_at", "")
+
+    try:
+        result["update_available"] = (
+            version_parse.parse(latest) > version_parse.parse(current_version)
+        )
+    except Exception as exc:
+        result["error"] = f"Version comparison failed: {exc}"
+
+    return result
+
+
 class PluginUpdateChecker:
     """Check and report plugin update status.
 
