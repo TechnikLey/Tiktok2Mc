@@ -1,9 +1,9 @@
 config_version: 1.0
 
 # =============================================================================
-#  TIKTOK2MC — CONFIGURATION FILE
+#  TIKTOK2MC — CONFIGURATION FILE (v1.0.0)
 # =============================================================================
-# This is the main configuration file for the TikTok-to-Minecraft tool.
+# This is the main configuration file for TikTok2Mc.
 # Every option is explained below. Read through it carefully before your
 # first stream.
 #
@@ -22,6 +22,8 @@ config_version: 1.0
 #         - item2
 #   - For empty lists, use:  list_name: []
 #   - Lines starting with # are comments and are ignored
+#
+# For detailed explanations of all sections, see docs/GUIDE.md.
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -48,6 +50,9 @@ show_sudo_warning: true
 #   "127.0.0.1"  — Local access only (default, safe)
 #   "0.0.0.0"    — Allow access from other devices on your network
 #   "<IP>"       — Bind to a specific network interface
+#
+# The central API server always runs on port 29185.
+# Interactive API documentation: http://localhost:29185/docs
 server_host: "127.0.0.1"
 
 # ---------------------------------------------------------------------------
@@ -68,6 +73,7 @@ control_method: DCS
 #  AUTO-SHUTDOWN
 # ---------------------------------------------------------------------------
 # When enabled, the tool shuts down automatically after your live stream ends.
+# A countdown gives you time to cancel (type 'stop' in the console).
 shutdown:
   enabled: true
   delay_seconds: 30
@@ -427,8 +433,9 @@ win_counter:
   decrement_on_death: false  # Disabled by default — standalone win tracking
 
 # --- WEB DASHBOARD (GUI) ---
-# A web-based gift browser and server dashboard.
-# Enable this to search gift IDs visually in a browser window.
+# Reserved for the future graphical user interface (post-v1.0.0).
+# Port 29185 is currently used by the central API server.
+# This section will be activated when the GUI is implemented.
 gui:
   enabled: false
   port: 29185
@@ -554,6 +561,8 @@ theme:
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.
+# You can also check for updates manually via the API:
+#   GET http://localhost:29185/api/v1/updates/check
 update:
   enabled: true
 
