@@ -17,6 +17,8 @@
 - ✓ `API_VERSION` in `models.py` zentral definiert (kein Circular Import mehr)
 - ✓ Route-Ordering gefixt: `/plugins/updates` vor `/plugins/{name}`
 - ✓ `start.py`: Breitere Exception-Behandlung beim Config-Laden + API-Thread-Fehler-Logging
+- ✓ Enable/Disable-Endpunkte — `POST /api/v1/plugins/{name}/enable|disable`
+- ✓ Plugin-Discovery-Endpunkt — `GET /api/v1/plugins/discover` (read-only, kein Registry-Seiteneffekt)
 
 ### Plugin-Manifest (plugin.json)
 - ✓ `plugin.json` für alle 8 Plugins
@@ -28,6 +30,10 @@
 - ✓ Zentrales Registrieren über `POST /api/v1/plugins/register`
 - ✓ Plugin-Self-Registration aus allen `main.py` entfernt
 
+### Discovery-Service
+- ✓ `core/api/services/plugin_discovery.py` — reiner Dateisystem-Scanner, kein Registry-Import
+- ✓ `services.py` in Package `services/` umgewandelt (abwärtskompatibel)
+
 ### Update-System
 - ✓ `PluginUpdateChecker`-Service: Versionsvergleich über `update_url`
 - ✓ `GET /api/v1/plugins/updates`-Endpunkt
@@ -37,8 +43,9 @@
 - ✓ 45 Tests: 18 Manifest + 22 Updater + 5 Signal-Endpunkt
 
 ### Testing & CI
-- ✓ Tests: `pytest.ini`, `conftest.py`, 204 Testfälle (4 Skipped SSE/WS)
-- ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events
+- ✓ Tests: `pytest.ini`, `conftest.py`, 274 Testfälle (4 Skipped SSE/WS)
+- ✓ API-Integrationstests: Health, Config CRUD, Plugins CRUD, Events, Discovery
+- ✓ Discovery-Tests: 6 Tests — Vollständigkeit, Registry-Merge, leeres Verzeichnis, Determinismus, kein Seiteneffekt
 - ✓ API-Fehlertests: Config 404, 500, Event-Validierung
 - ✓ API-Validierung: Plugin-Felder (level, port, name) werden korrekt abgewiesen (422)
 - ✓ Core-Tests: `normalize_config_version()`, EventBus, PluginAPIClient, PluginLauncher
@@ -87,15 +94,7 @@
 
 ## 🔜 Für v1.0.0
 
-### 1. API-Erweiterungen (Hoch)
-> Grundlegende Steuerbarkeit ohne GUI — einfache Ein-/Ausschalter und Discovery.
-
-- [ ] **Enable/Disable-Endpunkte** — `POST /api/v1/plugins/{name}/enable` und `POST /api/v1/plugins/{name}/disable`
-  - Klare, idempotente API statt generischem PUT mit voller Config.
-  - Einfach: delegiert an `registry.update(name, enabled=True/False)`.
-- [ ] **Plugin-Discovery-Endpunkt** — `GET /api/v1/plugins/discover`
-  - Scannt `src/plugins/*/plugin.json`, listet verfügbare Plugins, ohne sie zu registrieren.
-  - Ermöglicht CLI/Tools die Plugin-Erkennung vor Registrierung.
+### 1. Tool-Update-Prüfung (Hoch)
 - [ ] **Tool-Update-Prüfung** — `GET /api/v1/updates/check`
   - Prüft das Haupt-Repo (`TechnikLey/Tiktok2Mc`) auf neue Releases.
   - Liefert `tag_name`, `version`, `release_url`, `published_at`.
