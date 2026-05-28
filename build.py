@@ -149,6 +149,25 @@ def main():
                     h.update(chunk)
             return h.hexdigest()
 
+        def compute_core_hash():
+            """Compute a combined SHA256 of all src/core/**/*.py files.
+            If any core module changes, all dependent executables must rebuild."""
+            h = hashlib.sha256()
+            core_dir = SCRIPT_DIR / "src" / "core"
+            if core_dir.exists():
+                files = sorted(core_dir.rglob("*.py"))
+                for f in files:
+                    h.update(f.read_bytes())
+            return h.hexdigest()
+
+        core_hash = compute_core_hash()
+        core_hash_file = HASH_CACHE_DIR / "core.sha256"
+        core_hash_changed = True
+        if core_hash_file.exists():
+            if core_hash_file.read_text().strip() == core_hash:
+                core_hash_changed = False
+        core_hash_file.write_text(core_hash)
+
         def build_one(item):
             full_src = Path(item["src"]).resolve()
 
@@ -160,7 +179,7 @@ def main():
             current_hash = sha256_file(full_src)
             need_build = True
 
-            if hash_file.exists() and cache_exe.exists():
+            if hash_file.exists() and cache_exe.exists() and not core_hash_changed:
                 if hash_file.read_text().strip() == current_hash:
                     need_build = False
 
