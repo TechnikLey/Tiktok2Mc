@@ -162,7 +162,37 @@
   - Aktuell: 1 API + 7 Plugin + Minecraft + RCON = 10+ Ports.
   - Ziel: API als Router, Ausnahme Minecraft (25565), RCON (25575), API (29185).
 
-### 5. Mittel — GUI (frühestens nach stabiler API)
+### 5. Hoch — API-Erweiterungen
+
+> Einige wichtige API-Funktionen fehlen noch für die volle
+> Steuerbarkeit ohne laufende GUI oder manuelle Konfiguration.
+
+- [ ] **Hoch** — API-Endpunkt für Plugin-Suche (offline)
+  - `GET /api/v1/plugins/discover` — Scannt `src/plugins/*/plugin.json`
+    und listet verfügbare Plugins auf, **ohne** sie zu registrieren.
+  - Ermöglicht CLI/Tools die Plugin-Erkennung, ohne dass der Launcher
+    oder die App gestartet sein muss.
+  - **Warum:** Ein externer Updater/Manager muss wissen, welche Plugins
+    installiert sind, bevor er sie aktiviert oder aktualisiert.
+
+- [ ] **Hoch** — API-Endpunkt für Tool-Update-Suche
+  - `GET /api/v1/updates/check` — Prüft das Haupt-Repo
+    (`TechnikLey/Tiktok2Mc`) auf neue Releases.
+  - Liefert `tag_name`, `version`, `release_url`, `published_at`.
+  - Unabhängig von den Plugin-`update_url`s (die nur Plugin-Updates prüfen).
+  - **Warum:** Bisher läuft die Update-Prüfung nur im compiled
+    `update.exe`. Ein API-Endpunkt erlaubt der GUI/CLI den Zugriff
+    ohne separaten Prozess.
+
+- [ ] **Hoch** — API-Endpunkt zum Aktivieren/Deaktivieren von Plugins
+  - `POST /api/v1/plugins/{name}/enable` — Setzt `enabled: true`
+  - `POST /api/v1/plugins/{name}/disable` — Setzt `enabled: false`
+  - Alternativ: `PATCH /api/v1/plugins/{name}/state` mit `{"enabled": bool}`
+  - Klarer und idempotenter als das generische `PUT /plugins/{name}`.
+  - **Warum:** Ein Plugin-Manager (GUI/CLI) braucht einfache
+    Ein-/Ausschalter ohne die restliche Plugin-Konfiguration mitzuschicken.
+
+### 7. Mittel — GUI (frühestens nach stabiler API)
 
 > GUI ist ein eigenes Projekt. Setzt stabile API, Plugin-Manifeste und
 > Config-Validierung voraus. Manifeste sind jetzt implementiert.
@@ -181,7 +211,7 @@
 - [ ] **Niedrig** — Overlay-Vorschau + Theme-Editor
 - [ ] **Niedrig** — Minecraft-Server-Console (RCON)
 
-### 6. Niedrig — Build & Deployment
+### 8. Niedrig — Build & Deployment
 
 - [ ] **Niedrig** — Totmodule identifizieren
   - Welche Teile von `start.py`, `main.py`, `server.py` werden durch die API abgelöst?
@@ -191,7 +221,7 @@
 - [ ] **Niedrig** — Rollback-Mechanismus dokumentieren
 - [ ] **Niedrig** — Troubleshooting-Sektion erweitern
 
-### 7. Niedrig — Dokumentation (nach Feature-Freeze)
+### 9. Niedrig — Dokumentation (nach Feature-Freeze)
 
 - [ ] **Niedrig** — README.md + GUIDE.md für v1.0.0
 - [ ] **Niedrig** — Entwicklerdokumentation (dev-book EN+DE)
