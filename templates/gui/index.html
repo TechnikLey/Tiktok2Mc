@@ -167,6 +167,28 @@
         .btn-secondary { background: var(--border); color: var(--text); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+        .inline-error {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin-top: 0.3rem;
+            display: none;
+        }
+        .inline-error.visible { display: block; }
+        input.invalid { border-color: var(--danger) !important; }
+        .strength-meter {
+            display: flex; gap: 4px; margin-top: 0.4rem;
+        }
+        .strength-segment {
+            flex: 1; height: 4px; border-radius: 2px; background: var(--border);
+            transition: background 0.2s;
+        }
+        .strength-segment.weak { background: var(--danger); }
+        .strength-segment.medium { background: var(--accent-hover); }
+        .strength-segment.strong { background: var(--success); }
+        .strength-label {
+            font-size: 0.75rem; margin-top: 0.3rem; color: var(--muted);
+        }
+
         /* Overlay URLs */
         .url-row {
             display: flex; align-items: center; gap: 0.6rem;
@@ -476,6 +498,7 @@
                         <div class="form-group">
                             <label>TikTok Username (without @)</label>
                             <input type="text" id="w-tiktok-user" value="${escapeHtml(wizardData.tiktok_user)}" placeholder="your_tiktok_username">
+                            <div class="inline-error" id="err-tiktok-user">Please enter a valid TikTok username.</div>
                             <div class="hint">The username you use when going live on TikTok.</div>
                         </div>
                     `;
@@ -485,10 +508,19 @@
                         <p class="muted" style="margin-bottom:1.5rem;">Set a secure password for the Minecraft RCON connection. This is required.</p>
                         <div class="form-group">
                             <label>RCON Password</label>
-                            <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Required">
-                            <div class="hint">Anyone with this password can control your Minecraft server. Choose something secure.</div>
+                            <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Required" oninput="updatePasswordMeter()">
+                            <div class="inline-error" id="err-rcon-password">Please fix the password issues above.</div>
+                            <div class="strength-meter">
+                                <div class="strength-segment"></div>
+                                <div class="strength-segment"></div>
+                                <div class="strength-segment"></div>
+                            </div>
+                            <div class="strength-label" id="strength-label">Enter a password to see strength</div>
+                            <div class="hint">Must be at least 8 characters with uppercase, lowercase, number and special character.</div>
                         </div>
                     `;
+                    // Initialize meter if password is pre-filled
+                    setTimeout(updatePasswordMeter, 0);
                     break;
                 case 2:
                     const enabledCount = currentPlugins.filter(p => p.enabled).length;
@@ -506,14 +538,71 @@
             }
         }
 
+        function validatePassword(pass) {
+            const issues = [];
+            if (pass.length < 8) issues.push('At least 8 characters');
+            if (!/[A-Z]/.test(pass)) issues.push('One uppercase letter (A-Z)');
+            if (!/[a-z]/.test(pass)) issues.push('One lowercase letter (a-z)');
+            if (!/[0-9]/.test(pass)) issues.push('One number (0-9)');
+            if (!/[^A-Za-z0-9]/.test(pass)) issues.push('One special character (!@#$ etc.)');
+            return issues;
+        }
+
+        function getPasswordStrength(pass) {
+            let score = 0;
+            if (pass.length >= 8) score++;
+            if (pass.length >= 12) score++;
+            if (/[A-Z]/.test(pass)) score++;
+            if (/[a-z]/.test(pass)) score++;
+            if (/[0-9]/.test(pass)) score++;
+            if (/[^A-Za-z0-9]/.test(pass)) score++;
+            if (score <= 2) return 'weak';
+            if (score <= 4) return 'medium';
+            return 'strong';
+        }
+
+        function updatePasswordMeter() {
+            const pass = document.getElementById('w-rcon-password').value;
+            const strength = getPasswordStrength(pass);
+            const segments = document.querySelectorAll('.strength-segment');
+            const label = document.getElementById('strength-label');
+            segments.forEach(s => s.className = 'strength-segment');
+            if (pass.length > 0) {
+                if (strength === 'weak') { segments[0].classList.add('weak'); label.textContent = 'Weak'; label.style.color = 'var(--danger)'; }
+                else if (strength === 'medium') { segments[0].classList.add('medium'); segments[1].classList.add('medium'); label.textContent = 'Medium'; label.style.color = 'var(--accent-hover)'; }
+                else { segments[0].classList.add('strong'); segments[1].classList.add('strong'); segments[2].classList.add('strong'); label.textContent = 'Strong'; label.style.color = 'var(--success)'; }
+            } else {
+                label.textContent = 'Enter a password to see strength';
+                label.style.color = 'var(--muted)';
+            }
+        }
+
         async function wizardNext() {
+            // Clear previous errors
+            document.querySelectorAll('.inline-error').forEach(el => el.classList.remove('visible'));
+            document.querySelectorAll('input').forEach(el => el.classList.remove('invalid'));
+
             if (wizardStep === 0) {
-                const user = document.getElementById('w-tiktok-user').value.trim();
-                if (!user) { alert('Please enter your TikTok username.'); return; }
+                const userInput = document.getElementById('w-tiktok-user');
+                const user = userInput.value.trim();
+                const err = document.getElementById('err-tiktok-user');
+                if (!user || user.toLowerCase() === 'your_tiktok_username') {
+                    userInput.classList.add('invalid');
+                    err.classList.add('visible');
+                    return;
+                }
                 wizardData.tiktok_user = user;
             } else if (wizardStep === 1) {
-                const pass = document.getElementById('w-rcon-password').value;
-                if (!pass) { alert('Please set an RCON password.'); return; }
+                const passInput = document.getElementById('w-rcon-password');
+                const pass = passInput.value;
+                const err = document.getElementById('err-rcon-password');
+                const issues = validatePassword(pass);
+                if (issues.length > 0) {
+                    passInput.classList.add('invalid');
+                    err.innerHTML = issues.map(i => '• ' + i).join('<br>');
+                    err.classList.add('visible');
+                    return;
+                }
                 wizardData.rcon_password = pass;
             }
 
