@@ -70,7 +70,11 @@ def create_app(
     app.include_router(api_router)
 
     # Serve the central GUI dashboard at /gui
-    gui_dir = get_root_dir() / "core" / "templates" / "gui"
+    # Release layout: core/templates/gui/   Dev layout: templates/gui/
+    root = get_root_dir()
+    gui_dir = root / "core" / "templates" / "gui"
+    if not gui_dir.exists():
+        gui_dir = root / "templates" / "gui"
     if gui_dir.exists():
         app.mount(
             "/gui",

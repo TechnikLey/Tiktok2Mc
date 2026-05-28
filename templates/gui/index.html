@@ -16,6 +16,7 @@
             --accent-hover: #ffc107;
             --danger: #ff4d4d;
             --success: #4caf50;
+            --info: #2196f3;
         }
         * { box-sizing: border-box; }
         body {
@@ -111,6 +112,97 @@
         .log-info { color: var(--text); }
         .log-warn { color: var(--accent-hover); }
         .log-err { color: var(--danger); }
+
+        /* Wizard */
+        .wizard-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .wizard-card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 2rem; width: 100%; max-width: 560px;
+        }
+        .wizard-card h2 { margin-top: 0; border-left: 3px solid var(--accent); padding-left: 0.6rem; }
+        .wizard-steps { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .step-dot {
+            flex: 1; height: 4px; border-radius: 2px; background: var(--border);
+        }
+        .step-dot.active { background: var(--accent); }
+        .step-dot.done { background: var(--success); }
+
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label {
+            display: block; margin-bottom: 0.4rem;
+            color: var(--muted); font-size: 0.9rem; font-weight: 500;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"] {
+            width: 100%; padding: 0.7rem 0.9rem;
+            background: var(--input-bg); border: 1px solid var(--border);
+            color: var(--text); border-radius: 6px; font-size: 0.95rem;
+            outline: none; transition: border-color 0.2s;
+        }
+        .form-group input:focus { border-color: var(--accent); }
+        .form-group .hint {
+            margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted);
+        }
+        .warning-box {
+            background: rgba(255,77,77,0.1); border-left: 3px solid var(--danger);
+            padding: 0.8rem 1rem; border-radius: 0 6px 6px 0;
+            margin-bottom: 1rem; font-size: 0.9rem;
+        }
+
+        .wizard-actions {
+            display: flex; justify-content: space-between; margin-top: 1.5rem;
+        }
+        .btn {
+            padding: 0.7rem 1.4rem; border: none; border-radius: 8px;
+            cursor: pointer; font-weight: 600; font-size: 0.95rem;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--accent); color: var(--bg); }
+        .btn-secondary { background: var(--border); color: var(--text); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .plugin-select-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.8rem;
+        }
+        .plugin-option {
+            background: var(--input-bg); border: 2px solid var(--border);
+            border-radius: 8px; padding: 1rem; cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .plugin-option:hover { border-color: var(--accent); }
+        .plugin-option.selected {
+            border-color: var(--success); background: rgba(76,175,80,0.08);
+        }
+        .plugin-option h4 { margin: 0 0 0.3rem 0; font-size: 1rem; }
+        .plugin-option p { margin: 0; font-size: 0.8rem; color: var(--muted); }
+        .plugin-option .port { font-size: 0.75rem; color: var(--accent); margin-top: 0.4rem; }
+
+        /* Overlay URLs */
+        .url-row {
+            display: flex; align-items: center; gap: 0.6rem;
+            margin-bottom: 0.4rem;
+        }
+        .url-row code {
+            flex: 1; background: var(--input-bg); padding: 0.35rem 0.6rem;
+            border-radius: 4px; font-size: 0.8rem; color: var(--accent);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .btn-copy {
+            padding: 0.3rem 0.6rem; font-size: 0.75rem;
+            background: var(--border); color: var(--text);
+            border: none; border-radius: 4px; cursor: pointer;
+        }
+        .btn-copy:hover { background: var(--accent); color: var(--bg); }
+        .copied { background: var(--success) !important; color: #fff !important; }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -119,7 +211,7 @@
         <div id="status-pill" class="offline">Connecting...</div>
     </header>
 
-    <main>
+    <main id="dashboard" class="hidden">
         <div class="card">
             <h2>System Status</h2>
             <div id="system-info" class="muted">Loading...</div>
@@ -135,6 +227,7 @@
                     <tr><td colspan="4" class="muted">Loading...</td></tr>
                 </tbody>
             </table>
+            <div id="overlay-urls" style="margin-top:1rem;"></div>
         </div>
 
         <div class="card">
@@ -148,8 +241,36 @@
         </div>
     </main>
 
+    <!-- First-Run Wizard -->
+    <div id="wizard" class="wizard-overlay hidden">
+        <div class="wizard-card">
+            <h2 id="wizard-title">Welcome to TikTok2Mc</h2>
+            <div class="wizard-steps" id="wizard-steps"></div>
+            <div id="wizard-content"></div>
+            <div class="wizard-actions">
+                <button class="btn btn-secondary" id="wizard-back">Back</button>
+                <button class="btn btn-primary" id="wizard-next">Next</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API = '/api/v1';
+        let currentConfig = {};
+        let currentPlugins = [];
+        let wizardStep = 0;
+        let wizardData = {};
+
+        // Mapping: API plugin name -> config.yaml section key
+        const PLUGIN_CONFIG_MAP = {
+            'overlaytxt': 'overlay_text',
+            'likegoal': 'like_goal',
+            'timer': 'timer',
+            'deathcounter': 'death_counter',
+            'wincounter': 'win_counter',
+            'spotify': 'spotify',
+            'channelpoints': 'channel_points'
+        };
 
         async function fetchJSON(path) {
             const res = await fetch(API + path);
@@ -167,16 +288,17 @@
             return res.json();
         }
 
-        async function togglePlugin(name, current) {
-            const action = current ? 'disable' : 'enable';
-            try {
-                await postJSON(`/plugins/${name}/${action}`, {});
-                loadPlugins();
-            } catch (e) {
-                log('Failed to toggle ' + name + ': ' + e.message, 'err');
-            }
+        async function putJSON(path, body) {
+            const res = await fetch(API + path, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+            return res.json();
         }
 
+        // ── Logging ──
         function log(msg, level='info') {
             const view = document.getElementById('log-view');
             const line = document.createElement('div');
@@ -186,13 +308,13 @@
             view.scrollTop = view.scrollHeight;
         }
 
+        // ── Dashboard ──
         async function loadHealth() {
             try {
                 const data = await fetchJSON('/health');
                 const pill = document.getElementById('status-pill');
                 pill.textContent = 'API v' + data.api_version;
                 pill.className = 'online';
-                log('API connected: v' + data.api_version);
             } catch (e) {
                 const pill = document.getElementById('status-pill');
                 pill.textContent = 'Offline';
@@ -205,23 +327,81 @@
             const tbody = document.getElementById('plugin-list');
             try {
                 const data = await fetchJSON('/plugins');
-                if (!data.plugins || data.plugins.length === 0) {
+                currentPlugins = data.plugins || [];
+                if (!currentPlugins.length) {
                     tbody.innerHTML = '<tr><td colspan="4" class="muted">No plugins found.</td></tr>';
+                    document.getElementById('overlay-urls').innerHTML = '';
                     return;
                 }
-                tbody.innerHTML = data.plugins.map(p => {
+                tbody.innerHTML = currentPlugins.map(p => {
                     const btnClass = p.enabled ? 'on' : 'off';
                     const btnText = p.enabled ? 'Enabled' : 'Disabled';
                     return `<tr>
-                        <td>${p.display_name || p.name}</td>
+                        <td>${escapeHtml(p.display_name || p.name)}</td>
                         <td>${p.version || '-'}</td>
                         <td>${p.port || '-'}</td>
                         <td><button class="toggle-btn ${btnClass}" onclick="togglePlugin('${p.name}', ${p.enabled})">${btnText}</button></td>
                     </tr>`;
                 }).join('');
+                renderOverlayUrls();
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="4" class="muted">Failed to load plugins.</td></tr>';
                 log('Plugins load failed: ' + e.message, 'err');
+            }
+        }
+
+        function renderOverlayUrls() {
+            const container = document.getElementById('overlay-urls');
+            const enabled = currentPlugins.filter(p => p.enabled && p.port > 0);
+            if (!enabled.length) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--muted);">OBS Browser Sources</h3>' +
+                enabled.map(p => {
+                    const url = `http://localhost:${p.port}`;
+                    return `<div class="url-row">
+                        <span style="font-size:0.85rem;min-width:100px;">${escapeHtml(p.display_name || p.name)}</span>
+                        <code>${url}</code>
+                        <button class="btn-copy" onclick="copyUrl(this,'${url}')">Copy</button>
+                    </div>`;
+                }).join('');
+        }
+
+        function copyUrl(btn, url) {
+            navigator.clipboard.writeText(url).then(() => {
+                btn.textContent = 'Copied';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+            });
+        }
+
+        async function togglePlugin(name, current) {
+            const action = current ? 'disable' : 'enable';
+            try {
+                // 1. Update API registry
+                await postJSON(`/plugins/${name}/${action}`, {});
+                // 2. Persist to config.yaml
+                await persistPluginEnabled(name, !current);
+                await loadPlugins();
+                log(`Plugin ${name} ${!current ? 'enabled' : 'disabled'}`);
+            } catch (e) {
+                log('Failed to toggle ' + name + ': ' + e.message, 'err');
+            }
+        }
+
+        async function persistPluginEnabled(apiName, enabled) {
+            const configKey = PLUGIN_CONFIG_MAP[apiName];
+            if (!configKey) return;
+            try {
+                const cfgData = await fetchJSON('/config');
+                const cfg = cfgData.config || {};
+                if (cfg[configKey]) {
+                    cfg[configKey].enabled = enabled;
+                    await putJSON('/config', { config: cfg, backup: true });
+                }
+            } catch (e) {
+                log('Failed to persist plugin state: ' + e.message, 'err');
             }
         }
 
@@ -229,14 +409,14 @@
             const el = document.getElementById('config-summary');
             try {
                 const data = await fetchJSON('/config');
-                const cfg = data.config || {};
-                const tiktok = cfg.tiktok || {};
-                const rcon = cfg.rcon || {};
+                currentConfig = data.config || {};
+                const tiktok = currentConfig.tiktok || {};
+                const rcon = currentConfig.rcon || {};
                 el.innerHTML = `
-                    <div class="field-row"><span>TikTok User</span><span>${tiktok.user || '—'}</span></div>
-                    <div class="field-row"><span>Server Host</span><span>${cfg.server_host || '—'}</span></div>
+                    <div class="field-row"><span>TikTok User</span><span>${escapeHtml(tiktok.user || '—')}</span></div>
+                    <div class="field-row"><span>Server Host</span><span>${escapeHtml(currentConfig.server_host || '—')}</span></div>
                     <div class="field-row"><span>RCON Enabled</span><span>${rcon.enabled ? 'Yes' : 'No'}</span></div>
-                    <div class="field-row"><span>Control Method</span><span>${cfg.control_method || '—'}</span></div>
+                    <div class="field-row"><span>Control Method</span><span>${escapeHtml(currentConfig.control_method || '—')}</span></div>
                 `;
             } catch (e) {
                 el.textContent = 'Failed to load configuration.';
@@ -244,10 +424,224 @@
             }
         }
 
+        // ── Wizard ──
+        function isFirstRun(cfg) {
+            const tiktok = cfg.tiktok || {};
+            const rcon = cfg.rcon || {};
+            return tiktok.user === 'your_tiktok_username' || rcon.password === 'ABC1234';
+        }
+
+        function showWizard() {
+            document.getElementById('wizard').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            wizardStep = 0;
+            wizardData = {
+                tiktok_user: (currentConfig.tiktok || {}).user || '',
+                server_host: currentConfig.server_host || '127.0.0.1',
+                rcon_password: (currentConfig.rcon || {}).password || '',
+                plugins: {}
+            };
+            // Pre-select plugins already enabled in config
+            Object.entries(PLUGIN_CONFIG_MAP).forEach(([apiName, configKey]) => {
+                const section = currentConfig[configKey];
+                wizardData.plugins[apiName] = section ? !!section.enabled : false;
+            });
+            renderWizardStep();
+        }
+
+        function hideWizard() {
+            document.getElementById('wizard').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function renderWizardStep() {
+            const steps = document.getElementById('wizard-steps');
+            const content = document.getElementById('wizard-content');
+            const backBtn = document.getElementById('wizard-back');
+            const nextBtn = document.getElementById('wizard-next');
+
+            steps.innerHTML = [0,1,2,3].map(i =>
+                `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`
+            ).join('');
+
+            backBtn.disabled = wizardStep === 0;
+            backBtn.style.visibility = wizardStep === 0 ? 'hidden' : 'visible';
+            nextBtn.textContent = wizardStep === 3 ? 'Finish' : 'Next';
+
+            const cfg = currentConfig;
+            const rcon = cfg.rcon || {};
+
+            switch (wizardStep) {
+                case 0:
+                    content.innerHTML = `
+                        <p class="muted" style="margin-bottom:1.5rem;">Let's get your stream connected. Enter your TikTok username and server settings below.</p>
+                        <div class="form-group">
+                            <label>TikTok Username (without @)</label>
+                            <input type="text" id="w-tiktok-user" value="${escapeHtml(wizardData.tiktok_user)}" placeholder="your_tiktok_username">
+                            <div class="hint">The username you use when going live on TikTok.</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Server Host</label>
+                            <input type="text" id="w-server-host" value="${escapeHtml(wizardData.server_host)}" placeholder="127.0.0.1">
+                            <div class="hint">Use 127.0.0.1 for local-only. Use 0.0.0.0 only if you need network access.</div>
+                        </div>
+                    `;
+                    break;
+                case 1:
+                    const isDefault = wizardData.rcon_password === 'ABC1234' || !wizardData.rcon_password;
+                    content.innerHTML = `
+                        <p class="muted" style="margin-bottom:1.5rem;">Set a secure password for the Minecraft RCON connection.</p>
+                        ${isDefault ? `<div class="warning-box">You are still using the default password. Change it before going live!</div>` : ''}
+                        <div class="form-group">
+                            <label>RCON Password</label>
+                            <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Change from default">
+                            <div class="hint">Anyone with this password can control your Minecraft server.</div>
+                        </div>
+                    `;
+                    break;
+                case 2:
+                    content.innerHTML = `
+                        <p class="muted" style="margin-bottom:1.5rem;">Choose which features you want to enable. You can change these later in the dashboard.</p>
+                        <div class="plugin-select-grid">
+                            ${currentPlugins.map(p => {
+                                const configKey = PLUGIN_CONFIG_MAP[p.name];
+                                if (!configKey) return '';
+                                const selected = wizardData.plugins[p.name] ? 'selected' : '';
+                                return `<div class="plugin-option ${selected}" onclick="toggleWizardPlugin('${p.name}')" id="w-plugin-${p.name}">
+                                    <h4>${escapeHtml(p.display_name || p.name)}</h4>
+                                    <p>${escapeHtml(p.description || '')}</p>
+                                    ${p.port ? `<div class="port">Port: ${p.port}</div>` : ''}
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    `;
+                    break;
+                case 3:
+                    const enabledPlugins = currentPlugins.filter(p => wizardData.plugins[p.name]);
+                    content.innerHTML = `
+                        <p class="muted" style="margin-bottom:1.5rem;">Review your settings before saving.</p>
+                        <div style="background:var(--input-bg);padding:1rem;border-radius:8px;margin-bottom:1rem;">
+                            <div class="field-row"><span>TikTok User</span><span>${escapeHtml(wizardData.tiktok_user || '—')}</span></div>
+                            <div class="field-row"><span>Server Host</span><span>${escapeHtml(wizardData.server_host)}</span></div>
+                            <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '••••••••' : 'Not set'}</span></div>
+                            <div class="field-row"><span>Plugins</span><span>${enabledPlugins.length} enabled</span></div>
+                        </div>
+                        ${enabledPlugins.length > 0 ? `
+                            <p style="margin:0 0 0.5rem 0;font-size:0.85rem;color:var(--muted);">Your OBS Browser Source URLs:</p>
+                            ${enabledPlugins.filter(p => p.port > 0).map(p =>
+                                `<div class="url-row"><span style="font-size:0.85rem;min-width:120px;">${escapeHtml(p.display_name || p.name)}</span><code>http://localhost:${p.port}</code><button class="btn-copy" onclick="copyUrl(this,'http://localhost:${p.port}')">Copy</button></div>`
+                            ).join('')}
+                        ` : ''}
+                    `;
+                    break;
+            }
+        }
+
+        function toggleWizardPlugin(name) {
+            wizardData.plugins[name] = !wizardData.plugins[name];
+            const el = document.getElementById('w-plugin-' + name);
+            if (el) el.classList.toggle('selected');
+        }
+
+        async function wizardNext() {
+            // Save current step data
+            if (wizardStep === 0) {
+                const user = document.getElementById('w-tiktok-user').value.trim();
+                const host = document.getElementById('w-server-host').value.trim();
+                if (!user) { alert('Please enter your TikTok username.'); return; }
+                if (!host) { alert('Please enter a server host.'); return; }
+                wizardData.tiktok_user = user;
+                wizardData.server_host = host;
+            } else if (wizardStep === 1) {
+                const pass = document.getElementById('w-rcon-password').value;
+                if (!pass) { alert('Please set an RCON password.'); return; }
+                wizardData.rcon_password = pass;
+            }
+
+            if (wizardStep === 3) {
+                await wizardSave();
+                return;
+            }
+
+            wizardStep++;
+            renderWizardStep();
+        }
+
+        async function wizardSave() {
+            const nextBtn = document.getElementById('wizard-next');
+            nextBtn.disabled = true;
+            nextBtn.textContent = 'Saving...';
+
+            try {
+                const cfgData = await fetchJSON('/config');
+                const cfg = cfgData.config || {};
+
+                // Update tiktok
+                if (!cfg.tiktok) cfg.tiktok = {};
+                cfg.tiktok.user = wizardData.tiktok_user;
+
+                // Update server host
+                cfg.server_host = wizardData.server_host;
+
+                // Update RCON
+                if (!cfg.rcon) cfg.rcon = {};
+                cfg.rcon.password = wizardData.rcon_password;
+                cfg.rcon.enabled = true;
+
+                // Update plugin enabled states
+                Object.entries(wizardData.plugins).forEach(([apiName, enabled]) => {
+                    const configKey = PLUGIN_CONFIG_MAP[apiName];
+                    if (configKey && cfg[configKey]) {
+                        cfg[configKey].enabled = enabled;
+                    }
+                });
+
+                // Also enable/disable in API registry
+                for (const [apiName, enabled] of Object.entries(wizardData.plugins)) {
+                    try {
+                        await postJSON(`/plugins/${apiName}/${enabled ? 'enable' : 'disable'}`, {});
+                    } catch (e) {
+                        log('Registry update failed for ' + apiName + ': ' + e.message, 'warn');
+                    }
+                }
+
+                await putJSON('/config', { config: cfg, backup: true });
+                log('Setup saved successfully.');
+                hideWizard();
+                await loadConfig();
+                await loadPlugins();
+            } catch (e) {
+                log('Failed to save setup: ' + e.message, 'err');
+                alert('Failed to save: ' + e.message);
+            } finally {
+                nextBtn.disabled = false;
+                nextBtn.textContent = 'Finish';
+            }
+        }
+
+        document.getElementById('wizard-back').addEventListener('click', () => {
+            if (wizardStep > 0) { wizardStep--; renderWizardStep(); }
+        });
+        document.getElementById('wizard-next').addEventListener('click', wizardNext);
+
+        // ── Init ──
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function init() {
             await loadHealth();
-            await loadPlugins();
             await loadConfig();
+            await loadPlugins();
+
+            if (isFirstRun(currentConfig)) {
+                showWizard();
+            } else {
+                hideWizard();
+            }
+
             setInterval(loadHealth, 10000);
             setInterval(loadPlugins, 5000);
         }
