@@ -187,6 +187,7 @@ SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown", {}).get("delay_seconds", 30)
 # -----------------------------
 processes = {}
 linux_sessions = []  # Track tmux/screen session names
+restart_requested = False  # Set by file watcher when runtime/restart appears
 
 # -----------------------------
 # Process management (start, stop, visibility)
@@ -641,47 +642,10 @@ async def check_and_run():
                     log.info(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
                     asyncio.create_task(shutdown_countdown())
             elif name == "restart":
-                log.info("\nRestart signal detected. Restarting all programs...")
-                stop_all_processes()
-                restart_exe = BASE_DIR / f"start{SUFFIX}"
-                if restart_exe.exists():
-                    if IS_WINDOWS:
-                        restart_bat = BASE_DIR / "_restart.bat"
-                        restart_bat.write_text(
-                            f'@echo off\n'
-                            f'timeout /t 5 /nobreak >nul\n'
-                            f'cd /d "{BASE_DIR}"\n'
-                            f'start "" "{restart_exe}"\n'
-                            f'del "%~f0"\n',
-                            encoding="utf-8",
-                        )
-                        subprocess.Popen(
-                            [str(restart_bat)],
-                            shell=True,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                        )
-                    else:
-                        restart_sh = BASE_DIR / "_restart.sh"
-                        restart_sh.write_text(
-                            f'#!/bin/sh\n'
-                            f'sleep 5\n'
-                            f'cd "{BASE_DIR}"\n'
-                            f'"{restart_exe}" &\n'
-                            f'rm "{restart_sh}"\n',
-                            encoding="utf-8",
-                        )
-                        restart_sh.chmod(0o755)
-                        subprocess.Popen(
-                            [str(restart_sh)],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            start_new_session=True,
-                        )
-                else:
-                    log.error(f"Restart failed: {restart_exe} not found.")
-                os._exit(0)
+                log.info("\nRestart signal detected. Requesting clean restart...")
+                global restart_requested
+                restart_requested = True
+                return  # Exit the file watcher loop so main() can return cleanly
         await asyncio.sleep(5)
 
 # =============================================================================
@@ -689,11 +653,20 @@ async def check_and_run():
 # =============================================================================
 
 async def command_loop():
+    global restart_requested
     while True:
-        cmd = await asyncio.to_thread(
-            input,
-            "\nType 'exit' to stop all programs ('help' for commands): "
-        )
+        if restart_requested:
+            break
+        try:
+            cmd = await asyncio.wait_for(
+                asyncio.to_thread(
+                    input,
+                    "\nType 'exit' to stop all programs ('help' for commands): "
+                ),
+                timeout=1.0
+            )
+        except asyncio.TimeoutError:
+            continue
         cmd = cmd.strip().lower()
         if cmd == "help":
             log.info("\nAvailable commands:")
@@ -733,6 +706,50 @@ if ALLOW_CLOSE:
         log.info("-----------------------------------")
 
     asyncio.run(main())
+
+    # After main() returns, check if restart was requested
+    if restart_requested:
+        log.info("\nPerforming restart...")
+        stop_all_processes()
+        restart_exe = BASE_DIR / f"start{SUFFIX}"
+        if restart_exe.exists():
+            if IS_WINDOWS:
+                restart_bat = BASE_DIR / "_restart.bat"
+                restart_bat.write_text(
+                    f'@echo off\n'
+                    f'timeout /t 5 /nobreak >nul\n'
+                    f'cd /d "{BASE_DIR}"\n'
+                    f'start "" "{restart_exe}"\n'
+                    f'del "%~f0"\n',
+                    encoding="utf-8",
+                )
+                subprocess.Popen(
+                    [str(restart_bat)],
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                )
+            else:
+                restart_sh = BASE_DIR / "_restart.sh"
+                restart_sh.write_text(
+                    f'#!/bin/sh\n'
+                    f'sleep 5\n'
+                    f'cd "{BASE_DIR}"\n'
+                    f'"{restart_exe}" &\n'
+                    f'rm "{restart_sh}"\n',
+                    encoding="utf-8",
+                )
+                restart_sh.chmod(0o755)
+                subprocess.Popen(
+                    [str(restart_sh)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+        else:
+            log.error(f"Restart failed: {restart_exe} not found.")
+        sys.exit(0)
 
 else:
     # AllowClose=False -> script exits itself, EXEs continue running quietly
