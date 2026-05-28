@@ -645,14 +645,10 @@ async def check_and_run():
                 stop_all_processes()
                 restart_exe = BASE_DIR / f"start{SUFFIX}"
                 if restart_exe.exists():
-                    kwargs = {}
-                    if IS_WINDOWS:
-                        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE | subprocess.DETACHED_PROCESS
-                    subprocess.Popen([str(restart_exe)], **kwargs)
-                    time.sleep(1.5)
+                    subprocess.Popen([str(restart_exe)])
                 else:
                     log.error(f"Restart failed: {restart_exe} not found.")
-                os._exit(0)
+                sys.exit(0)
         await asyncio.sleep(5)
 
 # =============================================================================
