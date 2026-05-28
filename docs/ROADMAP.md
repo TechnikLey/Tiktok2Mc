@@ -1,151 +1,77 @@
 # TikTok2Mc — Project Roadmap
 
+## Project Overview
+
+TikTok2Mc connects your TikTok Live stream to a Minecraft server. When viewers send gifts, follow, or hit like milestones, things happen in your game — automatically.
+
+Think of it as a bridge: TikTok events come in on one side, Minecraft commands go out on the other. Everything in between is handled by the tool. You just set up what you want to happen and go live.
+
+The project has been around for a while, but version 1.0.0 is a complete rebuild from the ground up. It is more reliable, better organised, and much easier to maintain going forward.
+
+---
+
 ## Current Progress
 
-The system works end to end. It has been fully rebuilt from the
-ground up for version 1.0.0, which means existing setups from
-earlier versions will need a fresh install. The old architecture
-was held together by file-based configuration and hard-wired
-connections between components. That is gone.
+The core system works end to end. Here is what is stable right now:
 
-**What is stable right now:**
+- **TikTok Live connection** — follows, likes, shares, gifts, and other events come through reliably.
+- **Minecraft commands** — when an event triggers an action, the command reaches your server as expected.
+- **Plugins work independently** — Timer, Death Counter, Win Counter, Overlay, and more. Each one runs on its own. Turning on the Timer will not accidentally trigger the Death Counter anymore.
+- **Everything starts disabled** — nothing runs unless you turn it on. You are in control.
+- **Your config is backed up automatically** — if something goes wrong during a save, the last good version is still there.
+- **The system warns you about risky settings** — exposing services to your whole network or leaving the default RCON password in place triggers a clear warning.
+- **Over 270 automated checks** run on every change to catch problems early.
 
-- TikTok Live connection works — follows, likes, shares, gifts,
-  and other events come through reliably.
-- Minecraft RCON connection works — commands arrive at your server
-  as expected.
-- All four plugins are stable and work independently:
-  - **Timer** — runs a command after a set interval
-  - **Death Counter** — tracks in-game deaths
-  - **Win Counter** — tracks wins or milestones
-  - **Overlay** — shows live notifications on stream (OBS browser
-    source)
-- Every plugin starts disabled by default. You choose what to turn
-  on — nothing runs without your say-so.
-- Plugins no longer depend on each other. Turning on the Timer
-  will not accidentally trigger the Death Counter anymore.
-- The central backend that manages all plugins is tested
-  thoroughly. **274 automated checks** run on every change to catch
-  regressions early.
-- Trigger files (.mca) are validated when loaded. Mistakes like
-  missing brackets or wrong command prefixes are caught before
-  they reach Minecraft.
-- Your configuration is backed up automatically. If something goes
-  wrong during a save, the last good version is still there.
-- The system warns you if you try to expose it to the internet
-  accidentally (`0.0.0.0` is not the default).
-- **Plugin discovery is now manifest-driven.** Each plugin ships
-  with a `plugin.json` manifest that declares its name, version,
-  entry point, ports, capabilities, and update URL. The backend
-  discovers plugins by reading these files — no executable
-  scanning, no guessing.
-- **A plugin update checker is in place.** Every plugin with an
-  `update_url` can be checked for newer versions via
-  `GET /api/v1/plugins/updates`. Available updates are logged at
-  startup.
-- **Plugins can be enabled and disabled at runtime** via the API
-  (`POST /api/v1/plugins/{name}/enable` and
-  `POST /api/v1/plugins/{name}/disable`).
-- **A read-only plugin discovery endpoint** (`GET /api/v1/plugins/discover`)
-  scans `plugin.json` files on disk and merges registry state — no
-  side effects, no plugin loading.
+> **A quick note about version 1.0.0:**  
+> This version is a clean break. Config files, plugins, and data from versions 0.x are not compatible. Think of it as a fresh start with a much more solid foundation.
 
 ---
 
 ## What We Are Working On Now
 
-The focus is on completing the remaining pieces before the 1.0.0
-release. The core engine and plugin system are done. What is left
-is mostly integration and safety.
+The engine is built. The plugins work. The backend is stable. What is left is wrapping things up for the 1.0.0 release.
 
-## Plugin Lifecycle
+**Current focus areas:**
 
-A plugin passes through four distinct stages:
-
-1. **Discovered** — The `GET /api/v1/plugins/discover` endpoint finds
-   the plugin's `plugin.json` on disk. The discovery endpoint is
-   **read-only** — it never registers or modifies state.
-2. **Registered** — The launcher (or a manual API call) submits the
-   plugin to `POST /api/v1/plugins/register`. The plugin now appears
-   in `GET /api/v1/plugins` and the registry is the **source of truth**
-   for execution state.
-3. **Enabled** — The plugin's `enabled` flag is `true`
-   (via `POST /api/v1/plugins/{name}/enable`). Only enabled plugins
-   are started by the launcher.
-4. **Disabled** — The plugin's `enabled` flag is `false`
-   (via `POST /api/v1/plugins/{name}/disable`). Disabled plugins
-   remain registered but are not started.
-
-**What this means in practice:**
-- Discovery shows what is *installable*. The registry shows what is
-  *configured*.
-- Enable/disable toggle execution without losing configuration.
-- The discovery endpoint is safe to call at any time — zero side
-  effects.
-
----
-
-## What We Are Working On Now
-
-The focus is on completing the remaining pieces before the 1.0.0
-release. The core engine, plugin system, and API surface are done.
-What is left is testing, safety, and documentation.
-
-**Current priorities:**
-
-- **Tool update check** — `GET /api/v1/updates/check` endpoint to
-  check the main repository for new releases.
-- **Update path testing** — The new API-based update signalling is
-  implemented; the next step is to test the full update flow
-  end-to-end (v1.0.0 → v1.0.1).
-- **RCON default password warning** is already logged at startup
-  (`docs/TODO.md`: ✅). API authentication is deferred to post-
-  v1.0.0 since the API binds to localhost by default.
-- **Documentation overhaul** — README, GUIDE, and CHANGELOG need to
-  reflect the v1.0.0 architecture.
+- **An automatic update check** — so the tool can tell you when a new version is available, without you having to check manually.
+- **End-to-end update testing** — the update system works on paper; now we are running it through a real version upgrade to make sure nothing breaks.
+- **Documentation overhaul** — the existing guides still describe the old system. They need to be rewritten to match how things actually work today.
 
 ---
 
 ## What Comes Next
 
-Once the items above are done, the focus shifts to making the
-system easier to use for non-technical people.
+Once 1.0.0 is out, the focus shifts to making the tool easier to use for everyone.
 
-**Upcoming milestones:**
+**Planned milestones:**
 
-1. **Desktop application** — A proper graphical interface so you
-   do not have to edit YAML configuration files by hand. First-run
-   wizard, configuration forms, trigger editor, live dashboard.
-2. **Plugin manager** — See which plugins are installed, turn them
-   on or off, check their status — all from the desktop app.
-3. **Live log viewer** — See what the system is doing in real time
-   without checking log files.
-4. **Overhauled documentation** — New guides written for 1.0.0
-   that reflect how the system actually works today.
-5. **End-to-end testing** — Simulated TikTok events flowing all
-   the way through to Minecraft commands, verified automatically.
+1. **Desktop application** — a proper graphical interface so you do not have to edit configuration files by hand. First-run wizard, configuration forms, and a live dashboard.
+2. **Plugin manager** — see which plugins are installed, turn them on or off, check their status — all from the desktop app.
+3. **Live log viewer** — see what the system is doing in real time without opening log files.
+4. **New guides and documentation** — rewritten from scratch for version 1.0.0.
 
 ---
 
 ## Future Vision
 
-Long term, TikTok2Mc aims to be a set-and-forget bridge between
-TikTok Live and Minecraft. The ideal flow:
+Long term, TikTok2Mc aims to be a set-and-forget bridge between TikTok Live and Minecraft. The ideal flow:
 
 1. Install the desktop app
 2. Enter your TikTok username and RCON details
-3. Write a few triggers (or use the built-in editor)
+3. Write a few trigger rules (or use the built-in editor)
 4. Go live — everything else runs automatically
 
-There are no plans to support Twitch, YouTube, or other platforms
-at this point. The project stays focused on TikTok. There will
-also not be a mobile app or cloud component — everything runs
-locally on your machine.
-
-> **One more thing:** version 1.0.0 is a clean break. Config files,
-> plugins, and data from versions 0.x are not compatible. Think of
-> it as a fresh start with a much more solid foundation.
+There are no plans to support Twitch, YouTube, or other platforms. The project stays focused on TikTok. There will also not be a mobile app or cloud component — everything runs locally on your machine.
 
 ---
 
-*Last updated: 2026-05-28* (plugin lifecycle, updated test count, discovery/enable/disable endpoints)
+## Fun Facts
+
+- The project runs **over 270 automated tests** on every change. That is more than one test for every plugin, every configuration option, and every trigger rule — combined.
+- Each plugin now ships with its own manifest file that describes what it does, what version it is, and how to update it. No more guesswork.
+- The entire backend was rebuilt from scratch for version 1.0.0. The old system relied on files and hard-wired connections between components. That is all gone.
+- Despite the rebuild, the core loop is surprisingly simple: TikTok event arrives → a trigger rule matches → a Minecraft command runs. Everything else is there to make that loop reliable and manageable.
+
+---
+
+*Last updated: 2026-05-28*
