@@ -280,23 +280,19 @@ document.getElementById('btn-restart-later').addEventListener('click', () => { h
 /* ─── Config Editor ─── */
 
 const SECTION_ORDER = [
-  'auto_update_config','show_sudo_warning',
-  'server_host','control_method','shutdown',
-  'java','rcon',
-  'tiktok',
+  'tiktok','rcon','server_host','control_method',
+  'java','minecraft_server_api',
+  'console',
   'comment_commands','random_triggers',
-  'console','minecraft_server_api',
-  'gui',
   'theme',
-  'update'
+  'update','shutdown','auto_update_config','show_sudo_warning','gui'
 ];
 
 const CATEGORIES = {
-  'System': ['auto_update_config','show_sudo_warning','shutdown','gui','update'],
-  'Connection': ['server_host','control_method','rcon','tiktok'],
+  'Connection': ['tiktok','rcon','server_host','control_method'],
   'Minecraft': ['java','minecraft_server_api'],
+  'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui'],
   'Chat & Commands': ['comment_commands','random_triggers'],
-  'System & Visibility': ['console'],
   'Appearance': ['theme']
 };
 
