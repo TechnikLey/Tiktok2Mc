@@ -1,91 +1,94 @@
 # TikTok2Mc — Project Roadmap
 
-## What Is This?
+## What This Is
 
-TikTok2Mc connects your TikTok Live stream to Minecraft. When viewers follow, like, share, or send gifts, those events can trigger commands inside your Minecraft server. You decide what happens and when.
+TikTok2Mc links your TikTok Live stream to a Minecraft server. When viewers follow, like, share, comment, or send gifts, those events can trigger commands in your Minecraft world. You decide which events matter and what they do.
+
+---
 
 ## What Works Today
 
-The system is fully functional and ready for daily use.
+All items listed here are implemented and functional in the current version.
 
-**Live connection** — TikTok events (follows, likes, shares, gifts, comments, joins) arrive reliably during a stream.
+### Live Stream Connection
 
-**Minecraft command execution** — Events trigger actions in your Minecraft server through RCON or datapacks. You define the commands in `data/actions.mca`.
+TikTok events arrive reliably during a live stream. Supported event types:
 
-**Seven built-in plugins** — Each one adds a specific feature and can be turned on or off independently:
-- **Timer** — Countdown with pause-on-death and auto-win
-- **Death Counter** — Real-time death tracker overlay
-- **Win Counter** — Wins and losses with optional death penalty
-- **Like Goal** — Progress bar that fills from TikTok likes
-- **Overlay Text** — Scrolling or static text displayed on stream
-- **Channel Points** — Loyalty points viewers earn while watching
-- **Spotify Control** — Control Spotify playback through chat commands
+- Follows
+- Likes
+- Shares
+- Comments
+- Gift sends
+- Viewer joins
 
-**Desktop application** — A graphical interface opens in your browser when you start the tool. It includes:
-- A setup wizard for first-time configuration
-- A settings editor where you can adjust every option through forms
-- A plugin manager to turn features on and off
-- A restart and shutdown button
+### Minecraft Command Execution
 
-**Configuration is backed up automatically** — Every time you save your settings, the previous version is preserved. Nothing is lost if something goes wrong.
+Events can trigger commands in your Minecraft server. Commands are defined in a file named `actions.mca` and can use different execution methods depending on your server setup.
 
-**Automatic updates** — The tool checks for new versions and can update itself. All your settings are preserved during an update.
+### Built-in Add-ons
 
-**Over 365 automated checks** run on every change to catch problems early.
+Seven optional features are included. Each one can be turned on or off independently:
 
----
+- **Timer** — A visible countdown that can pause when a death happens
+- **Death Counter** — Tracks and displays deaths during the stream
+- **Win Counter** — Tracks wins and losses, with an optional death penalty
+- **Like Goal** — A progress bar that fills as likes come in
+- **Overlay Text** — Scrolling or static text shown on your stream overlay
+- **Channel Points** — Loyalty points that viewers earn over time
+- **Spotify Control** — Lets viewers control Spotify playback through chat commands
 
-## What We Are Working On Now
+### Desktop Interface
 
-The engine is built. Plugins work. The desktop app works. What is left is polishing the last rough edges before the 1.0.0 release.
+When you start the tool, a dashboard opens in your browser. It includes:
 
-**Current priorities:**
+- **Setup wizard** — Guides you through the initial configuration (TikTok username, server password)
+- **Settings editor** — All tool options are available through forms organized by category (connection, Minecraft, system, appearance, chat commands). Changes are reviewed before saving.
+- **Feature manager** — See which add-ons are installed, turn them on or off, and adjust their individual settings
+- **Overlay URL display** — Shows the web addresses you need for OBS Browser Sources, with copy buttons
+- **Restart and shutdown controls**
 
-- **Log viewer** — A live feed inside the desktop app so you can see what the system is doing in real time, without opening log files or the console window.
+### Configuration Backups
 
-- **Actions editor** — A built-in editor for trigger rules so you can create and change Minecraft commands without editing files by hand.
-
-- **Update testing** — Verifying that the update system works correctly with compiled releases, so you can be sure updates install safely.
-
-- **Documentation improvements** — Making sure the guides match the current version of the tool.
-
----
-
-## The v1.0.0 Vision
-
-Version 1.0.0 represents a stable, complete foundation. Everything works end to end: TikTok connects to Minecraft, plugins add features, the desktop app lets you control everything, and updates keep you current without manual work.
-
-This version is a clean break from older 0.x releases. Your configuration files and plugins from earlier versions will need to be set up again. Think of this as starting fresh with a much more solid base.
+Every time you save your settings, a backup is created automatically. If something goes wrong during a save, the previous version is preserved.
 
 ---
 
-## What Comes After 1.0.0
+## Areas That Need Improvement
 
-Once the 1.0.0 release is out, focus will shift to convenience and deeper features:
+These are real gaps in the current version. None of them prevent the tool from functioning, but they affect the experience.
 
-- **Plugin improvements** — Better tools for managing plugin settings
-- **Real-time dashboard** — Live status updates without refreshing the page
-- **Overlay preview** — See what your stream overlays look like before going live
-- **Minecraft console in the app** — Send commands to your server directly from the desktop interface
-- **API access** — For advanced users who want to build their own tools on top of TikTok2Mc
+**No update notifications in the interface.** The tool checks for new versions at startup (in the console window), but the desktop interface does not show update status, check for updates, or notify you when a new version is available.
 
-There are no current plans to support Twitch, YouTube, or other platforms. The project stays focused on TikTok.
+**No live log viewer.** The dashboard has a placeholder section for logs that reads "Log streaming not yet implemented." There is no way to see what the system is doing in real time without opening the console window or reading log files.
+
+**No built-in trigger editor.** Trigger rules (the `actions.mca` file) must be edited by hand. There is no editor or validation tool in the desktop interface.
+
+**Overlay URLs are not shown on the main dashboard.** They only appear inside the feature manager popup.
 
 ---
 
-## In Summary
+## What v1.0.0 Is Aiming For
 
-| Area | Status |
-|------|--------|
-| TikTok Live connection | Working |
-| Minecraft command execution | Working |
-| Plugins (Timer, Death/Win Counter, Like Goal, Overlay, Channel Points, Spotify) | Working |
-| Desktop app (wizard, settings, plugin manager) | Working |
-| Config editor with backup | Working |
-| Update system | Working (needs final testing) |
-| Log viewer | In development |
-| Actions editor | In development |
-| Guides and documentation | Being updated |
+The v1.0.0 release focuses on making the current foundation stable and complete. The main areas of work are:
+
+- **Verifying the update system** works correctly with compiled releases, so updates install safely
+- **Updating the guides** to match the current version of the tool
+- **Resolving the known gaps** listed above where practical
+
+This version is a clean break from older 0.x releases. Configuration files and add-ons from earlier versions are not compatible and will need to be set up again.
+
+---
+
+## Ideas After v1.0.0
+
+These are possible future improvements. None are confirmed or scheduled.
+
+- A live log viewer inside the desktop interface
+- An editor for trigger rules
+- Update notifications within the interface
+- A preview of what stream overlays look like before going live
+- A way to send Minecraft commands directly from the interface
+- Better tools for managing add-on settings
 
 ---
 
