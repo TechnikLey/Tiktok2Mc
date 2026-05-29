@@ -4,16 +4,6 @@ let currentPlugins = [];
 let wizardStep = 0;
 let wizardData = {};
 
-const PLUGIN_CONFIG_MAP = {
-  overlaytxt: 'overlay_text',
-  likegoal: 'like_goal',
-  timer: 'timer',
-  deathcounter: 'death_counter',
-  wincounter: 'win_counter',
-  spotify: 'spotify',
-  channelpoints: 'channel_points'
-};
-
 /* ─── API helpers ─── */
 async function fetchJSON(path) {
   const res = await fetch(API + path);
@@ -108,22 +98,11 @@ function copyUrl(btn, url) {
 async function togglePlugin(name, current) {
   try {
     await postJSON(`/plugins/${name}/${current ? 'disable' : 'enable'}`, {});
-    await persistPluginEnabled(name, !current);
     await loadPlugins();
     log(`Plugin ${name} ${!current ? 'enabled' : 'disabled'}`);
   } catch (e) {
     log('Failed to toggle ' + name + ': ' + e.message, 'err');
   }
-}
-
-async function persistPluginEnabled(apiName, enabled) {
-  const key = PLUGIN_CONFIG_MAP[apiName];
-  if (!key) return;
-  try {
-    const cfgData = await fetchJSON('/config');
-    const cfg = cfgData.config || {};
-    if (cfg[key]) { cfg[key].enabled = enabled; await putJSON('/config', { config: cfg, backup: true }); }
-  } catch (e) { log('Failed to persist plugin state: ' + e.message, 'err'); }
 }
 
 async function loadConfig() {
@@ -303,9 +282,8 @@ document.getElementById('btn-restart-later').addEventListener('click', () => { h
 const SECTION_ORDER = [
   'tiktok','rcon','server_host','control_method',
   'java','minecraft_server_api',
-  'overlay_text','like_goal','timer','death_counter','win_counter','console',
-  'comment_commands','channel_points','random_triggers',
-  'spotify',
+  'console',
+  'comment_commands','random_triggers',
   'theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui'
 ];
@@ -313,11 +291,9 @@ const SECTION_ORDER = [
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method'],
   'Minecraft': ['java','minecraft_server_api'],
-  'Streaming & Overlays': ['overlay_text','like_goal','timer','death_counter','win_counter','console'],
-  'Chat & Commands': ['comment_commands','channel_points','random_triggers'],
-  'Integrations': ['spotify'],
-  'Appearance': ['theme'],
-  'System': ['update','shutdown','auto_update_config','show_sudo_warning','gui']
+  'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui'],
+  'Chat & Commands': ['comment_commands','random_triggers'],
+  'Appearance': ['theme']
 };
 
 const SECTION_META = {
@@ -326,16 +302,9 @@ const SECTION_META = {
   java: { title: 'Minecraft Server', desc: 'Controls how much RAM the Minecraft server uses and which port it runs on.', category: 'Minecraft' },
   comment_commands: { title: 'Chat Commands', desc: 'Let viewers send commands via TikTok chat. You can create multiple groups with different prefixes, roles, and rules.', category: 'Chat & Commands' },
   random_triggers: { title: 'Random Trigger Filter', desc: 'Controls which triggers can be selected by the $random action in data/actions.mca.', category: 'Chat & Commands' },
-  console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'Streaming & Overlays' },
+  console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
   minecraft_server_api: { title: 'Minecraft Server API', desc: 'Handles communication between the tool and the Minecraft server. Required for player death/respawn detection.', category: 'Minecraft' },
-  overlay_text: { title: 'Overlay Text', desc: 'Display text notifications on your stream. Triggered via >> in actions.mca. Works as an OBS Browser Source.', category: 'Streaming & Overlays' },
-  like_goal: { title: 'Like Goal', desc: 'A progress bar tracking likes toward a goal. Fires triggers at set intervals.', category: 'Streaming & Overlays' },
-  timer: { title: 'Stream Timer', desc: 'A standalone countdown timer for your stream. Can auto-pause on player death or post wins.', category: 'Streaming & Overlays' },
-  death_counter: { title: 'Death Counter', desc: 'Displays the number of player deaths on stream as an overlay.', category: 'Streaming & Overlays' },
-  win_counter: { title: 'Win Counter', desc: 'Tracks wins and losses on stream. Can subtract a win when the player dies.', category: 'Streaming & Overlays' },
   gui: { title: 'Dashboard', desc: 'The graphical user interface is served by the central API server and shown in a window.', category: 'System' },
-  spotify: { title: 'Spotify Control', desc: 'Let viewers control your Spotify playback via chat. Displays the current track as an overlay.', category: 'Integrations' },
-  channel_points: { title: 'Channel Points', desc: 'Awards loyalty points to active viewers. Viewers can check !points and redeem rewards.', category: 'Chat & Commands' },
   theme: { title: 'Overlay Colors', desc: 'Customize colors for each plugin overlay. All values are CSS hex codes like #ff0000.', category: 'Appearance' },
   update: { title: 'Auto-Updater', desc: 'Checks for new versions on startup and installs them automatically. Strongly recommended.', category: 'System' },
   shutdown: { title: 'Auto-Shutdown', desc: 'Automatically shuts down the tool after your live stream ends.', category: 'System' },
@@ -377,7 +346,7 @@ const HELP_TEXT = {
   'comment_commands.groups[].cooldown': 'Seconds to wait between ANY command in this group. Set to 0 to disable.',
   'comment_commands.groups[].user_cooldown': 'Seconds the SAME viewer must wait before their next command in this group. Set to 0 to disable.',
   'comment_commands.groups[].trigger_comment_event': 'Also fire the "comment" trigger in actions.mca when a command is used? Default: true.',
-  'comment_commands.groups[].url': 'HTTP endpoint that receives the command. You can use placeholders: {user} = viewer name, {text} = command text, {spotify_port} = resolved from spotify.port.',
+  'comment_commands.groups[].url': 'HTTP endpoint that receives the command. You can use placeholders: {user} = viewer name, {text} = command text.',
   'comment_commands.groups[].commands_config[].points_cost': 'Points cost — viewer needs this many channel points to use this command. Set to 0 to make it free.',
   'comment_commands.groups[].commands_config[].cooldown': 'Per-command cooldown in seconds. Overrides the group cooldown.',
   'comment_commands.groups[].commands_config[].conditional': 'When true: points and cooldowns only apply if the command succeeds. If it fails, nothing is deducted and no cooldown is set.',
@@ -392,81 +361,9 @@ const HELP_TEXT = {
   'minecraft_server_api.enabled': 'Required for player death/respawn detection and datapack loading. Keep enabled unless you know you do not need these features.',
   'minecraft_server_api.api_port': 'Port for the internal Minecraft API bridge. Default: 29187.',
   'minecraft_server_api.web_server_port': 'Port for the webhook server that receives Minecraft events. Default: 29188.',
-  'overlay_text.enabled': 'Display text notifications on your stream. Triggered via >> in actions.mca. Works as an OBS Browser Source with a transparent background.',
-  'overlay_text.port': 'Port for the OBS Browser Source overlay. Default: 29186.',
-  'overlay_text.display_mode': 'overwrite = new message replaces the current one (recommended). queue = messages stack and show one after another. WARNING: Queue mode can pile up on busy streams.',
-  'overlay_text.fade_in': 'Fade-in duration in milliseconds. This is NOT included in the Duration from >>commands. Set to 0 for instant appear.',
-  'overlay_text.fade_out': 'Fade-out duration in milliseconds. Set to 0 for instant disappear.',
-  'overlay_text.max_fails': 'Circuit breaker: after this many consecutive failures, the tool stops trying.',
-  'overlay_text.cooldown': 'Seconds to wait before retrying after max_fails consecutive failures.',
-  'overlay_text.overlays': 'Named overlay instances. Each name creates a separate URL. You can send text to a specific overlay from actions.mca using @NAME>> syntax.',
-  'like_goal.enabled': 'Show a like progress bar on your stream as an OBS Browser Source.',
-  'like_goal.port': 'Port for the Like Goal OBS overlay. Default: 29193.',
-  'like_goal.display_text': 'Text displayed above the progress bar. Example: "Like Goal" or "Community Goal".',
-  'like_goal.initial_goal': 'Number of likes needed to reach the first goal. Use underscores for readability in the config file (100_000 = 100000). Do NOT use dots or commas.',
-  'like_goal.goal_multiplier': 'What happens after a goal is reached: 0 = reset likes to 0 and start over, 1 = increase goal by initial_goal each time, 2+ = multiply goal by this value each time.',
-  'like_goal.triggers': 'Like triggers fire when total stream likes reach a threshold. Each needs a unique ID, an interval, and a function name that matches an entry in data/actions.mca.',
-  'like_goal.triggers[].id': 'A unique name for this trigger. Used in logs.',
-  'like_goal.triggers[].every': 'Like interval between activations. Example: 100 means the trigger fires every 100 likes.',
-  'like_goal.triggers[].function': 'The trigger name used in data/actions.mca. This connects the config to your custom commands.',
-  'like_goal.triggers[].payload': 'A label passed with the trigger. This is optional and defaults to "Community".',
-  'like_goal.triggers[].enabled': 'Set to false to disable this trigger without deleting it.',
-  'timer.enabled': 'A standalone countdown timer for your stream. Can be controlled via REST API (start, pause, reset).',
-  'timer.port': 'Port for the timer OBS overlay. Default: 29189.',
-  'timer.start_time': 'Starting minutes for the countdown. Example: 10 means 10 minutes.',
-  'timer.auto_win': 'POST a win to WinCounter each time the timer reaches 0. Disabled by default so the timer runs standalone.',
-  'timer.pause_on_death': 'Auto-pause the timer when the player dies. Requires MinecraftServerAPI to be enabled.',
-  'death_counter.enabled': 'Display the number of player deaths on stream as an overlay.',
-  'death_counter.port': 'Port for the Death Counter OBS overlay. Default: 29190.',
-  'win_counter.enabled': 'Track wins and losses on stream as an overlay.',
-  'win_counter.port': 'Port for the Win Counter OBS overlay. Default: 29191.',
-  'win_counter.decrement_on_death': 'Subtract a win when the player dies. Disabled by default for standalone win tracking.',
   'gui.enabled': 'Launch the graphical dashboard on startup. If disabled, you can still open it manually.',
-  'spotify.enabled': 'Let viewers control your Spotify playback via chat commands and stream events. Also displays the current track as an OBS overlay.',
-  'spotify.port': 'Port for the Spotify web server, overlay, and chat command endpoint. Default: 29194.',
-  'spotify.client_id': 'Your Spotify Developer App Client ID. Get it at https://developer.spotify.com/dashboard',
-  'spotify.client_secret': 'Your Spotify Developer App Client Secret. Keep this private.',
-  'spotify.redirect_uri': 'Must exactly match what you entered in your Spotify Developer App settings. Only change this if you also changed the port above.',
-  'spotify.device_id': 'Target a specific Spotify device by ID. Leave empty to use whatever device is currently active. You can find device IDs via the API when Spotify is playing.',
-  'spotify.volume_step': 'How much the volume changes per "$volume up" or "$volume down" command, in percent. Example: 10 means each command changes volume by 10%.',
-  'spotify.playtrack_mode': 'replace = play the requested song immediately, replacing the current track. queue = add the requested song to the queue (plays after current track).',
-  'channel_points.enabled': 'Award loyalty points to active viewers. Viewers can check their points with !points and redeem rewards with !redeem <name>.',
-  'channel_points.port': 'Port for the channel points overlay and API. Default: 29195.',
-  'channel_points.award_amount': 'How many points are awarded per interval to each active viewer.',
-  'channel_points.award_interval_seconds': 'How often points are awarded, in seconds.',
-  'channel_points.ping_timeout_minutes': 'How many minutes after last activity a viewer is considered inactive and stops earning points.',
-  'channel_points.leaderboard_count': 'Number of top viewers shown on the leaderboard overlay.',
   'update.enabled': 'Checks for new versions on startup and installs them automatically. It is strongly recommended to keep this enabled.',
-  'update.max_update_logs': 'Maximum number of update log files to keep in logs/update_logs/. 0 = delete all after each update. -1 = keep forever.',
-  'theme.like_goal.background': 'Like goal overlay background color. Use a CSS hex code like #050505.',
-  'theme.like_goal.text': 'Like goal overlay text color.',
-  'theme.like_goal.accent': 'Like goal primary accent color.',
-  'theme.like_goal.accent2': 'Like goal secondary accent color.',
-  'theme.like_goal.danger': 'Like goal danger or warning color.',
-  'theme.death_counter.background': 'Death counter overlay background color.',
-  'theme.death_counter.text': 'Death counter overlay text color.',
-  'theme.win_counter.background': 'Win counter overlay background color.',
-  'theme.win_counter.text': 'Win counter overlay text color.',
-  'theme.win_counter.danger': 'Win counter danger color.',
-  'theme.win_counter.muted': 'Win counter muted color.',
-  'theme.win_counter.separator': 'Win counter separator color.',
-  'theme.timer.background': 'Timer overlay background color.',
-  'theme.timer.text': 'Timer overlay text color.',
-  'theme.timer.warning': 'Timer warning color.',
-  'theme.timer.blink': 'Timer blink color.',
-  'theme.timer.danger': 'Timer danger color.',
-  'theme.overlay_text.background': 'Overlay text background color.',
-  'theme.overlay_text.text': 'Overlay text text color.',
-  'theme.spotify.background': 'Spotify overlay background color.',
-  'theme.spotify.text': 'Spotify overlay text color.',
-  'theme.spotify.accent': 'Spotify primary accent color.',
-  'theme.spotify.accent2': 'Spotify secondary accent color.',
-  'theme.channel_points.background': 'Channel points overlay background color.',
-  'theme.channel_points.text': 'Channel points overlay text color.',
-  'theme.channel_points.accent': 'Channel points primary accent color.',
-  'theme.channel_points.accent2': 'Channel points secondary accent color.',
-  'theme.channel_points.accent3': 'Channel points tertiary accent color.',
-  'theme.channel_points.danger': 'Channel points danger color.'
+  'update.max_update_logs': 'Maximum number of update log files to keep in logs/update_logs/. 0 = delete all after each update. -1 = keep forever.'
 };
 
 const FIELD_META = {
@@ -498,43 +395,7 @@ const FIELD_META = {
   'minecraft_server_api.enabled': { basic: true, type: 'bool' },
   'minecraft_server_api.api_port': { basic: false, type: 'number', min: 1, max: 65535 },
   'minecraft_server_api.web_server_port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'overlay_text.enabled': { basic: true, type: 'bool' },
-  'overlay_text.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'overlay_text.display_mode': { basic: false, type: 'select', options: ['overwrite','queue'] },
-  'overlay_text.fade_in': { basic: false, type: 'number', min: 0 },
-  'overlay_text.fade_out': { basic: false, type: 'number', min: 0 },
-  'overlay_text.max_fails': { basic: false, type: 'number', min: 1 },
-  'overlay_text.cooldown': { basic: false, type: 'number', min: 0 },
-  'like_goal.enabled': { basic: true, type: 'bool' },
-  'like_goal.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'like_goal.display_text': { basic: false, type: 'text' },
-  'like_goal.initial_goal': { basic: false, type: 'number', min: 1 },
-  'like_goal.goal_multiplier': { basic: false, type: 'number', min: 0 },
-  'timer.enabled': { basic: true, type: 'bool' },
-  'timer.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'timer.start_time': { basic: false, type: 'number', min: 1 },
-  'timer.auto_win': { basic: false, type: 'bool' },
-  'timer.pause_on_death': { basic: false, type: 'bool' },
-  'death_counter.enabled': { basic: true, type: 'bool' },
-  'death_counter.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'win_counter.enabled': { basic: true, type: 'bool' },
-  'win_counter.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'win_counter.decrement_on_death': { basic: false, type: 'bool' },
   'gui.enabled': { basic: true, type: 'bool' },
-  'spotify.enabled': { basic: true, type: 'bool' },
-  'spotify.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'spotify.client_id': { basic: true, type: 'text' },
-  'spotify.client_secret': { basic: true, type: 'password' },
-  'spotify.redirect_uri': { basic: false, type: 'text' },
-  'spotify.device_id': { basic: false, type: 'text' },
-  'spotify.volume_step': { basic: false, type: 'number', min: 1, max: 100 },
-  'spotify.playtrack_mode': { basic: false, type: 'select', options: ['replace','queue'] },
-  'channel_points.enabled': { basic: true, type: 'bool' },
-  'channel_points.port': { basic: false, type: 'number', min: 1, max: 65535 },
-  'channel_points.award_amount': { basic: false, type: 'number', min: 1 },
-  'channel_points.award_interval_seconds': { basic: false, type: 'number', min: 1 },
-  'channel_points.ping_timeout_minutes': { basic: false, type: 'number', min: 1 },
-  'channel_points.leaderboard_count': { basic: false, type: 'number', min: 1 },
   'update.enabled': { basic: true, type: 'bool' },
   'update.max_update_logs': { basic: false, type: 'number' },
   'comment_commands.groups[].enabled': { basic: false, type: 'bool' },
@@ -544,13 +405,7 @@ const FIELD_META = {
   'comment_commands.groups[].cooldown': { basic: false, type: 'number', min: 0 },
   'comment_commands.groups[].user_cooldown': { basic: false, type: 'number', min: 0 },
   'comment_commands.groups[].trigger_comment_event': { basic: false, type: 'bool' },
-  'comment_commands.groups[].url': { basic: false, type: 'text' },
-  'like_goal.triggers[].id': { basic: false, type: 'text' },
-  'like_goal.triggers[].every': { basic: false, type: 'number', min: 1 },
-  'like_goal.triggers[].function': { basic: false, type: 'text' },
-  'like_goal.triggers[].payload': { basic: false, type: 'text' },
-  'like_goal.triggers[].enabled': { basic: false, type: 'bool' },
-  'overlay_text.overlays[].name': { basic: false, type: 'text' }
+  'comment_commands.groups[].url': { basic: false, type: 'text' }
 };
 
 function getMeta(path) {
@@ -741,12 +596,8 @@ class ConfigEditor {
         }
         html += '</div></div>';
       } else if (Array.isArray(v)) {
-        if (path === 'like_goal.triggers') {
-          html += this.buildTriggerTable(path, v);
-        } else if (path === 'comment_commands.groups') {
+        if (path === 'comment_commands.groups') {
           html += this.buildGroupEditor(path, v);
-        } else if (path === 'overlay_text.overlays') {
-          html += this.buildOverlayList(path, v);
         } else if (path === 'random_triggers.triggers') {
           html += this.buildTagEditor(path, v, { label: 'Triggers', suggestions: ['likes','like_2','follow','join','comment','gift','share'] });
         } else if (path.endsWith('.commands')) {
@@ -864,67 +715,9 @@ class ConfigEditor {
     this.setValue(path, arr);
   }
 
-  buildTriggerTable(path, triggers) {
-    const help = getHelp(path);
-    let rows = (triggers || []).map((t, i) => {
-      const p = `${path}[${i}]`;
-      return `<tr>
-        <td><input type="text" value="${escapeHtml(t.id || '')}" data-path="${p}.id" data-type="string" placeholder="likes_standard"></td>
-        <td><input type="number" value="${t.every !== undefined ? t.every : ''}" data-path="${p}.every" data-type="number" placeholder="100"></td>
-        <td><input type="text" value="${escapeHtml(t.function || '')}" data-path="${p}.function" data-type="string" placeholder="likes"></td>
-        <td><input type="text" value="${escapeHtml(t.payload || '')}" data-path="${p}.payload" data-type="string" placeholder="Community"></td>
-        <td><input type="checkbox" class="toggle" ${t.enabled !== false ? 'checked' : ''} data-path="${p}.enabled" data-type="bool"></td>
-        <td class="row-actions"><button class="btn-icon" onclick="editor.removeArrayItem('${path}', ${i})">Remove</button></td>
-      </tr>`;
-    }).join('');
-    return `<div class="editor-field full-width" data-path="${path}">
-      <div class="field-label">Like Triggers</div>
-      <div class="field-widget">
-        <table class="array-table">
-          <thead><tr><th>ID</th><th>Every (likes)</th><th>Function</th><th>Payload</th><th>Enabled</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="editor.addTrigger('${path}')">Add Trigger</button>
-        ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
-      </div>
-    </div>`;
-  }
-
-  addTrigger(path) {
-    const arr = this.getValue(path) || [];
-    arr.push({ id: '', every: 100, function: '', payload: 'Community', enabled: true });
-    this.setValue(path, arr);
-    this.render();
-  }
-
   removeArrayItem(path, index) {
     const arr = this.getValue(path) || [];
     arr.splice(index, 1);
-    this.setValue(path, arr);
-    this.render();
-  }
-
-  buildOverlayList(path, overlays) {
-    const help = getHelp(path);
-    let items = (overlays || []).map((o, i) => {
-      return `<div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
-        <input type="text" value="${escapeHtml(o.name || '')}" data-path="${path}[${i}].name" data-type="string" style="flex:1;" placeholder="default">
-        <button class="btn-icon" onclick="editor.removeArrayItem('${path}', ${i})">Remove</button>
-      </div>`;
-    }).join('');
-    return `<div class="editor-field full-width" data-path="${path}">
-      <div class="field-label">Overlay Names</div>
-      <div class="field-widget">
-        ${items}
-        <button class="btn btn-secondary" onclick="editor.addOverlay('${path}')">Add Overlay</button>
-        ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
-      </div>
-    </div>`;
-  }
-
-  addOverlay(path) {
-    const arr = this.getValue(path) || [];
-    arr.push({ name: '' });
     this.setValue(path, arr);
     this.render();
   }
@@ -1085,8 +878,10 @@ class ConfigEditor {
   }
 
   buildThemeEditor(path, theme) {
+    const pluginKeys = new Set(['like_goal','death_counter','win_counter','timer','overlay_text','spotify','channel_points']);
     let html = '';
     for (const [plugin, colors] of Object.entries(theme || {})) {
+      if (pluginKeys.has(plugin)) continue; // plugin colors are managed in their own configs
       html += `<div style="margin-bottom:1.5rem;"><strong style="font-size:0.95rem;color:var(--text);display:block;margin-bottom:0.5rem;">${escapeHtml(toTitle(plugin))}</strong>`;
       for (const [ckey, cval] of Object.entries(colors)) {
         const p = `${path}.${plugin}.${ckey}`;
