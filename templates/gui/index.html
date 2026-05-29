@@ -34,6 +34,12 @@
         </div>
 
         <div class="card">
+            <h2>Actions (actions.mca)</h2>
+            <div class="muted">Configure Twitch/TikTok event triggers and commands.</div>
+            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="actionsEditor.open()">Edit Actions</button>
+        </div>
+
+        <div class="card">
             <h2>Configuration</h2>
             <div id="config-summary" class="muted">Loading...</div>
             <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="editor.open(currentConfig)">Edit Configuration</button>
@@ -110,6 +116,55 @@
         </div>
     </div>
 
+    <!-- Actions Editor -->
+    <div id="actions-editor" class="editor-overlay hidden">
+      <div class="actions-layout">
+        <div class="actions-topbar">
+          <h2>Actions Editor</h2>
+          <div class="actions-tabs">
+            <button class="actions-tab active" id="actions-tab-visual">Visual Editor</button>
+            <button class="actions-tab" id="actions-tab-raw">Raw</button>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-secondary" id="actions-editor-close">Close</button>
+            <button class="btn btn-primary" id="actions-editor-save">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- Visual Panel -->
+        <div id="actions-visual-panel" class="actions-body">
+          <div class="actions-table-panel">
+            <div class="actions-table-header">
+              <h3>Event Triggers</h3>
+              <button class="btn btn-secondary" id="actions-add-trigger" style="font-size:0.85rem;padding:0.4rem 0.8rem;">+ Add Event</button>
+            </div>
+            <table class="actions-table">
+              <thead><tr>
+                <th style="width:70px;">Type</th>
+                <th style="width:140px;">Name</th>
+                <th style="width:80px;">Status</th>
+                <th>Commands</th>
+              </tr></thead>
+              <tbody id="actions-table-body"></tbody>
+            </table>
+          </div>
+          <div id="actions-detail" class="actions-detail hidden">
+            <div id="actions-detail-content"></div>
+          </div>
+        </div>
+
+        <!-- Raw Panel -->
+        <div id="actions-raw-panel" class="actions-body hidden">
+          <div class="actions-raw-header">
+            <h3>Raw Editor</h3>
+            <div class="muted" style="font-size:0.85rem;">Edit actions.mca directly. Invalid syntax will be shown below.</div>
+          </div>
+          <textarea id="actions-raw-text" class="actions-raw-textarea" spellcheck="false"></textarea>
+          <div id="actions-raw-diag" class="raw-diag"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Plugin Config Editor -->
     <div id="plugin-config-editor" class="editor-overlay hidden">
         <div class="editor-layout">
@@ -183,6 +238,7 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
+    <script src="./actions-editor.js?v=1"></script>
     <script src="./app.js?v=3"></script>
 </body>
 </html>

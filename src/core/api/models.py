@@ -258,3 +258,42 @@ class ConfigUpdateRequest(BaseModel):
     backup: bool = True
 
 
+# ── Actions (actions.mca) models ───────────────────────────────────
+
+
+class ActionCommand(BaseModel):
+    """A single command inside a trigger."""
+
+    type: str = "vanilla"  # vanilla, rcon, script, overlay, named_overlay
+    command: str = ""
+    multiplier: int = 1
+    title: str = ""
+    subtitle: str = ""
+    duration: int = 3
+    overlay_name: str = "default"
+
+
+class ActionTrigger(BaseModel):
+    name: str
+    enabled: bool = True
+    type: str = "Custom"
+    commands: list[ActionCommand] = []
+
+
+class ActionsResponse(BaseModel):
+    triggers: list[ActionTrigger]
+
+
+class ActionsUpdateRequest(BaseModel):
+    triggers: list[ActionTrigger]
+
+
+class RawActionsResponse(BaseModel):
+    content: str
+    diagnostics: list[dict] = []
+
+
+class RawActionsUpdateRequest(BaseModel):
+    content: str
+
+

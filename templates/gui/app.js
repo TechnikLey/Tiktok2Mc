@@ -2122,6 +2122,7 @@ class PluginConfigEditor {
 }
 
 const pluginEditor = new PluginConfigEditor();
+const actionsEditor = new ActionsEditor();
 
 /* ─── Init ─── */
 async function init() {

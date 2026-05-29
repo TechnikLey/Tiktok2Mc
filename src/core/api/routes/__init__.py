@@ -8,6 +8,7 @@ from .events import router as events_router
 from .ws import router as ws_router
 from .updater import router as updater_router
 from .system import router as system_router
+from .actions import router as actions_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -18,3 +19,4 @@ api_router.include_router(events_router)
 api_router.include_router(ws_router)
 api_router.include_router(updater_router)
 api_router.include_router(system_router)
+api_router.include_router(actions_router)
