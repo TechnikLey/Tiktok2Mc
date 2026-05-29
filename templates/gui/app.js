@@ -60,38 +60,74 @@ function getPluginStatus(p) {
 }
 
 async function loadPlugins() {
-  const tbody = document.getElementById('plugin-list');
+  const summary = document.getElementById('plugin-summary');
   try {
     const data = await fetchJSON('/plugins');
     currentPlugins = data.plugins || [];
-    if (!currentPlugins.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="muted">No plugins found.</td></tr>';
-      document.getElementById('overlay-urls').innerHTML = '';
-      return;
+    const enabled = currentPlugins.filter(p => p.enabled).length;
+    if (summary) {
+      summary.textContent = currentPlugins.length
+        ? `${currentPlugins.length} plugins (${enabled} enabled).`
+        : 'No plugins found.';
     }
-    tbody.innerHTML = currentPlugins.map(p => {
-      const status = getPluginStatus(p);
-      const action = p.enabled
-        ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Disable</button>`
-        : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Enable</button>`;
-      return `<tr><td>${escapeHtml(p.display_name || p.name)}</td><td>${p.version || '-'}</td><td>${p.port || '-'}</td><td><span class="plugin-status ${status.cls}">${status.label}</span></td><td>${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="pluginEditor.open('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td></tr>`;
-    }).join('');
+    renderPluginManager();
     renderOverlayUrls();
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="5" class="muted">Failed to load plugins.</td></tr>';
+    if (summary) summary.textContent = 'Failed to load plugins.';
     log('Plugins load failed: ' + e.message, 'err');
   }
 }
 
 function renderOverlayUrls() {
-  const c = document.getElementById('overlay-urls');
+  const containers = [
+    document.getElementById('overlay-urls'),
+    document.getElementById('plugin-manager-urls')
+  ];
   const en = currentPlugins.filter(p => p.enabled && p.port > 0);
-  if (!en.length) { c.innerHTML = ''; return; }
-  c.innerHTML = '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">OBS Browser Sources</h3>' +
-    en.map(p => {
-      const u = `http://localhost:${p.port}`;
-      return `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(p.display_name || p.name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
-    }).join('');
+  const html = en.length
+    ? '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">OBS Browser Sources</h3>' +
+      en.map(p => {
+        const u = `http://localhost:${p.port}`;
+        return `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(p.display_name || p.name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
+      }).join('')
+    : '';
+  for (const c of containers) {
+    if (c) c.innerHTML = html;
+  }
+}
+
+function renderPluginManager() {
+  const tableDiv = document.getElementById('plugin-manager-table');
+  if (!tableDiv) return;
+  if (!currentPlugins.length) {
+    tableDiv.innerHTML = '<p class="muted">No plugins found.</p>';
+    return;
+  }
+  let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>Port</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  for (const p of currentPlugins) {
+    const status = getPluginStatus(p);
+    const action = p.enabled
+      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Disable</button>`
+      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Enable</button>`;
+    html += `<tr>
+      <td data-label="Name">${escapeHtml(p.display_name || p.name)}</td>
+      <td data-label="Version">${p.version || '-'}</td>
+      <td data-label="Port">${p.port || '-'}</td>
+      <td data-label="Status"><span class="plugin-status ${status.cls}">${status.label}</span></td>
+      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="pluginEditor.open('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  tableDiv.innerHTML = html;
+}
+
+function openPluginManager() {
+  renderPluginManager();
+  document.getElementById('plugin-manager').classList.remove('hidden');
+}
+
+function closePluginManager() {
+  document.getElementById('plugin-manager').classList.add('hidden');
 }
 
 function copyUrl(btn, url) {
@@ -478,7 +514,6 @@ class ConfigEditor {
     this.errors = new Map();
     this.sidebar = document.getElementById('editor-sidebar');
     this.content = document.getElementById('editor-content');
-    this.status = document.getElementById('save-status');
     this.knownTop = new Set(Object.keys(SECTION_META));
     this.activeSection = null;
     this.originalTypes = {}; // track original types for commands_config etc.
@@ -494,7 +529,6 @@ class ConfigEditor {
     document.getElementById('editor-search').value = '';
     this.render();
     document.getElementById('config-editor').classList.remove('hidden');
-    this.setStatus('', '');
     this.activeSection = null;
     // Setup IntersectionObserver after render
     this.setupScrollSpy();
@@ -1215,7 +1249,6 @@ class ConfigEditor {
 
   async confirmSave() {
     this.hideReview();
-    this.setStatus('Saving...', '');
     try {
       await putJSON('/config', { config: this.data, backup: true });
       currentConfig = JSON.parse(JSON.stringify(this.data));
@@ -1225,14 +1258,8 @@ class ConfigEditor {
       _restartPending = true;
       showRestartDialog('Configuration Saved', 'Some configuration changes require a restart.');
     } catch (e) {
-      this.setStatus('Save failed: ' + e.message, 'err');
       this.showToast('Save failed: ' + e.message, 'error');
     }
-  }
-
-  setStatus(msg, cls) {
-    this.status.textContent = msg;
-    this.status.className = 'save-status ' + (cls || '');
   }
 
   computeDiff() {
