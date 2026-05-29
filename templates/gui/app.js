@@ -31,19 +31,54 @@ async function putJSON(path, body) {
 
 /* ─── Shutdown Countdown ─── */
 let _shutdownPollInterval = null;
+let _shutdownTriggered = false;
+let _shutdownNowClicked = false;
 
 async function pollShutdownStatus() {
   try {
     const data = await fetchJSON('/shutdown/status');
     const overlay = document.getElementById('shutdown-overlay');
     const display = document.getElementById('shutdown-countdown-display');
-    if (data.shutdown_pending && data.remaining_seconds !== null && data.remaining_seconds > 0) {
-      overlay.classList.remove('hidden');
-      display.textContent = data.remaining_seconds + ' seconds';
-    } else if (data.shutdown_pending && data.remaining_seconds === 0) {
+    const shutdownNowBtn = document.getElementById('btn-shutdown-now');
+    const cancelBtn = document.getElementById('btn-shutdown-cancel');
+
+    // Once "Shutdown Now" is clicked, ignore all stale API responses
+    if (_shutdownNowClicked) {
       overlay.classList.remove('hidden');
       display.textContent = 'Shutting down...';
+      return;
+    }
+
+    const state = data.state || 'idle';
+
+    overlay.classList.remove('hidden');
+
+    if (state === 'countdown') {
+      display.textContent = data.remaining_seconds + ' seconds';
+      shutdownNowBtn.disabled = false;
+      cancelBtn.disabled = false;
+    } else if (state === 'shutting_down') {
+      display.textContent = 'Shutting down...';
+      shutdownNowBtn.disabled = true;
+      cancelBtn.disabled = true;
+      if (_shutdownPollInterval) {
+        clearInterval(_shutdownPollInterval);
+        _shutdownPollInterval = null;
+      }
+    } else if (state === 'complete') {
+      overlay.classList.add('hidden');
+      _shutdownTriggered = false;
+      if (_shutdownPollInterval) {
+        clearInterval(_shutdownPollInterval);
+        _shutdownPollInterval = null;
+      }
+    } else if (_shutdownTriggered) {
+      // Backend hasn't processed our request yet (file watcher has 5s delay)
+      display.textContent = 'Preparing shutdown...';
+      shutdownNowBtn.disabled = true;
+      cancelBtn.disabled = false;
     } else {
+      // idle and not triggered
       overlay.classList.add('hidden');
       if (_shutdownPollInterval) {
         clearInterval(_shutdownPollInterval);
@@ -51,26 +86,47 @@ async function pollShutdownStatus() {
       }
     }
   } catch (e) {
-    // API might be gone during actual shutdown
+    // If API fails during shutdown, keep showing overlay
+    if (_shutdownTriggered || _shutdownNowClicked) {
+      const overlay = document.getElementById('shutdown-overlay');
+      const display = document.getElementById('shutdown-countdown-display');
+      overlay.classList.remove('hidden');
+      display.textContent = _shutdownNowClicked ? 'Shutting down...' : 'Preparing shutdown...';
+    }
   }
 }
 
 function startShutdownPolling() {
+  _shutdownTriggered = true;
+  _shutdownNowClicked = false;
   if (_shutdownPollInterval) clearInterval(_shutdownPollInterval);
   pollShutdownStatus();
   _shutdownPollInterval = setInterval(pollShutdownStatus, 1000);
 }
 
 document.getElementById('btn-shutdown-now').addEventListener('click', async () => {
+  _shutdownNowClicked = true;
   try {
+    const overlay = document.getElementById('shutdown-overlay');
+    const display = document.getElementById('shutdown-countdown-display');
+    overlay.classList.remove('hidden');
+    display.textContent = 'Shutting down...';
+    document.getElementById('btn-shutdown-now').disabled = true;
+    document.getElementById('btn-shutdown-cancel').disabled = true;
     await fetch('/api/v1/shutdown/now', { method: 'POST' });
-    document.getElementById('shutdown-countdown-display').textContent = 'Shutting down...';
   } catch (e) {
     showToast('Shutdown Now failed: ' + e.message, 'error');
   }
 });
 
 document.getElementById('btn-shutdown-cancel').addEventListener('click', async () => {
+  _shutdownNowClicked = false;
+  _shutdownTriggered = false;
+  if (_shutdownPollInterval) {
+    clearInterval(_shutdownPollInterval);
+    _shutdownPollInterval = null;
+  }
+  document.getElementById('shutdown-overlay').classList.add('hidden');
   try {
     await fetch('/api/v1/shutdown/cancel', { method: 'POST' });
   } catch (e) {
@@ -293,10 +349,16 @@ async function promptShutdown() {
     'btn-danger'
   );
   if (!confirmed) return;
+  // Show overlay immediately — don't wait for backend (5s file watcher delay)
+  _shutdownTriggered = true;
+  const overlay = document.getElementById('shutdown-overlay');
+  const display = document.getElementById('shutdown-countdown-display');
+  overlay.classList.remove('hidden');
+  display.textContent = 'Preparing shutdown...';
+  document.getElementById('btn-shutdown-now').disabled = true;
   try {
     const res = await fetch('/api/v1/shutdown', { method: 'POST' });
     if (res.ok) {
-      showToast('Shutdown signal sent.', 'info');
       startShutdownPolling();
     } else {
       showToast('Shutdown signal failed: ' + res.status + ' ' + res.statusText, 'error');

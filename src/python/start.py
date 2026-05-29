@@ -16,6 +16,7 @@ import shutil
 import threading
 import os
 import json
+import enum
 import urllib.error
 import urllib.request
 import shlex
@@ -715,9 +716,17 @@ if overlay_ports:
 # STATE
 # =============================================================================
 
+class ShutdownState(str, enum.Enum):
+    IDLE = "idle"
+    COUNTDOWN = "countdown"
+    SHUTTING_DOWN = "shutting_down"
+    COMPLETE = "complete"
+
 RUNTIME_DIR = (BASE_DIR / "core" / "runtime").resolve()
 
 shutdown_pending = False
+_shutdown_state = ShutdownState.IDLE
+_shutdown_countdown_task: asyncio.Task | None = None
 shutdown_cancel_event = asyncio.Event()
 shutdown_complete_event: asyncio.Event | None = None
 
@@ -726,7 +735,7 @@ def _write_shutdown_status(remaining: int | None) -> None:
     """Write current countdown state to a file the API can serve."""
     try:
         status_file = RUNTIME_DIR / "shutdown_status"
-        data = {"remaining": remaining}
+        data = {"remaining": remaining, "state": _shutdown_state.value}
         status_file.write_text(json.dumps(data), encoding="utf-8")
     except Exception:
         pass
@@ -745,14 +754,19 @@ def _clear_shutdown_status() -> None:
 # =============================================================================
 
 async def shutdown_countdown():
-    global shutdown_pending
+    global shutdown_pending, _shutdown_state
 
     delay = SHUTDOWN_DELAY_SECONDS
+    _shutdown_state = ShutdownState.COUNTDOWN
 
     for remaining in range(delay, 0, -1):
+        if _shutdown_state != ShutdownState.COUNTDOWN:
+            # State changed externally (e.g. shutdown_now was triggered)
+            return
         if shutdown_cancel_event.is_set():
             shutdown_cancel_event.clear()
             shutdown_pending = False
+            _shutdown_state = ShutdownState.IDLE
             _clear_shutdown_status()
             log.info("\nCancelled shutdown.")
             return
@@ -762,18 +776,21 @@ async def shutdown_countdown():
         _write_shutdown_status(remaining)
         await asyncio.sleep(1)
     log.info("\nShutting down now!")
+    _shutdown_state = ShutdownState.SHUTTING_DOWN
     _write_shutdown_status(0)
     stop_all_processes()
+    _stop_api_server()
+    _shutdown_state = ShutdownState.COMPLETE
     _clear_shutdown_status()
-    if shutdown_complete_event is not None:
-        shutdown_complete_event.set()
+    sys.stdin.close()
+    os._exit(0)
 
 # =============================================================================
 # FILE WATCHER
 # =============================================================================
 
 async def check_and_run():
-    global shutdown_pending
+    global shutdown_pending, _shutdown_state, _shutdown_countdown_task
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     while True:
         if shutdown_complete_event is not None and shutdown_complete_event.is_set():
@@ -790,15 +807,20 @@ async def check_and_run():
                 if not shutdown_pending:
                     shutdown_pending = True
                     log.info(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
-                    asyncio.create_task(shutdown_countdown())
+                    _shutdown_countdown_task = asyncio.create_task(shutdown_countdown())
             elif name == "shutdown_now":
                 log.info("\nImmediate shutdown signal detected.")
+                _shutdown_state = ShutdownState.SHUTTING_DOWN
+                if _shutdown_countdown_task is not None:
+                    _shutdown_countdown_task.cancel()
+                    _shutdown_countdown_task = None
                 _write_shutdown_status(0)
                 stop_all_processes()
+                _stop_api_server()
+                _shutdown_state = ShutdownState.COMPLETE
                 _clear_shutdown_status()
-                if shutdown_complete_event is not None:
-                    shutdown_complete_event.set()
-                return
+                sys.stdin.close()
+                os._exit(0)
             elif name == "restart":
                 log.info("\nRestart signal detected. Requesting clean restart...")
                 restart_app()
@@ -946,6 +968,8 @@ async def main():
     watcher.cancel()
 
     await asyncio.sleep(0.1)
+    sys.stdin.close()
+
 
 # =============================================================================
 # EVENT DEFINITIONS (ENTRY POINT)
@@ -965,6 +989,15 @@ if ALLOW_CLOSE:
         log.info("-----------------------------------")
 
     asyncio.run(main())
+
+    # Clean up all child processes (atexit handlers are skipped by os._exit)
+    stop_all_processes()
+    _stop_api_server()
+
+    # Force exit — asyncio.to_thread(input) leaves a non-daemon thread
+    # pool thread that keeps the process alive after the event loop finishes.
+    sys.stdin.close()
+    os._exit(0)
 
 else:
     # AllowClose=False -> script exits itself, EXEs continue running quietly

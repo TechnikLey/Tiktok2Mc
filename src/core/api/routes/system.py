@@ -60,21 +60,23 @@ async def shutdown_now():
 
 @router.get("/shutdown/status")
 async def shutdown_status():
-    """Return the current countdown state (``null`` when no countdown is active)."""
+    """Return the current shutdown state (countdown, shutting_down, etc.)."""
     try:
         status_file = _runtime_dir() / "shutdown_status"
         if status_file.exists():
             raw = status_file.read_text(encoding="utf-8")
             data = json.loads(raw)
             remaining = data.get("remaining")
+            state = data.get("state", "idle")
             return {
                 "shutdown_pending": remaining is not None,
                 "remaining_seconds": remaining,
+                "state": state,
             }
-        return {"shutdown_pending": False, "remaining_seconds": None}
+        return {"shutdown_pending": False, "remaining_seconds": None, "state": "idle"}
     except Exception as e:
         log.exception("Failed to read shutdown status")
-        return {"shutdown_pending": False, "remaining_seconds": None}
+        return {"shutdown_pending": False, "remaining_seconds": None, "state": "idle"}
 
 
 @router.post("/shutdown/cancel")

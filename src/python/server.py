@@ -270,4 +270,3 @@ except KeyboardInterrupt:
     log.info("\nServer was stopped manually.")
 
 log.info("\nServer stopped.")
-input("Press Enter to exit...")
