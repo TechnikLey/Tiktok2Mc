@@ -965,22 +965,20 @@ class ConfigEditor {
 
   buildCommandsConfig(path, cfg, commands) {
     const help = getHelp(path);
-    // Normalize empty array to empty object for editing
     let config = cfg;
     if (Array.isArray(config)) config = {};
-    const keys = Object.keys(config);
-    if (!keys.length && !commands.length) {
+    if (!commands.length) {
       return `<div class="editor-field full-width" data-path="${path}">
         <div class="field-label">Command Overrides</div>
-        <div class="field-widget"><p class="field-desc">No per-command overrides configured. Add commands to the group first to configure overrides.</p></div>
+        <div class="field-widget"><p class="field-desc">No commands defined in this group yet. Add commands above to configure per-command overrides.</p></div>
       </div>`;
     }
     let html = `<div class="editor-field full-width" data-path="${path}"><div class="field-label">Command Overrides</div><div class="field-widget">`;
     for (const cmd of commands) {
       const c = config[cmd] || {};
-      html += `<details style="margin-bottom:0.5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.5rem;">
+      html += `<details style="margin-bottom:0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.6rem;">
         <summary style="cursor:pointer;font-size:0.9rem;font-weight:500;">${escapeHtml(cmd)}</summary>
-        <div style="padding:0.5rem 0.25rem;">
+        <div style="padding:0.6rem 0.25rem 0.2rem 0.25rem;">
           ${this.buildOverrideField('points_cost', c.points_cost, `${path}.${cmd}.points_cost`)}
           ${this.buildOverrideField('cooldown', c.cooldown, `${path}.${cmd}.cooldown`)}
           ${this.buildOverrideField('conditional', c.conditional, `${path}.${cmd}.conditional`)}
@@ -995,10 +993,15 @@ class ConfigEditor {
   }
 
   buildOverrideField(key, value, path) {
-    if (value === undefined && key !== 'roles') return '';
-    const meta = getMeta(path);
     const label = toTitle(key);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
+
+    if (value === undefined) {
+      if (key === 'roles') value = [];
+      else if (key === 'conditional') value = false;
+      else value = '';
+    }
+
     if (key === 'roles') {
       const roles = ['all','moderator','superfan','fanclub'];
       const current = value || [];
@@ -1006,15 +1009,18 @@ class ConfigEditor {
         const checked = current.includes(r) ? 'checked' : '';
         return `<label style="margin-right:0.75rem;font-size:0.85rem;"><input type="checkbox" ${checked} data-role="${r}" onchange="editor.onRoleChange('${path}', this)">${toTitle(r)}</label>`;
       }).join('');
-      return `<div style="margin-bottom:0.5rem;"><span style="font-size:0.82rem;color:var(--text-secondary);">${escapeHtml(label)}</span><div style="margin-top:0.25rem;">${boxes}</div></div>`;
+      return `<div style="margin-bottom:0.6rem;"><span style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</span><div>${boxes}</div></div>`;
     }
-    if (typeof value === 'boolean') {
-      return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;"><input type="checkbox" class="toggle" id="${id}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool"><label for="${id}" style="font-size:0.85rem;">${escapeHtml(label)}</label></div>`;
+    if (key === 'conditional') {
+      return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;"><input type="checkbox" class="toggle" id="${id}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool"><label for="${id}" style="font-size:0.85rem;">${escapeHtml(label)}</label></div>`;
     }
     if (key === 'handler') {
-      return `<div style="margin-bottom:0.5rem;"><label style="font-size:0.82rem;color:var(--text-secondary);display:block;margin-bottom:0.25rem;">${escapeHtml(label)}</label><select id="${id}" data-path="${path}" data-type="string" style="width:auto;"><option value="">(inherit)</option><option value="rcon" ${value==='rcon'?'selected':''}>rcon</option><option value="http" ${value==='http'?'selected':''}>http</option></select></div>`;
+      return `<div style="margin-bottom:0.6rem;"><label style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</label><select id="${id}" data-path="${path}" data-type="string" style="padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"><option value="">(inherit from group)</option><option value="rcon" ${value==='rcon'?'selected':''}>rcon</option><option value="http" ${value==='http'?'selected':''}>http</option></select></div>`;
     }
-    return `<div style="margin-bottom:0.5rem;"><label style="font-size:0.82rem;color:var(--text-secondary);display:block;margin-bottom:0.25rem;">${escapeHtml(label)}</label><input type="${typeof value === 'number'?'number':'text'}" id="${id}" value="${value !== undefined ? escapeHtml(String(value)) : ''}" data-path="${path}" data-type="${typeof value === 'number'?'number':'string'}" style="width:100%;"></div>`;
+    if (key === 'points_cost' || key === 'cooldown') {
+      return `<div style="margin-bottom:0.6rem;"><label style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</label><input type="number" id="${id}" value="${value !== '' ? escapeHtml(String(value)) : ''}" data-path="${path}" data-type="number" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"></div>`;
+    }
+    return `<div style="margin-bottom:0.6rem;"><label style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</label><input type="text" id="${id}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"></div>`;
   }
 
   addGroup(path) {
@@ -1027,19 +1033,17 @@ class ConfigEditor {
   buildThemeEditor(path, theme) {
     let html = '';
     for (const [plugin, colors] of Object.entries(theme || {})) {
-      html += `<div style="margin-bottom:1rem;"><strong style="font-size:0.9rem;">${escapeHtml(toTitle(plugin))}</strong><div style="display:flex;flex-wrap:wrap;gap:1rem;margin-top:0.5rem;">`;
+      html += `<div style="margin-bottom:1.5rem;"><strong style="font-size:0.95rem;color:var(--text);display:block;margin-bottom:0.5rem;">${escapeHtml(toTitle(plugin))}</strong>`;
       for (const [ckey, cval] of Object.entries(colors)) {
         const p = `${path}.${plugin}.${ckey}`;
         const id = 'f_' + p.replace(/[^a-zA-Z0-9]/g, '_');
-        const help = getHelp(p);
-        html += `<div style="display:flex;align-items:center;gap:0.5rem;">
-          <div class="color-preview" style="background:${cval};" id="${id}_preview"></div>
-          <input type="color" id="${id}" value="${cval}" data-path="${p}" data-type="string" oninput="document.getElementById('${id}_preview').style.background=this.value">
-          <input type="text" value="${escapeHtml(cval)}" data-path="${p}" data-type="string" style="width:90px;font-family:monospace;" oninput="document.getElementById('${id}').value=this.value;document.getElementById('${id}_preview').style.background=this.value">
-          <span style="font-size:0.8rem;color:var(--text-secondary);min-width:70px;">${escapeHtml(toTitle(ckey))}</span>
+        html += `<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+          <span style="font-size:0.85rem;color:var(--text-secondary);min-width:100px;">${escapeHtml(toTitle(ckey))}</span>
+          <input type="color" id="${id}" value="${cval}" data-path="${p}" data-type="string" oninput="document.getElementById('${id}_hex').value=this.value">
+          <input type="text" id="${id}_hex" value="${escapeHtml(cval)}" style="width:120px;padding:0.45rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;" oninput="document.getElementById('${id}').value=this.value">
         </div>`;
       }
-      html += '</div></div>';
+      html += '</div>';
     }
     return html;
   }
