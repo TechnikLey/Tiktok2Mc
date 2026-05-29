@@ -8,11 +8,13 @@
 # and pushes updates to connected clients via SSE.
 # ==================================================
 
-import json, yaml, sys, threading, webview
+import json, sys, threading, webview, os
+from pathlib import Path
 from flask import Flask, Response, request, render_template_string
 from flask_cors import CORS
 from queue import Queue
-from core import parse_args, get_base_dir, get_root_dir, get_base_file
+from core import parse_args, get_base_dir, get_base_file
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
@@ -21,11 +23,21 @@ log = logging.getLogger(__name__)
 args = parse_args()
 
 BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
 
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
-STATE_FILE = (ROOT_DIR / "data" / "window_state_death.json").resolve()
-WEB_SERVER_PORT = 29190 
+PLUGIN_DIR = Path(__file__).resolve().parent
+DATA_DIR = (BASE_DIR.parent / "data").resolve()
+STATE_FILE = (DATA_DIR / "window_state_death.json").resolve()
+
+cfg = load_plugin_config(PLUGIN_DIR)
+WEB_SERVER_PORT = cfg.get("port", 29190)
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
+
+THEME = load_plugin_theme(cfg, "death_counter")
+THEME_STYLE = theme_css(THEME)
+BG_COLOR = THEME["background"]
+
+DEATH_COUNTER_EXE_PATH = get_base_file()
+
 
 def load_win_size():
     if STATE_FILE.exists():
@@ -34,30 +46,6 @@ def load_win_size():
         except Exception as e:
             log.info(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}
-
-cfg = {}
-
-if CONFIG_FILE.exists():
-    try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-            WEB_SERVER_PORT = cfg.get("death_counter", {}).get("port", 29190)
-    except Exception as e:
-        log.info(f"Config error: {e}")
-        cfg = {}
-else:
-    log.info(f"Config file not found: {CONFIG_FILE}")
-    sys.exit(1)
-
-# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
-SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-
-THEME = load_plugin_theme(cfg, "death_counter")
-THEME_STYLE = theme_css(THEME)
-BG_COLOR = THEME["background"]
-
-DEATH_COUNTER_ENABLED = cfg.get("death_counter", {}).get("enabled", False)
-DEATH_COUNTER_EXE_PATH = get_base_file()
 
 
 # --- Flask app & death tracking ---

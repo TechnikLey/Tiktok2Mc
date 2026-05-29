@@ -9,25 +9,25 @@
 # State is persisted to stats.json.
 # ==================================================
 
-import webview, threading, json, sys, yaml
+import webview, threading, json, sys, os
 from pathlib import Path
 from flask import Flask, render_template_string, Response, request
 from queue import Queue
-from core import parse_args, get_base_file, get_base_dir, get_root_dir
+from core import parse_args, get_base_file, get_base_dir
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
 
-DATA_DIR = (ROOT_DIR / "data").resolve()
+PLUGIN_DIR = Path(__file__).resolve().parent
+DATA_DIR = (BASE_DIR.parent / "data").resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 STATS_FILE = (DATA_DIR / "stats.json").resolve()
 STATE_FILE = (DATA_DIR / "window_state_wins.json").resolve()
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 
 args = parse_args()
 
@@ -47,14 +47,10 @@ def load_win_size():
     return {"width": 600, "height": 300}
 
 # --- Configuration ---
-try:
-    with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f) or {}
-except Exception: cfg = {}
-PORT = cfg.get("win_counter", {}).get("port", 29191)
-# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
-SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-DECREMENT_ON_DEATH = cfg.get("win_counter", {}).get("decrement_on_death", False)
+cfg = load_plugin_config(PLUGIN_DIR)
+PORT = cfg.get("port", 29191)
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
+DECREMENT_ON_DEATH = cfg.get("decrement_on_death", False)
 
 THEME = load_plugin_theme(cfg, "win_counter")
 THEME_STYLE = theme_css(THEME)

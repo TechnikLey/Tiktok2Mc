@@ -9,19 +9,20 @@
 # Works in pywebview AND as an OBS browser source.
 # ==================================================
 
-import webview, threading, requests, json, sys, yaml, logging, time
+import webview, threading, requests, json, sys, logging, time, os
+from pathlib import Path
 from flask import Flask, request, Response
-from core import parse_args, get_root_dir, get_base_file, get_base_dir
+from core import parse_args, get_base_file, get_base_dir
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 from queue import Queue
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
 
-DATA_DIR = (ROOT_DIR / "data").resolve()
+PLUGIN_DIR = Path(__file__).resolve().parent
+DATA_DIR = (BASE_DIR.parent / "data").resolve()
 STATE_FILE = (DATA_DIR / "window_state_timer.json").resolve()
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 
 log = logging.getLogger(__name__)
 logging.getLogger('werkzeug').setLevel(logging.INFO)
@@ -29,20 +30,17 @@ logging.getLogger('werkzeug').setLevel(logging.INFO)
 args = parse_args()
 
 # --- Configuration ---
-try:
-    with CONFIG_FILE.open("r", encoding="utf-8") as f: cfg = yaml.safe_load(f) or {}
-except Exception: cfg = {}
+cfg = load_plugin_config(PLUGIN_DIR)
 
-TIMER_MINS = cfg.get("timer", {}).get("start_time", 10)
-WIN_PORT = cfg.get("win_counter", {}).get("port", 29191)
-WEB_PORT = cfg.get("timer", {}).get("port", 29189)
-SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-ADD_URL = f"http://127.0.0.1:{WIN_PORT}/add?amount=1"
-TIMER_EXE_PATH = get_base_file()
+TIMER_MINS = cfg.get("start_time", 10)
+WEB_PORT = cfg.get("port", 29189)
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
 # Decoupling options
-AUTO_WIN = cfg.get("timer", {}).get("auto_win", False)
-PAUSE_ON_DEATH = cfg.get("timer", {}).get("pause_on_death", False)
+AUTO_WIN = cfg.get("auto_win", False)
+PAUSE_ON_DEATH = cfg.get("pause_on_death", False)
+WIN_COUNTER_PORT = cfg.get("win_counter_port", 29191)
+ADD_URL = f"http://127.0.0.1:{WIN_COUNTER_PORT}/add?amount=1"
 
 THEME = load_plugin_theme(cfg, "timer")
 THEME_STYLE = theme_css(THEME)

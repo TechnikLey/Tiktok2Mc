@@ -1,0 +1,20 @@
+# ==========================================
+# Spotify Control Plugin — Configuration
+# ==========================================
+# This file controls the Spotify plugin settings.
+# All settings are local to this plugin.
+
+enabled: false
+port: 29194
+client_id: ""
+client_secret: ""
+redirect_uri: "http://127.0.0.1:29194/callback"
+device_id: ""
+volume_step: 10
+playtrack_mode: "replace"
+
+theme:
+  background: "#000000"
+  text: "#ffffff"
+  accent: "#1db954"
+  accent2: "#1ed760"

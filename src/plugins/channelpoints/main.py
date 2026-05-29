@@ -2,8 +2,8 @@
 # ==================================================
 # channelpoints - Viewer loyalty points plugin
 # ==================================================
-# Awards points to active viewers, lets them check
-# their balance and spend points on rewards.
+# Awards points to active viewers. Viewers earn points
+# over time and can spend them on rewards.
 # ==================================================
 
 import sqlite3
@@ -12,40 +12,34 @@ import threading
 import time
 import sys
 import html
-import yaml
+import os
 from queue import Queue
 from pathlib import Path
 from flask import Flask, request, Response, jsonify
-from core import parse_args, get_root_dir, get_base_file, get_base_dir
+from core import parse_args, get_base_file, get_base_dir
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
 
 # --- Paths ---
 BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
-DATA_DIR = (ROOT_DIR / "data").resolve()
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
-CHANNEL_POINTS_DIR = (ROOT_DIR / "data").resolve()
-DB_PATH = (CHANNEL_POINTS_DIR / "channel_points.db").resolve()
+
+PLUGIN_DIR = Path(__file__).resolve().parent
+DATA_DIR = (BASE_DIR.parent / "data").resolve()
+DB_PATH = (DATA_DIR / "channel_points.db").resolve()
 
 args = parse_args()
 
 # --- Configuration ---
-try:
-    with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f) or {}
-except Exception as e:
-    log.info(f"[CHANNEL POINTS] Config load error: {e}")
-    cfg = {}
+cfg = load_plugin_config(PLUGIN_DIR)
 
-cp_cfg = cfg.get("channel_points", {})
-PORT = cp_cfg.get("port", 29195)
-AWARD_AMOUNT = cp_cfg.get("award_amount", 10)
-AWARD_INTERVAL = cp_cfg.get("award_interval_seconds", 60)
-PING_TIMEOUT = cp_cfg.get("ping_timeout_minutes", 10)
-TOP_COUNT = cp_cfg.get("leaderboard_count", 10)
-SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+PORT = cfg.get("port", 29195)
+AWARD_AMOUNT = cfg.get("award_amount", 10)
+AWARD_INTERVAL = cfg.get("award_interval_seconds", 60)
+PING_TIMEOUT = cfg.get("ping_timeout_minutes", 10)
+TOP_COUNT = cfg.get("leaderboard_count", 10)
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
 THEME = load_plugin_theme(cfg, "channel_points")
 THEME_STYLE = theme_css(THEME)
@@ -56,7 +50,7 @@ CP_EXE_PATH = get_base_file()
 
 # --- Database ---
 def init_db():
-    CHANNEL_POINTS_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (

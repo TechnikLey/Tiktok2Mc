@@ -7,11 +7,13 @@ import webview
 from flask import Flask, render_template_string, request, Response
 import threading
 import sys
-import yaml
 import json
 from queue import Queue
 from collections import defaultdict
-from core import parse_args, get_root_dir, get_base_dir, get_base_file
+from pathlib import Path
+import os
+from core import parse_args, get_base_dir, get_base_file
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
@@ -23,44 +25,24 @@ _listeners_lock = threading.Lock()
 # ==========================================
 
 BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
 
+PLUGIN_DIR = Path(__file__).resolve().parent
 args = parse_args()
-full_config = {}
+
+cfg = load_plugin_config(PLUGIN_DIR)
 
 # Standardwerte
-APP_PORT = 29186 
-DISPLAY_MODE = "overwrite"
-FADE_IN = 500
-FADE_OUT = 500
-OVERLAYS_CONFIG = []
-# Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
-SERVER_HOST = "127.0.0.1"
-
-if CONFIG_FILE.exists():
-    try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            full_config = yaml.safe_load(f)
-            # Fokus auf den Unterpunkt Overlaytxt
-            conf = full_config.get("overlay_text", {})
-            
-            APP_PORT = conf.get("port", 29186)
-            DISPLAY_MODE = conf.get("display_mode", "overwrite")
-            FADE_IN = max(0, int(conf.get("fade_in", 500)))
-            FADE_OUT = max(0, int(conf.get("fade_out", 500)))
-            
-            # NEU: Liste wird jetzt hier gesucht
-            OVERLAYS_CONFIG = conf.get("overlays", [])
-            SERVER_HOST = full_config.get("server_host", "127.0.0.1")
-            
-    except Exception as e:
-        log.info(f"[!] Config error: {e}")
+APP_PORT = cfg.get("port", 29186)
+DISPLAY_MODE = cfg.get("display_mode", "overwrite")
+FADE_IN = max(0, int(cfg.get("fade_in", 500)))
+FADE_OUT = max(0, int(cfg.get("fade_out", 500)))
+OVERLAYS_CONFIG = cfg.get("overlays", [])
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
 if not OVERLAYS_CONFIG:
     OVERLAYS_CONFIG = [{"name": "default"}]
 
-THEME = load_plugin_theme(full_config, "overlay_text")
+THEME = load_plugin_theme(cfg, "overlay_text")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 

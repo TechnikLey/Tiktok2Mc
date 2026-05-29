@@ -24,6 +24,7 @@ import yaml
 import requests
 from flask import Flask, Response, request, jsonify, redirect
 from core import parse_args, get_base_dir, get_root_dir, get_base_file
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 log = logging.getLogger(__name__)
 
@@ -33,44 +34,25 @@ log = logging.getLogger(__name__)
 BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
 
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
+PLUGIN_DIR = Path(__file__).resolve().parent
 TOKEN_FILE = (ROOT_DIR / "data" / "spotify_token.json").resolve()
 
 args = parse_args()
 
-cfg = {}
+cfg = load_plugin_config(PLUGIN_DIR)
 
-try:
-    if not CONFIG_FILE.exists():
-        log.info("Config not found")
-        sys.exit(1)
-    else:
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-        SPOTIFY_CFG = cfg.get("spotify", {})
-        SPOTIFY_PORT = SPOTIFY_CFG.get("port", 29194)
-        CLIENT_ID = SPOTIFY_CFG.get("client_id", "")
-        CLIENT_SECRET = SPOTIFY_CFG.get("client_secret", "")
-        REDIRECT_URI = SPOTIFY_CFG.get("redirect_uri", f"http://127.0.0.1:{SPOTIFY_PORT}/callback")
-        DEVICE_ID = SPOTIFY_CFG.get("device_id", "")
-        VOLUME_STEP = SPOTIFY_CFG.get("volume_step", 10)
-        PLAYTRACK_MODE = SPOTIFY_CFG.get("playtrack_mode", "replace")
-        SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-except Exception as e:
-    log.info(f"Config error: {e}")
-    SPOTIFY_PORT = 29194
-    CLIENT_ID = ""
-    CLIENT_SECRET = ""
-    REDIRECT_URI = f"http://127.0.0.1:{SPOTIFY_PORT}/callback"
-    DEVICE_ID = ""
-    VOLUME_STEP = 10
-    PLAYTRACK_MODE = "replace"
-    SERVER_HOST = "127.0.0.1"
+SPOTIFY_PORT = cfg.get("port", 29194)
+CLIENT_ID = cfg.get("client_id", "")
+CLIENT_SECRET = cfg.get("client_secret", "")
+REDIRECT_URI = cfg.get("redirect_uri", f"http://127.0.0.1:{SPOTIFY_PORT}/callback")
+DEVICE_ID = cfg.get("device_id", "")
+VOLUME_STEP = cfg.get("volume_step", 10)
+PLAYTRACK_MODE = cfg.get("playtrack_mode", "replace")
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
 SPOTIFY_EXE_PATH = get_base_file()
 
-_theme_cfg = cfg if isinstance(cfg, dict) else {}
-THEME = load_plugin_theme(_theme_cfg, "spotify")
+THEME = load_plugin_theme(cfg, "spotify")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
@@ -889,10 +871,9 @@ if __name__ == "__main__":
         log.info("  1. A Spotify Developer account (https://developer.spotify.com)")
         log.info("  2. An app with Client ID and Client Secret")
         log.info("  3. Redirect URI set to: http://127.0.0.1:29194/callback")
-        log.info("  Then add to config/config.yaml:")
-        log.info("    spotify:")
-        log.info('      client_id: "YOUR_CLIENT_ID"')
-        log.info('      client_secret: "YOUR_CLIENT_SECRET"')
+        log.info("  Then edit plugins/spotify/config.yaml:")
+        log.info("    client_id: \"YOUR_CLIENT_ID\"")
+        log.info("    client_secret: \"YOUR_CLIENT_SECRET\"")
         log.info("  On first start, your browser will open for Spotify login.")
         log.info("=" * 60)
 

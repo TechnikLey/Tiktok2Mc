@@ -2,17 +2,25 @@
 import time
 import threading
 import requests
-import yaml
 import logging
 import sys
 from pathlib import Path
 
+from core.plugin_config import load_plugin_config, discover_plugins_dir, load_plugin_manifest
+
 log = logging.getLogger(__name__)
 
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+
+def _find_overlay_plugin_dir() -> Path:
+    plugins_dir = discover_plugins_dir()
+    for child in plugins_dir.iterdir():
+        if not child.is_dir():
+            continue
+        manifest = load_plugin_manifest(child)
+        if manifest and manifest.get("name") == "overlay-text":
+            return child
+    return plugins_dir / "overlaytxt"
+
 
 class OverlayClient:
     def __init__(self, name, global_port, max_fails, cooldown):
@@ -28,7 +36,7 @@ class OverlayClient:
             elapsed = time.time() - self._last_fail_time
             if elapsed < self.cooldown:
                 return True, int(self.cooldown - elapsed)
-            self._fail_count = 0 
+            self._fail_count = 0
         return False, 0
 
     def mark_success(self):
@@ -38,31 +46,25 @@ class OverlayClient:
         self._fail_count += 1
         self._last_fail_time = time.time()
 
+
 class OverlayManager:
     def __init__(self):
         self.clients = {}
-        self.config_path = get_base_dir().parent / "config" / "config.yaml"
         self.load_config()
 
     def load_config(self):
-        if not self.config_path.exists():
-            log.critical(f"Config not found: {self.config_path}")
-            return
-
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                full_config = yaml.safe_load(f) or {}
-                conf = full_config.get("overlay_text", {})
+            plugin_dir = _find_overlay_plugin_dir()
+            cfg = load_plugin_config(plugin_dir)
         except Exception as e:
-            log.error(f"YAML Error: {e}")
-            return
+            log.error(f"Failed to load overlay plugin config: {e}")
+            cfg = {}
 
-        global_port = conf.get("port", 29186)
-        def_fails = conf.get("max_fails", 3)
-        def_cooldown = conf.get("cooldown", 10)
+        global_port = cfg.get("port", 29186)
+        def_fails = cfg.get("max_fails", 3)
+        def_cooldown = cfg.get("cooldown", 10)
 
-        # Overlays aus dem Unterpunkt laden
-        for item in conf.get("overlays", []):
+        for item in cfg.get("overlays", []):
             name = item.get("name")
             if not name:
                 log.warning(f"Skipping overlay with missing name: {item}")
@@ -71,20 +73,20 @@ class OverlayManager:
                 name=name,
                 global_port=global_port,
                 max_fails=def_fails,
-                cooldown=def_cooldown
+                cooldown=def_cooldown,
             )
 
-        # Immer ein "default" Overlay bereitstellen, auch wenn es nicht in der Config steht
+        # Always provide a "default" overlay even if not explicitly configured
         if "default" not in self.clients:
             self.clients["default"] = OverlayClient(
                 name="default",
                 global_port=global_port,
                 max_fails=def_fails,
-                cooldown=def_cooldown
+                cooldown=def_cooldown,
             )
-            log.info(f"Created fallback 'default' overlay (not in config).")
+            log.info("Created fallback 'default' overlay (not in config).")
 
-        log.info(f"Loaded {len(self.clients)} overlays from {self.config_path}")
+        log.info("Loaded %d overlays from overlay-text plugin config", len(self.clients))
 
     def dispatch(self, title, subtitle, duration, target_name):
         client = self.clients.get(target_name)
@@ -108,8 +110,10 @@ class OverlayManager:
             client.mark_failure()
         return False
 
+
 _manager = None
 _manager_lock = threading.Lock()
+
 
 def send_overlay_text(title, subtitle, duration=3, overlay_name="default"):
     global _manager

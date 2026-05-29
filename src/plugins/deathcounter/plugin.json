@@ -20,5 +20,42 @@
   ],
   "depends_on": [],
   "auto_enable": false,
-  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": false,
+        "label": "Enable Plugin",
+        "help": "Turn the death counter overlay on or off",
+        "category": "General"
+      },
+      {
+        "key": "port",
+        "type": "integer",
+        "default": 29190,
+        "min": 1024,
+        "max": 65535,
+        "label": "Port",
+        "help": "Web server and overlay port",
+        "category": "General"
+      },
+      {
+        "key": "theme.background",
+        "type": "color",
+        "default": "#000000",
+        "label": "Background Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.text",
+        "type": "color",
+        "default": "#8ef3ff",
+        "label": "Text Color",
+        "category": "Theme"
+      }
+    ]
+  }
 }

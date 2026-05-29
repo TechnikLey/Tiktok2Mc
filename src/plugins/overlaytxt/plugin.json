@@ -20,5 +20,100 @@
   ],
   "depends_on": [],
   "auto_enable": false,
-  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": false,
+        "label": "Enable Plugin",
+        "help": "Turn the text overlay on or off",
+        "category": "General"
+      },
+      {
+        "key": "port",
+        "type": "integer",
+        "default": 29186,
+        "min": 1024,
+        "max": 65535,
+        "label": "Port",
+        "help": "Web server and overlay port",
+        "category": "General"
+      },
+      {
+        "key": "display_mode",
+        "type": "select",
+        "options": ["overwrite", "queue"],
+        "default": "overwrite",
+        "label": "Display Mode",
+        "help": "overwrite = replace current message; queue = line up messages",
+        "category": "Behavior"
+      },
+      {
+        "key": "fade_in",
+        "type": "integer",
+        "default": 500,
+        "min": 0,
+        "label": "Fade In (ms)",
+        "help": "Fade-in duration in milliseconds",
+        "category": "Behavior"
+      },
+      {
+        "key": "fade_out",
+        "type": "integer",
+        "default": 500,
+        "min": 0,
+        "label": "Fade Out (ms)",
+        "help": "Fade-out duration in milliseconds",
+        "category": "Behavior"
+      },
+      {
+        "key": "max_fails",
+        "type": "integer",
+        "default": 3,
+        "min": 1,
+        "label": "Max Fails",
+        "help": "Circuit breaker: consecutive failures before cooldown",
+        "category": "Behavior"
+      },
+      {
+        "key": "cooldown",
+        "type": "integer",
+        "default": 10,
+        "min": 0,
+        "label": "Cooldown (seconds)",
+        "help": "Seconds to wait after max_fails before retrying",
+        "category": "Behavior"
+      },
+      {
+        "key": "overlays",
+        "type": "array",
+        "default": [{"name": "default"}],
+        "item_schema": {
+          "type": "object",
+          "fields": [
+            {"key": "name", "type": "string", "default": "default", "label": "Overlay Name"}
+          ]
+        },
+        "label": "Overlay Slots",
+        "category": "Overlays"
+      },
+      {
+        "key": "theme.background",
+        "type": "color",
+        "default": "#00FF00",
+        "label": "Background Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.text",
+        "type": "color",
+        "default": "#ffffff",
+        "label": "Text Color",
+        "category": "Theme"
+      }
+    ]
+  }
 }

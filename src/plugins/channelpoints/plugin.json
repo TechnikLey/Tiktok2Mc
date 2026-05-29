@@ -20,5 +20,107 @@
   ],
   "depends_on": [],
   "auto_enable": false,
-  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": false,
+        "label": "Enable Plugin",
+        "help": "Turn the channel points system on or off",
+        "category": "General"
+      },
+      {
+        "key": "port",
+        "type": "integer",
+        "default": 29195,
+        "min": 1024,
+        "max": 65535,
+        "label": "Port",
+        "help": "Web server, overlay and chat command port",
+        "category": "General"
+      },
+      {
+        "key": "award_amount",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Award Amount",
+        "help": "Points awarded per interval to each active viewer",
+        "category": "Rewards"
+      },
+      {
+        "key": "award_interval_seconds",
+        "type": "integer",
+        "default": 60,
+        "min": 1,
+        "label": "Award Interval (seconds)",
+        "help": "How often points are awarded",
+        "category": "Rewards"
+      },
+      {
+        "key": "ping_timeout_minutes",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Ping Timeout (minutes)",
+        "help": "Minutes after last activity before a viewer is considered inactive",
+        "category": "Rewards"
+      },
+      {
+        "key": "leaderboard_count",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "max": 100,
+        "label": "Leaderboard Count",
+        "help": "Number of top viewers shown on the leaderboard overlay",
+        "category": "Rewards"
+      },
+      {
+        "key": "theme.background",
+        "type": "color",
+        "default": "#000000",
+        "label": "Background Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.text",
+        "type": "color",
+        "default": "#ffffff",
+        "label": "Text Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent",
+        "type": "color",
+        "default": "#FFD700",
+        "label": "Accent Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent2",
+        "type": "color",
+        "default": "#00BFFF",
+        "label": "Accent 2 Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent3",
+        "type": "color",
+        "default": "#40E0D0",
+        "label": "Accent 3 Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.danger",
+        "type": "color",
+        "default": "#FF4500",
+        "label": "Danger Color",
+        "category": "Theme"
+      }
+    ]
+  }
 }

@@ -1,0 +1,14 @@
+# ==========================================
+# Win Counter Plugin — Configuration
+# ==========================================
+
+enabled: false
+port: 29191
+decrement_on_death: false
+
+theme:
+  background: "#000000"
+  text: "#ffffff"
+  danger: "#ff4d4d"
+  muted: "#666666"
+  separator: "#333333"

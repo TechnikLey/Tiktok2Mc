@@ -42,3 +42,15 @@ def get_plugin_dir() -> Path:
 
 def get_plugin_config_file() -> Path:
     return get_plugin_dir() / "config.yaml"
+
+
+def get_plugins_dir() -> Path:
+    """Return the resolved plugins directory (dev or release layout)."""
+    root = get_root_dir()
+    dev_dir = root / "src" / "plugins"
+    if dev_dir.is_dir():
+        return dev_dir
+    rel_dir = root / "plugins"
+    if rel_dir.is_dir():
+        return rel_dir
+    return dev_dir

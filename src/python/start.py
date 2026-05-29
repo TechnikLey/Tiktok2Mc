@@ -182,6 +182,10 @@ MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", 
 AUTO_SHUTDOWN_ENABLED = cfg.get("shutdown", {}).get("enabled", True)
 SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown", {}).get("delay_seconds", 30)
 
+# Forward core system settings to child processes so plugins do not
+# need to read the global config for basic networking values.
+os.environ["SERVER_HOST"] = cfg.get("server_host", "127.0.0.1")
+
 # -----------------------------
 # Process dictionary
 # -----------------------------
@@ -205,19 +209,23 @@ def get_visibility(required_level):
 def _sanitize_session_name(name):
     return name.replace(" ", "-").replace("/", "-").lower()
 
+_FORWARDED_ENV_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "SERVER_HOST")
+
+
 def _build_display_env_tmux():
     """Build -e flags for tmux new-session to forward display vars."""
     args = []
-    for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+    for var in _FORWARDED_ENV_VARS:
         val = os.environ.get(var)
         if val:
             args.extend(["-e", f"{var}={val}"])
     return args
 
+
 def _build_display_env_screen():
     """Build env prefix for screen sessions to forward display vars."""
     env_args = []
-    for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+    for var in _FORWARDED_ENV_VARS:
         val = os.environ.get(var)
         if val:
             env_args.append(f"{var}={val}")

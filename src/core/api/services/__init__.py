@@ -29,21 +29,8 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "random_triggers": dict,
     "console": dict,
     "minecraft_server_api": dict,
-    "overlay_text": dict,
-    "like_goal": dict,
-    "timer": dict,
-    "death_counter": dict,
-    "win_counter": dict,
     "gui": dict,
-    "spotify": dict,
-    "channel_points": dict,
-    "theme": dict,
     "update": dict,
-}
-
-_PLUGIN_SECTIONS = {
-    "overlay_text", "like_goal", "timer", "death_counter",
-    "win_counter", "spotify", "channel_points",
 }
 
 
@@ -83,16 +70,6 @@ def _validate_config_schema(data: Any, path: str = "") -> None:
             "Config version %s is legacy — will be normalised to %s on write",
             norm_ver, EXPECTED_CONFIG_VERSION,
         )
-
-    # Every plugin section must have an 'enabled' boolean
-    for sec in _PLUGIN_SECTIONS:
-        if sec in data:
-            enabled = data[sec].get("enabled")
-            if not isinstance(enabled, bool):
-                raise ValueError(
-                    f"{sec}.enabled must be a bool, "
-                    f"got {type(enabled).__name__ if enabled is not None else 'None'}"
-                )
 
     # Warn about unknown keys (typo protection)
     known = set(_CONFIG_SCHEMA)

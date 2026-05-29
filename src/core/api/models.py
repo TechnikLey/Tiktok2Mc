@@ -4,6 +4,38 @@ from typing import Any, Optional
 API_VERSION = "1.0.0"
 
 
+# ── Plugin Config Schema ──────────────────────────────────────────────
+
+
+class ConfigSchemaField(BaseModel):
+    """A single field inside a plugin's ``config_schema``."""
+
+    key: str = Field(..., description="Dotted path, e.g. 'port' or 'theme.background'")
+    type: str = Field("string", description="Data type: string, integer, number, boolean, color, select, array, object")
+    default: Any = Field(None, description="Default value used when the key is missing")
+    label: str = Field("", description="Human-readable label for the GUI")
+    help: str = Field("", description="Tooltip / help text shown in the GUI")
+    category: str = Field("General", description="Grouping category for the GUI")
+    required: bool = Field(False, description="Whether the field is mandatory")
+    secret: bool = Field(False, description="If true, value should be masked in the GUI")
+    min: Optional[int] = Field(None, description="Minimum value (for integer/number)")
+    max: Optional[int] = Field(None, description="Maximum value (for integer/number)")
+    options: list[str] = Field(default_factory=list, description="Allowed values (for select)")
+    advanced: bool = Field(False, description="Hide from basic / first-run wizard view")
+    widget: Optional[str] = Field(None, description="GUI widget hint (e.g. 'textarea', 'color')")
+    item_schema: Optional[dict] = Field(None, description="Schema for array items or nested objects")
+
+
+class PluginConfigSchemaModel(BaseModel):
+    """Root schema object embedded in ``plugin.json``."""
+
+    version: int = Field(1, description="Schema format version")
+    fields: list[ConfigSchemaField] = Field(default_factory=list, description="Ordered list of fields")
+
+
+# ── Plugin Manifest ──────────────────────────────────────────────────
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str
@@ -66,6 +98,9 @@ class PluginManifest(BaseModel):
     level: int = Field(4, ge=1, le=4, description="Default visibility level")
     port: int = Field(
         0, ge=0, description="Primary web/overlay port from ports.declared"
+    )
+    config_schema: Optional[PluginConfigSchemaModel] = Field(
+        None, description="Schema for plugin-local config (GUI + validation)"
     )
 
     @property

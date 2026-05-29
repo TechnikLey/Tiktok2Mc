@@ -45,9 +45,23 @@ _DEFAULT_THEMES = {
 }
 
 
-def load_plugin_theme(cfg: dict, plugin_key: str) -> dict:
+def load_plugin_theme(plugin_cfg: dict, plugin_key: str) -> dict:
+    """Return merged theme colors for a plugin.
+
+    *plugin_cfg* is the **plugin-local** configuration dict (the one loaded
+    from ``plugins/<name>/config.yaml``).  The plugin's own ``theme:``
+    section is read directly; no global config is consulted.
+
+    Parameters
+    ----------
+    plugin_cfg:
+        The dict returned by ``load_plugin_config(plugin_dir)``.
+    plugin_key:
+        Canonical theme key (e.g. ``"spotify"``, ``"like_goal"``) used
+        to look up built-in fallback colors.
+    """
     defaults = _DEFAULT_THEMES.get(plugin_key, {})
-    user_theme = cfg.get("theme", {}).get(plugin_key, {})
+    user_theme = plugin_cfg.get("theme", {})
     return {**defaults, **user_theme}
 
 

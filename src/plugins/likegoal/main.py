@@ -8,7 +8,7 @@
 #   0 = reset (likes reset to 0 after reaching the goal)
 #   1 = step  (goal increases by InitialGoal each time)
 #   2+= multiply (goal is multiplied each time)
-# All settings are read from config.yaml.
+# All settings are read from the plugin-local config.yaml.
 # Data is pushed to the overlay via SSE.
 # ==================================================
 
@@ -18,8 +18,10 @@ import json
 from queue import Queue
 from flask import Flask, Response, request, jsonify
 import sys
-import yaml
-from core import parse_args, get_base_dir, get_base_file, get_root_dir
+import os
+from pathlib import Path
+from core import parse_args, get_base_dir, get_base_file
+from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
@@ -28,34 +30,15 @@ log = logging.getLogger(__name__)
 # Paths & configuration
 # =========================
 BASE_DIR = get_base_dir()
-ROOT_DIR = get_root_dir()
 
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
+PLUGIN_DIR = Path(__file__).resolve().parent
+cfg = load_plugin_config(PLUGIN_DIR)
 
-args = parse_args()
-
-cfg = {}
-
-try:
-    if not CONFIG_FILE.exists():
-        log.info("Config not found")
-        sys.exit(1)
-    else:
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-        LIKE_GOAL_PORT = cfg.get("like_goal", {}).get("port", 29193)
-        CUSTOM_TEXT = cfg.get("like_goal", {}).get("display_text", "Like Goal")
-        INITIAL_GOAL = int(cfg.get("like_goal", {}).get("initial_goal", 100_000))
-        GOAL_MULTIPLIER = int(cfg.get("like_goal", {}).get("goal_multiplier", 2))
-        # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
-        SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-except Exception as e:
-    log.error(f"Config error: {e}")
-    LIKE_GOAL_PORT = 29193
-    CUSTOM_TEXT = "Like Goal"
-    INITIAL_GOAL = 100_000
-    GOAL_MULTIPLIER = 2
-    SERVER_HOST = "127.0.0.1"
+LIKE_GOAL_PORT = cfg.get("port", 29193)
+CUSTOM_TEXT = cfg.get("display_text", "Like Goal")
+INITIAL_GOAL = int(cfg.get("initial_goal", 100_000))
+GOAL_MULTIPLIER = int(cfg.get("goal_multiplier", 2))
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
 THEME = load_plugin_theme(cfg, "like_goal")
 THEME_STYLE = theme_css(THEME)
@@ -262,6 +245,7 @@ def stream():
 def run_flask():
     app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True, debug=False, use_reloader=False)
 
+args = parse_args()
 gui_hidden = args.gui_hidden
 
 # =========================

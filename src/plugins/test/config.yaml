@@ -2,6 +2,5 @@
 # Plugin configuration
 # ==========================================
 # This is the local configuration file for this plugin.
-# Settings here override the global config.yaml when applicable.
 
 enabled: true

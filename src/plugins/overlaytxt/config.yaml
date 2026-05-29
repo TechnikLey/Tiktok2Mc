@@ -1,0 +1,18 @@
+# ==========================================
+# Overlay Text Plugin — Configuration
+# ==========================================
+
+enabled: false
+port: 29186
+display_mode: overwrite
+fade_in: 500
+fade_out: 500
+max_fails: 3
+cooldown: 10
+
+overlays:
+  - name: "default"
+
+theme:
+  background: "#00FF00"
+  text: "#ffffff"

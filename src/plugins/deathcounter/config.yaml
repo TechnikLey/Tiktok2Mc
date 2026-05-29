@@ -1,0 +1,10 @@
+# ==========================================
+# Death Counter Plugin — Configuration
+# ==========================================
+
+enabled: false
+port: 29190
+
+theme:
+  background: "#000000"
+  text: "#8ef3ff"

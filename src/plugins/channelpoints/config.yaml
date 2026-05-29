@@ -1,0 +1,18 @@
+# ==========================================
+# Channel Points Plugin — Configuration
+# ==========================================
+
+enabled: false
+port: 29195
+award_amount: 10
+award_interval_seconds: 60
+ping_timeout_minutes: 10
+leaderboard_count: 10
+
+theme:
+  background: "#000000"
+  text: "#ffffff"
+  accent: "#FFD700"
+  accent2: "#00BFFF"
+  accent3: "#40E0D0"
+  danger: "#FF4500"

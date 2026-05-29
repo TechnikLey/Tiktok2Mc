@@ -33,6 +33,7 @@ from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
+from core.plugin_config import load_all_plugin_configs
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -201,6 +202,9 @@ def load_config():
 
         ctx.config = config
 
+        # Load all plugin configs for port references and cross-plugin data
+        _plugin_configs = load_all_plugin_configs()
+
         ctx.mc_host = config.get("server_host", "127.0.0.1")
         ctx.mc_pass = config.get("rcon", {}).get("password", "")
         ctx.mc_port = config.get("rcon", {}).get("port", 25575)
@@ -208,8 +212,8 @@ def load_config():
         ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
         ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
         ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
-        ctx.overlaytxt_port = config.get("overlay_text", {}).get("port", 29186)
-        ctx.like_goal_port = config.get("like_goal", {}).get("port", 29193)
+        ctx.overlaytxt_port = _plugin_configs.get("overlay-text", {}).get("port", 29186)
+        ctx.like_goal_port = _plugin_configs.get("like-goal", {}).get("port", 29193)
         ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
         ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
@@ -226,7 +230,8 @@ def load_config():
             ctx._followed_cache.clear()
             log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
 
-        ctx.like_triggers = validate_like_triggers(config.get("like_goal", {}).get("triggers", []))
+        like_goal_cfg = _plugin_configs.get("like-goal", {})
+        ctx.like_triggers = validate_like_triggers(like_goal_cfg.get("triggers", []))
 
         comment_cmd_cfg = config.get("comment_commands", {})
         ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
@@ -289,17 +294,17 @@ def load_config():
                         # Resolve port vars in per-command url
                         if "url" in ccfg:
                             url_tpl = str(ccfg["url"])
-                            spotify_port = config.get("spotify", {}).get("port", 29194)
+                            spotify_port = _plugin_configs.get("spotify-control", {}).get("port", 29194)
                             url_tpl = url_tpl.replace("{spotify_port}", str(spotify_port))
-                            cp_port = config.get("channel_points", {}).get("port", 29195)
+                            cp_port = _plugin_configs.get("channel-points", {}).get("port", 29195)
                             url_tpl = url_tpl.replace("{channel_points_port}", str(cp_port))
                             ccfg = {**ccfg, "url": url_tpl}
                         commands_config[cname] = ccfg
             handler = str(g.get("handler", "rcon")).lower()
             url = str(g.get("url", ""))
-            spotify_port = config.get("spotify", {}).get("port", 29194)
+            spotify_port = _plugin_configs.get("spotify-control", {}).get("port", 29194)
             url = url.replace("{spotify_port}", str(spotify_port))
-            cp_port = config.get("channel_points", {}).get("port", 29195)
+            cp_port = _plugin_configs.get("channel-points", {}).get("port", 29195)
             url = url.replace("{channel_points_port}", str(cp_port))
             cooldown = max(0, int(g.get("cooldown", 0)))
             user_cooldown = max(0, int(g.get("user_cooldown", 0)))
@@ -739,11 +744,17 @@ def _dispatch_comment_http_sync(url_template, username, cmd_text):
         return None
 
 
+def _get_plugin_config(name: str) -> dict:
+    """Helper to fetch a cached plugin config dict by name."""
+    return load_all_plugin_configs().get(name, {})
+
+
 def _ping_channel_points(user):
     """Pings the channel points plugin to mark a user as active."""
-    if not ctx.config.get("channel_points", {}).get("enabled", False):
+    cp_cfg = _get_plugin_config("channel-points")
+    if not cp_cfg.get("enabled", False):
         return
-    port = ctx.config.get("channel_points", {}).get("port", 29195)
+    port = cp_cfg.get("port", 29195)
     import urllib.request
     import json
     try:
@@ -775,7 +786,7 @@ def _process_follow(username: str, persist: bool = True):
 
 
 def _get_channel_points_port():
-    return ctx.config.get("channel_points", {}).get("port", 29195)
+    return _get_plugin_config("channel-points").get("port", 29195)
 
 
 def _get_user_points(user):

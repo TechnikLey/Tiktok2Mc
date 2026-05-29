@@ -22,12 +22,17 @@
 # ==================================================
 
 from core.hook_api import HookAPI
+from core.plugin_config import load_all_plugin_configs
 import logging
 log = logging.getLogger(__name__)
 
+# Cache plugin configs at module level to avoid repeated disk scans
+_PLUGIN_CFGS = load_all_plugin_configs()
+
 
 def _get_plugin_base(api):
-    port = api.config.get("spotify", {}).get("port", 29194)
+    cfg = _PLUGIN_CFGS.get("spotify-control", {})
+    port = cfg.get("port", 29194)
     return f"http://127.0.0.1:{port}"
 
 

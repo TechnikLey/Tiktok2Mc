@@ -1,0 +1,28 @@
+# ==========================================
+# Like Goal Plugin — Configuration
+# ==========================================
+
+enabled: false
+port: 29193
+display_text: "Like Goal"
+initial_goal: 100_000
+goal_multiplier: 1
+
+triggers:
+  - id: likes_standard
+    every: 100
+    function: likes
+    payload: Community
+    enabled: true
+  - id: likes_100k
+    every: 100_000
+    function: like_2
+    payload: Community
+    enabled: true
+
+theme:
+  background: "#050505"
+  text: "#ffffff"
+  accent: "#00f5ff"
+  accent2: "#8a2be2"
+  danger: "#ff4d4d"
