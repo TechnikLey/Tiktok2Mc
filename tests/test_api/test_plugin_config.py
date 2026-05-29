@@ -61,6 +61,32 @@ class TestUpdatePluginConfig:
         assert body["config"]["port"] == 5000
         assert body["config"]["label"] == "Updated"
 
+    def test_put_creates_backup_by_default(self, client, fake_plugins_dir):
+        plugin_dir = fake_plugins_dir / "test-plugin"
+        config_path = plugin_dir / "config.yaml"
+        original_mtime = config_path.stat().st_mtime
+
+        payload = {"enabled": False, "port": 5001, "label": "BackupTest"}
+        resp = client.put("/api/v1/plugins/test-plugin/config", json=payload)
+        assert resp.status_code == 200
+
+        # Backup file should exist alongside config
+        backup_files = list(plugin_dir.glob("config.yaml.*.bak"))
+        assert len(backup_files) == 1
+
+    def test_put_respects_disable_backup(self, client, fake_plugins_dir):
+        plugin_dir = fake_plugins_dir / "test-plugin"
+        # Remove any existing backups first
+        for bak in plugin_dir.glob("config.yaml.*.bak"):
+            bak.unlink()
+
+        payload = {"enabled": True, "port": 5002, "label": "NoBackup", "_backup": False}
+        resp = client.put("/api/v1/plugins/test-plugin/config", json=payload)
+        assert resp.status_code == 200
+
+        backup_files = list(plugin_dir.glob("config.yaml.*.bak"))
+        assert len(backup_files) == 0
+
     def test_put_invalid_type_422(self, client, fake_plugins_dir):
         payload = {"enabled": "not_a_bool", "port": 5000}
         resp = client.put("/api/v1/plugins/test-plugin/config", json=payload)

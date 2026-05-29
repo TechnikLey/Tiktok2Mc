@@ -214,6 +214,10 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; backg
 .yaml-fallback textarea { width: 100%; min-height: 140px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: monospace; font-size: 0.85rem; resize: vertical; }
 .yaml-fallback .hint { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
 
+/* Raw JSON fallback (plugin editor) */
+.json-fallback textarea { width: 100%; min-height: 200px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem; border-radius: 6px; font-family: monospace; font-size: 0.85rem; resize: vertical; }
+.json-fallback .hint { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
+
 
 
 /* Responsive */

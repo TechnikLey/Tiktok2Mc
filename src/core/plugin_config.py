@@ -171,7 +171,7 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
     return data
 
 
-def save_plugin_config(plugin_dir: Path, data: dict) -> None:
+def save_plugin_config(plugin_dir: Path, data: dict, backup: bool = True) -> None:
     """Write *data* to the plugin's ``config.yaml`` atomically.
 
     Loads the existing file first (if present) to preserve any manual
@@ -188,7 +188,7 @@ def save_plugin_config(plugin_dir: Path, data: dict) -> None:
         existing = CommentedMap()
 
     deep_update_rt(existing, data)
-    save_yaml(config_path, existing, backup=False)
+    save_yaml(config_path, existing, backup=backup)
     log.debug("Plugin config written: %s", config_path)
 
 

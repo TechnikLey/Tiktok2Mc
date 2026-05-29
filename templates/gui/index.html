@@ -22,10 +22,10 @@
             <h2>Plugins</h2>
             <table>
                 <thead>
-                    <tr><th>Name</th><th>Version</th><th>Port</th><th>Status</th></tr>
+                    <tr><th>Name</th><th>Version</th><th>Port</th><th>Status</th><th style="width:120px;">Actions</th></tr>
                 </thead>
                 <tbody id="plugin-list">
-                    <tr><td colspan="4" class="muted">Loading...</td></tr>
+                    <tr><td colspan="5" class="muted">Loading...</td></tr>
                 </tbody>
             </table>
             <div id="overlay-urls" style="margin-top:1rem;"></div>
@@ -88,6 +88,39 @@
                     </div>
                 </div>
                 <div class="editor-content" id="editor-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plugin Config Editor -->
+    <div id="plugin-config-editor" class="editor-overlay hidden">
+        <div class="editor-layout">
+            <nav class="editor-sidebar" id="plugin-editor-sidebar"></nav>
+            <div class="editor-main">
+                <div class="editor-topbar" id="plugin-editor-topbar">
+                    <h2 id="plugin-editor-title">Plugin Configuration</h2>
+                    <div class="editor-search">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="plugin-editor-search" placeholder="Search settings..." oninput="pluginEditor.onSearch(this.value)">
+                    </div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button class="btn btn-secondary" onclick="pluginEditor.close()">Close</button>
+                        <button class="btn btn-primary" onclick="pluginEditor.save()">Save Changes</button>
+                    </div>
+                </div>
+                <div class="editor-content" id="plugin-editor-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plugin Review Modal -->
+    <div id="plugin-review-modal" class="wizard-overlay hidden" style="z-index:250;">
+        <div class="modal-card">
+            <h3>Review Changes</h3>
+            <div id="plugin-review-body" style="flex:1;overflow-y:auto;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="pluginEditor.hideReview()">Back</button>
+                <button class="btn btn-primary" onclick="pluginEditor.confirmSave()">Confirm Save</button>
             </div>
         </div>
     </div>

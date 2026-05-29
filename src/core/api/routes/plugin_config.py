@@ -55,8 +55,9 @@ async def update_plugin_config(name: str, body: dict[str, Any]):
                 detail={"message": "Validation failed", "errors": errors},
             )
 
+    backup = body.pop("_backup", True)
     try:
-        save_plugin_config(plugin_dir, body)
+        save_plugin_config(plugin_dir, body, backup=backup)
         return {"name": name, "config": body}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
