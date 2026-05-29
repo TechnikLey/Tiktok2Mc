@@ -197,7 +197,7 @@ comment_commands:
       commands:
         - say
         - give
-      commands_config: []
+      commands_config: {}
       handler: rcon
       cooldown: 0
       user_cooldown: 0
