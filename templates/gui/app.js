@@ -283,17 +283,17 @@ const SECTION_ORDER = [
   'tiktok','rcon','server_host','control_method',
   'java','minecraft_server_api',
   'console',
-  'comment_commands','random_triggers',
   'theme',
-  'update','shutdown','auto_update_config','show_sudo_warning','gui'
+  'update','shutdown','auto_update_config','show_sudo_warning','gui',
+  'comment_commands','random_triggers'
 ];
 
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method'],
   'Minecraft': ['java','minecraft_server_api'],
   'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui'],
-  'Chat & Commands': ['comment_commands','random_triggers'],
-  'Appearance': ['theme']
+  'Appearance': ['theme'],
+  'Chat & Commands': ['comment_commands','random_triggers']
 };
 
 const SECTION_META = {
