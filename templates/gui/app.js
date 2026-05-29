@@ -143,13 +143,36 @@ function hideWizard() {
   document.getElementById('wizard').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
 }
-function showRestartDialog() {
-  document.getElementById('restart-dialog').classList.remove('hidden');
+let _restartPending = false;
+
+function showRestartDialog(title, message) {
+  const card = document.querySelector('#restart-dialog .wizard-card');
+  card.innerHTML = `
+    <h2 style="border:none;padding:0;">${escapeHtml(title || 'Restart Required')}</h2>
+    <p class="muted" style="margin-bottom:1.5rem;">${escapeHtml(message || 'Your settings have been saved. The tool must be restarted for changes to take effect.')}</p>
+    <div style="display:flex;gap:1rem;justify-content:center;">
+      <button class="btn btn-primary" id="btn-restart-now">Restart Now</button>
+      <button class="btn btn-secondary" id="btn-restart-later">Later</button>
+    </div>
+  `;
+  // Re-attach listeners since we replaced the innerHTML
+  document.getElementById('btn-restart-now').addEventListener('click', triggerRestart);
+  document.getElementById('btn-restart-later').addEventListener('click', () => { hideRestartDialog(); loadConfig(); });
   document.getElementById('wizard').classList.add('hidden');
+  document.getElementById('restart-dialog').classList.remove('hidden');
 }
 function hideRestartDialog() {
   document.getElementById('restart-dialog').classList.add('hidden');
+  document.getElementById('wizard').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
+  updateRestartBanner();
+}
+
+function updateRestartBanner() {
+  const banner = document.getElementById('restart-pending-banner');
+  if (banner) {
+    banner.classList.toggle('hidden', !_restartPending);
+  }
 }
 function renderWizardStep() {
   const steps = document.getElementById('wizard-steps');
@@ -167,13 +190,12 @@ function renderWizardStep() {
       <div class="inline-error" id="err-tiktok-user">Please enter a valid TikTok username.</div>
       <div class="hint">The username you use when going live on TikTok.</div></div>`;
   } else if (wizardStep === 1) {
-    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Set a secure password for the Minecraft RCON connection. This is required.</p>
+    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Set a password for the Minecraft RCON connection.</p>
       <div class="form-group"><label>RCON Password</label>
-      <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Required" oninput="updatePasswordMeter()">
-      <div class="inline-error" id="err-rcon-password">Please fix the password issues above.</div>
+      <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Password" oninput="updatePasswordMeter()">
       <div class="strength-meter"><div class="strength-segment"></div><div class="strength-segment"></div><div class="strength-segment"></div></div>
       <div class="strength-label" id="strength-label">Enter a password to see strength</div>
-      <div class="hint">Must be at least 8 characters with uppercase, lowercase, number and special character.</div></div>`;
+      <div class="hint">Choose any password you prefer. Strength meter is for guidance only.</div></div>`;
     setTimeout(updatePasswordMeter, 0);
   } else {
     content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Review your settings before saving.</p>
@@ -230,15 +252,7 @@ async function wizardNext() {
     wizardData.tiktok_user = user;
   } else if (wizardStep === 1) {
     const passInput = document.getElementById('w-rcon-password');
-    const pass = passInput.value;
-    const issues = validatePassword(pass);
-    if (issues.length > 0) {
-      passInput.classList.add('invalid');
-      document.getElementById('err-rcon-password').innerHTML = issues.map(i => '&bull; ' + i).join('<br>');
-      document.getElementById('err-rcon-password').classList.add('visible');
-      return;
-    }
-    wizardData.rcon_password = pass;
+    wizardData.rcon_password = passInput.value;
   }
   if (wizardStep === 2) { await wizardSave(); return; }
   wizardStep++;
@@ -258,13 +272,15 @@ async function wizardSave() {
     cfg.rcon.enabled = true;
     await putJSON('/config', { config: cfg, backup: true });
     log('Setup saved successfully.');
-    showRestartDialog();
+    showRestartDialog('Setup Complete', 'Your settings have been saved. The tool must be restarted for changes to take effect.');
   } catch (e) {
     log('Failed to save setup: ' + e.message, 'err');
     alert('Failed to save: ' + e.message);
   } finally { nextBtn.disabled = false; nextBtn.textContent = 'Save'; }
 }
 async function triggerRestart() {
+  _restartPending = false;
+  updateRestartBanner();
   try {
     const res = await fetch('/api/v1/restart', { method: 'POST' });
     if (res.ok) {
@@ -274,8 +290,6 @@ async function triggerRestart() {
 }
 document.getElementById('wizard-back').addEventListener('click', () => { if (wizardStep > 0) { wizardStep--; renderWizardStep(); } });
 document.getElementById('wizard-next').addEventListener('click', wizardNext);
-document.getElementById('btn-restart-now').addEventListener('click', triggerRestart);
-document.getElementById('btn-restart-later').addEventListener('click', () => { hideRestartDialog(); loadConfig(); });
 
 /* ─── Config Editor ─── */
 
@@ -1172,7 +1186,8 @@ class ConfigEditor {
       currentConfig = JSON.parse(JSON.stringify(this.data));
       this.close();
       await loadConfig();
-      this.showToast('Configuration saved successfully. Some changes may require a restart.', 'success');
+      _restartPending = true;
+      showRestartDialog('Restart Required', 'Configuration saved successfully. The tool must be restarted for global changes to take effect.');
     } catch (e) {
       this.setStatus('Save failed: ' + e.message, 'err');
       this.showToast('Save failed: ' + e.message, 'error');
@@ -1822,6 +1837,7 @@ async function init() {
   await loadHealth();
   await loadConfig();
   await loadPlugins();
+  updateRestartBanner();
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
   setInterval(loadHealth, 10000);

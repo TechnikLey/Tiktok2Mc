@@ -291,6 +291,108 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
         if ALLOW_CLOSE:
             log.info(f"Error starting {name}: {e}")
 
+def stop_process(name):
+    """Stop a single process or session by name."""
+    proc = processes.get(name)
+    session_name = _sanitize_session_name(f"mc-{name}")
+
+    # Try Linux session first
+    if not IS_WINDOWS and SESSION_TOOL:
+        try:
+            if SESSION_TOOL == "tmux":
+                subprocess.run(
+                    ["tmux", "kill-session", "-t", session_name],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            elif SESSION_TOOL == "screen":
+                subprocess.run(
+                    ["screen", "-X", "-S", session_name, "quit"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+            if session_name in linux_sessions:
+                linux_sessions.remove(session_name)
+            log.info(f"{name} session terminated.")
+            if name in processes:
+                del processes[name]
+            return True
+        except Exception:
+            pass
+
+    # Fallback: direct process
+    if proc is not None and proc.poll() is None:
+        try:
+            if IS_WINDOWS:
+                subprocess.run(["taskkill", "/F", "/PID", str(proc.pid), "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                proc.terminate()
+            log.info(f"{name} terminated.")
+            if name in processes:
+                del processes[name]
+            return True
+        except Exception as e:
+            log.info(f"Failed to terminate process {name}: {e}")
+    elif name in processes:
+        del processes[name]
+    return False
+
+
+def start_plugin_process(name, path_str, level=2, ics=False, gui_hidden=None):
+    """Start a single plugin process by name, mirroring the startup logic."""
+    from pathlib import Path
+    p = Path(path_str)
+    if not p.exists():
+        log.warning(f"Plugin executable not found: {p}")
+        return False
+
+    hidden = get_visibility(level)
+    try:
+        cmd = [str(p)]
+        if gui_hidden is not None:
+            cmd.append("--gui-hidden")
+
+        if IS_WINDOWS:
+            kwargs = {}
+            flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
+            kwargs["creationflags"] = flags
+            proc = subprocess.Popen(cmd, **kwargs)
+            processes[name] = proc
+        elif SESSION_TOOL == "tmux":
+            session_name = _sanitize_session_name(f"mc-{name}")
+            subprocess.run(
+                ["tmux", "kill-session", "-t", session_name],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            subprocess.Popen(
+                ["tmux", "new-session", "-d", "-s", session_name] + _build_display_env_tmux() + cmd
+            )
+            linux_sessions.append(session_name)
+            processes[name] = None
+        elif SESSION_TOOL == "screen":
+            session_name = _sanitize_session_name(f"mc-{name}")
+            subprocess.run(
+                ["screen", "-X", "-S", session_name, "quit"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            subprocess.Popen(
+                ["screen", "-dmS", session_name] + _build_display_env_screen() + cmd
+            )
+            linux_sessions.append(session_name)
+            processes[name] = None
+        else:
+            log_dir = BASE_DIR / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / f"{_sanitize_session_name(name)}.log"
+            with open(log_file, "w", encoding="utf-8") as lf:
+                proc = subprocess.Popen(cmd, stdout=lf, stderr=lf)
+            processes[name] = proc
+
+        log.info(f"Plugin {name} started{' (hidden)' if hidden else ''}.")
+        return True
+    except Exception as e:
+        log.error(f"Failed to start plugin {name}: {e}")
+        return False
+
+
 def stop_all_processes():
     """Terminates all started processes including child processes (only when allow_close=True)."""
     if not ALLOW_CLOSE:
@@ -318,7 +420,7 @@ def stop_all_processes():
         linux_sessions.clear()
 
     # Kill Windows processes / fallback Linux processes
-    for name, proc in processes.items():
+    for name, proc in list(processes.items()):
         if proc is not None and proc.poll() is None:
             try:
                 if IS_WINDOWS:
@@ -666,6 +768,29 @@ async def check_and_run():
                 log.info("\nRestart signal detected. Requesting clean restart...")
                 restart_app()
                 return
+            elif name.startswith("plugin_start_"):
+                plugin_name = name[len("plugin_start_"):]
+                log.info(f"\nPlugin start signal detected for '{plugin_name}'.")
+                try:
+                    # Re-fetch plugin details from API
+                    with urllib.request.urlopen(
+                        f"{_API_BASE_URL}/plugins/{plugin_name}", timeout=3
+                    ) as resp:
+                        if resp.status == 200:
+                            data = json.loads(resp.read().decode("utf-8"))
+                            path = data.get("path", "")
+                            level = data.get("level", 2)
+                            ics = data.get("ics", False)
+                            gui_h = True if ics and CONTROL_METHOD == "DCS" else None
+                            start_plugin_process(plugin_name, path, level=level, ics=ics, gui_hidden=gui_h)
+                        else:
+                            log.warning(f"API returned {resp.status} for plugin '{plugin_name}'.")
+                except Exception as exc:
+                    log.warning(f"Failed to start plugin '{plugin_name}' from signal: {exc}")
+            elif name.startswith("plugin_stop_"):
+                plugin_name = name[len("plugin_stop_"):]
+                log.info(f"\nPlugin stop signal detected for '{plugin_name}'.")
+                stop_process(plugin_name)
         await asyncio.sleep(5)
 
 # =============================================================================

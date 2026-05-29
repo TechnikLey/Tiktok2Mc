@@ -6,6 +6,7 @@ JSON store (``data/api_plugin_registry.json``).
 """
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
@@ -25,6 +26,17 @@ from core.api.updater import PluginUpdateChecker
 from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)
+
+
+def _write_plugin_signal(plugin_name: str, action: str) -> None:
+    """Write a signal file that start.py watches for plugin lifecycle events."""
+    runtime_dir = get_root_dir() / "core" / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    signal_file = runtime_dir / f"plugin_{action}_{plugin_name}"
+    try:
+        signal_file.write_text(plugin_name, encoding="utf-8")
+    except Exception as exc:
+        log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
 
 router = APIRouter(tags=["Plugins"])
 
@@ -151,7 +163,7 @@ async def discover_plugins():
 
 @router.post("/plugins/{name}/enable", response_model=PluginRegistration)
 async def enable_plugin(name: str):
-    """Enable a plugin by name."""
+    """Enable a plugin by name and signal runtime start."""
     try:
         registry = get_registry()
         result = registry.update(name, enabled=True)
@@ -159,6 +171,7 @@ async def enable_plugin(name: str):
             raise HTTPException(
                 status_code=404, detail=f"Plugin '{name}' not found"
             )
+        _write_plugin_signal(name, "start")
         return result
     except HTTPException:
         raise
@@ -169,7 +182,7 @@ async def enable_plugin(name: str):
 
 @router.post("/plugins/{name}/disable", response_model=PluginRegistration)
 async def disable_plugin(name: str):
-    """Disable a plugin by name."""
+    """Disable a plugin by name and signal runtime stop."""
     try:
         registry = get_registry()
         result = registry.update(name, enabled=False)
@@ -177,6 +190,7 @@ async def disable_plugin(name: str):
             raise HTTPException(
                 status_code=404, detail=f"Plugin '{name}' not found"
             )
+        _write_plugin_signal(name, "stop")
         return result
     except HTTPException:
         raise

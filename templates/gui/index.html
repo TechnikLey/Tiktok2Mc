@@ -13,6 +13,12 @@
     </header>
 
     <main id="dashboard" class="hidden">
+        <div id="restart-pending-banner" class="card hidden" style="border-left: 3px solid var(--warning); background: rgba(255,167,38,0.05);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="color:var(--warning);font-weight:500;">Restart pending — some changes require a restart to take effect.</span>
+                <button class="btn btn-primary" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="triggerRestart()">Restart Now</button>
+            </div>
+        </div>
         <div class="card">
             <h2>System Status</h2>
             <div id="system-info" class="muted">Loading...</div>
