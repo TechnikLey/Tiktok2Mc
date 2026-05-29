@@ -224,15 +224,17 @@
 2. **Test count corrected:** 363 passed (was 285 in the old TODO). The 4 skipped SSE/WS tests remain accurately noted.
 3. **Plugin Config System recognized as complete.** The backend (schema parsing, validation, ruamel.yaml round-trip, API routes) is fully implemented and covered by tests. What is missing is only the GUI frontend for it.
 4. **Actions editor reclassified.** The validation engine (`core/validator.py`) is complete and well-tested. The missing piece is the API endpoint and GUI integration, not the engine itself.
-5. **Release-critical scope narrowed.** The only true release blocker that can strand users is the unvalidated compiled update flow. The remaining GUI gaps are important for polish but do not compromise stability.
+5. **Release-critical scope redefined.** Two blockers remain: (a) unvalidated compiled update flow (must be fixed first) and (b) complete documentation rewrite (must be done last). The remaining GUI gaps are important for polish but do not compromise stability.
 
 ### Removed as Obsolete
 - "Full `config.yaml` editor" as a release blocker → moved to **Completed**.
 - "285 tests passing" → corrected to **363 tests passing**.
 - "12 consistent REST routes" → removed the hard count; the API has grown to 15+ routes including plugin config and event endpoints.
 - "Automated verification that `version.txt` matches `TOOL_VERSION` in `build.py`" → removed; `build.py` generates `version.txt` dynamically at build time, so this verification is obsolete.
+- Old "Documentation Finalization" (minor final-pass tasks) → replaced by **Complete Documentation Rewrite** release blocker. A light final pass is insufficient because the docs are structurally stale.
 
 ### Added Based on Code Analysis
+- **Complete Documentation Rewrite** elevated to release blocker (user request). GUIDE.md, README.md, and dev-books are stale after massive architecture changes.
 - **Plugin Config Editor GUI frontend** (discovered gap: API exists, no frontend).
 - **Real-time log viewer** (discovered gap: placeholder text exists in GUI, no backend or frontend implementation).
 - **`data/actions.mca` editor** (already listed, but clarified that `core/validator.py` is done; missing piece is API/GUI wiring).
@@ -242,10 +244,12 @@
 - **Frontend/GUI integration tests** (discovered gap: zero frontend tests exist).
 
 ### What Is Now Considered Release-Critical
-Only one item is release-blocking:
-- **End-to-End Update Validation** — because an broken update path on a compiled build would prevent users from ever receiving fixes and could corrupt their installation.
+Two items are release-blocking, with a strict execution order:
 
-Everything else (GUI editors, documentation, hardening) is important for the v1.0.0 experience but does not make the tool unstable or unusable if shipped without it.
+1. **End-to-End Update Validation** — a broken update path on a compiled build would prevent users from ever receiving fixes and could corrupt their installation. Must be resolved **first**.
+2. **Complete Documentation Rewrite** — shipping v1.0.0 with stale docs (referencing old architecture, wrong RCON defaults, missing plugin config system) would create support chaos and erode trust. Must be resolved **last**, after all code changes are frozen.
+
+Everything else (GUI editors, data consistency fixes, hardening) is important for the v1.0.0 experience but does not make the tool unstable or unusable if shipped without it.
 
 ---
 
