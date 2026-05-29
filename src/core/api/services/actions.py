@@ -66,12 +66,26 @@ def _strip_prefix(cmd_str: str, cmd_type: str, extra: dict[str, Any]) -> str:
     return cmd_str[1:]
 
 
-def _detect_trigger_type(name: str) -> str:
-    """Categorize a trigger name into a human-readable type."""
-    if name.isdigit():
-        return "Gift"
+def _detect_trigger_type(name: str, gifts: list[dict] | None = None) -> str:
+    """Categorize a trigger name into a human-readable type.
+
+    Checks against the gift database (by ID, exact name, or normalized name)
+    before falling back to Custom.
+    """
     if name in EVENT_TRIGGERS:
         return "Event"
+    if gifts:
+        normalized = name.lower().strip()
+        for g in gifts:
+            g_name = g.get("name", "").lower().strip()
+            if g_name == normalized:
+                return "Gift"
+            if g_name.replace(" ", "") == normalized.replace(" ", ""):
+                return "Gift"
+            if str(g.get("id")) == name:
+                return "Gift"
+    if name.isdigit():
+        return "Gift"
     return "Custom"
 
 
@@ -178,10 +192,16 @@ class ActionsService:
 
     # ── Parse (raw → structured) ─────────────────────────────────────
 
-    def parse(self, text: str | None = None) -> list[dict[str, Any]]:
+    def parse(self, text: str | None = None, gifts: list[dict] | None = None) -> list[dict[str, Any]]:
         """Parse actions.mca text into a list of trigger dicts.
 
-        Each trigger dict::
+        Comment rules (strict):
+          - ``#`` at column 0 = full-line comment, skipped entirely
+          - ``##`` at column 0 = disabled trigger, parsed but marked inactive
+          - Inline ``#`` on an active line = inline comment, stripped
+
+        If *gifts* is provided it is used for accurate type detection
+        (Gift vs Custom). Each trigger dict::
             {
                 "name": str,
                 "enabled": bool,
@@ -209,13 +229,22 @@ class ActionsService:
             if not stripped:
                 continue
 
-            # Detect if the entire line is a comment (disabled trigger)
-            is_commented = stripped.startswith("#")
-
-            # Get the meaningful content
-            if is_commented:
-                content = stripped[1:].strip()
+            # ── Comment / disabled-trigger detection ────────────────
+            #
+            #   ##  → disabled trigger (parse content after ##)
+            #   #   → full-line comment (skip entirely)
+            #   neither → active trigger
+            #
+            if stripped.startswith("##"):
+                # Disabled trigger — strip "##", parse normally
+                is_disabled = True
+                content = stripped[2:].strip()
+            elif stripped.startswith("#"):
+                # Full-line comment — skip entirely
+                continue
             else:
+                # Active trigger — strip inline # comment
+                is_disabled = False
                 content = stripped.split("#", 1)[0].strip()
 
             if not content or ":" not in content:
@@ -226,7 +255,7 @@ class ActionsService:
             if not trigger_name or not commands_str:
                 continue
 
-            # Strip surrounding quotes from trigger name
+            # Strip surrounding single quotes from trigger name
             display_name = trigger_name
             if trigger_name.startswith("'") and trigger_name.endswith("'"):
                 trigger_name = trigger_name[1:-1].strip()
@@ -273,8 +302,8 @@ class ActionsService:
 
             triggers.append({
                 "name": display_name,
-                "enabled": not is_commented,
-                "type": _detect_trigger_type(trigger_name),
+                "enabled": not is_disabled,
+                "type": _detect_trigger_type(trigger_name, gifts),
                 "commands": commands,
             })
 
@@ -283,7 +312,12 @@ class ActionsService:
     # ── Serialize (structured → raw) ─────────────────────────────────
 
     def serialize(self, triggers: list[dict[str, Any]]) -> str:
-        """Serialize a list of trigger dicts back to actions.mca text."""
+        """Serialize a list of trigger dicts back to actions.mca text.
+
+        Disabled triggers are prefixed with ``##``.
+        Full-line comments are not re-serialized (the raw tab preserves
+        them; the visual tab produces clean output).
+        """
         lines: list[str] = []
 
         for trigger in triggers:
@@ -325,7 +359,7 @@ class ActionsService:
 
             line = f"{serialized_name}:{' ; '.join(cmd_parts)}"
             if not enabled:
-                line = "#" + line
+                line = "##" + line
             lines.append(line)
 
         return "\n".join(lines) + "\n" if lines else ""

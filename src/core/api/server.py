@@ -82,4 +82,16 @@ def create_app(
             name="gui",
         )
 
+    # Serve gift images at /gifts-pictures
+    # Release layout: core/assets/gifts_picture/   Dev layout: assets/gifts_picture/
+    gifts_pics = root / "core" / "assets" / "gifts_picture"
+    if not gifts_pics.exists():
+        gifts_pics = root / "assets" / "gifts_picture"
+    if gifts_pics.exists():
+        app.mount(
+            "/gifts-pictures",
+            StaticFiles(directory=str(gifts_pics)),
+            name="gifts_pictures",
+        )
+
     return app

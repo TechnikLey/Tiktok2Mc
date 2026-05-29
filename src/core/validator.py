@@ -109,7 +109,24 @@ def validate_text(text: str) -> List[Diagnostic]:
 
     lines = text.splitlines()
     for line_number, raw_line in enumerate(lines):
-        # Strip everything after the first '#' (comments).
+
+        # ── Comment / disabled-trigger detection ────────────────────
+        #
+        #   ##  → disabled trigger (validate content after ##)
+        #   #   → full-line comment (skip entirely)
+        #
+        stripped = raw_line.strip()
+        if stripped.startswith("##"):
+            # Disabled trigger — rewrite raw_line without the ##
+            # prefix so the existing validation logic works normally.
+            lead = raw_line[: len(raw_line) - len(raw_line.lstrip())]
+            raw_line = lead + raw_line[len(lead) + 2 :]
+        elif stripped.startswith("#"):
+            # Full-line comment — skip
+            continue
+        # else: active trigger — fall through
+
+        # Strip everything after the first '#' (inline comments).
         line_no_comment = raw_line.split("#", 1)[0]
 
         # Skip empty / comment-only lines.

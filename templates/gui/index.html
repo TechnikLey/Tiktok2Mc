@@ -157,10 +157,57 @@
         <div id="actions-raw-panel" class="actions-body hidden">
           <div class="actions-raw-header">
             <h3>Raw Editor</h3>
-            <div class="muted" style="font-size:0.85rem;">Edit actions.mca directly. Invalid syntax will be shown below.</div>
+            <div class="muted" style="font-size:0.85rem;">Edit actions.mca directly. Syntax is checked on every keystroke.</div>
           </div>
-          <textarea id="actions-raw-text" class="actions-raw-textarea" spellcheck="false"></textarea>
-          <div id="actions-raw-diag" class="raw-diag"></div>
+          <textarea id="actions-raw-text" class="actions-raw-textarea" spellcheck="false" oninput="actionsEditor._onRawInput()"></textarea>
+          <div class="raw-diag">
+            <div id="actions-raw-diag-list"></div>
+            <div class="raw-footer">
+              <div id="actions-raw-status" class="raw-status"></div>
+              <button class="btn btn-primary" id="actions-raw-save-btn" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Save Raw</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Event Modal -->
+    <div id="actions-add-modal" class="wizard-overlay hidden" style="z-index:250;">
+      <div class="modal-card" style="max-width:560px;">
+        <h3>Add Event Trigger</h3>
+        <div class="form-group">
+          <label>Trigger Type</label>
+          <select id="actions-add-type" class="form-select">
+            <option value="event">Event (follow, join, comment, likes, etc.)</option>
+            <option value="gift">Gift (visual picker from database)</option>
+          </select>
+        </div>
+
+        <!-- Event panel -->
+        <div id="actions-add-event-panel" class="form-group">
+          <label>Event Name</label>
+          <select id="actions-add-event-name" class="form-select">
+            <option value="follow">Follow</option>
+            <option value="join">Join</option>
+            <option value="comment">Comment</option>
+            <option value="likes">Likes</option>
+            <option value="like_2">Like_2 (milestone)</option>
+            <option value="share">Share</option>
+          </select>
+        </div>
+
+        <!-- Gift panel -->
+        <div id="actions-add-gift-panel" class="form-group hidden">
+          <label>Search Gifts</label>
+          <input type="text" id="actions-add-gift-search" class="form-input" placeholder="Search by name or ID...">
+          <div id="actions-add-gift-list" class="gift-list"></div>
+        </div>
+
+        <div id="actions-add-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="actions-add-event-cancel">Cancel</button>
+          <button class="btn btn-primary" id="actions-add-event-confirm">Add Event</button>
+          <button class="btn btn-primary hidden" id="actions-add-gift-confirm" disabled>Add Gift Trigger</button>
         </div>
       </div>
     </div>
