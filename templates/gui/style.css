@@ -260,6 +260,10 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; backg
 .plugin-table th { color: var(--text-secondary); font-weight: 500; }
 .plugin-table tr:last-child td { border-bottom: none; }
 
+/* Confirmation dialog */
+#confirm-dialog .wizard-card { max-width: 420px; }
+#confirm-dialog h2 { border: none; padding: 0; }
+
 /* Responsive */
 @media (max-width: 768px) {
   .editor-layout { flex-direction: column; }

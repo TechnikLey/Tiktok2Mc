@@ -29,6 +29,38 @@ async function putJSON(path, body) {
   return res.json();
 }
 
+/* ─── Dialogs ─── */
+function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-primary') {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('confirm-dialog');
+    const titleEl = document.getElementById('confirm-title');
+    const msgEl = document.getElementById('confirm-message');
+    const okBtn = document.getElementById('btn-confirm-ok');
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    okBtn.textContent = okText;
+    okBtn.className = 'btn ' + okClass;
+
+    const cleanup = () => {
+      dlg.classList.add('hidden');
+      okBtn.replaceWith(okBtn.cloneNode(true));
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+    };
+
+    const newOk = okBtn.cloneNode(true);
+    const newCancel = cancelBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    newOk.addEventListener('click', () => { cleanup(); resolve(true); });
+    newCancel.addEventListener('click', () => { cleanup(); resolve(false); });
+
+    dlg.classList.remove('hidden');
+  });
+}
+
 /* ─── Logging ─── */
 function log(msg, level = 'info') {
   const view = document.getElementById('log-view');
@@ -37,6 +69,15 @@ function log(msg, level = 'info') {
   line.textContent = new Date().toLocaleTimeString() + '  ' + msg;
   view.appendChild(line);
   view.scrollTop = view.scrollHeight;
+}
+
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
 }
 
 /* ─── Dashboard ─── */
@@ -139,24 +180,41 @@ function copyUrl(btn, url) {
 }
 
 async function promptEnablePlugin(name, displayName) {
-  if (!confirm(`Do you want to enable "${displayName || name}"?`)) return;
+  const confirmed = await showConfirmDialog(
+    'Enable Plugin',
+    `Do you want to enable "${displayName || name}"?`,
+    'Enable'
+  );
+  if (!confirmed) return;
   try {
     await postJSON(`/plugins/${name}/enable`, {});
     await loadPlugins();
+    showToast(`Plugin "${displayName || name}" enabled.`, 'success');
     log(`Plugin ${name} enabled`);
   } catch (e) {
-    log('Failed to enable ' + name + ': ' + e.message, 'err');
+    const msg = 'Failed to enable "' + (displayName || name) + '": ' + e.message;
+    showToast(msg, 'error');
+    log(msg, 'err');
   }
 }
 
 async function promptDisablePlugin(name, displayName) {
-  if (!confirm(`Do you want to disable "${displayName || name}"?`)) return;
+  const confirmed = await showConfirmDialog(
+    'Disable Plugin',
+    `Do you want to disable "${displayName || name}"?`,
+    'Disable',
+    'btn-danger'
+  );
+  if (!confirmed) return;
   try {
     await postJSON(`/plugins/${name}/disable`, {});
     await loadPlugins();
+    showToast(`Plugin "${displayName || name}" disabled.`, 'info');
     log(`Plugin ${name} disabled`);
   } catch (e) {
-    log('Failed to disable ' + name + ': ' + e.message, 'err');
+    const msg = 'Failed to disable "' + (displayName || name) + '": ' + e.message;
+    showToast(msg, 'error');
+    log(msg, 'err');
   }
 }
 
@@ -169,9 +227,33 @@ async function restartPlugin(name, displayName) {
     await new Promise(r => setTimeout(r, 800));
     await postJSON(`/plugins/${name}/enable`, {});
     await loadPlugins();
+    showToast(`Plugin "${displayName || name}" restarted.`, 'success');
     log(`Plugin ${name} restarted successfully.`);
   } catch (e) {
-    log('Failed to restart ' + name + ': ' + e.message, 'err');
+    const msg = 'Failed to restart "' + (displayName || name) + '": ' + e.message;
+    showToast(msg, 'error');
+    log(msg, 'err');
+  }
+}
+
+async function promptShutdown() {
+  const confirmed = await showConfirmDialog(
+    'Shutdown Application',
+    'Are you sure you want to shut down the application?\nAll running programs and plugins will be stopped.',
+    'Shutdown',
+    'btn-danger'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await fetch('/api/v1/shutdown', { method: 'POST' });
+    if (res.ok) {
+      showToast('Shutdown signal sent. The application will shut down shortly.', 'info');
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-secondary);font-size:1.2rem;">Shutting down...</div>';
+    } else {
+      showToast('Shutdown signal failed: ' + res.status + ' ' + res.statusText, 'error');
+    }
+  } catch (e) {
+    showToast('Shutdown signal failed: ' + e.message, 'error');
   }
 }
 
@@ -345,7 +427,7 @@ async function wizardSave() {
     showRestartDialog('Setup Complete', 'Your settings have been saved. The tool must be restarted for changes to take effect.');
   } catch (e) {
     log('Failed to save setup: ' + e.message, 'err');
-    alert('Failed to save: ' + e.message);
+    showToast('Failed to save: ' + e.message, 'error');
   } finally { nextBtn.disabled = false; nextBtn.textContent = 'Save'; }
 }
 async function triggerRestart() {
@@ -355,8 +437,12 @@ async function triggerRestart() {
     const res = await fetch('/api/v1/restart', { method: 'POST' });
     if (res.ok) {
       document.querySelector('#restart-dialog .wizard-card').innerHTML = '<h2 style="border:none;padding:0;">Restarting...</h2><p class="muted">Please wait while the tool restarts.</p>';
-    } else { alert('Restart signal failed. Please restart manually.'); }
-  } catch (e) { alert('Restart signal failed. Please restart manually.'); }
+    } else {
+      showToast('Restart signal failed. Please restart manually.', 'error');
+    }
+  } catch (e) {
+    showToast('Restart signal failed. Please restart manually.', 'error');
+  }
 }
 document.getElementById('wizard-back').addEventListener('click', () => { if (wizardStep > 0) { wizardStep--; renderWizardStep(); } });
 document.getElementById('wizard-next').addEventListener('click', wizardNext);
@@ -1803,8 +1889,13 @@ class PluginConfigEditor {
       this.showToast('Plugin configuration saved successfully.', 'success');
       // Prompt to restart the plugin so changes take effect
       const display = this.displayName || this.pluginName;
-      setTimeout(() => {
-        if (confirm(`Plugin "${display}" configuration updated.\n\nChanges may require the plugin to reload.\n\nRestart plugin now?`)) {
+      setTimeout(async () => {
+        const confirmed = await showConfirmDialog(
+          'Restart Plugin?',
+          `Plugin "${display}" configuration updated.\n\nChanges may require the plugin to reload.\n\nRestart plugin now?`,
+          'Restart Now'
+        );
+        if (confirmed) {
           restartPlugin(this.pluginName, display);
         }
       }, 300);

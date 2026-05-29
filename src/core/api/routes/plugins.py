@@ -166,18 +166,29 @@ async def enable_plugin(name: str):
     """Enable a plugin by name and signal runtime start."""
     try:
         registry = get_registry()
+        plugin = registry.get(name)
+        if plugin is None:
+            log.warning("Enable plugin '%s' failed: not found in registry", name)
+            raise HTTPException(
+                status_code=404, detail=f"Plugin '{name}' not found in registry"
+            )
+        if plugin.enabled:
+            log.info("Plugin '%s' is already enabled — returning current state", name)
+            return plugin
         result = registry.update(name, enabled=True)
         if result is None:
+            log.error("Enable plugin '%s': registry.update returned None after get succeeded", name)
             raise HTTPException(
-                status_code=404, detail=f"Plugin '{name}' not found"
+                status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
             )
         _write_plugin_signal(name, "start")
+        log.info("Plugin '%s' enabled and start signal written", name)
         return result
     except HTTPException:
         raise
     except Exception as e:
-        log.exception("Failed to enable plugin")
-        raise HTTPException(status_code=500, detail=str(e))
+        log.exception("Failed to enable plugin '%s': %s", name, e)
+        raise HTTPException(status_code=500, detail=f"Failed to enable plugin '{name}': {e}")
 
 
 @router.post("/plugins/{name}/disable", response_model=PluginRegistration)
@@ -185,18 +196,29 @@ async def disable_plugin(name: str):
     """Disable a plugin by name and signal runtime stop."""
     try:
         registry = get_registry()
+        plugin = registry.get(name)
+        if plugin is None:
+            log.warning("Disable plugin '%s' failed: not found in registry", name)
+            raise HTTPException(
+                status_code=404, detail=f"Plugin '{name}' not found in registry"
+            )
+        if not plugin.enabled:
+            log.info("Plugin '%s' is already disabled — returning current state", name)
+            return plugin
         result = registry.update(name, enabled=False)
         if result is None:
+            log.error("Disable plugin '%s': registry.update returned None after get succeeded", name)
             raise HTTPException(
-                status_code=404, detail=f"Plugin '{name}' not found"
+                status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
             )
         _write_plugin_signal(name, "stop")
+        log.info("Plugin '%s' disabled and stop signal written", name)
         return result
     except HTTPException:
         raise
     except Exception as e:
-        log.exception("Failed to disable plugin")
-        raise HTTPException(status_code=500, detail=str(e))
+        log.exception("Failed to disable plugin '%s': %s", name, e)
+        raise HTTPException(status_code=500, detail=f"Failed to disable plugin '{name}': {e}")
 
 
 # ── Get single ───────────────────────────────────────────────────────

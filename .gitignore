@@ -8,3 +8,8 @@ __pycache__/
 data/api_plugin_registry.json*
 .coverage
 core/runtime/restart
+core/runtime/plugin_start_channel-points
+core/runtime/plugin_start_test-plugin
+core/runtime/plugin_stop_channel-points
+core/runtime/plugin_stop_test-plugin
+core/runtime/shutdown
