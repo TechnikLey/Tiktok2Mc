@@ -301,17 +301,19 @@ document.getElementById('btn-restart-later').addEventListener('click', () => { h
 /* ─── Config Editor ─── */
 
 const SECTION_ORDER = [
-  'tiktok','rcon','java','comment_commands','control_method','server_host',
-  'overlay_text','like_goal','timer','death_counter','win_counter',
-  'spotify','channel_points','minecraft_server_api','console',
-  'random_triggers','theme','update','shutdown','auto_update_config',
-  'show_sudo_warning','gui'
+  'tiktok','rcon','server_host','control_method',
+  'java','minecraft_server_api',
+  'overlay_text','like_goal','timer','death_counter','win_counter','console',
+  'comment_commands','channel_points','random_triggers',
+  'spotify',
+  'theme',
+  'update','shutdown','auto_update_config','show_sudo_warning','gui'
 ];
 
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method'],
   'Minecraft': ['java','minecraft_server_api'],
-  'Streaming & Overlays': ['console','overlay_text','like_goal','timer','death_counter','win_counter'],
+  'Streaming & Overlays': ['overlay_text','like_goal','timer','death_counter','win_counter','console'],
   'Chat & Commands': ['comment_commands','channel_points','random_triggers'],
   'Integrations': ['spotify'],
   'Appearance': ['theme'],
