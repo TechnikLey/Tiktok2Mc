@@ -1,94 +1,138 @@
-# TikTok2Mc — Project Roadmap
+# TikTok2Mc — v1.0.0 Progress
 
-## What This Is
+## Overall Status
 
-TikTok2Mc links your TikTok Live stream to a Minecraft server. When viewers follow, like, share, comment, or send gifts, those events can trigger commands in your Minecraft world. You decide which events matter and what they do.
-
----
-
-## What Works Today
-
-All items listed here are implemented and functional in the current version.
-
-### Live Stream Connection
-
-TikTok events arrive reliably during a live stream. Supported event types:
-
-- Follows
-- Likes
-- Shares
-- Comments
-- Gift sends
-- Viewer joins
-
-### Minecraft Command Execution
-
-Events can trigger commands in your Minecraft server. Commands are defined in a file named `actions.mca` and can use different execution methods depending on your server setup.
-
-### Built-in Add-ons
-
-Seven optional features are included. Each one can be turned on or off independently:
-
-- **Timer** — A visible countdown that can pause when a death happens
-- **Death Counter** — Tracks and displays deaths during the stream
-- **Win Counter** — Tracks wins and losses, with an optional death penalty
-- **Like Goal** — A progress bar that fills as likes come in
-- **Overlay Text** — Scrolling or static text shown on your stream overlay
-- **Channel Points** — Loyalty points that viewers earn over time
-- **Spotify Control** — Lets viewers control Spotify playback through chat commands
-
-### Desktop Interface
-
-When you start the tool, a dashboard opens in your browser. It includes:
-
-- **Setup wizard** — Guides you through the initial configuration (TikTok username, server password)
-- **Settings editor** — All tool options are available through forms organized by category (connection, Minecraft, system, appearance, chat commands). Changes are reviewed before saving.
-- **Feature manager** — See which add-ons are installed, turn them on or off, and adjust their individual settings
-- **Overlay URL display** — Shows the web addresses you need for OBS Browser Sources, with copy buttons
-- **Restart and shutdown controls**
-
-### Configuration Backups
-
-Every time you save your settings, a backup is created automatically. If something goes wrong during a save, the previous version is preserved.
+About 80% complete. All major systems are implemented. Remaining work is concentrated in GUI polish, end-to-end update validation, and documentation.
 
 ---
 
-## Areas That Need Improvement
+## Completed since v0.5.0
 
-These are real gaps in the current version. None of them prevent the tool from functioning, but they affect the experience.
+### Central API Server
+- FastAPI backend on `127.0.0.1:29185` with 24+ REST routes at `/api/v1`
+- Interactive API documentation at `/docs`
+- Plugin management (register, list, enable, disable, discover, update check)
+- Configuration CRUD with schema validation and automatic versioned backups
+- Tool update check via GitHub Releases API
+- Update coordination signals (file-based + API-based, dual mechanism)
+- Event system: EventBus with Server-Sent Events (`/events/stream`) and WebSocket (`/ws`)
+- CORS restricted to localhost by default
+- Security warnings for default RCON password and network exposure
 
-**No update notifications in the interface.** The tool checks for new versions at startup (in the console window), but the desktop interface does not show update status, check for updates, or notify you when a new version is available.
+### Plugin System Overhaul
+- Manifest-driven plugin discovery via `plugin.json` (name, version, entry point, ports, capabilities, schema)
+- `PluginLauncher` replaces legacy self-registration — no more `register_plugin()` calls in plugin code
+- All 7 plugins migrated to standalone, fully decoupled mode with no cross-plugin hard dependencies
+- Plugin enable/disable is idempotent with signal-file lifecycle management
+- All plugins default to `enabled: false` (opt-in)
+- Plugin update checker with semver comparison, download, install, extract, rollback
+- Plugin port registration and deduplication
 
-**No live log viewer.** The dashboard has a placeholder section for logs that reads "Log streaming not yet implemented." There is no way to see what the system is doing in real time without opening the console window or reading log files.
+### Plugin Config System
+- Self-contained per-plugin `config.yaml` files alongside manifests
+- `config_schema` in `plugin.json` declares field types, defaults, validation rules
+- Schema types: string, integer, number, boolean, color, select, array (nested item_schema), object
+- Full validation backend: required fields, min/max bounds, color regex, select options, array items
+- `ruamel.yaml` round-trip I/O preserving comments, quotes, ordering, formatting
+- Atomic writes with SHA-256-deduplicated, coalesced versioned backups
+- Schema-driven default generation from field definitions
 
-**No built-in trigger editor.** Trigger rules (the `actions.mca` file) must be edited by hand. There is no editor or validation tool in the desktop interface.
+### Desktop GUI (entirely new in v1.0.0)
+- `gui.py` — pywebview shell opening the SPA dashboard
+- `templates/gui/index.html` — single-page dashboard with 4-card layout (System Status, Plugins, Configuration, Live Log)
+- First-Run Setup Wizard — 3-step: TikTok username, RCON password with strength meter, review and save
+- Plugin Manager — table showing name, version, port, status; enable/disable toggle per plugin; "Edit Config" button opens Plugin Config Editor
+- Overlay URL Helper — OBS Browser Source URLs displayed inside Plugin Manager with copy-to-clipboard buttons
+- Full `config.yaml` Editor — form-based with 5 categories (Connection, Minecraft, System, Appearance, Chat & Commands), IntersectionObserver scroll-spy, real-time search, validation, diff review modal before save, unknown key preservation
+- Plugin Config Editor — schema-driven dynamic form renderer with category sidebar, 9+ field types, raw JSON fallback, plugin restart prompt after save
+- Restart system — `POST /api/v1/restart` with dialog, pending banner, background daemon
+- Shutdown system — `POST /api/v1/shutdown` with confirmation dialog, countdown, graceful termination
 
-**Overlay URLs are not shown on the main dashboard.** They only appear inside the feature manager popup.
+### Backup System
+- `BackupManager` class with SHA-256 deduplication, time-based coalescing (60s window), retention (default 10 backups)
+- Integrated into main config save, plugin config save, and plugin registry save paths
+- Backups stored in `data/backups/` with category subdirectories
+
+### Testing
+- Test suite expanded from ~0 (no API tests) to 369 tests (365 passing, 4 skipped)
+- Coverage added: API integration (config, plugins, plugin_config, events, updates), plugin registry, manifest validation, EventBus, plugin config system, schema validation, YAML round-trip, theme, overlay utils, actions validator (36 tests), smoke tests for all 8 plugin manifests
+- CI workflow `test.yml` runs on every push/PR to `main`
+- Test runtime ~7 seconds
+
+### Legacy Cleanup
+- `python/registry.py` deleted (legacy file-based plugin registry)
+- `python/client.py` deleted (legacy API client)
+- `python/gui.py` deleted (legacy GUI module)
+- `python/plugin_updater.py` deleted (replaced by PluginUpdateChecker)
+- All `register_plugin()` calls removed from plugin `main.py` files
+- `ErrorResponse`, `WSMessage`, `ImportLegacyResponse`, `validate_config_dict`, `read_plugin_registry()` removed
+- `--register-only` CLI flag removed
+- `build.py` / `upload.py` version bumped to `v1.0.0`
+
+### Documentation
+- `README.md` rewritten for v1.0.0
+- `GUIDE.md` rewritten with architecture, plugin system, API usage, actions/triggers, update system, troubleshooting
+- `CHANGELOG.md` normalized with v1.0.0 section (Keep a Changelog format)
+- `config.yaml` inline documentation improved
 
 ---
 
-## What v1.0.0 Is Aiming For
+## In Progress
 
-The v1.0.0 release focuses on making the current foundation stable and complete. The main areas of work are:
+- **GUIDE.md** — needs updates covering the API server (`/docs`, event bus, config API), event hooks system, config versioning. Currently accurate for user-facing features but missing new v1.0.0 infrastructure documentation.
 
-- **Verifying the update system** works correctly with compiled releases, so updates install safely
-- **Updating the guides** to match the current version of the tool
-- **Resolving the known gaps** listed above where practical
-
-This version is a clean break from older 0.x releases. Configuration files and add-ons from earlier versions are not compatible and will need to be set up again.
+- **End-to-end update validation** — update subsystem has 50+ tests but compiled `update.exe` → `start.exe` → restart flow has never been tested with actual compiled binaries. Update runs at console startup before GUI.
 
 ---
 
-## Ideas After v1.0.0
+## Missing / Blocking v1.0.0
 
-These are possible future improvements. None are confirmed or scheduled.
+### GUI Gaps
+- **Log viewer** — dashboard has a placeholder reading "Log streaming not yet implemented." Backend EventBus with SSE and WebSocket endpoints exists but is not connected from the frontend.
+- **Actions editor** — no API endpoint or GUI for editing `data/actions.mca` or `shell_actions.txt`. Users must edit these files by hand.
+- **Update check UI** — backend endpoints `GET /api/v1/updates/check` and `GET /api/v1/plugins/updates` exist, but the frontend never calls them. No "Check for Updates" button, no update notification banner.
+- **Overlay URLs not on main dashboard** — `renderOverlayUrls()` targets a non-existent element `#overlay-urls`. URLs only appear inside the Plugin Manager popup.
+- **No WebSocket/SSE client** — backend streaming endpoints are fully functional but the frontend never connects to them. All status updates rely on polling.
 
-- A live log viewer inside the desktop interface
-- An editor for trigger rules
-- Update notifications within the interface
-- A preview of what stream overlays look like before going live
-- A way to send Minecraft commands directly from the interface
-- Better tools for managing add-on settings
+### Plugin System Gaps
+- **No process health monitoring** — plugins are launched as subprocesses but never checked for liveness. A crashed plugin remains marked as `enabled: true` in the registry.
+- **No auto-restart on crash** — if a plugin process dies, there is no watchdog to restart it.
+- **Registry/filesystem state mismatch** — `/plugins/discover` is read-only. Plugins deleted from disk leave stale registry entries. New plugin directories are not auto-registered until restart.
+- **Port conflicts not detected** — no validation when two plugins declare the same port.
+- **Non-atomic enable/disable** — registry update and signal file write are separate operations; failure mid-way leaves inconsistent state.
+
+### Build & Release
+- **End-to-end update flow untested on compiled builds** — all update tests mock HTTP and run on Python source. No CI step compiles and exercises `update.exe` against a real version boundary.
+- **Hardcoded versions** — `TOOL_VERSION` and `UPDATER_VERSION` hardcoded in `build.py` with no single source of truth.
+- **`upload.py` stale in git** — checked in with hardcoded `v1.0.0`.
+- **No CI build step on PRs** — build only runs on tags. PRs can break compilation without detection.
+
+### Testing Gaps (Untested Modules)
+- `src/python/main.py` (~1614 lines) — 0 tests
+- `src/python/start.py` (~919 lines) — 0 tests
+- `src/core/backup.py` (265 lines) — 0 standalone tests (only indirect via registry)
+- `src/core/hook_api.py` / `hook_loader.py` — 0 tests
+- `src/core/api/routes/system.py` (restart/shutdown) — 0 tests
+- `src/core/api/routes/ws.py` (WebSocket) — all tests skipped (httpx limitation)
+- `src/core/api/updater.py` (download/install logic) — untested
+- `templates/gui/` (2022 lines of JS + HTML + CSS) — 0 tests
+- All 8 plugin implementations — 0 tests beyond manifest smoke tests
+- `build.py` / `create_plugin.py` / `upload.py` — 0 tests
+
+### Documentation
+- `GUIDE.md` needs updates for: API server documentation, event hooks, config versioning
+- `CHANGELOG.md` test count stale (285 claimed vs 369 actual), `Unreleased` section empty
+
+---
+
+## Current Stability Status
+
+The system is functional for daily use. All core features (TikTok connection, Minecraft command execution, plugins, desktop GUI, configuration) work end-to-end. Known gaps affect the user experience but do not prevent operation:
+
+- Console window flash on Windows during update checks (runs before GUI)
+- No way to view logs, check for updates, or edit trigger rules from within the GUI
+- No recovery mechanism if a plugin process crashes mid-stream
+- Update path has never been exercised with a compiled binary release
 
 ---
 
