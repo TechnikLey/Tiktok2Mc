@@ -23,7 +23,6 @@
 import requests
 import sys
 from pathlib import Path
-import yaml
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 
@@ -40,8 +39,11 @@ if not CONFIG_FILE.exists():
     log.error(f"Configuration file not found at {CONFIG_FILE}")
     sys.exit(1)
 
-with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-    cfg = yaml.safe_load(f)
+_src = BASE_DIR.parent / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
+from core.yaml_utils import load_yaml
+cfg = load_yaml(CONFIG_FILE)
 
 BOT_HOST = "http://127.0.0.1"
 BOT_PORT = cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)

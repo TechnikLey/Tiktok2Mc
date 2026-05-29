@@ -10,7 +10,6 @@
 # ==================================================
 
 import sys
-import yaml
 import asyncio
 import aiohttp
 import re
@@ -34,6 +33,7 @@ from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
 from core.plugin_config import load_all_plugin_configs
+from core.yaml_utils import load_yaml
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -197,9 +197,7 @@ def load_config():
     _check_dup_cmd_config()
 
     try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            config = yaml.safe_load(f) or {}
-
+        config = load_yaml(CONFIG_FILE)
         ctx.config = config
 
         # Load all plugin configs for port references and cross-plugin data

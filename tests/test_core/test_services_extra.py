@@ -1,5 +1,6 @@
 import pytest
-import yaml
+
+from core.yaml_utils import save_yaml
 
 
 class TestApiServiceFallback:
@@ -13,35 +14,26 @@ class TestApiServiceFallback:
         defaults_dir = project_dir / "defaults"
         defaults_dir.mkdir(exist_ok=True)
         fallback = defaults_dir / "config.yaml"
-        fallback.write_text(
-            yaml.dump(
-                {
-                    "config_version": "1.0",
-                    "auto_update_config": True,
-                    "show_sudo_warning": False,
-                    "server_host": "127.0.0.1",
-                    "control_method": "DCS",
-                    "shutdown": {},
-                    "java": {},
-                    "rcon": {},
-                    "tiktok": {},
-                    "comment_commands": {},
-                    "random_triggers": {},
-                    "console": {},
-                    "minecraft_server_api": {},
-                    "overlay_text": {"enabled": False},
-                    "like_goal": {"enabled": False},
-                    "timer": {"enabled": False},
-                    "death_counter": {"enabled": False},
-                    "win_counter": {"enabled": False},
-                    "gui": {},
-                    "spotify": {"enabled": False},
-                    "channel_points": {"enabled": False},
-                    "theme": {},
-                    "update": {},
-                }
-            ),
-            encoding="utf-8",
+        save_yaml(
+            fallback,
+            {
+                "config_version": "1.0",
+                "auto_update_config": True,
+                "show_sudo_warning": False,
+                "server_host": "127.0.0.1",
+                "control_method": "DCS",
+                "shutdown": {},
+                "java": {},
+                "rcon": {},
+                "tiktok": {},
+                "comment_commands": {},
+                "random_triggers": {},
+                "console": {},
+                "minecraft_server_api": {},
+                "gui": {},
+                "update": {},
+            },
+            backup=False,
         )
         monkeypatch.setattr(
             "core.paths.get_config_file", lambda: main_config

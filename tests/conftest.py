@@ -1,7 +1,6 @@
 import sys
 import os
 import tempfile
-import yaml
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +9,8 @@ from fastapi.testclient import TestClient
 _src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
+
+from core.yaml_utils import save_yaml
 
 MINIMAL_CONFIG = {
     "config_version": "1.0",
@@ -25,15 +26,7 @@ MINIMAL_CONFIG = {
     "random_triggers": {},
     "console": {},
     "minecraft_server_api": {},
-    "overlay_text": {"enabled": False},
-    "like_goal": {"enabled": False},
-    "timer": {"enabled": False},
-    "death_counter": {"enabled": False},
-    "win_counter": {"enabled": False},
     "gui": {},
-    "spotify": {"enabled": False},
-    "channel_points": {"enabled": False},
-    "theme": {},
     "update": {},
 }
 
@@ -43,8 +36,7 @@ def project_dir():
     with tempfile.TemporaryDirectory(prefix="tiktok2mc_test_") as tmp:
         root = Path(tmp)
         config_file = root / "config.yaml"
-        with config_file.open("w", encoding="utf-8") as f:
-            yaml.dump(MINIMAL_CONFIG, f)
+        save_yaml(config_file, MINIMAL_CONFIG, backup=False)
         (root / "data").mkdir()
         (root / "plugins").mkdir()
         yield root

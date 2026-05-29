@@ -20,7 +20,6 @@ from urllib.parse import urlencode, parse_qs
 from pathlib import Path
 
 import logging
-import yaml
 import requests
 from flask import Flask, Response, request, jsonify, redirect
 from core import parse_args, get_base_dir, get_root_dir, get_base_file

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import sys
-import yaml
 import logging
 from typing import Any
+
+from core.yaml_utils import load_yaml
 
 log = logging.getLogger(__name__)
 
@@ -68,14 +69,11 @@ def normalize_config_version(value: Any) -> str:
 
 def load_config(config: str | Path) -> dict:
     path = Path(config)
-
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-
     try:
-        with path.open("r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    except yaml.YAMLError as e:
+        return load_yaml(path)
+    except FileNotFoundError:
+        raise
+    except ValueError as e:
         raise ValueError(f"YAML error in {path}: {e}")
     except Exception as e:
-        raise RuntimeError(f"General error in {path}: {e}")
+        raise RuntimeError(f"Error loading {path}: {e}")

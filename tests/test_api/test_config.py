@@ -9,7 +9,6 @@ class TestConfigEndpoints:
         assert "path" in body
         assert "config" in body
         assert body["config"]["config_version"] == "1.0"
-        assert body["config"]["overlay_text"]["enabled"] is False
 
     def test_get_config_path_matches_project(self, client, project_dir):
         resp = client.get("/api/v1/config")
@@ -34,7 +33,8 @@ class TestConfigEndpoints:
         client.put("/api/v1/config", json={"config": original_config, "backup": False})
 
     def test_update_config_validates_schema(self, client):
-        resp = client.put("/api/v1/config", json={"config": {"bad": "data"}, "backup": False})
+        # Sending a type-violating update must still fail after merge
+        resp = client.put("/api/v1/config", json={"config": {"java": "not_a_dict"}, "backup": False})
         assert resp.status_code == 500
 
     def test_update_config_upgrades_version_on_write(self, client):
@@ -66,6 +66,7 @@ class TestConfigEndpoints:
             backup_path.rename(config_file)
 
     def test_get_config_corrupt_500(self, client, project_dir):
+        from core.yaml_utils import save_yaml
         config_file = project_dir / "config.yaml"
         config_file.write_text(": broken yaml [", encoding="utf-8")
         try:
@@ -73,7 +74,4 @@ class TestConfigEndpoints:
             assert resp.status_code == 500
         finally:
             from tests.conftest import MINIMAL_CONFIG
-            import yaml
-            config_file.write_text(
-                yaml.dump(MINIMAL_CONFIG), encoding="utf-8"
-            )
+            save_yaml(config_file, MINIMAL_CONFIG, backup=False)

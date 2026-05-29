@@ -1,13 +1,15 @@
 import re
 from pathlib import Path
-import yaml
 import shutil
 import logging
 from datetime import datetime
 from typing import Any
 
+from ruamel.yaml.comments import CommentedMap
+
 from core.paths import get_root_dir, get_config_file
 from core.utils import normalize_config_version
+from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
 
 log = logging.getLogger(__name__)
 
@@ -114,8 +116,7 @@ class ApiService:
             raise FileNotFoundError(
                 f"Config file not found: {self.config_path}"
             )
-        with self.config_path.open("r", encoding="utf-8") as f:
-            data: dict[str, Any] = yaml.safe_load(f) or {}
+        data = load_yaml(self.config_path)
 
         # Normalise legacy integer / string config_version on load
         if "config_version" in data:
@@ -147,32 +148,14 @@ class ApiService:
         if "config_version" in data:
             data["config_version"] = EXPECTED_CONFIG_VERSION
 
-        _validate_config_schema(data)
+        # Load existing config to preserve comments/formatting
+        existing = load_yaml(self.config_path) if self.config_path.exists() else CommentedMap()
+        if not isinstance(existing, CommentedMap):
+            existing = CommentedMap(existing) if isinstance(existing, dict) else CommentedMap()
 
-        if backup and self.config_path.exists():
-            stem = self.config_path.stem  # "config"
-            parent = self.config_path.parent
-            bak_num = 0
-            for p in parent.glob(f"{stem}.yaml.v*.bak"):
-                m = re.search(r"\.v(\d+)\.bak$", p.name)
-                if m:
-                    bak_num = max(bak_num, int(m.group(1)))
-            bak_path = parent / f"{stem}.yaml.v{bak_num + 1}.bak"
-            shutil.copy2(self.config_path, bak_path)
-            log.info("Config backup created: %s", bak_path)
-
-        tmp_path = self.config_path.with_name(
-            self.config_path.name + ".tmp"
-        )
-        with tmp_path.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(
-                data,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-            )
-        tmp_path.replace(self.config_path)
+        deep_update_rt(existing, data)
+        _validate_config_schema(existing)
+        save_yaml(self.config_path, existing, backup=backup)
         log.info("Config written: %s", self.config_path)
 
     def get_config_status(self) -> bool:

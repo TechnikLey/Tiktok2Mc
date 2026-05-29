@@ -18,7 +18,6 @@ import re
 import time
 import io
 import os
-import yaml
 from pathlib import Path
 from packaging import version
 from ruamel.yaml import YAML

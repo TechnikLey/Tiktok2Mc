@@ -1,5 +1,4 @@
 import pytest
-import yaml
 from pathlib import Path
 
 
@@ -66,10 +65,10 @@ class TestApiService:
         assert cfg["config_version"] == "1.0"
 
     def test_read_config_normalises_version(self, svc, project_dir):
+        from core.yaml_utils import save_yaml
         config_file = project_dir / "config.yaml"
         original = config_file.read_text(encoding="utf-8")
-        with config_file.open("w", encoding="utf-8") as f:
-            yaml.dump({"config_version": 7}, f)
+        save_yaml(config_file, {"config_version": 7}, backup=False)
 
         try:
             cfg = svc.read_config()
@@ -99,8 +98,9 @@ class TestApiService:
         assert len(backups) >= 1
 
     def test_write_config_validates_schema(self, svc):
-        with pytest.raises(ValueError, match="Missing required key"):
-            svc.write_config({"bad": "data"}, backup=False)
+        # A type-violating update must still fail after merge
+        with pytest.raises(ValueError, match="must be dict"):
+            svc.write_config({"java": "not_a_dict"}, backup=False)
 
     def test_get_uptime(self, svc):
         uptime = svc.get_uptime()

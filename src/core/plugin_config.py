@@ -27,7 +27,7 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-import yaml
+from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
 
 log = logging.getLogger(__name__)
 
@@ -151,8 +151,7 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
 
     if config_path.exists():
         try:
-            with config_path.open("r", encoding="utf-8") as f:
-                data: dict = yaml.safe_load(f) or {}
+            data = load_yaml(config_path)
         except Exception as exc:
             log.warning("Failed to load plugin config %s: %s", config_path, exc)
             data = {}
@@ -171,18 +170,20 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
 
 
 def save_plugin_config(plugin_dir: Path, data: dict) -> None:
-    """Write *data* to the plugin's ``config.yaml`` atomically."""
+    """Write *data* to the plugin's ``config.yaml`` atomically.
+
+    Loads the existing file first (if present) to preserve any manual
+    comments or formatting, then deep-updates it with *data* before
+    saving.
+    """
     config_path = get_plugin_config_path(plugin_dir)
-    tmp_path = config_path.with_suffix(".yaml.tmp")
-    with tmp_path.open("w", encoding="utf-8") as f:
-        yaml.safe_dump(
-            data,
-            f,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-    tmp_path.replace(config_path)
+
+    existing = load_yaml(config_path) if config_path.exists() else {}
+    if not isinstance(existing, dict):
+        existing = {}
+
+    deep_update_rt(existing, data)
+    save_yaml(config_path, existing, backup=False)
     log.debug("Plugin config written: %s", config_path)
 
 

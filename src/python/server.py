@@ -8,9 +8,9 @@ import urllib.request
 from pathlib import Path
 from core.paths import get_base_dir
 import logging
-import yaml
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from core.yaml_utils import load_yaml
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
@@ -113,8 +113,7 @@ try:
     if not CONFIG_FILE.exists():
         raise FileNotFoundError(f"Config missing: {CONFIG_FILE}")
 
-    with CONFIG_FILE.open("r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f) or {}
+    cfg = load_yaml(CONFIG_FILE)
 
     Xms = cfg.get("java", {}).get("xms", "1G")
     Xmx = cfg.get("java", {}).get("xmx", "1G")
