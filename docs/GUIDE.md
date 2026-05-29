@@ -385,9 +385,9 @@ Another program is using one of the ports the tool needs. Common causes:
 
 ### Config file looks wrong after update
 
-The updater creates a backup at `config/config.yaml.bak` before migrating. If something went wrong:
+The updater creates a backup in `data/backups/migration/` before migrating. If something went wrong:
 1. Close the tool.
-2. Rename `config/config.yaml.bak` to `config/config.yaml`.
+2. Locate the most recent backup in `data/backups/migration/` and copy it to `config/config.yaml`.
 3. Restart the tool.
 
 ### Security warnings in the console

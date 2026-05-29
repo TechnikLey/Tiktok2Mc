@@ -291,7 +291,7 @@ Wenn `auto_update_config` in der geladenen Konfiguration aktiviert ist, führt d
 4. Vor der Migration wird ein Backup erstellt:
 
 ```text
-config/config.yaml.bak
+data/backups/migration/
 ```
 
 5. Die Struktur der Vorlage wird beibehalten.

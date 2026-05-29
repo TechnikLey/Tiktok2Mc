@@ -23,6 +23,7 @@ from packaging import version
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
+from core.backup import get_backup_manager
 from core.paths import get_base_dir
 from core.utils import load_config, normalize_config_version
 from core.api.server import DEFAULT_PORT
@@ -223,11 +224,14 @@ def migrate_config_if_needed() -> bool:
 
     log.info(f"Migrating config: {raw_user} -> {raw_default}")
 
-    # Backup
-    backup_path = CONFIG_FILE.with_suffix(".yaml.bak")
+    # Backup (via centralized BackupManager)
     try:
-        shutil.copy2(CONFIG_FILE, backup_path)
-        log.info(f"Backup created at: {backup_path}")
+        bm = get_backup_manager()
+        bak = bm.create_backup(CONFIG_FILE, category="migration")
+        if bak:
+            log.info(f"Backup created at: {bak}")
+        else:
+            log.info("Backup skipped (identical content or too recent)")
     except Exception as e:
         log.error(f"Migration aborted. Could not create backup: {e}")
         return False

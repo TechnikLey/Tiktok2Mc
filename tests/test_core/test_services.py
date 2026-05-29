@@ -94,7 +94,7 @@ class TestApiService:
         cfg = svc.read_config()
         cfg["server_host"] = "0.0.0.0"
         svc.write_config(cfg, backup=True)
-        backups = list(project_dir.glob("config.yaml.v*.bak"))
+        backups = list((project_dir / "data" / "backups" / "config").glob("*"))
         assert len(backups) >= 1
 
     def test_write_config_validates_schema(self, svc):

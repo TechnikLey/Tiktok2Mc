@@ -291,7 +291,7 @@ If `auto_update_config` is enabled in the loaded configuration, the updater perf
 4. A backup is created before migration:
 
 ```text
-config/config.yaml.bak
+data/backups/migration/
 ```
 
 5. The structure of the template is preserved.

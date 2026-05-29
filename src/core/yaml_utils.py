@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import shutil
+import logging
 from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
+
+from core.backup import get_backup_manager
+
+log = logging.getLogger(__name__)
 
 
 def create_yaml_rt() -> YAML:
@@ -43,31 +47,20 @@ def load_yaml(path: Path) -> Any:
 def save_yaml(path: Path, data: Any, backup: bool = False) -> None:
     """Write *data* to *path* atomically, preserving ruamel.yaml metadata.
 
-    Creates a versioned backup (``*.v1.bak``, …) when *backup* is ``True`` and
-    the file already exists.
+    Delegates backup creation to the centralized ``BackupManager`` when
+    *backup* is ``True`` and the file already exists.
     """
     yaml = create_yaml_rt()
     if backup and path.exists():
-        _make_backup(path)
+        bm = get_backup_manager()
+        try:
+            bm.create_backup(path)
+        except Exception as exc:
+            log.warning("Failed to create backup for %s: %s", path, exc)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         yaml.dump(data, f)
     tmp_path.replace(path)
-
-
-def _make_backup(path: Path) -> Path:
-    import re
-
-    stem = path.stem
-    parent = path.parent
-    bak_num = 0
-    for p in parent.glob(f"{stem}.yaml.v*.bak"):
-        m = re.search(r"\.v(\d+)\.bak$", p.name)
-        if m:
-            bak_num = max(bak_num, int(m.group(1)))
-    bak_path = parent / f"{stem}.yaml.v{bak_num + 1}.bak"
-    shutil.copy2(path, bak_path)
-    return bak_path
 
 
 def deep_update_rt(base: Any, overlay: Any) -> None:

@@ -54,13 +54,16 @@ class TestSaveYaml:
         assert p.exists()
         assert "key: value" in p.read_text(encoding="utf-8")
 
-    def test_save_backup(self, tmp_path):
+    def test_save_backup(self, tmp_path, monkeypatch):
+        from core.backup import BackupManager
+        bm = BackupManager(root_dir=tmp_path)
+        monkeypatch.setattr("core.yaml_utils.get_backup_manager", lambda: bm)
         p = tmp_path / "out.yaml"
         p.write_text("old: data\n", encoding="utf-8")
         yaml = create_yaml_rt()
         data = yaml.load("new: data\n")
         save_yaml(p, data, backup=True)
-        backups = list(tmp_path.glob("out.yaml.v*.bak"))
+        backups = list((tmp_path / "data" / "backups" / "_other").glob("*"))
         assert len(backups) == 1
         assert "old: data" in backups[0].read_text(encoding="utf-8")
 

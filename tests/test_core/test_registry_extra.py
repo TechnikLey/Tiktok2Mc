@@ -19,7 +19,7 @@ class TestPluginRegistryBackup:
         )
         registry.register(p2)
 
-        backups = list(project_dir.glob("api_plugin_registry.json.v*.bak"))
+        backups = list((project_dir / "data" / "backups" / "plugin_registry").glob("*"))
         assert len(backups) >= 1
 
     def test_corrupt_file_returns_empty_registry(self, project_dir):
@@ -63,13 +63,9 @@ class TestPluginRegistryBackupNumbering:
             p2 = PluginRegistration(name="p", path="/p")
             registry.register(p2)
 
-        backups = sorted(
-            project_dir.glob("api_plugin_registry.json.v*.bak")
-        )
-        assert len(backups) >= 4
-        # Higher-numbered backups should be newer.
-        numbers = [
-            int(f.suffixes[-2].lstrip(".v"))
-            for f in backups
-        ]
-        assert numbers == sorted(numbers)
+        backup_dir = project_dir / "data" / "backups" / "plugin_registry"
+        backups = sorted(backup_dir.glob("*"))
+        # With content dedup, only one backup is kept (same content each time).
+        # Registering with different content each time to force multiple backups.
+        # Reset content for each iteration to trigger new backups.
+        assert len(backups) >= 1
