@@ -591,11 +591,8 @@ class ConfigEditor {
     document.getElementById('config-editor').classList.remove('hidden');
     this.setStatus('', '');
     this.activeSection = null;
-    // Attach scroll spy
-    const main = document.querySelector('.editor-main');
-    if (main) {
-      main.addEventListener('scroll', () => this.onScrollSpy(), { passive: true });
-    }
+    // Setup IntersectionObserver after render
+    this.setupScrollSpy();
     // Scroll to first section
     const first = this.content.querySelector('.section-card');
     if (first) { this.scrollTo(first.id); }
@@ -626,6 +623,8 @@ class ConfigEditor {
   render() {
     this.renderSidebar();
     this.renderContent();
+    // Re-attach observer to new section cards after any re-render
+    this.setupScrollSpy();
   }
 
   renderSidebar() {
@@ -1174,31 +1173,64 @@ class ConfigEditor {
     }
   }
 
-  onScrollSpy() {
-    if (this._scrollTimer) clearTimeout(this._scrollTimer);
-    this._scrollTimer = setTimeout(() => {
-      const main = document.querySelector('.editor-main');
-      if (!main) return;
-      const mainRect = main.getBoundingClientRect();
-      const threshold = 100; // pixels from top of editor-main
-      let best = null;
-      let bestTop = -Infinity;
-      for (const card of this.content.querySelectorAll('.section-card')) {
-        const rect = card.getBoundingClientRect();
-        const relativeTop = rect.top - mainRect.top;
-        if (relativeTop <= threshold && relativeTop > bestTop) {
-          bestTop = relativeTop;
-          best = card.id;
+  setupScrollSpy() {
+    const main = document.querySelector('.editor-main');
+    if (!main) return;
+    if (this._observer) this._observer.disconnect();
+
+    // Track which section is most visible
+    const visibleRatios = new Map();
+
+    this._observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const id = entry.target.id;
+        if (id && id.startsWith('section_')) {
+          visibleRatios.set(id, entry.intersectionRatio);
         }
       }
-      if (best && best.startsWith('section_')) {
-        const key = best.substring('section_'.length);
+
+      // Pick the visible section with the highest ratio
+      let bestId = null;
+      let bestRatio = -1;
+      for (const [id, ratio] of visibleRatios) {
+        if (ratio > bestRatio) {
+          bestRatio = ratio;
+          bestId = id;
+        }
+      }
+
+      if (bestId) {
+        const key = bestId.substring('section_'.length);
         if (this.activeSection !== key) {
           this.activeSection = key;
-          this.renderSidebar();
+          this.updateSidebarActive();
         }
       }
-    }, 80);
+    }, {
+      root: main,
+      rootMargin: '-80px 0px -40% 0px',
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1]
+    });
+
+    for (const card of this.content.querySelectorAll('.section-card')) {
+      this._observer.observe(card);
+    }
+  }
+
+  updateSidebarActive() {
+    this.sidebar.querySelectorAll('.sidebar-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    const items = this.sidebar.querySelectorAll('.sidebar-item');
+    for (const item of items) {
+      const onClick = item.getAttribute('onclick');
+      if (onClick && onClick.includes(`section_${this.activeSection}`)) {
+        item.classList.add('active');
+        // Scroll item into view within sidebar if needed
+        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        break;
+      }
+    }
   }
 
   onSearch(q) {
