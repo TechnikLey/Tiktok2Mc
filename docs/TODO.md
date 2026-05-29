@@ -124,6 +124,9 @@
 
 > **These must be completed before release, but they do not block tagging on their own if the blockers above are resolved.**
 
+### User Experience Polish
+- [ ] **High** — Log_level rework for better intetragtion for People who only want a GUI and no Terminal
+
 ### Build & Deployment Finalization
 - [ ] **High** — Migration notice for v0.x users (config/plugins are incompatible)
 - [ ] **High** — Automated verification that `version.txt` matches `TOOL_VERSION` in `build.py`
