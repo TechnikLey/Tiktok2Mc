@@ -976,15 +976,18 @@ class ConfigEditor {
     let html = `<div class="editor-field full-width" data-path="${path}"><div class="field-label">Command Overrides</div><div class="field-widget">`;
     for (const cmd of commands) {
       const c = config[cmd] || {};
+      const overrideKeys = Object.keys(c).filter(k => k !== 'undefined');
+      let fieldsHtml = '';
+      for (const key of overrideKeys) {
+        fieldsHtml += this.buildOverrideWidget(key, c[key], `${path}.${cmd}.${key}`);
+      }
+      const used = new Set(overrideKeys);
+      const available = ['points_cost','cooldown','user_cooldown','conditional','url','handler','roles'].filter(k => !used.has(k));
       html += `<details style="margin-bottom:0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.6rem;">
         <summary style="cursor:pointer;font-size:0.9rem;font-weight:500;">${escapeHtml(cmd)}</summary>
         <div style="padding:0.6rem 0.25rem 0.2rem 0.25rem;">
-          ${this.buildOverrideField('points_cost', c.points_cost, `${path}.${cmd}.points_cost`)}
-          ${this.buildOverrideField('cooldown', c.cooldown, `${path}.${cmd}.cooldown`)}
-          ${this.buildOverrideField('conditional', c.conditional, `${path}.${cmd}.conditional`)}
-          ${this.buildOverrideField('url', c.url, `${path}.${cmd}.url`)}
-          ${this.buildOverrideField('handler', c.handler, `${path}.${cmd}.handler`)}
-          ${this.buildOverrideField('roles', c.roles, `${path}.${cmd}.roles`)}
+          ${fieldsHtml}
+          ${available.length ? `<div style="margin-top:0.5rem;"><select onchange="editor.addOverride('${path}.${cmd}', this.value);this.value=''" style="padding:0.35rem 0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;"><option value="">+ Add override...</option>${available.map(k => `<option value="${k}">${toTitle(k)}</option>`).join('')}</select></div>` : ''}
         </div>
       </details>`;
     }
@@ -992,15 +995,10 @@ class ConfigEditor {
     return html;
   }
 
-  buildOverrideField(key, value, path) {
+  buildOverrideWidget(key, value, path) {
     const label = toTitle(key);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
-
-    if (value === undefined) {
-      if (key === 'roles') value = [];
-      else if (key === 'conditional') value = false;
-      else value = '';
-    }
+    let widget = '';
 
     if (key === 'roles') {
       const roles = ['all','moderator','superfan','fanclub'];
@@ -1009,18 +1007,73 @@ class ConfigEditor {
         const checked = current.includes(r) ? 'checked' : '';
         return `<label style="margin-right:0.75rem;font-size:0.85rem;"><input type="checkbox" ${checked} data-role="${r}" onchange="editor.onRoleChange('${path}', this)">${toTitle(r)}</label>`;
       }).join('');
-      return `<div style="margin-bottom:0.6rem;"><span style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</span><div>${boxes}</div></div>`;
+      widget = `<div>${boxes}</div>`;
+    } else if (key === 'conditional') {
+      widget = `<input type="checkbox" class="toggle" id="${id}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool">`;
+    } else if (key === 'handler') {
+      widget = `<select id="${id}" data-path="${path}" data-type="string" style="padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"><option value="">(inherit from group)</option><option value="rcon" ${value==='rcon'?'selected':''}>rcon</option><option value="http" ${value==='http'?'selected':''}>http</option></select>`;
+    } else if (key === 'points_cost' || key === 'cooldown' || key === 'user_cooldown') {
+      widget = `<input type="number" id="${id}" value="${value !== undefined && value !== '' ? escapeHtml(String(value)) : ''}" data-path="${path}" data-type="number" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">`;
+    } else {
+      widget = `<input type="text" id="${id}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">`;
     }
-    if (key === 'conditional') {
-      return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;"><input type="checkbox" class="toggle" id="${id}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool"><label for="${id}" style="font-size:0.85rem;">${escapeHtml(label)}</label></div>`;
+
+    return `<div style="margin-bottom:0.6rem;padding:0.5rem;background:var(--elevated);border-radius:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+        <span style="font-size:0.85rem;color:var(--text);font-weight:500;">${escapeHtml(label)}</span>
+        <button class="btn-icon" style="font-size:0.85rem;" onclick="editor.removeOverride('${path}')">Remove</button>
+      </div>
+      ${widget}
+    </div>`;
+  }
+
+  addOverride(cmdPath, key) {
+    const keys = cmdPath.split(/\.|\[(\d+)\]/).filter(k => k !== '' && k !== undefined);
+    let target = this.data;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const k = keys[i];
+      if (!(k in target)) target[k] = {};
+      target = target[k];
     }
-    if (key === 'handler') {
-      return `<div style="margin-bottom:0.6rem;"><label style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</label><select id="${id}" data-path="${path}" data-type="string" style="padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"><option value="">(inherit from group)</option><option value="rcon" ${value==='rcon'?'selected':''}>rcon</option><option value="http" ${value==='http'?'selected':''}>http</option></select></div>`;
+    const last = keys[keys.length - 1];
+    if (!target[last] || typeof target[last] !== 'object' || Array.isArray(target[last])) target[last] = {};
+    let defaultValue = '';
+    if (key === 'points_cost' || key === 'cooldown') defaultValue = 0;
+    else if (key === 'conditional') defaultValue = false;
+    else if (key === 'roles') defaultValue = [];
+    target[last][key] = defaultValue;
+    this._preserveDetailsAndRender();
+  }
+
+  removeOverride(path) {
+    const keys = path.split(/\.|\[(\d+)\]/).filter(k => k !== '' && k !== undefined);
+    let target = this.data;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const k = keys[i];
+      if (!(k in target)) return;
+      target = target[k];
     }
-    if (key === 'points_cost' || key === 'cooldown') {
-      return `<div style="margin-bottom:0.6rem;"><label style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</label><input type="number" id="${id}" value="${value !== '' ? escapeHtml(String(value)) : ''}" data-path="${path}" data-type="number" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"></div>`;
+    const last = keys[keys.length - 1];
+    delete target[last];
+    this._preserveDetailsAndRender();
+  }
+
+  _preserveDetailsAndRender() {
+    // Speichere offene <details> anhand ihrer Summary-Texte
+    const openSet = new Set();
+    for (const details of this.content.querySelectorAll('details')) {
+      if (details.open && details.querySelector('summary')) {
+        openSet.add(details.querySelector('summary').textContent.trim());
+      }
     }
-    return `<div style="margin-bottom:0.6rem;"><label style="font-size:0.85rem;color:var(--text);display:block;margin-bottom:0.3rem;">${escapeHtml(label)}</label><input type="text" id="${id}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"></div>`;
+    this.render();
+    // Wiederherstellen
+    for (const details of this.content.querySelectorAll('details')) {
+      const summary = details.querySelector('summary');
+      if (summary && openSet.has(summary.textContent.trim())) {
+        details.open = true;
+      }
+    }
   }
 
   addGroup(path) {
@@ -1126,14 +1179,15 @@ class ConfigEditor {
     this._scrollTimer = setTimeout(() => {
       const main = document.querySelector('.editor-main');
       if (!main) return;
-      const offset = main.getBoundingClientRect().top + 80; // below topbar
+      const mainRect = main.getBoundingClientRect();
+      const threshold = 100; // pixels from top of editor-main
       let best = null;
-      let bestDist = Infinity;
+      let bestTop = -Infinity;
       for (const card of this.content.querySelectorAll('.section-card')) {
         const rect = card.getBoundingClientRect();
-        const dist = Math.abs(rect.top - offset);
-        if (rect.top <= offset + 20 && dist < bestDist) {
-          bestDist = dist;
+        const relativeTop = rect.top - mainRect.top;
+        if (relativeTop <= threshold && relativeTop > bestTop) {
+          bestTop = relativeTop;
           best = card.id;
         }
       }
