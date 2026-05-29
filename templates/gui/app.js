@@ -305,7 +305,7 @@ const SECTION_ORDER = [
   'overlay_text','like_goal','timer','death_counter','win_counter',
   'spotify','channel_points','minecraft_server_api','console',
   'random_triggers','theme','update','shutdown','auto_update_config',
-  'show_sudo_warning','gui','config_version'
+  'show_sudo_warning','gui'
 ];
 
 const CATEGORIES = {
@@ -315,7 +315,7 @@ const CATEGORIES = {
   'Chat & Commands': ['comment_commands','channel_points','random_triggers'],
   'Integrations': ['spotify'],
   'Appearance': ['theme'],
-  'System': ['update','shutdown','auto_update_config','show_sudo_warning','gui','config_version']
+  'System': ['update','shutdown','auto_update_config','show_sudo_warning','gui']
 };
 
 const SECTION_META = {
@@ -340,8 +340,7 @@ const SECTION_META = {
   server_host: { title: 'Server Address', desc: 'Controls which network interfaces the tool listens on.', category: 'Connection' },
   control_method: { title: 'Control Method', desc: 'How the tool communicates with your streaming software.', category: 'Connection' },
   auto_update_config: { title: 'Auto-Update Config', desc: 'Automatically merge new options when the tool updates.', category: 'System' },
-  show_sudo_warning: { title: 'Sudo Warning', desc: 'Linux only. Warns if running without sudo, which can cause permission issues.', category: 'System' },
-  config_version: { title: 'Config Version', desc: 'Internal format version. Do not change manually.', category: 'System' }
+  show_sudo_warning: { title: 'Sudo Warning', desc: 'Linux only. Warns if running without sudo, which can cause permission issues.', category: 'System' }
 };
 
 const HELP_TEXT = {
@@ -570,12 +569,10 @@ class ConfigEditor {
     this.data = {};
     this.original = {};
     this.unknownKeys = {};
-    this.mode = 'basic';
     this.searchQuery = '';
     this.errors = new Map();
     this.sidebar = document.getElementById('editor-sidebar');
     this.content = document.getElementById('editor-content');
-    this.savebar = document.getElementById('editor-savebar');
     this.status = document.getElementById('save-status');
     this.knownTop = new Set(Object.keys(SECTION_META));
     this.activeSection = null;
@@ -588,14 +585,17 @@ class ConfigEditor {
     this.unknownKeys = {};
     this.errors.clear();
     this.extractUnknownKeys();
-    this.mode = 'basic';
     this.searchQuery = '';
     document.getElementById('editor-search').value = '';
-    this.setModeToggle('basic');
     this.render();
     document.getElementById('config-editor').classList.remove('hidden');
     this.setStatus('', '');
     this.activeSection = null;
+    // Attach scroll spy
+    const main = document.querySelector('.editor-main');
+    if (main) {
+      main.addEventListener('scroll', () => this.onScrollSpy(), { passive: true });
+    }
     // Scroll to first section
     const first = this.content.querySelector('.section-card');
     if (first) { this.scrollTo(first.id); }
@@ -608,6 +608,10 @@ class ConfigEditor {
 
   extractUnknownKeys() {
     for (const key of Object.keys(this.data)) {
+      if (key === 'config_version') {
+        delete this.data[key];
+        continue;
+      }
       if (!this.knownTop.has(key)) {
         this.unknownKeys[key] = this.data[key];
         delete this.data[key];
@@ -634,14 +638,16 @@ class ConfigEditor {
       for (const key of visibleKeys) {
         const meta = SECTION_META[key] || { title: toTitle(key) };
         const hasErr = this.sectionHasError(key);
-        html += `<a class="sidebar-item ${hasErr ? 'has-error' : ''}" onclick="editor.scrollTo('section_${key}')">${escapeHtml(meta.title)}${hasErr ? '<span class="badge">!</span>' : ''}</a>`;
+        const isActive = this.activeSection === key;
+        html += `<a class="sidebar-item ${hasErr ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="editor.scrollTo('section_${key}')">${escapeHtml(meta.title)}${hasErr ? '<span class="badge">!</span>' : ''}</a>`;
       }
       html += '</div>';
     }
     if (Object.keys(this.unknownKeys).length) {
       html += '<div class="sidebar-group">';
       html += '<div class="sidebar-group-title">Other</div>';
-      html += `<a class="sidebar-item ${this.sectionHasError('_unknown') ? 'has-error' : ''}" onclick="editor.scrollTo('section_unknown')">Unrecognized Settings</a>`;
+      const isActive = this.activeSection === '_unknown';
+      html += `<a class="sidebar-item ${this.sectionHasError('_unknown') ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="editor.scrollTo('section_unknown')">Unrecognized Settings</a>`;
       html += '</div>';
     }
     this.sidebar.innerHTML = html;
@@ -717,11 +723,9 @@ class ConfigEditor {
   buildObjectFields(prefix, obj) {
     let html = '';
     for (const [k, v] of Object.entries(obj)) {
+      if (k === 'config_version') continue;
       const path = `${prefix}.${k}`;
       const meta = getMeta(path);
-      if (this.mode === 'basic' && !meta.basic) {
-        if (!this.searchQuery) continue;
-      }
       if (this.searchQuery && !this.fieldMatchesSearch(path, k)) continue;
       if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
         // Nested object (e.g., follow_tracking)
@@ -731,13 +735,11 @@ class ConfigEditor {
         for (const [k2, v2] of Object.entries(v)) {
           const p2 = `${path}.${k2}`;
           const m2 = getMeta(p2);
-          if (this.mode === 'basic' && !m2.basic && !this.searchQuery) continue;
           if (this.searchQuery && !this.fieldMatchesSearch(p2, k2)) continue;
           html += this.buildField(k2, v2, p2);
         }
         html += '</div></div>';
       } else if (Array.isArray(v)) {
-        if (this.mode === 'basic' && !meta.basic && !this.searchQuery) continue;
         if (path === 'like_goal.triggers') {
           html += this.buildTriggerTable(path, v);
         } else if (path === 'comment_commands.groups') {
@@ -775,7 +777,6 @@ class ConfigEditor {
     const help = getHelp(path);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
     const isReq = meta.required;
-    const hideClass = (this.mode === 'basic' && !meta.basic && !this.searchQuery) ? 'hidden' : '';
 
     let inputHtml = '';
     if (meta.readonly) {
@@ -794,7 +795,7 @@ class ConfigEditor {
     }
 
     const err = this.errors.get(path) || '';
-    return `<div class="editor-field ${hideClass}" data-path="${path}">
+    return `<div class="editor-field" data-path="${path}">
       <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}</div>
       <div class="field-widget">
         ${inputHtml}
@@ -1109,23 +1110,37 @@ class ConfigEditor {
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // Highlight active sidebar
-    this.sidebar.querySelectorAll('.sidebar-item').forEach(a => a.classList.remove('active'));
-    const items = this.sidebar.querySelectorAll('.sidebar-item');
-    for (const a of items) {
-      if (a.getAttribute('onclick') && a.getAttribute('onclick').includes(id)) a.classList.add('active');
+    // Update active section state and re-render sidebar
+    if (id.startsWith('section_')) {
+      this.activeSection = id.substring('section_'.length);
+      this.renderSidebar();
     }
   }
 
-  setMode(mode) {
-    this.mode = mode;
-    this.setModeToggle(mode);
-    this.render();
-  }
-
-  setModeToggle(mode) {
-    const sw = document.getElementById('mode-toggle');
-    sw.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  onScrollSpy() {
+    if (this._scrollTimer) clearTimeout(this._scrollTimer);
+    this._scrollTimer = setTimeout(() => {
+      const main = document.querySelector('.editor-main');
+      if (!main) return;
+      const offset = main.getBoundingClientRect().top + 80; // below topbar
+      let best = null;
+      let bestDist = Infinity;
+      for (const card of this.content.querySelectorAll('.section-card')) {
+        const rect = card.getBoundingClientRect();
+        const dist = Math.abs(rect.top - offset);
+        if (rect.top <= offset + 20 && dist < bestDist) {
+          bestDist = dist;
+          best = card.id;
+        }
+      }
+      if (best && best.startsWith('section_')) {
+        const key = best.substring('section_'.length);
+        if (this.activeSection !== key) {
+          this.activeSection = key;
+          this.renderSidebar();
+        }
+      }
+    }, 80);
   }
 
   onSearch(q) {
