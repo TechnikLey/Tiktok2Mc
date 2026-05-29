@@ -116,23 +116,12 @@ About 80% complete. All major systems are implemented. Remaining work is concent
 - `src/core/api/routes/ws.py` (WebSocket) — all tests skipped (httpx limitation)
 - `src/core/api/updater.py` (download/install logic) — untested
 - `templates/gui/` (2022 lines of JS + HTML + CSS) — 0 tests
-- All 8 plugin implementations — 0 tests beyond manifest smoke tests
+- All 7 plugin implementations — 0 tests beyond manifest smoke tests
 - `build.py` / `create_plugin.py` / `upload.py` — 0 tests
 
 ### Documentation
 - `GUIDE.md` needs updates for: API server documentation, event hooks, config versioning
 - `CHANGELOG.md` test count stale (285 claimed vs 369 actual), `Unreleased` section empty
-
----
-
-## Current Stability Status
-
-The system is functional for daily use. All core features (TikTok connection, Minecraft command execution, plugins, desktop GUI, configuration) work end-to-end. Known gaps affect the user experience but do not prevent operation:
-
-- Console window flash on Windows during update checks (runs before GUI)
-- No way to view logs, check for updates, or edit trigger rules from within the GUI
-- No recovery mechanism if a plugin process crashes mid-stream
-- Update path has never been exercised with a compiled binary release
 
 ---
 
