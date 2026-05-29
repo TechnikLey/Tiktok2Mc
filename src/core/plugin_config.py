@@ -27,6 +27,8 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
+from ruamel.yaml.comments import CommentedMap
+
 from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
 
 log = logging.getLogger(__name__)
@@ -178,9 +180,12 @@ def save_plugin_config(plugin_dir: Path, data: dict) -> None:
     """
     config_path = get_plugin_config_path(plugin_dir)
 
-    existing = load_yaml(config_path) if config_path.exists() else {}
-    if not isinstance(existing, dict):
-        existing = {}
+    if config_path.exists():
+        existing = load_yaml(config_path)
+        if not isinstance(existing, dict):
+            existing = CommentedMap()
+    else:
+        existing = CommentedMap()
 
     deep_update_rt(existing, data)
     save_yaml(config_path, existing, backup=False)
@@ -205,8 +210,11 @@ def _validate_field_value(value: Any, field: dict, path: str) -> list[str]:
     if ftype == "string":
         if not isinstance(value, str):
             errors.append(f"{path} must be a string, got {type(value).__name__}")
+        elif field.get("required") and not value.strip():
+            errors.append(f"{path} is required")
+        return errors
 
-    elif ftype == "integer":
+    if ftype == "integer":
         if not isinstance(value, int) or isinstance(value, bool):
             errors.append(f"{path} must be an integer, got {type(value).__name__}")
         else:
@@ -216,8 +224,9 @@ def _validate_field_value(value: Any, field: dict, path: str) -> list[str]:
                 errors.append(f"{path} must be >= {mn}")
             if mx is not None and value > mx:
                 errors.append(f"{path} must be <= {mx}")
+        return errors
 
-    elif ftype == "number":
+    if ftype == "number":
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             errors.append(f"{path} must be a number, got {type(value).__name__}")
         else:
@@ -227,23 +236,27 @@ def _validate_field_value(value: Any, field: dict, path: str) -> list[str]:
                 errors.append(f"{path} must be >= {mn}")
             if mx is not None and value > mx:
                 errors.append(f"{path} must be <= {mx}")
+        return errors
 
-    elif ftype == "boolean":
+    if ftype == "boolean":
         if not isinstance(value, bool):
             errors.append(f"{path} must be a boolean, got {type(value).__name__}")
+        return errors
 
-    elif ftype == "color":
+    if ftype == "color":
         if not isinstance(value, str) or not re.fullmatch(
             r"#[0-9a-fA-F]{6}", value
         ):
             errors.append(f"{path} must be a hex color like #RRGGBB")
+        return errors
 
-    elif ftype == "select":
+    if ftype == "select":
         options = field.get("options", [])
         if options and value not in options:
             errors.append(f"{path} must be one of {options}, got {value!r}")
+        return errors
 
-    elif ftype == "array":
+    if ftype == "array":
         if not isinstance(value, list):
             errors.append(f"{path} must be an array, got {type(value).__name__}")
         else:
@@ -260,10 +273,12 @@ def _validate_field_value(value: Any, field: dict, path: str) -> list[str]:
                                     subval, subfield, f"{path}[{i}].{subkey}"
                                 )
                             )
+        return errors
 
-    elif ftype == "object":
+    if ftype == "object":
         if not isinstance(value, dict):
             errors.append(f"{path} must be an object, got {type(value).__name__}")
+        return errors
 
     return errors
 
