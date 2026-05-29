@@ -119,6 +119,17 @@ input.invalid { border-color: var(--danger) !important; }
 
 .editor-content { padding: 1.5rem 2rem; max-width: 900px; margin: 0 auto; width: 100%; }
 
+/* Plugin editor uses full available width */
+#plugin-config-editor .editor-content { max-width: none; padding: 1.5rem 2.5rem; }
+
+/* Plugin status indicators */
+.plugin-status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 500; padding: 0.2rem 0.5rem; border-radius: 4px; }
+.plugin-status::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.status-enabled { color: var(--success); background: var(--success-bg); }
+.status-enabled::before { background: var(--success); }
+.status-disabled { color: var(--text-secondary); background: var(--bg); }
+.status-disabled::before { background: var(--border); }
+
 .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; overflow: hidden; transition: box-shadow 0.2s; }
 .section-card:focus-within { box-shadow: 0 0 0 2px rgba(255,213,79,0.08); }
 .section-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
@@ -245,6 +256,14 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; backg
 #plugin-config-editor .editor-main { overflow-x: hidden; }
 #plugin-config-editor .editor-content { overflow-x: hidden; }
 
+/* Plugin editor responsive: prevent horizontal scrolling */
+@media (max-width: 960px) {
+  #plugin-config-editor .editor-field { grid-template-columns: 1fr; gap: 0.5rem; }
+  #plugin-config-editor .editor-field .field-label { padding-top: 0; }
+  #plugin-config-editor .color-row { flex-wrap: wrap; }
+  #plugin-config-editor .array-table { display: block; overflow-x: auto; }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .editor-layout { flex-direction: column; }
@@ -252,6 +271,4 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; backg
   .editor-field { grid-template-columns: 1fr; }
   .editor-field .field-label { padding-top: 0; }
   main { grid-template-columns: 1fr; padding: 1rem; }
-  .editor-content { padding: 1rem; }
-  .color-row { flex-wrap: wrap; }
 }

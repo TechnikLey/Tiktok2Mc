@@ -54,6 +54,11 @@ async function loadHealth() {
   }
 }
 
+function getPluginStatus(p) {
+  if (!p.enabled) return { label: 'Disabled', cls: 'status-disabled' };
+  return { label: 'Enabled', cls: 'status-enabled' };
+}
+
 async function loadPlugins() {
   const tbody = document.getElementById('plugin-list');
   try {
@@ -65,9 +70,11 @@ async function loadPlugins() {
       return;
     }
     tbody.innerHTML = currentPlugins.map(p => {
-      const cls = p.enabled ? 'on' : 'off';
-      const txt = p.enabled ? 'Enabled' : 'Disabled';
-      return `<tr><td>${escapeHtml(p.display_name || p.name)}</td><td>${p.version || '-'}</td><td>${p.port || '-'}</td><td><button class="toggle-btn ${cls}" onclick="togglePlugin('${p.name}', ${p.enabled})">${txt}</button></td><td><button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="pluginEditor.open('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td></tr>`;
+      const status = getPluginStatus(p);
+      const action = p.enabled
+        ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Disable</button>`
+        : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Enable</button>`;
+      return `<tr><td>${escapeHtml(p.display_name || p.name)}</td><td>${p.version || '-'}</td><td>${p.port || '-'}</td><td><span class="plugin-status ${status.cls}">${status.label}</span></td><td>${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="pluginEditor.open('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td></tr>`;
     }).join('');
     renderOverlayUrls();
   } catch (e) {
@@ -95,13 +102,40 @@ function copyUrl(btn, url) {
   });
 }
 
-async function togglePlugin(name, current) {
+async function promptEnablePlugin(name, displayName) {
+  if (!confirm(`Do you want to enable "${displayName || name}"?`)) return;
   try {
-    await postJSON(`/plugins/${name}/${current ? 'disable' : 'enable'}`, {});
+    await postJSON(`/plugins/${name}/enable`, {});
     await loadPlugins();
-    log(`Plugin ${name} ${!current ? 'enabled' : 'disabled'}`);
+    log(`Plugin ${name} enabled`);
   } catch (e) {
-    log('Failed to toggle ' + name + ': ' + e.message, 'err');
+    log('Failed to enable ' + name + ': ' + e.message, 'err');
+  }
+}
+
+async function promptDisablePlugin(name, displayName) {
+  if (!confirm(`Do you want to disable "${displayName || name}"?`)) return;
+  try {
+    await postJSON(`/plugins/${name}/disable`, {});
+    await loadPlugins();
+    log(`Plugin ${name} disabled`);
+  } catch (e) {
+    log('Failed to disable ' + name + ': ' + e.message, 'err');
+  }
+}
+
+async function restartPlugin(name, displayName) {
+  try {
+    log(`Restarting plugin ${name}...`);
+    await postJSON(`/plugins/${name}/disable`, {});
+    await loadPlugins();
+    // Small delay to let the stop signal be processed
+    await new Promise(r => setTimeout(r, 800));
+    await postJSON(`/plugins/${name}/enable`, {});
+    await loadPlugins();
+    log(`Plugin ${name} restarted successfully.`);
+  } catch (e) {
+    log('Failed to restart ' + name + ': ' + e.message, 'err');
   }
 }
 
@@ -478,6 +512,7 @@ class ConfigEditor {
     for (const key of Object.keys(this.data)) {
       if (key === 'config_version') {
         delete this.data[key];
+        delete this.original[key];
         continue;
       }
       if (!this.knownTop.has(key)) {
@@ -1186,8 +1221,9 @@ class ConfigEditor {
       currentConfig = JSON.parse(JSON.stringify(this.data));
       this.close();
       await loadConfig();
+      this.showToast('Configuration saved successfully.', 'success');
       _restartPending = true;
-      showRestartDialog('Restart Required', 'Configuration saved successfully. The tool must be restarted for global changes to take effect.');
+      showRestartDialog('Configuration Saved', 'Some configuration changes require a restart.');
     } catch (e) {
       this.setStatus('Save failed: ' + e.message, 'err');
       this.showToast('Save failed: ' + e.message, 'error');
@@ -1729,6 +1765,28 @@ class PluginConfigEditor {
   }
 
   async confirmSave() {
+    this.hideReview();
+    try {
+      const payload = JSON.parse(JSON.stringify(this.config));
+      payload._backup = true;
+      await putJSON(`/plugins/${encodeURIComponent(this.pluginName)}/config`, payload);
+      this.original = JSON.parse(JSON.stringify(this.config));
+      this.close();
+      await loadPlugins();
+      this.showToast('Plugin configuration saved successfully.', 'success');
+      // Prompt to restart the plugin so changes take effect
+      const display = this.displayName || this.pluginName;
+      setTimeout(() => {
+        if (confirm(`Plugin "${display}" configuration updated.\n\nChanges may require the plugin to reload.\n\nRestart plugin now?`)) {
+          restartPlugin(this.pluginName, display);
+        }
+      }, 300);
+    } catch (e) {
+      this.showToast('Save failed: ' + e.message, 'error');
+    }
+  }
+
+  async confirmSaveNoPrompt() {
     this.hideReview();
     try {
       const payload = JSON.parse(JSON.stringify(this.config));

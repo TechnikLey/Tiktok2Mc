@@ -185,12 +185,40 @@ class PluginLauncher:
     def _register_manifests(
         self, manifests: list[PluginManifest]
     ) -> None:
-        """Register each manifest with the central API."""
+        """Register each manifest with the central API.
+
+        In release builds (frozen executables) the entry_point path
+        is normalised: the ``src/`` prefix is stripped and ``.py``
+        is replaced by the platform executable suffix so the
+        launcher points to the compiled binary.
+        """
+        import sys
         from core.paths import get_root_dir
 
         root = get_root_dir()
+        frozen = getattr(sys, "frozen", False)
+        suffix = ".exe" if sys.platform == "win32" else ".bin"
+
         for manifest in manifests:
-            entry_path = root / manifest.entry_point if manifest.entry_point else ""
+            entry_point = manifest.entry_point or ""
+            if frozen:
+                # Normalise dev path → release executable path
+                if entry_point.startswith("src/"):
+                    entry_point = entry_point[4:]
+                if entry_point.endswith(".py"):
+                    entry_point = entry_point[:-3] + suffix
+
+            entry_path = root / entry_point if entry_point else ""
+
+            # Sanity check: if the resolved path does not exist and we are
+            # in frozen mode, log a warning so the user knows the build may
+            # be incomplete.
+            if frozen and entry_path and not entry_path.exists():
+                log.warning(
+                    "Plugin executable not found: %s (did the release build copy it?)",
+                    entry_path,
+                )
+
             registration = PluginRegistration.from_manifest(
                 manifest,
                 path=str(entry_path),
