@@ -40,11 +40,20 @@ class PluginRegistry:
     # ------------------------------------------------------------------
 
     def register(self, data: PluginRegistration) -> PluginRegistration:
-        """Insert or update a plugin entry."""
+        """Insert or update a plugin entry.
+
+        Preserves the existing ``enabled`` and ``registered_at`` state
+        when a plugin is already registered — the launcher must NOT
+        override runtime state with ``auto_enable`` from the manifest.
+        """
         now = time.time()
         data.registered_at = data.registered_at or now
         data.updated_at = now
         with self._lock:
+            existing = self._plugins.get(data.name)
+            if existing is not None:
+                data.enabled = existing.enabled
+                data.registered_at = existing.registered_at
             self._plugins[data.name] = data
             self._save()
         return data

@@ -719,6 +719,26 @@ RUNTIME_DIR = (BASE_DIR / "core" / "runtime").resolve()
 
 shutdown_pending = False
 shutdown_cancel_event = asyncio.Event()
+shutdown_complete_event: asyncio.Event | None = None
+
+
+def _write_shutdown_status(remaining: int | None) -> None:
+    """Write current countdown state to a file the API can serve."""
+    try:
+        status_file = RUNTIME_DIR / "shutdown_status"
+        data = {"remaining": remaining}
+        status_file.write_text(json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _clear_shutdown_status() -> None:
+    try:
+        status_file = RUNTIME_DIR / "shutdown_status"
+        status_file.unlink(missing_ok=True)
+    except Exception:
+        pass
+
 
 # =============================================================================
 # SHUTDOWN COUNTDOWN
@@ -733,15 +753,20 @@ async def shutdown_countdown():
         if shutdown_cancel_event.is_set():
             shutdown_cancel_event.clear()
             shutdown_pending = False
+            _clear_shutdown_status()
             log.info("\nCancelled shutdown.")
             return
         log.info(
             f"\rShutdown in {remaining} seconds... Press 'stop' to cancel."
         )
+        _write_shutdown_status(remaining)
         await asyncio.sleep(1)
     log.info("\nShutting down now!")
+    _write_shutdown_status(0)
     stop_all_processes()
-    sys.exit(0)
+    _clear_shutdown_status()
+    if shutdown_complete_event is not None:
+        shutdown_complete_event.set()
 
 # =============================================================================
 # FILE WATCHER
@@ -751,6 +776,8 @@ async def check_and_run():
     global shutdown_pending
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     while True:
+        if shutdown_complete_event is not None and shutdown_complete_event.is_set():
+            return
         for file in list(RUNTIME_DIR.iterdir()):
             if not file.is_file():
                 continue
@@ -764,6 +791,14 @@ async def check_and_run():
                     shutdown_pending = True
                     log.info(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
                     asyncio.create_task(shutdown_countdown())
+            elif name == "shutdown_now":
+                log.info("\nImmediate shutdown signal detected.")
+                _write_shutdown_status(0)
+                stop_all_processes()
+                _clear_shutdown_status()
+                if shutdown_complete_event is not None:
+                    shutdown_complete_event.set()
+                return
             elif name == "restart":
                 log.info("\nRestart signal detected. Requesting clean restart...")
                 restart_app()
@@ -787,6 +822,9 @@ async def check_and_run():
                             log.warning(f"API returned {resp.status} for plugin '{plugin_name}'.")
                 except Exception as exc:
                     log.warning(f"Failed to start plugin '{plugin_name}' from signal: {exc}")
+            elif name == "shutdown_cancel":
+                log.info("\nShutdown cancel signal detected.")
+                shutdown_cancel_event.set()
             elif name.startswith("plugin_stop_"):
                 plugin_name = name[len("plugin_stop_"):]
                 log.info(f"\nPlugin stop signal detected for '{plugin_name}'.")
@@ -799,6 +837,8 @@ async def check_and_run():
 
 async def command_loop():
     while True:
+        if shutdown_complete_event is not None and shutdown_complete_event.is_set():
+            break
         cmd = await asyncio.to_thread(
             input,
             "\nType 'exit' to stop all programs ('help' for commands): "
@@ -889,11 +929,23 @@ def restart_app():
 
 
 async def main():
+    global shutdown_complete_event
+    shutdown_complete_event = asyncio.Event()
+
     watcher = asyncio.create_task(check_and_run())
-    try:
-        await command_loop()
-    finally:
-        watcher.cancel()
+    cmd_task = asyncio.create_task(command_loop())
+    shutdown_wait = asyncio.create_task(shutdown_complete_event.wait())
+
+    done, pending = await asyncio.wait(
+        [cmd_task, shutdown_wait],
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+
+    for task in pending:
+        task.cancel()
+    watcher.cancel()
+
+    await asyncio.sleep(0.1)
 
 # =============================================================================
 # EVENT DEFINITIONS (ENTRY POINT)

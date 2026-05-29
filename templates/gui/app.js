@@ -29,6 +29,55 @@ async function putJSON(path, body) {
   return res.json();
 }
 
+/* ─── Shutdown Countdown ─── */
+let _shutdownPollInterval = null;
+
+async function pollShutdownStatus() {
+  try {
+    const data = await fetchJSON('/shutdown/status');
+    const overlay = document.getElementById('shutdown-overlay');
+    const display = document.getElementById('shutdown-countdown-display');
+    if (data.shutdown_pending && data.remaining_seconds !== null && data.remaining_seconds > 0) {
+      overlay.classList.remove('hidden');
+      display.textContent = data.remaining_seconds + ' seconds';
+    } else if (data.shutdown_pending && data.remaining_seconds === 0) {
+      overlay.classList.remove('hidden');
+      display.textContent = 'Shutting down...';
+    } else {
+      overlay.classList.add('hidden');
+      if (_shutdownPollInterval) {
+        clearInterval(_shutdownPollInterval);
+        _shutdownPollInterval = null;
+      }
+    }
+  } catch (e) {
+    // API might be gone during actual shutdown
+  }
+}
+
+function startShutdownPolling() {
+  if (_shutdownPollInterval) clearInterval(_shutdownPollInterval);
+  pollShutdownStatus();
+  _shutdownPollInterval = setInterval(pollShutdownStatus, 1000);
+}
+
+document.getElementById('btn-shutdown-now').addEventListener('click', async () => {
+  try {
+    await fetch('/api/v1/shutdown/now', { method: 'POST' });
+    document.getElementById('shutdown-countdown-display').textContent = 'Shutting down...';
+  } catch (e) {
+    showToast('Shutdown Now failed: ' + e.message, 'error');
+  }
+});
+
+document.getElementById('btn-shutdown-cancel').addEventListener('click', async () => {
+  try {
+    await fetch('/api/v1/shutdown/cancel', { method: 'POST' });
+  } catch (e) {
+    showToast('Cancel failed: ' + e.message, 'error');
+  }
+});
+
 /* ─── Dialogs ─── */
 function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-primary') {
   return new Promise((resolve) => {
@@ -247,8 +296,8 @@ async function promptShutdown() {
   try {
     const res = await fetch('/api/v1/shutdown', { method: 'POST' });
     if (res.ok) {
-      showToast('Shutdown signal sent. The application will shut down shortly.', 'info');
-      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-secondary);font-size:1.2rem;">Shutting down...</div>';
+      showToast('Shutdown signal sent.', 'info');
+      startShutdownPolling();
     } else {
       showToast('Shutdown signal failed: ' + res.status + ' ' + res.statusText, 'error');
     }
@@ -1887,18 +1936,22 @@ class PluginConfigEditor {
       this.close();
       await loadPlugins();
       this.showToast('Plugin configuration saved successfully.', 'success');
-      // Prompt to restart the plugin so changes take effect
-      const display = this.displayName || this.pluginName;
-      setTimeout(async () => {
-        const confirmed = await showConfirmDialog(
-          'Restart Plugin?',
-          `Plugin "${display}" configuration updated.\n\nChanges may require the plugin to reload.\n\nRestart plugin now?`,
-          'Restart Now'
-        );
-        if (confirmed) {
-          restartPlugin(this.pluginName, display);
-        }
-      }, 300);
+      // Only prompt to restart if the plugin is currently enabled
+      // Disabled plugins should not trigger restart/reload prompts
+      const plugin = currentPlugins.find(p => p.name === this.pluginName);
+      if (plugin && plugin.enabled) {
+        const display = this.displayName || this.pluginName;
+        setTimeout(async () => {
+          const confirmed = await showConfirmDialog(
+            'Restart Plugin?',
+            `Plugin "${display}" configuration updated.\n\nChanges may require the plugin to reload.\n\nRestart plugin now?`,
+            'Restart Now'
+          );
+          if (confirmed) {
+            restartPlugin(this.pluginName, display);
+          }
+        }, 300);
+      }
     } catch (e) {
       this.showToast('Save failed: ' + e.message, 'error');
     }
