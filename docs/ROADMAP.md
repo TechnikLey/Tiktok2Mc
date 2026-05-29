@@ -1,58 +1,92 @@
 # TikTok2Mc — Project Roadmap
 
-## Current Progress
+## What Is This?
 
-The core system works end to end. Here is what is stable right now:
+TikTok2Mc connects your TikTok Live stream to Minecraft. When viewers follow, like, share, or send gifts, those events can trigger commands inside your Minecraft server. You decide what happens and when.
 
-- **TikTok Live connection** — follows, likes, shares, gifts, and other events come through reliably.
-- **Minecraft commands** — when an event triggers an action, the command reaches your server as expected.
-- **Plugins work independently** — Timer, Death Counter, Win Counter, Overlay, and more. Each one runs on its own. Turning on the Timer will not accidentally trigger the Death Counter anymore.
-- **Everything starts disabled** — nothing runs unless you turn it on. You are in control.
-- **Your config is backed up automatically** — if something goes wrong during a save, the last good version is still there.
-- **The system warns you about risky settings** — exposing services to your whole network or leaving the default RCON password in place triggers a clear warning.
-- **Over 270 automated checks** run on every change to catch problems early.
+## What Works Today
 
-> **A quick note about version 1.0.0:**  
-> This version is a clean break. Config files, plugins, and data from versions 0.x are not compatible. Think of it as a fresh start with a much more solid foundation.
+The system is fully functional and ready for daily use.
+
+**Live connection** — TikTok events (follows, likes, shares, gifts, comments, joins) arrive reliably during a stream.
+
+**Minecraft command execution** — Events trigger actions in your Minecraft server through RCON or datapacks. You define the commands in `data/actions.mca`.
+
+**Seven built-in plugins** — Each one adds a specific feature and can be turned on or off independently:
+- **Timer** — Countdown with pause-on-death and auto-win
+- **Death Counter** — Real-time death tracker overlay
+- **Win Counter** — Wins and losses with optional death penalty
+- **Like Goal** — Progress bar that fills from TikTok likes
+- **Overlay Text** — Scrolling or static text displayed on stream
+- **Channel Points** — Loyalty points viewers earn while watching
+- **Spotify Control** — Control Spotify playback through chat commands
+
+**Desktop application** — A graphical interface opens in your browser when you start the tool. It includes:
+- A setup wizard for first-time configuration
+- A settings editor where you can adjust every option through forms
+- A plugin manager to turn features on and off
+- A restart and shutdown button
+
+**Configuration is backed up automatically** — Every time you save your settings, the previous version is preserved. Nothing is lost if something goes wrong.
+
+**Automatic updates** — The tool checks for new versions and can update itself. All your settings are preserved during an update.
+
+**Over 365 automated checks** run on every change to catch problems early.
 
 ---
 
 ## What We Are Working On Now
 
-The engine is built. The plugins work. The backend is stable. What is left is wrapping things up for the 1.0.0 release.
+The engine is built. Plugins work. The desktop app works. What is left is polishing the last rough edges before the 1.0.0 release.
 
-**Current focus areas:**
+**Current priorities:**
 
-- **An automatic update check** — so the tool can tell you when a new version is available, without you having to check manually.
-- **End-to-end update testing** — the update system works on paper; now we are running it through a real version upgrade to make sure nothing breaks.
-- **Documentation overhaul** — the existing guides still describe the old system. They need to be rewritten to match how things actually work today.
+- **Log viewer** — A live feed inside the desktop app so you can see what the system is doing in real time, without opening log files or the console window.
 
----
+- **Actions editor** — A built-in editor for trigger rules so you can create and change Minecraft commands without editing files by hand.
 
-## What Comes Next
+- **Update testing** — Verifying that the update system works correctly with compiled releases, so you can be sure updates install safely.
 
-Once 1.0.0 is out, the focus shifts to making the tool easier to use for everyone.
-
-**Planned milestones:**
-
-1. **Desktop application** — a proper graphical interface so you do not have to edit configuration files by hand. First-run wizard, configuration forms, and a live dashboard.
-2. **Plugin manager** — see which plugins are installed, turn them on or off, check their status — all from the desktop app.
-3. **Live log viewer** — see what the system is doing in real time without opening log files.
-4. **New guides and documentation** — rewritten from scratch for version 1.0.0.
+- **Documentation improvements** — Making sure the guides match the current version of the tool.
 
 ---
 
-## Future Vision
+## The v1.0.0 Vision
 
-Long term, TikTok2Mc aims to be a set-and-forget bridge between TikTok Live and Minecraft. The ideal flow:
+Version 1.0.0 represents a stable, complete foundation. Everything works end to end: TikTok connects to Minecraft, plugins add features, the desktop app lets you control everything, and updates keep you current without manual work.
 
-1. Install the desktop app
-2. Enter your TikTok username and RCON details
-3. Write a few trigger rules (or use the built-in editor)
-4. Go live — everything else runs automatically
-
-There are current no plans to support Twitch, YouTube, or other platforms. The project stays focused on TikTok.
+This version is a clean break from older 0.x releases. Your configuration files and plugins from earlier versions will need to be set up again. Think of this as starting fresh with a much more solid base.
 
 ---
 
-*Last updated: 2026-05-28*
+## What Comes After 1.0.0
+
+Once the 1.0.0 release is out, focus will shift to convenience and deeper features:
+
+- **Plugin improvements** — Better tools for managing plugin settings
+- **Real-time dashboard** — Live status updates without refreshing the page
+- **Overlay preview** — See what your stream overlays look like before going live
+- **Minecraft console in the app** — Send commands to your server directly from the desktop interface
+- **API access** — For advanced users who want to build their own tools on top of TikTok2Mc
+
+There are no current plans to support Twitch, YouTube, or other platforms. The project stays focused on TikTok.
+
+---
+
+## In Summary
+
+| Area | Status |
+|------|--------|
+| TikTok Live connection | Working |
+| Minecraft command execution | Working |
+| Plugins (Timer, Death/Win Counter, Like Goal, Overlay, Channel Points, Spotify) | Working |
+| Desktop app (wizard, settings, plugin manager) | Working |
+| Config editor with backup | Working |
+| Update system | Working (needs final testing) |
+| Log viewer | In development |
+| Actions editor | In development |
+| Guides and documentation | Being updated |
+
+---
+
+*Last updated: 2026-05-29*
