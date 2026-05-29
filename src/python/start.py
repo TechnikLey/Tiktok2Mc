@@ -759,9 +759,21 @@ async def shutdown_countdown():
     delay = SHUTDOWN_DELAY_SECONDS
     _shutdown_state = ShutdownState.COUNTDOWN
 
+    cancel_signal = RUNTIME_DIR / "shutdown_cancel"
+
     for remaining in range(delay, 0, -1):
         if _shutdown_state != ShutdownState.COUNTDOWN:
             # State changed externally (e.g. shutdown_now was triggered)
+            return
+        # Check cancel file directly (every 1s) instead of waiting for the file
+        # watcher which polls every 5s — eliminates a race where the countdown
+        # finishes before the watcher processes the cancel signal.
+        if cancel_signal.exists():
+            cancel_signal.unlink(missing_ok=True)
+            shutdown_pending = False
+            _shutdown_state = ShutdownState.IDLE
+            _clear_shutdown_status()
+            log.info("\nCancelled shutdown.")
             return
         if shutdown_cancel_event.is_set():
             shutdown_cancel_event.clear()
