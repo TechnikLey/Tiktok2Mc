@@ -19,7 +19,10 @@
         <div id="restart-pending-banner" class="card hidden" style="border-left: 3px solid var(--warning); background: rgba(255,167,38,0.05);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span style="color:var(--warning);font-weight:500;">Restart pending — some changes require a restart to take effect.</span>
-                <button class="btn btn-primary" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="triggerRestart()">Restart Now</button>
+                <div style="display:flex;gap:0.5rem;">
+                    <button class="btn btn-primary" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="triggerRestart()">Restart Now</button>
+                    <button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="dismissRestartBanner()">Dismiss</button>
+                </div>
             </div>
         </div>
         <div class="card">
@@ -31,6 +34,7 @@
             <h2>Plugins</h2>
             <div id="plugin-summary" class="muted">Loading...</div>
             <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="openPluginManager()">Manage Plugins</button>
+            <div id="overlay-urls" style="margin-top:1rem;"></div>
         </div>
 
         <div class="card">
@@ -47,7 +51,7 @@
 
         <div class="card">
             <h2>Live Log</h2>
-            <div id="log-view" class="muted">Log streaming not yet implemented.</div>
+            <div id="log-view">Connecting to log stream...</div>
         </div>
     </main>
 

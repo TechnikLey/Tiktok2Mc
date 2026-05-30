@@ -39,10 +39,11 @@ About 80% complete. All major systems are implemented. Remaining work is concent
 
 ### Desktop GUI (entirely new in v1.0.0)
 - `gui.py` — pywebview shell opening the SPA dashboard
-- `templates/gui/index.html` — single-page dashboard with 4-card layout (System Status, Plugins, Configuration, Live Log)
+- `templates/gui/index.html` — single-page dashboard with 4-card layout (System Status, Plugins, Actions, Configuration, Live Log)
 - First-Run Setup Wizard — 3-step: TikTok username, RCON password with strength meter, review and save
 - Plugin Manager — table showing name, version, port, status; enable/disable toggle per plugin; "Edit Config" button opens Plugin Config Editor
 - Overlay URL Helper — OBS Browser Source URLs displayed inside Plugin Manager with copy-to-clipboard buttons
+- Actions Editor (`actions-editor.js`) — visual tab (trigger table + detail panel + command editing), raw tab (textarea with live validation, diagnostics, save blocked on errors), Add Event modal (event selector or gift picker with search), script registry integration, gift database with image URLs
 - Full `config.yaml` Editor — form-based with 5 categories (Connection, Minecraft, System, Appearance, Chat & Commands), IntersectionObserver scroll-spy, real-time search, validation, diff review modal before save, unknown key preservation
 - Plugin Config Editor — schema-driven dynamic form renderer with category sidebar, 9+ field types, raw JSON fallback, plugin restart prompt after save
 - Restart system — `POST /api/v1/restart` with dialog, pending banner, background daemon
@@ -54,7 +55,7 @@ About 80% complete. All major systems are implemented. Remaining work is concent
 - Backups stored in `data/backups/` with category subdirectories
 
 ### Testing
-- Test suite expanded from ~0 (no API tests) to 369 tests (365 passing, 4 skipped)
+- Test suite expanded from ~0 (no API tests) to 378 tests (374 passing, 4 skipped)
 - Coverage added: API integration (config, plugins, plugin_config, events, updates), plugin registry, manifest validation, EventBus, plugin config system, schema validation, YAML round-trip, theme, overlay utils, actions validator (36 tests), smoke tests for all 8 plugin manifests
 - CI workflow `test.yml` runs on every push/PR to `main`
 - Test runtime ~7 seconds
@@ -89,7 +90,7 @@ About 80% complete. All major systems are implemented. Remaining work is concent
 
 ### GUI Gaps
 - **Log viewer** — dashboard has a placeholder reading "Log streaming not yet implemented." Backend EventBus with SSE and WebSocket endpoints exists but is not connected from the frontend.
-- **Actions editor** — no API endpoint or GUI for editing `data/actions.mca` or `shell_actions.txt`. Users must edit these files by hand.
+- **Actions editor** — visual editor is implemented (`templates/gui/actions-editor.js`) with both Visual and Raw tabs, gift picker, script registry integration, and live validation. Backend routes (GET/PUT `/actions`, `/actions/raw`, `/gifts`, `/actions/scripts`) all exist and are functional.
 - **Update check UI** — backend endpoints `GET /api/v1/updates/check` and `GET /api/v1/plugins/updates` exist, but the frontend never calls them. No "Check for Updates" button, no update notification banner.
 - **Overlay URLs not on main dashboard** — `renderOverlayUrls()` targets a non-existent element `#overlay-urls`. URLs only appear inside the Plugin Manager popup.
 - **No WebSocket/SSE client** — backend streaming endpoints are fully functional but the frontend never connects to them. All status updates rely on polling.

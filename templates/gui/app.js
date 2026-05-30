@@ -105,7 +105,6 @@ function startShutdownPolling() {
 }
 
 document.getElementById('btn-shutdown-now').addEventListener('click', async () => {
-  _shutdownNowClicked = true;
   try {
     const overlay = document.getElementById('shutdown-overlay');
     const display = document.getElementById('shutdown-countdown-display');
@@ -113,8 +112,13 @@ document.getElementById('btn-shutdown-now').addEventListener('click', async () =
     display.textContent = 'Shutting down...';
     document.getElementById('btn-shutdown-now').disabled = true;
     document.getElementById('btn-shutdown-cancel').disabled = true;
-    await fetch('/api/v1/shutdown/now', { method: 'POST' });
+    const res = await fetch('/api/v1/shutdown/now', { method: 'POST' });
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    _shutdownNowClicked = true;
   } catch (e) {
+    document.getElementById('btn-shutdown-now').disabled = false;
+    document.getElementById('btn-shutdown-cancel').disabled = false;
+    document.getElementById('shutdown-overlay').classList.add('hidden');
     showToast('Shutdown Now failed: ' + e.message, 'error');
   }
 });
@@ -197,6 +201,31 @@ async function loadHealth() {
     pill.textContent = 'Offline';
     pill.className = 'offline';
     log('API unreachable: ' + e.message, 'err');
+  }
+}
+
+function formatUptime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+  if (m > 0) return m + 'm ' + s + 's';
+  return s + 's';
+}
+
+async function loadStatus() {
+  try {
+    const data = await fetchJSON('/status');
+    const el = document.getElementById('system-info');
+    if (!el) return;
+    el.innerHTML =
+      '<div class="field-row"><span>Server</span><span class="status-enabled">' + escapeHtml(data.server) + '</span></div>' +
+      '<div class="field-row"><span>Plugins</span><span>' + data.plugins_active + ' / ' + data.plugins_total + ' active</span></div>' +
+      '<div class="field-row"><span>Config</span><span>' + (data.config_loaded ? 'Loaded' : 'Not loaded') + '</span></div>' +
+      '<div class="field-row"><span>Uptime</span><span>' + formatUptime(data.uptime_seconds) + '</span></div>';
+  } catch (e) {
+    const el = document.getElementById('system-info');
+    if (el) el.innerHTML = '<span class="log-err">Failed to load status: ' + escapeHtml(e.message) + '</span>';
   }
 }
 
@@ -554,6 +583,10 @@ async function triggerRestart() {
   } catch (e) {
     showToast('Restart signal failed. Please restart manually.', 'error');
   }
+}
+function dismissRestartBanner() {
+  _restartPending = false;
+  updateRestartBanner();
 }
 document.getElementById('wizard-back').addEventListener('click', () => { if (wizardStep > 0) { wizardStep--; renderWizardStep(); } });
 document.getElementById('wizard-next').addEventListener('click', wizardNext);
@@ -1360,19 +1393,7 @@ class ConfigEditor {
         this.setValue(path, el.value);
       }
     });
-    // Role selectors handled via onRoleChange live updates
-    // Commands config handled via onChange for each field? No, we need to collect them too.
-    this.content.querySelectorAll('[data-path]').forEach(el => {
-      const path = el.getAttribute('data-path');
-      const type = el.getAttribute('data-type');
-      if (!path || !type) return;
-      if (path.includes('commands_config') && el.tagName === 'INPUT' && el.type === 'checkbox' && !el.classList.contains('toggle')) {
-        // Handled by onRoleChange for roles, but we also need to collect toggle overrides
-        const parentPath = path.substring(0, path.lastIndexOf('.'));
-        // Actually the buildOverrideField for bool uses data-path directly
-        // and the text inputs too. They should be collected above.
-      }
-    });
+
   }
 
   /* ─── Validation ─── */
@@ -2221,15 +2242,48 @@ document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
   _closeInProgress = false;
 });
 
+/* ─── SSE Log Streaming ─── */
+let _sseSource = null;
+
+function connectLogStream() {
+  if (_sseSource) {
+    _sseSource.close();
+  }
+  const ep = '/api/v1/events/stream';
+  _sseSource = new EventSource(ep);
+  _sseSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const type = data.type || '';
+      const payload = data.data || {};
+      if (type === 'log') {
+        log(payload.msg || payload.message || '', payload.level || 'info');
+      } else if (type === 'server.started') {
+        log('API server started (v' + (payload.version || '?') + ')', 'info');
+      } else if (type === 'server.stopping') {
+        log('API server stopping', 'warn');
+      } else if (type.startsWith('plugin.')) {
+        log('Plugin: ' + (payload.msg || type), payload.level || 'info');
+      }
+    } catch (_) {}
+  };
+  _sseSource.onerror = () => {
+    log('Log stream disconnected — retrying...', 'warn');
+  };
+}
+
 /* ─── Init ─── */
 async function init() {
   await loadHealth();
+  await loadStatus();
   await loadConfig();
   await loadPlugins();
   updateRestartBanner();
+  connectLogStream();
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
   setInterval(loadHealth, 10000);
+  setInterval(loadStatus, 10000);
   setInterval(loadPlugins, 5000);
   if (typeof pywebview !== 'undefined' && pywebview.api) {
     setInterval(_pollCloseRequest, 200);

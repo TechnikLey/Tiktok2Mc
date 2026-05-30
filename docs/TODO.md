@@ -58,8 +58,7 @@
 - API server mounts `/gui` static files (dev + release layouts supported)
 - `start.py` launches `gui.exe` when `gui.enabled: true`
 - **First-Run Setup Wizard** — 3 steps: TikTok username, RCON password (with strength meter + validation), review & save. Auto-triggers when RCON password is empty.
-- **Plugin Manager** — Enable/disable toggles in dashboard, "Edit Config" button per plugin
-- **Overlay URL Helper** — Shows OBS Browser Source URLs for active plugins with copy-to-clipboard buttons (inside Plugin Manager)
+- **Plugin Manager** — Enable/disable toggles in dashboard, overlay URL helper with copy-to-clipboard, "Edit Config" button per plugin
 - **Restart System** — `POST /api/v1/restart` writes signal; `start.py` uses background daemon thread with `os._exit(0)`
 - **Shutdown System** — `POST /api/v1/shutdown` with confirmation dialog, signal file, graceful countdown, cancel, and immediate "Shutdown Now" button. Cancel signal checked directly in countdown loop (1s polling, no longer reliant on 5s file watcher).
 - **Full `config.yaml` Editor** — Form-based editor with:
@@ -82,15 +81,17 @@
   - Raw JSON fallback editor when no schema
   - Search/filter, validation, diff review, backup before save
   - Plugin restart prompt after save
-- **Actions Editor** — Full visual editor with:
+- **Actions Editor** — Full visual editor (`templates/gui/actions-editor.js`) with:
   - Visual tab: table of triggers, detail panel with inline command editing (vanilla, rcon, script, overlay, named_overlay), add/remove/delete triggers
   - Add Event modal: event type selector (follow/join/comment/likes/like_2/share) or gift picker with search-by-name/ID
-  - Script dropdown with search and lazy-loaded script registry
+  - Script dropdown with search and lazy-loaded script registry (`GET /actions/scripts`)
   - Raw tab: textarea with live validation (debounced 400ms), diagnostics panel, save blocked on errors
-  - Gift database integration with image URLs and coin cost sorting
+  - Gift database integration (`GET /gifts`) with image URLs and coin cost sorting
+- **Unsaved Changes Protection** — `beforeunload` event (browser fallback) + pywebview `_pollCloseRequest()` with 200ms polling. Modal with Save & Exit / Exit Without Saving / Cancel.
+- **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **374 tests: 370 passed, 4 skipped** (SSE/WS streaming due to `TestClient` / `httpx` limitations)
+- **378 tests: 374 passed, 4 skipped** (SSE/WS streaming due to `TestClient` / `httpx` limitations)
 - CI workflow `test.yml` on push/PR to `main` (~7s runtime)
 - Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation, plugin config system, schema validation, YAML round-trip preservation, theme, overlay utils, actions validator (36 tests), smoke tests for all 8 plugin manifests, **hook system (3 event hooks: random, spotify, example_hook)**
 
@@ -99,6 +100,7 @@
 - `gui.py` (legacy) removed; `plugin_updater.py` dead code removed
 - `build.py` / `upload.py` version bumped to `v1.0.0`
 - Old self-registration `register_plugin()` calls removed from all plugin `main.py` files
+- Legacy fallback `EditableResponse`, `ImportLegacyResponse`, `validate_config_dict`, `read_plugin_registry()` removed
 
 ### Documentation
 - `README.md` rewritten for v1.0.0
@@ -106,19 +108,26 @@
 - `CHANGELOG.md` normalized with v1.0.0 section (Keep a Changelog format)
 - `config.yaml` inline documentation improved
 
-### Fixed Bugs
+### Fixed Bugs (Git History)
 - `commands_config` default type mismatch (`[]` → `{}` in `defaults/config.yaml`) — RESOLVED
 - Config editor scroll-spy and sidebar order alignment — RESOLVED
 - Plugin settings removed from main config editor (moved to plugin-specific editor) — RESOLVED
 - Config save restart prompts, plugin UX, release path resolution — RESOLVED
 - Shutdown cancel signal race: now checked directly in countdown loop (1s) instead of file watcher (5s) — RESOLVED
 - Shutdown countdown UI race: deterministic termination, immediate UI feedback — RESOLVED
+- Overlay X layout, script dropdown/search — RESOLVED
+- Script registry lazy-load on first access — RESOLVED
+- Test relocation (split test_api/test_core) — RESOLVED
+- ShutdownNow race condition (UI freeze on API error) — RESOLVED
+- Overlay URLs missing dashboard container — RESOLVED
+- Dismiss button on restart-pending banner — RESOLVED
+- Dead code in ConfigEditor.collect() — RESOLVED
+- Live log viewer connected via SSE — RESOLVED
 
 ---
 
 ## In Progress
 
-- **GUIDE.md rewrite** — Missing: API server docs (`/docs`, event bus, config API), event hooks system (`src/event_hooks/`), config versioning, actions editor. Currently covers user-facing features adequately but omits new v1.0.0 infrastructure.
 - **End-to-end update validation** — Update subsystem has 50+ tests but compiled `update.exe` → `start.exe` → restart flow never exercised across actual version boundaries.
 
 ---
@@ -126,9 +135,9 @@
 ## Critical Bugs
 
 ### GUI
-1. **Dashboard overlay URLs not displayed** — `renderOverlayUrls()` in `app.js:227-243` looks for `document.getElementById('overlay-urls')` which does not exist in `index.html`. The overlay URL container `plugin-manager-urls` exists inside the plugin manager modal, so URLs display there but never on the main dashboard.
+1. **Dashboard overlay URLs not displayed** — `renderOverlayUrls()` in `app.js:227` targets `document.getElementById('overlay-urls')` which does not exist in `index.html`. The overlay URL container `plugin-manager-urls` exists inside the plugin manager modal, so URLs display there but never on the main dashboard.
 
-2. **Dead code in ConfigEditor.collect()** — `app.js:1346-1376` calls `this.content.querySelectorAll('[data-path]')` twice sequentially. The second loop body contains only comments and a no-op conditional. Dead code artifact that wastes a DOM query.
+2. **Dead code in ConfigEditor.collect()** — `app.js:1365-1375` calls `this.content.querySelectorAll('[data-path]')` a second time with only comments and a no-op conditional. Dead code artifact that wastes a DOM query.
 
 3. **No dismiss button on restart-pending banner** — `_restartPending` flag only clears on actual restart. No "Dismiss" button on the banner (`index.html:19-24`). User must restart to clear visual state.
 
@@ -137,21 +146,23 @@
    - No real-time status updates (dashboard resorts to 10s polling via `loadHealth()`)
    - Plugin state changes are not pushed
 
+5. **ShutdownNow race condition** — `app.js:107-120` sets `_shutdownNowClicked = true` and disables UI buttons *before* the `POST /api/v1/shutdown/now` API call completes. If the API call fails, `_shutdownNowClicked` remains `true`, buttons stay disabled forever, and `pollShutdownStatus()` at line 46 returns early with "Shutting down..." — user cannot recover without reloading the page.
+
 ### Plugin System
-5. **Registry ↔ filesystem state mismatch** — `/plugins/discover` is read-only. If a plugin directory is deleted from disk, registry still has stale metadata. If a plugin directory appears, it is not auto-registered until restart.
+6. **Registry ↔ filesystem state mismatch** — `/plugins/discover` is read-only. If a plugin directory is deleted from disk, registry still has stale metadata. If a plugin directory appears, it is not auto-registered until restart.
 
-6. **Enable/disable ↔ process state gap** — Enable/disable writes signal files; `start.py` polls async. No confirmation the plugin process actually started or stopped. No heartbeat/health check — registry says `enabled: true` even if the process crashed.
+7. **Enable/disable ↔ process state gap** — Enable/disable writes signal files; `start.py` polls async. No confirmation the plugin process actually started or stopped. No heartbeat/health check — registry says `enabled: true` even if the process crashed.
 
-7. **Port staleness** — `PluginRegistration.port` comes from manifest; actual port in `config.yaml` can diverge if user edits config directly (not via API). No cross-validation.
+8. **Port staleness** — `PluginRegistration.port` comes from manifest; actual port in `config.yaml` can diverge if user edits config directly (not via API). No cross-validation.
 
-8. **Non-atomic enable/disable** — Registry update and signal file write are separate operations. If signal write fails after registry update, state is inconsistent.
+9. **Non-atomic enable/disable** — Registry update and signal file write are separate operations. If signal write fails after registry update, state is inconsistent.
 
-9. **Dead plugin entries** — `DELETE /plugins/{name}` unregisters from registry but does not stop running process or clean up files.
+10. **Dead plugin entries** — `DELETE /plugins/{name}` unregisters from registry but does not stop running process or clean up files.
 
 ### Restart / Update
-10. **3-second sleep race in Windows restart** — `start.py:935` sleeps 3s then checks if new process is alive. Under load, 3s may be insufficient; on fast systems, the check passes but the process could crash immediately after.
+11. **3-second sleep race in Windows restart** — `start.py:935` sleeps 3s then checks if new process is alive. Under load, 3s may be insufficient; on fast systems, the check passes but the process could crash immediately after.
 
-11. **Manual restart after update** — Update does not auto-restart. User presses Enter, then re-launches `start.exe` manually.
+12. **Manual restart after update** — Update does not auto-restart. User presses Enter, then re-launches `start.exe` manually.
 
 ---
 
@@ -222,25 +233,26 @@
    - `README.md` is mostly current but should mention API server access and actions editor.
    - Must be done last after all code changes are frozen.
 
-3. **Log Viewer**
-   - Placeholder text exists (`index.html:50`). Backend EventBus provides SSE (`/events/stream`) and WebSocket (`/ws`) — both fully functional. GUI has log infrastructure (`log()` function, log div). Missing: frontend connection to backend streaming endpoint.
-   - Without this, GUI-only users who hide the console have no way to see warnings or errors.
-
 ### IMPORTANT (Non-Blocking But Should Ship)
 
-4. **Update Check UI**
+3. **ShutdownNow Race Condition (Critical Bug #5)**
+   - User gets permanently stuck in "Shutting down..." state if `POST /api/v1/shutdown/now` returns an error.
+   - Fix: move `_shutdownNowClicked = true` into the success path and re-enable UI on error. **RESOLVED**
+
+5. **Update Check UI**
    - Backend endpoints exist (`GET /api/v1/updates/check`, `GET /api/v1/plugins/updates`). `start.py` already calls plugin updates at startup. Missing: any frontend element to display or trigger update checks.
 
-5. **GUI Bugs (see Critical Bugs section)**
-   - `#1` Overlay URLs not displayed on dashboard (workaround: they show in Plugin Manager)
+6. **GUI Bugs**
+   - `#1` Overlay URLs not displayed on dashboard
    - `#2` Dead loop in ConfigEditor.collect()
    - `#3` No dismiss button on restart-pending banner
    - `#4` No WebSocket/SSE client (ties into log viewer blocker)
+   - `#5` ShutdownNow race condition
 
-6. **Plugin Health Monitoring**
+7. **Plugin Health Monitoring**
    - No health checking after plugin launch. No auto-restart on crash. Plugin marked `enabled: true` even when process is dead.
 
-7. **Build System Hardening**
+8. **Build System Hardening**
    - Hardcoded versions in `build.py` — no single source of truth
    - No CI build step on PRs (only on tags)
    - `upload.py` checked into git with stale version
@@ -291,52 +303,57 @@
 
 Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) greatest stability improvement.
 
-### 1. Add dismiss button to restart-pending banner
-- **Why next:** Trivial 2-line fix. Users cannot clear the banner without restarting. Low risk, high UX impact.
+### 1. Fix ShutdownNow race condition (#5)
+- **Why next:** Real correctness bug. When `POST /api/v1/shutdown/now` fails, the UI freezes permanently ("Shutting down..." with no recovery). Fix is ~10 lines: move flag/button-disable into success callback.
 - **Complexity:** 1 (very simple)
-- **Blocks v1.0.0?** No, but should ship.
+- **Blocks v1.0.0?** Yes — can leave users stuck with no recourse.
 
 ### 2. Add `#overlay-urls` container to dashboard
-- **Why next:** ~5 minute fix. Add the missing DOM element referenced by `renderOverlayUrls()`. Low risk, visible improvement.
+- **Why next:** ~2 minute fix. Add the missing DOM element referenced by `renderOverlayUrls()`. Low risk, visible improvement.
 - **Complexity:** 1
-- **Blocks v1.0.0?** No.
+- **Blocks v1.0.0?** No, but should ship.
 
-### 3. Remove dead code loop in ConfigEditor.collect()
+### 3. Add dismiss button to restart-pending banner
+- **Why next:** Trivial 2-line fix. Users cannot clear the banner without restarting. Low risk, high UX impact.
+- **Complexity:** 1
+- **Blocks v1.0.0?** No, but should ship.
+
+### 4. Remove dead code loop in ConfigEditor.collect()
 - **Why next:** 5 minute cleanup. The second `querySelectorAll('[data-path]')` does nothing but waste CPU. Easy win.
 - **Complexity:** 1
 - **Blocks v1.0.0?** No.
 
-### 4. Connect log viewer to SSE endpoint
+### 5. Connect log viewer to SSE endpoint
 - **Why next:** Highest user impact among remaining blockers. GUI-only users have no way to see errors without showing the console. Backend SSE endpoint already exists and works. Frontend needs ~50 lines of JavaScript to connect and display log entries.
 - **Complexity:** 3 (moderate)
 - **Blocks v1.0.0?** Yes. Without this, users who hide the console are blind to errors.
 
-### 5. Update CHANGELOG.md test count and add unreleased section
-- **Why next:** Quick documentation fix. Test count is stale (285 → 374). Missing unreleased section for recent actions editor, hook system, and shutdown fixes.
+### 6. Update CHANGELOG.md test count and add unreleased section
+- **Why next:** Quick documentation fix. Test count is stale (285 → 378). Missing unreleased section for recent actions editor, hook system, and shutdown fixes.
 - **Complexity:** 1
 - **Blocks v1.0.0?** Yes — release docs must be accurate.
 
-### 6. End-to-end update test with compiled binaries
+### 7. End-to-end update test with compiled binaries
 - **Why next:** Highest risk item. A broken update permanently damages user installations. Requires creating a mock release on GitHub or locally and running `update.exe` → `start.exe` → restart through a full cycle.
 - **Complexity:** 5 (complex — requires build + mock server)
 - **Blocks v1.0.0?** Yes. Must be done before release.
 
-### 7. Add update-check UI to dashboard
+### 8. Add update-check UI to dashboard
 - **Why next:** Backend endpoints exist and work. Frontend just needs a "Check Updates" button that calls `GET /api/v1/updates/check` and displays results. ~1 hour of work.
 - **Complexity:** 2
 - **Blocks v1.0.0?** Important but not blocking.
 
-### 8. Fix registry/filesystem mismatch with filesystem watcher
+### 9. Fix registry/filesystem mismatch with filesystem watcher
 - **Why next:** Plugin discovery is currently read-only. A user who manually deletes a plugin directory will have stale registry entries until restart. A simple `inotify`/`ReadDirectoryChangesW` watcher on the plugins directory could auto-sync.
 - **Complexity:** 4 (moderate-complex)
 - **Blocks v1.0.0?** Important for plugin system integrity.
 
-### 9. Plugin health monitoring
+### 10. Plugin health monitoring
 - **Why next:** Currently no way to detect crashed plugins. Add a watchdog thread that pings plugin health endpoints every N seconds and updates registry state on failure.
 - **Complexity:** 4 (moderate-complex)
 - **Blocks v1.0.0?** Important for reliability.
 
-### 10. Single version source of truth
+### 11. Single version source of truth
 - **Why next:** `build.py` hardcodes versions. Extract to `core/version.py` or `version.txt` that all modules read. Prevents version drift between build, API, and updater.
 - **Complexity:** 2
 - **Blocks v1.0.0?** Important for release engineering.
