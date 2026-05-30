@@ -126,12 +126,6 @@
 
 ---
 
-## In Progress
-
-- **End-to-end update validation** — Update subsystem has 50+ tests but compiled `update.exe` → `start.exe` → restart flow never exercised across actual version boundaries.
-
----
-
 ## Critical Bugs
 
 ### GUI
@@ -227,7 +221,7 @@
    - Must verify: file signaling, API kill signal fallback, config whitelist preservation, rollback on interrupted update, Windows/Linux path correctness.
    - **Risk:** A broken update path on compiled build prevents users from ever receiving fixes and could corrupt installation.
 
-2. **Documentation Rewrite (DO LAST)**
+2. **Documentation Rewrite (DO LAST AFTER ALL POINTS IN THIS DOCUMENT ARE FINISHED)**
    - `GUIDE.md` is stale: missing API server documentation (`/docs`, event bus, config API), event hooks system, config versioning, actions editor.
    - `CHANGELOG.md` test count stale (285 claimed vs 374 actual), `Unreleased` section empty, no v1.0.0 release date.
    - `README.md` is mostly current but should mention API server access and actions editor.
@@ -296,6 +290,22 @@
 - Identify and strip dead modules from PyInstaller builds
 - Automated release notes generation from CHANGELOG
 - Single version source of truth (version file or constant)
+
+### GUI installer
+- GUI can run without the API server you can start all over the GUI (same as you start over start.exe)
+- Installer.exe that run as a Setup Wizard so you can create shortcuts, add to startup, choose install location, etc.
+- The Installer.exe should be optional, you can still run the portable version by downloading the zip and running start.exe or the GUI directly. But for users that want a more traditional installation experience or dont have much knowledge of PC they are more comfortable when they have a setup wizard and a desktop shortcut, the installer would be a nice addition.
+
+### Plugin system
+- Some Plugins still are to integrated in the main system or chain with other plugins exemplate:
+Channelpoints has config option in command_commands. command_commands main system but the option channelpoints are plugin related.
+Same as spotify has the ability to deny cooldown aktivation or channelpoints reduce wehen a song request not work.
+
+### Hook system
+- The hook system may be also to string implementet in the main system.
+- Dev should be able to create a hook but the hook as no updater or version Info. So we need a new or rework hook system (Should Hook remove and direct implementation in a Plugin?).
+- Need the Hook API a rework to give more power to the devs?
+- Is the Hook API up to date with the current system? Do we need to add more functions or remove some of them?
 
 ---
 
