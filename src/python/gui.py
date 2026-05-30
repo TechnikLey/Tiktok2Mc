@@ -71,13 +71,44 @@ def main() -> None:
         input("Press Enter to exit...")
         sys.exit(1)
 
-    webview.create_window(
+    class _CloseApi:
+        """JS-accessible API for the unsaved-changes close flow.
+
+        Methods are callable from JavaScript via pywebview.api.*().
+        All methods must be synchronous (no I/O, no evaluate_js).
+        """
+
+        def __init__(self):
+            self._approved = False
+            self._close_requested = False
+
+        def approve_close(self):
+            self._approved = True
+
+        def close_requested(self) -> bool:
+            return self._close_requested
+
+        def reset_close_request(self):
+            self._close_requested = False
+
+    close_api = _CloseApi()
+
+    window = webview.create_window(
         "TikTok2Mc",
         GUI_URL,
         width=1280,
         height=800,
         min_size=(800, 600),
+        js_api=close_api,
     )
+
+    def _on_closing():
+        if close_api._approved:
+            return True
+        close_api._close_requested = True
+        return False
+
+    window.events.closing += _on_closing
     webview.start(debug=False)
 
 

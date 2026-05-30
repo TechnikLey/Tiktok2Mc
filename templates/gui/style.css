@@ -338,6 +338,16 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; backg
 .detail-delete-btn { background:transparent; border:1px solid var(--danger); color:var(--danger); padding:0.35rem 0.7rem; border-radius:6px; font-size:0.8rem; cursor:pointer; transition:all 0.15s; }
 .detail-delete-btn:hover { background:var(--danger); color:#fff; }
 
+/* ─── Script Dropdown ─── */
+.cmd-script-dropdown { background:var(--elevated); border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto; z-index:1000; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+.cmd-script-option { padding:0.5rem; cursor:pointer; border-bottom:1px solid var(--border); color:var(--text); transition:background 0.12s; }
+.cmd-script-option:last-child { border-bottom:none; }
+.cmd-script-option:hover { background:var(--input-bg); }
+.cmd-script-option.selected { background:rgba(255,213,79,0.1); }
+
+/* ─── Unsaved Changes Modal ─── */
+#unsaved-changes-modal .btn { width:100%; justify-content:center; }
+
 @media (max-width: 768px) {
   .editor-layout { flex-direction: column; }
   .editor-sidebar { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }

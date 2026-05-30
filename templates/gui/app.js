@@ -734,6 +734,10 @@ class ConfigEditor {
     if (first) { this.scrollTo(first.id); }
   }
 
+  isDirty() {
+    return JSON.stringify(this.data) !== JSON.stringify(this.original);
+  }
+
   close() {
     document.getElementById('config-editor').classList.add('hidden');
     document.getElementById('review-modal').classList.add('hidden');
@@ -1448,6 +1452,7 @@ class ConfigEditor {
     this.hideReview();
     try {
       await putJSON('/config', { config: this.data, backup: true });
+      this.original = JSON.parse(JSON.stringify(this.data));
       currentConfig = JSON.parse(JSON.stringify(this.data));
       this.close();
       await loadConfig();
@@ -1545,6 +1550,10 @@ class PluginConfigEditor {
     this.render();
     document.getElementById('plugin-config-editor').classList.remove('hidden');
     this.setupScrollSpy();
+  }
+
+  isDirty() {
+    return JSON.stringify(this.config) !== JSON.stringify(this.original);
   }
 
   close() {
@@ -2124,6 +2133,94 @@ class PluginConfigEditor {
 const pluginEditor = new PluginConfigEditor();
 const actionsEditor = new ActionsEditor();
 
+/* ─── Unsaved changes warning on window close ─── */
+let _closeInProgress = false;
+
+// Fallback for browser testing (no pywebview API)
+if (typeof pywebview === 'undefined' || !pywebview.api) {
+  window.addEventListener('beforeunload', function (e) {
+    if (isAnyEditorDirty()) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+}
+
+function isAnyEditorDirty() {
+  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty;
+}
+
+/* Detect close requests from pywebview's on_closing (deadlock-free polling) */
+async function _pollCloseRequest() {
+  if (_closeInProgress) return;
+  try {
+    const requested = await pywebview.api.close_requested();
+    if (!requested) return;
+    await pywebview.api.reset_close_request();
+    await _handleCloseRequest();
+  } catch (_) {}
+}
+
+async function _handleCloseRequest() {
+  if (_closeInProgress) return;
+  if (!isAnyEditorDirty()) {
+    _closeInProgress = true;
+    await pywebview.api.approve_close();
+    window.close();
+    return;
+  }
+  _closeInProgress = true;
+  document.getElementById('unsaved-changes-modal').classList.remove('hidden');
+}
+
+async function _saveAllEditors() {
+  if (actionsEditor.isDirty) {
+    await actionsEditor.save();
+    if (actionsEditor.isDirty) {
+      throw new Error('Actions editor could not be saved — check for errors.');
+    }
+  }
+  if (editor.isDirty()) {
+    editor.collect();
+    editor.mergeUnknownKeys();
+    await putJSON('/config', { config: editor.data, backup: true });
+    editor.original = JSON.parse(JSON.stringify(editor.data));
+    currentConfig = JSON.parse(JSON.stringify(editor.data));
+  }
+  if (pluginEditor.isDirty()) {
+    pluginEditor.collect();
+    const payload = JSON.parse(JSON.stringify(pluginEditor.config));
+    payload._backup = true;
+    await putJSON(`/plugins/${encodeURIComponent(pluginEditor.pluginName)}/config`, payload);
+    pluginEditor.original = JSON.parse(JSON.stringify(pluginEditor.config));
+  }
+}
+
+document.getElementById('btn-unsaved-save-exit').addEventListener('click', async () => {
+  _closeInProgress = true;
+  document.getElementById('unsaved-changes-modal').classList.add('hidden');
+  try {
+    await _saveAllEditors();
+    await pywebview.api.approve_close();
+    window.close();
+  } catch (e) {
+    showToast('Save failed before exit: ' + e.message, 'error');
+    _closeInProgress = false;
+  }
+});
+
+document.getElementById('btn-unsaved-exit-no-save').addEventListener('click', async () => {
+  _closeInProgress = true;
+  document.getElementById('unsaved-changes-modal').classList.add('hidden');
+  await pywebview.api.approve_close();
+  window.close();
+});
+
+document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
+  document.getElementById('unsaved-changes-modal').classList.add('hidden');
+  _closeInProgress = false;
+});
+
 /* ─── Init ─── */
 async function init() {
   await loadHealth();
@@ -2134,5 +2231,8 @@ async function init() {
   else hideWizard();
   setInterval(loadHealth, 10000);
   setInterval(loadPlugins, 5000);
+  if (typeof pywebview !== 'undefined' && pywebview.api) {
+    setInterval(_pollCloseRequest, 200);
+  }
 }
 init();

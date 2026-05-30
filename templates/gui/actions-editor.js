@@ -72,6 +72,7 @@ class ActionsEditor {
     if (this.isDirty) {
       const confirmed = await showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger');
       if (!confirmed) return;
+      this.isDirty = false;
     }
     this.el.classList.add('hidden');
   }
@@ -210,7 +211,7 @@ class ActionsEditor {
             onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)"
             onfocus="actionsEditor._showScriptDropdown(event, ${index}, ${ci})"
             oninput="actionsEditor._filterScriptDropdown(event)">
-          <div class="cmd-script-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+          <div class="cmd-script-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;">
             <div class="cmd-script-list"></div>
           </div>
         </div>`;
@@ -282,8 +283,7 @@ class ActionsEditor {
     } else {
       listContainer.innerHTML = filtered.map(script => `
         <div class="cmd-script-option" data-script-name="${escapeHtml(script.name)}"
-          onclick="actionsEditor._selectScript(event, '${escapeHtml(script.name)}')"
-          style="padding:0.5rem;cursor:pointer;border-bottom:1px solid var(--border);hover:background:var(--bg-hover);">
+          onclick="actionsEditor._selectScript(event, '${escapeHtml(script.name)}')">
           ${escapeHtml(script.name)}
         </div>
       `).join('');
@@ -557,9 +557,11 @@ class ActionsEditor {
   /* ── Raw Editor ── */
 
   async _onRawInput() {
-    // Live validation on input, debounced
     if (this._rawInputTimer) clearTimeout(this._rawInputTimer);
     this._rawInputTimer = setTimeout(() => this._validateRawContent(), 400);
+    if (this.rawTextarea && this.rawTextarea.value !== this.rawContent) {
+      this.isDirty = true;
+    }
   }
 
   async _validateRawContent() {
