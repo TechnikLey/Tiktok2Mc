@@ -234,6 +234,22 @@ class PluginUpdatesResponse(BaseModel):
     updates_available: int
 
 
+class PluginUpdateInstallResult(BaseModel):
+    """Install result for a single plugin."""
+
+    name: str
+    display_name: str
+    version: str
+    success: bool
+    error: str | None = None
+
+
+class PluginUpdatesInstallResponse(BaseModel):
+    results: list[PluginUpdateInstallResult]
+    installed: int
+    failed: int
+
+
 # ── Config models ────────────────────────────────────────────────────
 
 

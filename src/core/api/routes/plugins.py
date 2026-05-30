@@ -19,6 +19,8 @@ from core.api.models import (
     PluginUpdatesResponse,
     PluginUpdateStatus,
     PluginUpdateRequest,
+    PluginUpdatesInstallResponse,
+    PluginUpdateInstallResult,
 )
 from core.api.registry import get_registry
 from core.api.services.plugin_discovery import discover_plugins_from_manifests
@@ -120,6 +122,55 @@ async def check_plugin_updates():
         )
     except Exception as e:
         log.exception("Failed to check plugin updates")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/plugins/updates/install", response_model=PluginUpdatesInstallResponse)
+async def install_plugin_updates():
+    """Install all pending plugin updates immediately."""
+    try:
+        registry = get_registry()
+        plugins = [p.model_dump(mode="json") for p in registry.list()]
+        # Re-check to get latest versions
+        results = _updater.check_updates(plugins)
+
+        plugins_dir = get_root_dir() / "plugins"
+        if not plugins_dir.is_dir():
+            plugins_dir = get_root_dir() / "src" / "plugins"
+        if not plugins_dir.is_dir():
+            raise HTTPException(status_code=500, detail="Cannot locate plugins directory")
+
+        install_results: list[PluginUpdateInstallResult] = []
+        for r in results:
+            if not r.get("update_available"):
+                continue
+            name = r.get("name", "")
+            display_name = r.get("display_name", name)
+            latest_version = r.get("latest_version", "")
+            plugin = next((p for p in plugins if p.get("name") == name), {})
+            success = _updater.install_update(plugin, plugins_dir)
+            if success:
+                # Update registry with new version
+                registry.update(name, version=latest_version)
+            install_results.append(
+                PluginUpdateInstallResult(
+                    name=name,
+                    display_name=display_name,
+                    version=latest_version,
+                    success=success,
+                    error=None if success else "Installation failed",
+                )
+            )
+
+        installed = sum(1 for r in install_results if r.success)
+        failed = sum(1 for r in install_results if not r.success)
+        return PluginUpdatesInstallResponse(
+            results=install_results, installed=installed, failed=failed
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to install plugin updates")
         raise HTTPException(status_code=500, detail=str(e))
 
 

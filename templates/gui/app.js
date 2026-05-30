@@ -378,8 +378,6 @@ async function promptShutdown() {
     'btn-danger'
   );
   if (!confirmed) return;
-  // Show overlay immediately — don't wait for backend (5s file watcher delay)
-  _shutdownTriggered = true;
   const overlay = document.getElementById('shutdown-overlay');
   const display = document.getElementById('shutdown-countdown-display');
   overlay.classList.remove('hidden');
@@ -388,11 +386,14 @@ async function promptShutdown() {
   try {
     const res = await fetch('/api/v1/shutdown', { method: 'POST' });
     if (res.ok) {
+      _shutdownTriggered = true;
       startShutdownPolling();
     } else {
+      overlay.classList.add('hidden');
       showToast('Shutdown signal failed: ' + res.status + ' ' + res.statusText, 'error');
     }
   } catch (e) {
+    overlay.classList.add('hidden');
     showToast('Shutdown signal failed: ' + e.message, 'error');
   }
 }
@@ -2329,10 +2330,33 @@ function _renderUpdateResults() {
   detail.classList.remove('hidden');
 }
 
-function applyUpdates() {
+async function applyUpdates() {
+  const btn = document.querySelector('#updates-card .btn-primary');
+  if (btn) btn.disabled = true;
+  log('Installing plugin updates...', 'info');
+  let result = null;
+  try {
+    result = await postJSON('/plugins/updates/install', {});
+    if (result.installed > 0) {
+      log(result.installed + ' plugin update(s) installed successfully.', 'info');
+    }
+    if (result.failed > 0) {
+      log(result.failed + ' plugin update(s) failed.', 'err');
+      for (const r of result.results) {
+        if (!r.success) showToast('Update failed: ' + (r.display_name || r.name) + ' — ' + (r.error || 'unknown error'), 'error');
+      }
+    }
+  } catch (e) {
+    log('Plugin update install failed: ' + e.message, 'err');
+    showToast('Plugin update install failed: ' + e.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
   showRestartDialog(
     'Apply Updates',
-    'Updates will be installed during the next startup. Restart now to apply all pending updates.'
+    result && result.installed > 0
+      ? result.installed + ' plugin update(s) installed. Restart to complete and apply tool updates.'
+      : 'Restart to apply tool updates.'
   );
 }
 
