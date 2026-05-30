@@ -49,6 +49,15 @@
             <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="editor.open(currentConfig)">Edit Configuration</button>
         </div>
 
+        <div class="card" id="updates-card">
+            <h2>Updates</h2>
+            <div id="updates-summary">
+                <div class="muted">No update information available.</div>
+                <button class="btn btn-primary" style="margin-top:1rem;width:100%;" id="btn-check-updates" onclick="checkAllUpdates()">Check for Updates</button>
+            </div>
+            <div id="updates-detail" class="hidden" style="margin-top:1rem;"></div>
+        </div>
+
         <div class="card">
             <h2>Live Log</h2>
             <div id="log-view">Connecting to log stream...</div>

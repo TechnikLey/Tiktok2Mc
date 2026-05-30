@@ -2242,6 +2242,100 @@ document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
   _closeInProgress = false;
 });
 
+/* ─── Update Checker ─── */
+let _updateData = null;
+
+async function checkAllUpdates() {
+  const btn = document.getElementById('btn-check-updates');
+  const summary = document.getElementById('updates-summary');
+  const detail = document.getElementById('updates-detail');
+  if (btn) btn.disabled = true;
+  if (summary) summary.innerHTML = '<span class="muted">Checking for updates...</span>';
+  if (detail) detail.classList.add('hidden');
+
+  try {
+    const [toolData, pluginData] = await Promise.all([
+      fetchJSON('/updates/check').catch(() => null),
+      fetchJSON('/plugins/updates').catch(() => null),
+    ]);
+
+    _updateData = { tool: toolData, plugins: pluginData };
+    _renderUpdateResults();
+  } catch (e) {
+    if (summary) summary.innerHTML = '<span class="log-err">Update check failed.</span>';
+    log('Update check failed: ' + e.message, 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _renderUpdateResults() {
+  const summary = document.getElementById('updates-summary');
+  const detail = document.getElementById('updates-detail');
+  if (!summary) return;
+
+  const tool = _updateData?.tool;
+  const plugins = _updateData?.plugins;
+  const toolAvail = tool && tool.update_available;
+  const pluginAvail = plugins && plugins.updates_available > 0;
+  const total = (toolAvail ? 1 : 0) + (pluginAvail ? plugins.updates_available : 0);
+
+  if (!toolAvail && !pluginAvail) {
+    summary.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+      '<span style="color:var(--success);font-weight:500;">All up to date</span>' +
+      '<span class="muted" style="font-size:0.85rem;">' +
+      (tool ? 'Tool v' + tool.current_version : '') +
+      '</span></div>' +
+      '<button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="checkAllUpdates()">Check for Updates</button>';
+    detail.classList.add('hidden');
+    return;
+  }
+
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+    '<span style="color:var(--warning);font-weight:500;">' + total + ' update(s) available</span>' +
+    '<span class="muted" style="font-size:0.85rem;">' +
+    (tool ? 'Tool v' + tool.current_version : '') +
+    '</span></div>' +
+    '<button class="btn btn-primary" style="margin-top:0.75rem;width:100%;" onclick="applyUpdates()">Apply Updates (Restart)</button>' +
+    '<button class="btn btn-secondary" style="margin-top:0.5rem;width:100%;" onclick="checkAllUpdates()">Check Again</button>';
+
+  summary.innerHTML = html;
+
+  // Detail panel
+  let detailHtml = '';
+  if (toolAvail) {
+    detailHtml +=
+      '<div class="update-item">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+      '<div><strong>TikTok2Mc</strong><br><span class="muted" style="font-size:0.85rem;">' +
+      tool.current_version + ' → <strong style="color:var(--accent);">' + tool.latest_version + '</strong></span></div>' +
+      (tool.release_url ? '<a href="' + escapeHtml(tool.release_url) + '" target="_blank" class="btn btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.85rem;text-decoration:none;">View Release</a>' : '') +
+      '</div></div>';
+  }
+  if (pluginAvail && plugins.plugins) {
+    for (const p of plugins.plugins) {
+      if (!p.update_available) continue;
+      detailHtml +=
+        '<div class="update-item">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div><strong>' + escapeHtml(p.display_name || p.name) + '</strong><br><span class="muted" style="font-size:0.85rem;">' +
+        p.current_version + ' → <strong style="color:var(--accent);">' + p.latest_version + '</strong></span></div>' +
+        (p.error ? '<span class="log-err" style="font-size:0.85rem;">' + escapeHtml(p.error) + '</span>' : '') +
+        '</div></div>';
+    }
+  }
+  detail.innerHTML = detailHtml;
+  detail.classList.remove('hidden');
+}
+
+function applyUpdates() {
+  showRestartDialog(
+    'Apply Updates',
+    'Updates will be installed during the next startup. Restart now to apply all pending updates.'
+  );
+}
+
 /* ─── SSE Log Streaming ─── */
 let _sseSource = null;
 
@@ -2280,6 +2374,7 @@ async function init() {
   await loadPlugins();
   updateRestartBanner();
   connectLogStream();
+  checkAllUpdates();
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
   setInterval(loadHealth, 10000);
