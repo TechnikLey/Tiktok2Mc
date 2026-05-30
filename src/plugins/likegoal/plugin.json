@@ -6,12 +6,6 @@
   "description": "Displays a progress bar that fills as the stream accumulates likes. Supports multiple goal modes (reset, step, multiply).",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29193
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "like_goal:progress",
@@ -30,16 +24,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn the Like Goal overlay on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29193,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server and overlay port",
         "category": "General"
       },
       {

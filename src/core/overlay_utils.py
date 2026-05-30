@@ -1,14 +1,16 @@
-#!/usr/bin/env python3
 import time
 import threading
-import requests
+import json
+import urllib.request
 import logging
-import sys
 from pathlib import Path
 
 from core.plugin_config import load_plugin_config, discover_plugins_dir, load_plugin_manifest
 
 log = logging.getLogger(__name__)
+
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "overlay-text"
 
 
 def _find_overlay_plugin_dir() -> Path:
@@ -23,9 +25,8 @@ def _find_overlay_plugin_dir() -> Path:
 
 
 class OverlayClient:
-    def __init__(self, name, global_port, max_fails, cooldown):
+    def __init__(self, name, max_fails, cooldown):
         self.name = name
-        self.url = f"http://127.0.0.1:{global_port}/display/{name}"
         self.max_fails = max_fails
         self.cooldown = cooldown
         self._fail_count = 0
@@ -60,7 +61,6 @@ class OverlayManager:
             log.error(f"Failed to load overlay plugin config: {e}")
             cfg = {}
 
-        global_port = cfg.get("port", 29186)
         def_fails = cfg.get("max_fails", 3)
         def_cooldown = cfg.get("cooldown", 10)
 
@@ -71,16 +71,13 @@ class OverlayManager:
                 continue
             self.clients[name] = OverlayClient(
                 name=name,
-                global_port=global_port,
                 max_fails=def_fails,
                 cooldown=def_cooldown,
             )
 
-        # Always provide a "default" overlay even if not explicitly configured
         if "default" not in self.clients:
             self.clients["default"] = OverlayClient(
                 name="default",
-                global_port=global_port,
                 max_fails=def_fails,
                 cooldown=def_cooldown,
             )
@@ -100,13 +97,26 @@ class OverlayManager:
             return False
 
         try:
-            r = requests.post(client.url, json={"title": title, "subtitle": subtitle, "duration": duration}, timeout=2)
-            if r.status_code == 200:
-                client.mark_success()
-                return True
-            client.mark_failure()
+            body = json.dumps({
+                "command": "display",
+                "args": {
+                    "overlay_name": target_name,
+                    "title": title,
+                    "subtitle": subtitle,
+                    "duration": duration,
+                }
+            }).encode()
+            req = urllib.request.Request(
+                f"{API_BASE}/plugins/{PLUGIN_NAME}/command",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=5)
+            client.mark_success()
+            return True
         except Exception as e:
-            log.error(f"[OVERLAY] POST to {client.url} failed: {e}")
+            log.error(f"[OVERLAY] Command to {client.name} failed: {e}")
             client.mark_failure()
         return False
 

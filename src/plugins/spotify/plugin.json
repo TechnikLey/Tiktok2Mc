@@ -6,12 +6,6 @@
   "description": "Allows viewers to control Spotify playback via TikTok comments. Supports play, skip, volume, and queue management through the Spotify Web API.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29194
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "spotify:playback",
@@ -30,16 +24,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn Spotify control on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29194,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server and overlay port",
         "category": "General"
       },
       {
@@ -62,7 +46,7 @@
       {
         "key": "redirect_uri",
         "type": "string",
-        "default": "http://127.0.0.1:29194/callback",
+        "default": "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control",
         "label": "Redirect URI",
         "category": "Authentication"
       },

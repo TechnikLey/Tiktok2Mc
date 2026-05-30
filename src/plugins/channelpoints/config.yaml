@@ -3,7 +3,6 @@
 # ==========================================
 
 enabled: false
-port: 29195
 award_amount: 10
 award_interval_seconds: 60
 ping_timeout_minutes: 10

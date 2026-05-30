@@ -11,7 +11,6 @@
 
 import sys
 import asyncio
-import aiohttp
 import re
 import shutil
 import subprocess
@@ -32,7 +31,6 @@ from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
-from core.plugin_config import load_all_plugin_configs
 from core.yaml_utils import load_yaml
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
@@ -62,9 +60,7 @@ class BotContext:
         self.tiktok_user = ""
         self.reconnect_delay = 30
         self.server_host = "127.0.0.1"
-        self.like_goal_port = 29193
         self.mcserver_api_port = 29188
-        self.overlaytxt_port = 29186
         self.like_triggers = []
         self.autosave_interval_seconds = 60
 
@@ -200,9 +196,6 @@ def load_config():
         config = load_yaml(CONFIG_FILE)
         ctx.config = config
 
-        # Load all plugin configs for port references and cross-plugin data
-        _plugin_configs = load_all_plugin_configs()
-
         ctx.mc_host = config.get("server_host", "127.0.0.1")
         ctx.mc_pass = config.get("rcon", {}).get("password", "")
         ctx.mc_port = config.get("rcon", {}).get("port", 25575)
@@ -210,8 +203,6 @@ def load_config():
         ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
         ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
         ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
-        ctx.overlaytxt_port = _plugin_configs.get("overlay-text", {}).get("port", 29186)
-        ctx.like_goal_port = _plugin_configs.get("like-goal", {}).get("port", 29193)
         ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
         ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
@@ -289,21 +280,9 @@ def load_config():
                 for cname, ccfg in raw_config.items():
                     cname = cname.strip().lower()
                     if cname and isinstance(ccfg, dict):
-                        # Resolve port vars in per-command url
-                        if "url" in ccfg:
-                            url_tpl = str(ccfg["url"])
-                            spotify_port = _plugin_configs.get("spotify-control", {}).get("port", 29194)
-                            url_tpl = url_tpl.replace("{spotify_port}", str(spotify_port))
-                            cp_port = _plugin_configs.get("channel-points", {}).get("port", 29195)
-                            url_tpl = url_tpl.replace("{channel_points_port}", str(cp_port))
-                            ccfg = {**ccfg, "url": url_tpl}
                         commands_config[cname] = ccfg
             handler = str(g.get("handler", "rcon")).lower()
             url = str(g.get("url", ""))
-            spotify_port = _plugin_configs.get("spotify-control", {}).get("port", 29194)
-            url = url.replace("{spotify_port}", str(spotify_port))
-            cp_port = _plugin_configs.get("channel-points", {}).get("port", 29195)
-            url = url.replace("{channel_points_port}", str(cp_port))
             cooldown = max(0, int(g.get("cooldown", 0)))
             user_cooldown = max(0, int(g.get("user_cooldown", 0)))
             if mode == "allow-all" and not commands and handler == "rcon":
@@ -713,11 +692,43 @@ def handle_minecraft_events():
 
     return {"status": "processed"}, 200
 
-def _dispatch_comment_http(url_template, username, cmd_text):
+API_BASE = "http://127.0.0.1:29185/api/v1"
+
+
+def _plugin_command(plugin_name, command, **kwargs):
+    import urllib.request
+    import json
+    try:
+        body = json.dumps({"command": command, "args": kwargs}).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}/plugins/{plugin_name}/command",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.info(f"[PLUGIN-CMD] {plugin_name}/{command} failed: {e}")
+        return False
+
+
+def _plugin_get_state(plugin_name):
+    import urllib.request
+    import json
+    try:
+        resp = urllib.request.urlopen(f"{API_BASE}/plugins/{plugin_name}/state", timeout=5)
+        return json.loads(resp.read().decode())
+    except Exception as e:
+        log.info(f"[PLUGIN-STATE] {plugin_name} failed: {e}")
+        return None
+
+
+def _dispatch_comment_http(cmd_url, username, cmd_text):
     import urllib.request
     import urllib.parse
     try:
-        url = url_template.replace("{user}", urllib.parse.quote(username, safe=""))
+        url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
         req = urllib.request.Request(url, method="POST")
         urllib.request.urlopen(req, timeout=5)
@@ -725,14 +736,12 @@ def _dispatch_comment_http(url_template, username, cmd_text):
         log.info(f"[COMMENT CMD] HTTP dispatch failed: {e}")
 
 
-def _dispatch_comment_http_sync(url_template, username, cmd_text):
-    """Sends a conditional HTTP command and returns the JSON response.
-    Returns None on failure."""
+def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
     import urllib.request
     import urllib.parse
     import json
     try:
-        url = url_template.replace("{user}", urllib.parse.quote(username, safe=""))
+        url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
         req = urllib.request.Request(url, method="POST")
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -742,27 +751,11 @@ def _dispatch_comment_http_sync(url_template, username, cmd_text):
         return None
 
 
-def _get_plugin_config(name: str) -> dict:
-    """Helper to fetch a cached plugin config dict by name."""
-    return load_all_plugin_configs().get(name, {})
+
 
 
 def _ping_channel_points(user):
-    """Pings the channel points plugin to mark a user as active."""
-    cp_cfg = _get_plugin_config("channel-points")
-    if not cp_cfg.get("enabled", False):
-        return
-    port = cp_cfg.get("port", 29195)
-    import urllib.request
-    import json
-    try:
-        url = f"http://127.0.0.1:{port}/ping"
-        data = json.dumps({"user": user}).encode()
-        req = urllib.request.Request(url, data=data, method="POST")
-        req.add_header("Content-Type", "application/json")
-        urllib.request.urlopen(req, timeout=2)
-    except Exception as e:
-        log.info(f"[CHANNEL POINTS] Ping failed for {user}: {e}")
+    _plugin_command("channel-points", "ping", user=user)
 
 
 def _process_follow(username: str, persist: bool = True):
@@ -783,41 +776,19 @@ def _process_follow(username: str, persist: bool = True):
         ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
 
 
-def _get_channel_points_port():
-    return _get_plugin_config("channel-points").get("port", 29195)
-
-
 def _get_user_points(user):
-    """Returns the point balance for a user, or 0 on error."""
-    port = _get_channel_points_port()
-    import urllib.request
-    import urllib.parse
-    import json
-    try:
-        url = f"http://127.0.0.1:{port}/points?user={urllib.parse.quote(user)}"
-        resp = urllib.request.urlopen(url, timeout=3)
-        data = json.loads(resp.read())
-        return data.get("points", 0)
-    except Exception as e:
-        log.info(f"[CHANNEL POINTS] Failed to get points for {user}: {e}")
-        return 0
-
+    _plugin_command("channel-points", "get_points", user=user)
+    time.sleep(0.1)
+    state = _plugin_get_state("channel-points")
+    if state and isinstance(state, dict):
+        data = state.get("state", {})
+        if isinstance(data, dict):
+            user_points = data.get("user_points", {})
+            return user_points.get(user.lower(), user_points.get(user, 0))
+    return 0
 
 def _deduct_user_points(user, amount):
-    """Deducts points from a user. Returns True on success."""
-    port = _get_channel_points_port()
-    import urllib.request
-    import json
-    try:
-        url = f"http://127.0.0.1:{port}/spend"
-        data = json.dumps({"user": user, "amount": amount}).encode()
-        req = urllib.request.Request(url, data=data, method="POST")
-        req.add_header("Content-Type", "application/json")
-        resp = urllib.request.urlopen(req, timeout=3)
-        return json.loads(resp.read()).get("success", False)
-    except Exception as e:
-        log.info(f"[CHANNEL POINTS] Failed to deduct points for {user}: {e}")
-        return False
+    return _plugin_command("channel-points", "spend", user=user, amount=amount)
 
 
 def _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[COMMENT CMD]"):
@@ -1143,20 +1114,15 @@ def get_safe_username(user):
 # Likegoal worker (forwards like counts)
 # =========================================
 async def likegoal_worker():
-    timeout = aiohttp.ClientTimeout(total=2)
     log.info("[LIKEGOAL-QUEUE] Worker started.")
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        while True:
-            delta_val = await ctx.likegoal_queue.get()
-            try:
-                url = f"http://127.0.0.1:{ctx.like_goal_port}/update_likes?add={delta_val}"
-                async with session.get(url) as resp:
-                    if resp.status == 200:
-                        pass
-            except Exception as e:
-                log.info(f"[LIKEGOAL ERROR] {e}")
-            finally:
-                ctx.likegoal_queue.task_done()
+    while True:
+        delta_val = await ctx.likegoal_queue.get()
+        try:
+            _plugin_command("like-goal", "add_likes", delta=delta_val)
+        except Exception as e:
+            log.info(f"[LIKEGOAL ERROR] {e}")
+        finally:
+            ctx.likegoal_queue.task_done()
 
 # =========================================
 # Like trigger validation

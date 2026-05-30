@@ -87,7 +87,6 @@ class TestPluginLauncher:
                 "enabled": True,
                 "level": 3,
                 "ics": True,
-                "port": 8888,
             },
         )
         monkeypatch.setattr(
@@ -100,7 +99,6 @@ class TestPluginLauncher:
         assert p.enable is True
         assert p.level == 3
         assert p.ics is True
-        assert p.port == 8888
 
     def test_env_var_overrides_base_url(self, monkeypatch):
         import os

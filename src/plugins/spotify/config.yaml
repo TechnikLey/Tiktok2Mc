@@ -5,10 +5,9 @@
 # All settings are local to this plugin.
 
 enabled: false
-port: 29194
 client_id: ""
 client_secret: ""
-redirect_uri: "http://127.0.0.1:29194/callback"
+redirect_uri: "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control"
 device_id: ""
 volume_step: 10
 playtrack_mode: "replace"

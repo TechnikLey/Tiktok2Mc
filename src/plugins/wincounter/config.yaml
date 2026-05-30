@@ -3,7 +3,6 @@
 # ==========================================
 
 enabled: false
-port: 29191
 decrement_on_death: false
 
 theme:

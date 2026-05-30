@@ -1,24 +1,10 @@
-#!/usr/bin/env python3
-# ==================================================
-# likegoal - Like goal progress bar plugin
-# ==================================================
-# Displays a progress bar that fills up as the stream
-# accumulates likes. Supports three goal modes based
-# on the GoalMultiplier config value:
-#   0 = reset (likes reset to 0 after reaching the goal)
-#   1 = step  (goal increases by InitialGoal each time)
-#   2+= multiply (goal is multiplied each time)
-# All settings are read from the plugin-local config.yaml.
-# Data is pushed to the overlay via SSE.
-# ==================================================
-
 import webview
 import threading
 import json
-from queue import Queue
-from flask import Flask, Response, request, jsonify
 import sys
 import os
+import urllib.request
+from queue import Queue
 from pathlib import Path
 from core import parse_args, get_base_dir, get_base_file
 from core.plugin_config import load_plugin_config
@@ -26,9 +12,6 @@ from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
 
-# =========================
-# Paths & configuration
-# =========================
 BASE_DIR = get_base_dir()
 
 PLUGIN_DIR = Path(__file__).resolve().parent
@@ -44,61 +27,93 @@ THEME = load_plugin_theme(cfg, "like_goal")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-LIKEGOAL_EXE_PATH = get_base_file()
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "like-goal"
 
-
-# =========================
-# Flask setup & like tracking
-# =========================
-app = Flask(__name__)
 
 class LikeManager:
-    """Tracks cumulative likes and computes progress toward the next goal."""
     def __init__(self, initial_goal=100_000, multiplier=2):
         self.likes = 0
         self.initial_goal = initial_goal
         self.multiplier = multiplier
         self.goal = initial_goal
         self.previous_goal = 0
-        self.listeners = []
         self._lock = threading.Lock()
 
     def add_likes(self, amount=1):
-        self.likes += amount
-        while self.likes >= self.goal:
-            if self.multiplier == 0:
-                self.likes = 0
-                self.goal = self.initial_goal
-                self.previous_goal = 0
-            elif self.multiplier == 1:
-                self.previous_goal = self.goal
-                self.goal += self.initial_goal
-            else:
-                self.previous_goal = self.goal
-                self.goal = int(self.goal * self.multiplier)
-        self._notify()
-
-    def _notify(self):
-        data = self.get_data()
         with self._lock:
-            for q in list(self.listeners):
-                q.put(data)
+            self.likes += amount
+            while self.likes >= self.goal:
+                if self.multiplier == 0:
+                    self.likes = 0
+                    self.goal = self.initial_goal
+                    self.previous_goal = 0
+                elif self.multiplier == 1:
+                    self.previous_goal = self.goal
+                    self.goal += self.initial_goal
+                else:
+                    self.previous_goal = self.goal
+                    self.goal = int(self.goal * self.multiplier)
 
     def get_data(self):
-        segment_size = self.goal - self.previous_goal
-        progress_in_segment = self.likes - self.previous_goal
-        percent = round((progress_in_segment / segment_size) * 100, 2) if segment_size > 0 else 0
-        return {
-            "likes": self.likes,
-            "goal": self.goal,
-            "percent": percent
-        }
+        with self._lock:
+            segment_size = self.goal - self.previous_goal
+            progress_in_segment = self.likes - self.previous_goal
+            percent = round((progress_in_segment / segment_size) * 100, 2) if segment_size > 0 else 0
+            return {
+                "likes": self.likes,
+                "goal": self.goal,
+                "percent": percent
+            }
+
 
 like_manager = LikeManager(initial_goal=max(INITIAL_GOAL, 1), multiplier=GOAL_MULTIPLIER)
 
-# =========================
-# HTML overlay template
-# =========================
+
+def _api_post(path: str, data: dict) -> bool:
+    try:
+        body = json.dumps(data).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}{path}", data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.warning("API POST %s failed: %s", path, e)
+        return False
+
+
+def _api_get(path: str) -> dict | None:
+    try:
+        req = urllib.request.Request(f"{API_BASE}{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        log.warning("API GET %s failed: %s", path, e)
+        return None
+
+
+def _push_state():
+    _api_post(f"/plugins/{PLUGIN_NAME}/state", {"state": like_manager.get_data()})
+
+
+def command_polling_loop():
+    while True:
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        if result:
+            for cmd_entry in result.get("commands", []):
+                cmd = cmd_entry.get("command")
+                args_data = cmd_entry.get("args", {})
+                if cmd == "update_likes":
+                    add_val = int(args_data.get("add", 0))
+                    if add_val > 0:
+                        like_manager.add_likes(add_val)
+                        _push_state()
+        time.sleep(0.5)
+
+
 HTML_TEMPLATE = f"""
 <!DOCTYPE html>
 <html lang="de">
@@ -181,7 +196,7 @@ HTML_TEMPLATE = f"""
 </div>
 
 <script>
-const evtSource = new EventSource(`/stream`);
+const evtSource = new EventSource(`/api/v1/plugins/like-goal/stream`);
 
 evtSource.onmessage = function(event) {{
     try {{
@@ -189,7 +204,6 @@ evtSource.onmessage = function(event) {{
         const bar = document.getElementById("bar");
         const text = document.getElementById("text");
 
-        // Simple update without effect logic
         bar.style.width = data.percent + "%";
         text.innerText = `${{data.percent}}% (${{data.likes.toLocaleString()}} / ${{data.goal.toLocaleString()}})`;
 
@@ -207,59 +221,24 @@ evtSource.onerror = function() {{
 </html>
 """
 
-# =========================
-# Flask routes
-# =========================
-@app.route("/")
-def index():
-    return HTML_TEMPLATE
 
-@app.route("/update_likes")
-def update_likes():
-    add_val = request.args.get("add", default=0, type=int)
-    like_manager.add_likes(add_val)
-    return jsonify(like_manager.get_data())
+def _register_overlay():
+    _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": HTML_TEMPLATE})
 
-@app.route("/stream")
-def stream():
-    q = Queue()
-    with like_manager._lock:
-        like_manager.listeners.append(q)
-    def event_stream():
-        try:
-            yield f"data: {json.dumps(like_manager.get_data())}\n\n"
-            while True:
-                try:
-                    data = q.get(timeout=1)
-                    yield f"data: {json.dumps(data)}\n\n"
-                except Exception:
-                    yield f"data: {json.dumps(like_manager.get_data())}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            with like_manager._lock:
-                try: like_manager.listeners.remove(q)
-                except ValueError: pass
-    return Response(event_stream(), mimetype="text/event-stream")
-
-def run_flask():
-    app.run(host=SERVER_HOST, port=LIKE_GOAL_PORT, threaded=True, debug=False, use_reloader=False)
 
 args = parse_args()
 gui_hidden = args.gui_hidden
 
-# =========================
-# Main execution
-# =========================
 if __name__ == "__main__":
-    server_thread = threading.Thread(target=run_flask, daemon=True)
+    _register_overlay()
 
-    server_thread.start()
+    poll_thread = threading.Thread(target=command_polling_loop, daemon=True)
+    poll_thread.start()
 
     if not gui_hidden:
         window = webview.create_window(
             "Like Goal Overlay",
-            f"http://127.0.0.1:{LIKE_GOAL_PORT}",
+            f"http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay",
             width=600,
             height=150,
             on_top=True,
@@ -268,4 +247,4 @@ if __name__ == "__main__":
         webview.start(debug=False)
     else:
         log.info("GUI hidden, running server only.")
-        server_thread.join()
+        poll_thread.join()

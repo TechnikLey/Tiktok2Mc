@@ -6,12 +6,6 @@
   "description": "Tracks wins and losses with optional death decrement from Minecraft. Wins escalate the target automatically when reached.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29191
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "win_counter:track",
@@ -30,16 +24,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn the win counter overlay on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29191,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server and overlay port",
         "category": "General"
       },
       {

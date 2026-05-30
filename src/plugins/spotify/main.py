@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# ==================================================
-# spotify - Spotify Control Plugin
-# ==================================================
-# Allows viewers to control Spotify playback via
-# TikTok comments and events. Uses the Spotify
-# Web API for all playback control.
-# ==================================================
-
 import sys
 import json
 import time
@@ -15,21 +6,17 @@ import webbrowser
 import base64
 import hashlib
 import os
-from queue import Queue
-from urllib.parse import urlencode, parse_qs
+import urllib.request
+from urllib.parse import urlencode
 from pathlib import Path
 
 import logging
 import requests
-from flask import Flask, Response, request, jsonify, redirect
 from core import parse_args, get_base_dir, get_root_dir, get_base_file
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 log = logging.getLogger(__name__)
 
-# =========================
-# Paths & configuration
-# =========================
 BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
 
@@ -43,22 +30,19 @@ cfg = load_plugin_config(PLUGIN_DIR)
 SPOTIFY_PORT = cfg.get("port", 29194)
 CLIENT_ID = cfg.get("client_id", "")
 CLIENT_SECRET = cfg.get("client_secret", "")
-REDIRECT_URI = cfg.get("redirect_uri", f"http://127.0.0.1:{SPOTIFY_PORT}/callback")
+REDIRECT_URI = cfg.get("redirect_uri", "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control")
 DEVICE_ID = cfg.get("device_id", "")
 VOLUME_STEP = cfg.get("volume_step", 10)
 PLAYTRACK_MODE = cfg.get("playtrack_mode", "replace")
 SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
-SPOTIFY_EXE_PATH = get_base_file()
-
 THEME = load_plugin_theme(cfg, "spotify")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "spotify-control"
 
-# =========================
-# Spotify API wrapper
-# =========================
 SPOTIFY_API = "https://api.spotify.com/v1"
 SPOTIFY_AUTH = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN = "https://accounts.spotify.com/api/token"
@@ -233,11 +217,20 @@ class SpotifyClient:
         return self._request("PUT", f"/me/player/repeat?state={state}")
 
     def save_current(self):
-        track = self.get_current_track()
-        if not track or not track.get("item"):
+        track = self._get_current_track_item()
+        if not track:
             return None
-        track_id = track["item"]["id"]
+        track_id = track["id"]
         return self._request("PUT", "/me/tracks", json={"ids": [track_id]})
+
+    def _get_current_track_item(self):
+        data = self.get_current_track()
+        if data and data.get("item"):
+            return data["item"]
+        playback = self.get_playback()
+        if playback and playback.get("item"):
+            return playback["item"]
+        return None
 
     def transfer_playback(self):
         if not DEVICE_ID:
@@ -274,139 +267,18 @@ class SpotifyClient:
         return self._request("PUT", "/me/player/play", **kwargs)
 
     def queue_track(self, track_uri):
-        import urllib.parse
-        params = f"uri={urllib.parse.quote(track_uri, safe='')}"
+        import urllib.parse as up
+        params = f"uri={up.quote(track_uri, safe='')}"
         if DEVICE_ID:
-            params += f"&device_id={urllib.parse.quote(DEVICE_ID, safe='')}"
+            params += f"&device_id={up.quote(DEVICE_ID, safe='')}"
         return self._request("POST", f"/me/player/queue?{params}")
 
 
 spotify = SpotifyClient(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI)
 
-# =========================
-# Flask setup
-# =========================
-app = Flask(__name__)
-
-auth_state = None
-
-# --- Overlay (SSE + HTML) ---
-class OverlayClients:
-    def __init__(self):
-        self.listeners = []
-        self._lock = threading.Lock()
-
-    def add(self, q):
-        with self._lock:
-            self.listeners.append(q)
-
-    def remove(self, q):
-        with self._lock:
-            try:
-                self.listeners.remove(q)
-            except ValueError:
-                pass
-
-    def notify(self, data):
-        with self._lock:
-            for q in list(self.listeners):
-                q.put(data)
-
-    def notify_auth(self, success):
-        self.notify({"type": "auth", "success": success})
-
-
-overlay_clients = OverlayClients()
-
-
+_auth_state = None
 _last_track_id = None
 _last_track_lock = threading.Lock()
-
-
-def _notify_overlay():
-    global _last_track_id
-    data = spotify.get_current_track()
-    if not data or not data.get("item"):
-        playback = spotify.get_playback()
-        if playback and playback.get("item"):
-            data = playback
-        else:
-            if _last_track_id:
-                return
-            overlay_clients.notify({"type": "no_track"})
-            return
-    track = _format_track(data)
-    track["type"] = "track"
-    with _last_track_lock:
-        if track["id"] and track["id"] != _last_track_id:
-            _last_track_id = track["id"]
-            progress_ms = track.get("progress_ms", 0)
-            track["progress_ms"] = 0
-            track["progress_sec"] = 0
-            pct = progress_ms / track["duration_ms"] * 100 if track.get("duration_ms") else 0
-            if pct < 90:
-                track["progress_ms"] = progress_ms
-                track["progress_sec"] = progress_ms // 1000
-    overlay_clients.notify(track)
-
-
-def _poll_spotify():
-    while True:
-        time.sleep(2)
-        try:
-            if spotify.is_authenticated:
-                _notify_overlay()
-        except Exception as e:
-            log.info(f"[SPOTIFY-POLL] Error polling overlay: {e}")
-
-
-@app.route("/login")
-def login():
-    global auth_state
-    url, state = spotify.get_auth_url()
-    auth_state = state
-    return redirect(url)
-
-
-@app.route("/callback")
-def callback():
-    code = request.args.get("code")
-    state = request.args.get("state")
-    error = request.args.get("error")
-    if error:
-        return f"Spotify auth error: {error}", 400
-    if not code:
-        return "Missing authorization code", 400
-    if auth_state is None or state != auth_state:
-        log.info(f"[SPOTIFY] State mismatch in OAuth callback — possible CSRF attack")
-        return "Authorization failed: state mismatch", 400
-    if spotify.exchange_code(code):
-        overlay_clients.notify_auth(True)
-        _notify_overlay()
-        return "<html><body><h2>Connected to Spotify!</h2><p>You can close this window.</p></body></html>"
-    return "Authorization failed", 400
-
-
-@app.route("/status")
-def status_endpoint():
-    return jsonify({
-        "authenticated": spotify.is_authenticated,
-        "has_client_id": bool(CLIENT_ID),
-    })
-
-
-@app.route("/current")
-def current_track():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    data = spotify.get_current_track()
-    if not data or not data.get("item"):
-        playback = spotify.get_playback()
-        if playback and playback.get("item"):
-            data = playback
-        else:
-            return jsonify({"error": "no_track"}), 404
-    return jsonify(_format_track(data))
 
 
 def _format_track(data):
@@ -427,135 +299,81 @@ def _format_track(data):
     }
 
 
-# --- Playback control endpoints ---
-@app.route("/play", methods=["POST"])
-def cmd_play():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    spotify.play()
-    _notify_overlay()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/pause", methods=["POST"])
-def cmd_pause():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    spotify.pause()
-    _notify_overlay()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/next", methods=["POST"])
-def cmd_next():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    spotify.next_track()
-    time.sleep(0.5)
-    _notify_overlay()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/previous", methods=["POST"])
-def cmd_previous():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    spotify.previous_track()
-    time.sleep(0.5)
-    _notify_overlay()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/volume", methods=["POST"])
-def cmd_volume():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    level = request.args.get("level", type=int)
-    if level is None:
-        return jsonify({"error": "missing level"}), 400
-    spotify.set_volume(level)
-    return jsonify({"status": "ok"})
-
-
-@app.route("/volume/up", methods=["POST"])
-def cmd_volume_up():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    playback = spotify.get_playback()
-    if playback and playback.get("device"):
-        current = playback["device"].get("volume_percent", 50)
-    else:
-        current = 50
-    spotify.set_volume(min(100, current + VOLUME_STEP))
-    return jsonify({"status": "ok"})
-
-
-@app.route("/volume/down", methods=["POST"])
-def cmd_volume_down():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    playback = spotify.get_playback()
-    if playback and playback.get("device"):
-        current = playback["device"].get("volume_percent", 50)
-    else:
-        current = 50
-    spotify.set_volume(max(0, current - VOLUME_STEP))
-    return jsonify({"status": "ok"})
-
-
-@app.route("/shuffle", methods=["POST"])
-def cmd_shuffle():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    state = request.args.get("state", "").lower()
-    if state == "toggle":
+def _get_current_track_data():
+    data = spotify.get_current_track()
+    if not data or not data.get("item"):
         playback = spotify.get_playback()
-        current = playback.get("shuffle_state", False) if playback else False
-        spotify.toggle_shuffle(not current)
-    else:
-        spotify.toggle_shuffle(state in ("true", "1"))
-    return jsonify({"status": "ok"})
+        if playback and playback.get("item"):
+            data = playback
+        else:
+            return None
+    return _format_track(data)
 
 
-@app.route("/repeat", methods=["POST"])
-def cmd_repeat():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    state = request.args.get("state", "toggle")
-    if state == "toggle":
-        playback = spotify.get_playback()
-        current = playback.get("repeat_state", "off") if playback else "off"
-        order = ["off", "context", "track"]
-        next_idx = (order.index(current) + 1) % len(order) if current in order else 1
-        spotify.set_repeat(order[next_idx])
-    else:
-        spotify.set_repeat(state)
-    return jsonify({"status": "ok"})
+def _notify_overlay():
+    global _last_track_id
+    track_data = _get_current_track_data()
+    if track_data is None:
+        if _last_track_id:
+            return
+        _api_post(f"/plugins/{PLUGIN_NAME}/state", {
+            "state": {"type": "no_track"}
+        })
+        return
+    with _last_track_lock:
+        if track_data["id"] and track_data["id"] != _last_track_id:
+            _last_track_id = track_data["id"]
+            progress_ms = track_data.get("progress_ms", 0)
+            track_data["progress_ms"] = 0
+            track_data["progress_sec"] = 0
+            pct = progress_ms / track_data["duration_ms"] * 100 if track_data.get("duration_ms") else 0
+            if pct < 90:
+                track_data["progress_ms"] = progress_ms
+                track_data["progress_sec"] = progress_ms // 1000
+    _api_post(f"/plugins/{PLUGIN_NAME}/state", {
+        "state": track_data
+    })
 
 
-@app.route("/save", methods=["POST"])
-def cmd_save():
-    if not spotify.is_authenticated:
-        return jsonify({"error": "not_authenticated"}), 401
-    result = spotify.save_current()
-    if result is None:
-        return jsonify({"error": "no_track"}), 404
-    return jsonify({"status": "ok"})
+def _poll_spotify():
+    while True:
+        time.sleep(2)
+        try:
+            if spotify.is_authenticated:
+                _notify_overlay()
+        except Exception as e:
+            log.info(f"[SPOTIFY-POLL] Error polling overlay: {e}")
 
 
-@app.route("/playtrack", methods=["POST"])
-def cmd_playtrack():
-    if not spotify.is_authenticated:
-        log.info(f"[PLAYTRACK] Cannot search — Spotify not authenticated")
-        return jsonify({"error": "not_authenticated", "found": False}), 401
-    text = request.args.get("text", "").strip()
-    if not text:
-        log.info(f"[PLAYTRACK] Missing search text")
-        return jsonify({"error": "missing text", "found": False}), 400
+def _api_post(path: str, data: dict) -> bool:
+    try:
+        body = json.dumps(data).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}{path}", data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.warning("API POST %s failed: %s", path, e)
+        return False
 
+
+def _api_get(path: str) -> dict | None:
+    try:
+        req = urllib.request.Request(f"{API_BASE}{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        log.warning("API GET %s failed: %s", path, e)
+        return None
+
+
+def _search_and_play(text: str) -> dict:
+    text = text.strip()
     if text.lower().startswith("playtrack"):
         text = text[len("playtrack"):].strip()
-
     parts = text.split(" - ", maxsplit=1)
     if len(parts) < 2:
         artist = ""
@@ -563,134 +381,171 @@ def cmd_playtrack():
     else:
         artist = parts[0].strip()
         song = parts[1].strip()
-
-    log.info(f"[PLAYTRACK] Searching — artist: '{artist}', song: '{song}'")
-
     query_parts = []
     if artist:
         query_parts.append(f"artist:{artist}")
     if song:
         query_parts.append(f"track:{song}")
     query = " ".join(query_parts)
-
     result = spotify.search_track(query)
     if not result:
         query = f"{artist} - {song}" if artist else song
-        log.info(f"[PLAYTRACK] Structured search returned nothing, retrying with plain text: '{query}'")
         result = spotify.search_track(query)
-
     if not result or not result.get("tracks", {}).get("items"):
-        log.info(f"[PLAYTRACK] No results found for '{artist} - {song}'")
-        return jsonify({"status": "not_found", "found": False})
-
+        return {"status": "not_found", "found": False}
     track = result["tracks"]["items"][0]
     track_name = track["name"]
     track_artists = ", ".join(a["name"] for a in track["artists"])
     track_uri = track["uri"]
-    log.info(f"[PLAYTRACK] Found track — '{track_name}' by {track_artists}")
-
     if PLAYTRACK_MODE == "queue":
-        log.info(f"[PLAYTRACK] Queuing track (playtrack_mode=queue)")
         spotify.queue_track(track_uri)
     else:
-        log.info(f"[PLAYTRACK] Playing track now (playtrack_mode=replace)")
         spotify.play_specific(track_uri)
-
     time.sleep(0.5)
     _notify_overlay()
-
-    return jsonify({
+    return {
         "status": "ok",
         "found": True,
         "mode": PLAYTRACK_MODE,
-        "track": {
-            "name": track_name,
-            "artists": track_artists,
-            "uri": track_uri,
-        }
-    })
+        "track": {"name": track_name, "artists": track_artists, "uri": track_uri},
+    }
 
 
-@app.route("/comment", methods=["POST"])
-def cmd_comment():
-    user = request.args.get("user", "Unknown")
-    text = request.args.get("text", "").strip().lower()
-    if not text:
-        return jsonify({"error": "missing text"}), 400
-    parts = text.split(maxsplit=1)
-    command = parts[0]
-    arg = parts[1] if len(parts) > 1 else None
-
-    if command == "play":
-        spotify.play()
-        _notify_overlay()
-    elif command == "pause":
-        spotify.pause()
-        _notify_overlay()
-    elif command == "skip":
-        spotify.next_track()
+def command_polling_loop():
+    global _auth_state
+    while True:
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        if result:
+            for cmd_entry in result.get("commands", []):
+                cmd = cmd_entry.get("command")
+                args_data = cmd_entry.get("args", {})
+                if cmd == "start_oauth":
+                    if not CLIENT_ID or not CLIENT_SECRET:
+                        log.info("[SPOTIFY] Cannot start OAuth: missing client_id or client_secret")
+                    else:
+                        url, state = spotify.get_auth_url()
+                        _auth_state = state
+                        webbrowser.open(url)
+                        log.info("[SPOTIFY] OAuth URL opened in browser")
+                elif cmd == "oauth_callback":
+                    code = args_data.get("code", "")
+                    state = args_data.get("state", "")
+                    if state and _auth_state is not None and state != _auth_state:
+                        log.info("[SPOTIFY] State mismatch in OAuth callback")
+                    elif code:
+                        spotify.exchange_code(code)
+                        _notify_overlay()
+                elif cmd == "play":
+                    if spotify.is_authenticated:
+                        spotify.play()
+                        _notify_overlay()
+                elif cmd == "pause":
+                    if spotify.is_authenticated:
+                        spotify.pause()
+                        _notify_overlay()
+                elif cmd == "next":
+                    if spotify.is_authenticated:
+                        spotify.next_track()
+                        time.sleep(0.5)
+                        _notify_overlay()
+                elif cmd == "previous":
+                    if spotify.is_authenticated:
+                        spotify.previous_track()
+                        time.sleep(0.5)
+                        _notify_overlay()
+                elif cmd == "volume":
+                    level = args_data.get("level")
+                    if level is not None and spotify.is_authenticated:
+                        spotify.set_volume(int(level))
+                elif cmd == "volume_up":
+                    if spotify.is_authenticated:
+                        playback = spotify.get_playback()
+                        current = playback["device"].get("volume_percent", 50) if playback and playback.get("device") else 50
+                        spotify.set_volume(min(100, current + VOLUME_STEP))
+                elif cmd == "volume_down":
+                    if spotify.is_authenticated:
+                        playback = spotify.get_playback()
+                        current = playback["device"].get("volume_percent", 50) if playback and playback.get("device") else 50
+                        spotify.set_volume(max(0, current - VOLUME_STEP))
+                elif cmd == "shuffle":
+                    if spotify.is_authenticated:
+                        state_val = args_data.get("state", "toggle")
+                        if state_val == "toggle":
+                            playback = spotify.get_playback()
+                            current = playback.get("shuffle_state", False) if playback else False
+                            spotify.toggle_shuffle(not current)
+                        else:
+                            spotify.toggle_shuffle(state_val in ("true", "1"))
+                        _notify_overlay()
+                elif cmd == "repeat":
+                    if spotify.is_authenticated:
+                        state_val = args_data.get("state", "toggle")
+                        if state_val == "toggle":
+                            playback = spotify.get_playback()
+                            current = playback.get("repeat_state", "off") if playback else "off"
+                            order = ["off", "context", "track"]
+                            next_idx = (order.index(current) + 1) % len(order) if current in order else 1
+                            spotify.set_repeat(order[next_idx])
+                        else:
+                            spotify.set_repeat(state_val)
+                        _notify_overlay()
+                elif cmd == "save":
+                    if spotify.is_authenticated:
+                        spotify.save_current()
+                elif cmd == "playtrack":
+                    text = args_data.get("text", "")
+                    if text and spotify.is_authenticated:
+                        _search_and_play(text)
+                elif cmd == "comment":
+                    text = args_data.get("text", "").strip().lower()
+                    if not text:
+                        continue
+                    parts = text.split(maxsplit=1)
+                    sub_cmd = parts[0]
+                    arg = parts[1] if len(parts) > 1 else None
+                    if sub_cmd == "play":
+                        if spotify.is_authenticated:
+                            spotify.play()
+                            _notify_overlay()
+                    elif sub_cmd == "pause":
+                        if spotify.is_authenticated:
+                            spotify.pause()
+                            _notify_overlay()
+                    elif sub_cmd == "skip":
+                        if spotify.is_authenticated:
+                            spotify.next_track()
+                            time.sleep(0.5)
+                            _notify_overlay()
+                    elif sub_cmd in ("prev", "previous", "back"):
+                        if spotify.is_authenticated:
+                            spotify.previous_track()
+                            time.sleep(0.5)
+                            _notify_overlay()
+                    elif sub_cmd == "volume" and arg:
+                        try:
+                            spotify.set_volume(int(arg))
+                        except ValueError:
+                            pass
+                    elif sub_cmd == "save":
+                        if spotify.is_authenticated:
+                            spotify.save_current()
+                    elif sub_cmd == "shuffle":
+                        if spotify.is_authenticated:
+                            playback = spotify.get_playback()
+                            current = playback.get("shuffle_state", False) if playback else False
+                            spotify.toggle_shuffle(not current)
+                            _notify_overlay()
+                    elif sub_cmd in ("repeat", "loop"):
+                        if spotify.is_authenticated:
+                            playback = spotify.get_playback()
+                            current = playback.get("repeat_state", "off") if playback else "off"
+                            order = ["off", "context", "track"]
+                            next_idx = (order.index(current) + 1) % len(order) if current in order else 1
+                            spotify.set_repeat(order[next_idx])
+                            _notify_overlay()
+                    elif sub_cmd == "playtrack":
+                        _search_and_play(text)
         time.sleep(0.5)
-        _notify_overlay()
-    elif command in ("prev", "previous", "back"):
-        spotify.previous_track()
-        time.sleep(0.5)
-        _notify_overlay()
-    elif command == "volume" and arg:
-        try:
-            spotify.set_volume(int(arg))
-        except ValueError:
-            return jsonify({"error": "invalid level"}), 400
-    elif command == "save":
-        spotify.save_current()
-    elif command == "shuffle":
-        playback = spotify.get_playback()
-        current = playback.get("shuffle_state", False) if playback else False
-        spotify.toggle_shuffle(not current)
-        _notify_overlay()
-    elif command in ("repeat", "loop"):
-        playback = spotify.get_playback()
-        current = playback.get("repeat_state", "off") if playback else "off"
-        order = ["off", "context", "track"]
-        next_idx = (order.index(current) + 1) % len(order) if current in order else 1
-        spotify.set_repeat(order[next_idx])
-    elif command in ("current", "song", "track"):
-        return current_track()
-    elif command == "playtrack":
-        return cmd_playtrack()
-    else:
-        return jsonify({"error": "unknown_command"}), 400
-    return jsonify({"status": "ok"})
-
-
-@app.route("/")
-def overlay():
-    return HTML_OVERLAY
-
-
-@app.route("/stream")
-def overlay_stream():
-    q = Queue()
-    overlay_clients.add(q)
-    def event_stream():
-        try:
-            if spotify.is_authenticated:
-                data = spotify.get_current_track()
-                if data and data.get("item"):
-                    track = _format_track(data)
-                    track["type"] = "track"
-                    yield f"data: {json.dumps(track)}\n\n"
-            yield f"data: {json.dumps({'type': 'connected', 'authenticated': spotify.is_authenticated})}\n\n"
-            while True:
-                try:
-                    data = q.get(timeout=1)
-                    yield f"data: {json.dumps(data)}\n\n"
-                except Exception:
-                    pass
-        except GeneratorExit:
-            pass
-        finally:
-            overlay_clients.remove(q)
-    return Response(event_stream(), mimetype="text/event-stream")
 
 
 HTML_OVERLAY = """<!DOCTYPE html>
@@ -798,7 +653,7 @@ const cover = document.getElementById('cover');
 const trackName = document.getElementById('track-name');
 const trackArtist = document.getElementById('track-artist');
 const progressBar = document.getElementById('progress-bar');
-const evtSource = new EventSource('/stream');
+const evtSource = new EventSource('/api/v1/plugins/spotify-control/stream');
 
 let progressStart = 0, durationMs = 0, lastUpdate = 0, isPlaying = false;
 
@@ -815,7 +670,7 @@ function updateProgress() {
 evtSource.onmessage = function(e) {
     try {
         const data = JSON.parse(e.data);
-        if (data.type === 'track') {
+        if (data.name) {
             player.classList.add('visible');
             statusText.style.display = 'none';
             cover.src = data.image || '';
@@ -826,20 +681,8 @@ evtSource.onmessage = function(e) {
             lastUpdate = Date.now();
             isPlaying = data.is_playing || false;
             updateProgress();
-        } else if (data.type === 'auth' && data.success) {
-            statusText.textContent = 'Spotify connected!';
         } else if (data.type === 'no_track' && !player.classList.contains('visible')) {
-            if (data.authenticated !== false) {
-                statusText.textContent = 'No active track';
-            } else {
-                statusText.textContent = 'Spotify not connected – open /login';
-            }
-        } else if (data.type === 'connected' && !player.classList.contains('visible')) {
-            if (data.authenticated) {
-                statusText.textContent = 'No active track';
-            } else {
-                statusText.textContent = 'Spotify not connected – open /login';
-            }
+            statusText.textContent = 'No active track';
         }
     } catch(e) {}
 };
@@ -854,41 +697,45 @@ setInterval(updateProgress, 1000);
 </body>
 </html>"""
 
-# =========================
-# Server + Main
-# =========================
-def run_flask():
-    app.run(host=SERVER_HOST, port=SPOTIFY_PORT, threaded=True, use_reloader=False)
+
+def _register_overlay():
+    _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": HTML_OVERLAY})
+
+
+def _initial_auth_setup():
+    if not spotify.is_authenticated and CLIENT_ID and CLIENT_SECRET:
+        url, state = spotify.get_auth_url()
+        global _auth_state
+        _auth_state = state
+        webbrowser.open(url)
+        log.info(f"[SPOTIFY] Browser opened for Spotify login")
 
 
 if __name__ == "__main__":
-    if not spotify.is_authenticated and (not CLIENT_ID or not CLIENT_SECRET):
-        log.info("=" * 60)
-        log.info("  SPOTIFY PLUGIN — CONFIGURATION REQUIRED")
-        log.info("=" * 60)
-        log.info("  To use the Spotify plugin you need:")
-        log.info("  1. A Spotify Developer account (https://developer.spotify.com)")
-        log.info("  2. An app with Client ID and Client Secret")
-        log.info("  3. Redirect URI set to: http://127.0.0.1:29194/callback")
-        log.info("  Then edit plugins/spotify/config.yaml:")
-        log.info("    client_id: \"YOUR_CLIENT_ID\"")
-        log.info("    client_secret: \"YOUR_CLIENT_SECRET\"")
-        log.info("  On first start, your browser will open for Spotify login.")
-        log.info("=" * 60)
-
-    server_thread = threading.Thread(target=run_flask, daemon=True)
-    server_thread.start()
+    _register_overlay()
 
     polling_thread = threading.Thread(target=_poll_spotify, daemon=True)
     polling_thread.start()
 
+    command_thread = threading.Thread(target=command_polling_loop, daemon=True)
+    command_thread.start()
+
     if spotify.is_authenticated:
-        log.info(f"[SPOTIFY] Already authenticated. Starting on port {SPOTIFY_PORT}")
+        log.info(f"[SPOTIFY] Already authenticated.")
     else:
-        log.info(f"[SPOTIFY] Not authenticated. Open http://127.0.0.1:{SPOTIFY_PORT}/login in your browser")
-        if CLIENT_ID and CLIENT_SECRET:
-            url, _ = spotify.get_auth_url()
-            webbrowser.open(url)
+        log.info(f"[SPOTIFY] Not authenticated.")
+        if not CLIENT_ID or not CLIENT_SECRET:
+            log.info("=" * 60)
+            log.info("  SPOTIFY PLUGIN — CONFIGURATION REQUIRED")
+            log.info("=" * 60)
+            log.info("  1. A Spotify Developer account (https://developer.spotify.com)")
+            log.info("  2. An app with Client ID and Client Secret")
+            log.info("  3. Redirect URI set to: http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control")
+            log.info("  Then edit plugins/spotify/config.yaml:")
+            log.info("    client_id: \"YOUR_CLIENT_ID\"")
+            log.info("    client_secret: \"YOUR_CLIENT_SECRET\"")
+            log.info("  On first start, your browser will open for Spotify login.")
+            log.info("=" * 60)
 
     gui_hidden = args.gui_hidden
     if not gui_hidden:
@@ -896,7 +743,7 @@ if __name__ == "__main__":
             import webview
             window = webview.create_window(
                 "Spotify Control",
-                f"http://127.0.0.1:{SPOTIFY_PORT}/",
+                f"http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay",
                 width=440,
                 height=160,
                 on_top=True,
@@ -904,7 +751,7 @@ if __name__ == "__main__":
             )
             webview.start(debug=False)
         except ImportError:
-            server_thread.join()
+            command_thread.join()
     else:
-        log.info(f"[SPOTIFY] GUI hidden, running server only.")
-        server_thread.join()
+        log.info(f"[SPOTIFY] GUI hidden.")
+        command_thread.join()

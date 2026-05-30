@@ -1,25 +1,17 @@
-#!/usr/bin/env python3
-# ==================================================
-# deathcounter - Death counter overlay plugin
-# ==================================================
-# Displays a real-time death counter as a browser
-# source / pywebview overlay. Receives death events
-# via a /webhook POST endpoint (from MinecraftServerAPI)
-# and pushes updates to connected clients via SSE.
-# ==================================================
-
-import json, sys, threading, webview, os
+import json
+import sys
+import threading
+import webview
+import os
+import time
+import urllib.request
 from pathlib import Path
-from flask import Flask, Response, request, render_template_string
-from flask_cors import CORS
-from queue import Queue
 from core import parse_args, get_base_dir, get_base_file
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
 
-# --- Paths & configuration ---
 args = parse_args()
 
 BASE_DIR = get_base_dir()
@@ -36,44 +28,87 @@ THEME = load_plugin_theme(cfg, "death_counter")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-DEATH_COUNTER_EXE_PATH = get_base_file()
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "death-counter"
+
+
+class DeathManager:
+    def __init__(self):
+        self.count = 0
+        self._lock = threading.Lock()
+
+    def add_death(self):
+        with self._lock:
+            self.count += 1
+
+    def get_count(self):
+        with self._lock:
+            return self.count
+
+
+death_manager = DeathManager()
 
 
 def load_win_size():
     if STATE_FILE.exists():
         try:
-            with STATE_FILE.open("r", encoding="utf-8") as f: return json.load(f)
+            with STATE_FILE.open("r", encoding="utf-8") as f:
+                return json.load(f)
         except Exception as e:
             log.info(f"[DEATHCOUNTER] Failed to load state: {e}")
     return {"width": 500, "height": 400}
 
 
-# --- Flask app & death tracking ---
-app = Flask(__name__)
-CORS(app)
+def _api_post(path: str, data: dict) -> bool:
+    try:
+        body = json.dumps(data).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}{path}", data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.warning("API POST %s failed: %s", path, e)
+        return False
 
-class DeathManager:
-    """Tracks the death count and notifies connected SSE listeners."""
-    def __init__(self):
-        self.count = 0
-        self.listeners = []
-        self._lock = threading.Lock()
-    def add_death(self):
-        self.count += 1
-        with self._lock:
-            for q in list(self.listeners):
-                q.put(self.count)
 
-death_manager = DeathManager()
+def _api_get(path: str) -> dict | None:
+    try:
+        req = urllib.request.Request(f"{API_BASE}{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        log.warning("API GET %s failed: %s", path, e)
+        return None
 
-# --- HTML template (served as browser source) ---
+
+def _push_state():
+    _api_post(f"/plugins/{PLUGIN_NAME}/state", {
+        "state": {"deaths": death_manager.get_count()}
+    })
+
+
+def command_polling_loop():
+    while True:
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        if result:
+            for cmd_entry in result.get("commands", []):
+                cmd = cmd_entry.get("command")
+                if cmd == "player_death":
+                    death_manager.add_death()
+                    _push_state()
+        time.sleep(0.5)
+
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap');
-{THEME_STYLE}
+""" + THEME_STYLE + """
         body, html { 
             background: var(--background); margin: 0; padding: 0;
             width: 100%; height: 100%; display: flex;
@@ -95,7 +130,7 @@ HTML_TEMPLATE = """
         const card = document.getElementById('card');
         const counter = document.getElementById('counter');
         function connect() {
-            const es = new EventSource("/stream");
+            const es = new EventSource("/api/v1/plugins/death-counter/stream");
             es.onmessage = (e) => {
                 counter.innerText = JSON.parse(e.data).deaths;
                 card.classList.add('bump');
@@ -108,10 +143,10 @@ HTML_TEMPLATE = """
         window.addEventListener('resize', () => {
             clearTimeout(window.rt);
             window.rt = setTimeout(() => {
-                fetch('/save_dims', {
+                fetch('/api/v1/plugins/death-counter/command', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ width: window.outerWidth, height: window.outerHeight })
+                    body: JSON.stringify({ command: 'save_dims', args: { width: window.outerWidth, height: window.outerHeight } })
                 });
             }, 500);
         });
@@ -120,57 +155,27 @@ HTML_TEMPLATE = """
 </html>
 """
 
-@app.route("/")
-def index(): return render_template_string(HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE))
 
-@app.route("/save_dims", methods=["POST"])
-def save_dims():
-    data = request.json or {}
-    with STATE_FILE.open("w", encoding="utf-8") as f: json.dump(data, f)
-    return "OK"
+def _register_overlay():
+    _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": HTML_TEMPLATE})
 
-@app.route("/webhook", methods=["POST"])
-def add():
-    try:
-        data = request.json
-        if data and data.get("event") == "player_death":
-            death_manager.add_death()
-    except Exception as e:
-        log.info(f"[DEATHCOUNTER] Webhook error: {e}")
-    return "OK"
-
-@app.route("/stream")
-def stream():
-    q = Queue()
-    with death_manager._lock:
-        death_manager.listeners.append(q)
-    def event_stream():
-        try:
-            yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
-            while True:
-                try:
-                    deaths = q.get(timeout=1)
-                    yield f"data: {json.dumps({'deaths': deaths})}\n\n"
-                except Exception:
-                    yield f"data: {json.dumps({'deaths': death_manager.count})}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            with death_manager._lock:
-                try: death_manager.listeners.remove(q)
-                except ValueError: pass
-    return Response(event_stream(), mimetype="text/event-stream")
 
 gui_hidden = args.gui_hidden
 
 if __name__ == "__main__":
     win = load_win_size()
-    server_thread = threading.Thread(target=lambda: app.run(host=SERVER_HOST, port=WEB_SERVER_PORT, threaded=True, use_reloader=False), daemon=True)
-    server_thread.start()
+
+    _register_overlay()
+
+    poll_thread = threading.Thread(target=command_polling_loop, daemon=True)
+    poll_thread.start()
 
     if not gui_hidden:
-        webview.create_window('Death Counter', f'http://127.0.0.1:{WEB_SERVER_PORT}', width=win['width'], height=win['height'], on_top=True, background_color=BG_COLOR)
+        webview.create_window('Death Counter',
+                              f'http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay',
+                              width=win['width'], height=win['height'],
+                              on_top=True, background_color=BG_COLOR)
         webview.start()
     else:
         log.info("GUI hidden, running server only.")
-        server_thread.join()
+        poll_thread.join()

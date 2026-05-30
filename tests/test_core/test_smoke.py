@@ -16,50 +16,34 @@ EXPECTED_PLUGINS: dict[str, dict[str, object]] = {
     "channel-points": {
         "dir": "channelpoints",
         "display_name": "Channel Points",
-        "has_flask": True,
-        "port": 29195,
     },
     "death-counter": {
         "dir": "deathcounter",
         "display_name": "Death Counter",
-        "has_flask": True,
-        "port": 29190,
     },
     "like-goal": {
         "dir": "likegoal",
         "display_name": "Like Goal",
-        "has_flask": True,
-        "port": 29193,
     },
     "overlay-text": {
         "dir": "overlaytxt",
         "display_name": "Overlay Text",
-        "has_flask": True,
-        "port": 29186,
     },
     "spotify-control": {
         "dir": "spotify",
         "display_name": "Spotify Control",
-        "has_flask": True,
-        "port": 29194,
     },
     "test": {
         "dir": "test",
         "display_name": "Test Plugin",
-        "has_flask": False,
-        "port": None,
     },
     "timer": {
         "dir": "timer",
         "display_name": "Timer",
-        "has_flask": True,
-        "port": 29189,
     },
     "win-counter": {
         "dir": "wincounter",
         "display_name": "Win Counter",
-        "has_flask": True,
-        "port": 29191,
     },
 }
 
@@ -144,28 +128,6 @@ class TestPluginManifestContent:
     def test_all_plugin_names_are_unique(self):
         names = [_read_manifest(n)["name"] for n in _expected_names()]
         assert len(names) == len(set(names)), "Duplicate plugin names found"
-
-    def test_declared_ports_are_unique(self):
-        ports = []
-        for name in _expected_names():
-            manifest = _read_manifest(name)
-            declared = manifest.get("ports", {}).get("declared", [])
-            ports.extend(declared)
-        assert len(ports) == len(set(ports)), (
-            f"Duplicate ports: {[p for p in ports if ports.count(p) > 1]}"
-        )
-
-    @pytest.mark.parametrize("name", _expected_names())
-    def test_port_matches_expected(self, name):
-        manifest = _read_manifest(name)
-        expected_port = EXPECTED_PLUGINS[name]["port"]
-        declared = manifest.get("ports", {}).get("declared", [])
-        if expected_port is None:
-            assert declared == [], f"{name}: expected no ports, got {declared}"
-        else:
-            assert expected_port in declared, (
-                f"{name}: expected port {expected_port} in {declared}"
-            )
 
     @pytest.mark.parametrize("name", _expected_names())
     def test_update_url_is_url_or_empty(self, name):

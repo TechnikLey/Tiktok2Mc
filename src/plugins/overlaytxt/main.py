@@ -1,28 +1,17 @@
-#!/usr/bin/env python3
-# ==================================================
-# overlaytxt - Text overlay plugin (green screen)
-# ==================================================
-
 import webview
-from flask import Flask, render_template_string, request, Response
 import threading
 import sys
 import json
-from queue import Queue
-from collections import defaultdict
-from pathlib import Path
+import time
+import urllib.request
 import os
-from core import parse_args, get_base_dir, get_base_file
+from pathlib import Path
+from collections import defaultdict
+from core import parse_args, get_base_file, get_base_dir
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
-
-_listeners_lock = threading.Lock()
-
-# ==========================================
-# Paths & configuration
-# ==========================================
 
 BASE_DIR = get_base_dir()
 
@@ -31,7 +20,6 @@ args = parse_args()
 
 cfg = load_plugin_config(PLUGIN_DIR)
 
-# Standardwerte
 APP_PORT = cfg.get("port", 29186)
 DISPLAY_MODE = cfg.get("display_mode", "overwrite")
 FADE_IN = max(0, int(cfg.get("fade_in", 500)))
@@ -46,74 +34,8 @@ THEME = load_plugin_theme(cfg, "overlay_text")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-OVERLAYTXT_EXE_PATH = get_base_file()
-
-
-app = Flask(__name__)
-
-listeners = defaultdict(list)
-
-# ==========================================
-# Flask routes
-# ==========================================
-
-@app.route('/')
-def index():
-    overlay_name = request.args.get('overlay', 'default')
-    chroma = request.args.get('chroma', '0') == '1'
-    return render_template_string(
-        HTML_TEMPLATE, 
-        display_mode=DISPLAY_MODE, 
-        fade_in=FADE_IN, 
-        fade_out=FADE_OUT, 
-        chroma=chroma,
-        overlay_name=overlay_name,
-        theme_style=THEME_STYLE,
-        chroma_color=THEME["background"]
-    )
-
-@app.route("/stream/<overlay_name>")
-def stream(overlay_name):
-    q = Queue()
-    with _listeners_lock:
-        listeners[overlay_name].append(q)
-    def event_stream():
-        try:
-            while True:
-                try:
-                    data = q.get(timeout=1)
-                    yield f"data: {json.dumps(data)}\n\n"
-                except Exception:
-                    pass
-        except GeneratorExit:
-            pass
-        finally:
-            with _listeners_lock:
-                if q in listeners[overlay_name]:
-                    listeners[overlay_name].remove(q)
-    return Response(event_stream(), mimetype="text/event-stream")
-
-@app.route('/display/<overlay_name>', methods=['POST'])
-def display(overlay_name):
-    content = request.json
-    if not content:
-        return "No data", 400
-    
-    data = {
-        "title": content.get("title", ""),
-        "subtitle": content.get("subtitle", ""),
-        "duration": content.get("duration", 3)
-    }
-    
-    with _listeners_lock:
-        for q in list(listeners[overlay_name]):
-            q.put(data)
-        
-    return f"Angezeigt auf {overlay_name}", 200
-
-# ==========================================
-# HTML template (green screen overlay)
-# ==========================================
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "overlay-text"
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -121,7 +43,7 @@ HTML_TEMPLATE = """
 <head>
     <style>
 {{ theme_style }}
-        body {
+        body {{
             margin: 0; padding: 0; overflow: hidden;
             background-color: {% if chroma %}{{ chroma_color }}{% else %}transparent{% endif %};
             display: flex;
@@ -131,15 +53,15 @@ HTML_TEMPLATE = """
             color: var(--text);
             font-family: 'Segoe UI', Arial, sans-serif;
             text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000;
-        }
-        #container {
+        }}
+        #container {{
             text-align: center;
             opacity: 0;
             transition: opacity {{ fade_in }}ms ease-in-out;
-        }
-        h1 { font-size: 70px; margin: 0; color: var(--text); }
-        p { font-size: 30px; margin: 0; color: var(--text); }
-        .show { opacity: 1 !important; }
+        }}
+        h1 {{ font-size: 70px; margin: 0; color: var(--text); }}
+        p {{ font-size: 30px; margin: 0; color: var(--text); }}
+        .show {{ opacity: 1 !important; }}
     </style>
 </head>
 <body>
@@ -152,10 +74,10 @@ HTML_TEMPLATE = """
         const DISPLAY_MODE = "{{ display_mode }}";
         const FADE_IN_MS = {{ fade_in }};
         const FADE_OUT_MS = {{ fade_out }};
-        
-        // Dynamischer Stream-Endpunkt basierend auf dem Namen
-        const eventSource = new EventSource("/stream/{{ overlay_name }}");
-        
+        const OVERLAY_NAME = "{{ overlay_name }}";
+
+        const eventSource = new EventSource("/api/v1/plugins/overlay-text/stream");
+
         const container = document.getElementById('container');
         const titleEl = document.getElementById('title');
         const subtitleEl = document.getElementById('subtitle');
@@ -190,6 +112,8 @@ HTML_TEMPLATE = """
 
         eventSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
+            if (data.command !== "display") return;
+            if (data.overlay_name && data.overlay_name !== OVERLAY_NAME) return;
             if (DISPLAY_MODE === "queue" && showing) {
                 messageQueue.push(data);
             } else {
@@ -201,31 +125,92 @@ HTML_TEMPLATE = """
 </html>
 """
 
+
+def _render_html(overlay_name: str) -> str:
+    return HTML_TEMPLATE.replace("{{ theme_style }}", THEME_STYLE) \
+        .replace("{{ chroma_color }}", THEME["background"]) \
+        .replace("{{ display_mode }}", str(DISPLAY_MODE)) \
+        .replace("{{ fade_in }}", str(FADE_IN)) \
+        .replace("{{ fade_out }}", str(FADE_OUT)) \
+        .replace("{{ overlay_name }}", overlay_name)
+
+
+def _api_post(path: str, data: dict) -> bool:
+    try:
+        body = json.dumps(data).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}{path}", data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.warning("API POST %s failed: %s", path, e)
+        return False
+
+
+def _api_get(path: str) -> dict | None:
+    try:
+        req = urllib.request.Request(f"{API_BASE}{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        log.warning("API GET %s failed: %s", path, e)
+        return None
+
+
+def command_polling_loop():
+    while True:
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        if result:
+            for cmd_entry in result.get("commands", []):
+                cmd = cmd_entry.get("command")
+                args = cmd_entry.get("args", {})
+                if cmd == "display":
+                    _api_post(f"/plugins/{PLUGIN_NAME}/state", {
+                        "state": {
+                            "command": "display",
+                            "overlay_name": args.get("overlay_name", "default"),
+                            "title": args.get("title", ""),
+                            "subtitle": args.get("subtitle", ""),
+                            "duration": args.get("duration", 3),
+                        }
+                    })
+        time.sleep(0.5)
+
+
+def _register_overlay():
+    for idx, ov in enumerate(OVERLAYS_CONFIG):
+        name = ov.get("name", f"overlay_{idx}")
+        html = _render_html(name)
+        _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": html})
+
+
 gui_hidden = getattr(args, 'gui_hidden', False)
 
-def start_flask():
-    app.run(host=SERVER_HOST, port=APP_PORT, threaded=True, debug=False, use_reloader=False)
-
 if __name__ == '__main__':
-    server_thread = threading.Thread(target=start_flask, daemon=True)
-    server_thread.start()
+    _register_overlay()
+
+    poll_thread = threading.Thread(target=command_polling_loop, daemon=True)
+    poll_thread.start()
 
     if not gui_hidden:
         for idx, ov in enumerate(OVERLAYS_CONFIG):
             name = ov.get("name", f"overlay_{idx}")
             webview.create_window(
-                f'Overlay: {name.upper()}', 
-                f'http://127.0.0.1:{APP_PORT}/?overlay={name}&chroma=1', 
-                transparent=False, 
-                frameless=False, 
+                f'Overlay: {name.upper()}',
+                f'http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay?overlay={name}&chroma=1',
+                transparent=False,
+                frameless=False,
                 on_top=True,
-                width=800, 
+                width=800,
                 height=300,
-                x=100 + (idx * 50), # Leicht versetzt auf dem Bildschirm
+                x=100 + (idx * 50),
                 y=100 + (idx * 50),
                 background_color=BG_COLOR
             )
         webview.start()
     else:
-        log.info(f"GUI hidden, running server on port {APP_PORT} only.")
-        server_thread.join()
+        log.info(f"GUI hidden, overlay registered with Main API.")
+        poll_thread.join()

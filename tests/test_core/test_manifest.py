@@ -88,12 +88,10 @@ class TestPluginRegistrationFromManifest:
             entry_point="src/plugins/timer/main.py",
             display_name="Timer",
             description="Countdown timer",
-            ports={"declared": [29189], "protocol": "tcp"},
             capabilities=["timer:schedule", "timer:pause"],
         )
         reg = PluginRegistration.from_manifest(manifest)
         assert reg.name == "timer"
-        assert reg.port == 29189
         assert reg.display_name == "Timer"
         assert reg.capabilities == ["timer:schedule", "timer:pause"]
         assert reg.description == "Countdown timer"

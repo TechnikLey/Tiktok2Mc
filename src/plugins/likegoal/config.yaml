@@ -3,7 +3,6 @@
 # ==========================================
 
 enabled: false
-port: 29193
 display_text: "Like Goal"
 initial_goal: 100_000
 goal_multiplier: 1

@@ -1,53 +1,43 @@
-#!/usr/bin/env python3
-# ==================================================
-# timer - Countdown timer overlay plugin
-# ==================================================
-# Standalone countdown timer.  Optional coupling:
-#   pause_on_death  — pause/reset on player death/respawn
-#   auto_win        — POST a win to WinCounter on expiry
-# Control via REST: POST /start, /pause, /reset
-# Works in pywebview AND as an OBS browser source.
-# ==================================================
-
-import webview, threading, requests, json, sys, logging, time, os
+import webview
+import threading
+import json
+import sys
+import time
+import os
+import urllib.request
 from pathlib import Path
-from flask import Flask, request, Response
 from core import parse_args, get_base_file, get_base_dir
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
-from queue import Queue
+import logging
+log = logging.getLogger(__name__)
+logging.getLogger('werkzeug').setLevel(logging.INFO)
 
-# --- Paths ---
 BASE_DIR = get_base_dir()
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 DATA_DIR = (BASE_DIR.parent / "data").resolve()
 STATE_FILE = (DATA_DIR / "window_state_timer.json").resolve()
 
-log = logging.getLogger(__name__)
-logging.getLogger('werkzeug').setLevel(logging.INFO)
-
 args = parse_args()
 
-# --- Configuration ---
 cfg = load_plugin_config(PLUGIN_DIR)
 
 TIMER_MINS = cfg.get("start_time", 10)
 WEB_PORT = cfg.get("port", 29189)
 SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
-# Decoupling options
 AUTO_WIN = cfg.get("auto_win", False)
 PAUSE_ON_DEATH = cfg.get("pause_on_death", False)
-WIN_COUNTER_PORT = cfg.get("win_counter_port", 29191)
-ADD_URL = f"http://127.0.0.1:{WIN_COUNTER_PORT}/add?amount=1"
 
 THEME = load_plugin_theme(cfg, "timer")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "timer"
 
-# --- Timer State (Python-side, works with or without pywebview) ---
+
 class TimerState:
     def __init__(self, initial_seconds):
         self.initial = initial_seconds
@@ -75,7 +65,7 @@ class TimerState:
                 self.time_left -= 1
                 if self.time_left == 0:
                     self.is_waiting = True
-                    return True  # signal: timer hit zero
+                    return True
         return False
 
     def get_state(self):
@@ -91,26 +81,60 @@ class TimerState:
 timer_state = TimerState(TIMER_MINS * 60)
 
 
-# --- SSE client management ---
-class OverlayClients:
-    def __init__(self):
-        self.listeners = []
-
-    def add(self, q):
-        self.listeners.append(q)
-
-    def remove(self, q):
-        try:
-            self.listeners.remove(q)
-        except ValueError:
-            pass
-
-    def notify(self, data):
-        for q in self.listeners:
-            q.put(data)
+def _api_post(path: str, data: dict) -> bool:
+    try:
+        body = json.dumps(data).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}{path}", data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.warning("API POST %s failed: %s", path, e)
+        return False
 
 
-overlay_clients = OverlayClients()
+def _api_get(path: str) -> dict | None:
+    try:
+        req = urllib.request.Request(f"{API_BASE}{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        log.warning("API GET %s failed: %s", path, e)
+        return None
+
+
+def _push_state():
+    _api_post(f"/plugins/{PLUGIN_NAME}/state", {"state": timer_state.get_state()})
+
+
+def command_polling_loop():
+    while True:
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        if result:
+            for cmd_entry in result.get("commands", []):
+                cmd = cmd_entry.get("command")
+                if cmd == "start":
+                    timer_state.unpause()
+                    _push_state()
+                elif cmd == "pause":
+                    timer_state.pause()
+                    _push_state()
+                elif cmd == "reset":
+                    timer_state.reset()
+                    _push_state()
+                elif cmd == "player_death":
+                    if PAUSE_ON_DEATH:
+                        timer_state.pause()
+                        timer_state.reset()
+                        _push_state()
+                elif cmd == "player_respawn":
+                    if PAUSE_ON_DEATH:
+                        timer_state.unpause()
+                        _push_state()
+        time.sleep(0.5)
 
 
 def timer_tick_loop():
@@ -118,21 +142,15 @@ def timer_tick_loop():
         hit_zero = timer_state.tick()
         if hit_zero:
             if AUTO_WIN:
-                log.info(f"[ACTION] Timer reached 0. Sending win to {ADD_URL}")
-                try:
-                    requests.post(ADD_URL, timeout=2)
-                except Exception as e:
-                    log.error(f"Could not reach win counter: {e}")
+                _api_post(f"/plugins/win-counter/command", {
+                    "command": "add_win",
+                    "args": {"amount": 1},
+                })
             else:
                 log.info("[TIMER] Timer reached 0 (auto_win disabled)")
-            threading.Thread(target=timer_state.reset, daemon=True).start()
-        overlay_clients.notify(timer_state.get_state())
+            timer_state.reset()
+        _push_state()
         time.sleep(1)
-
-
-# --- Flask app ---
-app = Flask(__name__)
-window = None
 
 
 def load_win_size():
@@ -145,118 +163,41 @@ def load_win_size():
     return {"width": 400, "height": 200}
 
 
-@app.route("/save_dims", methods=["POST"])
-def save_dims():
-    try:
-        with STATE_FILE.open("w", encoding="utf-8") as f:
-            json.dump(request.json or {}, f)
-    except Exception as e:
-        log.info(f"[TIMER] Failed to save dimensions: {e}")
-    return "OK"
-
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    try:
-        data = request.json
-    except Exception as e:
-        log.info(f"[TIMER] Invalid JSON in webhook: {e}")
-        return "OK"
-    ev = data.get("event") if data else None
-    if PAUSE_ON_DEATH:
-        if ev == "player_death":
-            timer_state.pause()
-            timer_state.reset()
-        elif ev == "player_respawn":
-            timer_state.unpause()
-    else:
-        log.debug("[TIMER] Ignoring webhook event %s (pause_on_death disabled)", ev)
-    return "OK"
-
-
-@app.route("/start", methods=["POST"])
-def start_timer():
-    timer_state.unpause()
-    return "OK"
-
-
-@app.route("/pause", methods=["POST"])
-def pause_timer():
-    timer_state.pause()
-    return "OK"
-
-
-@app.route("/reset", methods=["POST"])
-def reset_timer():
-    timer_state.reset()
-    return "OK"
-
-
-@app.route("/status", methods=["GET"])
-def status_timer():
-    return json.dumps(timer_state.get_state())
-
-
-@app.route("/stream")
-def stream():
-    q = Queue()
-    overlay_clients.add(q)
-
-    def generate():
-        try:
-            while True:
-                try:
-                    data = q.get(timeout=1)
-                    yield f"data: {json.dumps(data)}\n\n"
-                except Exception:
-                    yield f"data: {json.dumps(timer_state.get_state())}\n\n"
-        except GeneratorExit:
-            overlay_clients.remove(q)
-
-    return Response(generate(), mimetype="text/event-stream")
-
-
-@app.route("/")
-def index():
-    return HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE)
-
-
-# --- HTML / CSS / JS (timer overlay) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
 {THEME_STYLE}
-        body {
+        body {{
             background-color: var(--background); color: var(--text); margin: 0;
             display: flex; justify-content: center; align-items: center;
             height: 100vh; overflow: hidden; font-family: 'Segoe UI', sans-serif;
             -webkit-app-region: drag; user-select: none;
-        }
-        #display {
+        }}
+        #display {{
             font-size: 70vh; font-weight: bold;
             font-variant-numeric: tabular-nums; white-space: nowrap;
-        }
-        .warning { color: var(--warning); }
-        .blink {
+        }}
+        .warning {{ color: var(--warning); }}
+        .blink {{
             color: var(--blink);
             animation: syncFlash 1s infinite steps(1);
-        }
-        .critical {
+        }}
+        .critical {{
             color: var(--danger) !important;
             animation: pulse 0.5s infinite ease-in-out;
-        }
-        @keyframes syncFlash {
-            0% { opacity: 1; }
-            50% { opacity: 0.2; }
-            100% { opacity: 1; }
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-            100% { transform: scale(1); }
-        }
+        }}
+        @keyframes syncFlash {{
+            0% {{ opacity: 1; }}
+            50% {{ opacity: 0.2; }}
+            100% {{ opacity: 1; }}
+        }}
+        @keyframes pulse {{
+            0% {{ transform: scale(1); }}
+            50% {{ transform: scale(1.08); }}
+            100% {{ transform: scale(1); }}
+        }}
     </style>
 </head>
 <body>
@@ -264,43 +205,47 @@ HTML_TEMPLATE = """
     <script>
         const display = document.getElementById('display');
 
-        function update(data) {
+        function update(data) {{
             const t = data.time_left;
             const m = Math.floor(t / 60), s = t % 60;
             display.innerText = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
 
             display.classList.remove('warning', 'blink', 'critical');
 
-            if (t === 0 || data.is_waiting) {
+            if (t === 0 || data.is_waiting) {{
                 display.classList.add('critical');
-            } else if (t <= 10) {
+            }} else if (t <= 10) {{
                 display.classList.add('critical');
-            } else if (t <= 30) {
+            }} else if (t <= 30) {{
                 display.classList.add('blink');
-            } else if (t <= 60) {
+            }} else if (t <= 60) {{
                 display.classList.add('warning');
-            }
-        }
+            }}
+        }}
 
-        const evtSource = new EventSource('/stream');
-        evtSource.onmessage = function(e) {
+        const evtSource = new EventSource('/api/v1/plugins/timer/stream');
+        evtSource.onmessage = function(e) {{
             update(JSON.parse(e.data));
-        };
+        }};
 
-        window.addEventListener('resize', () => {
+        window.addEventListener('resize', () => {{
             clearTimeout(window.rt);
-            window.rt = setTimeout(() => {
-                fetch('/save_dims', {
+            window.rt = setTimeout(() => {{
+                fetch('/api/v1/plugins/timer/command', {{
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ width: window.outerWidth, height: window.outerHeight })
-                });
-            }, 500);
-        });
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ command: 'save_dims', args: {{ width: window.outerWidth, height: window.outerHeight }} }})
+                }});
+            }}, 500);
+        }});
     </script>
 </body>
 </html>
-"""
+""".format(THEME_STYLE=THEME_STYLE)
+
+
+def _register_overlay():
+    _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": HTML_TEMPLATE})
 
 
 gui_hidden = args.gui_hidden
@@ -308,21 +253,18 @@ gui_hidden = args.gui_hidden
 if __name__ == '__main__':
     size = load_win_size()
 
-    # Start the countdown thread
+    _register_overlay()
+
     tick_thread = threading.Thread(target=timer_tick_loop, daemon=True)
     tick_thread.start()
 
-    # Start Flask
-    server_thread = threading.Thread(
-        target=lambda: app.run(host=SERVER_HOST, port=WEB_PORT, threaded=True, debug=False, use_reloader=False),
-        daemon=True
-    )
-    server_thread.start()
+    poll_thread = threading.Thread(target=command_polling_loop, daemon=True)
+    poll_thread.start()
 
     if not gui_hidden:
         window = webview.create_window(
             'Scalable Timer',
-            f'http://127.0.0.1:{WEB_PORT}',
+            f'http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay',
             width=size['width'],
             height=size['height'],
             on_top=True,
@@ -330,5 +272,5 @@ if __name__ == '__main__':
         )
         webview.start()
     else:
-        log.info(f"[TIMER] Running in gui_hidden mode. Open http://{SERVER_HOST}:{WEB_PORT} in OBS as a Browser Source.")
-        server_thread.join()
+        log.info(f"[TIMER] Running in gui_hidden mode. Open http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay in OBS as a Browser Source.")
+        tick_thread.join()

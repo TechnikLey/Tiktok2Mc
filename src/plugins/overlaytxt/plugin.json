@@ -6,12 +6,6 @@
   "description": "Displays scrolling or static text overlays on stream. Supports multiple overlay slots with configurable fade and timing.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29186
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "overlay:text",
@@ -30,16 +24,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn the text overlay on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29186,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server and overlay port",
         "category": "General"
       },
       {

@@ -1,28 +1,17 @@
-#!/usr/bin/env python3
-# ==================================================
-# channelpoints - Viewer loyalty points plugin
-# ==================================================
-# Awards points to active viewers. Viewers earn points
-# over time and can spend them on rewards.
-# ==================================================
-
 import sqlite3
 import json
 import threading
 import time
 import sys
-import html
 import os
-from queue import Queue
+import urllib.request
 from pathlib import Path
-from flask import Flask, request, Response, jsonify
 from core import parse_args, get_base_file, get_base_dir
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 import logging
 log = logging.getLogger(__name__)
 
-# --- Paths ---
 BASE_DIR = get_base_dir()
 
 PLUGIN_DIR = Path(__file__).resolve().parent
@@ -31,7 +20,6 @@ DB_PATH = (DATA_DIR / "channel_points.db").resolve()
 
 args = parse_args()
 
-# --- Configuration ---
 cfg = load_plugin_config(PLUGIN_DIR)
 
 PORT = cfg.get("port", 29195)
@@ -45,10 +33,10 @@ THEME = load_plugin_theme(cfg, "channel_points")
 THEME_STYLE = theme_css(THEME)
 BG_COLOR = THEME["background"]
 
-CP_EXE_PATH = get_base_file()
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "channel-points"
 
 
-# --- Database ---
 def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
@@ -71,32 +59,14 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 def get_db():
     return sqlite3.connect(str(DB_PATH))
 
-# --- SSE clients ---
-class OverlayClients:
-    def __init__(self):
-        self.listeners = []
 
-    def add(self, q):
-        self.listeners.append(q)
-
-    def remove(self, q):
-        try:
-            self.listeners.remove(q)
-        except ValueError:
-            pass
-
-    def notify(self, data):
-        for q in self.listeners:
-            q.put(data)
-
-overlay_clients = OverlayClients()
-
-# --- Award loop ---
 def award_loop():
     while True:
         time.sleep(AWARD_INTERVAL)
@@ -109,24 +79,31 @@ def award_loop():
             )
             db.commit()
             db.close()
-            overlay_clients.notify(get_leaderboard_data())
+            _push_state()
         except Exception as e:
             log.info(f"[CHANNEL POINTS] Award loop error: {e}")
 
-# --- Helpers ---
+
 def get_leaderboard_data():
     db = get_db()
     rows = db.execute(
         "SELECT user, points FROM users ORDER BY points DESC LIMIT ?", (TOP_COUNT,)
     ).fetchall()
+    user_rows = db.execute("SELECT user, points FROM users").fetchall()
     db.close()
-    return {"type": "leaderboard", "entries": [{"user": r[0], "points": r[1]} for r in rows]}
+    return {
+        "type": "leaderboard",
+        "entries": [{"user": r[0], "points": r[1]} for r in rows],
+        "user_points": {r[0]: r[1] for r in user_rows},
+    }
+
 
 def get_user_points(user):
     db = get_db()
     row = db.execute("SELECT points FROM users WHERE user = ?", (user,)).fetchone()
     db.close()
     return row[0] if row else 0
+
 
 def ping_user(user):
     db = get_db()
@@ -136,6 +113,7 @@ def ping_user(user):
     )
     db.commit()
     db.close()
+
 
 def spend_points(user, amount, action=""):
     db = get_db()
@@ -148,103 +126,67 @@ def spend_points(user, amount, action=""):
     )
     db.commit()
     db.close()
-    overlay_clients.notify(get_leaderboard_data())
+    _push_state()
     return True
 
-# --- Flask ---
-app = Flask(__name__)
 
-@app.route("/ping", methods=["POST"])
-def handle_ping():
-    user = (request.json or {}).get("user", "") if request.is_json else request.args.get("user", "")
-    if user:
-        ping_user(user)
-    return "OK"
-
-@app.route("/points", methods=["GET"])
-def handle_points():
-    user = request.args.get("user", "")
-    if not user:
-        return jsonify({"error": "Missing user"}), 400
-    return jsonify({"user": user, "points": get_user_points(user)})
-
-@app.route("/spend", methods=["POST"])
-def handle_spend():
-    data = request.json or {}
-    user = data.get("user", "")
-    amount = int(data.get("amount", 0))
-    action = data.get("action", "")
-    if not user or amount <= 0:
-        return jsonify({"error": "Missing user or invalid amount"}), 400
-    if spend_points(user, amount, action):
-        return jsonify({"success": True, "user": user, "points": get_user_points(user)})
-    return jsonify({"error": "Not enough points"}), 400
-
-@app.route("/leaderboard", methods=["GET"])
-def handle_leaderboard():
-    return jsonify(get_leaderboard_data())
-
-@app.route("/stream")
-def stream():
-    q = Queue()
-    overlay_clients.add(q)
-    q.put(get_leaderboard_data())
-
-    def generate():
-        try:
-            while True:
-                try:
-                    data = q.get(timeout=1)
-                    yield f"data: {json.dumps(data)}\n\n"
-                except Exception:
-                    yield f"data: {json.dumps(get_leaderboard_data())}\n\n"
-        except GeneratorExit:
-            overlay_clients.remove(q)
-
-    return Response(generate(), mimetype="text/event-stream")
-
-@app.route("/")
-def index():
-    return HTML_TEMPLATE.format(THEME_STYLE=THEME_STYLE)
-
-@app.route("/comment", methods=["POST"])
-def handle_comment():
-    user = request.args.get("user", "")
-    text = request.args.get("text", "").strip().lower()
-    if not user or not text:
-        return "OK"
-
-    parts = text.split()
-    cmd = parts[0]
-
-    if cmd == "points":
-        pts = get_user_points(user)
-        log.info(f"[CHANNEL POINTS] {user} has {pts} points")
-        return jsonify({"user": user, "points": pts})
-
-    if cmd == "redeem" and len(parts) >= 2:
-        reward_name = parts[1]
-        db = get_db()
-        reward = db.execute("SELECT cost FROM rewards WHERE name = ?", (reward_name,)).fetchone()
-        db.close()
-        if not reward:
-            log.info(f"[CHANNEL POINTS] Unknown reward '{reward_name}'")
-            return jsonify({"error": "Unknown reward"}), 400
-        if spend_points(user, reward[0], reward_name):
-            log.info(f"[CHANNEL POINTS] {user} redeemed '{reward_name}' for {reward[0]} points")
-            return jsonify({"success": True, "user": user, "reward": reward_name, "cost": reward[0]})
-        return jsonify({"error": "Not enough points"}), 400
-
-    return jsonify({"error": "Unknown command"}), 400
+def _api_post(path: str, data: dict) -> bool:
+    try:
+        body = json.dumps(data).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}{path}", data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
+    except Exception as e:
+        log.warning("API POST %s failed: %s", path, e)
+        return False
 
 
-# --- HTML / CSS / JS (leaderboard overlay) ---
+def _api_get(path: str) -> dict | None:
+    try:
+        req = urllib.request.Request(f"{API_BASE}{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        log.warning("API GET %s failed: %s", path, e)
+        return None
+
+
+def _push_state():
+    _api_post(f"/plugins/{PLUGIN_NAME}/state", {"state": get_leaderboard_data()})
+
+
+def command_polling_loop():
+    while True:
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        if result:
+            for cmd_entry in result.get("commands", []):
+                cmd = cmd_entry.get("command")
+                args_data = cmd_entry.get("args", {})
+                if cmd == "ping":
+                    user = args_data.get("user", "")
+                    if user:
+                        ping_user(user)
+                elif cmd == "get_points":
+                    _push_state()
+                elif cmd == "spend":
+                    user = args_data.get("user", "")
+                    amount = int(args_data.get("amount", 0))
+                    action = args_data.get("action", "")
+                    if user and amount > 0:
+                        spend_points(user, amount, action)
+        time.sleep(0.5)
+
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-{THEME_STYLE}
+""" + THEME_STYLE + """
         body {
             margin: 0; padding: 20px;
             background: var(--background);
@@ -283,49 +225,57 @@ HTML_TEMPLATE = """
     </table>
     <script>
         const tbody = document.getElementById('tbody');
-        const evtSource = new EventSource('/stream');
+        const evtSource = new EventSource('/api/v1/plugins/channel-points/stream');
         evtSource.onmessage = function(e) {
             const data = JSON.parse(e.data);
             if (data.type !== 'leaderboard') return;
             tbody.innerHTML = '';
-            data.entries.forEach(function(entry, i) {
+            (data.entries || data.leaderboard || []).forEach(function(entry, i) {
                 const tr = document.createElement('tr');
                 if (i === 0) tr.className = 'top1';
                 else if (i === 1) tr.className = 'top2';
                 else if (i === 2) tr.className = 'top3';
-                tr.innerHTML = '<td class="pos">#' + (i+1) + '</td><td class="name">' + html.escape(entry.user) + '</td><td class="points">' + html.escape(str(entry.points)) + '</td>';
+                tr.innerHTML = '<td class="pos">#' + (i+1) + '</td><td class="name">' + escapeHtml(entry.user) + '</td><td class="points">' + entry.points + '</td>';
                 tbody.appendChild(tr);
             });
         };
+        function escapeHtml(s) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(s));
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>
 """
 
-# --- Start ---
+
+def _register_overlay():
+    _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": HTML_TEMPLATE})
+
+
 gui_hidden = args.gui_hidden
 
 if __name__ == "__main__":
+    _register_overlay()
+
     award_thread = threading.Thread(target=award_loop, daemon=True)
     award_thread.start()
 
-    server_thread = threading.Thread(
-        target=lambda: app.run(host=SERVER_HOST, port=PORT, threaded=True, debug=False, use_reloader=False),
-        daemon=True
-    )
-    server_thread.start()
+    poll_thread = threading.Thread(target=command_polling_loop, daemon=True)
+    poll_thread.start()
 
     if not gui_hidden:
         import webview
         size = {"width": 400, "height": 600}
         window = webview.create_window(
             "Channel Points",
-            f"http://127.0.0.1:{PORT}",
+            f"http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay",
             width=size["width"],
             height=size["height"],
             on_top=True,
         )
         webview.start()
     else:
-        log.info(f"[CHANNEL POINTS] Running. Leaderboard at http://{SERVER_HOST}:{PORT}")
-        server_thread.join()
+        log.info(f"[CHANNEL POINTS] Running. Leaderboard at http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay")
+        poll_thread.join()

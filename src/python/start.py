@@ -702,15 +702,12 @@ for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
                     hidden=get_visibility(app.level)
                 )
 
-# Show overlay URLs for OBS browser sources
-overlay_ports = []
-for app in PLUGIN_REGISTRY:
-    if app.port > 0:
-        overlay_ports.append((app.name, app.port))
-if overlay_ports:
+# Show overlay URLs for OBS browser sources (all served through Main API)
+overlay_names = [app.name for app in PLUGIN_REGISTRY if app.enabled]
+if overlay_names:
     log.info("\n[OVERLAYS] Add these URLs as OBS Browser Sources:")
-    for name, port in sorted(overlay_ports, key=lambda x: x[1]):
-        log.info(f"  {name}: http://localhost:{port}")
+    for name in overlay_names:
+        log.info(f"  {name}: http://127.0.0.1:29185/api/v1/plugins/{name}/overlay")
 
 # =============================================================================
 # STATE

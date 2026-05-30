@@ -6,12 +6,6 @@
   "description": "Awards loyalty points to active viewers. Viewers earn points over time and can spend them on rewards.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29195
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "channel_points:reward",
@@ -30,16 +24,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn the channel points system on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29195,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server, overlay and chat command port",
         "category": "General"
       },
       {

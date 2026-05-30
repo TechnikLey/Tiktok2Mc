@@ -6,12 +6,6 @@
   "description": "Tracks in-game deaths and displays a real-time counter as an OBS browser source or pywebview overlay.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29190
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "deaths:track",
@@ -30,16 +24,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn the death counter overlay on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29190,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server and overlay port",
         "category": "General"
       },
       {

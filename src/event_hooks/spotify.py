@@ -1,59 +1,32 @@
-#!/usr/bin/env python3
-# ==================================================
-# spotify.py - Spotify Control Event Hook
-# ==================================================
-# Registers $spotify* direct-trigger actions for
-# gifts, follows, likes etc. in actions.mca.
-#
-# Chat-based commands (!spotify, !sp) are handled
-# by the comment_commands HTTP handler instead.
-#
-# USAGE in actions.mca:
-#   follow:$spotify_current              # Shows current track on follow
-#   gift_id:$spotify_play                # Resumes playback
-#   gift_id:$spotify_pause               # Pauses playback
-#   gift_id:$spotify_skip                # Next track
-#   gift_id:$spotify_previous            # Previous track
-#   gift_id:$spotify_volume_up           # Volume up
-#   gift_id:$spotify_volume_down         # Volume down
-#   gift_id:$spotify_save                # Save song to library
-#   gift_id:$spotify_shuffle             # Toggle shuffle
-#   gift_id:$spotify_repeat              # Toggle repeat
-# ==================================================
-
 from core.hook_api import HookAPI
 from core.plugin_config import load_all_plugin_configs
 import logging
 log = logging.getLogger(__name__)
 
-# Cache plugin configs at module level to avoid repeated disk scans
-_PLUGIN_CFGS = load_all_plugin_configs()
+API_BASE = "http://127.0.0.1:29185/api/v1"
+PLUGIN_NAME = "spotify-control"
 
 
-def _get_plugin_base(api):
-    cfg = _PLUGIN_CFGS.get("spotify-control", {})
-    port = cfg.get("port", 29194)
-    return f"http://127.0.0.1:{port}"
-
-
-def _request(api, method, path, **kwargs):
+def _command(api, command, **kwargs):
     try:
-        import requests
-        base = _get_plugin_base(api)
-        resp = requests.request(method, f"{base}{path}", timeout=5, **kwargs)
-        if resp.status_code in (200, 204):
-            return resp.json() if resp.status_code == 200 else {}
-        return None
-    except requests.ConnectionError:
-        return None
+        import json
+        import urllib.request
+        body = json.dumps({"command": command, "args": kwargs}).encode()
+        req = urllib.request.Request(
+            f"{API_BASE}/plugins/{PLUGIN_NAME}/command",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return True
     except Exception as e:
-        log.info(f"[SPOTIFY-HOOK] Request error: {e}")
-        return None
+        log.info(f"[SPOTIFY-HOOK] Command '{command}' failed: {e}")
+        return False
 
 
-def _cmd_post(api, user, path, action_name):
-    result = _request(api, "POST", path)
-    if result is not None:
+def _cmd_post(api, user, command, action_name):
+    if _command(api, command):
         api.send_overlay_text(
             title="Spotify",
             subtitle=f"{action_name} — triggered by {user}",
@@ -62,17 +35,31 @@ def _cmd_post(api, user, path, action_name):
 
 
 def _cmd_current(api, user):
-    track = _request(api, "GET", "/current")
-    if track and "name" in track:
-        progress = track.get("progress_sec", 0)
-        duration = track.get("duration_sec", 0)
-        pct = f"{progress // 60:02d}:{progress % 60:02d} / {duration // 60:02d}:{duration % 60:02d}" if duration else ""
-        api.send_overlay_text(
-            title=track["name"],
-            subtitle=f"{track['artists']}  |  {pct}",
-            duration=6
+    try:
+        import json
+        import urllib.request
+        resp = urllib.request.urlopen(
+            f"{API_BASE}/plugins/{PLUGIN_NAME}/state", timeout=5
         )
-    else:
+        data = json.loads(resp.read().decode())
+        state = data.get("state", {})
+        if state and state.get("name"):
+            progress = state.get("progress_sec", 0)
+            duration = state.get("duration_sec", 0)
+            pct = f"{progress // 60:02d}:{progress % 60:02d} / {duration // 60:02d}:{duration % 60:02d}" if duration else ""
+            api.send_overlay_text(
+                title=state["name"],
+                subtitle=f"{state['artists']}  |  {pct}",
+                duration=6
+            )
+        else:
+            api.send_overlay_text(
+                title="Spotify",
+                subtitle="No active track",
+                duration=3
+            )
+    except Exception as e:
+        log.info(f"[SPOTIFY-HOOK] Failed to get state: {e}")
         api.send_overlay_text(
             title="Spotify",
             subtitle="No active track",
@@ -81,24 +68,24 @@ def _cmd_current(api, user):
 
 
 def register(api: HookAPI):
-    def _make_handler(path, action_title):
+    def _make_handler(command, action_title):
         def handler(user, trigger, context):
             if isinstance(user, dict):
-                _cmd_post(api, user.get("user", "Unknown"), path, action_title)
+                _cmd_post(api, user.get("user", "Unknown"), command, action_title)
                 return
-            _cmd_post(api, str(user), path, action_title)
+            _cmd_post(api, str(user), command, action_title)
         return handler
 
-    api.register_action("spotify_play", _make_handler("/play", "Play"))
-    api.register_action("spotify_pause", _make_handler("/pause", "Pause"))
-    api.register_action("spotify_next", _make_handler("/next", "Next"))
-    api.register_action("spotify_skip", _make_handler("/next", "Skip"))
-    api.register_action("spotify_previous", _make_handler("/previous", "Previous"))
-    api.register_action("spotify_volume_up", _make_handler("/volume/up", "Volume Up"))
-    api.register_action("spotify_volume_down", _make_handler("/volume/down", "Volume Down"))
-    api.register_action("spotify_save", _make_handler("/save", "Saved"))
-    api.register_action("spotify_shuffle", _make_handler("/shuffle?state=toggle", "Shuffle"))
-    api.register_action("spotify_repeat", _make_handler("/repeat?state=toggle", "Repeat"))
+    api.register_action("spotify_play", _make_handler("play", "Play"))
+    api.register_action("spotify_pause", _make_handler("pause", "Pause"))
+    api.register_action("spotify_next", _make_handler("next", "Next"))
+    api.register_action("spotify_skip", _make_handler("next", "Skip"))
+    api.register_action("spotify_previous", _make_handler("previous", "Previous"))
+    api.register_action("spotify_volume_up", _make_handler("volume_up", "Volume Up"))
+    api.register_action("spotify_volume_down", _make_handler("volume_down", "Volume Down"))
+    api.register_action("spotify_save", _make_handler("save", "Saved"))
+    api.register_action("spotify_shuffle", _make_handler("shuffle", "Shuffle"))
+    api.register_action("spotify_repeat", _make_handler("repeat", "Repeat"))
 
     def current_handler(user, trigger, context):
         if isinstance(user, dict):

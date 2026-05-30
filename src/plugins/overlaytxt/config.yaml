@@ -3,7 +3,6 @@
 # ==========================================
 
 enabled: false
-port: 29186
 display_mode: overwrite
 fade_in: 500
 fade_out: 500

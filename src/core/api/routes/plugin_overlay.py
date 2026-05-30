@@ -1,0 +1,157 @@
+import asyncio
+import json
+import logging
+
+from fastapi import APIRouter, HTTPException
+from starlette.responses import HTMLResponse, StreamingResponse
+
+from core.api.eventbus import event_bus
+from core.api.plugin_overlay import (
+    state_store,
+    command_queue,
+    overlay_html_store,
+)
+
+log = logging.getLogger(__name__)
+
+router = APIRouter(tags=["Plugin Overlay"])
+
+
+@router.post("/plugins/{name}/overlay-html")
+async def register_overlay_html(name: str, body: dict):
+    """Register the rendered overlay HTML for a plugin.
+
+    Called by the plugin process on startup so the Main API
+    can serve the overlay at ``GET /plugins/{name}/overlay``.
+    """
+    html = body.get("html")
+    if not html:
+        raise HTTPException(status_code=422, detail="Missing 'html' field")
+    overlay_html_store.set_html(name, html)
+    log.info("Overlay HTML registered for plugin '%s' (%d bytes)", name, len(html))
+    return {"status": "ok"}
+
+
+@router.get("/plugins/{name}/overlay")
+async def serve_overlay(name: str):
+    """Serve the overlay HTML for a plugin.
+
+    Intended for use as an OBS Browser Source or pywebview URL.
+    """
+    html = overlay_html_store.get_html(name)
+    if html is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No overlay registered for plugin '{name}' — is the plugin running?",
+        )
+    return HTMLResponse(html)
+
+
+@router.get("/plugins/{name}/stream")
+async def plugin_event_stream(name: str):
+    """SSE endpoint for a single plugin's state stream.
+
+    Clients (OBS browser sources, pywebview) connect here
+    and receive real-time state updates pushed by the plugin.
+    On connection the client receives the latest cached state.
+    """
+
+    async def generate():
+        q = event_bus.subscribe(f"plugin.{name}.state_update")
+        try:
+            # Send latest cached state immediately
+            cached = state_store.get_state(name)
+            if cached is not None:
+                yield f"data: {json.dumps(cached)}\n\n"
+            # Stream real-time updates
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=30)
+                    yield f"data: {json.dumps(msg['data'])}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            event_bus.unsubscribe(q)
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.post("/plugins/{name}/command")
+async def enqueue_command(name: str, body: dict):
+    """Enqueue a command for a plugin.
+
+    Other components (main.py, event hooks, other plugins) call
+    this to send a command to a plugin.  The plugin picks it up
+    via ``GET /plugins/{name}/commands``.
+    """
+    cmd = body.get("command")
+    if not cmd:
+        raise HTTPException(status_code=422, detail="Missing 'command' field")
+    cmd_id = command_queue.enqueue(name, cmd, **body.get("args", {}))
+    log.info("Command '%s' enqueued for plugin '%s' (id=%s)", cmd, name, cmd_id)
+    return {"status": "ok", "command_id": cmd_id}
+
+
+@router.get("/plugins/{name}/commands")
+async def poll_commands(name: str):
+    """Poll and clear pending commands for a plugin.
+
+    Called periodically by the plugin process to receive
+    commands from other components.
+    """
+    cmds = command_queue.dequeue_all(name)
+    return {"commands": cmds}
+
+
+@router.get("/plugins/{name}/state")
+async def get_plugin_state(name: str):
+    """Return the latest cached state for a plugin."""
+    state = state_store.get_state(name)
+    if state is None:
+        return {"state": None}
+    return {"state": state}
+
+
+@router.post("/plugins/{name}/state")
+async def update_plugin_state(name: str, body: dict):
+    """Post a state update for a plugin.
+
+    Called by the plugin process whenever its state changes.
+    The state is cached for late-joining SSE clients and also
+    published to the EventBus for real-time SSE streaming.
+    """
+    state = body.get("state", {})
+    state_store.set_state(name, state)
+    await event_bus.publish(f"plugin.{name}.state_update", state)
+    return {"status": "ok"}
+
+
+OAUTH_SUCCESS_HTML = """<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Authorization Complete</title></head>
+<body style="font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;background:#111;color:#fff;">
+<div style="text-align:center;">
+<h1>Authorization Complete</h1>
+<p>You have successfully authenticated. You can close this window.</p>
+</div>
+</body>
+</html>"""
+
+
+@router.get("/plugins/oauth/callback")
+async def oauth_callback(name: str, code: str = "", state: str = "", error: str = ""):
+    """Generic OAuth callback handler for plugins.
+
+    Plugins that need OAuth (e.g. spotify-control) configure
+    their redirect URI to point here.  The auth code is forwarded
+    to the plugin as a command.
+    """
+    if error:
+        return HTMLResponse(f"<h1>Authorization failed</h1><p>{error}</p>", status_code=400)
+    if not code:
+        return HTMLResponse("<h1>Missing authorization code</h1>", status_code=400)
+    command_queue.enqueue(name, "oauth_callback", code=code, state=state)
+    log.info("OAuth callback forwarded to plugin '%s'", name)
+    return HTMLResponse(OAUTH_SUCCESS_HTML)

@@ -3,15 +3,9 @@
   "version": "1.0.0",
   "entry_point": "src/plugins/timer/main.py",
   "display_name": "Timer",
-  "description": "A configurable countdown timer overlay. Can pause on player death, auto-post wins to Win Counter, and be controlled via REST endpoints.",
+  "description": "A configurable countdown timer overlay. Can pause on player death and auto-post wins to Win Counter.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [
-      29189
-    ],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [
     "timer:schedule",
@@ -31,16 +25,6 @@
         "default": false,
         "label": "Enable Plugin",
         "help": "Turn the countdown timer on or off",
-        "category": "General"
-      },
-      {
-        "key": "port",
-        "type": "integer",
-        "default": 29189,
-        "min": 1024,
-        "max": 65535,
-        "label": "Port",
-        "help": "Web server and overlay port",
         "category": "General"
       },
       {
@@ -66,16 +50,6 @@
         "default": false,
         "label": "Pause on Death",
         "help": "Pause and reset the timer when the player dies",
-        "category": "Coupling"
-      },
-      {
-        "key": "win_counter_port",
-        "type": "integer",
-        "default": 29191,
-        "min": 1024,
-        "max": 65535,
-        "label": "Win Counter Port",
-        "help": "Port of the Win Counter plugin (used when Auto Win is enabled)",
         "category": "Coupling"
       },
       {

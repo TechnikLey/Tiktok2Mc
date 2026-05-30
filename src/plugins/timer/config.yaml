@@ -3,11 +3,9 @@
 # ==========================================
 
 enabled: false
-port: 29189
 start_time: 10
 auto_win: false
 pause_on_death: false
-win_counter_port: 29191
 
 theme:
   background: "#000000"

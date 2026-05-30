@@ -74,7 +74,6 @@ class TestPluginRegistry:
         assert updated is not None
         assert updated.enabled is True
         assert updated.level == 4
-        assert updated.port == 0
 
     def test_update_nonexistent(self, registry):
         updated = registry.update("nope", enabled=True)

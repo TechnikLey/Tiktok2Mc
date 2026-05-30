@@ -10,7 +10,6 @@ class AppConfig:
     enable: bool
     level: int
     ics: bool
-    port: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip():
@@ -25,8 +24,6 @@ class AppConfig:
             raise ValueError("level must be a non-negative int.")
         if not isinstance(self.ics, bool):
             raise TypeError("ics must be a bool.")
-        if not isinstance(self.port, int) or self.port < 0:
-            raise ValueError("port must be a non-negative int.")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -35,7 +32,6 @@ class AppConfig:
             "enable": self.enable,
             "level": self.level,
             "ics": self.ics,
-            "port": self.port,
         }
 
     @classmethod
@@ -46,6 +42,5 @@ class AppConfig:
             enable=data["enable"],
             level=data["level"],
             ics=data["ics"],
-            port=data.get("port", 0),
         )
 
