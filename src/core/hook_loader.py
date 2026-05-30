@@ -33,7 +33,11 @@ ALLOWED_IMPORTS: frozenset[str] = frozenset({
 })
 
 # Modules explicitly allowed for IntelliSense/type-checking only.
-ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({"core.hook_api"})
+# Add specific "core.*" modules here to permit AST-checked imports that
+# are safe and intended for hook scripts. Adding `core.plugin_config`
+# allows hooks to import plugin configuration helpers used by the
+# `spotify.py` hook without being rejected by the static import checker.
+ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({"core.hook_api", "core.plugin_config"})
 
 def _check_imports(path: Path) -> list[str]:
     """

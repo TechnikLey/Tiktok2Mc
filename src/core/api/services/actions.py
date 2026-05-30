@@ -309,6 +309,62 @@ class ActionsService:
 
         return triggers
 
+    # ── Script validation ──────────────────────────────────────────────
+
+    def _get_registered_scripts(self) -> set[str]:
+        """Get the set of registered script names from the hook registry."""
+        try:
+            from core.hook_api import HOOK_ACTIONS
+            return set(HOOK_ACTIONS.keys())
+        except Exception as e:
+            log.warning(f"Failed to get registered scripts: {e}")
+            return set()
+
+    def validate_triggers(self, triggers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Validate trigger configuration and return diagnostics.
+        
+        Checks:
+        - Script commands must reference registered scripts only
+        - Overlay actions must not have invalid data
+        """
+        registered_scripts = self._get_registered_scripts()
+        diagnostics: list[dict[str, Any]] = []
+
+        for ti, trigger in enumerate(triggers):
+            for ci, cmd in enumerate(trigger.get("commands", [])):
+                cmd_type = cmd.get("type", "vanilla")
+                
+                # Validate script commands
+                if cmd_type == "script":
+                    script_name = cmd.get("command", "").strip()
+                    if not script_name:
+                        diagnostics.append({
+                            "line": ti,
+                            "message": f"Script action has empty script name",
+                            "severity": "ERROR",
+                            "code": "INVALID_SCRIPT"
+                        })
+                    elif script_name not in registered_scripts:
+                        diagnostics.append({
+                            "line": ti,
+                            "message": f"Script '{script_name}' is not registered. Available: {', '.join(sorted(registered_scripts)) if registered_scripts else 'none'}",
+                            "severity": "WARNING",
+                            "code": "UNREGISTERED_SCRIPT"
+                        })
+                
+                # Validate overlay actions
+                elif cmd_type in ("overlay", "named_overlay"):
+                    title = cmd.get("title", "").strip()
+                    if not title:
+                        diagnostics.append({
+                            "line": ti,
+                            "message": f"{cmd_type} action must have a title",
+                            "severity": "WARNING",
+                            "code": "MISSING_OVERLAY_TITLE"
+                        })
+
+        return diagnostics
+
     # ── Serialize (structured → raw) ─────────────────────────────────
 
     def serialize(self, triggers: list[dict[str, Any]]) -> str:

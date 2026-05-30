@@ -7,6 +7,7 @@ class ActionsEditor {
     this.activeTab = 'visual';
     this.gifts = [];
     this.giftSearch = '';
+    this.availableScripts = [];
 
     this.el = document.getElementById('actions-editor');
     this.tableBody = document.getElementById('actions-table-body');
@@ -86,6 +87,7 @@ class ActionsEditor {
     } catch (e) {
       showToast('Failed to load actions: ' + e.message, 'error');
     }
+    this._populateScriptDropdowns();
   }
 
   async loadGifts() {
@@ -192,10 +194,38 @@ class ActionsEditor {
 
       html += `<div class="detail-command" data-cmd-index="${ci}">
         <div class="cmd-row">
-          <select class="cmd-type" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'type', this.value)">${typeOpts}</select>
-          <input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="/command" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">
-          <label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>
-          <button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="Remove command">&times;</button>
+          <select class="cmd-type" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'type', this.value)">${typeOpts}</select>`;
+
+      // For overlay actions, show only overlay-specific fields
+      if (cmd.type === 'overlay' || cmd.type === 'named_overlay') {
+        html += '<span style="flex:1"></span>';
+      } else if (cmd.type === 'script') {
+        const currentScript = cmd.command || '';
+        html += `<div class="cmd-input-container" style="flex:1;position:relative;display:flex;align-items:center;">
+          <input class="cmd-input cmd-script-search" type="text" style="width:100%;"
+            value="${escapeHtml(currentScript)}" 
+            placeholder="Search or select script..."
+            data-trigger-idx="${index}"
+            data-cmd-idx="${ci}"
+            onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)"
+            onfocus="actionsEditor._showScriptDropdown(event, ${index}, ${ci})"
+            oninput="actionsEditor._filterScriptDropdown(event)">
+          <div class="cmd-script-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;max-height:200px;overflow-y:auto;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+            <div class="cmd-script-list"></div>
+          </div>
+        </div>`;
+      } else {
+        // For vanilla, rcon: show command input
+        const placeholders = { 'vanilla': 'command', 'rcon': 'command' };
+        const placeholder = placeholders[cmd.type] || 'command';
+        html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
+      }
+
+      if (cmd.type !== 'overlay' && cmd.type !== 'named_overlay') {
+        html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
+      }
+
+      html += `<button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="Remove command">&times;</button>
         </div>`;
 
       if (cmd.type === 'overlay' || cmd.type === 'named_overlay') {
@@ -216,6 +246,91 @@ class ActionsEditor {
     html += `<button class="btn btn-secondary" onclick="actionsEditor.addCmd(${index})" style="margin-top:0.5rem;font-size:0.85rem;">+ Add Command</button>`;
 
     this.detailPanel.innerHTML = html;
+
+    // Populate script dropdowns after rendering
+    this._populateScriptDropdowns();
+  }
+
+  async _populateScriptDropdowns() {
+    try {
+      const data = await fetchJSON('/actions/scripts');
+      this.availableScripts = data.scripts || [];
+    } catch (e) {
+      console.error('Failed to load scripts:', e);
+      this.availableScripts = [];
+    }
+  }
+
+  _showScriptDropdown(event, triggerIdx, cmdIdx) {
+    const input = event.target;
+    const dropdown = input.nextElementSibling;
+
+    const listContainer = dropdown.querySelector('.cmd-script-list');
+    if (!listContainer) return;
+
+    const query = input.value.toLowerCase().trim();
+    const scripts = this.availableScripts || [];
+
+    // Filter scripts
+    const filtered = query
+      ? scripts.filter(s => s.name.toLowerCase().includes(query))
+      : scripts;
+
+    // Render filtered list
+    if (filtered.length === 0) {
+      listContainer.innerHTML = '<div style="padding:0.5rem;color:var(--text-secondary);font-size:0.85rem;">No scripts match</div>';
+    } else {
+      listContainer.innerHTML = filtered.map(script => `
+        <div class="cmd-script-option" data-script-name="${escapeHtml(script.name)}"
+          onclick="actionsEditor._selectScript(event, '${escapeHtml(script.name)}')"
+          style="padding:0.5rem;cursor:pointer;border-bottom:1px solid var(--border);hover:background:var(--bg-hover);">
+          ${escapeHtml(script.name)}
+        </div>
+      `).join('');
+    }
+
+    dropdown.style.display = 'block';
+
+    // Close dropdown when clicking outside
+    if (!input.dataset.dropdownCloseHandler) {
+      input.dataset.dropdownCloseHandler = true;
+      document.addEventListener('click', (e) => {
+        const searchInputs = document.querySelectorAll('.cmd-script-search');
+        searchInputs.forEach(inp => {
+          const dd = inp.nextElementSibling;
+          if (dd && dd.classList.contains('cmd-script-dropdown')) {
+            if (!inp.contains(e.target) && !dd.contains(e.target)) {
+              dd.style.display = 'none';
+            }
+          }
+        });
+      });
+    }
+  }
+
+  _selectScript(event, scriptName) {
+    event.stopPropagation();
+    const option = event.target;
+    const dropdown = option.closest('.cmd-script-dropdown');
+    const input = dropdown?.previousElementSibling;
+    
+    if (!input || !input.classList.contains('cmd-script-search')) return;
+
+    input.value = scriptName;
+    dropdown.style.display = 'none';
+
+    // Extract indices from data attributes
+    const triggerIdx = parseInt(input.dataset.triggerIdx);
+    const cmdIdx = parseInt(input.dataset.cmdIdx);
+    
+    this.updateCmd(triggerIdx, cmdIdx, 'command', scriptName);
+  }
+
+  _filterScriptDropdown(event) {
+    const input = event.target;
+    const triggerIdx = parseInt(input.dataset.triggerIdx);
+    const cmdIdx = parseInt(input.dataset.cmdIdx);
+    this._showScriptDropdown(event, triggerIdx, cmdIdx);
   }
 
   async confirmDeleteTrigger(index) {

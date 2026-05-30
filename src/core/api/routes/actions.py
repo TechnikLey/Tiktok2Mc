@@ -47,10 +47,21 @@ async def get_actions():
 async def update_actions(body: ActionsUpdateRequest):
     """Save structured triggers back to actions.mca."""
     try:
+        # Validate triggers before saving
+        validation_diags = _service.validate_triggers([t.model_dump() for t in body.triggers])
+        errors = [d for d in validation_diags if d.get("severity") == "ERROR"]
+        if errors:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid action configuration: {errors[0]['message']}"
+            )
+        
         raw = _service.serialize([t.model_dump() for t in body.triggers])
         _service.write_raw(raw, backup=True)
         gifts = _load_gifts()
         return ActionsResponse(triggers=_service.parse(gifts=gifts))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -144,4 +155,58 @@ async def get_gifts():
         gifts.sort(key=lambda g: (g.get("coins", 0), g.get("name", "")))
         return {"gifts": gifts}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/actions/scripts")
+async def get_registered_scripts():
+    """Return list of all registered scripts from the hook registry.
+    
+    Format: [
+        {"name": "script_name", "description": "optional description"},
+        ...
+    ]
+    """
+    try:
+        from core.hook_api import HOOK_ACTIONS
+        from core.hook_loader import load_event_hooks
+        from pathlib import Path
+
+        if not HOOK_ACTIONS:
+            try:
+                from core.paths import get_base_dir, get_root_dir
+
+                candidates = []
+                base_dir = get_base_dir()
+                root_dir = get_root_dir()
+                candidates.append((base_dir / ".." / "event_hooks").resolve())
+                candidates.append(root_dir / "src" / "event_hooks")
+                candidates.append(root_dir / "event_hooks")
+
+                hooks_dir = None
+                for p in candidates:
+                    if p.is_dir():
+                        hooks_dir = p
+                        break
+
+                if hooks_dir:
+                    class _StubAPI:
+                        def register_action(self, name: str, fn) -> None:
+                            HOOK_ACTIONS[name] = fn
+                        def __getattr__(self, _name: str):
+                            return lambda *args, **kwargs: None
+                    load_event_hooks(_StubAPI(), hooks_dir)
+                    log.info(f"[SCRIPTS] Lazy-loaded {len(HOOK_ACTIONS)} hook(s) from {hooks_dir}")
+                else:
+                    log.warning(f"[SCRIPTS] No hooks directory found among: {candidates}")
+            except Exception as e:
+                log.warning(f"[SCRIPTS] Could not lazy-load hooks: {e}")
+
+        scripts = [
+            {"name": name}
+            for name in sorted(HOOK_ACTIONS.keys())
+        ]
+        return {"scripts": scripts}
+    except Exception as e:
+        log.error(f"Failed to get registered scripts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
