@@ -10,12 +10,9 @@ from ruamel.yaml.comments import CommentedMap
 from core.paths import get_root_dir, get_config_file
 from core.utils import normalize_config_version
 from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
+from core.version import EXPECTED_CONFIG_VERSION
 
 log = logging.getLogger(__name__)
-
-# ── v1.0 schema ──────────────────────────────────────────────────────
-
-EXPECTED_CONFIG_VERSION = "1.0"
 
 _CONFIG_SCHEMA: dict[str, type] = {
     "config_version": str,

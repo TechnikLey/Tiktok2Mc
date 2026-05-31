@@ -11,8 +11,13 @@ logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
 
+_src = Path(__file__).resolve().parent / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
+
+from core.version import TOOL_VERSION as VERSION
+
 PLUGINS_DIR = Path("src/plugins")
-VERSION = "v1.0.0"
 
 CONFIG_YAML_TEMPLATE = '''\
 # ==========================================

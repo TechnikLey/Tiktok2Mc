@@ -34,6 +34,13 @@ def cprint(msg, color=Color.RESET):
 if sys.platform == "win32":
     os.system("")  # enables ANSI escape sequences in Windows terminal
 
+_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
+from core.version import TOOL_VERSION, UPDATER_VERSION
+
+
 def main():
     start = time.time()
 
@@ -41,8 +48,6 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
-        TOOL_VERSION = "v1.0.0"
-        UPDATER_VERSION = "v1.4.0"
 
         IS_WINDOWS = sys.platform == "win32"
         SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -356,7 +361,11 @@ def main():
             'logging.basicConfig(level=logging.INFO, format=\'%(message)s\', stream=sys.stdout)\n'
             'log = logging.getLogger(__name__)\n'
             '\n'
-            f'TOOL_VERSION = "{TOOL_VERSION}"\n'
+            '_src = Path(__file__).resolve().parent / "src"\n'
+            'if str(_src) not in sys.path:\n'
+            '    sys.path.insert(0, str(_src))\n'
+            '\n'
+            'from core.version import TOOL_VERSION\n'
             '\n'
             'os.chdir(Path(__file__).resolve().parent)\n'
             '\n'

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
-API_VERSION = "1.0.0"
+from core.version import API_VERSION
 
 
 # ── Plugin Config Schema ──────────────────────────────────────────────
