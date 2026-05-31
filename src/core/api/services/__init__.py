@@ -7,7 +7,7 @@ from typing import Any
 
 from ruamel.yaml.comments import CommentedMap
 
-from core.paths import get_root_dir, get_config_file
+import core.paths
 from core.utils import normalize_config_version
 from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
 from core.version import EXPECTED_CONFIG_VERSION
@@ -90,9 +90,9 @@ class ApiService:
         # Config path with fallback:
         # 1. Standard location (used in builds):   root/config/config.yaml
         # 2. Fallback (dev mode):                   root/defaults/config.yaml
-        self.config_path: Path = get_config_file()
+        self.config_path: Path = core.paths.get_config_file()
         if not self.config_path.exists():
-            fallback = get_root_dir() / "defaults" / "config.yaml"
+            fallback = core.paths.get_root_dir() / "defaults" / "config.yaml"
             if fallback.exists():
                 self.config_path = fallback
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from core.paths import get_root_dir
+import core.paths
 
 log = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ router = APIRouter(tags=["System"])
 
 
 def _runtime_dir() -> Path:
-    d = get_root_dir() / "core" / "runtime"
+    d = core.paths.get_root_dir() / "core" / "runtime"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

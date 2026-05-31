@@ -26,7 +26,7 @@ from core.api.models import (
 from core.api.registry import get_registry
 from core.api.services.plugin_discovery import discover_plugins_from_manifests
 from core.api.updater import PluginUpdateChecker
-from core.paths import get_root_dir
+import core.paths
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ _HEALTH_POLL_TIMEOUT = 30.0
 
 
 def _runtime_dir() -> Path:
-    d = get_root_dir() / "core" / "runtime"
+    d = core.paths.get_root_dir() / "core" / "runtime"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -158,9 +158,9 @@ async def install_plugin_updates():
         # Re-check to get latest versions
         results = _updater.check_updates(plugins)
 
-        plugins_dir = get_root_dir() / "plugins"
+        plugins_dir = core.paths.get_root_dir() / "plugins"
         if not plugins_dir.is_dir():
-            plugins_dir = get_root_dir() / "src" / "plugins"
+            plugins_dir = core.paths.get_root_dir() / "src" / "plugins"
         if not plugins_dir.is_dir():
             raise HTTPException(status_code=500, detail="Cannot locate plugins directory")
 
@@ -212,7 +212,7 @@ async def discover_plugins():
     or loaded as a side effect.
     """
     try:
-        plugins_dir = str(get_root_dir() / "src" / "plugins")
+        plugins_dir = str(core.paths.get_root_dir() / "src" / "plugins")
         discovered = discover_plugins_from_manifests(plugins_dir)
     except Exception as e:
         log.exception("Failed to discover plugins")

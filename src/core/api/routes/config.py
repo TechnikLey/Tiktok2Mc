@@ -4,24 +4,34 @@ from core.api.models import ConfigResponse, ConfigUpdateRequest
 from core.api.services import ApiService
 
 router = APIRouter(tags=["Config"])
-_service = ApiService()
+
+_service: ApiService | None = None
+
+
+def _get_service() -> ApiService:
+    global _service
+    if _service is None:
+        _service = ApiService()
+    return _service
 
 
 @router.get("/config", response_model=ConfigResponse)
 async def get_config():
+    svc = _get_service()
     try:
-        cfg = _service.read_config()
+        cfg = svc.read_config()
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return ConfigResponse(path=str(_service.config_path), config=cfg)
+    return ConfigResponse(path=str(svc.config_path), config=cfg)
 
 
 @router.put("/config", response_model=ConfigResponse)
 async def update_config(body: ConfigUpdateRequest):
+    svc = _get_service()
     try:
-        _service.write_config(body.config, backup=body.backup)
+        svc.write_config(body.config, backup=body.backup)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return ConfigResponse(path=str(_service.config_path), config=body.config)
+    return ConfigResponse(path=str(svc.config_path), config=body.config)
