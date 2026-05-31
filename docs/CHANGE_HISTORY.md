@@ -13,6 +13,7 @@
 - **Removed ChannelPoints Plugin** — `src/plugins/channelpoints/` deleted entirely (281 lines). The main system no longer manages economy/points.
 - **Removed hardcoded `like-goal` coupling** — `validate_like_triggers()` and `likegoal_queue` removed from `main.py`. Like events go through EventBus → EventBridge.
 - **Removed hardcoded `overlay-text` coupling** — `overlay_utils.py` made plugin-agnostic with optional `plugin_name` parameter.
+- **Promoted `overlay-text` to built-in core subsystem** — `src/plugins/overlaytxt/` deleted entirely. New `src/core/overlay.py` manages config (global `config.yaml`), circuit breakers, HTML rendering, and direct EventBus dispatch. New `src/python/overlay.py` standalone window process. Dedicated API routes at `/api/v1/overlay/*`. Removed plugin manifest, config schema, and lifecycle indirection.
 - **Removed `points_cost` from comment commands** — was a ChannelPoints-specific leak into the core command framework.
 - **Removed `random_triggers` from main config** — moved to `hooks/random/config.yaml` where it belongs.
 - **Removed hardcoded Spotify URLs** — `{spotify_port}` placeholders and direct HTTP endpoints removed from `defaults/config.yaml`.

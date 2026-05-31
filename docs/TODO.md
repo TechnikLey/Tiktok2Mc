@@ -97,4 +97,4 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 
 ---
 
-*Last updated: 2026-05-31 — 506 Python tests + 226 GUI frontend = 732 total*
+*Last updated: 2026-05-31 — 510 Python tests + 226 GUI frontend = 736 total*
