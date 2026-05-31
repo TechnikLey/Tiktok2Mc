@@ -108,7 +108,7 @@
 - **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **750 total: 524 passed, 3 skipped, 0 failures** (524 Python + 226 GUI frontend; WS streaming tests active, SSE endpoint tested via POST)
+- **754 total: 528 passed, 3 skipped, 0 failures** (528 Python + 226 GUI frontend; WS streaming tests active, SSE endpoint tested via POST)
 - **GUI frontend (Vitest + JSDOM):** 226 tests across 5 test files:
   - `helpers.test.js` — 43 utility function tests (escapeHtml, toTitle, formatUptime, getPluginStatus, validatePassword, etc.)
   - `config-editor.test.js` — 44 ConfigEditor method tests (open/close, getValue/setValue, validate, computeDiff, etc.)
@@ -128,6 +128,19 @@
 - `build.py` / `upload.py` version bumped to `v1.0.0`
 - Old self-registration `register_plugin()` calls removed from all plugin `main.py` files
 - Legacy fallback `EditableResponse`, `ImportLegacyResponse`, `validate_config_dict`, `read_plugin_registry()` removed
+
+### Hook System Redesign
+- `HookManifest` (`hook.json`) with name, version, config_schema, update_url
+- `HookRegistry` (persistent JSON, thread-safe, backup-managed)
+- `HookLoader` rewritten: scans `hooks/` + `plugins/*/hooks/` by manifest, loads per-hook config, syncs registry, filters by enabled state
+- Per-hook config via `api.get_hook_config(name)` (`core/hook_api.py`)
+- Hook management API: list, discover, enable/disable, config CRUD (8 REST endpoints)
+- `create_hook.py` scaffolding script (mirrors `create_plugin.py`)
+- Hooks restructured from flat `.py` to subdirectories (`hook.json` + `main.py`)
+- Spotify hook absorbed into `plugins/spotify/hooks/spotify_control/`
+- Folder renamed `event_hooks/` → `hooks/`, all references updated
+- Release build: `gui`, `update`, `server` exe moved into `core/` (only `start.exe` at root)
+- 13 hook system tests, all 528 Python tests passing
 
 ### Documentation
 - `README.md` rewritten for v1.0.0
@@ -188,11 +201,7 @@ All previously identified critical bugs are now resolved in the codebase.
 
 3. **Plugin system tightly coupled with main system** — ChannelPoints has config options inside `comment_commands` (main system config), Spotify integrates with cooldown/points systems. Plugins aren't fully self-contained — they reach into main config structures and depend on main system behavior. A proper rework should fully decouple plugins so they own their config and behavior independently.
 
-4. **Hook system needs rework before testing** — The hook system is too tightly integrated into the main system. Hooks have no updater, no version info, no manifest. Dev experience is poor. Questions to resolve:
-   - Should hooks be removed and replaced with direct plugin implementation?
-   - Does the Hook API need more power (or less) for devs?
-   - Is the Hook API up to date with the current system?
-   - Without answers here, writing tests for hooks is premature — the interface will change.
+4. **Hook system needs rework before testing** — **RESOLVED.** Hook system redesigned with HookManifest (hook.json), HookRegistry, per-hook config, manage API, and `create_hook.py` scaffolding. Hooks stay in-process with subdirectory-based layout, scanned from `hooks/` + `plugins/*/hooks/`.
 
 7. **`core_hash` build cache is conservative** — Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes.
 
@@ -206,8 +215,8 @@ All previously identified critical bugs are now resolved in the codebase.
 | `src/python/main.py` | ~1580 | **COVERED** — 38 tests for sanitize_filename, validate_like_triggers, get_safe_username, load_shell_actions, dup config detection |
 | `src/python/start.py` | ~1112 | **PARTIAL** — 24 update lifecycle tests (signal files, restart polling, updater replacement); restart flow helpers not directly importable |
 | `src/core/backup.py` | 265 | **COVERED** — 30 standalone tests for BackupManager |
-| `src/core/hook_api.py` | 136 | HIGH — **BLOCKED:** Hook system needs rework first (see Architecture Issues #4). Test surface will change. |
-| `src/core/hook_loader.py` | 132 | HIGH — **BLOCKED:** Hook system needs rework first (see Architecture Issues #4). Test surface will change. |
+| `src/core/hook_api.py` | 136 | **COVERED** — 13 hook system tests (structure, registration, manifest, API, plugin-bundled hooks) |
+| `src/core/hook_loader.py` | 132 | **COVERED** — 13 hook system tests (structure, registration, manifest, API, plugin-bundled hooks) |
 | `src/core/api/server.py` | 97 | MEDIUM — FastAPI app factory, CORS, static mounts |
 | `src/core/api/routes/system.py` | 92 | **COVERED** — 8 tests for restart/shutdown/cancel/status endpoints |
 | `src/core/api/routes/ws.py` | 71 | **COVERED** — 3 tests: event injection, ordering, disconnect cleanup |
@@ -225,7 +234,7 @@ All previously identified critical bugs are now resolved in the codebase.
 ### Other Gaps
 - **GUI (frontend):** **COVERED** — 226 Vitest+JSDOM tests across `app.js` (2154 lines), `actions-editor.js` (636 lines), `index.html`
 - **All 7 plugin implementations:** **BLOCKED** — Plugin system needs decoupling rework first (see Architecture Issues #3). Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration).
-- **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): **BLOCKED** — Hook system needs rework first (see Architecture Issues #4). Hook loader tests exist but no functional tests.
+- **All 3 event hooks** (`random`, `spotify_control`, `example_hook`): **COVERED** — 13 structural tests (manifest, registration, config, API); functional tests still missing.
 - **Compiled binary update flow:** `update.py` has 34 E2E tests but no compiled binary test (update.exe → start.exe → restart)
 - **SSE:** SSE stream receive tests cannot use TestClient (httpx blocking limitation); emit tests work via POST endpoint
 - **Test isolation:** Session-scoped fixtures share state across tests; `_clear_registry` fixture not consistently applied
@@ -323,17 +332,18 @@ All previously identified critical bugs are now resolved in the codebase.
 
 ## Recommended Next Steps
 
-> **All 13 pre-release fixes are DONE.** The remaining work is architecture rework (blocks meaningful testing) and release validation.
+> **Hook system redesigned. All pre-release fixes DONE.** Remaining work: one architecture blocker (plugin decoupling), release validation, and hardening.
 
 ### Next Step 1: End-to-End Update Validation 🔴 REQUIRED BLOCKER
-The single highest-risk item. Update has 58 unit/integration tests but the compiled `update.exe → start.exe → restart` flow has never been exercised across actual version boundaries. If this breaks on release, users can never receive fixes and could corrupt their installation.
+Single highest-risk item. Update has 58 unit/integration tests but the compiled `update.exe → start.exe → restart` flow has never been exercised across actual version boundaries. If this breaks on release, users can never receive fixes and could corrupt their installation.
 - Test with real compiled binaries across a simulated v0.x → v1.0.0 upgrade
 - Verify: file signaling, API kill signal fallback, config whitelist preservation, rollback on interruption, Windows/Linux paths
 
-### Next Step 2: Architecture Rework — Plugin Decoupling + Hook System Redesign
-Testing hooks or plugins is premature — both need rework first (see Architecture Issues #3, #4).
-- **Plugin decoupling:** Pull ChannelPoints config out of `comment_commands`, remove Spotify's hard dependency on main cooldown/points. Each plugin should own its config and behavior without reaching into main system internals.
-- **Hook system redesign:** Decide whether hooks become standalone plugins (with manifests, updaters, versioning) or get absorbed into the plugin system entirely. Resolve the Hook API surface questions before any test effort.
+### Next Step 2: Architecture Rework — Plugin Decoupling 🔴 BLOCKER
+Hooks are done; plugin decoupling is the remaining architecture blocker (see Architecture Issue #3).
+- Pull ChannelPoints config out of `comment_commands` (main system config)
+- Remove Spotify's hard dependency on main cooldown/points system
+- Each plugin should own its config and behavior without reaching into main system internals
 
 ### Next Step 3: Build System Hardening
 - Single version source of truth (`core/version.py` — stop hardcoding in `build.py`)
@@ -341,8 +351,7 @@ Testing hooks or plugins is premature — both need rework first (see Architectu
 - Clean up `upload.py` stale version
 
 ### Step 4 (continuous / whenever): Low-Risk Test Coverage
-Independent of the rework above, these modules can be tested now:
-- `src/core/api/updater.py` — `_download_update()`, `install_update()` untested (MEDIUM risk)
+- `src/core/api/updater.py` — `_download_update()`, `install_update()` untested (MEDIUM)
 - `src/core/api/server.py` — FastAPI app factory, CORS, static mounts (MEDIUM)
 - `build.py` — Build system, no tests (MEDIUM)
 - `src/core/api/services/actions.py` — line-parser coverage incomplete
@@ -352,4 +361,4 @@ Only after all code changes are frozen.
 
 ---
 
-*Last updated: 2026-05-31* (updated for v1.0.0-dev — 750 total tests: 524 Python + 226 GUI frontend; all Green)
+*Last updated: 2026-05-31* (updated for v1.0.0-dev — 528 Python tests + 226 GUI frontend = 754 total; all Green)
