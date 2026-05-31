@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -12,6 +13,7 @@ from .models import API_VERSION
 from .plugin_health import get_health_monitor
 from .plugin_watcher import get_plugin_watcher
 from core.paths import get_root_dir
+from core.overlay import set_event_loop
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ async def lifespan(app: FastAPI):
         "CORS origin restricted to localhost — "
         "use create_app(cors_origins=[\"*\"]) to open for development"
     )
+    set_event_loop(asyncio.get_running_loop())
     get_plugin_watcher().start()
     await get_health_monitor().start()
     await event_bus.publish("server.started", {"version": API_VERSION})

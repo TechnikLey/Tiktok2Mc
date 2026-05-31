@@ -70,10 +70,12 @@ def normalize_config_version(value: Any) -> str:
 def load_config(config: str | Path) -> dict:
     path = Path(config)
     try:
-        return load_yaml(path)
+        data = load_yaml(path)
     except FileNotFoundError:
         raise
     except ValueError as e:
         raise ValueError(f"YAML error in {path}: {e}")
     except Exception as e:
         raise RuntimeError(f"Error loading {path}: {e}")
+
+    return data

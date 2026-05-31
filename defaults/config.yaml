@@ -296,6 +296,34 @@ minecraft_server_api:
 gui:
   enabled: true
 
+# ===========================================================================
+#  OVERLAY (CORE)
+# ===========================================================================
+# The built-in overlay subsystem displays text messages on stream.
+# It runs as a core component, not a plugin.
+overlay:
+  enabled: true
+
+  # Display mode: overwrite = replace current message; queue = line up messages
+  display_mode: overwrite
+
+  # Fade durations (milliseconds)
+  fade_in: 500
+  fade_out: 500
+
+  # Circuit breaker settings
+  max_fails: 3
+  cooldown: 10
+
+  # Named overlay slots (at least "default" is required)
+  overlays:
+    - name: "default"
+
+  # Theme colours for the overlay windows
+  theme:
+    background: "#00FF00"
+    text: "#ffffff"
+
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.

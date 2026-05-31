@@ -48,6 +48,7 @@ APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / "core" / f"server{SUFFIX}").resolve()
 UPDATE_EXE_PATH = (BASE_DIR / "core" / f"update{SUFFIX}").resolve()
 GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
+OVERLAY_EXE_PATH = (BASE_DIR / "core" / f"overlay{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------
@@ -673,11 +674,13 @@ _launcher = PluginLauncher()
 PLUGIN_REGISTRY: list[AppConfig] = _launcher.get_plugins()
 
 GUI_ENABLED = cfg.get("gui", {}).get("enabled", False)
+OVERLAY_ENABLED = cfg.get("overlay", {}).get("enabled", True)
 
 BUILTIN_REGISTRY: list[AppConfig] = [
     AppConfig(name="App", path=APP_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="Minecraft Server", path=SERVER_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="GUI", path=GUI_EXE_PATH, enable=GUI_ENABLED, level=2, ics=False),
+    AppConfig(name="Overlay", path=OVERLAY_EXE_PATH, enable=OVERLAY_ENABLED, level=2, ics=False),
 ]
 
 for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
@@ -711,10 +714,17 @@ for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
                 )
 
 # Show overlay URLs for OBS browser sources (all served through Main API)
-overlay_names = [app.name for app in PLUGIN_REGISTRY if app.enabled]
-if overlay_names:
-    log.info("\n[OVERLAYS] Add these URLs as OBS Browser Sources:")
-    for name in overlay_names:
+_builtin_overlay_names = cfg.get("overlay", {}).get("overlays", [{"name": "default"}])
+_builtin_overlay_names = [o.get("name", "default") for o in _builtin_overlay_names if o.get("name")]
+if OVERLAY_ENABLED and _builtin_overlay_names:
+    log.info("\n[OVERLAYS] Built-in overlay URLs:")
+    for name in _builtin_overlay_names:
+        log.info(f"  {name}: http://127.0.0.1:29185/api/v1/overlay?overlay={name}&chroma=1")
+
+_plugin_overlay_names = [app.name for app in PLUGIN_REGISTRY if app.enabled]
+if _plugin_overlay_names:
+    log.info("\n[OVERLAYS] Plugin overlay URLs:")
+    for name in _plugin_overlay_names:
         log.info(f"  {name}: http://127.0.0.1:29185/api/v1/plugins/{name}/overlay")
 
 # Start plugin health checker background thread

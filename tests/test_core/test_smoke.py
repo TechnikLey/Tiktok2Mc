@@ -21,10 +21,6 @@ EXPECTED_PLUGINS: dict[str, dict[str, object]] = {
         "dir": "likegoal",
         "display_name": "Like Goal",
     },
-    "overlay-text": {
-        "dir": "overlaytxt",
-        "display_name": "Overlay Text",
-    },
     "spotify-control": {
         "dir": "spotify",
         "display_name": "Spotify Control",

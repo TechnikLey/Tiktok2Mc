@@ -197,7 +197,7 @@ class TestUpdateWhitelist:
 
     WHITELIST_DIRS = {
         "core", "scripts", "config",
-        "plugins/deathcounter", "plugins/likegoal", "plugins/overlaytxt",
+        "plugins/deathcounter", "plugins/likegoal",
         "plugins/timer", "plugins/wincounter", "plugins/spotify",
     }
     WHITELIST_DIR_FILES = {

@@ -5,10 +5,8 @@ from pathlib import Path
 from core.overlay_utils import (
     OverlayClient,
     OverlayManager,
-    _find_overlay_plugin_dir,
     send_overlay_text,
 )
-from core.yaml_utils import save_yaml
 
 
 class TestOverlayClient:
@@ -40,51 +38,24 @@ class TestOverlayClient:
         assert blocked is False
 
 
-class TestFindOverlayPluginDir:
-    def test_finds_overlay_text(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "plugins"
-        plugins_dir.mkdir()
-        overlay_dir = plugins_dir / "overlaytxt"
-        overlay_dir.mkdir()
-        (overlay_dir / "plugin.json").write_text(
-            json.dumps({"name": "overlay-text"}), encoding="utf-8"
-        )
-        monkeypatch.setattr(
-            "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
-        )
-        result = _find_overlay_plugin_dir()
-        assert result == overlay_dir
-
-    def test_fallback_when_not_found(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "plugins"
-        plugins_dir.mkdir()
-        monkeypatch.setattr(
-            "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
-        )
-        result = _find_overlay_plugin_dir()
-        assert result == plugins_dir / "overlaytext"
-
-
 class TestOverlayManager:
-    def test_loads_config(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "plugins"
-        plugins_dir.mkdir()
-        overlay_dir = plugins_dir / "overlaytxt"
-        overlay_dir.mkdir()
-        (overlay_dir / "plugin.json").write_text(
-            json.dumps({"name": "overlay-text"}), encoding="utf-8"
-        )
+    def test_loads_config_from_global(self, tmp_path, monkeypatch):
+        from core.yaml_utils import save_yaml
+
+        config_file = tmp_path / "config.yaml"
         save_yaml(
-            overlay_dir / "config.yaml",
+            config_file,
             {
-                "max_fails": 5,
-                "cooldown": 15,
-                "overlays": [{"name": "alerts"}, {"name": "chat"}],
+                "overlay": {
+                    "max_fails": 5,
+                    "cooldown": 15,
+                    "overlays": [{"name": "alerts"}, {"name": "chat"}],
+                },
             },
             backup=False,
         )
         monkeypatch.setattr(
-            "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
+            "core.overlay_utils.get_config_file", lambda: config_file
         )
 
         mgr = OverlayManager()
@@ -94,16 +65,12 @@ class TestOverlayManager:
         assert mgr.clients["alerts"].max_fails == 5
 
     def test_loads_fallback_defaults(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "plugins"
-        plugins_dir.mkdir()
-        overlay_dir = plugins_dir / "overlaytxt"
-        overlay_dir.mkdir()
-        (overlay_dir / "plugin.json").write_text(
-            json.dumps({"name": "overlay-text"}), encoding="utf-8"
-        )
-        save_yaml(overlay_dir / "config.yaml", {}, backup=False)
+        from core.yaml_utils import save_yaml
+
+        config_file = tmp_path / "config.yaml"
+        save_yaml(config_file, {}, backup=False)
         monkeypatch.setattr(
-            "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
+            "core.overlay_utils.get_config_file", lambda: config_file
         )
 
         mgr = OverlayManager()
@@ -112,16 +79,12 @@ class TestOverlayManager:
         assert mgr.clients["default"].cooldown == 10
 
     def test_dispatch_unknown_overlay(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "plugins"
-        plugins_dir.mkdir()
-        overlay_dir = plugins_dir / "overlaytxt"
-        overlay_dir.mkdir()
-        (overlay_dir / "plugin.json").write_text(
-            json.dumps({"name": "overlay-text"}), encoding="utf-8"
-        )
-        save_yaml(overlay_dir / "config.yaml", {}, backup=False)
+        from core.yaml_utils import save_yaml
+
+        config_file = tmp_path / "config.yaml"
+        save_yaml(config_file, {}, backup=False)
         monkeypatch.setattr(
-            "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
+            "core.overlay_utils.get_config_file", lambda: config_file
         )
 
         mgr = OverlayManager()
@@ -129,16 +92,12 @@ class TestOverlayManager:
         assert result is False
 
     def test_dispatch_during_cooldown(self, tmp_path, monkeypatch):
-        plugins_dir = tmp_path / "plugins"
-        plugins_dir.mkdir()
-        overlay_dir = plugins_dir / "overlaytxt"
-        overlay_dir.mkdir()
-        (overlay_dir / "plugin.json").write_text(
-            json.dumps({"name": "overlay-text"}), encoding="utf-8"
-        )
-        save_yaml(overlay_dir / "config.yaml", {}, backup=False)
+        from core.yaml_utils import save_yaml
+
+        config_file = tmp_path / "config.yaml"
+        save_yaml(config_file, {}, backup=False)
         monkeypatch.setattr(
-            "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
+            "core.overlay_utils.get_config_file", lambda: config_file
         )
 
         mgr = OverlayManager()

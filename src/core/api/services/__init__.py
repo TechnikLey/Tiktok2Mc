@@ -29,6 +29,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "minecraft_server_api": dict,
     "gui": dict,
     "update": dict,
+    "overlay": dict,
 }
 
 

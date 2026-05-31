@@ -598,6 +598,7 @@ const SECTION_ORDER = [
   'tiktok','rcon','server_host','control_method',
   'java','minecraft_server_api',
   'console',
+  'overlay',
   'theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'comment_commands','random_triggers'
@@ -607,7 +608,7 @@ const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method'],
   'Minecraft': ['java','minecraft_server_api'],
   'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui'],
-  'Appearance': ['theme'],
+  'Appearance': ['overlay','theme'],
   'Chat & Commands': ['comment_commands','random_triggers']
 };
 
@@ -620,7 +621,8 @@ const SECTION_META = {
   console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
   minecraft_server_api: { title: 'Minecraft Server API', desc: 'Handles communication between the tool and the Minecraft server. Required for player death/respawn detection.', category: 'Minecraft' },
   gui: { title: 'Dashboard', desc: 'The graphical user interface is served by the central API server and shown in a window.', category: 'System' },
-  theme: { title: 'Overlay Colors', desc: 'Customize colors for each plugin overlay. All values are CSS hex codes like #ff0000.', category: 'Appearance' },
+  overlay: { title: 'Overlay Text', desc: 'Built-in overlay subsystem for displaying text messages on stream. Runs as a core component, not a plugin.', category: 'Appearance' },
+  theme: { title: 'Overlay Colors', desc: 'Customize colors for overlays. All values are CSS hex codes like #ff0000.', category: 'Appearance' },
   update: { title: 'Auto-Updater', desc: 'Checks for new versions on startup and installs them automatically. Strongly recommended.', category: 'System' },
   shutdown: { title: 'Auto-Shutdown', desc: 'Automatically shuts down the tool after your live stream ends.', category: 'System' },
   server_host: { title: 'Server Address', desc: 'Controls which network interfaces the tool listens on.', category: 'Connection' },
@@ -678,7 +680,16 @@ const HELP_TEXT = {
   'minecraft_server_api.web_server_port': 'Port for the webhook server that receives Minecraft events. Default: 29188.',
   'gui.enabled': 'Launch the graphical dashboard on startup. If disabled, you can still open it manually.',
   'update.enabled': 'Checks for new versions on startup and installs them automatically. It is strongly recommended to keep this enabled.',
-  'update.max_update_logs': 'Maximum number of update log files to keep in logs/update_logs/. 0 = delete all after each update. -1 = keep forever.'
+  'update.max_update_logs': 'Maximum number of update log files to keep in logs/update_logs/. 0 = delete all after each update. -1 = keep forever.',
+  'overlay.enabled': 'Enable the built-in text overlay subsystem. When disabled, overlay windows will not open and overlay actions in actions.mca will be skipped.',
+  'overlay.display_mode': 'overwrite replaces the current message immediately. queue lines up messages and shows them one after another.',
+  'overlay.fade_in': 'Fade-in duration in milliseconds. Set to 0 for instant appearance.',
+  'overlay.fade_out': 'Fade-out duration in milliseconds. Set to 0 for instant disappearance.',
+  'overlay.max_fails': 'Consecutive failed dispatches before the circuit breaker activates and blocks further messages.',
+  'overlay.cooldown': 'Seconds to wait after max_fails before allowing new messages again.',
+  'overlay.overlays': 'Named overlay slots. Each slot can have its own OBS Browser Source URL. "default" is required and used when no specific overlay is requested.',
+  'overlay.theme.background': 'Background colour of the overlay window. Also used as the chroma key colour.',
+  'overlay.theme.text': 'Text colour shown in the overlay.'
 };
 
 const FIELD_META = {
@@ -713,6 +724,15 @@ const FIELD_META = {
   'gui.enabled': { basic: true, type: 'bool' },
   'update.enabled': { basic: true, type: 'bool' },
   'update.max_update_logs': { basic: false, type: 'number' },
+  'overlay.enabled': { basic: true, type: 'bool' },
+  'overlay.display_mode': { basic: true, type: 'select', options: ['overwrite','queue'] },
+  'overlay.fade_in': { basic: false, type: 'number', min: 0 },
+  'overlay.fade_out': { basic: false, type: 'number', min: 0 },
+  'overlay.max_fails': { basic: false, type: 'number', min: 1 },
+  'overlay.cooldown': { basic: false, type: 'number', min: 0 },
+  'overlay.overlays': { basic: false, type: 'json' },
+  'overlay.theme.background': { basic: false, type: 'color' },
+  'overlay.theme.text': { basic: false, type: 'color' },
   'comment_commands.groups[].enabled': { basic: false, type: 'bool' },
   'comment_commands.groups[].prefix': { basic: false, type: 'text' },
   'comment_commands.groups[].handler': { basic: false, type: 'select', options: ['rcon','http'] },
@@ -1196,7 +1216,7 @@ class ConfigEditor {
   }
 
   buildThemeEditor(path, theme) {
-    const pluginKeys = new Set(['like_goal','death_counter','win_counter','timer','overlay_text','spotify','channel_points']);
+    const pluginKeys = new Set(['like_goal','death_counter','win_counter','timer','spotify','channel_points']);
     let html = '';
     for (const [plugin, colors] of Object.entries(theme || {})) {
       if (pluginKeys.has(plugin)) continue; // plugin colors are managed in their own configs

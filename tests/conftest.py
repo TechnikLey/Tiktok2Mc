@@ -28,6 +28,7 @@ MINIMAL_CONFIG = {
     "minecraft_server_api": {},
     "gui": {},
     "update": {},
+    "overlay": {},
 }
 
 

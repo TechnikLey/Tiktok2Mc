@@ -4,24 +4,35 @@ import json
 import urllib.request
 import logging
 from pathlib import Path
+from typing import Any
 
-from core.plugin_config import load_plugin_config, discover_plugins_dir, load_plugin_manifest
+from core.yaml_utils import load_yaml
+from core.paths import get_config_file
 
 log = logging.getLogger(__name__)
 
 API_BASE = "http://127.0.0.1:29185/api/v1"
-DEFAULT_PLUGIN_NAME = "overlay-text"
 
 
-def _find_overlay_plugin_dir(name: str = DEFAULT_PLUGIN_NAME) -> Path:
-    plugins_dir = discover_plugins_dir()
-    for child in plugins_dir.iterdir():
-        if not child.is_dir():
-            continue
-        manifest = load_plugin_manifest(child)
-        if manifest and manifest.get("name") == name:
-            return child
-    return plugins_dir / name.replace("-", "")
+# ---------------------------------------------------------------------------
+#  Config helper (global config)
+# ---------------------------------------------------------------------------
+
+
+def _load_overlay_config() -> dict[str, Any]:
+    """Load overlay settings from the global config file."""
+    cfg_path = get_config_file()
+    try:
+        global_cfg = load_yaml(cfg_path) if cfg_path.exists() else {}
+    except Exception as exc:
+        log.warning("Failed to load global config for overlay: %s", exc)
+        global_cfg = {}
+    return global_cfg.get("overlay", {})
+
+
+# ---------------------------------------------------------------------------
+#  Circuit-breaker client
+# ---------------------------------------------------------------------------
 
 
 class OverlayClient:
@@ -48,19 +59,22 @@ class OverlayClient:
         self._last_fail_time = time.time()
 
 
+# ---------------------------------------------------------------------------
+#  Manager
+# ---------------------------------------------------------------------------
+
+
 class OverlayManager:
-    def __init__(self, plugin_name: str = DEFAULT_PLUGIN_NAME):
-        self.plugin_name = plugin_name
+    """Client-side overlay manager that reads from the global config and
+    dispplays overlay text via the core API endpoint.
+    """
+
+    def __init__(self):
         self.clients = {}
         self.load_config()
 
     def load_config(self):
-        try:
-            plugin_dir = _find_overlay_plugin_dir(self.plugin_name)
-            cfg = load_plugin_config(plugin_dir)
-        except Exception as e:
-            log.error(f"Failed to load overlay plugin config: {e}")
-            cfg = {}
+        cfg = _load_overlay_config()
 
         def_fails = cfg.get("max_fails", 3)
         def_cooldown = cfg.get("cooldown", 10)
@@ -68,7 +82,7 @@ class OverlayManager:
         for item in cfg.get("overlays", []):
             name = item.get("name")
             if not name:
-                log.warning(f"Skipping overlay with missing name: {item}")
+                log.warning("Skipping overlay with missing name: %s", item)
                 continue
             self.clients[name] = OverlayClient(
                 name=name,
@@ -84,31 +98,28 @@ class OverlayManager:
             )
             log.info("Created fallback 'default' overlay (not in config).")
 
-        log.info("Loaded %d overlays from %s plugin config", len(self.clients), self.plugin_name)
+        log.info("Loaded %d overlays from global config", len(self.clients))
 
     def dispatch(self, title, subtitle, duration, target_name):
         client = self.clients.get(target_name)
         if not client:
-            log.error(f"Overlay '{target_name}' not found.")
+            log.error("Overlay '%s' not found.", target_name)
             return False
 
         blocked, remaining = client.get_cooldown_status()
         if blocked:
-            log.warning(f"[{client.name}] Circuit breaker active ({remaining}s).")
+            log.warning("[%s] Circuit breaker active (%ss).", client.name, remaining)
             return False
 
         try:
             body = json.dumps({
-                "command": "display",
-                "args": {
-                    "overlay_name": target_name,
-                    "title": title,
-                    "subtitle": subtitle,
-                    "duration": duration,
-                }
+                "title": title,
+                "subtitle": subtitle,
+                "duration": duration,
+                "overlay_name": target_name,
             }).encode()
             req = urllib.request.Request(
-                f"{API_BASE}/plugins/{self.plugin_name}/command",
+                f"{API_BASE}/overlay/display",
                 data=body,
                 headers={"Content-Type": "application/json"},
                 method="POST",
@@ -116,20 +127,35 @@ class OverlayManager:
             urllib.request.urlopen(req, timeout=5)
             client.mark_success()
             return True
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                log.warning("[%s] Server reported cooldown.", client.name)
+            else:
+                log.error("[OVERLAY] Command to %s failed: HTTP %s", client.name, e.code)
+            client.mark_failure()
         except Exception as e:
-            log.error(f"[OVERLAY] Command to {client.name} failed: {e}")
+            log.error("[OVERLAY] Command to %s failed: %s", client.name, e)
             client.mark_failure()
         return False
 
+
+# ---------------------------------------------------------------------------
+#  Singleton + public API
+# ---------------------------------------------------------------------------
 
 _manager = None
 _manager_lock = threading.Lock()
 
 
-def send_overlay_text(title, subtitle, duration=3, overlay_name="default", plugin_name: str = DEFAULT_PLUGIN_NAME):
+def send_overlay_text(title, subtitle, duration=3, overlay_name="default", plugin_name: str = "overlay-text"):
+    """Send overlay text via the core overlay subsystem.
+
+    The *plugin_name* parameter is kept for backward compatibility but
+    is no longer used — overlay is a core subsystem, not a plugin.
+    """
     global _manager
-    if _manager is None or _manager.plugin_name != plugin_name:
+    if _manager is None:
         with _manager_lock:
-            if _manager is None or _manager.plugin_name != plugin_name:
-                _manager = OverlayManager(plugin_name)
+            if _manager is None:
+                _manager = OverlayManager()
     return _manager.dispatch(title, subtitle, duration, overlay_name)

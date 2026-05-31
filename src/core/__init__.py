@@ -12,3 +12,10 @@ from core.paths import (
 )
 from core.models import AppConfig
 from core.plugin_config import load_plugin_config, save_plugin_config, load_all_plugin_configs
+from core.overlay import (
+    OverlayConfig,
+    OverlayClient,
+    OverlayManager,
+    get_overlay_manager,
+    send_overlay_text,
+)

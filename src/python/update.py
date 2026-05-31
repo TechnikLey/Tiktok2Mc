@@ -110,7 +110,6 @@ WHITELIST_DIRS = {
     "config",
     "plugins/deathcounter",
     "plugins/likegoal",
-    "plugins/overlaytxt",
     "plugins/timer",
     "plugins/wincounter",
     "plugins/spotify",
