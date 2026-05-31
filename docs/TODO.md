@@ -39,6 +39,38 @@ Only manifest smoke tests exist for plugins. No tests for command handlers (play
 
 ---
 
+## 🟠 IMPORTANT — Plugin Coupling & Unfinished Work
+
+> These are **not** out-of-scope ideas. They are real structural issues that need to be addressed before v1.0.0, tracked here because they span multiple plugins.
+
+### Plugin Cross-Coupling
+Some plugins are not fully decoupled and still depend on each other's internal behaviour:
+- **Timer → WinCounter** dependency is hardcoded (`timer` plugin sends `add_win` commands to `win-counter` via `send_command()`). This should be declarative (e.g. `depends_on` + event subscription) rather than hardcoded target plugin name.
+- **DeathCounter → Timer** coupling exists in pause-on-death logic. Timer checks death-counter state directly.
+- **LikeGoal** emits events that other plugins may implicitly rely on; no formal contract documented.
+
+### Security
+- Spotify `client_secret` validation and encrypted storage
+- Download integrity verification (checksummed artifacts)
+
+### Architecture
+- Plugin sandboxing / resource limits
+
+### GUI
+- WebSocket/SSE client for real-time dashboard updates (beyond log streaming)
+- Overlay preview + live theme editor
+- Integrated Minecraft server console (RCON terminal)
+- Mobile-responsive web dashboard variant
+
+### Testing
+- Frontend/GUI integration tests (Playwright or similar)
+
+### Build & Packaging
+- Identify and strip dead modules from PyInstaller builds
+- Automated release notes generation from CHANGELOG
+
+---
+
 ## 📋 Next 3 Steps
 
 1. **Plugin Implementation Tests** — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) and add BasePlugin edge-case tests
