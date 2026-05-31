@@ -106,7 +106,7 @@ CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAu
 
 1. **Plugin Implementation Tests** *(in progress)* — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) and add BasePlugin edge-case tests
 2. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates)
-3. **Spotify OAuth Centralisation** — move tokens from `data/spotify_token.json` into `config.yaml` `spotify` section (aligns with `spotify_setup.py` output)
+3. **Spotify OAuth Centralisation** *(done)* — tokens moved from `data/spotify_token.json` into `config.yaml` `spotify` section. `SpotifyClient` now reads/writes via `core.yaml_utils` instead of a separate JSON file.
 
 ---
 

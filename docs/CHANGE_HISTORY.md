@@ -50,6 +50,7 @@
 - **Port Scanner** (`src/core/port_scanner.py`, 28 tests) — scans 3 bind ports (29185/29187/29188) on startup, auto-resolves conflicts via env vars + runtime file. `port_policy` config section with `max_offset: -1` for unlimited scanning.
 - **core_hash Build Cache Optimization** — replaced global all-or-nothing `core_hash_changed` flag with per-task dependency tracking via AST import analysis. Changing one core file only invalidates executables that actually import it.
 - **EventBus Plugin Integration** — replaced 0.5s polling loops with long-polling (`?wait=1`), backed by `asyncio.Event` notification on command enqueue. Zero-latency command delivery, no CPU wasted on idle polling.
+- **Spotify OAuth Centralisation** — tokens moved from `data/spotify_token.json` into `config.yaml` `spotify` section. `SpotifyClient` reads/writes via `core.yaml_utils` (`load_yaml` / `save_yaml`) instead of a separate JSON file, aligning with `spotify_setup.py` output.
 
 ### New Features
 - **API Authentication** — `api_key` config field, middleware checks `X-API-Key` header on non-localhost requests. `start.py` warns when exposed without key. 6 tests.

@@ -12,6 +12,8 @@ from pathlib import Path
 import requests
 import logging
 from core.base_plugin import BasePlugin
+from core.paths import get_config_file
+from core.yaml_utils import load_yaml, save_yaml
 
 log = logging.getLogger(__name__)
 
@@ -22,11 +24,11 @@ SCOPES = "user-read-playback-state user-modify-playback-state user-library-modif
 
 
 class SpotifyClient:
-    def __init__(self, client_id, client_secret, redirect_uri, token_file):
+    def __init__(self, client_id, client_secret, redirect_uri, config_path=None):
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
-        self.token_file = Path(token_file)
+        self.config_path = Path(config_path) if config_path else get_config_file()
         self.access_token = None
         self.refresh_token = None
         self.expires_at = 0
@@ -35,26 +37,27 @@ class SpotifyClient:
 
     def _load_tokens(self):
         with self._token_lock:
-            if self.token_file.exists():
-                try:
-                    data = json.loads(self.token_file.read_text(encoding="utf-8"))
-                    self.access_token = data.get("access_token")
-                    self.refresh_token = data.get("refresh_token")
-                    self.expires_at = data.get("expires_at", 0)
-                except Exception as e:
-                    log.info(f"[SPOTIFY] Failed to load tokens: {e}")
+            try:
+                cfg = load_yaml(self.config_path)
+                spotify_cfg = cfg.get("spotify", {})
+                self.access_token = spotify_cfg.get("access_token") or None
+                self.refresh_token = spotify_cfg.get("refresh_token") or None
+                self.expires_at = spotify_cfg.get("token_expires_at", 0)
+            except Exception as e:
+                log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
         with self._token_lock:
-            self.token_file.parent.mkdir(parents=True, exist_ok=True)
-            self.token_file.write_text(
-                json.dumps({
-                    "access_token": self.access_token,
-                    "refresh_token": self.refresh_token,
-                    "expires_at": self.expires_at,
-                }, indent=2),
-                encoding="utf-8",
-            )
+            try:
+                cfg = load_yaml(self.config_path)
+                if "spotify" not in cfg:
+                    cfg["spotify"] = {}
+                cfg["spotify"]["access_token"] = self.access_token or ""
+                cfg["spotify"]["refresh_token"] = self.refresh_token or ""
+                cfg["spotify"]["token_expires_at"] = int(self.expires_at) if self.expires_at else 0
+                save_yaml(self.config_path, cfg)
+            except Exception as e:
+                log.info(f"[SPOTIFY] Failed to save tokens: {e}")
 
     @property
     def is_authenticated(self):
@@ -281,13 +284,11 @@ class SpotifyControlPlugin(BasePlugin):
         self._device_id = cfg.get("device_id", "")
         self._volume_step = cfg.get("volume_step", 10)
         self._playtrack_mode = cfg.get("playtrack_mode", "replace")
-        self._token_file = self._data_dir / "spotify_token.json"
 
         self._client = SpotifyClient(
             self._client_id,
             self._client_secret,
             self._redirect_uri,
-            self._token_file,
         )
         self._auth_state = None
         self._last_track_id = None
