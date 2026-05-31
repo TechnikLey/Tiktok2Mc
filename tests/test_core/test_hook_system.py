@@ -20,7 +20,7 @@ def clean_registry():
 @pytest.fixture
 def hooks_dir():
     base = Path(__file__).resolve().parent.parent.parent
-    return (base / "src" / "event_hooks").resolve()
+    return (base / "src" / "hooks").resolve()
 
 
 def test_hooks_directory_exists(hooks_dir):

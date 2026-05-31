@@ -118,8 +118,8 @@ WHITELIST_DIRS = {
 
 # Individual files in subdirectories that may be overwritten.
 WHITELIST_DIR_FILES = {
-    "event_hooks/random.py",
-    "event_hooks/spotify.py",
+    "hooks/random/main.py",
+    "hooks/example_hook/main.py",
 }
 
 WHITELIST_FILES = {

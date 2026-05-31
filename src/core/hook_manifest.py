@@ -59,7 +59,7 @@ def discover_hooks_dirs() -> list[Path]:
     """Return all directories that should be scanned for hooks.
 
     Scans:
-    1. ``event_hooks/`` — standalone hooks shipped with the tool
+    1. ``hooks/`` — standalone hooks shipped with the tool
     2. ``plugins/*/hooks/`` — hooks bundled with specific plugins
     """
     from core.paths import get_root_dir
@@ -68,8 +68,8 @@ def discover_hooks_dirs() -> list[Path]:
     dirs: list[Path] = []
 
     # Main hooks directory (dev or release layout)
-    dev_hooks = root / "src" / "event_hooks"
-    rel_hooks = root / "event_hooks"
+    dev_hooks = root / "src" / "hooks"
+    rel_hooks = root / "hooks"
     main_hooks = dev_hooks if dev_hooks.is_dir() else rel_hooks
     if main_hooks.is_dir():
         dirs.append(main_hooks)

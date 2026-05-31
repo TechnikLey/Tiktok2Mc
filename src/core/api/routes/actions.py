@@ -161,9 +161,9 @@ async def get_registered_scripts():
                 candidates = []
                 base_dir = get_base_dir()
                 root_dir = get_root_dir()
-                candidates.append((base_dir / ".." / "event_hooks").resolve())
-                candidates.append(root_dir / "src" / "event_hooks")
-                candidates.append(root_dir / "event_hooks")
+                candidates.append((base_dir / ".." / "hooks").resolve())
+                candidates.append(root_dir / "src" / "hooks")
+                candidates.append(root_dir / "hooks")
 
                 hooks_dir = None
                 for p in candidates:

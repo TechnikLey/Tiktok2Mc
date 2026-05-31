@@ -203,11 +203,11 @@ def _load_single_hook(
             )
         return False
 
-    module_name = f"event_hooks.{manifest.name}"
+    module_name = f"hooks.{manifest.name}"
     try:
-        if "event_hooks" not in sys.modules:
+        if "hooks" not in sys.modules:
             import types
-            sys.modules["event_hooks"] = types.ModuleType("event_hooks")
+            sys.modules["hooks"] = types.ModuleType("hooks")
 
         spec = importlib.util.spec_from_file_location(module_name, main_py)
         if spec is None or spec.loader is None:
@@ -246,7 +246,7 @@ def load_event_hooks(
 
     This is the main entry point. It:
 
-    1. Discovers hooks in ``event_hooks/`` and ``plugins/*/hooks/``
+    1. Discovers hooks in ``hooks/`` and ``plugins/*/hooks/``
     2. Loads per-hook configs
     3. Syncs the persistent hook registry
     4. Loads each enabled hook's ``main.py`` entry point

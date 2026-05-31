@@ -95,7 +95,7 @@ def main():
             OUT_DIR / "server" / "mc" / "plugins" / "MinecraftServerAPI",
             OUT_DIR / "server" / "mc" / "world" / "datapacks" / "StreamingTool" / "data" / "streamingtool" / "function",
             OUT_DIR / "server" / "mc" / "plugins" / "DelayedTNT",
-            OUT_DIR / "event_hooks",
+            OUT_DIR / "hooks",
             OUT_DIR / "docs",
         ]
 
@@ -117,6 +117,8 @@ def main():
 
         # Find and add plugins
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
+        # Collect plugin hook dirs to copy raw later (not compiled to .exe)
+        plugin_hook_dirs: list[Path] = []
         if src_plugins_root.exists():
             for py_file in src_plugins_root.rglob("*.py"):
                 # Skip __pycache__ directories
@@ -124,6 +126,10 @@ def main():
                     continue
                 # Skip test plugins (dev-only, not for user release)
                 if "test" == py_file.parent.name and py_file.parent.parent.name == "plugins":
+                    continue
+                # Skip plugin hooks (these are imported in-process, not exec'd)
+                if "hooks" in py_file.parent.parts:
+                    plugin_hook_dirs.append(py_file.parent)
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
@@ -293,8 +299,12 @@ def main():
         sync_folder("assets",          OUT_DIR / "core" / "assets")
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
-        sync_folder("src/event_hooks", OUT_DIR / "event_hooks", exclude=["example_hook.py"])
-        sync_folder("docs",            OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
+        sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
+        # Copy plugin hooks as raw .py (not compiled to .exe — imported in-process)
+        for hook_src_dir in set(plugin_hook_dirs):
+            rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
+            sync_folder(hook_src_dir, OUT_DIR / rel_hook)
+        sync_folder("docs", OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),

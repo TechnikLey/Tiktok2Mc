@@ -17,7 +17,7 @@ if str(_src) not in sys.path:
 
 from core.version import TOOL_VERSION as VERSION
 
-MAIN_HOOKS_DIR = Path("src/event_hooks")
+MAIN_HOOKS_DIR = Path("src/hooks")
 PLUGINS_DIR = Path("src/plugins")
 
 MAIN_PY_TEMPLATE = '''\
@@ -134,7 +134,7 @@ def main():
 
     # Choose location: main hooks dir or plugin-bundled
     log.info("\nWhere should this hook be placed?")
-    log.info("  1) Main hooks directory (event_hooks/)")
+    log.info("  1) Main hooks directory (hooks/)")
     log.info("  2) Plugin-bundled (plugins/<plugin>/hooks/)")
     choice = input("Choice (1 or 2, default: 1): ").strip()
 
