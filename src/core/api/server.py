@@ -27,6 +27,8 @@ _LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from core.event_command_mapper import get_event_command_mapper
+
     log.info("API server v%s starting up ...", API_VERSION)
     log.info(
         "CORS origin restricted to localhost — "
@@ -36,8 +38,10 @@ async def lifespan(app: FastAPI):
     command_queue.set_loop(asyncio.get_running_loop())
     get_plugin_watcher().start()
     await get_health_monitor().start()
+    get_event_command_mapper().start()
     await event_bus.publish("server.started", {"version": API_VERSION})
     yield
+    await get_event_command_mapper().stop()
     await get_health_monitor().stop()
     await event_bus.publish("server.stopping", {})
     log.info("API server shutting down ...")

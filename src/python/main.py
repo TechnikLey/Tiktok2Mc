@@ -672,6 +672,21 @@ def load_shell_actions(file_path=SHELL_ACTIONS_FILE):
 # ==========================================
 # Webhook endpoint for MinecraftServerAPI
 # ==========================================
+def _publish_event(event_type: str, event_data: dict) -> None:
+    """Forward a Minecraft event to the central EventBus via API."""
+    body = json.dumps({"type": event_type, "data": event_data}).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except Exception as exc:
+        log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
+
+
 @app.route('/webhook', methods=['POST'])
 def handle_minecraft_events():
     try:
@@ -684,14 +699,17 @@ def handle_minecraft_events():
         return {"status": "no data"}, 400
 
     event = data.get("event")
+    player = data.get("player", "")
 
     if event == "player_death":
         ctx.queue_active = False
         log.info("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
-    
+        _publish_event("minecraft.player_death", {"player": player})
+
     elif event == "player_respawn":
         ctx.queue_active = True
         log.info("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
+        _publish_event("minecraft.player_respawn", {"player": player})
 
     return {"status": "processed"}, 200
 

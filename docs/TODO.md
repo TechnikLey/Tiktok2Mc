@@ -45,8 +45,8 @@ Only manifest smoke tests exist for plugins. No tests for command handlers (play
 
 ### Plugin Cross-Coupling
 Some plugins are not fully decoupled and still depend on each other's internal behaviour:
-- ✅ **Timer** — rewritten to publish `timer.*` events to the EventBus via `POST /api/v1/events`. No `depends_on`, no `send_command()` to other plugins. Consumers (hooks, plugins, dashboard) subscribe via EventBus or state polling. Configurable direction, loop, milestones, reset triggers, and signal events.
-- ⬜ **DeathCounter → Timer** coupling exists in pause-on-death logic. Timer no longer has built-in death handling; this should be moved to a hook or the death-counter plugin should send timer commands via API.
+- ✅ **Timer** — rewritten to publish `timer.*` events to the EventBus via `POST /api/v1/events`. No `depends_on`, no `send_command()` to other plugins. Configurable direction, loop, milestones, reset triggers, and signal events.
+- ✅ **Event-Command Mapper** — new central system (`core/event_command_mapper.py`) that wires EventBus events to plugin commands without any plugin coupling. Config lives in `data/event_commands.yaml`. Minecraft bridge now publishes `minecraft.player_death` and `minecraft.player_respawn` to EventBus. Example: `minecraft.player_death → pause(timer), pause(spotify-control)`.
 - ⬜ **LikeGoal** emits events that other plugins may implicitly rely on; no formal contract documented.
 
 ### Security

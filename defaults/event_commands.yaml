@@ -1,0 +1,35 @@
+# ===================================================================
+# Event-Command Mapper — Configuration
+# ===================================================================
+# Maps EventBus events to plugin commands.  When an event matching one
+# of the keys below is published, every listed action is dispatched to
+# the target plugin's command queue via the API.
+#
+# Format:
+#   event_type:
+#     - target: plugin_name
+#       command: command_name
+#       args: {}            # optional
+#
+# Example:
+#   minecraft.player_death:
+#     - target: timer
+#       command: pause
+#     - target: spotify-control
+#       command: pause
+#
+#   minecraft.player_respawn:
+#     - target: timer
+#       command: resume
+#
+#   timer.zero:
+#     - target: win-counter
+#       command: add_win
+#       args:
+#         amount: 1
+#
+# This file lives in data/event_commands.yaml at runtime.
+# Edit it there or via the API config editor.
+# ===================================================================
+
+event_commands: {}

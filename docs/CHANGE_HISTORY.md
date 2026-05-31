@@ -51,6 +51,7 @@
 - **core_hash Build Cache Optimization** — replaced global all-or-nothing `core_hash_changed` flag with per-task dependency tracking via AST import analysis. Changing one core file only invalidates executables that actually import it.
 - **EventBus Plugin Integration** — replaced 0.5s polling loops with long-polling (`?wait=1`), backed by `asyncio.Event` notification on command enqueue. Zero-latency command delivery, no CPU wasted on idle polling.
 - **Spotify OAuth Centralisation** — tokens moved from `data/spotify_token.json` into `config.yaml` `spotify` section. `SpotifyClient` reads/writes via `core.yaml_utils` (`load_yaml` / `save_yaml`) instead of a separate JSON file, aligning with `spotify_setup.py` output.
+- **Event-Command Mapper** (`src/core/event_command_mapper.py`, 8 tests) — central background task that listens to EventBus events and dispatches plugin commands via `CommandQueue`. Reads mapping config from `data/event_commands.yaml`. Eliminates all hardcoded plugin-to-plugin coupling. Minecraft bridge now publishes `minecraft.player_death` and `minecraft.player_respawn` to EventBus instead of only pausing the comment queue locally.
 
 ### New Features
 - **API Authentication** — `api_key` config field, middleware checks `X-API-Key` header on non-localhost requests. `start.py` warns when exposed without key. 6 tests.
@@ -118,7 +119,7 @@
 - Integrated into registry, plugin config, config.yaml, and actions.mca
 
 ### Testing
-- **678 Python tests + 226 GUI frontend tests = 904 total**
+- **690 Python tests + 226 GUI frontend tests = 916 total**
 - GUI frontend (Vitest + JSDOM): 226 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
 - CI workflow `test.yml` on push/PR to `main`
 - BackupManager: 30 standalone tests
@@ -133,6 +134,7 @@
 - GUI installer: 13 tests
 - Spotify OAuth helper: 16 tests
 - Timer plugin: 12 tests (direction, tick, loop, milestones, signals, formatting)
+- Event-Command Mapper: 8 tests (config loading, dispatch, lifecycle)
 - Test suite stability: infinite loop fix, `pytest-timeout = 40s`, heavy-import mocking
 
 ### Documentation
