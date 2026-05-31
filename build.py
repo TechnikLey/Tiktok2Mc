@@ -11,6 +11,7 @@ import subprocess
 import uuid
 import time
 import fnmatch
+import ast
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
@@ -161,24 +162,48 @@ def main():
                     h.update(chunk)
             return h.hexdigest()
 
-        def compute_core_hash():
-            """Compute a combined SHA256 of all src/core/**/*.py files.
-            If any core module changes, all dependent executables must rebuild."""
-            h = hashlib.sha256()
-            core_dir = SCRIPT_DIR / "src" / "core"
-            if core_dir.exists():
-                files = sorted(core_dir.rglob("*.py"))
-                for f in files:
-                    h.update(f.read_bytes())
-            return h.hexdigest()
+        def _add_core_dep(module, deps):
+            """Resolve a 'core.xxx.yyy' import to actual file paths (relative to SCRIPT_DIR)."""
+            rel = module.replace(".", "/")
+            base = SCRIPT_DIR / "src"
+            py_file = base / f"{rel}.py"
+            if py_file.exists():
+                deps.add(str(py_file.relative_to(SCRIPT_DIR)))
+            init_file = base / rel / "__init__.py"
+            if init_file.exists():
+                deps.add(str(init_file.relative_to(SCRIPT_DIR)))
+            parts = rel.split("/")
+            for i in range(1, len(parts)):
+                parent_init = base / "/".join(parts[:i]) / "__init__.py"
+                if parent_init.exists():
+                    deps.add(str(parent_init.relative_to(SCRIPT_DIR)))
 
-        core_hash = compute_core_hash()
-        core_hash_file = HASH_CACHE_DIR / "core.sha256"
-        core_hash_changed = True
-        if core_hash_file.exists():
-            if core_hash_file.read_text().strip() == core_hash:
-                core_hash_changed = False
-        core_hash_file.write_text(core_hash)
+        def resolve_core_imports(source_path):
+            """Return set of core file paths that source_path imports directly."""
+            deps = set()
+            try:
+                with open(source_path, "rb") as f:
+                    tree = ast.parse(f.read())
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.name == "core" or alias.name.startswith("core."):
+                                _add_core_dep(alias.name, deps)
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module and (node.module == "core" or node.module.startswith("core.")):
+                            _add_core_dep(node.module, deps)
+                            base_path = SCRIPT_DIR / "src" / node.module.replace(".", "/")
+                            for alias in node.names:
+                                if alias.name != "*":
+                                    sub_mod = base_path / f"{alias.name}.py"
+                                    if sub_mod.exists():
+                                        deps.add(str(sub_mod.relative_to(SCRIPT_DIR)))
+                                    sub_init = base_path / alias.name / "__init__.py"
+                                    if sub_init.exists():
+                                        deps.add(str(sub_init.relative_to(SCRIPT_DIR)))
+            except SyntaxError:
+                pass
+            return deps
 
         def build_one(item):
             full_src = Path(item["src"]).resolve()
@@ -186,13 +211,27 @@ def main():
             # Unique name for cache/hash
             safe_name = str(full_src.relative_to(SCRIPT_DIR)).replace(os.sep, "_")
             hash_file = HASH_CACHE_DIR / f"{safe_name}.sha256"
+            dep_hash_file = HASH_CACHE_DIR / f"{safe_name}.dep_sha256"
             cache_exe = EXE_CACHE_DIR / safe_name.replace(".py", SUFFIX)
 
             current_hash = sha256_file(full_src)
             need_build = True
 
-            if hash_file.exists() and cache_exe.exists() and not core_hash_changed:
-                if hash_file.read_text().strip() == current_hash:
+            # Compute dependency-inclusive hash
+            deps = resolve_core_imports(full_src)
+            dep_hasher = hashlib.sha256()
+            dep_hasher.update(current_hash.encode())
+            for dep in sorted(deps):
+                dep_path = SCRIPT_DIR / dep
+                if dep_path.exists():
+                    dep_hasher.update(sha256_file(dep_path).encode())
+                else:
+                    dep_hasher.update(b"")
+            combined_hash = dep_hasher.hexdigest()
+
+            if (hash_file.exists() and dep_hash_file.exists() and cache_exe.exists()):
+                if (hash_file.read_text().strip() == current_hash and
+                    dep_hash_file.read_text().strip() == combined_hash):
                     need_build = False
 
             target_dir = OUT_DIR if not item["dest"] else OUT_DIR / item["dest"]
@@ -231,6 +270,7 @@ def main():
                     shutil.copy2(fresh, final_path)
                     shutil.copy2(fresh, cache_exe)
                     hash_file.write_text(current_hash)
+                    dep_hash_file.write_text(combined_hash)
                     cprint(f"Done: {item['name']}", Color.GREEN)
                 else:
                     cprint(f"FAILED: {item['name']}", Color.RED)

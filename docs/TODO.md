@@ -17,17 +17,12 @@
 
 ## 🟡 HIGH — Should Ship Before v1.0.0
 
-### 2. Declarative Command Handler Registration
-`comment_commands` in `defaults/config.yaml` has hardcoded `handler: http` + `url:` for Spotify and other entries. Plugins should register their own command handlers dynamically via `POST /api/v1/plugins/{name}/commands` instead of URLs being baked into main config. Remove `handler` / `url` from global `comment_commands` schema. Bridge (main.py) should query the API for registered commands instead of reading them from config.
-
----
+*(none currently — see MEDIUM and Release Blocker above)*
 
 ## 🟢 MEDIUM — Nice to Have
 
-### 3. Build System Hardening
-### 4. Update Check UI
-### 5. `core_hash` Build Cache Optimization
-Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes. Could be refined to only invalidate dependent exes.
+### 2. `core_hash` Build Cache Optimization
+Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes. Refined to only invalidate dependent exes via per-task dependency tracking (static import analysis).
 
 ---
 
@@ -48,6 +43,7 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 - **End-to-end update validation** (`tests/test_core/test_update_integration.py`, 24 tests): version boundary upgrade, signal lifecycle, restart flow, rollback, platform paths
 - **Plugin dependency ordering** (`tests/test_core/test_dependency.py`, 30 tests): topological sort, validation on register/put/enable, `depends_on` in `AppConfig`, timer → win-counter enforced
 - **Port Scanner** (`src/core/port_scanner.py`, 28 tests): scans 3 bind ports (29185/29187/29188) on startup, auto-resolves conflicts via env vars + runtime file, `port_policy` config section with `max_offset: -1` for unlimited scanning
+- **Declarative Command Handler Registration** (`CommentHandler` model, `PUT/DELETE /plugins/{name}/comment-handler`, `GET /comment-handlers`): Spotify registers `$` prefix in `plugin.json`, bridge dispatches comments to plugin API instead of hardcoded HTTP URLs. Removed `handler`/`url` from `config.yaml` Spotify group.
 
 ---
 
@@ -70,7 +66,6 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 - Overlay preview + live theme editor
 - Integrated Minecraft server console (RCON terminal)
 - Mobile-responsive web dashboard variant
-- "Check for Updates" button + notification badge
 
 ### Testing
 - Frontend/GUI integration tests (Playwright or similar)
@@ -84,4 +79,4 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 
 ---
 
-*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total*
+*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total | Current: core_hash Build Cache Optimization. Next: Documentation Rewrite (DO LAST).*
