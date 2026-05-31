@@ -22,10 +22,6 @@ webhooks:
 
   # You can set a list of URLs which should be called when the Webhook is triggered.
   # You can set multiple URLs here.
-  #
-  # TikTok2Mc v1.0.0+ uses a single central webhook (29188) that forwards all
-  # events to the EventBus.  The old per-plugin ports (29189-29191) are
-  # eliminated — plugins no longer run their own Flask servers.
   urls:
     - "http://localhost:29188/webhook"
   
