@@ -554,7 +554,8 @@ class TestRunUpdateOrchestration:
                 (path / "version.txt").write_text(
                     "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
                 )
-                (path / "update.exe").write_text("new updater binary")
+                (path / "core").mkdir(exist_ok=True)
+                (path / "core" / "update.exe").write_text("new updater binary")
 
             with patch("python.update.requests.get") as mock_get, \
                  patch("python.update.subprocess.Popen") as mock_popen, \
