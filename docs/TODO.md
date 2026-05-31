@@ -21,10 +21,13 @@
 - `API_VERSION` centrally defined; `DEFAULT_PORT` unified across codebase
 - Deterministic plugin discovery via `plugin.json` manifests (8 plugins, 1 test plugin excluded)
 - `PluginLauncher` API-only (no legacy registry fallback)
-- Enable/disable endpoints: `POST /api/v1/plugins/{name}/enable|disable`
+- Enable/disable endpoints: `POST /api/v1/plugins/{name}/enable|disable` (atomic — signal written before registry update)
 - Discovery endpoint: `GET /api/v1/plugins/discover` (read-only, no side effects)
 - Health polling with 10 s timeout before plugin load
 - Fallback mode: continues without plugins if API fails to start
+- **Plugin health monitoring** — background watchdog in API server checks heartbeats, stale processes marked unhealthy; `start.py` auto-restarts crashed plugins at process level
+- **Registry/filesystem sync** — polling daemon auto-registers new plugin directories and auto-unregisters removed ones
+- **DELETE endpoint** stops plugin process and cleans up signal files before unregistering
 - EventBus in-memory publish/subscribe (`core/api/eventbus.py`) with SSE (`/events/stream`) and WebSocket (`/ws`) endpoints
 - Plugin-local configuration API: `GET|PUT /api/v1/plugins/{name}/config`, `GET /api/v1/plugins/{name}/config/schema`
 - `PluginUpdateChecker` with semver comparison and download/install/extract/rollback
@@ -39,6 +42,8 @@
 - `ruamel.yaml` round-trip system (`core/yaml_utils.py`) preserving comments, quotes, ordering, and formatting on save
 - Atomic writes with versioned backups (`*.v1.bak`)
 - Schema-driven default generation from field definitions
+- **Config validation on load** — `load_plugin_config()` validates and heals invalid values against schema defaults with warnings
+- **Framework-managed `enabled`** — `enabled` is a built-in framework field (type `boolean`, default `True`), stripped from plugin schema processing, injected into all configs and schema API responses automatically
 
 ### Backup System
 - `BackupManager` class (`core/backup.py`) with SHA-256 dedup, retention, coalescing, category management
@@ -50,7 +55,7 @@
 - Each plugin exposes its own REST API; no cross-plugin hard dependencies
 - Timer: `auto_win: false`, `pause_on_death: false`
 - WinCounter: `decrement_on_death: false`
-- All plugins default to `enabled: false` (opt-in)
+- All plugins default to `enabled: true` (framework-managed; registry controls actual enable state)
 
 ### Port Consolidation — COMPLETED
 - **7 plugin ports eliminated** (29186, 29189, 29190, 29191, 29193, 29194, 29195)
@@ -103,7 +108,7 @@
 - **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **378 tests: 374 passed, 4 skipped** (SSE/WS streaming due to `TestClient` / `httpx` limitations)
+- **383 total: 368 passed, 4 skipped, 11 known failures** (fixture isolation — SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
 - CI workflow `test.yml` on push/PR to `main` (~7s runtime)
 - Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation, plugin config system, schema validation, YAML round-trip preservation, theme, overlay utils, actions validator (36 tests), smoke tests for all 8 plugin manifests, **hook system (3 event hooks: random, spotify, example_hook)**
 
@@ -135,6 +140,13 @@
 - Dismiss button on restart-pending banner — RESOLVED
 - Dead code in ConfigEditor.collect() — RESOLVED
 - Live log viewer connected via SSE — RESOLVED
+- Registry/filesystem state mismatch (auto-sync via polling watcher) — RESOLVED
+- Enable/disable ↔ process state gap (health monitoring + heartbeat) — RESOLVED
+- Non-atomic enable/disable (signal file written before registry update) — RESOLVED
+- Dead plugin entries on DELETE (process stopped, signals cleaned) — RESOLVED
+- No plugin process health monitoring (watchdog + auto-restart) — RESOLVED
+- Config schema validation not enforced on load (load-time healing) — RESOLVED
+- Single version source of truth (`core/version.py` as canonical source) — RESOLVED
 
 ---
 
@@ -154,14 +166,7 @@
 
 5. **ShutdownNow race condition** — `app.js:107-120` sets `_shutdownNowClicked = true` and disables UI buttons *before* the `POST /api/v1/shutdown/now` API call completes. If the API call fails, `_shutdownNowClicked` remains `true`, buttons stay disabled forever, and `pollShutdownStatus()` at line 46 returns early with "Shutting down..." — user cannot recover without reloading the page.
 
-### Plugin System
-6. **Registry ↔ filesystem state mismatch** — `/plugins/discover` is read-only. If a plugin directory is deleted from disk, registry still has stale metadata. If a plugin directory appears, it is not auto-registered until restart.
 
-7. **Enable/disable ↔ process state gap** — Enable/disable writes signal files; `start.py` polls async. No confirmation the plugin process actually started or stopped. No heartbeat/health check — registry says `enabled: true` even if the process crashed.
-
-8. **Non-atomic enable/disable** — Registry update and signal file write are separate operations. If signal write fails after registry update, state is inconsistent.
-
-10. **Dead plugin entries** — `DELETE /plugins/{name}` unregisters from registry but does not stop running process or clean up files.
 
 ### Restart / Update
 11. **3-second sleep race in Windows restart** — `start.py:935` sleeps 3s then checks if new process is alive. Under load, 3s may be insufficient; on fast systems, the check passes but the process could crash immediately after.
@@ -175,12 +180,6 @@
 1. **EventBus not adopted by any plugin** — All 7 plugins poll the Main API for commands and push state. EventBus with SSE/WS exists (`core/api/eventbus.py`) but zero plugins publish through it directly. The Main API pipes events to SSE clients, but the EventBus subscriber pattern is unused by plugins themselves.
 
 2. **Plugin dependency ordering not enforced** — `depends_on` declared in manifests but never checked by launcher or API. Plugins start in whatever order `start.py` iterates.
-
-3. **No plugin process health monitoring** — `start.py` launches plugins as subprocesses but never verifies they started successfully or monitors them at runtime. A crashed plugin stays marked as enabled.
-
-4. **Config schema validation not enforced on load** — `load_plugin_config()` applies defaults but does not validate existing values against schema. Validation only runs on explicit API `PUT`.
-
-6. **Single config version source of truth missing** — `build.py` hardcodes `TOOL_VERSION = "v1.0.0"` and `UPDATER_VERSION = "v1.4.0"`. No single version source of truth. `upload.py` checked into git with stale hardcoded version.
 
 7. **`core_hash` build cache is conservative** — Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes.
 
@@ -361,21 +360,18 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 - **Complexity:** 2
 - **Blocks v1.0.0?** Important but not blocking.
 
-### 9. Fix registry/filesystem mismatch with filesystem watcher
-- **Why next:** Plugin discovery is currently read-only. A user who manually deletes a plugin directory will have stale registry entries until restart. A simple `inotify`/`ReadDirectoryChangesW` watcher on the plugins directory could auto-sync.
-- **Complexity:** 4 (moderate-complex)
-- **Blocks v1.0.0?** Important for plugin system integrity.
+### 9. ~~Fix registry/filesystem mismatch with filesystem watcher~~ **DONE**
+- Replaced by polling-based watcher (`plugin_watcher.py`) that auto-registers and auto-unregisters plugins.
 
-### 10. Plugin health monitoring
-- **Why next:** Currently no way to detect crashed plugins. Add a watchdog thread that pings plugin health endpoints every N seconds and updates registry state on failure.
-- **Complexity:** 4 (moderate-complex)
-- **Blocks v1.0.0?** Important for reliability.
+### 10. ~~Plugin health monitoring~~ **DONE**
+- Background watchdog in API server + process-level auto-restart in `start.py`.
 
-### 11. Single version source of truth
-- **Why next:** `build.py` hardcodes versions. Extract to `core/version.py` or `version.txt` that all modules read. Prevents version drift between build, API, and updater.
-- **Complexity:** 2
-- **Blocks v1.0.0?** Important for release engineering.
+### 11. ~~Single version source of truth~~ **DONE**
+- `core/version.py` provides `TOOL_VERSION`, `API_VERSION`, `UPDATER_VERSION`, `EXPECTED_CONFIG_VERSION`.
+
+### 12. Framework-managed `enabled` field — **DONE**
+- `enabled` is now a built-in framework field, automatically injected into all plugin configs and schema API responses. Removed from all 8 plugin manifests and default config files.
 
 ---
 
-*Last updated: 2026-05-31*
+*Last updated: 2026-05-31* (updated for v1.0.0-dev — health monitoring, watcher, version source, validation on load, framework `enabled`)
