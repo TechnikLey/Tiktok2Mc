@@ -37,7 +37,12 @@ class TestWinCounterPlugin:
             lambda d: {"decrement_on_death": False, **cfg_override},
         )
         monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
-        return WinCounterPlugin()
+        p = WinCounterPlugin()
+        p._data_dir = tmp_path / "data"
+        p._data_dir.mkdir(parents=True, exist_ok=True)
+        p._stats_file = p._data_dir / "stats.json"
+        p._manager._stats_path = p._stats_file
+        return p
 
     def test_initial_state(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
@@ -106,7 +111,11 @@ class TestDeathCounterPlugin:
         monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
         monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
         monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
-        return DeathCounterPlugin()
+        p = DeathCounterPlugin()
+        p._data_dir = tmp_path / "data"
+        p._data_dir.mkdir(parents=True, exist_ok=True)
+        p._manager._stats_path = p._data_dir / "deaths.json"
+        return p
 
     def test_initial_state(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
@@ -153,7 +162,10 @@ class TestLikeGoalPlugin:
             lambda d: {"initial_goal": 100, "goal_multiplier": 2, **cfg_override},
         )
         monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
-        return LikeGoalPlugin()
+        p = LikeGoalPlugin()
+        p._data_dir = tmp_path / "data"
+        p._data_dir.mkdir(parents=True, exist_ok=True)
+        return p
 
     def test_initial_state(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)

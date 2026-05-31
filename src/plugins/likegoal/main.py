@@ -22,9 +22,11 @@ class LikeManager:
                 self.goal = self.initial_goal
                 self.previous_goal = 0
             elif self.multiplier == 1:
+                self.likes -= self.goal
                 self.previous_goal = self.goal
                 self.goal += self.initial_goal
             else:
+                self.likes -= self.goal
                 self.previous_goal = self.goal
                 self.goal = int(self.goal * self.multiplier)
 
