@@ -82,4 +82,4 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 
 ---
 
-*Last updated: 2026-06-01 — 700+ Python tests pass, 3 skipped | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
+*Last updated: 2026-06-01 — 608 Python tests pass, 3 skipped | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*

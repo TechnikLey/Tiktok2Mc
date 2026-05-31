@@ -61,6 +61,18 @@
 - **GUI Installer** — Windows NSIS installer (`installer/install.nsi`). Setup wizard, desktop/start menu shortcuts, startup registration, uninstall. Built via `python build.py --installer`. 13 tests.
 - **Spotify OAuth Flow Helper** — CLI wizard (`src/python/spotify_setup.py`) guiding users through Spotify OAuth: opens browser, runs local callback server, exchanges code for tokens, saves to config. Also supports `--refresh` mode. 16 tests.
 
+### Shell Command Integration (actions.mca)
+- **Merged `shell_actions.txt` into `actions.mca`** — shell commands now use the `&` prefix inside `actions.mca` instead of a separate file. Unified parser, validator, serializer, and execution path.
+  - New `&` prefix: `12345:&curl -X POST http://localhost:29191/add`
+  - Full support in `ActionsService` parser/serializer (`shell` command type)
+  - Validator accepts `&` as valid prefix
+  - `generate_datapack()` parses `&` into `ctx.shell_actions_cache` (list-based, supports chaining via `;` and repetition via `xN`)
+  - `execute_global_command()` schedules shell commands alongside vanilla/RCON/script/overlay actions
+  - GUI Actions Editor supports `shell` type in dropdown with plain text input
+  - Removed legacy `load_shell_actions()` and `_migrate_shell_actions()` (v1.0.0 has no prior users to migrate)
+  - Removed `shell_actions.txt` from build release files and documentation
+  - Added `tests/test_core/test_actions_service.py` (9 tests) and expanded existing test coverage for shell parsing
+
 ### Test & Build Hardening
 - **Test suite stability fix** — fixed infinite tight-loop in `test_base_plugin.py` (2 tests calling `_command_polling_loop` without exit condition). Added `time.sleep(0.1)` safety guard in `BasePlugin._command_polling_loop`. Mocked heavy imports (`TikTokLive`, `mcrcon`, `flask`) in `conftest.py` to prevent test hangs. Configured `pytest-timeout = 40s`.
 - **End-to-end update validation** (`tests/test_core/test_update_integration.py`) — version boundary upgrade, signal lifecycle, restart flow, rollback, platform paths. 24 tests.
@@ -122,8 +134,8 @@
 - Integrated into registry, plugin config, config.yaml, and actions.mca
 
 ### Testing
-- **605 Python tests + 226 GUI frontend tests = 831 total**
-- GUI frontend (Vitest + JSDOM): 226 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
+- **608 Python tests + 228 GUI frontend tests = 836 total**
+- GUI frontend (Vitest + JSDOM): 228 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
 - CI workflow `test.yml` on push/PR to `main`
 - BackupManager: 30 standalone tests
 - TikTok bridge core: 38 tests
@@ -183,4 +195,4 @@
 
 ---
 
-*Last updated: 2026-05-31*
+*Last updated: 2026-06-01*
