@@ -38,12 +38,12 @@ CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAu
 
 ## 🟠 PLUGIN REWORK — Refactor Required
 
-### 7. Plugin Code Modernisation *(Timer done — 4 remaining)*
+### 7. Plugin Code Modernisation *(done — all 5 plugins)*
 - ✅ Timer refactored to `BasePlugin` (commit `b5e0f38`)
-- ⬜ Migrate `spotify`, `wincounter`, `deathcounter`, `likegoal` to `BasePlugin`
-- ⬜ Remove duplicated config load / theme load / `urllib.request` boilerplate
-- ⬜ Use `PluginAPIClient` and respect `SERVER_HOST` env var
-- ⬜ Move Spotify OAuth tokens from separate file into central `config.yaml`
+- ✅ `spotify`, `wincounter`, `deathcounter`, `likegoal` migrated to `BasePlugin` (commit `adb4f28`)
+- ✅ Duplicated config load / theme load / `urllib.request` boilerplate removed
+- ✅ Using BasePlugin API helpers (`api_post`, `api_get`, `push_state`, `register_handler`)
+- ⬜ Move Spotify OAuth tokens from separate file into central `config.yaml` (deferred)
 
 ## 🔵 TEST COVERAGE — Known Gaps
 
@@ -102,10 +102,10 @@ CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAu
 
 ## 🚀 Next 3 Steps
 
-1. **Finish Plugin Rework** — migrate `spotify`, `wincounter`, `deathcounter`, `likegoal` to `BasePlugin`, remove duplicated boilerplate
-2. **Plugin Implementation Tests** — add command handler tests across all 5 plugins (play, pause, add_win, player_death, player_respawn, reset, etc.)
-3. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates)
+1. **Plugin Implementation Tests** *(in progress)* — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) and add BasePlugin edge-case tests
+2. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates)
+3. **Spotify OAuth Centralisation** — move tokens from `data/spotify_token.json` into `config.yaml` `spotify` section (aligns with `spotify_setup.py` output)
 
 ---
 
-*Last updated: 2026-05-31 — 656 Python tests + 226 GUI frontend = 882 total | Current: Plugin Rework (4/5 remaining) → Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
+*Last updated: 2026-05-31 — 678 Python tests + 226 GUI frontend = 904 total | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
