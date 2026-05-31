@@ -13,12 +13,13 @@ from core.yaml_utils import save_yaml
 
 class TestOverlayClient:
     def test_initial_state(self):
-        client = OverlayClient("default", 8080, 3, 10)
+        client = OverlayClient("default", 3, 10)
         assert client.name == "default"
-        assert client.url == "http://127.0.0.1:8080/display/default"
+        assert client.max_fails == 3
+        assert client.cooldown == 10
 
     def test_cooldown_activates_after_max_fails(self):
-        client = OverlayClient("test", 8080, 2, 5)
+        client = OverlayClient("test", 2, 5)
         blocked, _ = client.get_cooldown_status()
         assert blocked is False
 
@@ -29,7 +30,7 @@ class TestOverlayClient:
         assert remaining <= 5
 
     def test_success_resets_cooldown(self):
-        client = OverlayClient("test", 8080, 2, 5)
+        client = OverlayClient("test", 2, 5)
         client.mark_failure()
         client.mark_failure()
         assert client.get_cooldown_status()[0] is True
@@ -76,7 +77,6 @@ class TestOverlayManager:
         save_yaml(
             overlay_dir / "config.yaml",
             {
-                "port": 29186,
                 "max_fails": 5,
                 "cooldown": 15,
                 "overlays": [{"name": "alerts"}, {"name": "chat"}],
@@ -92,7 +92,6 @@ class TestOverlayManager:
         assert "chat" in mgr.clients
         assert "default" in mgr.clients  # fallback
         assert mgr.clients["alerts"].max_fails == 5
-        assert mgr.clients["alerts"].url == "http://127.0.0.1:29186/display/alerts"
 
     def test_loads_fallback_defaults(self, tmp_path, monkeypatch):
         plugins_dir = tmp_path / "plugins"

@@ -39,7 +39,7 @@ class TestPluginRegistryBackup:
         reg_file = project_dir / "api_plugin_registry.json"
         reg_file.write_text(
             json.dumps([
-                {"name": "good", "path": "/a", "version": "1.0.0", "enabled": False, "level": 2, "port": 0, "ics": False, "description": ""},
+                {"name": "good", "path": "/a", "version": "1.0.0", "enabled": False, "level": 2, "ics": False, "description": ""},
                 {"name": "bad", "path": "/b", "version": 123},
             ]),
             encoding="utf-8",

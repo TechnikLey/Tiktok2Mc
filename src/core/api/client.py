@@ -50,7 +50,6 @@ def _api_to_app_config(data: dict[str, Any]) -> AppConfig:
         enable=data.get("enabled", False),
         level=data.get("level", 2),
         ics=data.get("ics", False),
-        port=data.get("port", 0),
     )
 
 

@@ -17,19 +17,6 @@ class TestPluginManifestModel:
             description="A test plugin",
         )
         assert m.name == "test-plugin"
-        assert m.primary_port == 0
-
-    def test_manifest_with_port(self):
-        from core.api.models import PluginManifest
-
-        m = PluginManifest(
-            name="timer",
-            version="1.2.0",
-            entry_point="src/plugins/timer/main.py",
-            display_name="Timer",
-            ports={"declared": [29189], "protocol": "tcp"},
-        )
-        assert m.primary_port == 29189
 
     def test_invalid_name_rejected(self):
         from core.api.models import PluginManifest

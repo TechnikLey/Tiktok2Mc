@@ -16,13 +16,6 @@ class TestPluginFieldValidation:
         )
         assert resp.status_code == 422
 
-    def test_register_negative_port_rejected(self, client):
-        resp = client.post(
-            "/api/v1/plugins/register",
-            json={"name": "p", "port": -1},
-        )
-        assert resp.status_code == 422
-
     def test_register_non_bool_ics_coerced(self, client):
         resp = client.post(
             "/api/v1/plugins/register",
@@ -36,13 +29,6 @@ class TestPluginFieldValidation:
         resp = client.put(
             "/api/v1/plugins/p",
             json={"level": 99},
-        )
-        assert resp.status_code == 422
-
-    def test_update_negative_port_rejected(self, client):
-        resp = client.put(
-            "/api/v1/plugins/p",
-            json={"port": -5},
         )
         assert resp.status_code == 422
 
@@ -78,7 +64,6 @@ class TestPluginUpsert:
                 "version": "2.1.0",
                 "enabled": True,
                 "level": 3,
-                "port": 8080,
                 "ics": True,
                 "description": "A full plugin",
             },
@@ -92,6 +77,5 @@ class TestPluginUpsert:
         assert p["version"] == "2.1.0"
         assert p["enabled"] is True
         assert p["level"] == 3
-        assert p["port"] == 8080
         assert p["ics"] is True
         assert p["description"] == "A full plugin"

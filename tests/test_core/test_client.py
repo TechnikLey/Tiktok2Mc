@@ -138,7 +138,6 @@ class TestRegisterPluginFunction:
             enable=True,
             level=2,
             ics=False,
-            port=0,
         )
         returned = {"name": "test", "path": "/t.exe", "enabled": True}
 

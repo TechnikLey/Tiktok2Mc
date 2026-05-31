@@ -8,7 +8,6 @@ class TestPluginEndpoints:
         "version": "1.0.0",
         "enabled": True,
         "level": 2,
-        "port": 9999,
         "ics": False,
         "description": "A test plugin",
     }
@@ -97,9 +96,8 @@ class TestPluginEndpoints:
 
     def test_update_plugin_partial_fields(self, client):
         client.post("/api/v1/plugins/register", json=self.PLUGIN)
-        resp = client.put("/api/v1/plugins/test-plugin", json={"level": 3, "port": 7777})
+        resp = client.put("/api/v1/plugins/test-plugin", json={"level": 3})
         assert resp.json()["level"] == 3
-        assert resp.json()["port"] == 7777
         assert resp.json()["enabled"] is True
 
     def test_register_twice_updates(self, client):
