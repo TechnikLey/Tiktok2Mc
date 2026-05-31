@@ -699,17 +699,21 @@ def handle_minecraft_events():
         return {"status": "no data"}, 400
 
     event = data.get("event")
-    player = data.get("player", "")
+    if not event:
+        return {"status": "no event"}, 400
 
+    # Legacy: local TikTok queue pause / resume
     if event == "player_death":
         ctx.queue_active = False
         log.info("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
-        _publish_event("minecraft.player_death", {"player": player})
-
     elif event == "player_respawn":
         ctx.queue_active = True
         log.info("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
-        _publish_event("minecraft.player_respawn", {"player": player})
+
+    # Publish every Minecraft event to the central EventBus generically.
+    # Any plugin, hook, or the Event-Command Mapper can react without
+    # hardcoded coupling.
+    _publish_event(f"minecraft.{event}", dict(data))
 
     return {"status": "processed"}, 200
 
