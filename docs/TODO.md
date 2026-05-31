@@ -108,12 +108,13 @@
 - **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **475 total: 460 passed, 4 skipped, 11 known failures** (fixture isolation — SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
+- **518 total: 513 passed, 5 skipped, 0 failures** (SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
 - CI workflow `test.yml` on push/PR to `main` (~9s runtime)
 - Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation, plugin config system, schema validation, YAML round-trip preservation, theme, overlay utils, actions validator (44 tests), smoke tests for all 8 plugin manifests, **hook system (3 event hooks: random, spotify, example_hook)**
 - **BackupManager** (core/backup.py): 30 standalone tests covering create, restore, list, dedup, coalescing, retention, category detection, edge cases
 - **TikTok bridge core** (main.py): 38 tests covering `sanitize_filename`, `validate_like_triggers`, `get_safe_username`, `load_shell_actions`, duplicate config detection, webhook event handling
 - **Update lifecycle** (update/restart flow): 24 tests covering signal file mechanism, API kill signal, polling-based restart, updater replacement logic, return code handling
+- **End-to-end update** (update.py): 34 tests covering config migration, whitelist copy, version I/O, extract_version regex, full `run_update()` orchestration, signal cleanup, platform paths
 
 ### Legacy Cleanup
 - `python/registry.py`, `client.py` legacy fallback, `--register-only` CLI flag removed
@@ -150,6 +151,9 @@
 - No plugin process health monitoring (watchdog + auto-restart) — RESOLVED
 - Config schema validation not enforced on load (load-time healing) — RESOLVED
 - Single version source of truth (`core/version.py` as canonical source) — RESOLVED
+- 11 pre-existing test failures caused by module-level `from core.paths import` capturing references before monkey-patching — RESOLVED (import → module attribute access pattern)
+- `update.py` module-level side effects (`load_config`, `input()`) crashing pytest on import — RESOLVED (moved to `_init()` guarded by `__name__`)
+- `server/` directory incorrectly whitelisted — RESOLVED (only root `server.exe`/`server.bin` is whitelisted via WHITELIST_FILES, not the `server/` dir)
 
 ---
 
@@ -196,7 +200,7 @@ All previously identified critical bugs are now resolved in the codebase.
 | `src/core/api/routes/events.py` | 80 | MEDIUM — SSE stream (skipped), only POST tested |
 | `src/core/api/updater.py` | 382 | MEDIUM — `_download_update()`, `install_update()` untested |
 | `src/python/gui.py` | 85 | LOW — pywebview shell |
-| `src/python/update.py` | ~500 | **HIGH** — Self-updater compiled binary, no tests |
+| `src/python/update.py` | ~500 | **COVERED** — 34 E2E tests (config migration, whitelist, version I/O, run_update orchestration, signals, platform paths) |
 | `build.py` | 422 | MEDIUM — Build system, no tests |
 | `create_plugin.py` | 151 | LOW — Plugin scaffolding |
 | `upload.py` | 51 | LOW — Release tagging |
@@ -208,7 +212,7 @@ All previously identified critical bugs are now resolved in the codebase.
 - **GUI (frontend):** Zero tests across `index.html`, `app.js` (2154 lines), `style.css`, `actions-editor.js` (636 lines)
 - **All 7 plugin implementations:** Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration)
 - **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): Hook loader tests exist but no functional tests
-- **End-to-end update flow:** No compiled binary test (update.exe → start.exe → restart)
+- **Compiled binary update flow:** `update.py` has 34 E2E tests but no compiled binary test (update.exe → start.exe → restart)
 - **SSE/WebSocket:** 4 tests permanently skipped (httpx/TestClient limitation)
 - **Test isolation:** Session-scoped fixtures share state across tests; `_clear_registry` fixture not consistently applied
 
@@ -340,7 +344,7 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 - "Check for Updates" button in `index.html:52-59`, backed by `checkAllUpdates()` in `app.js:2250`.
 
 ### 9. ~~End-to-end update tests~~ **DONE**
-- 24 tests covering signal files, API kill signal, restart polling, updater replacement, return code handling.
+- 24 signal/restart lifecycle tests + 34 E2E update.py tests (config migration, whitelist, version I/O, orchestration, signals, platform paths).
 
 ### 10. ~~BackupManager tests~~ **DONE**
 - 30 standalone tests covering create, restore, list, dedup, coalescing, retention, category detection.
@@ -348,12 +352,21 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 ### 11. ~~main.py bridge tests~~ **DONE**
 - 38 tests covering sanitize_filename, validate_like_triggers, get_safe_username, load_shell_actions, dup config detection.
 
-### 12. Remaining pre-v1.0.0 items
-- **Documentation**: CHANGELOG test count update, GUIDE.md refresh (see Option 3)
-- **GUI testing**: Zero frontend tests (index.html, app.js, actions-editor.js)
-- **Plugin implementation tests**: Only manifest smoke tests exist
-- **EventBus adoption**: Zero plugins use EventBus directly (post-v1.0.0)
+### 12. ~~Fix 11 pre-existing test failures (module-level import capturing)~~ **DONE**
+- Changed `from core.paths import get_root_dir` → `import core.paths` + `core.paths.get_root_dir()` in 6 files.
+- Refactored `update.py` to avoid module-level side effects.
+- All 513 tests pass (up from 460/11 failures).
+
+### 13. GUI Frontend Tests [IN PROGRESS]
+- Zero tests for `index.html`, `app.js` (2154 lines), `style.css`, `actions-editor.js` (636 lines).
+- Manual-only testing; any future regression goes undetected.
+
+### 14. Documentation Refresh ⬅️ LAST STEP BEFORE RELEASE
+- `CHANGELOG.md`: update test count (513 vs stale 285), add `Unreleased` entries for the above fixes.
+- `GUIDE.md`: still missing API server docs, event hooks, config versioning, actions editor docs.
+- `README.md`: minor review.
+- Do this last — code will keep changing until release.
 
 ---
 
-*Last updated: 2026-05-31* (updated for v1.0.0-dev — all Critical Bugs resolved, 92 new tests added, update lifecycle fixed)
+*Last updated: 2026-05-31* (updated for v1.0.0-dev — 513 tests pass, E2E update tests added, module-level import bugs fixed)

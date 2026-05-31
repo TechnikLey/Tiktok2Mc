@@ -13,3 +13,4 @@ core/runtime/plugin_start_test-plugin
 core/runtime/plugin_stop_channel-points
 core/runtime/plugin_stop_test-plugin
 core/runtime/shutdown
+templates/gui/node_modules/
