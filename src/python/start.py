@@ -26,6 +26,7 @@ from core.models import AppConfig
 from core.utils import load_config
 from core.paths import get_base_dir
 from core.api.server import DEFAULT_PORT
+from core.sandbox import PluginSandbox
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -66,6 +67,18 @@ if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
         log.error("This script must be run as root on Linux to start the tool.")
         input("Press Enter to exit...")
         sys.exit(1)
+
+# -----------------------------
+# Plugin sandbox
+# -----------------------------
+_sandbox_cfg = cfg.get("plugin_sandbox", {})
+_plugin_sandbox = PluginSandbox(
+    max_memory_mb=_sandbox_cfg.get("max_memory_mb"),
+    max_cpu_time=_sandbox_cfg.get("max_cpu_time"),
+    max_files=_sandbox_cfg.get("max_files", 256),
+    max_processes=_sandbox_cfg.get("max_processes", 32),
+    priority_class=_sandbox_cfg.get("priority_class", "below_normal"),
+) if _sandbox_cfg.get("enabled", False) else None
 
 # -----------------------------
 # Security warnings
@@ -401,8 +414,15 @@ def start_plugin_process(name, path_str, level=2, ics=False, gui_hidden=None):
         if IS_WINDOWS:
             kwargs = {}
             flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
-            kwargs["creationflags"] = flags
+            if _plugin_sandbox:
+                sandbox_kwargs = _plugin_sandbox.get_popen_kwargs()
+                # Merge creationflags so we keep the window flag
+                kwargs["creationflags"] = flags | sandbox_kwargs.get("creationflags", 0)
+            else:
+                kwargs["creationflags"] = flags
             proc = subprocess.Popen(cmd, **kwargs)
+            if _plugin_sandbox:
+                _plugin_sandbox.apply_post_spawn(proc)
             processes[name] = proc
         elif SESSION_TOOL == "tmux":
             session_name = _sanitize_session_name(f"mc-{name}")
@@ -410,6 +430,8 @@ def start_plugin_process(name, path_str, level=2, ics=False, gui_hidden=None):
                 ["tmux", "kill-session", "-t", session_name],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
+            # Note: resource limits cannot be enforced inside tmux sessions
+            # from the parent process. Sandbox limits are best-effort here.
             subprocess.Popen(
                 ["tmux", "new-session", "-d", "-s", session_name] + _build_display_env_tmux() + cmd
             )
@@ -430,8 +452,11 @@ def start_plugin_process(name, path_str, level=2, ics=False, gui_hidden=None):
             log_dir = BASE_DIR / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"{_sanitize_session_name(name)}.log"
+            kwargs = {}
+            if _plugin_sandbox:
+                kwargs.update(_plugin_sandbox.get_popen_kwargs())
             with open(log_file, "w", encoding="utf-8") as lf:
-                proc = subprocess.Popen(cmd, stdout=lf, stderr=lf)
+                proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, **kwargs)
             processes[name] = proc
 
         log.info(f"Plugin {name} started{' (hidden)' if hidden else ''}.")

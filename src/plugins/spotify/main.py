@@ -14,6 +14,7 @@ import logging
 from core.base_plugin import BasePlugin
 from core.paths import get_config_file
 from core.yaml_utils import load_yaml, save_yaml
+from core.secure_storage import secure_storage
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,27 @@ SPOTIFY_API = "https://api.spotify.com/v1"
 SPOTIFY_AUTH = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN = "https://accounts.spotify.com/api/token"
 SCOPES = "user-read-playback-state user-modify-playback-state user-library-modify user-read-currently-playing"
+
+
+def validate_spotify_client_secret(secret: str) -> tuple[bool, str]:
+    """Validate a Spotify client secret.
+
+    Returns ``(is_valid, message)``.  Spotify client secrets are
+    conventionally 32-character hexadecimal strings, but the check is
+    lenient enough to accept longer or non-hex secrets in case Spotify
+    changes their format.
+    """
+    if not secret:
+        return False, "client_secret is empty"
+    if len(secret) < 20:
+        return False, f"client_secret is too short ({len(secret)} chars, expected >= 20)"
+    if len(secret) == 32:
+        try:
+            int(secret, 16)
+            return True, "client_secret looks valid (32 hex chars)"
+        except ValueError:
+            return True, "client_secret is 32 chars but not hex — accepted anyway"
+    return True, f"client_secret accepted ({len(secret)} chars)"
 
 
 class SpotifyClient:
@@ -40,8 +62,8 @@ class SpotifyClient:
             try:
                 cfg = load_yaml(self.config_path)
                 spotify_cfg = cfg.get("spotify", {})
-                self.access_token = spotify_cfg.get("access_token") or None
-                self.refresh_token = spotify_cfg.get("refresh_token") or None
+                self.access_token = secure_storage.decrypt(spotify_cfg.get("access_token")) or None
+                self.refresh_token = secure_storage.decrypt(spotify_cfg.get("refresh_token")) or None
                 self.expires_at = spotify_cfg.get("token_expires_at", 0)
             except Exception as e:
                 log.info(f"[SPOTIFY] Failed to load tokens: {e}")
@@ -52,8 +74,8 @@ class SpotifyClient:
                 cfg = load_yaml(self.config_path)
                 if "spotify" not in cfg:
                     cfg["spotify"] = {}
-                cfg["spotify"]["access_token"] = self.access_token or ""
-                cfg["spotify"]["refresh_token"] = self.refresh_token or ""
+                cfg["spotify"]["access_token"] = secure_storage.encrypt(self.access_token) or ""
+                cfg["spotify"]["refresh_token"] = secure_storage.encrypt(self.refresh_token) or ""
                 cfg["spotify"]["token_expires_at"] = int(self.expires_at) if self.expires_at else 0
                 save_yaml(self.config_path, cfg)
             except Exception as e:
@@ -276,7 +298,14 @@ class SpotifyControlPlugin(BasePlugin):
         super().__init__()
         cfg = self.config
         self._client_id = cfg.get("client_id", "")
-        self._client_secret = cfg.get("client_secret", "")
+        raw_secret = cfg.get("client_secret", "")
+        self._client_secret = secure_storage.decrypt(raw_secret) or raw_secret
+        # Validate and warn if the secret looks suspicious
+        valid, msg = validate_spotify_client_secret(self._client_secret)
+        if not valid:
+            log.warning("[SPOTIFY] %s", msg)
+        else:
+            log.debug("[SPOTIFY] %s", msg)
         self._redirect_uri = cfg.get(
             "redirect_uri",
             "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control",

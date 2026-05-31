@@ -28,6 +28,7 @@ if str(_src) not in sys.path:
 from core.utils import load_config
 from core.yaml_utils import save_yaml
 from core.paths import get_root_dir
+from core.secure_storage import secure_storage
 
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
@@ -78,6 +79,10 @@ def _load_spotify_config() -> dict[str, Any]:
 def _save_spotify_config(data: dict[str, Any]) -> None:
     cfg_file = _get_config_file()
     cfg = load_config(cfg_file)
+    # Encrypt sensitive fields before persisting
+    for key in ("client_secret", "access_token", "refresh_token"):
+        if key in data and data[key]:
+            data[key] = secure_storage.encrypt(data[key])
     cfg["spotify"] = data
     save_yaml(cfg_file, cfg)
     print(f"\n[OK] Spotify config saved to {cfg_file}")
@@ -279,8 +284,9 @@ def refresh():
     spotify_cfg = _load_spotify_config()
 
     client_id = spotify_cfg.get("client_id", "")
-    client_secret = spotify_cfg.get("client_secret", "")
-    refresh_token_val = spotify_cfg.get("refresh_token", "")
+    raw_secret = spotify_cfg.get("client_secret", "")
+    client_secret = secure_storage.decrypt(raw_secret) or raw_secret
+    refresh_token_val = secure_storage.decrypt(spotify_cfg.get("refresh_token")) or spotify_cfg.get("refresh_token", "")
 
     if not all([client_id, client_secret, refresh_token_val]):
         print("[FAIL] Missing credentials. Run setup first.")

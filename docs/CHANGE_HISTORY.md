@@ -170,6 +170,17 @@
 - `update.py` module-level side effects crashing pytest on import
 - `server/` directory incorrectly whitelisted
 
+### Security
+- **Spotify client_secret validation and encrypted storage** — `validate_spotify_client_secret()` enforces length/format checks. `core/secure_storage.py` provides Fernet-encrypted storage for `client_secret`, `access_token`, and `refresh_token` in `config.yaml`. Fallback XOR obfuscation when `cryptography` is unavailable.
+- **Download integrity verification** — `core/checksum.py` provides `compute_sha256`, `verify_checksum`, `fetch_checksum`, and `find_checksum_asset_url`. Plugin updater (`core/api/updater.py`) and tool updater (`src/python/update.py`) now verify SHA-256 checksums after download and abort on mismatch. CI workflow generates `.sha256` companion files for release archives.
+
+### Architecture
+- **Plugin sandboxing / resource limits** — `core/sandbox.py` introduces `PluginSandbox` with cross-platform resource restriction:
+  - Linux: `RLIMIT_AS` (memory), `RLIMIT_CPU`, `RLIMIT_NOFILE`, `RLIMIT_NPROC` via `preexec_fn`, plus lowered niceness.
+  - Windows: `BELOW_NORMAL_PRIORITY_CLASS` / `IDLE_PRIORITY_CLASS` via `creationflags`, plus optional job-object memory limits via `apply_post_spawn()`.
+  - Configurable via new `plugin_sandbox` section in `config.yaml`.
+  - Integrated into `start.py` `start_plugin_process()` for direct-spawn plugins.
+
 ---
 
 *Last updated: 2026-05-31*

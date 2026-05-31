@@ -368,7 +368,26 @@ update:
 #   client_secret: Your Spotify Developer app Client Secret
 #   redirect_uri:  Must match exactly in your Spotify app settings
 #
-# After OAuth setup, access_token and refresh_token are populated automatically.
+  # After OAuth setup, access_token and refresh_token are populated automatically.
+
+# --- PLUGIN SANDBOX ---
+# Restricts plugin subprocess resources to limit the impact of
+# misbehaving or compromised plugins.
+#
+#   enabled:        true/false to enable sandboxing
+#   max_memory_mb:  Maximum RAM per plugin (Linux direct / Windows job)
+#   max_cpu_time:   Maximum CPU seconds per plugin (Linux only)
+#   max_files:      Maximum open file descriptors (Linux only)
+#   max_processes:  Maximum child processes per plugin (Linux only)
+#   priority_class: Windows process priority (below_normal / idle)
+plugin_sandbox:
+  enabled: false
+  max_memory_mb: 512
+  max_cpu_time: 3600
+  max_files: 256
+  max_processes: 32
+  priority_class: "below_normal"
+
 spotify:
   enabled: false
   client_id: ""

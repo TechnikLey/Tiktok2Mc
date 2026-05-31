@@ -64,6 +64,8 @@ jobs:
         run: |
           cd build-windows && zip -9 -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
           GZIP=-9 tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
+          sha256sum TikTok2Mc-${{ github.ref_name }}-Windows.zip > TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
+          sha256sum TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz > TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -71,3 +73,5 @@ jobs:
           files: |
             TikTok2Mc-${{ github.ref_name }}-Windows.zip
             TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz
+            TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
+            TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256

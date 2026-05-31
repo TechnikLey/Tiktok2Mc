@@ -53,11 +53,11 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 - ✅ **Event-Command Mapper** — central wiring via `data/event_commands.yaml` maps any EventBus event to plugin commands without coupling.
 
 ### Security
-- Spotify `client_secret` validation and encrypted storage
-- Download integrity verification (checksummed artifacts)
+- ~~Spotify `client_secret` validation and encrypted storage~~ ✅ Done (see CHANGE_HISTORY.md)
+- ~~Download integrity verification (checksummed artifacts)~~ ✅ Done (see CHANGE_HISTORY.md)
 
 ### Architecture
-- Plugin sandboxing / resource limits
+- ~~Plugin sandboxing / resource limits~~ ✅ Done (see CHANGE_HISTORY.md)
 
 ### GUI
 - WebSocket/SSE client for real-time dashboard updates (beyond log streaming)

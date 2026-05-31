@@ -22,6 +22,8 @@ from typing import Any
 
 from packaging import version as version_parse
 
+from core.checksum import compute_sha256, fetch_checksum, find_checksum_asset_url, verify_checksum
+
 log = logging.getLogger(__name__)
 
 _TIMEOUT = 10
@@ -308,6 +310,39 @@ class PluginUpdateChecker:
         if not _download_update(download_url, archive_path):
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return False
+
+        # ── Integrity verification ──────────────────────────────────
+        expected_hash = None
+        if "api.github.com" in update_url:
+            # Try to find a companion .sha256 asset in the release
+            checksum_url = find_checksum_asset_url(assets, target_asset["name"])
+            if checksum_url:
+                try:
+                    req = urllib.request.Request(
+                        checksum_url,
+                        headers={"User-Agent": _USER_AGENT, "Accept": "application/octet-stream"},
+                    )
+                    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+                        body = resp.read().decode("utf-8").strip()
+                        for line in body.splitlines():
+                            parts = line.strip().split()
+                            if parts:
+                                candidate = parts[0].lower()
+                                if len(candidate) == 64 and all(
+                                    c in "0123456789abcdef" for c in candidate
+                                ):
+                                    expected_hash = candidate
+                                    break
+                except Exception as exc:
+                    log.debug("Could not fetch checksum asset for '%s': %s", name, exc)
+        else:
+            expected_hash = fetch_checksum(download_url)
+
+        if expected_hash and not verify_checksum(archive_path, expected_hash):
+            log.error("Aborting update for '%s' — checksum verification failed", name)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return False
+        # ─────────────────────────────────────────────────────────────
 
         # Extract
         import zipfile

@@ -27,6 +27,7 @@ from core.backup import get_backup_manager
 from core.paths import get_base_dir
 from core.utils import load_config, normalize_config_version
 from core.api.server import DEFAULT_PORT
+from core.checksum import compute_sha256, fetch_checksum, verify_checksum
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
@@ -393,6 +394,40 @@ def run_update():
             TEMP_DIR.mkdir(parents=True, exist_ok=True)
         archive_path = TEMP_DIR / archive_name
         download_with_progress(asset["url"], archive_path)
+
+        # ── Integrity verification ──────────────────────────────────
+        expected_hash = None
+        # Look for a companion .sha256 asset in the same release
+        for a in release.get("assets", []):
+            if a["name"].lower() == archive_name.lower() + ".sha256":
+                try:
+                    r = requests.get(
+                        a["url"],
+                        headers=HEADERS_ASSET,
+                        timeout=10,
+                    )
+                    r.raise_for_status()
+                    for line in r.text.strip().splitlines():
+                        parts = line.strip().split()
+                        if parts:
+                            candidate = parts[0].lower()
+                            if len(candidate) == 64 and all(
+                                c in "0123456789abcdef" for c in candidate
+                            ):
+                                expected_hash = candidate
+                                break
+                except Exception as exc:
+                    log.debug("Could not fetch checksum asset: %s", exc)
+                break
+        if not expected_hash:
+            expected_hash = fetch_checksum(asset["url"])
+
+        if expected_hash and not verify_checksum(archive_path, expected_hash):
+            log.error("[FAIL] Downloaded archive checksum does not match expected value.")
+            if TEMP_DIR.exists():
+                shutil.rmtree(TEMP_DIR, ignore_errors=True)
+            sys.exit(5)
+        # ─────────────────────────────────────────────────────────────
 
         if sys.platform == "win32":
             with zipfile.ZipFile(archive_path, "r") as z:

@@ -14,3 +14,4 @@ core/runtime/plugin_stop_channel-points
 core/runtime/plugin_stop_test-plugin
 core/runtime/shutdown
 templates/gui/node_modules/
+data/.enc_key
