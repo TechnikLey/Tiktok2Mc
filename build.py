@@ -49,6 +49,7 @@ def main():
         # ----- Configuration -----
         MAX_THREADS = 8
         MAX_COPY_THREADS = 16
+        BUILD_INSTALLER = "--installer" in sys.argv
 
         IS_WINDOWS = sys.platform == "win32"
         SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -459,6 +460,31 @@ def main():
             'input("\\nPress Enter to exit...")\n'
         )
         Path("upload.py").write_text(upload_content, encoding="utf-8")
+
+        # ----- GUI Installer -----
+        if BUILD_INSTALLER and IS_WINDOWS:
+            cprint("Building GUI installer...", Color.CYAN)
+            import subprocess as _sp
+            nsis_script = SCRIPT_DIR / "installer" / "install.nsi"
+            installer_out = SCRIPT_DIR / "build" / f"TikTok2MC-{TOOL_VERSION}-Setup.exe"
+            if nsis_script.exists():
+                try:
+                    _sp.run(
+                        ["makensis",
+                         f"-DPRODUCT_VERSION={TOOL_VERSION}",
+                         f"-DOUT_FILE={installer_out}",
+                         str(nsis_script)],
+                        check=True, capture_output=True,
+                    )
+                    cprint(f"Installer created: {installer_out}", Color.GREEN)
+                except FileNotFoundError:
+                    cprint("makensis not found — install NSIS to build installer", Color.YELLOW)
+                except _sp.CalledProcessError as e:
+                    cprint(f"Installer build failed: {e.stderr.decode(errors='replace')}", Color.RED)
+            else:
+                cprint(f"NSIS script not found at {nsis_script}", Color.YELLOW)
+        elif BUILD_INSTALLER and not IS_WINDOWS:
+            cprint("Installer build skipped — Windows only", Color.YELLOW)
 
         # --- Finish ---
         elapsed = time.time() - start

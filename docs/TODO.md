@@ -28,8 +28,8 @@ Implement API-Key auth for `server_host: 0.0.0.0` deployments. Dashboard and API
 ### 4. Plugin Implementation Tests
 Only manifest smoke tests exist for plugins. No tests for command handlers (play, pause, add_win, player_death, etc.) across all 5 plugins. High regression risk.
 
-### 5. GUI Installer
-Setup wizard, shortcuts, startup registration, install location picker. Currently users must manually extract the release zip.
+### 5. GUI Installer *(in progress)*
+Windows NSIS installer (`installer/install.nsi`). Setup wizard, desktop/start menu shortcuts, startup registration, uninstall. Built via `python build.py --installer`.
 
 ### 6. Spotify OAuth Flow Helper
 GUI assistant that walks users through Spotify Developer app creation, redirect URI setup, and token exchange. Most complex plugin, most painful setup.
