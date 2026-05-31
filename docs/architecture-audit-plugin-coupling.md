@@ -136,15 +136,15 @@ This means the **main system owns knowledge** of Spotify's internal command voca
 
 ### 3.2 High-Priority Decoupling Targets
 
-#### 🔴 Target 1: Remove `comment_commands` from main config
-**Severity:** Critical
-**Why:** The main system owns a full chat-command engine that should be a plugin or hook.
+#### 🟡 Target 1: Extract plugin-specific parts from `comment_commands`
+**Severity:** Medium
+**Why:** `comment_commands` is a **core feature** (command parsing + execution framework belongs in main.py). BUT plugin-specific command definitions (Spotify `$` commands, ChannelPoints `points_cost`, plugin-specific URLs) leak plugin internals into the main config.
 **Migration:**
-1. Create a new plugin: `plugins/command-processor/` (or absorb into `channel-points`)
-2. Move `comment_commands` config to the plugin's own `config.yaml`
-3. Move the command execution logic from `main.py` to the plugin
-4. The plugin subscribes to `comment` events via EventBus (or polls its command queue)
-5. `main.py` only publishes raw `comment` events; the plugin decides what to do with them
+1. Keep `comment_commands` framework in `main.py` (parsing, roles, cooldowns, prefix matching)
+2. Remove Spotify-specific `$` command group from `defaults/config.yaml` — move to `plugins/spotify/config.yaml` under a `commands` or `chat_commands` key
+3. Remove `points_cost` from command definitions — ChannelPoints plugin should handle its own economy, main system just fires `comment` events
+4. Core provides a command registration hook: plugins register their command handlers via API (`POST /api/v1/plugins/{name}/commands/register` or via EventBus)
+5. `main.py` fires `comment` events to EventBus; plugins can subscribe and handle their own prefixes
 
 #### 🔴 Target 2: Decouple `channel-points` from main event loop
 **Severity:** Critical
@@ -294,7 +294,7 @@ This means the **main system owns knowledge** of Spotify's internal command voca
 | 1 | `main.py` hardcodes `channel-points` on every event | 🔴 Critical | Phase B |
 | 2 | `main.py` hardcodes `like-goal` for like triggers | 🔴 Critical | Phase B |
 | 3 | `overlay_utils.py` hardcoded to `overlay-text` | 🔴 Critical | Phase B |
-| 4 | `comment_commands` lives in main config | 🔴 Critical | Phase B |
+| 4 | Plugin-specific command definitions in `comment_commands` config | 🟡 Medium | Phase C |
 | 5 | `random_triggers` in main config | 🟡 Medium | Phase C |
 | 6 | `minecraft_server_api` in main config | 🟡 Medium | Phase C |
 | 7 | `theme.py` hardcoded plugin keys | 🟢 Low | Phase D |

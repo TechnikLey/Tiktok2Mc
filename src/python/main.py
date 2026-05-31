@@ -31,8 +31,9 @@ from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
-from core.plugin_config import load_all_plugin_configs
+
 from core.yaml_utils import load_yaml
+from core.api.eventbus import event_bus
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -84,7 +85,6 @@ class BotContext:
         # Queues
         self.trigger_queue = asyncio.Queue(maxsize=10_000)
         self.rcon_queue = asyncio.Queue(maxsize=10_000)
-        self.likegoal_queue = asyncio.Queue()
 
         # Throttling
         self.throttle_time = 0.5
@@ -110,11 +110,6 @@ class BotContext:
         # RCON state
         self.rcon_connection = None
         self.last_rcon_attempt = 0
-
-        # Like goal state
-        self.last_likegoal_sent = 0
-        self.last_likegoal_time = 0
-        self.likegoal_interval = 3
 
         # TikTok state
         self.disable_tiktok_connect = False
@@ -219,9 +214,6 @@ def load_config():
             ctx.follow_tracking_file.write_text("")
             ctx._followed_cache.clear()
             log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
-
-        like_goal_cfg = load_all_plugin_configs().get("like-goal", {})
-        ctx.like_triggers = validate_like_triggers(like_goal_cfg.get("triggers", []))
 
         comment_cmd_cfg = config.get("comment_commands", {})
         ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
@@ -696,35 +688,6 @@ def handle_minecraft_events():
 API_BASE = "http://127.0.0.1:29185/api/v1"
 
 
-def _plugin_command(plugin_name, command, **kwargs):
-    import urllib.request
-    import json
-    try:
-        body = json.dumps({"command": command, "args": kwargs}).encode()
-        req = urllib.request.Request(
-            f"{API_BASE}/plugins/{plugin_name}/command",
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        urllib.request.urlopen(req, timeout=5)
-        return True
-    except Exception as e:
-        log.info(f"[PLUGIN-CMD] {plugin_name}/{command} failed: {e}")
-        return False
-
-
-def _plugin_get_state(plugin_name):
-    import urllib.request
-    import json
-    try:
-        resp = urllib.request.urlopen(f"{API_BASE}/plugins/{plugin_name}/state", timeout=5)
-        return json.loads(resp.read().decode())
-    except Exception as e:
-        log.info(f"[PLUGIN-STATE] {plugin_name} failed: {e}")
-        return None
-
-
 def _dispatch_comment_http(cmd_url, username, cmd_text):
     import urllib.request
     import urllib.parse
@@ -755,8 +718,13 @@ def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
 
 
 
-def _ping_channel_points(user):
-    _plugin_command("channel-points", "ping", user=user)
+def _publish_tiktok_event(event_type: str, user: str, **extra):
+    """Publish a TikTok event to the EventBus for plugins to consume."""
+    if ctx.main_loop is not None:
+        data = {"type": event_type, "user": user, **extra}
+        asyncio.run_coroutine_threadsafe(
+            event_bus.publish("tiktok.event", data), ctx.main_loop
+        )
 
 
 def _process_follow(username: str, persist: bool = True):
@@ -775,21 +743,6 @@ def _process_follow(username: str, persist: bool = True):
             log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
     if "follow" in ctx.valid_functions:
         ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
-
-
-def _get_user_points(user):
-    _plugin_command("channel-points", "get_points", user=user)
-    time.sleep(0.1)
-    state = _plugin_get_state("channel-points")
-    if state and isinstance(state, dict):
-        data = state.get("state", {})
-        if isinstance(data, dict):
-            user_points = data.get("user_points", {})
-            return user_points.get(user.lower(), user_points.get(user, 0))
-    return 0
-
-def _deduct_user_points(user, amount):
-    return _plugin_command("channel-points", "spend", user=user, amount=amount)
 
 
 def _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[COMMENT CMD]"):
@@ -889,23 +842,7 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                     suppress = True
                 continue
 
-        points_cost = ccfg.get("points_cost", 0)
         conditional = ccfg.get("conditional", False)
-
-        if points_cost > 0:
-            balance = _get_user_points(username)
-            if balance < points_cost:
-                log.info(f"{log_prefix} {username} → not enough points for '{base_cmd}' (has {balance}, needs {points_cost})")
-                if not group.get("trigger_comment_event", True):
-                    suppress = True
-                continue
-            if not conditional:
-                if not _deduct_user_points(username, points_cost):
-                    log.info(f"{log_prefix} {username} points deduction failed for '{base_cmd}'")
-                    if not group.get("trigger_comment_event", True):
-                        suppress = True
-                    continue
-                log.info(f"{log_prefix} {username} spent {points_cost} points on '{base_cmd}'")
 
         cmd_url = ccfg.get("url", group["url"])
         cmd_handler = ccfg.get("handler", group["handler"])
@@ -934,11 +871,6 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                     ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
                     ctx.comment_cmd_global_last = now
                     ctx.comment_cmd_global_user_last[username] = now
-                    if points_cost > 0:
-                        if _deduct_user_points(username, points_cost):
-                            log.info(f"{log_prefix} {username} spent {points_cost} points on '{base_cmd}'")
-                        else:
-                            log.info(f"{log_prefix} {username} points deduction failed for '{base_cmd}'")
                     mode_label = resp_data.get("mode", "replace")
                     if mode_label == "queue":
                         log.info(f"{log_prefix} {username} → '{base_cmd}' successful — song added to queue")
@@ -1112,165 +1044,11 @@ def get_safe_username(user):
     return name
 
 # =========================================
-# Likegoal worker (forwards like counts)
-# =========================================
-async def likegoal_worker():
-    log.info("[LIKEGOAL-QUEUE] Worker started.")
-    while True:
-        delta_val = await ctx.likegoal_queue.get()
-        try:
-            _plugin_command("like-goal", "add_likes", delta=delta_val)
-        except Exception as e:
-            log.info(f"[LIKEGOAL ERROR] {e}")
-        finally:
-            ctx.likegoal_queue.task_done()
-
-# =========================================
 # Like trigger validation
 # =========================================
 
-def validate_like_triggers(raw_triggers):
-    """
-    Validates and normalizes like_triggers from the config.
-
-    Rules:
-    - id: required, non-empty string
-    - every: required, int > 0 (accepts "100_000")
-    - function: required, string
-    - payload: optional, default "Community"
-    - enable: optional, default True (cast to bool)
-    """
-
-    valid_triggers = []
-    seen_ids = set()
-
-    for i, rule in enumerate(raw_triggers):
-        if not isinstance(rule, dict):
-            log.info(f"[CONFIG ERROR] Entry #{i} is not an object: {rule}")
-            continue
-
-        # --- ID ---
-        rule_id = rule.get("id")
-        if not isinstance(rule_id, str) or not rule_id.strip():
-            log.info(f"[CONFIG ERROR] Invalid or missing 'id': {rule}")
-            continue
-
-        if rule_id in seen_ids:
-            log.info(f"[CONFIG ERROR] Duplicate id '{rule_id}'")
-            continue
-        seen_ids.add(rule_id)
-
-        # --- EVERY (trigger interval) ---
-        raw_every = rule.get("every")
-        if raw_every is None:
-            log.info(f"[CONFIG ERROR] 'every' missing for {rule_id}")
-            continue
-
-        try:
-            if isinstance(raw_every, str):
-                raw_every = raw_every.replace("_", "")
-            every = int(raw_every)
-
-            if every <= 0:
-                raise ValueError()
-
-        except Exception:
-            log.info(f"[CONFIG ERROR] Invalid 'every' value for {rule_id}: {raw_every}")
-            continue
-
-        # --- FUNCTION (action to execute) ---
-        function_name = rule.get("function")
-        if not isinstance(function_name, str) or not function_name.strip():
-            log.info(f"[CONFIG ERROR] Invalid or missing 'function' for {rule_id}")
-            continue
-
-        # --- PAYLOAD (user label, optional) ---
-        payload = rule.get("payload", "Community")
-        if not isinstance(payload, str):
-            log.info(f"[CONFIG ERROR] 'payload' must be a string for {rule_id}")
-            continue
-
-        # --- ENABLE (on/off toggle, optional) ---
-        enable = rule.get("enabled", True)
-
-        # Cast to bool (handles strings like "true", "false")
-        if isinstance(enable, str):
-            enable = enable.lower() in ("true", "1", "yes", "on")
-
-        enable = bool(enable)
-
-        # --- Final cleaned rule ---
-        clean_rule = {
-            "id": rule_id,
-            "every": every,
-            "function": function_name,
-            "payload": payload,
-            "enable": enable,
-        }
-
-        valid_triggers.append(clean_rule)
-
-    return valid_triggers
-
-def prepare_like_triggers(raw_triggers):
-    prepared = []
-
-    for rule in raw_triggers:
-        if not rule["enable"]:
-            continue
-
-        if rule["function"] not in ctx.valid_functions:
-            log.info(f"[CONFIG ERROR] Unknown function: {rule['function']}")
-            continue
-
-        prepared.append({
-            "id": rule["id"],
-            "every": rule["every"],
-            "function": rule["function"],
-            "payload": rule["payload"],
-            "last_blocks": 0
-        })
-
-    return prepared
-
-# =========================================
-# Daily revenue logger
-# =========================================
-
-def update_daily_revenue():
-    file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-
-    with ctx.gift_lock:
-        if ctx.gift_current_log_date != today:
-            ctx.gift_day_start_value = ctx.gift_value_usd
-            ctx.gift_current_log_date = today
-        daily_value = ctx.gift_value_usd - ctx.gift_day_start_value
-
-        new_entry = {
-            "date": today,
-            "estimated_revenue_usd": round(daily_value, 2)
-        }
-        entries = []
-        if file_path.exists():
-            with file_path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entries.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
-        updated = False
-        for i, entry in enumerate(entries):
-            if entry.get("date") == today:
-                entries[i] = new_entry
-                updated = True
-                break
-        if not updated:
-            entries.append(new_entry)
-        with file_path.open("w", encoding="utf-8") as f:
-            for entry in entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
+# ==========================================
+# Custom trigger + test comment endpoints
 # ==========================================
 # TIKTOK CLIENT
 # ==========================================
@@ -1304,7 +1082,7 @@ def create_client(user):
             execute_gift_action(gift_id)
 
             username = get_safe_username(event.user)
-            _ping_channel_points(username)
+            _publish_tiktok_event("gift", username, gift_name=gift_name, gift_id=gift_id, count=count)
 
             target = None
             if gift_name in ctx.valid_functions:
@@ -1333,7 +1111,7 @@ def create_client(user):
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
         username = get_safe_username(event.user)
-        _ping_channel_points(username)
+        _publish_tiktok_event("follow", username)
         _process_follow(username)
 
     # =========================
@@ -1343,7 +1121,7 @@ def create_client(user):
     def on_like(event: LikeEvent):
         username = get_safe_username(event.user) if hasattr(event, 'user') else None
         if username:
-            _ping_channel_points(username)
+            _publish_tiktok_event("like", username)
         with ctx.like_lock:
             if ctx.start_likes is None:
                 ctx.start_likes = event.total
@@ -1351,33 +1129,14 @@ def create_client(user):
                 return
             total_since_start = event.total - ctx.start_likes
         try:
-            with ctx.like_lock:
-                for rule in ctx.like_triggers:
-                    every = rule["every"]
-                    if every <= 0: continue
-                    current_blocks = total_since_start // every
-                    last_blocks = rule["last_blocks"]
-                    if current_blocks > last_blocks:
-                        diff = current_blocks - last_blocks
-                        rule["last_blocks"] = current_blocks
-                        log.info(f"[LIKE] Trigger '{rule['id']}' -> +{diff}")
-                        for _ in range(diff):
-                            try:
-                                ctx.main_loop.call_soon_threadsafe(
-                                    ctx.trigger_queue.put_nowait,
-                                    (rule["function"], rule["payload"])
-                                )
-                            except asyncio.QueueFull:
-                                log.info(f"[LIKE] Queue full, trigger '{rule['id']}' dropped")
-                now = time.time()
-                delta = total_since_start - ctx.last_likegoal_sent
-                if delta > 0 and (now - ctx.last_likegoal_time) >= ctx.likegoal_interval:
-                    try:
-                        ctx.main_loop.call_soon_threadsafe(ctx.likegoal_queue.put_nowait, delta)
-                        ctx.last_likegoal_sent = total_since_start
-                        ctx.last_likegoal_time = now
-                    except asyncio.QueueFull:
-                        log.info("[LIKEGOAL] Queue full, like delta dropped")
+            now = time.time()
+            # Throttle like-goal events to ~1 per 3 seconds
+            if not hasattr(ctx, "_last_like_event"):
+                ctx._last_like_event = 0
+            if now - ctx._last_like_event >= 3:
+                delta = total_since_start
+                _publish_tiktok_event("like", username or "unknown", delta=delta, total=event.total)
+                ctx._last_like_event = now
         except Exception as e:
             log.info(f"[EVENT ERROR] Error in like handling: {e}")
 
@@ -1387,7 +1146,7 @@ def create_client(user):
     @client.on(JoinEvent)
     def on_join(event):
         username = get_safe_username(event.user)
-        _ping_channel_points(username)
+        _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("join", username))
 
@@ -1400,7 +1159,7 @@ def create_client(user):
             return
 
         username = get_safe_username(event.user)
-        _ping_channel_points(username)
+        _publish_tiktok_event("comment", username)
         comment_text = getattr(event, 'comment', '')
 
         is_super_fan = bool(getattr(event, 'user_is_super_fan', None))
@@ -1447,7 +1206,7 @@ def create_client(user):
     @client.on(ShareEvent)
     def on_share(event):
         username = get_safe_username(event.user)
-        _ping_channel_points(username)
+        _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
             ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("share", username))
 
@@ -1533,7 +1292,6 @@ async def run_bot():
 
     asyncio.create_task(trigger_worker())
     asyncio.create_task(rcon_worker())
-    asyncio.create_task(likegoal_worker())
     asyncio.create_task(gift_revenue_counter())
 
     while True:

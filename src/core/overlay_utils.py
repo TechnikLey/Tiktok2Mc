@@ -10,18 +10,18 @@ from core.plugin_config import load_plugin_config, discover_plugins_dir, load_pl
 log = logging.getLogger(__name__)
 
 API_BASE = "http://127.0.0.1:29185/api/v1"
-PLUGIN_NAME = "overlay-text"
+DEFAULT_PLUGIN_NAME = "overlay-text"
 
 
-def _find_overlay_plugin_dir() -> Path:
+def _find_overlay_plugin_dir(name: str = DEFAULT_PLUGIN_NAME) -> Path:
     plugins_dir = discover_plugins_dir()
     for child in plugins_dir.iterdir():
         if not child.is_dir():
             continue
         manifest = load_plugin_manifest(child)
-        if manifest and manifest.get("name") == "overlay-text":
+        if manifest and manifest.get("name") == name:
             return child
-    return plugins_dir / "overlaytxt"
+    return plugins_dir / name.replace("-", "")
 
 
 class OverlayClient:
@@ -49,13 +49,14 @@ class OverlayClient:
 
 
 class OverlayManager:
-    def __init__(self):
+    def __init__(self, plugin_name: str = DEFAULT_PLUGIN_NAME):
+        self.plugin_name = plugin_name
         self.clients = {}
         self.load_config()
 
     def load_config(self):
         try:
-            plugin_dir = _find_overlay_plugin_dir()
+            plugin_dir = _find_overlay_plugin_dir(self.plugin_name)
             cfg = load_plugin_config(plugin_dir)
         except Exception as e:
             log.error(f"Failed to load overlay plugin config: {e}")
@@ -83,7 +84,7 @@ class OverlayManager:
             )
             log.info("Created fallback 'default' overlay (not in config).")
 
-        log.info("Loaded %d overlays from overlay-text plugin config", len(self.clients))
+        log.info("Loaded %d overlays from %s plugin config", len(self.clients), self.plugin_name)
 
     def dispatch(self, title, subtitle, duration, target_name):
         client = self.clients.get(target_name)
@@ -107,7 +108,7 @@ class OverlayManager:
                 }
             }).encode()
             req = urllib.request.Request(
-                f"{API_BASE}/plugins/{PLUGIN_NAME}/command",
+                f"{API_BASE}/plugins/{self.plugin_name}/command",
                 data=body,
                 headers={"Content-Type": "application/json"},
                 method="POST",
@@ -125,10 +126,10 @@ _manager = None
 _manager_lock = threading.Lock()
 
 
-def send_overlay_text(title, subtitle, duration=3, overlay_name="default"):
+def send_overlay_text(title, subtitle, duration=3, overlay_name="default", plugin_name: str = DEFAULT_PLUGIN_NAME):
     global _manager
-    if _manager is None:
+    if _manager is None or _manager.plugin_name != plugin_name:
         with _manager_lock:
-            if _manager is None:
-                _manager = OverlayManager()
+            if _manager is None or _manager.plugin_name != plugin_name:
+                _manager = OverlayManager(plugin_name)
     return _manager.dispatch(title, subtitle, duration, overlay_name)
