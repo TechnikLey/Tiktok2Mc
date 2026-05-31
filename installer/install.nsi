@@ -54,14 +54,27 @@ Page custom StartupPage StartupPageLeave
 !insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_LANGUAGE "German"
 
+; ---------- Language Selection on Startup ----------
+Function .onInit
+  !insertmacro MUI_LANGDLL_DISPLAY
+FunctionEnd
+
 ; ---------- Custom Page: Startup Registration ----------
 Var StartupCheckbox
 
+LangString STARTUP_TITLE ${LANG_ENGLISH} "Startup Options"
+LangString STARTUP_SUBTITLE ${LANG_ENGLISH} "Choose whether TikTok2MC starts automatically when you log in."
+LangString STARTUP_CHECKBOX ${LANG_ENGLISH} "Start TikTok2MC automatically when I log in"
+
+LangString STARTUP_TITLE ${LANG_GERMAN} "Startoptionen"
+LangString STARTUP_SUBTITLE ${LANG_GERMAN} "Wählen Sie, ob TikTok2MC automatisch beim Anmelden starten soll."
+LangString STARTUP_CHECKBOX ${LANG_GERMAN} "TikTok2MC automatisch beim Anmelden starten"
+
 Function StartupPage
-  !insertmacro MUI_HEADER_TEXT "Startup Options" "Choose whether TikTok2MC starts automatically when you log in."
+  !insertmacro MUI_HEADER_TEXT "$(STARTUP_TITLE)" "$(STARTUP_SUBTITLE)"
   nsDialogs::Create 1018
   Pop $0
-  ${NSD_CreateCheckBox} 0 0 100% 12u "Start TikTok2MC automatically when I log in"
+  ${NSD_CreateCheckBox} 0 0 100% 12u "$(STARTUP_CHECKBOX)"
   Pop $StartupCheckbox
   nsDialogs::Show
 FunctionEnd
