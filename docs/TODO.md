@@ -17,12 +17,19 @@
 
 ## 🟡 HIGH — Should Ship Before v1.0.0
 
-*(none currently — see MEDIUM and Release Blocker above)*
+### 2. Plugin Lifecycle Tests
+No e2e tests for the startup/bridge/plugin-spawn orchestration (`start.py`, `main.py`). The entire launch-to-ready flow is untested — high risk for regressions.
+
+### 3. API Authentication
+Implement API-Key auth for `server_host: 0.0.0.0` deployments. Dashboard and API endpoints should require a configurable key when exposed beyond localhost.
 
 ## 🟢 MEDIUM — Nice to Have
 
-### 2. `core_hash` Build Cache Optimization
+### 4. `core_hash` Build Cache Optimization
 Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes. Refined to only invalidate dependent exes via per-task dependency tracking (static import analysis).
+
+### 5. EventBus Plugin Integration
+Replace plugin command-polling loop with EventBus push model. Plugins subscribe to events they care about instead of polling `/commands` on a timer. Real-time, lower latency, less wasted CPU.
 
 ---
 
@@ -52,12 +59,10 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 > These are explicitly out of scope for v1.0.0. Listed here so they are not lost.
 
 ### Security
-- API authentication (API-Key) for `server_host: 0.0.0.0` deployments
 - Spotify `client_secret` validation and encrypted storage
 - Download integrity verification (checksummed artifacts)
 
 ### Architecture
-- EventBus direct integration into plugin-to-plugin communication (plugins push events to EventBus instead of polling commands)
 - Plugin sandboxing / resource limits
 
 ### GUI
@@ -70,7 +75,6 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 ### Testing
 - Frontend/GUI integration tests (Playwright or similar)
 - Plugin implementation tests (beyond manifest smoke tests)
-- Lifecycle tests (`start.py`, `main.py` orchestration)
 
 ### Build & Packaging
 - Identify and strip dead modules from PyInstaller builds
@@ -79,4 +83,4 @@ Any change to any file in `src/core/**/*.py` invalidates all cached executables.
 
 ---
 
-*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total | Current: core_hash Build Cache Optimization. Next: Documentation Rewrite (DO LAST).*
+*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total | Current: core_hash Build Cache Optimization. Next: Plugin Lifecycle Tests → API Authentication → EventBus Integration.*
