@@ -1,186 +1,135 @@
-import webview
-import threading
 import json
-import sys
-import os
-import time
-import urllib.request
-from pathlib import Path
-from core import parse_args, get_base_file, get_base_dir
-from core.plugin_config import load_plugin_config
-from core.theme import load_plugin_theme, theme_css
 import logging
+from core.base_plugin import BasePlugin
+
 log = logging.getLogger(__name__)
-
-BASE_DIR = get_base_dir()
-
-PLUGIN_DIR = Path(__file__).resolve().parent
-DATA_DIR = (BASE_DIR.parent / "data").resolve()
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-STATS_FILE = (DATA_DIR / "stats.json").resolve()
-STATE_FILE = (DATA_DIR / "window_state_wins.json").resolve()
-
-args = parse_args()
-
-
-def load_win_size():
-    if STATE_FILE.exists():
-        try:
-            with STATE_FILE.open("r", encoding="utf-8") as f:
-                size = json.load(f)
-                return {
-                    "width": max(size.get("width", 600), 200),
-                    "height": max(size.get("height", 300), 100)
-                }
-        except Exception as e:
-            log.info(f"[WINCOUNTER] Failed to load window size: {e}")
-    return {"width": 600, "height": 300}
-
-
-cfg = load_plugin_config(PLUGIN_DIR)
-PORT = cfg.get("port", 29191)
-SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
-DECREMENT_ON_DEATH = cfg.get("decrement_on_death", False)
-
-THEME = load_plugin_theme(cfg, "win_counter")
-THEME_STYLE = theme_css(THEME)
-BG_COLOR = THEME["background"]
-
-API_BASE = "http://127.0.0.1:29185/api/v1"
-PLUGIN_NAME = "win-counter"
 
 
 class WinManager:
-    def __init__(self):
-        self.wins, self.needed, self.record_low = 0, 10, 0
-        self._lock = threading.Lock()
-        self.load_stats()
+    """Thread-safe win counter with record-low tracking."""
 
-    def load_stats(self):
-        if STATS_FILE.exists():
+    def __init__(self, stats_path, initial_needed=10, theme=None):
+        self._stats_path = stats_path
+        self._theme = theme or {}
+        self.wins, self.needed, self.record_low = 0, initial_needed, 0
+        self._load()
+
+    def _load(self):
+        if self._stats_path.exists():
             try:
-                with STATS_FILE.open("r", encoding="utf-8") as f:
-                    d = json.load(f)
-                    self.wins = d.get("wins", 0)
-                    self.needed = d.get("needed", 10)
-                    self.record_low = d.get("record_low", d.get("record", 0))
-            except Exception as e:
-                log.info(f"[WINCOUNTER] Failed to load stats: {e}")
+                data = json.loads(self._stats_path.read_text(encoding="utf-8"))
+                self.wins = data.get("wins", 0)
+                self.needed = data.get("needed", 10)
+                self.record_low = data.get("record_low", data.get("record", 0))
+            except Exception:
+                pass
 
-    def save_stats(self):
+    def save(self):
         try:
-            with STATS_FILE.open("w", encoding="utf-8") as f:
-                json.dump({"wins": self.wins, "record_low": self.record_low, "needed": self.needed}, f, indent=4)
-        except Exception as e:
-            log.info(f"[WINCOUNTER] Failed to save stats: {e}")
+            self._stats_path.parent.mkdir(parents=True, exist_ok=True)
+            self._stats_path.write_text(
+                json.dumps({
+                    "wins": self.wins,
+                    "needed": self.needed,
+                    "record_low": self.record_low,
+                }, indent=4),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
 
-    def _notify(self):
-        self.save_stats()
+    def add(self, amount=1):
+        self.wins += amount
+        while self.wins >= self.needed:
+            self.wins -= self.needed
+            self.needed += 10
+        self.save()
 
-    def add_win(self, amount=1):
-        with self._lock:
-            self.wins += amount
-            while self.wins >= self.needed:
-                self.wins -= self.needed
-                self.needed += 10
-        self._notify()
-
-    def remove_win(self, amount=1):
-        with self._lock:
-            self.wins -= amount
-            if self.wins < self.record_low:
-                self.record_low = self.wins
-        self._notify()
+    def remove(self, amount=1):
+        self.wins -= amount
+        if self.wins < self.record_low:
+            self.record_low = self.wins
+        self.save()
 
     def get_data(self):
-        with self._lock:
-            return {
-                "wins": self.wins,
-                "needed": self.needed,
-                "record_low": self.record_low,
-                "win_color": THEME["danger"] if self.wins < 0 else THEME["text"]
-            }
+        return {
+            "wins": self.wins,
+            "needed": self.needed,
+            "record_low": self.record_low,
+            "win_color": self._theme.get("danger", "#ff4444") if self.wins < 0 else self._theme.get("text", "#ffffff"),
+        }
 
 
-win_manager_instance = WinManager()
+class WinCounterPlugin(BasePlugin):
+    PLUGIN_NAME = "win-counter"
+    DEFAULT_PORT = 29191
 
-
-def _api_post(path: str, data: dict) -> bool:
-    try:
-        body = json.dumps(data).encode()
-        req = urllib.request.Request(
-            f"{API_BASE}{path}", data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
+    def __init__(self):
+        super().__init__()
+        cfg = self.config
+        self._decrement_on_death = cfg.get("decrement_on_death", False)
+        self._stats_file = self._data_dir / "stats.json"
+        self._manager = WinManager(
+            self._stats_file,
+            initial_needed=cfg.get("initial_needed", 10),
+            theme=self._theme,
         )
-        urllib.request.urlopen(req, timeout=5)
-        return True
-    except Exception as e:
-        log.warning("API POST %s failed: %s", path, e)
-        return False
 
+        self.register_handler("add_win", self._on_add_win)
+        self.register_handler("remove_win", self._on_remove_win)
+        self.register_handler("player_death", self._on_death)
+        self.register_handler("save_dims", self._on_save_dims)
 
-def _api_get(path: str, timeout: int = 5) -> dict | None:
-    try:
-        req = urllib.request.Request(f"{API_BASE}{path}")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode())
-    except Exception as e:
-        log.warning("API GET %s failed: %s", path, e)
-        return None
+    # -- command handlers ---------------------------------------------------
 
+    def _on_add_win(self, args):
+        self._manager.add(int(args.get("amount", 1)))
+        self.push_state()
 
-def _push_state():
-    _api_post(f"/plugins/{PLUGIN_NAME}/state", {"state": win_manager_instance.get_data()})
+    def _on_remove_win(self, args):
+        self._manager.remove(int(args.get("amount", 1)))
+        self.push_state()
 
+    def _on_death(self, _):
+        if self._decrement_on_death:
+            self._manager.remove(1)
+            self.push_state()
 
-def command_polling_loop():
-    while True:
-        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands?wait=1", timeout=35)
-        if result:
-            for cmd_entry in result.get("commands", []):
-                cmd = cmd_entry.get("command")
-                args_data = cmd_entry.get("args", {})
-                if cmd == "add_win":
-                    win_manager_instance.add_win(int(args_data.get("amount", 1)))
-                    _push_state()
-                elif cmd == "remove_win":
-                    win_manager_instance.remove_win(int(args_data.get("amount", 1)))
-                    _push_state()
-                elif cmd == "player_death":
-                    if DECREMENT_ON_DEATH:
-                        win_manager_instance.remove_win(1)
-                        _push_state()
+    def _on_save_dims(self, args):
+        self.save_window_state(
+            args.get("width", 600),
+            args.get("height", 300),
+        )
 
+    # -- overlay HTML -------------------------------------------------------
 
-HTML_TEMPLATE = """
-<!DOCTYPE html>
+    def get_overlay_html(self) -> str:
+        return f"""<!DOCTYPE html>
 <html>
 <head>
     <style>
-""" + THEME_STYLE + """
-        body { 
-            background-color: var(--background); color: var(--text); 
-            font-family: 'Consolas', monospace; margin: 0; 
-            display: flex; flex-direction: column; 
+{self.theme_style}
+        body {{
+            background-color: var(--background); color: var(--text);
+            font-family: 'Consolas', monospace; margin: 0;
+            display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             height: 100vh; width: 100vw;
             overflow: hidden; user-select: none;
-        }
-        .container { 
-            display: flex; align-items: center; 
-            gap: 3vw; 
+        }}
+        .container {{
+            display: flex; align-items: center;
+            gap: 3vw;
             font-size: 25vmin;
-            font-weight: bold; 
+            font-weight: bold;
             white-space: nowrap;
             line-height: 1;
-        }
-        .record-section { 
-            margin-top: 1vh; 
-            font-size: 10vmin; 
-            color: var(--muted); 
-        }
+        }}
+        .record-section {{
+            margin-top: 1vh;
+            font-size: 10vmin;
+            color: var(--muted);
+        }}
     </style>
 </head>
 <body>
@@ -188,57 +137,32 @@ HTML_TEMPLATE = """
         <span>Wins:</span><span id="wins">0</span><span style="color: var(--separator);">|</span><span id="needed">10</span>
     </div>
     <div class="record-section">Record Low: <span id="record_low">0</span></div>
-    
     <script>
         const es = new EventSource("/api/v1/plugins/win-counter/stream");
-        es.onmessage = (e) => {
+        es.onmessage = (e) => {{
             const d = JSON.parse(e.data);
             document.getElementById('wins').innerText = d.wins;
             document.getElementById('wins').style.color = d.win_color;
             document.getElementById('needed').innerText = d.needed;
             document.getElementById('record_low').innerText = d.record_low;
-        };
-
-        window.addEventListener('resize', () => {
+        }};
+        window.addEventListener('resize', () => {{
             clearTimeout(window.rt);
-            window.rt = setTimeout(() => {
-                fetch('/api/v1/plugins/win-counter/command', {
+            window.rt = setTimeout(() => {{
+                fetch('/api/v1/plugins/win-counter/command', {{
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ command: 'save_dims', args: { width: window.outerWidth, height: window.outerHeight } })
-                });
-            }, 500);
-        });
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ command: 'save_dims', args: {{ width: window.outerWidth, height: window.outerHeight }} }})
+                }});
+            }}, 500);
+        }});
     </script>
 </body>
-</html>
-"""
+</html>"""
 
+    def get_state(self):
+        return self._manager.get_data()
 
-def _register_overlay():
-    _api_post(f"/plugins/{PLUGIN_NAME}/overlay-html", {"html": HTML_TEMPLATE})
-
-
-gui_hidden = args.gui_hidden
 
 if __name__ == "__main__":
-    size = load_win_size()
-
-    _register_overlay()
-
-    poll_thread = threading.Thread(target=command_polling_loop, daemon=True)
-    poll_thread.start()
-
-    if not gui_hidden:
-        window = webview.create_window(
-            'Win Counter Overlay',
-            f'http://127.0.0.1:29185/api/v1/plugins/{PLUGIN_NAME}/overlay',
-            width=size['width'] + 30,
-            height=size['height'] + 30,
-            on_top=True,
-            background_color=BG_COLOR
-        )
-        webview.start()
-    else:
-        log.info("GUI hidden, running server only.")
-        poll_thread.join()
+    WinCounterPlugin().run()
