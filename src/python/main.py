@@ -34,6 +34,7 @@ from core.overlay_utils import send_overlay_text
 
 from core.yaml_utils import load_yaml
 from core.api.eventbus import event_bus
+from core.api.plugin_overlay import command_queue
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -727,6 +728,38 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
         )
 
 
+async def _event_bridge_worker():
+    """Bridge: converts EventBus tiktok events into plugin commands.
+
+    Decouples main.py from plugins — main publishes events,
+    bridge translates them to commands plugins already understand.
+    """
+    q = event_bus.subscribe("tiktok.event")
+    log.info("[EVENT-BRIDGE] Started.")
+    while True:
+        msg = await q.get()
+        try:
+            data = msg.get("data", {})
+            ev_type = data.get("type")
+            user = data.get("user")
+            if not user:
+                continue
+
+            # ChannelPoints: ping on every TikTok event
+            command_queue.enqueue("channel-points", "ping", user=user)
+
+            # LikeGoal: add likes on like events
+            if ev_type == "like":
+                delta = data.get("delta")
+                if delta:
+                    command_queue.enqueue("like-goal", "add_likes", delta=delta)
+
+        except Exception as e:
+            log.info(f"[EVENT-BRIDGE] Error handling event: {e}")
+        finally:
+            q.task_done()
+
+
 def _process_follow(username: str, persist: bool = True):
     """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user."""
     user_lower = username.lower()
@@ -1292,6 +1325,7 @@ async def run_bot():
 
     asyncio.create_task(trigger_worker())
     asyncio.create_task(rcon_worker())
+    asyncio.create_task(_event_bridge_worker())
     asyncio.create_task(gift_revenue_counter())
 
     while True:
