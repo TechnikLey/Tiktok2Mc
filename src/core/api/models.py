@@ -99,6 +99,20 @@ class PluginManifest(BaseModel):
     config_schema: Optional[PluginConfigSchemaModel] = Field(
         None, description="Schema for plugin-local config (GUI + validation)"
     )
+    comment_handler: Optional["CommentHandler"] = Field(
+        None, description="Comment prefix + commands this plugin handles (declarative)"
+    )
+
+
+class CommentHandler(BaseModel):
+    """Declares that a plugin handles chat commands with a given prefix."""
+
+    prefix: str = Field(
+        "$", description="Comment prefix this handler responds to (e.g. $, !, #)"
+    )
+    enabled: bool = Field(
+        True, description="Whether this handler is currently active"
+    )
 
 
 # ── Plugin models ────────────────────────────────────────────────────
@@ -138,6 +152,9 @@ class PluginRegistration(BaseModel):
     updated_at: Optional[float] = Field(
         None, description="Unix timestamp of last update"
     )
+    comment_handler: Optional["CommentHandler"] = Field(
+        None, description="Comment prefix this plugin handles"
+    )
     health_status: str = Field(
         "unknown", description="Current health: unknown, healthy, unhealthy, dead"
     )
@@ -173,6 +190,9 @@ class PluginRegisterRequest(BaseModel):
     update_url: str = ""
     author: str = ""
     homepage: str = ""
+    comment_handler: Optional["CommentHandler"] = Field(
+        None, description="Comment prefix this plugin handles"
+    )
     health_status: str = "unknown"
     last_heartbeat: Optional[float] = None
 
@@ -194,6 +214,7 @@ class PluginUpdateRequest(BaseModel):
     update_url: Optional[str] = None
     author: Optional[str] = None
     homepage: Optional[str] = None
+    comment_handler: Optional["CommentHandler"] = None
     health_status: Optional[str] = None
     last_heartbeat: Optional[float] = None
 

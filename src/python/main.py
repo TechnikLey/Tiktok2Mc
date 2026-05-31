@@ -21,6 +21,8 @@ import traceback
 import time
 import datetime
 import json
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
@@ -77,6 +79,7 @@ class BotContext:
         self.comment_cmd_enable = False
         self.comment_cmd_groups = []
         self.comment_cmd_all_prefixes = set()
+        self.comment_handler_map: dict[str, str] = {}  # prefix → plugin_name
         self.comment_cmd_global_cooldown = 0
         self.comment_cmd_global_last = 0.0
         self.comment_cmd_global_user_cooldown = 0
@@ -695,6 +698,37 @@ def handle_minecraft_events():
 API_BASE = "http://127.0.0.1:29185/api/v1"
 
 
+def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) -> None:
+    """Post a comment command to a plugin's command queue via the API."""
+    url = f"{API_BASE}/plugins/{plugin_name}/command"
+    body = json.dumps({
+        "command": "comment",
+        "args": {"text": cmd_text, "username": username},
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+        urllib.request.urlopen(req, timeout=3)
+        log.debug("Routed '%s' to plugin '%s'", cmd_text, plugin_name)
+    except Exception as exc:
+        log.info("Failed to route comment to plugin '%s': %s", plugin_name, exc)
+
+
+def _fetch_comment_handlers() -> dict[str, str]:
+    """Fetch ``{prefix: plugin_name}`` from the API registry.
+
+    Called once at startup so the bridge can route chat commands
+    to the correct plugin's command queue.
+    """
+    try:
+        req = urllib.request.Request(f"{API_BASE}/comment-handlers")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("handlers") or {}
+    except Exception as exc:
+        log.info("No comment handlers from API (plugins may not be registered yet): %s", exc)
+        return {}
+
+
 def _dispatch_comment_http(cmd_url, username, cmd_text):
     import urllib.request
     import urllib.parse
@@ -938,9 +972,9 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
 
         conditional = ccfg.get("conditional", False)
 
-        cmd_url = ccfg.get("url", group["url"])
-        cmd_handler = ccfg.get("handler", group["handler"])
-        log.info(f"{log_prefix} {username} -> {cmd_text} (prefix '{prefix}', handler {cmd_handler})")
+        cmd_url = ccfg.get("url", group.get("url", ""))
+        cmd_handler = ccfg.get("handler", group.get("handler", ""))
+        log.info(f"{log_prefix} {username} -> {cmd_text} (prefix '{prefix}')")
 
         if not conditional:
             ctx.comment_cmd_last_global[prefix] = now
@@ -955,8 +989,14 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
             cutoff = now - 3600
             ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
 
-        if cmd_handler == "rcon":
+        # 1. API-registered handler (declarative, dynamic)
+        plugin_name = ctx.comment_handler_map.get(prefix)
+        if plugin_name:
+            _dispatch_comment_to_plugin(plugin_name, cmd_text, username)
+        # 2. Legacy RCON handler
+        elif cmd_handler == "rcon":
             ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+        # 3. Legacy HTTP handler (backward compat)
         elif cmd_handler == "http" and cmd_url:
             if conditional:
                 resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
@@ -971,7 +1011,6 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                 else:
                     log.info(f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered")
             else:
-                import urllib.request, urllib.parse
                 url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
                 url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
                 threading.Thread(
@@ -1341,6 +1380,11 @@ async def run_bot():
     if not load_config():
         log.info("Error in load_config")
         sys.exit(1)
+
+    # Fetch registered comment handlers from API for prefix→plugin routing
+    ctx.comment_handler_map = _fetch_comment_handlers()
+    if ctx.comment_handler_map:
+        log.info("[COMMENT] Registered handlers: %s", ctx.comment_handler_map)
 
     # TikTok username check: ask user if still default
     default_user = "your_tiktok_username"

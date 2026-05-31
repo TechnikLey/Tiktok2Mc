@@ -221,23 +221,22 @@ comment_commands:
       trigger_comment_event: true
 
       # ──────────────────────────────────────────────
-      #  Spotify Control (HTTP)
+      #  Spotify Control (API Handler)
       # ──────────────────────────────────────────────
       # Viewers type $play, $pause, $skip, $volume 50, etc.
       # to control Spotify playback. Requires the Spotify plugin
       # to be configured (see the Spotify plugin's own config.yaml).
       #
-      #   url — HTTP endpoint that receives the command.
-      #         {user} = viewer's TikTok name
-      #         {text} = command text (without the $ prefix)
-      #         {spotify_port} = resolved from the Spotify plugin config
+      # The Spotify plugin registers its ``comment_handler`` dynamically
+      # via the API (``plugin.json`` → ``comment_handler.prefix: "$"``).
+      # The bridge fetches registered handlers at startup and routes
+      # ``$`` commands to the plugin's command queue automatically.
+      # No static ``handler`` / ``url`` fields are needed anymore.
     - enabled: true
       prefix: "$"
       allowed_roles:
         - all
       mode: deny-all
-      # Plain list of command names. Used by mode (allow-all / deny-all)
-      # to decide which commands are allowed or blocked.
       commands:
         - play
         - pause
@@ -250,8 +249,6 @@ comment_commands:
         - current
         - playtrack
 
-      # Per-command overrides. Only commands listed here need an entry.
-      # Each key matches a command name from the commands list above.
       commands_config:
         skip:
           cooldown: 30
@@ -261,13 +258,8 @@ comment_commands:
           cooldown: 30
           conditional: true
         volume:
-          # Per-command role override (overrides group allowed_roles).
           roles:
             - moderator
-      handler: http
-      # NOTE: Plugins should register their own command handlers dynamically.
-      # Hardcoded URLs to specific plugin endpoints have been removed to avoid coupling.
-      url: ""
       cooldown: 0
       user_cooldown: 0
       trigger_comment_event: true

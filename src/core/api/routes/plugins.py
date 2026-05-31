@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from core.api.dependency import validate_dependencies
 from core.api.models import (
+    CommentHandler,
     PluginListResponse,
     PluginRegisterRequest,
     PluginRegisterResponse,
@@ -105,6 +106,7 @@ async def register_plugin(body: PluginRegisterRequest):
             update_url=body.update_url,
             author=body.author,
             homepage=body.homepage,
+            comment_handler=body.comment_handler,
         )
         result = registry.register(data)
         return PluginRegisterResponse(status="registered", plugin=result)
@@ -423,6 +425,63 @@ async def unregister_plugin(name: str):
         raise
     except Exception as e:
         log.exception("Failed to unregister plugin")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Comment Handlers ─────────────────────────────────────────────────
+
+
+@router.put("/plugins/{name}/comment-handler")
+async def set_comment_handler(name: str, body: CommentHandler):
+    """Register or update a plugin's comment handler."""
+    try:
+        registry = get_registry()
+        plugin = registry.get(name)
+        if not plugin:
+            raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+        plugin.comment_handler = body
+        registry.update(name, {"comment_handler": body})
+        log.info("Comment handler for '%s': prefix=%s", name, body.prefix)
+        return {"status": "updated", "plugin": name, "handler": body.model_dump()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to set comment handler")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/plugins/{name}/comment-handler")
+async def remove_comment_handler(name: str):
+    """Remove a plugin's comment handler."""
+    try:
+        registry = get_registry()
+        plugin = registry.get(name)
+        if not plugin:
+            raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+        plugin.comment_handler = None
+        registry.update(name, {"comment_handler": None})
+        log.info("Comment handler removed for '%s'", name)
+        return {"status": "removed", "plugin": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to remove comment handler")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/comment-handlers")
+async def list_comment_handlers():
+    """Return all registered comment handlers as ``{prefix: plugin_name}``."""
+    try:
+        registry = get_registry()
+        handlers: dict[str, str] = {}
+        for plugin in registry.list():
+            ch = plugin.comment_handler
+            if ch and ch.enabled:
+                handlers[ch.prefix] = plugin.name
+        return {"handlers": handlers}
+    except Exception as e:
+        log.exception("Failed to list comment handlers")
         raise HTTPException(status_code=500, detail=str(e))
 
 
