@@ -1,49 +1,39 @@
-#!/usr/bin/env python3
-# ==================================================
-# hook_loader.py - Event Hook script loader
-# ==================================================
-# Scans event_hooks/*.py and dynamically imports
-# each module into the running process. Each module
-# must expose a register(api) function that registers
-# its handlers via api.register_action().
-# ==================================================
-
 from __future__ import annotations
 
 import ast
 import importlib.util
 import sys
+import logging
 from pathlib import Path
+from typing import Optional
 
 from core.hook_api import HookAPI
-import logging
+from core.hook_manifest import (
+    load_hook_manifest,
+    discover_hooks_dirs,
+    read_hook_version,
+    HookManifest,
+)
+from core.hook_registry import get_hook_registry, HookRegistration
+from core.plugin_config import load_plugin_config, save_plugin_config
 
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Allowed top-level module names for event hook scripts.
-# Any import whose top-level module is NOT in this set will be rejected and
-# the hook will be skipped with an [ERROR] message.
+# Allowed imports for event hook scripts — AST-checked at load time
 # ---------------------------------------------------------------------------
+
 ALLOWED_IMPORTS: frozenset[str] = frozenset({
-    # standard library — safe utilities
-    "time", "random", "logging",
-    # third-party — used by Spotify hook
-    "requests",
+    "time", "random", "logging", "json", "urllib", "requests",
 })
 
-# Modules explicitly allowed for IntelliSense/type-checking only.
-# Add specific "core.*" modules here to permit AST-checked imports that
-# are safe and intended for hook scripts. Adding `core.plugin_config`
-# allows hooks to import plugin configuration helpers used by the
-# `spotify.py` hook without being rejected by the static import checker.
-ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({"core.hook_api", "core.plugin_config"})
+ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({
+    "core.hook_api", "core.plugin_config",
+})
+
 
 def _check_imports(path: Path) -> list[str]:
-    """
-    Parse the hook file with the AST and return a list of disallowed
-    top-level module names. An empty list means all imports are allowed.
-    """
+    """Parse the hook file with the AST and return disallowed imports."""
     try:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
@@ -70,67 +60,286 @@ def _check_imports(path: Path) -> list[str]:
                     disallowed.append(full_module)
     return disallowed
 
-def load_event_hooks(api: HookAPI, hooks_dir: Path) -> None:
+
+# ---------------------------------------------------------------------------
+# Hook discovery
+# ---------------------------------------------------------------------------
+
+
+def _discover_hook_dirs() -> list[dict]:
+    """Scan all hook directories and return metadata for each discovered hook.
+
+    Returns a list of dicts::
+        {
+            "name": str,
+            "version": str,
+            "display_name": str,
+            "description": str,
+            "author": str,
+            "capabilities": list[str],
+            "plugin": str,
+            "update_url": str,
+            "source": str,        # filesystem path to hook dir
+            "source_type": str,   # "main" or "plugin"
+        }
     """
-    Scan hooks_dir for *.py files and load each one.
+    hooks: list[dict] = []
+    seen_names: set[str] = set()
 
-    Each module must define:
-        def register(api: HookAPI) -> None: ...
+    for parent_dir in discover_hooks_dirs():
+        source_type = "main"
+        plugin_name = ""
+        # Check if this is a plugin-bundled hooks dir
+        parts = parent_dir.parts
+        for i, part in enumerate(parts):
+            if part in ("plugins",):
+                if i + 1 < len(parts):
+                    plugin_name = parts[i + 1]
+                    source_type = "plugin"
+                break
 
-    Files without a register() function are skipped with an error message.
+        for child in sorted(parent_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            manifest = load_hook_manifest(child)
+            if manifest is None:
+                continue
+
+            if manifest.name in seen_names:
+                log.warning(
+                    "[HOOK] Duplicate hook name '%s' in %s — skipping",
+                    manifest.name, child,
+                )
+                continue
+            seen_names.add(manifest.name)
+
+            version = read_hook_version(child)
+            hooks.append({
+                "name": manifest.name,
+                "version": version,
+                "display_name": manifest.display_name,
+                "description": manifest.description,
+                "author": manifest.author,
+                "capabilities": manifest.capabilities,
+                "plugin": plugin_name,
+                "update_url": manifest.update_url,
+                "source": str(child.resolve()),
+                "source_type": source_type,
+                "_manifest": manifest,
+            })
+            log.info(
+                "[HOOK] Discovered hook '%s' v%s in %s",
+                manifest.name, version, child,
+            )
+
+    return hooks
+
+
+# ---------------------------------------------------------------------------
+# Config loading per hook
+# ---------------------------------------------------------------------------
+
+
+def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
+    """Load or create the per-hook ``config.yaml``.
+
+    Uses ``core.plugin_config.load_plugin_config()`` with the hook's
+    ``config_schema`` from its manifest to generate defaults and validate.
     """
-    if not hooks_dir.exists():
-        hooks_dir.mkdir(parents=True, exist_ok=True)
-        log.info(f"[HOOK] Created event_hooks folder: {hooks_dir}")
-        return
+    config_path = hook_dir / "config.yaml"
 
-    hook_files = sorted(hooks_dir.glob("*.py"))
-    if not hook_files:
-        log.info("[HOOK] No event hooks found.")
-        return
+    if manifest.config_schema:
+        # Create a temporary plugin.json-like structure so we can reuse
+        # the config system
+        fake_manifest = {"config_schema": manifest.config_schema, "name": manifest.name}
+        manifest_path = hook_dir / ".hook_schema.tmp"
+        try:
+            import json
+            manifest_path.write_text(json.dumps(fake_manifest), encoding="utf-8")
+            cfg = load_plugin_config(hook_dir, apply_defaults=True)
+            return cfg
+        except Exception as exc:
+            log.warning("[HOOK] Failed to load config for '%s': %s", manifest.name, exc)
+        finally:
+            if manifest_path.exists():
+                manifest_path.unlink()
 
-    log.info(f"[HOOK] Loading {len(hook_files)} hook(s) from: {hooks_dir}")
+    # No schema: load raw if exists, return empty otherwise
+    if config_path.exists():
+        from core.yaml_utils import load_yaml
+        try:
+            return load_yaml(config_path) or {}
+        except Exception as exc:
+            log.warning("[HOOK] Failed to load config.yaml for '%s': %s", manifest.name, exc)
+    return {}
 
-    for path in hook_files:
-        _load_single_hook(api, path)
 
-def _load_single_hook(api: HookAPI, path: Path) -> None:
-    disallowed = _check_imports(path)
+# ---------------------------------------------------------------------------
+# Loading
+# ---------------------------------------------------------------------------
+
+
+def _load_single_hook(
+    api: HookAPI,
+    hook_dir: Path,
+    manifest: HookManifest,
+) -> bool:
+    """Load a single hook from its directory.
+
+    Expects ``hook_dir/main.py`` as the entry point.
+    Returns ``True`` on success.
+    """
+    main_py = hook_dir / "main.py"
+    if not main_py.exists():
+        log.warning("[HOOK] %s: no main.py found — skipping", hook_dir)
+        return False
+
+    disallowed = _check_imports(main_py)
     if disallowed:
         for name in disallowed:
             log.error(
-                f"[HOOK] {path.name} uses disallowed import: "
-                f"'{name}' — hook skipped. "
+                "[HOOK] %s uses disallowed import: '%s' — hook skipped.",
+                manifest.name, name,
             )
-        return
+        return False
 
-    module_name = f"event_hooks.{path.stem}"
+    module_name = f"event_hooks.{manifest.name}"
     try:
-        # Ensure parent package exists in sys.modules
         if "event_hooks" not in sys.modules:
             import types
             sys.modules["event_hooks"] = types.ModuleType("event_hooks")
 
-        spec = importlib.util.spec_from_file_location(module_name, path)
+        spec = importlib.util.spec_from_file_location(module_name, main_py)
         if spec is None or spec.loader is None:
-            log.warning(f"[HOOK] Could not create spec for: {path.name}")
-            return
+            log.warning("[HOOK] Could not create spec for: %s", manifest.name)
+            return False
 
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)  # type: ignore[attr-defined]
-
+        spec.loader.exec_module(module)
     except SyntaxError as e:
-        log.warning(f"[HOOK] Syntax error in {path.name}: {e}")
-        return
+        log.warning("[HOOK] Syntax error in %s: %s", manifest.name, e)
+        return False
     except Exception as e:
-        log.warning(f"[HOOK] Failed to load {path.name}: {e}")
-        return
+        log.warning("[HOOK] Failed to load %s: %s", manifest.name, e)
+        return False
 
     if hasattr(module, "register") and callable(module.register):
         try:
             module.register(api)
+            log.info("[HOOK] Loaded: %s v%s", manifest.name, manifest.version)
+            return True
         except Exception as e:
-            log.warning(f"[HOOK] register() failed in {path.name}: {e}")
+            log.warning("[HOOK] register() failed in %s: %s", manifest.name, e)
+            return False
     else:
-        log.error(f"[HOOK] {path.name} has no register() function — skipped.")
+        log.error("[HOOK] %s/main.py has no register() function — skipped.", hook_dir)
+        return False
+
+
+def load_event_hooks(
+    api: HookAPI,
+    hooks_dir: Path | None = None,
+    config: dict | None = None,
+) -> dict[str, dict]:
+    """Load all event hooks from all hook directories.
+
+    This is the main entry point. It:
+
+    1. Discovers hooks in ``event_hooks/`` and ``plugins/*/hooks/``
+    2. Loads per-hook configs
+    3. Syncs the persistent hook registry
+    4. Loads each enabled hook's ``main.py`` entry point
+    5. Returns a mapping ``{hook_name: hook_config}``
+
+    The ``hooks_dir`` parameter is kept for backward compatibility
+    (previously the only source). When provided, it is scanned
+    alongside the automatic discovery paths.
+    """
+    discovered = _discover_hook_dirs()
+    registry = get_hook_registry()
+
+    # Add legacy hooks_dir if provided and not already covered
+    if hooks_dir is not None:
+        legacy_dir = str(hooks_dir.resolve())
+        already = any(h["source"] == legacy_dir for h in discovered)
+        if not already and hooks_dir.exists():
+            for child in sorted(hooks_dir.iterdir()):
+                if child.is_dir():
+                    m = load_hook_manifest(child)
+                    if m:
+                        # Already caught by discover_hooks_dirs, but ensure we don't
+                        # double-count
+                        if not any(h["name"] == m.name for h in discovered):
+                            version = read_hook_version(child)
+                            discovered.append({
+                                "name": m.name,
+                                "version": version,
+                                "display_name": m.display_name,
+                                "description": m.description,
+                                "author": m.author,
+                                "capabilities": m.capabilities,
+                                "plugin": "",
+                                "update_url": m.update_url,
+                                "source": str(child.resolve()),
+                                "source_type": "main",
+                                "_manifest": m,
+                            })
+
+    # Sync registry: add new hooks, update versions
+    hook_infos = []
+    for info in discovered:
+        hook_infos.append({
+            "name": info["name"],
+            "version": info["version"],
+            "display_name": info["display_name"],
+            "description": info["description"],
+            "author": info["author"],
+            "capabilities": info["capabilities"],
+            "plugin": info["plugin"],
+            "update_url": info["update_url"],
+            "source": info["source"],
+        })
+
+    new_count = registry.sync_from_discovery(hook_infos)
+    if new_count:
+        log.info("[HOOK] Registered %d new hook(s) in registry", new_count)
+
+    # Load per-hook configs
+    hook_configs: dict[str, dict] = {}
+    for info in discovered:
+        manifest: HookManifest = info["_manifest"]
+        hook_dir = Path(info["source"])
+        hook_configs[manifest.name] = _ensure_hook_config(hook_dir, manifest)
+
+    # Inject configs into the API so hooks can access them
+    api._hook_configs = hook_configs
+
+    # Load each enabled hook
+    loaded = 0
+    skipped = 0
+    for info in discovered:
+        manifest: HookManifest = info["_manifest"]
+        if not registry.is_enabled(manifest.name):
+            log.info("[HOOK] Hook '%s' is disabled — skipping", manifest.name)
+            skipped += 1
+            continue
+
+        hook_dir = Path(info["source"])
+        if _load_single_hook(api, hook_dir, manifest):
+            loaded += 1
+        else:
+            skipped += 1
+
+    log.info(
+        "[HOOK] Loaded %d hook(s), %d skipped/disabled",
+        loaded, skipped,
+    )
+
+    # Clean stale registry entries
+    active_names = {info["name"] for info in discovered}
+    cleaned = registry.clean_stale(active_names)
+    if cleaned:
+        log.info("[HOOK] Removed %d stale registry entr(ies)", cleaned)
+
+    return hook_configs

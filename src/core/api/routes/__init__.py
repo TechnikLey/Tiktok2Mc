@@ -10,6 +10,7 @@ from .updater import router as updater_router
 from .system import router as system_router
 from .actions import router as actions_router
 from .plugin_overlay import router as plugin_overlay_router
+from .hooks import router as hooks_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -22,3 +23,4 @@ api_router.include_router(updater_router)
 api_router.include_router(system_router)
 api_router.include_router(actions_router)
 api_router.include_router(plugin_overlay_router)
+api_router.include_router(hooks_router)

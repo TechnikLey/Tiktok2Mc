@@ -201,8 +201,9 @@ class TestUpdateWhitelist:
         "plugins/timer", "plugins/wincounter", "plugins/spotify",
     }
     WHITELIST_DIR_FILES = {
-        "event_hooks/random.py",
-        "event_hooks/spotify.py",
+        "event_hooks/random/main.py",
+        "event_hooks/example_hook/main.py",
+        "plugins/spotify/hooks/main.py",
     }
     WHITELIST_FILES = {
         "version.txt", "README.md", "LICENSE",
@@ -266,8 +267,9 @@ class TestUpdateWhitelist:
         assert self._should_copy(".", "update.exe") is False
 
     def test_event_hooks_whitelisted(self):
-        assert self._should_copy("event_hooks", "random.py") is True
-        assert self._should_copy("event_hooks", "spotify.py") is True
+        assert self._should_copy("event_hooks/random", "main.py") is True
+        assert self._should_copy("event_hooks/example_hook", "main.py") is True
+        assert self._should_copy("plugins/spotify/hooks", "main.py") is True
 
     def test_non_whitelisted_event_hook_skipped(self):
         assert self._should_copy("event_hooks", "custom_hook.py") is False

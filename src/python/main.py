@@ -31,6 +31,7 @@ from core.paths import get_base_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
+from core.plugin_config import load_all_plugin_configs
 from core.yaml_utils import load_yaml
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
@@ -219,7 +220,7 @@ def load_config():
             ctx._followed_cache.clear()
             log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
 
-        like_goal_cfg = _plugin_configs.get("like-goal", {})
+        like_goal_cfg = load_all_plugin_configs().get("like-goal", {})
         ctx.like_triggers = validate_like_triggers(like_goal_cfg.get("triggers", []))
 
         comment_cmd_cfg = config.get("comment_commands", {})
@@ -1522,9 +1523,11 @@ async def run_bot():
     ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
     load_shell_actions()
 
-    EVENT_HOOKS_DIR = (BASE_DIR / ".." / "event_hooks").resolve()
-    ctx.hook_api = HookAPI(ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop, ctx.config, ctx.valid_functions)
-    load_event_hooks(ctx.hook_api, EVENT_HOOKS_DIR)
+    ctx.hook_api = HookAPI(
+        ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop,
+        ctx.config, ctx.valid_functions,
+    )
+    load_event_hooks(ctx.hook_api, ctx.config)
 
     threading.Thread(target=run_signal_server, daemon=True).start()
 

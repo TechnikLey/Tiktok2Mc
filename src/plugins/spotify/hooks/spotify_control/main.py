@@ -1,5 +1,4 @@
 from core.hook_api import HookAPI
-from core.plugin_config import load_all_plugin_configs
 import logging
 log = logging.getLogger(__name__)
 

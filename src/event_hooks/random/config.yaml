@@ -1,0 +1,3 @@
+# Random Trigger Hook Configuration
+mode: deny-all
+triggers: []

@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-# ==================================================
-# random.py - $random action hook
-# ==================================================
-# Picks a random eligible trigger and executes it.
-# Configurable via config.yaml > random_triggers.
-#
-# USAGE in actions.mca:
-#   gift_id:$random
-# ==================================================
-
 import random
 import logging
 from core.hook_api import HookAPI
@@ -24,7 +13,7 @@ def register(api: HookAPI):
             log.info("[RANDOM-HOOK] No valid functions available for $random.")
             return
 
-        random_cfg = api.config.get("random_triggers", {})
+        random_cfg = api.get_hook_config("random")
         mode = str(random_cfg.get("mode", "deny-all")).lower()
         raw_list = random_cfg.get("triggers", [])
         configured = [str(t).strip().lower() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []

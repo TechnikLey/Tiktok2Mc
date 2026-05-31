@@ -27,9 +27,24 @@ def test_hooks_directory_exists(hooks_dir):
     assert hooks_dir.exists(), f"Hooks directory not found: {hooks_dir}"
 
 
-def test_hooks_directory_has_py_files(hooks_dir):
-    py_files = list(hooks_dir.glob("*.py"))
-    assert len(py_files) > 0, f"No .py files in hooks directory: {hooks_dir}"
+def test_hooks_directory_has_hook_dirs(hooks_dir):
+    """Hooks are now subdirectories with main.py (not flat .py files)."""
+    hook_dirs = [d for d in hooks_dir.iterdir() if d.is_dir()]
+    assert len(hook_dirs) > 0, f"No hook subdirectories in: {hooks_dir}"
+
+
+def test_each_hook_dir_has_main_py(hooks_dir):
+    for d in sorted(hooks_dir.iterdir()):
+        if d.is_dir() and d.name != "__pycache__":
+            main_py = d / "main.py"
+            assert main_py.exists(), f"Missing main.py in hook dir: {d}"
+
+
+def test_each_hook_dir_has_hook_json(hooks_dir):
+    for d in sorted(hooks_dir.iterdir()):
+        if d.is_dir() and d.name != "__pycache__":
+            hook_json = d / "hook.json"
+            assert hook_json.exists(), f"Missing hook.json in hook dir: {d}"
 
 
 def test_hook_registration(clean_registry, hooks_dir):
@@ -44,7 +59,7 @@ def test_hook_registration(clean_registry, hooks_dir):
     valid_functions = set()
 
     api = HookAPI(rcon_queue, trigger_queue, loop, config, valid_functions)
-    load_event_hooks(api, hooks_dir)
+    load_event_hooks(api, hooks_dir, config=config)
 
     assert len(clean_registry) > 0, "No scripts were registered"
     for name in clean_registry:
@@ -58,7 +73,7 @@ def test_registration_names_are_strings(clean_registry, hooks_dir):
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
-    load_event_hooks(api, hooks_dir)
+    load_event_hooks(api, hooks_dir, config={})
 
     for name in clean_registry:
         assert isinstance(name, str), f"Registration name is not a string: {name!r}"
@@ -71,7 +86,7 @@ def test_registration_names_are_nonempty(clean_registry, hooks_dir):
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
-    load_event_hooks(api, hooks_dir)
+    load_event_hooks(api, hooks_dir, config={})
 
     for name in clean_registry:
         assert name.strip(), f"Registration name is empty or whitespace: {name!r}"
@@ -84,7 +99,7 @@ def test_duplicate_registration_is_ignored(clean_registry, hooks_dir):
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
-    load_event_hooks(api, hooks_dir)
+    load_event_hooks(api, hooks_dir, config={})
 
     original_count = len(HOOK_ACTIONS)
 
@@ -114,7 +129,7 @@ def test_api_response_format_matches_endpoint(clean_registry, hooks_dir):
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
-    load_event_hooks(api, hooks_dir)
+    load_event_hooks(api, hooks_dir, config={})
 
     scripts = [{"name": name} for name in sorted(HOOK_ACTIONS.keys())]
     response = {"scripts": scripts}
@@ -125,11 +140,32 @@ def test_api_response_format_matches_endpoint(clean_registry, hooks_dir):
         assert "name" in response["scripts"][0]
 
 
-def test_spotify_hook_plugin_config_import(hooks_dir):
-    spotify_file = hooks_dir / "spotify.py"
-    if not spotify_file.exists():
-        pytest.skip("spotify.py not found")
+def test_spotify_hook_exists_in_plugin_dir():
+    """Spotify hook moved to plugins/spotify/hooks/spotify_control/."""
+    base = Path(__file__).resolve().parent.parent.parent
+    spotify_hook = base / "src" / "plugins" / "spotify" / "hooks" / "spotify_control" / "main.py"
+    assert spotify_hook.exists(), f"Spotify hook not found: {spotify_hook}"
 
-    from core.hook_loader import _check_imports
-    disallowed = _check_imports(spotify_file)
-    assert "core.plugin_config" not in disallowed
+
+def test_spotify_hook_manifest_exists():
+    base = Path(__file__).resolve().parent.parent.parent
+    manifest = base / "src" / "plugins" / "spotify" / "hooks" / "spotify_control" / "hook.json"
+    assert manifest.exists(), f"Spotify hook manifest not found: {manifest}"
+
+
+def test_hook_api_get_hook_config():
+    from core.hook_api import HookAPI
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    api = HookAPI(
+        asyncio.Queue(), asyncio.Queue(), loop, {},
+        set(),
+        hook_configs={"test_hook": {"mode": "deny-all", "triggers": ["foo"]}},
+    )
+
+    cfg = api.get_hook_config("test_hook")
+    assert cfg == {"mode": "deny-all", "triggers": ["foo"]}
+
+    cfg_missing = api.get_hook_config("nonexistent")
+    assert cfg_missing == {}

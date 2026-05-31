@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# ==================================================
-# hook_api.py - Event Hook API for $-commands
-# ==================================================
-# Provides the HookAPI class that is passed to every
-# event_hook script via its register(api) function.
-# Also holds the global HOOK_ACTIONS registry.
-# ==================================================
-
 from __future__ import annotations
 
 import asyncio
@@ -15,23 +6,17 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# Global registry: action_name -> handler callable
 HOOK_ACTIONS: dict[str, Callable] = {}
 
-# Maximum trigger chain depth before enqueue_trigger blocks (prevents infinite loops)
 MAX_CHAIN_DEPTH: int = 3
+
 
 class HookAPI:
     """
-    Runtime API passed to every event_hook script.
-    Provides controlled access to main.py internals.
+    Runtime API passed to every event_hook script via its ``register()`` function.
 
-    Usage inside a hook script:
-        def register(api):
-            api.register_action("my_action", my_handler)
-
-        def my_handler(user, trigger, context):
-            api.rcon_enqueue(["say Hello " + user])
+    Provides controlled access to main.py internals (RCON queue, trigger queue)
+    and per-hook config via ``get_hook_config()``.
     """
 
     def __init__(
@@ -41,12 +26,14 @@ class HookAPI:
         main_loop: asyncio.AbstractEventLoop,
         config: dict,
         valid_functions: set[str],
+        hook_configs: dict[str, dict] | None = None,
     ) -> None:
         self._rcon_queue = rcon_queue
         self._trigger_queue = trigger_queue
         self._main_loop = main_loop
         self._config = config
         self._valid_functions = valid_functions
+        self._hook_configs: dict[str, dict] = hook_configs or {}
         self._current_depth: int = 0
         self._banned_triggers: set[str] = set()
 
@@ -56,9 +43,16 @@ class HookAPI:
 
     @property
     def config(self) -> dict:
-        """Read-only access to the loaded config.yaml values."""
+        """Read-only access to the loaded global config.yaml values."""
         from copy import deepcopy
         return deepcopy(self._config)
+
+    def get_hook_config(self, name: str) -> dict:
+        """Return the per-hook config for a named hook.
+
+        Falls back to an empty dict if the hook has no config.
+        """
+        return self._hook_configs.get(name, {})
 
     def set_depth(self, depth: int) -> None:
         self._current_depth = depth
@@ -79,10 +73,6 @@ class HookAPI:
         log.info(f"[HOOK] Registered action: {name}")
 
     def rcon_enqueue(self, commands: list[str]) -> None:
-        """
-        Enqueue a list of Minecraft RCON commands for execution.
-        Commands are run in order by the RCON worker.
-        """
         if not commands:
             return
         try:
@@ -93,10 +83,6 @@ class HookAPI:
             log.warning("[HOOK] RCON queue full — commands dropped.")
 
     def enqueue_trigger(self, action_name: str, user: str = "hook") -> None:
-        """
-        Push another trigger into the trigger queue.
-        Useful for chaining actions.
-        """
         if action_name in self._banned_triggers:
             log.error(f"[HOOK] enqueue_trigger('{action_name}') permanently blocked "
                   f"— trigger was banned after loop detection.")
@@ -117,20 +103,15 @@ class HookAPI:
             log.warning(f"[HOOK] Trigger queue full — '{action_name}' dropped.")
 
     def log(self, msg: str) -> None:
-        """Print a message with [HOOK] prefix."""
         log.info(f"[HOOK] {msg}")
 
     def send_overlay_text(self, title: str, subtitle: Optional[str] = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
-        """
-        Display overlay text on stream overlays. Returns True if successful.
-        """
         try:
             from core.overlay_utils import send_overlay_text as _send_overlay
             return _send_overlay(title, subtitle, duration, overlay_name)
         except Exception as e:
             log.error(f"[HOOK] send_overlay_text failed: {e}")
             return False
-    
+
     def get_valid_functions(self) -> set[str]:
-        """Return the set of valid function names for RCON commands."""
         return self._valid_functions

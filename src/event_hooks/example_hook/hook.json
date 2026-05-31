@@ -1,0 +1,10 @@
+{
+  "name": "example_hook",
+  "version": "1.0.0",
+  "display_name": "Example Hook",
+  "description": "Demonstrates how to create a custom $-command handler for the Streaming Tool.",
+  "author": "TikTok2Mc",
+  "min_api_version": "1.0.0",
+  "capabilities": [],
+  "update_url": ""
+}

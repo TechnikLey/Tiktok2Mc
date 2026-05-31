@@ -1,0 +1,16 @@
+[
+  {
+    "name": "example_hook",
+    "version": "1.0.0",
+    "enabled": true,
+    "display_name": "Example Hook",
+    "description": "Demonstrates how to create a custom $-command handler for the Streaming Tool.",
+    "author": "TikTok2Mc",
+    "capabilities": [],
+    "plugin": "",
+    "update_url": "",
+    "source": "D:\\Tiktok2Mc\\src\\event_hooks\\example_hook",
+    "registered_at": 1780234836.262676,
+    "updated_at": 1780234836.262676
+  }
+]
