@@ -501,19 +501,39 @@ def main():
             nsis_script = SCRIPT_DIR / "installer" / "install.nsi"
             installer_out = SCRIPT_DIR / "build" / f"TikTok2MC-{TOOL_VERSION}-Setup.exe"
             if nsis_script.exists():
+                # Find makensis: PATH first, then common install locations
+                makensis_cmd = "makensis"
                 try:
-                    _sp.run(
-                        ["makensis",
-                         f"-DPRODUCT_VERSION={TOOL_VERSION}",
-                         f"-DOUT_FILE={installer_out}",
-                         str(nsis_script)],
-                        check=True, capture_output=True,
-                    )
-                    cprint(f"Installer created: {installer_out}", Color.GREEN)
+                    _sp.run(["makensis", "/VERSION"], check=False, capture_output=True)
                 except FileNotFoundError:
-                    cprint("makensis not found — install NSIS to build installer", Color.YELLOW)
-                except _sp.CalledProcessError as e:
-                    cprint(f"Installer build failed: {e.stderr.decode(errors='replace')}", Color.RED)
+                    for nsis_path in [
+                        Path("C:/Program Files (x86)/NSIS/Bin/makensis.exe"),
+                        Path("C:/Program Files/NSIS/Bin/makensis.exe"),
+                        Path(os.environ.get("LOCALAPPDATA", "")) / "NSIS" / "Bin" / "makensis.exe",
+                    ]:
+                        if nsis_path.exists():
+                            makensis_cmd = str(nsis_path)
+                            break
+                    else:
+                        cprint("makensis not found — install NSIS or restart your terminal", Color.YELLOW)
+                        makensis_cmd = None
+
+                if makensis_cmd:
+                    try:
+                        _sp.run(
+                            [makensis_cmd,
+                             f"-DPRODUCT_VERSION={TOOL_VERSION}",
+                             f"-DOUT_FILE={installer_out}",
+                             str(nsis_script)],
+                            check=True, capture_output=True,
+                        )
+                        cprint(f"Installer created: {installer_out}", Color.GREEN)
+                        # Also copy installer into the release folder so it ships with the portable ZIP
+                        installer_in_release = OUT_DIR / installer_out.name
+                        shutil.copy2(installer_out, installer_in_release)
+                        cprint(f"Installer copied to release: {installer_in_release}", Color.GREEN)
+                    except _sp.CalledProcessError as e:
+                        cprint(f"Installer build failed: {e.stderr.decode(errors='replace')}", Color.RED)
             else:
                 cprint(f"NSIS script not found at {nsis_script}", Color.YELLOW)
         elif BUILD_INSTALLER and not IS_WINDOWS:

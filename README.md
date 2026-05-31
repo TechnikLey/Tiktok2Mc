@@ -26,9 +26,19 @@ Everything is controlled through simple text files. No programming required.
 
 ### Windows
 
-1. Download the latest release from [GitHub Releases](https://github.com/TechnikLey/Tiktok2Mc/releases).
+**Option A — Installer (Recommended)**
+
+1. Download `TikTok2MC-<version>-Windows-Setup.exe` from [GitHub Releases](https://github.com/TechnikLey/Tiktok2Mc/releases).
+2. Run the installer and follow the prompts.
+3. TikTok2Mc will be installed to `Program Files` and can be launched from the desktop or Start Menu shortcut.
+
+**Option B — Portable ZIP**
+
+1. Download `TikTok2Mc-<version>-Windows.zip` from [GitHub Releases](https://github.com/TechnikLey/Tiktok2Mc/releases).
 2. Extract the ZIP file to any folder.
 3. That is it. The tool includes everything it needs, including Java.
+
+> The ZIP also contains the `TikTok2MC-Setup.exe` installer if you later decide to install it properly instead of running it portably.
 
 ### Linux
 

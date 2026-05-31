@@ -5,7 +5,9 @@ Unicode True
 RequestExecutionLevel admin
 
 !define PRODUCT_NAME "TikTok2MC"
-!define PRODUCT_VERSION "v1.0.0"
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "v1.0.0"
+!endif
 !define PRODUCT_PUBLISHER "TechnikLey"
 !define PRODUCT_WEB_SITE "https://github.com/TechnikLey/Tiktok2Mc"
 !define PRODUCT_UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
@@ -30,10 +32,11 @@ RequestExecutionLevel admin
 
 ; ---------- Interface Settings ----------
 !define MUI_ABORTWARNING
-!define MUI_ICON ""
-!define MUI_UNICON ""
-!define MUI_WELCOMEFINISHPAGE_BITMAP ""
-!define MUI_HEADERIMAGE ""
+; Custom icons can be defined here later:
+; !define MUI_ICON "..\assets\icon.ico"
+; !define MUI_UNICON "..\assets\icon.ico"
+; !define MUI_WELCOMEFINISHPAGE_BITMAP "..\assets\welcome.bmp"
+; !define MUI_HEADERIMAGE "..\assets\header.bmp"
 
 ; ---------- Pages ----------
 !insertmacro MUI_PAGE_WELCOME
