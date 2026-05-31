@@ -36,46 +36,21 @@ log = logging.getLogger(__name__)
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-# =========================
-# Base paths & configuration
-# =========================
-BASE_DIR = get_base_dir()
-
 SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 
-TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
-VERSION_FILE = (BASE_DIR / "version.txt").resolve()
-DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
-CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
-START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
-
-AUTO_MODE = "--auto" in sys.argv
-
-def wait_for_key(msg="Press Enter to exit..."):
-    if not AUTO_MODE:
-        try:
-            input(msg)
-        except EOFError:
-            log.info("\nNo input available.")
-
-try:
-    cfg = load_config(CONFIG_FILE)
-except (FileNotFoundError, ValueError, RuntimeError) as e:
-    log.error(f"{e}")
-    wait_for_key()
-    sys.exit(1)
-
-if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
-    if os.geteuid() != 0:
-        log.error("This script must be run as root on Linux to perform updates.")
-        wait_for_key()
-        sys.exit(1)
-
-# =========================
-# HTTP headers for GitHub API
-# =========================
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
-
+# ---------------------------------------------------------------------------
+# Sentinel globals — set by _init() when run as script, or patched by tests.
+# ---------------------------------------------------------------------------
+BASE_DIR = None
+TEMP_DIR = None
+VERSION_FILE = None
+DEFAULT_CONFIG_FILE = None
+CONFIG_FILE = None
+START_FILE = None
+AUTO_MODE = False
+cfg = {}
+CONFIG_UPDATE_ENABLE = True
+GITHUB_TOKEN = None
 HEADERS_API = {
     "Accept": "application/vnd.github+json",
     "User-Agent": "Streaming-Tool-Updater"
@@ -85,9 +60,48 @@ HEADERS_ASSET = {
     "User-Agent": "Streaming-Tool-Updater"
 }
 
-if GITHUB_TOKEN:
-    HEADERS_API["Authorization"] = f"token {GITHUB_TOKEN}"
-    HEADERS_ASSET["Authorization"] = f"token {GITHUB_TOKEN}"
+# ---------------------------------------------------------------------------
+def wait_for_key(msg="Press Enter to exit..."):
+    if not AUTO_MODE:
+        try:
+            input(msg)
+        except EOFError:
+            log.info("\nNo input available.")
+
+def _init():
+    global BASE_DIR, TEMP_DIR, VERSION_FILE, DEFAULT_CONFIG_FILE, CONFIG_FILE, START_FILE
+    global AUTO_MODE, cfg, CONFIG_UPDATE_ENABLE, GITHUB_TOKEN, HEADERS_API, HEADERS_ASSET
+    BASE_DIR = get_base_dir()
+    TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
+    VERSION_FILE = (BASE_DIR / "version.txt").resolve()
+    DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
+    CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
+    START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
+    AUTO_MODE = "--auto" in sys.argv
+    try:
+        cfg = load_config(CONFIG_FILE)
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
+        log.error(f"{e}")
+        wait_for_key()
+        sys.exit(1)
+    if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
+        if os.geteuid() != 0:
+            log.error("This script must be run as root on Linux to perform updates.")
+            wait_for_key()
+            sys.exit(1)
+    CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
+    HEADERS_API = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "Streaming-Tool-Updater"
+    }
+    HEADERS_ASSET = {
+        "Accept": "application/octet-stream",
+        "User-Agent": "Streaming-Tool-Updater"
+    }
+    if GITHUB_TOKEN:
+        HEADERS_API["Authorization"] = f"token {GITHUB_TOKEN}"
+        HEADERS_ASSET["Authorization"] = f"token {GITHUB_TOKEN}"
 
 # Directories and individual files that may be overwritten by an update
 WHITELIST_DIRS = {
@@ -378,8 +392,8 @@ def run_update():
             log.error("[FAIL] No matching release asset found for this platform.")
             sys.exit(5)
 
-        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
-        TEMP_DIR.mkdir(parents=True)
+            if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
+            TEMP_DIR.mkdir(parents=True, exist_ok=True)
         archive_path = TEMP_DIR / archive_name
         download_with_progress(asset["url"], archive_path)
 
@@ -545,4 +559,5 @@ def run_update():
     sys.exit(0)
 
 if __name__ == "__main__":
+    _init()
     run_update()
