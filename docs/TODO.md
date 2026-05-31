@@ -38,15 +38,12 @@ CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAu
 
 ## 🟠 PLUGIN REWORK — Refactor Required
 
-### 7. Plugin Code Modernisation
-All 5 plugins (`spotify`, `timer`, `wincounter`, `deathcounter`, `likegoal`) have:
-- Copy-pasted boilerplate (config load, theme load, API_BASE, parse_args)
-- Raw `urllib.request` calls instead of `PluginAPIClient`
-- Hardcoded `http://127.0.0.1:29185` instead of respecting `SERVER_HOST` env var
-- No error handling on API calls
-- Spotify plugin: has its own OAuth token file instead of using central `config.yaml` spotify section
-
-Goal: Extract shared plugin lifecycle into a base class / utility module. Refactor each plugin to use `PluginAPIClient`, central config, and proper error handling.
+### 7. Plugin Code Modernisation *(Timer done — 4 remaining)*
+- ✅ Timer refactored to `BasePlugin` (commit `b5e0f38`)
+- ⬜ Migrate `spotify`, `wincounter`, `deathcounter`, `likegoal` to `BasePlugin`
+- ⬜ Remove duplicated config load / theme load / `urllib.request` boilerplate
+- ⬜ Use `PluginAPIClient` and respect `SERVER_HOST` env var
+- ⬜ Move Spotify OAuth tokens from separate file into central `config.yaml`
 
 ## 🔵 TEST COVERAGE — Known Gaps
 
@@ -62,16 +59,17 @@ Goal: Extract shared plugin lifecycle into a base class / utility module. Refact
 - WebSocket endpoint (`/api/v1/ws`) is fully implemented but has no client tests
 
 ### Recently Completed
+- **Test suite stability fix** (`commit 68e9739`): fixed infinite tight-loop in `test_base_plugin.py` (2 tests calling `_command_polling_loop` without exit condition), added `time.sleep(0.1)` safety guard in `BasePlugin._command_polling_loop`, mocked heavy imports (`TikTokLive`, `mcrcon`, `flask`) in `conftest.py` to prevent test hangs, configured `pytest-timeout = 40s`.
+- **BasePlugin + Timer refactor** (`src/core/base_plugin.py`, `src/plugins/timer/main.py`, `tests/test_core/test_base_plugin.py`, 18 tests): shared base class with config load, theme, API helpers, command polling, state push, window state, overlay registration. Timer reduced from 275 to 90 lines.
 - **End-to-end update validation** (`tests/test_core/test_update_integration.py`, 24 tests): version boundary upgrade, signal lifecycle, restart flow, rollback, platform paths
 - **Plugin dependency ordering** (`tests/test_core/test_dependency.py`, 30 tests): topological sort, validation on register/put/enable, `depends_on` in `AppConfig`, timer → win-counter enforced
 - **Port Scanner** (`src/core/port_scanner.py`, 28 tests): scans 3 bind ports (29185/29187/29188) on startup, auto-resolves conflicts via env vars + runtime file, `port_policy` config section with `max_offset: -1` for unlimited scanning
 - **Declarative Command Handler Registration** (`CommentHandler` model, `PUT/DELETE /plugins/{name}/comment-handler`, `GET /comment-handlers`): Spotify registers `$` prefix in `plugin.json`, bridge dispatches comments to plugin API instead of hardcoded HTTP URLs. Removed `handler`/`url` from `config.yaml` Spotify group.
 - **core_hash Build Cache Optimization** (`build.py`): replaced global all-or-nothing `core_hash_changed` flag with per-task dependency tracking via AST import analysis. Changing one core file only invalidates executables that actually import it.
 - **EventBus Plugin Integration** (`plugin_overlay.py`, `routes/plugin_overlay.py`, all 5 plugins): replaced 0.5s polling loops with long-polling (`?wait=1`), backed by `asyncio.Event` notification on command enqueue. Zero-latency command delivery, no CPU wasted on idle polling.
-- **GUI Installer** (`installer/install.nsi`, `build.py --installer`): NSIS Modern UI 2 script with setup wizard, desktop/start menu shortcuts, startup registration, uninstall.
+- **GUI Installer** (`installer/install.nsi`, `build.py --installer`): NSIS Modern UI 2 script with setup wizard, desktop/start menu shortcuts, startup registration, uninstall. 13 tests.
 - **API Authentication** (`server.py`, `config.yaml`, `start.py`): `api_key` config field, middleware on non-localhost, server_host control, 0.0.0.0 warning, 6 tests.
 - **Plugin Lifecycle Tests** (`test_lifecycle.py`, `test_auth.py`): 20 tests for signal files, manifest discovery, API enable/disable, health check pattern, bridge init.
-- **GUI Installer** (`installer/install.nsi`, `build.py --installer`): NSIS Modern UI 2 script with setup wizard, shortcuts, startup registration, uninstall. 13 tests.
 - **Spotify OAuth Flow Helper** (`src/python/spotify_setup.py`): CLI wizard for Spotify Developer app setup, browser OAuth, local callback server, token exchange, `--refresh` mode. 16 tests.
 
 ---
@@ -102,4 +100,12 @@ Goal: Extract shared plugin lifecycle into a base class / utility module. Refact
 
 ---
 
-*Last updated: 2026-05-31 — 638 Python tests + 226 GUI frontend = 864 total | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
+## 🚀 Next 3 Steps
+
+1. **Finish Plugin Rework** — migrate `spotify`, `wincounter`, `deathcounter`, `likegoal` to `BasePlugin`, remove duplicated boilerplate
+2. **Plugin Implementation Tests** — add command handler tests across all 5 plugins (play, pause, add_win, player_death, player_respawn, reset, etc.)
+3. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates)
+
+---
+
+*Last updated: 2026-05-31 — 656 Python tests + 226 GUI frontend = 882 total | Current: Plugin Rework (4/5 remaining) → Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
