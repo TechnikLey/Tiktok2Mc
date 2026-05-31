@@ -136,6 +136,34 @@ def _generate_defaults_from_fields(fields: list[dict]) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _heal_plugin_config(data: dict, schema: dict) -> dict:
+    """Validate *data* against *schema* and replace invalid values with
+    their schema defaults.  Logs warnings for each healed field.
+
+    Returns the healed copy of *data*.
+    """
+    errors = validate_plugin_config(data, schema)
+    if not errors:
+        return data
+
+    healed = copy.deepcopy(data)
+    fields = {f["key"]: f for f in schema.get("fields", [])}
+    for err in errors:
+        key = err.split(" ")[0] if " " in err else err
+        field = fields.get(key)
+        if field and "default" in field:
+            log.warning(
+                "Healing plugin config field '%s': %s — using default %r",
+                key, err, field["default"],
+            )
+            _set_nested(healed, key, copy.deepcopy(field["default"]))
+        else:
+            log.warning(
+                "Plugin config validation warning: %s (no default to heal)", err
+            )
+    return healed
+
+
 def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
     """Load a plugin's local ``config.yaml``.
 
@@ -143,6 +171,9 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
     ``config_schema``, a default config is generated from the schema.
     If *apply_defaults* is ``True`` (the default), any missing keys in
     the existing config are filled with schema defaults.
+
+    After loading, the config is validated against the schema (if any)
+    and invalid values are replaced with schema defaults (healing).
     """
     manifest = load_plugin_manifest(plugin_dir)
     schema = None
@@ -167,6 +198,10 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
         merged = copy.deepcopy(defaults)
         _deep_update(merged, data)
         data = merged
+
+    # Validate and heal on load
+    if schema:
+        data = _heal_plugin_config(data, schema)
 
     return data
 

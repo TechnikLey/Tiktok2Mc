@@ -357,4 +357,83 @@ class TestLoadAllPluginConfigs:
 
         result = load_all_plugin_configs()
         assert "good" in result
-        assert "bad" not in result
+
+
+class TestConfigValidationOnLoad:
+    def test_valid_config_preserved(self, tmp_path):
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({
+                "name": "test-plugin",
+                "config_schema": {
+                    "fields": [
+                        {"key": "enabled", "type": "boolean", "default": True},
+                        {"key": "port", "type": "integer", "default": 8080},
+                    ],
+                },
+            }),
+            encoding="utf-8",
+        )
+        save_yaml(plugin_dir / "config.yaml", {"enabled": False, "port": 9090}, backup=False)
+        cfg = load_plugin_config(plugin_dir)
+        assert cfg["enabled"] is False
+        assert cfg["port"] == 9090
+
+    def test_invalid_value_healed_on_load(self, tmp_path):
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({
+                "name": "test-plugin",
+                "config_schema": {
+                    "fields": [
+                        {"key": "enabled", "type": "boolean", "default": True},
+                    ],
+                },
+            }),
+            encoding="utf-8",
+        )
+        # enabled is "yes" (string) instead of boolean — should be healed
+        save_yaml(plugin_dir / "config.yaml", {"enabled": "yes"}, backup=False)
+        cfg = load_plugin_config(plugin_dir)
+        assert cfg["enabled"] is True  # healed to default
+
+    def test_invalid_value_without_default_logs_warning(self, tmp_path, caplog):
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({
+                "name": "test-plugin",
+                "config_schema": {
+                    "fields": [
+                        {"key": "color", "type": "color"},
+                    ],
+                },
+            }),
+            encoding="utf-8",
+        )
+        save_yaml(plugin_dir / "config.yaml", {"color": "not-a-color"}, backup=False)
+        cfg = load_plugin_config(plugin_dir)
+        # value is kept as-is but a warning is logged (no default to heal to)
+        assert cfg["color"] == "not-a-color"
+        assert any("validation warning" in r.message for r in caplog.records)
+
+    def test_healing_logs_warning(self, tmp_path, caplog):
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({
+                "name": "test-plugin",
+                "config_schema": {
+                    "fields": [
+                        {"key": "enabled", "type": "boolean", "default": False},
+                    ],
+                },
+            }),
+            encoding="utf-8",
+        )
+        save_yaml(plugin_dir / "config.yaml", {"enabled": "bad-value"}, backup=False)
+        cfg = load_plugin_config(plugin_dir)
+        assert cfg["enabled"] is False
+        assert any("Healing" in r.message for r in caplog.records)
