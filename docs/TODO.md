@@ -3,6 +3,8 @@
 > **This file only contains unfinished work.**
 >
 > Completed work, implemented features, and historical changes belong in `docs/CHANGE_HISTORY.md`.
+>
+> **When editing this file, also update `docs/CHANGE_HISTORY.md` if any items are marked done or removed.**
 
 ---
 

@@ -39,6 +39,27 @@
 - `event_subscriptions` field added to `PluginManifest` model
 - `channel-points` and `like-goal` manifests updated with `event_subscriptions`
 
+### Plugin Architecture Modernisation
+- **`BasePlugin` base class** (`src/core/base_plugin.py`) — shared config load, theme, API helpers (`api_post`, `api_get`, `push_state`, `register_handler`), command polling, state push, window state, overlay registration. 18 tests.
+- **Timer refactored to `BasePlugin`** — reduced from 275 to 90 lines.
+- **4 plugins migrated to `BasePlugin`** — `spotify`, `wincounter`, `deathcounter`, `likegoal`. Duplicated config load / theme load / `urllib.request` boilerplate removed across all 5 plugins.
+- **Plugin dependency ordering** — topological sort in `AppConfig`, `depends_on` field, enforced on register/put/enable. Timer → win-counter dependency enforced. 30 tests.
+
+### Core Infrastructure Improvements
+- **Declarative Command Handler Registration** — `CommentHandler` model, `PUT/DELETE /plugins/{name}/comment-handler`, `GET /comment-handlers`. Spotify registers `$` prefix in `plugin.json`; bridge dispatches comments to plugin API instead of hardcoded HTTP URLs. Removed `handler`/`url` from `config.yaml` Spotify group.
+- **Port Scanner** (`src/core/port_scanner.py`, 28 tests) — scans 3 bind ports (29185/29187/29188) on startup, auto-resolves conflicts via env vars + runtime file. `port_policy` config section with `max_offset: -1` for unlimited scanning.
+- **core_hash Build Cache Optimization** — replaced global all-or-nothing `core_hash_changed` flag with per-task dependency tracking via AST import analysis. Changing one core file only invalidates executables that actually import it.
+- **EventBus Plugin Integration** — replaced 0.5s polling loops with long-polling (`?wait=1`), backed by `asyncio.Event` notification on command enqueue. Zero-latency command delivery, no CPU wasted on idle polling.
+
+### New Features
+- **API Authentication** — `api_key` config field, middleware checks `X-API-Key` header on non-localhost requests. `start.py` warns when exposed without key. 6 tests.
+- **GUI Installer** — Windows NSIS installer (`installer/install.nsi`). Setup wizard, desktop/start menu shortcuts, startup registration, uninstall. Built via `python build.py --installer`. 13 tests.
+- **Spotify OAuth Flow Helper** — CLI wizard (`src/python/spotify_setup.py`) guiding users through Spotify OAuth: opens browser, runs local callback server, exchanges code for tokens, saves to config. Also supports `--refresh` mode. 16 tests.
+
+### Test & Build Hardening
+- **Test suite stability fix** — fixed infinite tight-loop in `test_base_plugin.py` (2 tests calling `_command_polling_loop` without exit condition). Added `time.sleep(0.1)` safety guard in `BasePlugin._command_polling_loop`. Mocked heavy imports (`TikTokLive`, `mcrcon`, `flask`) in `conftest.py` to prevent test hangs. Configured `pytest-timeout = 40s`.
+- **End-to-end update validation** (`tests/test_core/test_update_integration.py`) — version boundary upgrade, signal lifecycle, restart flow, rollback, platform paths. 24 tests.
+
 ---
 
 ## Pre-v1.0.0 Milestones
@@ -96,15 +117,21 @@
 - Integrated into registry, plugin config, config.yaml, and actions.mca
 
 ### Testing
-- **506 Python tests + 226 GUI frontend tests = 732 total**
+- **678 Python tests + 226 GUI frontend tests = 904 total**
 - GUI frontend (Vitest + JSDOM): 226 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
 - CI workflow `test.yml` on push/PR to `main`
 - BackupManager: 30 standalone tests
 - TikTok bridge core: 38 tests
 - Update lifecycle: 24 tests
-- End-to-end update: 34 tests
 - Hook system: 13 tests
 - Smoke tests for all plugin manifests
+- BasePlugin: 18 tests
+- Plugin dependency ordering: 30 tests
+- Port Scanner: 28 tests
+- Plugin lifecycle + auth: 26 tests (20 lifecycle + 6 auth)
+- GUI installer: 13 tests
+- Spotify OAuth helper: 16 tests
+- Test suite stability: infinite loop fix, `pytest-timeout = 40s`, heavy-import mocking
 
 ### Documentation
 - `README.md` rewritten for v1.0.0
