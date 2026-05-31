@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "entry_point": "src/plugins/timer/main.py",
   "display_name": "Timer",
-  "description": "A configurable countdown timer overlay. Can pause on player death and auto-post wins to Win Counter.",
+  "description": "A configurable count-up / count-down timer overlay. Publishes lifecycle events to the EventBus so hooks and other plugins can react without hardcoded coupling.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
@@ -11,38 +11,103 @@
     "timer:schedule",
     "timer:pause",
     "timer:reset",
-    "timer:status"
+    "timer:status",
+    "timer:events"
   ],
-  "depends_on": ["win-counter"],
+  "depends_on": [],
   "auto_enable": false,
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {
     "version": 1,
     "fields": [
       {
-        "key": "start_time",
-        "type": "integer",
-        "default": 10,
-        "min": 1,
-        "label": "Start Time (minutes)",
-        "help": "Initial countdown duration in minutes",
+        "key": "direction",
+        "type": "select",
+        "options": ["down", "up"],
+        "default": "down",
+        "label": "Direction",
+        "help": "Count down from start_time or count up from zero",
         "category": "Timer"
       },
       {
-        "key": "auto_win",
-        "type": "boolean",
-        "default": false,
-        "label": "Auto Win",
-        "help": "Post a win to Win Counter when the timer reaches zero",
-        "category": "Coupling"
+        "key": "start_time",
+        "type": "integer",
+        "default": 600,
+        "min": 1,
+        "label": "Start Time (seconds)",
+        "help": "Initial time in seconds. For direction=down this is the countdown start; for up this is the maximum (used with loop/stop logic).",
+        "category": "Timer"
       },
       {
-        "key": "pause_on_death",
+        "key": "time_step",
+        "type": "integer",
+        "default": 1,
+        "min": 1,
+        "max": 60,
+        "label": "Time Step (seconds)",
+        "help": "How many seconds to add/remove per tick",
+        "category": "Timer"
+      },
+      {
+        "key": "auto_start",
         "type": "boolean",
         "default": false,
-        "label": "Pause on Death",
-        "help": "Pause and reset the timer when the player dies",
-        "category": "Coupling"
+        "label": "Auto Start",
+        "help": "Start the timer automatically when the plugin loads",
+        "category": "Timer"
+      },
+      {
+        "key": "loop",
+        "type": "boolean",
+        "default": false,
+        "label": "Loop",
+        "help": "When counting down and reaching zero, automatically reset to start_time instead of pausing",
+        "category": "Timer"
+      },
+      {
+        "key": "reset_on",
+        "type": "array",
+        "default": ["zero"],
+        "item_schema": {
+          "type": "select",
+          "options": ["zero", "manual", "command"]
+        },
+        "label": "Reset On",
+        "help": "Events that trigger an automatic reset: zero = timer hits zero; manual = reset command; command = any set_time/add_time command",
+        "category": "Timer"
+      },
+      {
+        "key": "signal_on",
+        "type": "array",
+        "default": ["zero", "started", "paused", "reset"],
+        "item_schema": {
+          "type": "select",
+          "options": ["started", "paused", "resumed", "reset", "tick", "zero", "milestone"]
+        },
+        "label": "Signal On",
+        "help": "Timer events published to the EventBus via POST /api/v1/events. Consumers (hooks, other plugins) can subscribe without coupling.",
+        "category": "Events"
+      },
+      {
+        "key": "milestones",
+        "type": "array",
+        "default": [],
+        "item_schema": {
+          "type": "integer",
+          "min": 0
+        },
+        "label": "Milestones (seconds)",
+        "help": "List of times (seconds) at which a timer.milestone event is emitted. Count-down triggers at or below; count-up triggers at or above.",
+        "category": "Events"
+      },
+      {
+        "key": "format",
+        "type": "select",
+        "options": ["mm:ss", "hh:mm:ss", "seconds"],
+        "default": "mm:ss",
+        "label": "Display Format",
+        "help": "Overlay time display format",
+        "category": "Appearance"
       },
       {
         "key": "theme.background",

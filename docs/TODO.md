@@ -45,9 +45,9 @@ Only manifest smoke tests exist for plugins. No tests for command handlers (play
 
 ### Plugin Cross-Coupling
 Some plugins are not fully decoupled and still depend on each other's internal behaviour:
-- **Timer → WinCounter** dependency is hardcoded (`timer` plugin sends `add_win` commands to `win-counter` via `send_command()`). This should be declarative (e.g. `depends_on` + event subscription) rather than hardcoded target plugin name.
-- **DeathCounter → Timer** coupling exists in pause-on-death logic. Timer checks death-counter state directly.
-- **LikeGoal** emits events that other plugins may implicitly rely on; no formal contract documented.
+- ✅ **Timer** — rewritten to publish `timer.*` events to the EventBus via `POST /api/v1/events`. No `depends_on`, no `send_command()` to other plugins. Consumers (hooks, plugins, dashboard) subscribe via EventBus or state polling. Configurable direction, loop, milestones, reset triggers, and signal events.
+- ⬜ **DeathCounter → Timer** coupling exists in pause-on-death logic. Timer no longer has built-in death handling; this should be moved to a hook or the death-counter plugin should send timer commands via API.
+- ⬜ **LikeGoal** emits events that other plugins may implicitly rely on; no formal contract documented.
 
 ### Security
 - Spotify `client_secret` validation and encrypted storage

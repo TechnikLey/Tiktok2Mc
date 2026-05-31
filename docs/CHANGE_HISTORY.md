@@ -41,9 +41,9 @@
 
 ### Plugin Architecture Modernisation
 - **`BasePlugin` base class** (`src/core/base_plugin.py`) — shared config load, theme, API helpers (`api_post`, `api_get`, `push_state`, `register_handler`), command polling, state push, window state, overlay registration. 18 tests.
-- **Timer refactored to `BasePlugin`** — reduced from 275 to 90 lines.
+- **Timer completely rewritten** — now fully decoupled from all other plugins. Supports count-up / count-down, configurable direction, loop, reset triggers, milestones, and signal events. Publishes `timer.*` events to the EventBus via `POST /api/v1/events` instead of hardcoded `send_command("win-counter", ...)`. Removed `depends_on: ["win-counter"]`, `auto_win`, `pause_on_death`. Config schema expanded with `direction`, `loop`, `reset_on`, `signal_on`, `milestones`, `format`, `time_step`. Tests updated (12 timer-specific assertions).
 - **4 plugins migrated to `BasePlugin`** — `spotify`, `wincounter`, `deathcounter`, `likegoal`. Duplicated config load / theme load / `urllib.request` boilerplate removed across all 5 plugins.
-- **Plugin dependency ordering** — topological sort in `AppConfig`, `depends_on` field, enforced on register/put/enable. Timer → win-counter dependency enforced. 30 tests.
+- **Plugin dependency ordering** — topological sort in `AppConfig`, `depends_on` field, enforced on register/put/enable. 30 tests.
 
 ### Core Infrastructure Improvements
 - **Declarative Command Handler Registration** — `CommentHandler` model, `PUT/DELETE /plugins/{name}/comment-handler`, `GET /comment-handlers`. Spotify registers `$` prefix in `plugin.json`; bridge dispatches comments to plugin API instead of hardcoded HTTP URLs. Removed `handler`/`url` from `config.yaml` Spotify group.
@@ -132,6 +132,7 @@
 - Plugin lifecycle + auth: 26 tests (20 lifecycle + 6 auth)
 - GUI installer: 13 tests
 - Spotify OAuth helper: 16 tests
+- Timer plugin: 12 tests (direction, tick, loop, milestones, signals, formatting)
 - Test suite stability: infinite loop fix, `pytest-timeout = 40s`, heavy-import mocking
 
 ### Documentation
