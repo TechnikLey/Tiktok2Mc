@@ -25,7 +25,6 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "rcon": dict,
     "tiktok": dict,
     "comment_commands": dict,
-    "random_triggers": dict,
     "console": dict,
     "minecraft_server_api": dict,
     "gui": dict,

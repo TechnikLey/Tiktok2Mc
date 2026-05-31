@@ -62,7 +62,7 @@ class TestFindOverlayPluginDir:
             "core.overlay_utils.discover_plugins_dir", lambda: plugins_dir
         )
         result = _find_overlay_plugin_dir()
-        assert result == plugins_dir / "overlaytxt"
+        assert result == plugins_dir / "overlaytext"
 
 
 class TestOverlayManager:

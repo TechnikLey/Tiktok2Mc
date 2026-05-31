@@ -13,10 +13,6 @@ PLUGINS_DIR = PROJECT_ROOT / "src" / "plugins"
 # Keys are the kebab-case manifest names; "dir" maps to on-disk directory.
 
 EXPECTED_PLUGINS: dict[str, dict[str, object]] = {
-    "channel-points": {
-        "dir": "channelpoints",
-        "display_name": "Channel Points",
-    },
     "death-counter": {
         "dir": "deathcounter",
         "display_name": "Death Counter",

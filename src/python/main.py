@@ -962,11 +962,9 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                     ctx.comment_cmd_global_user_last[username] = now
                     mode_label = resp_data.get("mode", "replace")
                     if mode_label == "queue":
-                        log.info(f"{log_prefix} {username} → '{base_cmd}' successful — song added to queue")
-                    else:
-                        log.info(f"{log_prefix} {username} → '{base_cmd}' successful — song found and played")
+                        log.info(f"{log_prefix} {username} → '{base_cmd}' successful — conditional response: mode={mode_label}")
                 else:
-                    log.info(f"{log_prefix} {username} → '{base_cmd}' song not found — no points deducted, no cooldown triggered")
+                    log.info(f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered")
             else:
                 import urllib.request, urllib.parse
                 url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))

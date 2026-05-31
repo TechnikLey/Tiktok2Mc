@@ -237,55 +237,23 @@ comment_commands:
       # Each key matches a command name from the commands list above.
       commands_config:
         skip:
-          # Points cost — viewer needs this many channel points to use this command.
-          # Set to 0 (or omit) to make the command free.
-          points_cost: 50
-          # Per-command cooldown in seconds (overrides group cooldown below).
           cooldown: 30
         prev:
-          points_cost: 20
-        playtrack:
-          # Points cost — viewer needs this many channel points.
-          points_cost: 50
-          # Per-command cooldown in seconds.
           cooldown: 30
-          # When true: points & cooldowns only apply if the song is found.
-          # If the song can't be found, nothing is deducted and no cooldown fires.
+        playtrack:
+          cooldown: 30
           conditional: true
-          # Direct URL to the playtrack endpoint (bypasses /comment).
-          # The response includes {"found": true/false} for conditional handling.
-          url: "http://127.0.0.1:{spotify_port}/playtrack?user={user}&text={text}"
-          handler: http
         volume:
           # Per-command role override (overrides group allowed_roles).
           roles:
             - moderator
       handler: http
-      url: "http://127.0.0.1:{spotify_port}/comment?user={user}&text={text}"
+      # NOTE: Plugins should register their own command handlers dynamically.
+      # Hardcoded URLs to specific plugin endpoints have been removed to avoid coupling.
+      url: ""
       cooldown: 0
       user_cooldown: 0
       trigger_comment_event: true
-
-# ===========================================================================
-#  RANDOM TRIGGER FILTER ($random)
-# ===========================================================================
-# Controls which triggers can be selected by the $random action
-# in data/actions.mca.
-#
-# mode:
-#   "deny-all"  — Only triggers in the list are eligible
-#   "allow-all" — All triggers are eligible EXCEPT those in the list
-#
-# NOTE: Triggers that contain "$random" are automatically excluded
-# to prevent infinite recursion.
-random_triggers:
-  mode: deny-all
-  triggers:
-    - likes
-    - like_2
-    - follow
-    - join
-    - comment
 
 # ===========================================================================
 #  CONSOLE VISIBILITY

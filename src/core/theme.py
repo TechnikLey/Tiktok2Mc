@@ -34,14 +34,6 @@ _DEFAULT_THEMES = {
         "accent": "#1db954",
         "accent2": "#1ed760",
     },
-    "channel_points": {
-        "background": "#000000",
-        "text": "#ffffff",
-        "accent": "#FFD700",
-        "accent2": "#00BFFF",
-        "accent3": "#40E0D0",
-        "danger": "#FF4500",
-    },
 }
 
 
