@@ -44,6 +44,23 @@ auto_update_config: true
 show_sudo_warning: true
 
 # ---------------------------------------------------------------------------
+#  PORT POLICY
+# ---------------------------------------------------------------------------
+# Controls what happens when a required port is already in use.
+#
+#   auto_resolve: true   — Automatically find the next free port
+#   auto_resolve: false  — Log an error and exit (safe mode)
+#
+#   session_only: true   — Changed ports are used only this session
+#   session_only: false  — Save resolved ports to config permanently
+#
+#   max_offset: 10       — How many ports to try (-1 = unlimited)
+port_policy:
+  auto_resolve: true
+  session_only: true
+  max_offset: 10
+
+# ---------------------------------------------------------------------------
 #  SERVER BIND ADDRESS
 # ---------------------------------------------------------------------------
 # Controls which network interfaces the servers listen on.

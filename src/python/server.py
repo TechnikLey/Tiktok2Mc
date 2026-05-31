@@ -117,9 +117,9 @@ try:
 
     Xms = cfg.get("java", {}).get("xms", "1G")
     Xmx = cfg.get("java", {}).get("xmx", "1G")
-    MC_PORT = cfg.get("java", {}).get("port", 25565)
-    WEBSERVERPORT = cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)
-    APIPORT = cfg.get("minecraft_server_api", {}).get("api_port", 29187)
+    MC_PORT = int(os.environ.get("RESOLVED_PORT_MC_GAME_PORT", cfg.get("java", {}).get("port", 25565)))
+    WEBSERVERPORT = int(os.environ.get("RESOLVED_PORT_WEBHOOK_PORT", cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)))
+    APIPORT = int(os.environ.get("RESOLVED_PORT_MCSERVER_API_PORT", cfg.get("minecraft_server_api", {}).get("api_port", 29187)))
     MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
     # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
     SERVER_HOST = cfg.get("server_host", "127.0.0.1")

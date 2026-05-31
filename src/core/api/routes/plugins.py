@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
+from core.api.dependency import validate_dependencies
 from core.api.models import (
     PluginListResponse,
     PluginRegisterRequest,
@@ -80,6 +81,14 @@ async def register_plugin(body: PluginRegisterRequest):
     """Register or update a plugin in the central registry."""
     try:
         registry = get_registry()
+        if body.depends_on:
+            registered = {p.name: p for p in registry.list()}
+            missing = validate_dependencies(body.name, body.depends_on, registered)
+            if missing:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Plugin '{body.name}' depends on unregistered plugin(s): {', '.join(missing)}",
+                )
         data = PluginRegistration(
             name=body.name,
             path=body.path,
@@ -99,6 +108,8 @@ async def register_plugin(body: PluginRegisterRequest):
         )
         result = registry.register(data)
         return PluginRegisterResponse(status="registered", plugin=result)
+    except HTTPException:
+        raise
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
@@ -250,6 +261,21 @@ async def enable_plugin(name: str):
         if plugin.enabled:
             log.info("Plugin '%s' is already enabled — returning current state", name)
             return plugin
+        # Check dependencies are enabled
+        if plugin.depends_on:
+            registered = {p.name: p for p in registry.list()}
+            for dep_name in plugin.depends_on:
+                dep = registered.get(dep_name)
+                if dep is None:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Cannot enable '{name}': dependency '{dep_name}' is not registered",
+                    )
+                if not dep.enabled:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Cannot enable '{name}': dependency '{dep_name}' is not enabled",
+                    )
         # Write signal FIRST so start.py sees it immediately
         if not _write_plugin_signal(name, "start"):
             raise HTTPException(
@@ -335,6 +361,15 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
     """Partially update a plugin's properties (e.g. enable/disable, health)."""
     try:
         registry = get_registry()
+        # Validate depends_on if being updated
+        if body.depends_on is not None:
+            registered = {p.name: p for p in registry.list()}
+            missing = validate_dependencies(name, body.depends_on, registered)
+            if missing:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Plugin '{name}' depends on unregistered plugin(s): {', '.join(missing)}",
+                )
         kwargs: dict[str, Any] = dict(
             enabled=body.enabled,
             level=body.level,

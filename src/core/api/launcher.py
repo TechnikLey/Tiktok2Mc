@@ -27,6 +27,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from core.api.dependency import get_dependency_order
 from core.api.models import PluginManifest, PluginRegistration
 from core.models import AppConfig
 
@@ -49,7 +50,7 @@ def _api_to_legacy_dict(api_entry: dict[str, Any]) -> dict[str, Any]:
         "enable": api_entry.get("enabled", False),
         "level": api_entry.get("level", 2),
         "ics": api_entry.get("ics", False),
-        "port": api_entry.get("port", 0),
+        "depends_on": api_entry.get("depends_on", []),
     }
 
 
@@ -270,4 +271,11 @@ class PluginLauncher:
                     "Skipping invalid API entry %s: %s",
                     entry.get("name", "<unknown>"), exc,
                 )
+        # Sort by dependency order so dependants start after dependencies
+        result = [
+            AppConfig.from_dict(d)
+            for d in get_dependency_order(
+                [p.to_dict() for p in result],
+            )
+        ]
         return result

@@ -10,6 +10,7 @@ class AppConfig:
     enable: bool
     level: int
     ics: bool
+    depends_on: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip():
@@ -32,6 +33,7 @@ class AppConfig:
             "enable": self.enable,
             "level": self.level,
             "ics": self.ics,
+            "depends_on": self.depends_on,
         }
 
     @classmethod
@@ -42,5 +44,6 @@ class AppConfig:
             enable=data["enable"],
             level=data["level"],
             ics=data["ics"],
+            depends_on=data.get("depends_on", []),
         )
 

@@ -13,7 +13,7 @@
     "timer:reset",
     "timer:status"
   ],
-  "depends_on": [],
+  "depends_on": ["win-counter"],
   "auto_enable": false,
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {

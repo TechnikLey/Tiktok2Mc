@@ -41,7 +41,7 @@ def main() -> None:
     parser.add_argument(
         "--port",
         type=int,
-        default=DEFAULT_PORT,
+        default=int(os.environ.get("RESOLVED_PORT_API_PORT", DEFAULT_PORT)),
         help=f"Port number (default: {DEFAULT_PORT})",
     )
     parser.add_argument(

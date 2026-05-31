@@ -200,7 +200,12 @@ def load_config():
         ctx.server_host = config.get("server_host", "127.0.0.1")
         ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
         ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
-        ctx.mcserver_api_port = config.get("minecraft_server_api", {}).get("web_server_port", 29188)
+        ctx.mcserver_api_port = int(
+            os.environ.get(
+                "RESOLVED_PORT_WEBHOOK_PORT",
+                config.get("minecraft_server_api", {}).get("web_server_port", 29188),
+            )
+        )
         ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
 
         ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})

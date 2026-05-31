@@ -189,6 +189,47 @@ SHUTDOWN_DELAY_SECONDS = cfg.get("shutdown", {}).get("delay_seconds", 30)
 os.environ["SERVER_HOST"] = cfg.get("server_host", "127.0.0.1")
 
 # -----------------------------
+# Port scanner — detect conflicts before any process binds
+# -----------------------------
+from core.port_scanner import (
+    PortPolicy,
+    scan_bind_ports,
+    build_resolved_map,
+    write_runtime_file,
+    ports_to_env,
+)
+_PORT_RUNTIME_DIR = (BASE_DIR / "core" / "runtime").resolve()
+_port_policy = PortPolicy.from_config(cfg)
+
+_results = scan_bind_ports(
+    cfg.get("server_host", "127.0.0.1"), _port_policy
+)
+
+_unresolved = [r for r in _results if r.in_use and not _port_policy.auto_resolve]
+if _unresolved:
+    for r in _unresolved:
+        log.error("Port %d (%s) is already in use.", r.port, r.description)
+    log.error("Set port_policy.auto_resolve = true to automatically find a free port.")
+    input("Press Enter to exit...")
+    sys.exit(1)
+
+_resolved = build_resolved_map(_results)
+if any(r.in_use for r in _results):
+    for r in _results:
+        if r.in_use:
+            log.info(
+                "Port %d (%s) in use → resolved to %d",
+                r.port, r.description, r.resolved_port,
+            )
+
+write_runtime_file(_resolved, _PORT_RUNTIME_DIR)
+os.environ.update(ports_to_env(_resolved))
+
+if not _port_policy.session_only:
+    from core.port_scanner import persist_to_config
+    persist_to_config(_resolved, CONFIG_FILE)
+
+# -----------------------------
 # Process dictionary
 # -----------------------------
 processes = {}
@@ -568,7 +609,7 @@ else:
 # API SERVER — start in background before anything needs it
 # =============================================================================
 
-_API_PORT = DEFAULT_PORT
+_API_PORT = _resolved.get("api_port", DEFAULT_PORT)
 _API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
 
 _uvicorn_server = None
