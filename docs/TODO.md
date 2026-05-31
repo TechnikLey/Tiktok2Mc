@@ -36,6 +36,18 @@ CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAu
 
 ---
 
+## 🟠 PLUGIN REWORK — Refactor Required
+
+### 7. Plugin Code Modernisation
+All 5 plugins (`spotify`, `timer`, `wincounter`, `deathcounter`, `likegoal`) have:
+- Copy-pasted boilerplate (config load, theme load, API_BASE, parse_args)
+- Raw `urllib.request` calls instead of `PluginAPIClient`
+- Hardcoded `http://127.0.0.1:29185` instead of respecting `SERVER_HOST` env var
+- No error handling on API calls
+- Spotify plugin: has its own OAuth token file instead of using central `config.yaml` spotify section
+
+Goal: Extract shared plugin lifecycle into a base class / utility module. Refactor each plugin to use `PluginAPIClient`, central config, and proper error handling.
+
 ## 🔵 TEST COVERAGE — Known Gaps
 
 | Module | Lines | Risk | Status |
@@ -90,4 +102,4 @@ CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAu
 
 ---
 
-*Last updated: 2026-05-31 — 638 Python tests + 226 GUI frontend = 864 total | Current: Plugin Implementation Tests. Next: Documentation Rewrite.*
+*Last updated: 2026-05-31 — 638 Python tests + 226 GUI frontend = 864 total | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
