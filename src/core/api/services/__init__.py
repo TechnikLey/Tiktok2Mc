@@ -19,6 +19,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "auto_update_config": bool,
     "show_sudo_warning": bool,
     "server_host": str,
+    "api_key": str,
     "control_method": str,
     "shutdown": dict,
     "java": dict,

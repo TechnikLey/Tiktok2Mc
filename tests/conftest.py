@@ -17,6 +17,7 @@ MINIMAL_CONFIG = {
     "auto_update_config": True,
     "show_sudo_warning": False,
     "server_host": "127.0.0.1",
+    "api_key": "",
     "control_method": "DCS",
     "shutdown": {},
     "java": {},

@@ -2,8 +2,10 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.status import HTTP_401_UNAUTHORIZED
 
 from fastapi.staticfiles import StaticFiles
 
@@ -19,6 +21,8 @@ from core.overlay import set_event_loop
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 29185
+
+_LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
 @asynccontextmanager
@@ -43,6 +47,7 @@ def create_app(
     title: str = "TikTok2MC API",
     version: str = API_VERSION,
     cors_origins: list[str] | None = None,
+    api_key: str = "",
 ) -> FastAPI:
     """Build and return a configured FastAPI application instance.
 
@@ -54,6 +59,10 @@ def create_app(
         API version string.
     cors_origins:
         List of allowed origins for CORS.  Defaults to ``["*"]``.
+    api_key:
+        Optional API key for authentication.  When set, all non-localhost
+        requests must include the ``X-API-Key`` header.  Empty means
+        authentication is disabled.
 
     Returns
     -------
@@ -78,6 +87,20 @@ def create_app(
     )
 
     app.include_router(api_router)
+
+    if api_key:
+        @app.middleware("http")
+        async def check_api_key(request: Request, call_next):
+            client_host = request.client.host if request.client else ""
+
+            if client_host not in _LOCALHOSTS:
+                req_key = request.headers.get("X-API-Key", "")
+                if req_key != api_key:
+                    return JSONResponse(
+                        {"detail": "Missing or invalid API key. Provide X-API-Key header."},
+                        status_code=HTTP_401_UNAUTHORIZED,
+                    )
+            return await call_next(request)
 
     # Serve the central GUI dashboard at /gui
     # Release layout: core/templates/gui/   Dev layout: templates/gui/

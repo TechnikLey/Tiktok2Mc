@@ -73,6 +73,17 @@ port_policy:
 server_host: "127.0.0.1"
 
 # ---------------------------------------------------------------------------
+#  API KEY
+# ---------------------------------------------------------------------------
+# Optional API key for authentication when the server is exposed beyond
+# localhost.  When set, all non-localhost requests must include the header:
+#
+#   X-API-Key: <your_api_key>
+#
+# Leave empty to disable authentication (safe when server_host is 127.0.0.1).
+api_key: ""
+
+# ---------------------------------------------------------------------------
 #  CONTROL METHOD
 # ---------------------------------------------------------------------------
 # How the tool communicates with your streaming software.

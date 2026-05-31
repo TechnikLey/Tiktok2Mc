@@ -87,6 +87,11 @@ if cfg.get("server_host") == "0.0.0.0":
         "network interfaces and are accessible from other devices. "
         "Use 127.0.0.1 to restrict to localhost."
     )
+    if not cfg.get("api_key"):
+        log.warning(
+            "API key is not set. Set 'api_key' in config.yaml to "
+            "protect the API from unauthorized access."
+        )
 
 # -----------------------------
 # Linux: Detect tmux/screen
@@ -622,8 +627,10 @@ def _start_api_server():
     from core.api import create_app
 
     try:
-        app = create_app()
-        config = uvicorn.Config(app, host="127.0.0.1", port=_API_PORT, log_level="warning")
+        host = cfg.get("server_host", "127.0.0.1")
+        api_key = cfg.get("api_key", "")
+        app = create_app(api_key=api_key)
+        config = uvicorn.Config(app, host=host, port=_API_PORT, log_level="warning")
         _uvicorn_server = uvicorn.Server(config)
         _uvicorn_server.run()
     except Exception:
