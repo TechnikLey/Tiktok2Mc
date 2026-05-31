@@ -278,12 +278,18 @@ This means the **main system owns knowledge** of Spotify's internal command voca
     └────── comment command processor (extracted from main.py)
 ```
 
+**Progress (2026-05-31):**
+1. ✅ **Main system publishes, plugins subscribe** — `_publish_tiktok_event()` publishes to EventBus; `_event_bridge_worker()` translates to plugin commands
+2. ✅ **EventBus is actually used** — TikTok events flow through EventBus to EventBridge to CommandQueue
+3. ✅ **overlay_utils decoupled** — Plugin-agnostic via `plugin_name` parameter
+4. ⏳ **Comment commands stays core** — Framework kept in main.py; plugin-specific parts (Spotify commands, points_cost) need extraction
+5. ⏳ **Config is plugin-local** — `random_triggers`, `minecraft_server_api` still in main config
+
 **Key changes from current architecture:**
 1. **Main system publishes, plugins subscribe** — No hardcoded `_plugin_command("channel-points", ...)`
-2. **Comment commands become a plugin** — Not baked into `main.py`
-3. **EventBus is actually used** — TikTok events flow through it; plugins react
-4. **PluginClient standardizes communication** — No more copy-paste `urllib.request`
-5. **Config is plugin-local** — `defaults/config.yaml` only has framework settings
+2. **EventBus is actually used** — TikTok events flow through it; plugins react via EventBridge
+3. **PluginClient standardizes communication** — No more copy-paste `urllib.request`
+4. **Config is plugin-local** — `defaults/config.yaml` only has framework settings
 
 ---
 
@@ -291,9 +297,9 @@ This means the **main system owns knowledge** of Spotify's internal command voca
 
 | # | Coupling | Severity | Target Phase |
 |---|----------|----------|--------------|
-| 1 | `main.py` hardcodes `channel-points` on every event | 🔴 Critical | Phase B |
-| 2 | `main.py` hardcodes `like-goal` for like triggers | 🔴 Critical | Phase B |
-| 3 | `overlay_utils.py` hardcoded to `overlay-text` | 🔴 Critical | Phase B |
+| 1 | `main.py` hardcodes `channel-points` on every event | ✅ **RESOLVED** — EventBridge worker translates EventBus events to plugin commands |
+| 2 | `main.py` hardcodes `like-goal` for like triggers | ✅ **RESOLVED** — like events published to EventBus; EventBridge enqueues `add_likes` commands |
+| 3 | `overlay_utils.py` hardcoded to `overlay-text` | ✅ **RESOLVED** — `send_overlay_text()` now accepts `plugin_name` parameter |
 | 4 | Plugin-specific command definitions in `comment_commands` config | 🟡 Medium | Phase C |
 | 5 | `random_triggers` in main config | 🟡 Medium | Phase C |
 | 6 | `minecraft_server_api` in main config | 🟡 Medium | Phase C |
