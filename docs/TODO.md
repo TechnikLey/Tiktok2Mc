@@ -25,7 +25,14 @@ Implement API-Key auth for `server_host: 0.0.0.0` deployments. Dashboard and API
 
 ## 🟢 MEDIUM — Nice to Have
 
-*(none currently — see HIGH and Release Blocker above)*
+### 4. Plugin Implementation Tests
+Only manifest smoke tests exist for plugins. No tests for command handlers (play, pause, add_win, player_death, etc.) across all 5 plugins. High regression risk.
+
+### 5. GUI Installer
+Setup wizard, shortcuts, startup registration, install location picker. Currently users must manually extract the release zip.
+
+### 6. Spotify OAuth Flow Helper
+GUI assistant that walks users through Spotify Developer app creation, redirect URI setup, and token exchange. Most complex plugin, most painful setup.
 
 ---
 
@@ -65,20 +72,17 @@ Implement API-Key auth for `server_host: 0.0.0.0` deployments. Dashboard and API
 
 ### GUI
 - WebSocket/SSE client for real-time dashboard updates (beyond log streaming)
-- Spotify setup assistant (OAuth flow helper)
 - Overlay preview + live theme editor
 - Integrated Minecraft server console (RCON terminal)
 - Mobile-responsive web dashboard variant
 
 ### Testing
 - Frontend/GUI integration tests (Playwright or similar)
-- Plugin implementation tests (beyond manifest smoke tests)
 
 ### Build & Packaging
 - Identify and strip dead modules from PyInstaller builds
 - Automated release notes generation from CHANGELOG
-- GUI installer (Setup Wizard, shortcuts, startup, install location)
 
 ---
 
-*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total | Current: EventBus Plugin Integration. Next: Plugin Lifecycle Tests → API Authentication → Documentation Rewrite.*
+*Last updated: 2026-05-31 — 589 Python tests + 226 GUI frontend = 815 total | Current: Plugin Lifecycle Tests. Next: API Authentication → Plugin Implementation Tests → GUI Installer.*
