@@ -25,11 +25,7 @@ Implement API-Key auth for `server_host: 0.0.0.0` deployments. Dashboard and API
 
 ## 🟢 MEDIUM — Nice to Have
 
-### 4. `core_hash` Build Cache Optimization
-Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes. Refined to only invalidate dependent exes via per-task dependency tracking (static import analysis).
-
-### 5. EventBus Plugin Integration
-Replace plugin command-polling loop with EventBus push model. Plugins subscribe to events they care about instead of polling `/commands` on a timer. Real-time, lower latency, less wasted CPU.
+*(none currently — see HIGH and Release Blocker above)*
 
 ---
 
@@ -51,6 +47,8 @@ Replace plugin command-polling loop with EventBus push model. Plugins subscribe 
 - **Plugin dependency ordering** (`tests/test_core/test_dependency.py`, 30 tests): topological sort, validation on register/put/enable, `depends_on` in `AppConfig`, timer → win-counter enforced
 - **Port Scanner** (`src/core/port_scanner.py`, 28 tests): scans 3 bind ports (29185/29187/29188) on startup, auto-resolves conflicts via env vars + runtime file, `port_policy` config section with `max_offset: -1` for unlimited scanning
 - **Declarative Command Handler Registration** (`CommentHandler` model, `PUT/DELETE /plugins/{name}/comment-handler`, `GET /comment-handlers`): Spotify registers `$` prefix in `plugin.json`, bridge dispatches comments to plugin API instead of hardcoded HTTP URLs. Removed `handler`/`url` from `config.yaml` Spotify group.
+- **core_hash Build Cache Optimization** (`build.py`): replaced global all-or-nothing `core_hash_changed` flag with per-task dependency tracking via AST import analysis. Changing one core file only invalidates executables that actually import it.
+- **EventBus Plugin Integration** (`plugin_overlay.py`, `routes/plugin_overlay.py`, all 5 plugins): replaced 0.5s polling loops with long-polling (`?wait=1`), backed by `asyncio.Event` notification on command enqueue. Zero-latency command delivery, no CPU wasted on idle polling.
 
 ---
 
@@ -83,4 +81,4 @@ Replace plugin command-polling loop with EventBus push model. Plugins subscribe 
 
 ---
 
-*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total | Current: core_hash Build Cache Optimization. Next: Plugin Lifecycle Tests → API Authentication → EventBus Integration.*
+*Last updated: 2026-05-31 — 588 Python tests + 226 GUI frontend = 814 total | Current: EventBus Plugin Integration. Next: Plugin Lifecycle Tests → API Authentication → Documentation Rewrite.*

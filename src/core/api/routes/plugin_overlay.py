@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 
 from fastapi import APIRouter, HTTPException
 from starlette.responses import HTMLResponse, StreamingResponse
@@ -95,18 +96,30 @@ async def enqueue_command(name: str, body: dict):
 
 
 @router.get("/plugins/{name}/commands")
-async def poll_commands(name: str):
-    """Poll and clear pending commands for a plugin.
+async def poll_commands(name: str, wait: int = 0):
+    """Poll (or long-poll) and clear pending commands for a plugin.
 
     Called periodically by the plugin process to receive
-    commands from other components.  Also records a heartbeat
-    timestamp so the health monitor can track liveness.
+    commands from other components.
+
+    * ``wait=0`` (default): returns immediately, same as before.
+    * ``wait=1``: blocks up to 30 s until at least one command is
+      available, then returns all pending commands.  Zero latency,
+      no CPU wasted on polling.
+
+    Also records a heartbeat timestamp so the health monitor can
+    track liveness.
     """
+    if wait:
+        try:
+            await command_queue.wait_for_commands(name, timeout=30.0)
+        except asyncio.TimeoutError:
+            pass
     cmds = command_queue.dequeue_all(name)
     # Record heartbeat for health monitoring
     try:
         from core.api.registry import get_registry
-        get_registry().update(name, last_heartbeat=__import__("time").time())
+        get_registry().update(name, last_heartbeat=time.time())
     except Exception:
         pass
     return {"commands": cmds}

@@ -121,10 +121,10 @@ def _api_post(path: str, data: dict) -> bool:
         return False
 
 
-def _api_get(path: str) -> dict | None:
+def _api_get(path: str, timeout: int = 5) -> dict | None:
     try:
         req = urllib.request.Request(f"{API_BASE}{path}")
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
     except Exception as e:
         log.warning("API GET %s failed: %s", path, e)
@@ -137,7 +137,7 @@ def _push_state():
 
 def command_polling_loop():
     while True:
-        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands")
+        result = _api_get(f"/plugins/{PLUGIN_NAME}/commands?wait=1", timeout=35)
         if result:
             for cmd_entry in result.get("commands", []):
                 cmd = cmd_entry.get("command")
@@ -152,7 +152,6 @@ def command_polling_loop():
                     if DECREMENT_ON_DEATH:
                         win_manager_instance.remove_win(1)
                         _push_state()
-        time.sleep(0.5)
 
 
 HTML_TEMPLATE = """
