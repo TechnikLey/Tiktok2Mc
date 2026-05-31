@@ -307,7 +307,7 @@ class EventCommandsUpdateRequest(BaseModel):
 class ActionCommand(BaseModel):
     """A single command inside a trigger."""
 
-    type: str = "vanilla"  # vanilla, rcon, script, overlay, named_overlay
+    type: str = "vanilla"  # vanilla, rcon, script, overlay, named_overlay, shell
     command: str = ""
     multiplier: int = 1
     title: str = ""

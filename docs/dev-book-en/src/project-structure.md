@@ -111,7 +111,6 @@ The development structure contains everything needed to build the project.
 │   ├── configServerAPI.yml
 │   ├── DelayedTNTconfig.yml
 │   ├── gifts.json
-│   ├── shell_actions.txt
 │   └── pack.mcmeta
 ├── docs
 │   └── dev-book
@@ -168,7 +167,6 @@ Important files include:
 * `DelayedTNTconfig.yml`
 * `gifts.json`
 * `actions.mca`
-* `shell_actions.txt`
 * `pack.mcmeta`
 
 This folder is particularly important because it defines the initial state.
@@ -271,8 +269,7 @@ After the build process, the finished project version is created in the `build/r
 │   ├── WinCounter.exe
 │   └── window.exe
 ├── data
-│   ├── actions.mca
-│   └── shell_actions.txt
+│   └── actions.mca
 ├── LICENSE
 ├── logs
 ├── README.md

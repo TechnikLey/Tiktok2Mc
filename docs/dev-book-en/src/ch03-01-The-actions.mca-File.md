@@ -45,7 +45,7 @@ for line_num, original_line in enumerate(f, 1):
         continue
     trigger, full_cmd_line = map(str.strip, line.split(":", 1))
     # ...
-    if not cmd.startswith(("/", "!", "$")):
+    if not cmd.startswith(("/", "!", "$", "&")):
         print(f"[ERROR] Invalid command without prefix on line {line_num}: {cmd}")
 ```
 

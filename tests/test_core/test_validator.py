@@ -156,6 +156,12 @@ class TestValidatorCommandPrefixes:
         errors = [d for d in diags if d.severity.name == "ERROR"]
         assert len(errors) == 0
 
+    def test_valid_ampersand(self):
+        from core.validator import validate_text
+        diags = validate_text("test:&curl http://localhost")
+        errors = [d for d in diags if d.severity.name == "ERROR"]
+        assert len(errors) == 0
+
     def test_invalid_prefix(self):
         from core.validator import validate_text
         diags = validate_text("test:%bad")

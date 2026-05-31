@@ -401,12 +401,12 @@ def validate_text(text: str) -> List[Diagnostic]:
                         "overlay_multiplier",
                     ))
 
-            elif cmd_trim[0] not in ("/", "$", "!"):
+            elif cmd_trim[0] not in ("/", "$", "!", "&"):
                 diagnostics.append(_make_diag(
                     line_number,
                     cmd_start_global,
                     cmd_start_global + len(cmd_trim),
-                    f"Each command must start with '/', '$', '!' or '>>' "
+                    f"Each command must start with '/', '$', '!', '&' or '>>' "
                     f"(found: '{cmd_trim[0]}').",
                     Severity.ERROR,
                     "invalid_prefix",

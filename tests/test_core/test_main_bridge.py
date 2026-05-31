@@ -85,65 +85,6 @@ class TestGetSafeUsername:
 # validate_like_triggers — REMOVED as part of plugin decoupling.
 # Like triggers now live in the like-goal plugin config, validated by the plugin itself.
 # =========================================================================
-# load_shell_actions
-# =========================================================================
-
-class TestLoadShellActions:
-    def test_loads_simple_actions(self, tmp_path: Path):
-        from src.python.main import load_shell_actions
-        f = tmp_path / "shell_actions.txt"
-        f.write_text("trigger_1: http://example.com/cmd1\ntrigger_2: http://example.com/cmd2\n")
-        with patch("src.python.main.BASE_DIR", tmp_path):
-            load_shell_actions(f)
-        from src.python.main import ctx
-        assert "trigger_1" in ctx.shell_actions_cache
-        assert "trigger_2" in ctx.shell_actions_cache
-
-    def test_skips_comments(self, tmp_path: Path):
-        from src.python.main import load_shell_actions
-        f = tmp_path / "shell_actions.txt"
-        f.write_text("# this is a comment\ntrigger: http://example.com/cmd\n")
-        with patch("src.python.main.BASE_DIR", tmp_path):
-            load_shell_actions(f)
-        from src.python.main import ctx
-        assert "trigger" in ctx.shell_actions_cache
-
-    def test_handles_variable_definitions(self, tmp_path: Path):
-        from src.python.main import load_shell_actions
-        f = tmp_path / "shell_actions.txt"
-        f.write_text("//define host = example.com\ntrigger: http://{host}/cmd\n")
-        with patch("src.python.main.BASE_DIR", tmp_path):
-            load_shell_actions(f)
-        from src.python.main import ctx
-        assert "http://example.com/cmd" in ctx.shell_actions_cache.get("trigger", "")
-
-    def test_skips_lines_without_colon(self, tmp_path: Path):
-        from src.python.main import load_shell_actions
-        f = tmp_path / "shell_actions.txt"
-        f.write_text("no colon here\ntrigger: http://cmd\n")
-        with patch("src.python.main.BASE_DIR", tmp_path):
-            load_shell_actions(f)
-        from src.python.main import ctx
-        assert "trigger" in ctx.shell_actions_cache
-
-    def test_empty_file(self, tmp_path: Path):
-        from src.python.main import load_shell_actions
-        f = tmp_path / "shell_actions.txt"
-        f.write_text("")
-        with patch("src.python.main.BASE_DIR", tmp_path):
-            load_shell_actions(f)
-        from src.python.main import ctx
-        assert len(ctx.shell_actions_cache) == 0
-
-    def test_file_not_found(self, tmp_path: Path):
-        from src.python.main import load_shell_actions
-        f = tmp_path / "nonexistent.txt"
-        with patch("src.python.main.BASE_DIR", tmp_path):
-            load_shell_actions(f)
-        from src.python.main import ctx
-        assert len(ctx.shell_actions_cache) == 0
-
-
 # =========================================================================
 # Webhook handling
 # =========================================================================
@@ -196,3 +137,43 @@ class TestDupCmdConfig:
         from src.python.main import _check_dup_cmd_config
         with patch("src.python.main.CONFIG_FILE", f):
             _check_dup_cmd_config()
+
+
+# =========================================================================
+# generate_datapack shell parsing
+# =========================================================================
+
+class TestGenerateDatapackShell:
+    def test_parses_shell_prefix(self, tmp_path: Path):
+        from src.python.main import generate_datapack, ctx, ACTIONS_FILE
+        actions_file = tmp_path / "actions.mca"
+        actions_file.write_text("12345:&curl http://localhost:29191/add\n", encoding="utf-8")
+        dp_root = tmp_path / "datapacks"
+        dp_root.mkdir(parents=True, exist_ok=True)
+        with patch.object(ctx, "datapack_root", dp_root), \
+             patch("src.python.main.ACTIONS_FILE", actions_file):
+            generate_datapack()
+        assert "12345" in ctx.valid_functions
+        assert ctx.shell_actions_cache.get("12345") == ["curl http://localhost:29191/add"]
+
+    def test_parses_chained_shell_commands(self, tmp_path: Path):
+        from src.python.main import generate_datapack, ctx, ACTIONS_FILE
+        actions_file = tmp_path / "actions.mca"
+        actions_file.write_text("12345:&echo hello ; &echo world\n", encoding="utf-8")
+        dp_root = tmp_path / "datapacks"
+        dp_root.mkdir(parents=True, exist_ok=True)
+        with patch.object(ctx, "datapack_root", dp_root), \
+             patch("src.python.main.ACTIONS_FILE", actions_file):
+            generate_datapack()
+        assert ctx.shell_actions_cache.get("12345") == ["echo hello", "echo world"]
+
+    def test_parses_shell_multiplier(self, tmp_path: Path):
+        from src.python.main import generate_datapack, ctx, ACTIONS_FILE
+        actions_file = tmp_path / "actions.mca"
+        actions_file.write_text("12345:&echo hi x3\n", encoding="utf-8")
+        dp_root = tmp_path / "datapacks"
+        dp_root.mkdir(parents=True, exist_ok=True)
+        with patch.object(ctx, "datapack_root", dp_root), \
+             patch("src.python.main.ACTIONS_FILE", actions_file):
+            generate_datapack()
+        assert ctx.shell_actions_cache.get("12345") == ["echo hi", "echo hi", "echo hi"]

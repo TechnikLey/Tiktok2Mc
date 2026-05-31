@@ -30,6 +30,7 @@ TRIGGER_TYPE_MAP: dict[str, str] = {
     "/": "vanilla",
     "!": "rcon",
     "$": "script",
+    "&": "shell",
 }
 
 
@@ -403,6 +404,8 @@ class ActionsService:
                     part = f"!{body}"
                 elif cmd_type == "script":
                     part = f"${body}"
+                elif cmd_type == "shell":
+                    part = f"&{body}"
                 else:  # vanilla
                     part = f"/{body}"
 

@@ -50,7 +50,6 @@ BASE_DIR = get_base_dir()
 
 CONFIG_FILE = (BASE_DIR.parent / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR.parent / "data" / "actions.mca").resolve()
-SHELL_ACTIONS_FILE = (BASE_DIR.parent / "data" / "shell_actions.txt").resolve()
 FOLLOWED_USERS_FILE = (BASE_DIR.parent / "data" / "followed_users.txt").resolve()
 
 class BotContext:
@@ -335,7 +334,7 @@ def sanitize_filename(name):
 def generate_datapack():
     """Generates datapack files for vanilla commands and stores
     plugin/script commands separately.
-    Supported command prefixes: '!' (RCON), '$' (script), '/' (vanilla).
+    Supported command prefixes: '!' (RCON), '$' (script), '/' (vanilla), '&' (shell).
     Multiplier ' xN' applies to all types.
     """
     log.info(f"\n[BUILD] Generating datapack in: {ctx.datapack_root}")
@@ -354,6 +353,7 @@ def generate_datapack():
     ctx.vanilla_functions = set()
     ctx.script_actions = {}
     ctx.overlay_actions = {}
+    ctx.shell_actions_cache = {}
 
     # Prepare filesystem
     try:
@@ -405,6 +405,9 @@ def generate_datapack():
                         elif cmd.startswith("/"):
                             kind = "vanilla"
                             body = cmd[1:].strip()
+                        elif cmd.startswith("&"):
+                            kind = "shell"
+                            body = cmd[1:].strip()
                         else:
                             log.error(f"Invalid command without prefix on line {line_num}: {cmd}")
                             continue
@@ -436,6 +439,11 @@ def generate_datapack():
                                     collected_vanilla.setdefault(name, []).append(base_cmd)
                                     ctx.valid_functions.add(name)
                                     ctx.vanilla_functions.add(name)
+                                elif kind == "shell":
+                                    # shell commands keep the raw body (do not replace {user})
+                                    shell_cmd = body[:multi_match.start()] if multi_match else body
+                                    ctx.shell_actions_cache.setdefault(name, []).append(shell_cmd)
+                                    ctx.valid_functions.add(name)
 
         # === Write datapack files (vanilla commands only) ===
         for name, commands in collected_vanilla.items():
@@ -591,10 +599,19 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
     if name in ctx.rcon_only_actions:
         commands_to_send.extend(ctx.rcon_only_actions[name])
 
+    # --- 3. SHELL COMMANDS ---
+    if name in ctx.shell_actions_cache:
+        cmds = ctx.shell_actions_cache[name]
+        if cmds:
+            try:
+                asyncio.create_task(execute_shell_commands(cmds))
+            except Exception as e:
+                log.warning(f"[SHELL] Error scheduling shell commands for '{name}': {e}")
+
     if not commands_to_send:
         return
 
-    # --- 3. ENQUEUE ---
+    # --- 4. ENQUEUE ---
     def _enqueue():
         try:
             ctx.rcon_queue.put_nowait((commands_to_send, source_user))
@@ -628,46 +645,7 @@ async def trigger_worker():
             log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             await asyncio.sleep(0.1)  
 
-# ==========================================
-# HTTP actions loader
-# ==========================================
 
-def load_shell_actions(file_path=SHELL_ACTIONS_FILE):
-    """Loads all HTTP actions into memory at startup."""
-    ctx.shell_actions_cache = {}
-    variables = {}
-
-    if not file_path.exists():
-        log.error(f"File not found: {file_path}")
-        return
-
-    with file_path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line_clean = line.split("#", 1)[0].strip()
-            if not line_clean:
-                continue
-
-            # Variable definition: //define varname = value
-            if line_clean.startswith("//define"):
-                parts = line_clean[len("//define"):].strip().split("=", 1)
-                if len(parts) == 2:
-                    var_name = parts[0].strip()
-                    var_value = parts[1].strip()
-                    if var_name and var_value:
-                        variables[var_name] = var_value
-                        log.info(f"[HTTP] Defined variable '{var_name}' = '{var_value}'")
-                continue
-
-            if ":" not in line_clean:
-                continue
-
-            trigger_id, cmd = map(str.strip, line_clean.split(":", 1))
-            # Resolve variables in command
-            for var_name, var_value in variables.items():
-                cmd = cmd.replace(f"{{{var_name}}}", var_value)
-            ctx.shell_actions_cache[trigger_id] = cmd
-
-    log.info(f"Shell actions loaded: {len(ctx.shell_actions_cache)} entries")
 
 # ==========================================
 # Webhook endpoint for MinecraftServerAPI
@@ -1142,13 +1120,13 @@ def handle_custom_trigger():
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         raw_trigger = str(data.get("trigger", "")).strip()
-        cmd = ctx.shell_actions_cache.get(raw_trigger) or ctx.shell_actions_cache.get(sanitized)
-        if cmd:
+        cmds = ctx.shell_actions_cache.get(raw_trigger) or ctx.shell_actions_cache.get(sanitized)
+        if cmds:
             try:
-                asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
+                asyncio.run_coroutine_threadsafe(execute_shell_commands(cmds), ctx.main_loop)
             except Exception as e:
                 return {"status": "error", "message": str(e)}, 500
-            log.info(f"[CUSTOM TRIGGER] HTTP action for '{raw_trigger}' executed")
+            log.info(f"[CUSTOM TRIGGER] Shell action for '{raw_trigger}' executed ({len(cmds)} command(s))")
             return {"status": "ok", "trigger": raw_trigger, "user": user}, 200
 
         return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
@@ -1176,18 +1154,10 @@ def execute_http_command_sync(cmd: str):
 async def execute_http_command(cmd: str):
     await asyncio.to_thread(execute_http_command_sync, cmd)
 
-def execute_gift_action(gift_id: str):
-    """Executes an HTTP action for a gift asynchronously."""
-    cmd = ctx.shell_actions_cache.get(gift_id)
-    if not cmd:
-        return
-
-    try:
-        asyncio.run_coroutine_threadsafe(execute_http_command(cmd), ctx.main_loop)
-        log.info(f"[HTTP] Action for gift {gift_id} started")
-    except Exception as e:
-        log.info(f"[HTTP ERROR] {e}")
-        traceback.print_exc()
+async def execute_shell_commands(cmds: list[str]):
+    """Execute a list of shell commands sequentially."""
+    for cmd in cmds:
+        await execute_http_command(cmd)
 
 # ==========================================
 # User-friendly name extraction
@@ -1231,8 +1201,6 @@ def create_client(user):
 
             with ctx.gift_lock:
                 ctx.gift_value_usd += event.value
-
-            execute_gift_action(gift_id)
 
             username = get_safe_username(event.user)
             _publish_tiktok_event("gift", username, gift_name=gift_name, gift_id=gift_id, count=count)
@@ -1438,7 +1406,6 @@ async def run_bot():
 
     generate_datapack()
     ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
-    load_shell_actions()
 
     ctx.hook_api = HookAPI(
         ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop,

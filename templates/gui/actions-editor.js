@@ -140,7 +140,7 @@ class ActionsEditor {
       const typeLabel = t.type || 'Custom';
       const cmdSummary = (t.commands || []).length
         ? t.commands.map(c => {
-            const prefix = { vanilla: '/', rcon: '!', script: '$', overlay: '>>', named_overlay: `@${c.overlay_name}>>` }[c.type] || '/';
+            const prefix = { vanilla: '/', rcon: '!', script: '$', overlay: '>>', named_overlay: `@${c.overlay_name}>>`, shell: '&' }[c.type] || '/';
             return prefix + (c.command || '').substring(0, 30);
           }).join('; ')
         : 'No commands';
@@ -189,7 +189,7 @@ class ActionsEditor {
     html += `<div class="detail-commands"><h4>Commands</h4>`;
 
     (t.commands || []).forEach((cmd, ci) => {
-      const typeOpts = ['vanilla', 'rcon', 'script', 'overlay', 'named_overlay'].map(ot =>
+      const typeOpts = ['vanilla', 'rcon', 'script', 'overlay', 'named_overlay', 'shell'].map(ot =>
         `<option value="${ot}" ${ot === cmd.type ? 'selected' : ''}>${ot}</option>`
       ).join('');
 
@@ -216,8 +216,8 @@ class ActionsEditor {
           </div>
         </div>`;
       } else {
-        // For vanilla, rcon: show command input
-        const placeholders = { 'vanilla': 'command', 'rcon': 'command' };
+        // For vanilla, rcon, shell: show command input
+        const placeholders = { 'vanilla': 'command', 'rcon': 'command', 'shell': 'shell command' };
         const placeholder = placeholders[cmd.type] || 'command';
         html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
       }

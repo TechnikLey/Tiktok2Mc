@@ -1,5 +1,6 @@
 #'Gift IDs and Names':/ee core/gifts.json
 #'The ; chains both commands':/irst the /give, then the >> overlay.
+#'&' runs a shell command (e.g.':/url, custom scripts) directly on your PC.
 follow:/give @a minecraft:golden_apple 7 ; >>New Follower!|{user} is now following you!|5
 #'Use with caution':/void expensive or spammy commands here.
 #join:>>Welcome!|{user} just joined the stream!

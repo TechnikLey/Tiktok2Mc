@@ -72,6 +72,7 @@ Trigger:Command
 | `!` | Server plugin command | `!tnt 5 0.5 2` |
 | `$` | Special action | `$random` |
 | `>>` | Show text on your stream overlay | `>>New Follower!\|{user}\|5` |
+| `&` | Shell / system command | `&curl -X POST http://localhost:29191/add` |
 
 ### Simple examples
 
@@ -366,7 +367,6 @@ The tool checks for updates automatically on startup (enabled by default). If a 
 **Before updating, back up these files:**
 - `config/config.yaml` — your settings
 - `data/actions.mca` — your action rules
-- `data/shell_actions.txt` — your shell actions
 - `server/mc/` — your Minecraft world
 
 Copy them to a safe location outside the tool folder.

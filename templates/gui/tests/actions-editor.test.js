@@ -350,4 +350,30 @@ describe('ActionsEditor', () => {
       expect(actionsEditor.triggers[0].type).toBe('Gift');
     });
   });
+
+  /* ─── shell command rendering ─── */
+  describe('shell command support', () => {
+    it('shows shell prefix in table summary', () => {
+      actionsEditor.triggers = [{
+        name: '12345', enabled: true, type: 'Gift',
+        commands: [{ type: 'shell', command: 'curl http://localhost', multiplier: 1 }],
+      }];
+      actionsEditor.renderTable();
+      const body = document.getElementById('actions-table-body');
+      expect(body.textContent).toContain('&curl http://localhost');
+    });
+
+    it('renders shell type with text input in detail', () => {
+      actionsEditor.triggers = [{
+        name: '12345', enabled: true, type: 'Gift',
+        commands: [{ type: 'shell', command: 'curl http://localhost', multiplier: 1, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const select = document.querySelector('.cmd-type');
+      expect(select.value).toBe('shell');
+      const input = document.querySelector('.cmd-input');
+      expect(input.value).toBe('curl http://localhost');
+    });
+  });
 });

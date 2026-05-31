@@ -47,7 +47,7 @@ def main():
 
     try:
         # ----- Configuration -----
-        MAX_THREADS = 8
+        MAX_THREADS = min(8, (os.cpu_count() or 4))
         MAX_COPY_THREADS = 16
         BUILD_INSTALLER = "--installer" in sys.argv
 
@@ -78,8 +78,10 @@ def main():
         # ----- Preparation & Directory Structure -----
         cprint("Preparing build environment...", Color.CYAN)
 
+        cprint("CHECKPOINT: before rmtree", Color.RED)
         if OUT_DIR.exists():
             shutil.rmtree(OUT_DIR)
+        cprint("CHECKPOINT: after rmtree", Color.RED)
 
         REQUIRED_DIRS = [
             EXE_CACHE_DIR, HASH_CACHE_DIR, OUT_DIR, PARALLEL_TEMP_DIR,
@@ -105,6 +107,8 @@ def main():
         for d in REQUIRED_DIRS:
             d.mkdir(parents=True, exist_ok=True)
 
+        cprint("CHECKPOINT: after mkdirs", Color.RED)
+
         # ----- Collect Build Tasks -----
         cprint("Collecting all files to compile...", Color.CYAN)
         all_build_tasks = []
@@ -117,6 +121,8 @@ def main():
                 "src": item["src"],
                 "dest": item["dest"],
             })
+
+        cprint("CHECKPOINT: before plugin discovery", Color.RED)
 
         # Find and add plugins
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
@@ -149,6 +155,8 @@ def main():
                         target_dir = OUT_DIR / dest
                         target_dir.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(extra_path, target_dir / extra_file)
+
+        cprint("CHECKPOINT: after plugin discovery", Color.RED)
 
         # ----- Execution: Parallel Build -----
         cprint(
@@ -246,6 +254,7 @@ def main():
                 t_dist = PARALLEL_TEMP_DIR / f"dist_{unique_id}"
                 t_work = PARALLEL_TEMP_DIR / f"work_{unique_id}"
                 t_spec = PARALLEL_TEMP_DIR / f"spec_{unique_id}"
+                log_file = PARALLEL_TEMP_DIR / f"log_{unique_id}.txt"
 
                 cmd = [
                     sys.executable, "-m", "PyInstaller",
@@ -260,11 +269,19 @@ def main():
                     "--log-level", "ERROR",
                 ]
 
-                result = subprocess.run(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                )
+                try:
+                    with open(log_file, "w", encoding="utf-8") as lf:
+                        result = subprocess.run(
+                            cmd,
+                            stdout=lf,
+                            stderr=subprocess.STDOUT,
+                            timeout=600,
+                        )
+                except subprocess.TimeoutExpired:
+                    cprint(f"TIMEOUT: {item['name']} after 600s", Color.RED)
+                    if log_file.exists():
+                        cprint(log_file.read_text(errors="replace"), Color.RED)
+                    return False
 
                 fresh = t_dist / item["name"]
                 if fresh.exists():
@@ -275,19 +292,23 @@ def main():
                     cprint(f"Done: {item['name']}", Color.GREEN)
                 else:
                     cprint(f"FAILED: {item['name']}", Color.RED)
-                    if result.stdout:
-                        cprint(result.stdout.decode(errors="replace"), Color.RED)
+                    if log_file.exists():
+                        cprint(log_file.read_text(errors="replace"), Color.RED)
                     return False
 
                 # Cleanup temp for this thread
                 for p in (t_dist, t_work, t_spec):
                     shutil.rmtree(p, ignore_errors=True)
+                if log_file.exists():
+                    log_file.unlink(missing_ok=True)
             else:
                 cprint(f"Cache hit: {item['name']}", Color.GRAY)
                 if not final_path.exists():
                     shutil.copy2(cache_exe, final_path)
 
             return True
+
+        cprint("CHECKPOINT: before parallel build", Color.RED)
 
         with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
             futures = {executor.submit(build_one, task): task for task in all_build_tasks}
@@ -303,6 +324,8 @@ def main():
 
             if failed:
                 raise RuntimeError("One or more build tasks failed.")
+
+        cprint("CHECKPOINT: after parallel build", Color.RED)
 
         # ----- Assets & Resources -----
         cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
@@ -338,6 +361,8 @@ def main():
             with ThreadPoolExecutor(max_workers=threads) as pool:
                 pool.map(copy_one, all_files)
 
+        cprint("CHECKPOINT: before asset sync", Color.RED)
+
         sync_folder("assets",          OUT_DIR / "core" / "assets")
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
@@ -348,6 +373,8 @@ def main():
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)
         sync_folder("docs", OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
+        cprint("CHECKPOINT: after asset sync", Color.RED)
+
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),
             ("defaults/config.yaml",                "config/config.yaml"),
@@ -355,7 +382,6 @@ def main():
             ("LICENSE",                             "LICENSE"),
             ("README.md",                           "README.md"),
             ("defaults/actions.mca",                "data/actions.mca"),
-            ("defaults/shell_actions.txt",           "data/shell_actions.txt"),
             ("defaults/configServerAPI.yml",        "server/mc/plugins/MinecraftServerAPI/config.yml"),
             ("defaults/DelayedTNTconfig.yml",       "server/mc/plugins/DelayedTNT/config.yml"),
             ("tools/MinecraftServerAPI-1.21.x.jar", "server/mc/plugins/MinecraftServerAPI-1.21.x.jar"),
@@ -397,8 +423,10 @@ def main():
         if PARALLEL_TEMP_DIR.exists():
             shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
 
+        cprint("CHECKPOINT: before pycache cleanup", Color.RED)
         for cache_dir in sorted(SCRIPT_DIR.rglob("__pycache__")):
             shutil.rmtree(cache_dir, ignore_errors=True)
+        cprint("CHECKPOINT: after pycache cleanup", Color.RED)
 
         # ----- Release / Upload Script -----
         cprint("Creating upload.py...", Color.CYAN)
