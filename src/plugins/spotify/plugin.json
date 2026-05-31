@@ -74,6 +74,18 @@
         "category": "Playback"
       },
       {
+        "key": "signal_on",
+        "type": "array",
+        "default": ["track_changed", "play", "pause"],
+        "item_schema": {
+          "type": "select",
+          "options": ["track_changed", "play", "pause"]
+        },
+        "label": "Signal On",
+        "help": "Events published to the EventBus via POST /api/v1/events",
+        "category": "Events"
+      },
+      {
         "key": "theme.background",
         "type": "color",
         "default": "#000000",

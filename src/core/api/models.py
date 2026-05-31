@@ -292,6 +292,15 @@ class ConfigUpdateRequest(BaseModel):
     backup: bool = True
 
 
+class EventCommandsResponse(BaseModel):
+    path: str
+    event_commands: dict[str, list[dict[str, Any]]]
+
+
+class EventCommandsUpdateRequest(BaseModel):
+    event_commands: dict[str, list[dict[str, Any]]]
+
+
 # ── Actions (actions.mca) models ───────────────────────────────────
 
 

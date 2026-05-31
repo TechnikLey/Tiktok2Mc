@@ -41,8 +41,11 @@
 
 ### Plugin Architecture Modernisation
 - **`BasePlugin` base class** (`src/core/base_plugin.py`) — shared config load, theme, API helpers (`api_post`, `api_get`, `push_state`, `register_handler`), command polling, state push, window state, overlay registration. 18 tests.
-- **Timer completely rewritten** — now fully decoupled from all other plugins. Supports count-up / count-down, configurable direction, loop, reset triggers, milestones, and signal events. Publishes `timer.*` events to the EventBus via `POST /api/v1/events` instead of hardcoded `send_command("win-counter", ...)`. Removed `depends_on: ["win-counter"]`, `auto_win`, `pause_on_death`. Config schema expanded with `direction`, `loop`, `reset_on`, `signal_on`, `milestones`, `format`, `time_step`. Tests updated (12 timer-specific assertions).
-- **4 plugins migrated to `BasePlugin`** — `spotify`, `wincounter`, `deathcounter`, `likegoal`. Duplicated config load / theme load / `urllib.request` boilerplate removed across all 5 plugins.
+- **Timer completely rewritten** — fully decoupled. Publishes `timer.*` events to EventBus. Removed `depends_on`, `auto_win`, `pause_on_death`.
+- **WinCounter rewritten** — fully decoupled. Publishes `win.milestone` and `win.record_low` events. Removed `decrement_on_death` (was DeathCounter coupling). Config: `initial_needed`, `milestone_increment`, `signal_on`.
+- **DeathCounter rewritten** — fully decoupled. Publishes `death.milestone` events. Config: `milestones`, `signal_on`.
+- **LikeGoal rewritten** — fully decoupled. Publishes `likegoal.milestone` and `likegoal.progress` events. Removed direct TikTok event dependency; now consumes `add_likes` commands via API.
+- **SpotifyControl modernised** — publishes `spotify.track_changed`, `spotify.play`, `spotify.pause` events. Config: `signal_on`.
 - **Plugin dependency ordering** — topological sort in `AppConfig`, `depends_on` field, enforced on register/put/enable. 30 tests.
 
 ### Core Infrastructure Improvements
@@ -119,7 +122,7 @@
 - Integrated into registry, plugin config, config.yaml, and actions.mca
 
 ### Testing
-- **690 Python tests + 226 GUI frontend tests = 916 total**
+- **605 Python tests + 226 GUI frontend tests = 831 total**
 - GUI frontend (Vitest + JSDOM): 226 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
 - CI workflow `test.yml` on push/PR to `main`
 - BackupManager: 30 standalone tests

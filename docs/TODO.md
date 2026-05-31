@@ -44,10 +44,13 @@ Only manifest smoke tests exist for plugins. No tests for command handlers (play
 > These are **not** out-of-scope ideas. They are real structural issues that need to be addressed before v1.0.0, tracked here because they span multiple plugins.
 
 ### Plugin Cross-Coupling
-Some plugins are not fully decoupled and still depend on each other's internal behaviour:
-- ✅ **Timer** — rewritten to publish `timer.*` events to the EventBus via `POST /api/v1/events`. No `depends_on`, no `send_command()` to other plugins. Configurable direction, loop, milestones, reset triggers, and signal events.
-- ✅ **Event-Command Mapper** — new central system (`core/event_command_mapper.py`) that wires EventBus events to plugin commands without any plugin coupling. Config lives in `data/event_commands.yaml`. Minecraft bridge now publishes `minecraft.player_death` and `minecraft.player_respawn` to EventBus. Example: `minecraft.player_death → pause(timer), pause(spotify-control)`.
-- ⬜ **LikeGoal** emits events that other plugins may implicitly rely on; no formal contract documented.
+All plugins now use the EventBus for communication. No hardcoded inter-plugin dependencies remain:
+- ✅ **Timer** — publishes `timer.*` events (started, paused, zero, milestone, tick).
+- ✅ **WinCounter** — publishes `win.milestone` and `win.record_low` events. Removed `decrement_on_death` (was DeathCounter coupling).
+- ✅ **DeathCounter** — publishes `death.milestone` events with configurable milestones.
+- ✅ **LikeGoal** — publishes `likegoal.milestone` and `likegoal.progress` events. Removed direct TikTok event dependency; now consumes `add_likes` commands via API.
+- ✅ **SpotifyControl** — publishes `spotify.track_changed`, `spotify.play`, `spotify.pause` events.
+- ✅ **Event-Command Mapper** — central wiring via `data/event_commands.yaml` maps any EventBus event to plugin commands without coupling.
 
 ### Security
 - Spotify `client_secret` validation and encrypted storage

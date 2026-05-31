@@ -6,7 +6,7 @@ log = logging.getLogger(__name__)
 
 
 class WinManager:
-    """Thread-safe win counter with record-low tracking."""
+    """Thread-safe win counter with milestone tracking."""
 
     def __init__(self, stats_path, initial_needed=10, theme=None):
         self._stats_path = stats_path
@@ -20,7 +20,7 @@ class WinManager:
                 data = json.loads(self._stats_path.read_text(encoding="utf-8"))
                 self.wins = data.get("wins", 0)
                 self.needed = data.get("needed", 10)
-                self.record_low = data.get("record_low", data.get("record", 0))
+                self.record_low = data.get("record_low", 0)
             except Exception:
                 pass
 
@@ -67,33 +67,44 @@ class WinCounterPlugin(BasePlugin):
     def __init__(self):
         super().__init__()
         cfg = self.config
-        self._decrement_on_death = cfg.get("decrement_on_death", False)
+        self._initial_needed = cfg.get("initial_needed", 10)
+        self._milestone_increment = cfg.get("milestone_increment", 10)
+        self._signal_on = set(cfg.get("signal_on", ["milestone", "record_low"]))
         self._stats_file = self._data_dir / "stats.json"
         self._manager = WinManager(
             self._stats_file,
-            initial_needed=cfg.get("initial_needed", 10),
+            initial_needed=self._initial_needed,
             theme=self._theme,
         )
 
         self.register_handler("add_win", self._on_add_win)
         self.register_handler("remove_win", self._on_remove_win)
-        self.register_handler("player_death", self._on_death)
         self.register_handler("save_dims", self._on_save_dims)
+
+    # -- event publishing ------------------------------------------------
+
+    def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        if event_type in self._signal_on:
+            data = self._manager.get_data()
+            if extra:
+                data.update(extra)
+            self.api_post("/events", {"type": f"win.{event_type}", "data": data})
 
     # -- command handlers ---------------------------------------------------
 
     def _on_add_win(self, args):
+        prev_needed = self._manager.needed
         self._manager.add(int(args.get("amount", 1)))
+        if self._manager.needed != prev_needed:
+            self._maybe_signal("milestone", {"milestone": self._manager.needed - self._milestone_increment})
         self.push_state()
 
     def _on_remove_win(self, args):
+        prev_record = self._manager.record_low
         self._manager.remove(int(args.get("amount", 1)))
+        if self._manager.record_low != prev_record:
+            self._maybe_signal("record_low", {"record_low": self._manager.record_low})
         self.push_state()
-
-    def _on_death(self, _):
-        if self._decrement_on_death:
-            self._manager.remove(1)
-            self.push_state()
 
     def _on_save_dims(self, args):
         self.save_window_state(

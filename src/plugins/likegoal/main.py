@@ -5,7 +5,7 @@ log = logging.getLogger(__name__)
 
 
 class LikeManager:
-    """Thread-safe like-goal counter with milestone progression."""
+    """Like-goal counter with milestone progression."""
 
     def __init__(self, initial_goal, multiplier):
         self.likes = 0
@@ -51,17 +51,48 @@ class LikeGoalPlugin(BasePlugin):
         self._display_text = cfg.get("display_text", "Like Goal")
         self._initial_goal = int(cfg.get("initial_goal", 100_000))
         self._goal_multiplier = int(cfg.get("goal_multiplier", 2))
+        self._signal_on = set(cfg.get("signal_on", ["milestone", "progress"]))
         self._manager = LikeManager(self._initial_goal, self._goal_multiplier)
 
-        self.register_handler("tiktok_event", self._on_tiktok_event)
+        self.register_handler("add_likes", self._on_add_likes)
+        self.register_handler("reset", self._on_reset)
+        self.register_handler("save_dims", self._on_save_dims)
 
-    def _on_tiktok_event(self, args):
-        event_type = args.get("event_type", "")
-        if event_type == "tiktok.like":
-            delta = int(args.get("data", {}).get("delta", 0))
-            if delta > 0:
-                self._manager.add(delta)
-                self.push_state()
+    # -- event publishing ------------------------------------------------
+
+    def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        if event_type in self._signal_on:
+            data = self._manager.get_data()
+            if extra:
+                data.update(extra)
+            self.api_post("/events", {"type": f"likegoal.{event_type}", "data": data})
+
+    # -- command handlers ---------------------------------------------------
+
+    def _on_add_likes(self, args):
+        prev_goal = self._manager.goal
+        delta = int(args.get("amount", 0))
+        if delta > 0:
+            self._manager.add(delta)
+            if self._manager.goal != prev_goal:
+                self._maybe_signal("milestone", {"previous_goal": prev_goal, "new_goal": self._manager.goal})
+            else:
+                self._maybe_signal("progress")
+        self.push_state()
+
+    def _on_reset(self, _):
+        self._manager.likes = 0
+        self._manager.goal = self._initial_goal
+        self._manager.previous_goal = 0
+        self.push_state()
+
+    def _on_save_dims(self, args):
+        self.save_window_state(
+            args.get("width", 900),
+            args.get("height", 200),
+        )
+
+    # -- overlay HTML -------------------------------------------------------
 
     def get_overlay_html(self) -> str:
         return f"""<!DOCTYPE html>

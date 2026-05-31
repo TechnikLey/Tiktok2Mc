@@ -2172,6 +2172,224 @@ class PluginConfigEditor {
   }
 }
 
+class EventCommandsEditor {
+  constructor() {
+    this.el = document.getElementById('event-commands-editor');
+    this.list = document.getElementById('event-commands-list');
+    this.closeBtn = document.getElementById('event-commands-close');
+    this.saveBtn = document.getElementById('event-commands-save');
+    this.addBtn = document.getElementById('event-commands-add');
+    this.data = {};
+    this.original = {};
+    this.isDirty = false;
+
+    this.knownEvents = [
+      'minecraft.player_death',
+      'minecraft.player_respawn',
+      'timer.started',
+      'timer.paused',
+      'timer.resumed',
+      'timer.reset',
+      'timer.tick',
+      'timer.zero',
+      'timer.milestone',
+      'server.started',
+      'server.stopping'
+    ];
+
+    this.knownTargets = {
+      'timer': ['start', 'pause', 'resume', 'reset', 'add_time', 'set_time'],
+      'spotify-control': ['play', 'pause', 'next', 'previous', 'volume', 'volume_up', 'volume_down', 'shuffle', 'repeat', 'save', 'playtrack'],
+      'win-counter': ['add_win', 'remove_win'],
+      'death-counter': ['player_death'],
+      'like-goal': ['tiktok_event']
+    };
+
+    this._bindEvents();
+  }
+
+  _bindEvents() {
+    this.closeBtn?.addEventListener('click', () => this.close());
+    this.saveBtn?.addEventListener('click', () => this.save());
+    this.addBtn?.addEventListener('click', () => this.addMapping());
+  }
+
+  async open() {
+    this.el.classList.remove('hidden');
+    await this.load();
+  }
+
+  close() {
+    if (this.isDirty) {
+      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
+        if (!confirmed) return;
+        this.isDirty = false;
+        this.el.classList.add('hidden');
+      });
+      return;
+    }
+    this.el.classList.add('hidden');
+  }
+
+  async load() {
+    try {
+      const res = await fetchJSON('/event-commands');
+      this.data = JSON.parse(JSON.stringify(res.event_commands || {}));
+      this.original = JSON.parse(JSON.stringify(this.data));
+      this.isDirty = false;
+      this.render();
+    } catch (e) {
+      showToast('Failed to load event commands: ' + e.message, 'error');
+    }
+  }
+
+  render() {
+    if (!this.list) return;
+    const events = Object.keys(this.data);
+    if (!events.length) {
+      this.list.innerHTML = '<div class="muted" style="padding:1rem;text-align:center;">No mappings defined. Click "+ Add Mapping" to create one.</div>';
+      return;
+    }
+
+    let html = '';
+    for (const event of events) {
+      const actions = this.data[event] || [];
+      html += `<div class="section-card" style="padding:0.75rem 1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;flex:1;">
+            <select onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" style="min-width:220px;font-weight:600;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.3rem 0.5rem;">
+              ${this.knownEvents.map(ev => `<option value="${escapeHtml(ev)}" ${ev === event ? 'selected' : ''}>${escapeHtml(ev)}</option>`).join('')}
+              <option value="__custom__" ${!this.knownEvents.includes(event) ? 'selected' : ''}>Custom...</option>
+            </select>
+            ${!this.knownEvents.includes(event) ? `<input type="text" value="${escapeHtml(event)}" onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" style="min-width:180px;margin-left:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.3rem 0.5rem;">` : ''}
+          </div>
+          <button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="eventCommandsEditor.removeEvent('${escapeHtml(event)}')">Remove</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;padding-left:1rem;border-left:2px solid var(--border);">
+          ${actions.map((action, idx) => this.renderAction(event, action, idx)).join('')}
+          <button class="btn btn-secondary" style="font-size:0.8rem;padding:0.3rem 0.6rem;align-self:flex-start;" onclick="eventCommandsEditor.addAction('${escapeHtml(event)}')">+ Add Action</button>
+        </div>
+      </div>`;
+    }
+    this.list.innerHTML = html;
+  }
+
+  renderAction(event, action, idx) {
+    const targets = Object.keys(this.knownTargets);
+    const currentTarget = action.target || '';
+    const currentCommand = action.command || '';
+    const commands = this.knownTargets[currentTarget] || [];
+    const argsJson = action.args ? JSON.stringify(action.args) : '{}';
+
+    return `<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:0.85rem;color:var(--text-secondary);">Target:</span>
+      <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'target', this.value)" style="background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.25rem 0.4rem;font-size:0.85rem;">
+        <option value="">— select —</option>
+        ${targets.map(t => `<option value="${escapeHtml(t)}" ${t === currentTarget ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
+      </select>
+      <span style="font-size:0.85rem;color:var(--text-secondary);margin-left:0.25rem;">Command:</span>
+      <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'command', this.value)" style="background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.25rem 0.4rem;font-size:0.85rem;">
+        <option value="">— select —</option>
+        ${commands.map(c => `<option value="${escapeHtml(c)}" ${c === currentCommand ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+        ${!commands.includes(currentCommand) && currentCommand ? `<option value="${escapeHtml(currentCommand)}" selected>${escapeHtml(currentCommand)}</option>` : ''}
+      </select>
+      <span style="font-size:0.85rem;color:var(--text-secondary);margin-left:0.25rem;">Args:</span>
+      <input type="text" value="${escapeHtml(argsJson)}" onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'args', this.value)" style="width:120px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.25rem 0.4rem;font-size:0.85rem;font-family:monospace;" title="JSON object, e.g. {&quot;amount&quot;:1}">
+      <button class="btn-icon" style="font-size:1rem;color:var(--danger);" onclick="eventCommandsEditor.removeAction('${escapeHtml(event)}', ${idx})">&times;</button>
+    </div>`;
+  }
+
+  addMapping() {
+    let i = 1;
+    let name = 'minecraft.player_death';
+    while (name in this.data) {
+      name = `new.event_${i}`;
+      i++;
+    }
+    this.data[name] = [{ target: '', command: '', args: {} }];
+    this.isDirty = true;
+    this.render();
+  }
+
+  removeEvent(event) {
+    delete this.data[event];
+    this.isDirty = true;
+    this.render();
+  }
+
+  renameEvent(oldEvent, newEvent) {
+    if (oldEvent === newEvent) return;
+    if (!newEvent || newEvent === '__custom__') return;
+    if (newEvent in this.data) {
+      showToast('An mapping for this event already exists.', 'error');
+      this.render();
+      return;
+    }
+    this.data[newEvent] = this.data[oldEvent];
+    delete this.data[oldEvent];
+    this.isDirty = true;
+    this.render();
+  }
+
+  addAction(event) {
+    if (!this.data[event]) this.data[event] = [];
+    this.data[event].push({ target: '', command: '', args: {} });
+    this.isDirty = true;
+    this.render();
+  }
+
+  removeAction(event, idx) {
+    if (!this.data[event]) return;
+    this.data[event].splice(idx, 1);
+    if (this.data[event].length === 0) {
+      delete this.data[event];
+    }
+    this.isDirty = true;
+    this.render();
+  }
+
+  updateAction(event, idx, field, value) {
+    if (!this.data[event] || !this.data[event][idx]) return;
+    if (field === 'args') {
+      try {
+        this.data[event][idx].args = value.trim() ? JSON.parse(value) : {};
+      } catch (e) {
+        showToast('Invalid JSON in args: ' + e.message, 'error');
+        return;
+      }
+    } else {
+      this.data[event][idx][field] = value;
+      if (field === 'target') {
+        this.data[event][idx].command = '';
+      }
+    }
+    this.isDirty = true;
+    this.render();
+  }
+
+  async save() {
+    // Validate before saving
+    for (const [event, actions] of Object.entries(this.data)) {
+      for (const action of actions) {
+        if (!action.target || !action.command) {
+          showToast(`Missing target or command in mapping for "${event}"`, 'error');
+          return;
+        }
+      }
+    }
+    try {
+      await putJSON('/event-commands', { event_commands: this.data });
+      this.original = JSON.parse(JSON.stringify(this.data));
+      this.isDirty = false;
+      showToast('Event-Command mappings saved.', 'success');
+      this.close();
+    } catch (e) {
+      showToast('Save failed: ' + e.message, 'error');
+    }
+  }
+}
+
+const eventCommandsEditor = new EventCommandsEditor();
 const pluginEditor = new PluginConfigEditor();
 const actionsEditor = new ActionsEditor();
 
@@ -2189,7 +2407,7 @@ if (typeof pywebview === 'undefined' || !pywebview.api) {
 }
 
 function isAnyEditorDirty() {
-  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty;
+  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || eventCommandsEditor.isDirty;
 }
 
 /* Detect close requests from pywebview's on_closing (deadlock-free polling) */
@@ -2220,6 +2438,12 @@ async function _saveAllEditors() {
     await actionsEditor.save();
     if (actionsEditor.isDirty) {
       throw new Error('Actions editor could not be saved — check for errors.');
+    }
+  }
+  if (eventCommandsEditor.isDirty) {
+    await eventCommandsEditor.save();
+    if (eventCommandsEditor.isDirty) {
+      throw new Error('Event-Command editor could not be saved — check for errors.');
     }
   }
   if (editor.isDirty()) {

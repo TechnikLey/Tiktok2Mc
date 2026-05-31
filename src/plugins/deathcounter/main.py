@@ -6,7 +6,7 @@ log = logging.getLogger(__name__)
 
 
 class DeathManager:
-    """Thread-safe death counter."""
+    """Thread-safe death counter with milestone support."""
 
     def __init__(self, stats_path):
         self._stats_path = stats_path
@@ -31,8 +31,8 @@ class DeathManager:
         except Exception:
             pass
 
-    def add(self):
-        self._count += 1
+    def add(self, amount=1):
+        self._count += amount
         self.save()
 
     def get_data(self):
@@ -45,14 +45,44 @@ class DeathCounterPlugin(BasePlugin):
 
     def __init__(self):
         super().__init__()
+        cfg = self.config
+        self._milestones = sorted({int(m) for m in cfg.get("milestones", [])})
+        self._signal_on = set(cfg.get("signal_on", ["milestone"]))
         self._stats_file = self._data_dir / "deaths.json"
         self._manager = DeathManager(self._stats_file)
+        self._milestones_sent = set()
 
         self.register_handler("player_death", self._on_death)
+        self.register_handler("add_death", self._on_add_death)
+        self.register_handler("reset", self._on_reset)
         self.register_handler("save_dims", self._on_save_dims)
 
-    def _on_death(self, _):
-        self._manager.add()
+    # -- event publishing ------------------------------------------------
+
+    def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        if event_type in self._signal_on:
+            data = self._manager.get_data()
+            if extra:
+                data.update(extra)
+            self.api_post("/events", {"type": f"death.{event_type}", "data": data})
+
+    # -- command handlers ---------------------------------------------------
+
+    def _on_death(self, args):
+        self._manager.add(int(args.get("amount", 1)))
+        for ms in self._milestones:
+            if self._manager._count >= ms and ms not in self._milestones_sent:
+                self._milestones_sent.add(ms)
+                self._maybe_signal("milestone", {"milestone": ms})
+        self.push_state()
+
+    def _on_add_death(self, args):
+        self._on_death(args)
+
+    def _on_reset(self, _):
+        self._manager._count = 0
+        self._milestones_sent.clear()
+        self._manager.save()
         self.push_state()
 
     def _on_save_dims(self, args):
@@ -60,6 +90,8 @@ class DeathCounterPlugin(BasePlugin):
             args.get("width", 500),
             args.get("height", 400),
         )
+
+    # -- overlay HTML -------------------------------------------------------
 
     def get_overlay_html(self) -> str:
         return f"""<!DOCTYPE html>

@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "entry_point": "src/plugins/wincounter/main.py",
   "display_name": "Win Counter",
-  "description": "Tracks wins and losses with optional death decrement from Minecraft. Wins escalate the target automatically when reached.",
+  "description": "Counts wins with configurable milestones. Publishes win.milestone and win.record_low events to the EventBus so consumers can react without coupling.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
   "capabilities": [
-    "win_counter:track",
-    "win_counter:webhook",
-    "win_counter:escalation"
+    "win-counter:count",
+    "win-counter:milestones",
+    "win-counter:events"
   ],
   "depends_on": [],
   "auto_enable": false,
@@ -19,12 +19,34 @@
     "version": 1,
     "fields": [
       {
-        "key": "decrement_on_death",
-        "type": "boolean",
-        "default": false,
-        "label": "Decrement on Death",
-        "help": "Remove a win when the player dies (requires MinecraftServerAPI)",
-        "category": "Behavior"
+        "key": "initial_needed",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Initial Needed",
+        "help": "Wins required for the first milestone",
+        "category": "Goals"
+      },
+      {
+        "key": "milestone_increment",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Milestone Increment",
+        "help": "Additional wins needed for each next milestone",
+        "category": "Goals"
+      },
+      {
+        "key": "signal_on",
+        "type": "array",
+        "default": ["milestone", "record_low"],
+        "item_schema": {
+          "type": "select",
+          "options": ["milestone", "record_low"]
+        },
+        "label": "Signal On",
+        "help": "Events published to the EventBus via POST /api/v1/events",
+        "category": "Events"
       },
       {
         "key": "theme.background",
@@ -41,23 +63,23 @@
         "category": "Theme"
       },
       {
-        "key": "theme.danger",
+        "key": "theme.muted",
         "type": "color",
-        "default": "#ff4d4d",
-        "label": "Danger Color",
+        "default": "#aaaaaa",
+        "label": "Muted Color",
         "category": "Theme"
       },
       {
-        "key": "theme.muted",
+        "key": "theme.danger",
         "type": "color",
-        "default": "#666666",
-        "label": "Muted Color",
+        "default": "#ff4444",
+        "label": "Danger Color",
         "category": "Theme"
       },
       {
         "key": "theme.separator",
         "type": "color",
-        "default": "#333333",
+        "default": "#444444",
         "label": "Separator Color",
         "category": "Theme"
       }

@@ -3,17 +3,14 @@
   "version": "1.0.0",
   "entry_point": "src/plugins/likegoal/main.py",
   "display_name": "Like Goal",
-  "description": "Displays a progress bar that fills as the stream accumulates likes. Supports multiple goal modes (reset, step, multiply).",
+  "description": "Tracks like milestones with configurable goal progression. Publishes likegoal.milestone and likegoal.progress events to the EventBus so consumers can react without coupling.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
   "capabilities": [
-    "like_goal:progress",
-    "like_goal:reset",
-    "like_goal:status"
-  ],
-  "event_subscriptions": [
-    "tiktok.like"
+    "like-goal:progress",
+    "like-goal:milestones",
+    "like-goal:events"
   ],
   "depends_on": [],
   "auto_enable": false,
@@ -26,7 +23,6 @@
         "type": "string",
         "default": "Like Goal",
         "label": "Display Text",
-        "help": "Text shown above the progress bar",
         "category": "Appearance"
       },
       {
@@ -35,54 +31,34 @@
         "default": 100000,
         "min": 1,
         "label": "Initial Goal",
-        "help": "Number of likes needed to reach the first goal",
+        "help": "Likes required for the first milestone",
         "category": "Goals"
       },
       {
         "key": "goal_multiplier",
         "type": "integer",
-        "default": 1,
+        "default": 2,
         "min": 0,
         "label": "Goal Multiplier",
-        "help": "0=reset, 1=step, 2+=multiply",
+        "help": "0 = reset to initial; 1 = linear (+initial); 2+ = exponential",
         "category": "Goals"
       },
       {
-        "key": "triggers",
+        "key": "signal_on",
         "type": "array",
-        "default": [
-          {
-            "id": "likes_standard",
-            "every": 100,
-            "function": "likes",
-            "payload": "Community",
-            "enabled": true
-          },
-          {
-            "id": "likes_100k",
-            "every": 100000,
-            "function": "like_2",
-            "payload": "Community",
-            "enabled": true
-          }
-        ],
+        "default": ["milestone", "progress"],
         "item_schema": {
-          "type": "object",
-          "fields": [
-            {"key": "id", "type": "string", "default": ""},
-            {"key": "every", "type": "integer", "default": 100, "min": 1},
-            {"key": "function", "type": "string", "default": ""},
-            {"key": "payload", "type": "string", "default": "Community"},
-            {"key": "enabled", "type": "boolean", "default": true}
-          ]
+          "type": "select",
+          "options": ["milestone", "progress"]
         },
-        "label": "Like Triggers",
-        "category": "Triggers"
+        "label": "Signal On",
+        "help": "Events published to the EventBus via POST /api/v1/events",
+        "category": "Events"
       },
       {
         "key": "theme.background",
         "type": "color",
-        "default": "#050505",
+        "default": "#000000",
         "label": "Background Color",
         "category": "Theme"
       },
@@ -96,21 +72,21 @@
       {
         "key": "theme.accent",
         "type": "color",
-        "default": "#00f5ff",
+        "default": "#1db954",
         "label": "Accent Color",
         "category": "Theme"
       },
       {
         "key": "theme.accent2",
         "type": "color",
-        "default": "#8a2be2",
+        "default": "#1ed760",
         "label": "Accent 2 Color",
         "category": "Theme"
       },
       {
         "key": "theme.danger",
         "type": "color",
-        "default": "#ff4d4d",
+        "default": "#ff0000",
         "label": "Danger Color",
         "category": "Theme"
       }

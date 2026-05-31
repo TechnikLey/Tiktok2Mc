@@ -34,7 +34,7 @@ class TestWinCounterPlugin:
         monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
         monkeypatch.setattr(
             "core.base_plugin.load_plugin_config",
-            lambda d: {"decrement_on_death": False, **cfg_override},
+            lambda d: {"initial_needed": 10, **cfg_override},
         )
         monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
         p = WinCounterPlugin()
@@ -67,17 +67,11 @@ class TestWinCounterPlugin:
         p._on_remove_win({"amount": 2})
         assert p._manager.wins == 3
 
-    def test_death_decrement_when_enabled(self, tmp_path, monkeypatch):
-        p = self._make_plugin(tmp_path, monkeypatch, decrement_on_death=True)
-        p._manager.wins = 5
-        p._on_death({})
-        assert p._manager.wins == 4
-
-    def test_death_no_decrement_when_disabled(self, tmp_path, monkeypatch):
-        p = self._make_plugin(tmp_path, monkeypatch, decrement_on_death=False)
-        p._manager.wins = 5
-        p._on_death({})
-        assert p._manager.wins == 5
+    def test_remove_win_record_low(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager.wins = 2
+        p._on_remove_win({"amount": 5})
+        assert p._manager.record_low == -3
 
     def test_save_dims(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
@@ -175,7 +169,7 @@ class TestLikeGoalPlugin:
 
     def test_add_likes(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
-        p._on_tiktok_event({"event_type": "tiktok.like", "data": {"delta": 50}})
+        p._on_add_likes({"amount": 50})
         assert p._manager.get_data()["likes"] == 50
 
     def test_milestone_rollover(self, tmp_path, monkeypatch):

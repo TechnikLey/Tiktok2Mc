@@ -284,6 +284,7 @@ class SpotifyControlPlugin(BasePlugin):
         self._device_id = cfg.get("device_id", "")
         self._volume_step = cfg.get("volume_step", 10)
         self._playtrack_mode = cfg.get("playtrack_mode", "replace")
+        self._signal_on = set(cfg.get("signal_on", ["track_changed", "play", "pause"]))
 
         self._client = SpotifyClient(
             self._client_id,
@@ -309,6 +310,15 @@ class SpotifyControlPlugin(BasePlugin):
         self.register_handler("save", self._on_save)
         self.register_handler("playtrack", self._on_playtrack)
         self.register_handler("comment", self._on_comment)
+
+    # -- event publishing ------------------------------------------------
+
+    def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        if event_type in self._signal_on:
+            data = {}
+            if extra:
+                data.update(extra)
+            self.api_post("/events", {"type": f"spotify.{event_type}", "data": data})
 
     # -- tick (overlay polling) -------------------------------------------
 
@@ -342,22 +352,26 @@ class SpotifyControlPlugin(BasePlugin):
     def _on_play(self, _):
         if self._client.is_authenticated:
             self._client.play(self._device_id or None)
+            self._maybe_signal("play")
             self._notify_overlay()
 
     def _on_pause(self, _):
         if self._client.is_authenticated:
             self._client.pause(self._device_id or None)
+            self._maybe_signal("pause")
             self._notify_overlay()
 
     def _on_next(self, _):
         if self._client.is_authenticated:
             self._client.next_track()
+            self._maybe_signal("track_changed", {"direction": "next"})
             time.sleep(0.5)
             self._notify_overlay()
 
     def _on_previous(self, _):
         if self._client.is_authenticated:
             self._client.previous_track()
+            self._maybe_signal("track_changed", {"direction": "previous"})
             time.sleep(0.5)
             self._notify_overlay()
 
@@ -454,6 +468,7 @@ class SpotifyControlPlugin(BasePlugin):
         with self._last_track_lock:
             if track_data["id"] and track_data["id"] != self._last_track_id:
                 self._last_track_id = track_data["id"]
+                self._maybe_signal("track_changed", {"track": track_data["name"], "artist": track_data["artists"]})
                 progress_ms = track_data.get("progress_ms", 0)
                 track_data["progress_ms"] = 0
                 track_data["progress_sec"] = 0

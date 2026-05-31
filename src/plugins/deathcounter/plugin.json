@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "entry_point": "src/plugins/deathcounter/main.py",
   "display_name": "Death Counter",
-  "description": "Tracks in-game deaths and displays a real-time counter as an OBS browser source or pywebview overlay.",
+  "description": "Counts player deaths with configurable milestones. Publishes death.milestone events to the EventBus so consumers can react without coupling.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
   "capabilities": [
-    "deaths:track",
-    "deaths:webhook",
-    "deaths:reset"
+    "death-counter:count",
+    "death-counter:milestones",
+    "death-counter:events"
   ],
   "depends_on": [],
   "auto_enable": false,
@@ -18,6 +18,30 @@
   "config_schema": {
     "version": 1,
     "fields": [
+      {
+        "key": "milestones",
+        "type": "array",
+        "default": [],
+        "item_schema": {
+          "type": "integer",
+          "min": 1
+        },
+        "label": "Milestones",
+        "help": "Death counts at which a death.milestone event is emitted",
+        "category": "Events"
+      },
+      {
+        "key": "signal_on",
+        "type": "array",
+        "default": ["milestone"],
+        "item_schema": {
+          "type": "select",
+          "options": ["milestone"]
+        },
+        "label": "Signal On",
+        "help": "Events published to the EventBus via POST /api/v1/events",
+        "category": "Events"
+      },
       {
         "key": "theme.background",
         "type": "color",
@@ -28,8 +52,15 @@
       {
         "key": "theme.text",
         "type": "color",
-        "default": "#8ef3ff",
+        "default": "#ff4444",
         "label": "Text Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent",
+        "type": "color",
+        "default": "#ff8888",
+        "label": "Accent Color",
         "category": "Theme"
       }
     ]

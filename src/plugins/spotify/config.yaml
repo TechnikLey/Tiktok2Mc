@@ -11,6 +11,11 @@ device_id: ""
 volume_step: 10
 playtrack_mode: "replace"
 
+signal_on:
+  - "track_changed"
+  - "play"
+  - "pause"
+
 theme:
   background: "#000000"
   text: "#ffffff"

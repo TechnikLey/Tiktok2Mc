@@ -11,7 +11,58 @@
 #       command: command_name
 #       args: {}            # optional
 #
-# Example:
+# -------------------------------------------------------------------
+# WHERE DO EVENTS, TARGETS AND COMMANDS COME FROM?
+# -------------------------------------------------------------------
+#
+#  EVENTS  — Every plugin (and the core server) can publish events to
+#            the central EventBus via POST /api/v1/events.
+#            The event "type" field is what you write on the left side
+#            of this file.
+#
+#            Known built-in events:
+#              minecraft.player_death
+#              minecraft.player_respawn
+#              timer.started, timer.paused, timer.resumed, timer.reset
+#              timer.tick, timer.zero, timer.milestone
+#              server.started, server.stopping
+#
+#            Tip: Open the browser-dev-tools on the Dashboard, watch
+#            the Network tab or the /api/v1/ws WebSocket feed to see
+#            every event that flies by in real time.
+#
+#  TARGETS — The name of the plugin that should receive the command.
+#            This is the value from the plugin's plugin.json → "name".
+#
+#            Available targets (as shipped):
+#              timer
+#              spotify-control
+#              death-counter
+#              win-counter
+#              like-goal
+#
+#  COMMANDS — Each plugin declares the commands it understands by
+#             calling register_handler("command_name", ...) in its
+#             main.py.  You can also look at the plugin's plugin.json
+#             or overlay page for a list of supported commands.
+#
+#            Known commands per target:
+#              timer:
+#                start, pause, resume, reset, add_time, set_time
+#              spotify-control:
+#                play, pause, next, previous, volume, volume_up,
+#                volume_down, shuffle, repeat, save, playtrack
+#              win-counter:
+#                add_win, remove_win
+#              death-counter:
+#                player_death
+#              like-goal:
+#                tiktok_event
+#
+# -------------------------------------------------------------------
+# EXAMPLES
+# -------------------------------------------------------------------
+#
 #   minecraft.player_death:
 #     - target: timer
 #       command: pause
@@ -28,8 +79,12 @@
 #       args:
 #         amount: 1
 #
+# -------------------------------------------------------------------
+# RUNTIME LOCATION
+# -------------------------------------------------------------------
 # This file lives in data/event_commands.yaml at runtime.
-# Edit it there or via the API config editor.
+# The defaults/ copy is only a template.
+# Edit it there, via the API, or with the GUI editor on the dashboard.
 # ===================================================================
 
 event_commands: {}

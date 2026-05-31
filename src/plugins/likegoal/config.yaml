@@ -1,26 +1,20 @@
 # ==========================================
 # Like Goal Plugin — Configuration
 # ==========================================
+# Fully decoupled like-goal tracker with milestone progression.
+# Publishes events to the EventBus; consumers react via API.
 
 display_text: "Like Goal"
-initial_goal: 100_000
-goal_multiplier: 1
+initial_goal: 100000
+goal_multiplier: 2
 
-triggers:
-  - id: likes_standard
-    every: 100
-    function: likes
-    payload: Community
-    enabled: true
-  - id: likes_100k
-    every: 100_000
-    function: like_2
-    payload: Community
-    enabled: true
+signal_on:
+  - "milestone"
+  - "progress"
 
 theme:
-  background: "#050505"
+  background: "#000000"
   text: "#ffffff"
-  accent: "#00f5ff"
-  accent2: "#8a2be2"
-  danger: "#ff4d4d"
+  accent: "#1db954"
+  accent2: "#1ed760"
+  danger: "#ff0000"
