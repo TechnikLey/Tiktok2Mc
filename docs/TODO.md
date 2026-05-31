@@ -108,7 +108,7 @@
 - **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **744 total: 739 passed, 5 skipped, 0 failures** (513 Python + 226 GUI frontend; SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
+- **750 total: 524 passed, 3 skipped, 0 failures** (524 Python + 226 GUI frontend; WS streaming tests active, SSE endpoint tested via POST)
 - **GUI frontend (Vitest + JSDOM):** 226 tests across 5 test files:
   - `helpers.test.js` — 43 utility function tests (escapeHtml, toTitle, formatUptime, getPluginStatus, validatePassword, etc.)
   - `config-editor.test.js` — 44 ConfigEditor method tests (open/close, getValue/setValue, validate, computeDiff, etc.)
@@ -201,8 +201,8 @@ All previously identified critical bugs are now resolved in the codebase.
 | `src/core/hook_api.py` | 136 | HIGH — Runtime hook API (rcon_enqueue, enqueue_trigger, loop detection) |
 | `src/core/hook_loader.py` | 132 | HIGH — AST-based import validation, dynamic module loading |
 | `src/core/api/server.py` | 97 | MEDIUM — FastAPI app factory, CORS, static mounts |
-| `src/core/api/routes/system.py` | 92 | **HIGH** — restart/shutdown signal endpoints, zero tests |
-| `src/core/api/routes/ws.py` | 71 | HIGH — WebSocket (all tests skipped) |
+| `src/core/api/routes/system.py` | 92 | **COVERED** — 8 tests for restart/shutdown/cancel/status endpoints |
+| `src/core/api/routes/ws.py` | 71 | **COVERED** — 3 tests: event injection, ordering, disconnect cleanup |
 | `src/core/api/routes/events.py` | 80 | MEDIUM — SSE stream (skipped), only POST tested |
 | `src/core/api/updater.py` | 382 | MEDIUM — `_download_update()`, `install_update()` untested |
 | `src/python/gui.py` | 85 | LOW — pywebview shell |
@@ -219,7 +219,7 @@ All previously identified critical bugs are now resolved in the codebase.
 - **All 7 plugin implementations:** Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration)
 - **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): Hook loader tests exist but no functional tests
 - **Compiled binary update flow:** `update.py` has 34 E2E tests but no compiled binary test (update.exe → start.exe → restart)
-- **SSE/WebSocket:** 4 tests permanently skipped (httpx/TestClient limitation)
+- **SSE:** SSE stream receive tests cannot use TestClient (httpx blocking limitation); emit tests work via POST endpoint
 - **Test isolation:** Session-scoped fixtures share state across tests; `_clear_registry` fixture not consistently applied
 
 ---
@@ -375,4 +375,4 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 
 ---
 
-*Last updated: 2026-05-31* (updated for v1.0.0-dev — 739 total tests: 513 Python + 226 GUI frontend; all Green)
+*Last updated: 2026-05-31* (updated for v1.0.0-dev — 750 total tests: 524 Python + 226 GUI frontend; all Green)
