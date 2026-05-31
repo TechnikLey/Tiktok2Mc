@@ -51,6 +51,13 @@ jobs:
           name: TikTok2MC-Windows-Installer
           path: build/TikTok2MC-*-Setup.exe
 
+      - name: Upload Linux Installer Artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TikTok2Mc-Linux-Installer
+          path: build/TikTok2Mc-*-Linux-Setup.sh
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -75,7 +82,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: TikTok2MC-Windows-Installer
-          path: installer/
+          path: installer-win/
+
+      - name: Download Linux Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTok2Mc-Linux-Installer
+          path: installer-linux/
 
       - name: Create Archives
         run: |
@@ -83,8 +96,10 @@ jobs:
           GZIP=-9 tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
           sha256sum TikTok2Mc-${{ github.ref_name }}-Windows.zip > TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
           sha256sum TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz > TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
-          mv installer/TikTok2MC-*-Setup.exe ./TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe || true
+          mv installer-win/TikTok2MC-*-Setup.exe ./TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe || true
           sha256sum TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe > TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256 || true
+          mv installer-linux/TikTok2Mc-*-Linux-Setup.sh ./TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh || true
+          sha256sum TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh > TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256 || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -96,3 +111,5 @@ jobs:
             TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
             TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe
             TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256
+            TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh
+            TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256

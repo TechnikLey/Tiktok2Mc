@@ -42,9 +42,23 @@ Everything is controlled through simple text files. No programming required.
 
 ### Linux
 
-1. Download the latest release.
-2. Extract the archive.
+**Option A — Shell Installer (Recommended)**
+
+1. Download `TikTok2Mc-<version>-Linux-Setup.sh` from [GitHub Releases](https://github.com/TechnikLey/Tiktok2Mc/releases).
+2. Make it executable and run as root:
+   ```bash
+   chmod +x TikTok2Mc-<version>-Linux-Setup.sh
+   sudo ./TikTok2Mc-<version>-Linux-Setup.sh
+   ```
+3. TikTok2Mc will be installed to `/opt/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command.
+
+**Option B — Portable Archive**
+
+1. Download `TikTok2Mc-<version>-Linux.tar.gz` from [GitHub Releases](https://github.com/TechnikLey/Tiktok2Mc/releases).
+2. Extract the archive to any folder.
 3. Java will be detected automatically, or the tool will help you install it.
+
+> The archive also contains the `TikTok2Mc-Linux-Setup.sh` installer if you later decide to install it properly.
 
 ## Quick Start
 

@@ -536,8 +536,38 @@ def main():
                         cprint(f"Installer build failed: {e.stderr.decode(errors='replace')}", Color.RED)
             else:
                 cprint(f"NSIS script not found at {nsis_script}", Color.YELLOW)
+
         elif BUILD_INSTALLER and not IS_WINDOWS:
-            cprint("Installer build skipped — Windows only", Color.YELLOW)
+            cprint("Building Linux shell installer...", Color.CYAN)
+            linux_template = SCRIPT_DIR / "installer" / "install_linux.sh"
+            if linux_template.exists():
+                import tarfile
+                installer_out = SCRIPT_DIR / "build" / f"TikTok2Mc-{TOOL_VERSION}-Linux-Setup.sh"
+                tar_path = SCRIPT_DIR / "build" / f"TikTok2Mc-{TOOL_VERSION}-Linux.tar.gz"
+
+                # Pack release/ into a tar.gz
+                with tarfile.open(tar_path, "w:gz") as tf:
+                    for entry in OUT_DIR.rglob("*"):
+                        if entry.is_file():
+                            tf.add(entry, arcname=entry.relative_to(OUT_DIR))
+
+                # Build self-extracting script: header + archive
+                with open(installer_out, "wb") as outf:
+                    outf.write(linux_template.read_bytes())
+                    outf.write(b"\n__ARCHIVE_BELOW__\n")
+                    with open(tar_path, "rb") as tgf:
+                        outf.write(tgf.read())
+
+                # Make executable
+                os.chmod(installer_out, 0o755)
+                cprint(f"Linux installer created: {installer_out}", Color.GREEN)
+
+                # Copy into release folder as well
+                installer_in_release = OUT_DIR / installer_out.name
+                shutil.copy2(installer_out, installer_in_release)
+                cprint(f"Installer copied to release: {installer_in_release}", Color.GREEN)
+            else:
+                cprint(f"Linux installer template not found at {linux_template}", Color.YELLOW)
 
         # --- Finish ---
         elapsed = time.time() - start
