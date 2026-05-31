@@ -86,6 +86,10 @@ class PluginManifest(BaseModel):
         default_factory=list,
         description="Plugins that must be running first",
     )
+    event_subscriptions: list[str] = Field(
+        default_factory=list,
+        description="Event types this plugin wants to receive via CommandQueue. Supports wildcards: tiktok.*, tiktok.gift, etc.",
+    )
     update_url: str = Field(
         "", description="URL for checking plugin updates (GitHub Releases API or direct)")
     auto_enable: bool = Field(

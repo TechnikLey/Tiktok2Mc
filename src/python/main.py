@@ -35,6 +35,7 @@ from core.overlay_utils import send_overlay_text
 from core.yaml_utils import load_yaml
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import command_queue
+from core.plugin_config import discover_plugins_dir, load_plugin_manifest
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -728,31 +729,86 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
         )
 
 
-async def _event_bridge_worker():
-    """Bridge: converts EventBus tiktok events into plugin commands.
+def _load_event_subscriptions() -> dict[str, list[str]]:
+    """Scan all plugin manifests and build event_type → [plugin_names] mapping.
 
-    Decouples main.py from plugins — main publishes events,
-    bridge translates them to commands plugins already understand.
+    Supports wildcards in subscriptions:
+      "tiktok.*" matches "tiktok.gift", "tiktok.like", etc.
+      "tiktok.gift" matches only "tiktok.gift"
+    """
+    subs: dict[str, list[str]] = {}
+    plugins_dir = discover_plugins_dir()
+    if not plugins_dir.is_dir():
+        return subs
+
+    for child in sorted(plugins_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        manifest = load_plugin_manifest(child)
+        if not manifest:
+            continue
+        plugin_name = manifest.get("name", "")
+        if not plugin_name:
+            continue
+        for pattern in manifest.get("event_subscriptions", []):
+            subs.setdefault(pattern, []).append(plugin_name)
+
+    log.info("[EVENT-BRIDGE] Loaded subscriptions for %d pattern(s)", len(subs))
+    for pattern, names in sorted(subs.items()):
+        log.info("  %s → %s", pattern, names)
+    return subs
+
+
+def _match_event(event_type: str, pattern: str) -> bool:
+    """Check if an event type matches a subscription pattern."""
+    if pattern == event_type:
+        return True
+    if pattern.endswith(".*"):
+        prefix = pattern[:-2]
+        return event_type.startswith(prefix + ".")
+    return False
+
+
+async def _event_bridge_worker():
+    """Declarative event bridge.
+
+    Reads event_subscriptions from every plugin.json manifest.
+    Routes matching TikTok events to all subscribing plugins via
+    CommandQueue with a standardized tiktok_event command.
+
+    No plugin names are hardcoded — third-party plugins work the
+    same way as official ones by declaring subscriptions.
     """
     q = event_bus.subscribe("tiktok.event")
-    log.info("[EVENT-BRIDGE] Started.")
+    subscriptions = _load_event_subscriptions()
+    log.info("[EVENT-BRIDGE] Started (declarative).")
     while True:
         msg = await q.get()
         try:
             data = msg.get("data", {})
             ev_type = data.get("type")
             user = data.get("user")
-            if not user:
+            if not user or not ev_type:
                 continue
 
-            # ChannelPoints: ping on every TikTok event
-            command_queue.enqueue("channel-points", "ping", user=user)
+            # Normalize event type: gift → tiktok.gift
+            full_event_type = f"tiktok.{ev_type}"
 
-            # LikeGoal: add likes on like events
-            if ev_type == "like":
-                delta = data.get("delta")
-                if delta:
-                    command_queue.enqueue("like-goal", "add_likes", delta=delta)
+            # Find all plugins that subscribe to this event
+            recipients: set[str] = set()
+            for pattern, plugin_names in subscriptions.items():
+                if _match_event(full_event_type, pattern):
+                    recipients.update(plugin_names)
+
+            # Enqueue standardized tiktok_event command to each recipient
+            for plugin_name in recipients:
+                command_queue.enqueue(
+                    plugin_name,
+                    "tiktok_event",
+                    event_type=full_event_type,
+                    user=user,
+                    data={k: v for k, v in data.items() if k not in ("type", "user")},
+                )
 
         except Exception as e:
             log.info(f"[EVENT-BRIDGE] Error handling event: {e}")

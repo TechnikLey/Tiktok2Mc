@@ -166,7 +166,8 @@ def command_polling_loop():
             for cmd_entry in result.get("commands", []):
                 cmd = cmd_entry.get("command")
                 args_data = cmd_entry.get("args", {})
-                if cmd == "ping":
+                if cmd == "tiktok_event":
+                    # Decoupled event handling — main system routes based on manifest
                     user = args_data.get("user", "")
                     if user:
                         ping_user(user)

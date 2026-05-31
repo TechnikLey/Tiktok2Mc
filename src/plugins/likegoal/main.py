@@ -106,11 +106,14 @@ def command_polling_loop():
             for cmd_entry in result.get("commands", []):
                 cmd = cmd_entry.get("command")
                 args_data = cmd_entry.get("args", {})
-                if cmd == "update_likes":
-                    add_val = int(args_data.get("add", 0))
-                    if add_val > 0:
-                        like_manager.add_likes(add_val)
-                        _push_state()
+                if cmd == "tiktok_event":
+                    # Decoupled event handling — main system routes based on manifest
+                    event_type = args_data.get("event_type", "")
+                    if event_type == "tiktok.like":
+                        delta = int(args_data.get("data", {}).get("delta", 0))
+                        if delta > 0:
+                            like_manager.add_likes(delta)
+                            _push_state()
         time.sleep(0.5)
 
 
