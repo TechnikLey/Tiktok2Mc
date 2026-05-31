@@ -45,12 +45,24 @@
 - Versioned backup files (`*.v<N>.bak`)
 - Integrated into registry, plugin config, config.yaml, and actions.mca save paths
 
-### Plugin Decoupling
+### Plugin Decoupling & Port Consolidation
 - Timer, DeathCounter, WinCounter, OverlayText, LikeGoal, Spotify, ChannelPoints — all standalone
 - Each plugin exposes its own REST API; no cross-plugin hard dependencies
 - Timer: `auto_win: false`, `pause_on_death: false`
 - WinCounter: `decrement_on_death: false`
 - All plugins default to `enabled: false` (opt-in)
+
+### Port Consolidation — COMPLETED
+- **7 plugin ports eliminated** (29186, 29189, 29190, 29191, 29193, 29194, 29195)
+- **All Flask servers removed from plugins** — each plugin now communicates exclusively via the Main API (127.0.0.1:29185)
+- New infrastructure: `PluginStateStore`, `CommandQueue`, `OverlayHtmlStore` in `src/core/api/plugin_overlay.py`
+- 7 new API routes: overlay registration/serving, per-plugin SSE streams, command enqueue/poll, state get/set, generic OAuth callback
+- All pywebview windows point to `http://127.0.0.1:29185/api/v1/plugins/{name}/overlay`
+- Spotify OAuth callback routed through Main API: `/api/v1/plugins/oauth/callback?name=spotify-control`
+- New plugin communication model: plugins poll `GET /api/v1/plugins/{name}/commands` (atomic dequeue), push state via `POST /api/v1/plugins/{name}/state`
+- Remaining required ports: Main API (29185), RCON (25575), Minecraft Server (25565)
+- `port`/`ports` fields removed from `PluginManifest`, `PluginRegistration`, `AppConfig` models
+- Plugin manifests (`plugin.json`) and configs (`config.yaml`) cleaned up — no more port declarations
 
 ### GUI — Implemented
 - `src/python/gui.py` — pywebview shell that opens the dashboard served by the API server
@@ -147,9 +159,7 @@
 
 7. **Enable/disable ↔ process state gap** — Enable/disable writes signal files; `start.py` polls async. No confirmation the plugin process actually started or stopped. No heartbeat/health check — registry says `enabled: true` even if the process crashed.
 
-8. **Port staleness** — `PluginRegistration.port` comes from manifest; actual port in `config.yaml` can diverge if user edits config directly (not via API). No cross-validation.
-
-9. **Non-atomic enable/disable** — Registry update and signal file write are separate operations. If signal write fails after registry update, state is inconsistent.
+8. **Non-atomic enable/disable** — Registry update and signal file write are separate operations. If signal write fails after registry update, state is inconsistent.
 
 10. **Dead plugin entries** — `DELETE /plugins/{name}` unregisters from registry but does not stop running process or clean up files.
 
@@ -162,15 +172,13 @@
 
 ## Architecture Issues
 
-1. **EventBus not adopted by any plugin** — All 8 plugins run independent Flask HTTP servers on their own ports. EventBus with SSE/WS exists (`core/api/eventbus.py`) but zero plugins use it. This defeats the purpose of the pub/sub infrastructure. Plugins communicate via HTTP calls to each other's independent servers, not through the bus.
+1. **EventBus not adopted by any plugin** — All 7 plugins poll the Main API for commands and push state. EventBus with SSE/WS exists (`core/api/eventbus.py`) but zero plugins publish through it directly. The Main API pipes events to SSE clients, but the EventBus subscriber pattern is unused by plugins themselves.
 
 2. **Plugin dependency ordering not enforced** — `depends_on` declared in manifests but never checked by launcher or API. Plugins start in whatever order `start.py` iterates.
 
 3. **No plugin process health monitoring** — `start.py` launches plugins as subprocesses but never verifies they started successfully or monitors them at runtime. A crashed plugin stays marked as enabled.
 
-4. **7 independent plugin HTTP servers** — Port proliferation (29186, 29189, 29190, 29191, 29193, 29194, 29195). No central reverse proxy or port manager. Risk of port collisions — no detection during registration.
-
-5. **Config schema validation not enforced on load** — `load_plugin_config()` applies defaults but does not validate existing values against schema. Validation only runs on explicit API `PUT`.
+4. **Config schema validation not enforced on load** — `load_plugin_config()` applies defaults but does not validate existing values against schema. Validation only runs on explicit API `PUT`.
 
 6. **Single config version source of truth missing** — `build.py` hardcodes `TOOL_VERSION = "v1.0.0"` and `UPDATER_VERSION = "v1.4.0"`. No single version source of truth. `upload.py` checked into git with stale hardcoded version.
 
@@ -204,7 +212,7 @@
 
 ### Other Gaps
 - **GUI (frontend):** Zero tests across `index.html`, `app.js` (2154 lines), `style.css`, `actions-editor.js` (636 lines)
-- **All 8 plugin implementations:** Only manifest smoke tests exist; zero tests for actual plugin logic
+- **All 7 plugin implementations:** Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration)
 - **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): Hook loader tests exist but no functional tests
 - **End-to-end update flow:** No compiled binary test (update.exe → start.exe → restart)
 - **SSE/WebSocket:** 4 tests permanently skipped (httpx/TestClient limitation)
@@ -261,9 +269,7 @@
 - Download integrity verification (checksummed artifacts)
 
 ### Architecture
-- Port consolidation: reverse-proxy plugin HTTP servers through main API or reduce to fewer ports
-- Centralized port manager to prevent collisions
-- EventBus integration into plugin-to-plugin communication (replace independent Flask servers)
+- EventBus integration into plugin-to-plugin communication (plugins push events to EventBus instead of polling commands)
 - Plugin sandboxing / resource limits
 
 ### GUI Enhancements
@@ -310,6 +316,8 @@ Same as spotify has the ability to deny cooldown aktivation or channelpoints red
 ---
 
 ## Recommended Next Steps
+
+> **Port consolidation complete** — all 7 plugin Flask servers removed, communication centralized through Main API (29185).
 
 Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) greatest stability improvement.
 
@@ -370,4 +378,4 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 
 ---
 
-*Last updated: 2026-05-30*
+*Last updated: 2026-05-31*
