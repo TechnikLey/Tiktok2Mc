@@ -2,7 +2,6 @@
 # Timer Plugin — Configuration
 # ==========================================
 
-enabled: false
 start_time: 10
 auto_win: false
 pause_on_death: false

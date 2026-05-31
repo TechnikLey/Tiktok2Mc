@@ -2,7 +2,6 @@
 # Channel Points Plugin — Configuration
 # ==========================================
 
-enabled: false
 award_amount: 10
 award_interval_seconds: 60
 ping_timeout_minutes: 10

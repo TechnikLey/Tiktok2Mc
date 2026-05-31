@@ -2,7 +2,6 @@
 # Like Goal Plugin — Configuration
 # ==========================================
 
-enabled: false
 display_text: "Like Goal"
 initial_goal: 100_000
 goal_multiplier: 1

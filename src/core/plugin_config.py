@@ -193,15 +193,21 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
         if schema:
             log.info("Creating default config for plugin: %s", config_path.parent.name)
 
-    if apply_defaults and schema:
-        defaults = _generate_defaults_from_fields(schema.get("fields", []))
+    # Strip framework-managed fields from schema so they are never
+    # processed as plugin-defined fields
+    stripped_schema = _strip_framework_fields(schema) if schema else schema
+
+    if apply_defaults and stripped_schema:
+        defaults = _generate_defaults_from_fields(stripped_schema.get("fields", []))
         merged = copy.deepcopy(defaults)
         _deep_update(merged, data)
         data = merged
 
-    # Validate and heal on load
-    if schema:
-        data = _heal_plugin_config(data, schema)
+    # Inject framework-managed fields (e.g. enabled) after merging
+    _inject_framework_fields(data)
+
+    if stripped_schema:
+        data = _heal_plugin_config(data, stripped_schema)
 
     return data
 
@@ -225,6 +231,39 @@ def save_plugin_config(plugin_dir: Path, data: dict, backup: bool = True) -> Non
     deep_update_rt(existing, data)
     save_yaml(config_path, existing, backup=backup)
     log.debug("Plugin config written: %s", config_path)
+
+
+# ---------------------------------------------------------------------------
+#  Framework-managed fields
+# ---------------------------------------------------------------------------
+
+_FRAMEWORK_FIELDS = frozenset({"enabled"})
+
+
+def _strip_framework_fields(schema: dict) -> dict:
+    """Return a copy of *schema* with framework-managed fields removed
+    from the field list so they are not validated against plugin-defined
+    schemas."""
+    if not schema:
+        return schema
+    fields = schema.get("fields", [])
+    filtered = [f for f in fields if f.get("key") not in _FRAMEWORK_FIELDS]
+    if len(filtered) == len(fields):
+        return schema
+    stripped = dict(schema)
+    stripped["fields"] = filtered
+    return stripped
+
+
+def _inject_framework_fields(data: dict) -> dict:
+    """Ensure framework-managed fields exist in *data* with valid types.
+
+    Currently injects ``enabled`` (default ``True``) if missing or not
+    boolean.  Existing values are preserved when valid.
+    """
+    if not isinstance(data.get("enabled"), bool):
+        data["enabled"] = True
+    return data
 
 
 # ---------------------------------------------------------------------------

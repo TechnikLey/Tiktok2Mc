@@ -2,7 +2,6 @@
 # Overlay Text Plugin — Configuration
 # ==========================================
 
-enabled: false
 display_mode: overwrite
 fade_in: 500
 fade_out: 500

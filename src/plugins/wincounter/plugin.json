@@ -19,14 +19,6 @@
     "version": 1,
     "fields": [
       {
-        "key": "enabled",
-        "type": "boolean",
-        "default": false,
-        "label": "Enable Plugin",
-        "help": "Turn the win counter overlay on or off",
-        "category": "General"
-      },
-      {
         "key": "decrement_on_death",
         "type": "boolean",
         "default": false,

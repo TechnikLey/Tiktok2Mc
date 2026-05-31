@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from typing import Any
 
+from copy import deepcopy
+
 from core.plugin_config import (
+    _FRAMEWORK_FIELDS,
     discover_plugins_dir,
     load_plugin_manifest,
     load_plugin_config,
@@ -72,6 +75,37 @@ async def get_plugin_schema(name: str):
     try:
         manifest = load_plugin_manifest(plugin_dir)
         schema = manifest.get("config_schema") if manifest else None
+
+        # Inject framework-managed fields into the schema response so the
+        # GUI always renders them regardless of the plugin's own schema
+        if schema is None:
+            schema = {"fields": []}
+        else:
+            schema = deepcopy(schema)
+            schema.setdefault("fields", [])
+
+        existing_keys = {f.get("key") for f in schema["fields"]}
+        for fname in _FRAMEWORK_FIELDS:
+            if fname not in existing_keys:
+                schema["fields"].insert(
+                    0,
+                    {
+                        "key": fname,
+                        "type": "boolean",
+                        "label": "Enable Plugin",
+                        "section": "General",
+                        "default": True,
+                        "framework": True,
+                    },
+                )
+            elif not any(f.get("framework") for f in schema["fields"] if f.get("key") == fname):
+                # Mark existing enabled field as framework-managed
+                for f in schema["fields"]:
+                    if f.get("key") == fname:
+                        f["framework"] = True
+                        f["default"] = True
+                        break
+
         return {"name": name, "schema": schema}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

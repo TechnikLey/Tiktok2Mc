@@ -20,14 +20,6 @@
     "version": 1,
     "fields": [
       {
-        "key": "enabled",
-        "type": "boolean",
-        "default": false,
-        "label": "Enable Plugin",
-        "help": "Turn the countdown timer on or off",
-        "category": "General"
-      },
-      {
         "key": "start_time",
         "type": "integer",
         "default": 10,

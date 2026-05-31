@@ -2,7 +2,6 @@
 # Win Counter Plugin — Configuration
 # ==========================================
 
-enabled: false
 decrement_on_death: false
 
 theme:

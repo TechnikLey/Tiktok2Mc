@@ -2,7 +2,6 @@
 # Death Counter Plugin — Configuration
 # ==========================================
 
-enabled: false
 
 theme:
   background: "#000000"

@@ -19,14 +19,6 @@
     "version": 1,
     "fields": [
       {
-        "key": "enabled",
-        "type": "boolean",
-        "default": false,
-        "label": "Enable Plugin",
-        "help": "Turn the channel points system on or off",
-        "category": "General"
-      },
-      {
         "key": "award_amount",
         "type": "integer",
         "default": 10,

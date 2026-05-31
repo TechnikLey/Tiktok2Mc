@@ -19,7 +19,6 @@ def fake_plugins_dir(tmp_path, monkeypatch):
         "config_schema": {
             "version": 1,
             "fields": [
-                {"key": "enabled", "type": "boolean", "default": False},
                 {"key": "port", "type": "integer", "default": 8080, "min": 1024, "max": 65535},
                 {"key": "label", "type": "string", "default": "Test"},
             ],
@@ -87,12 +86,14 @@ class TestUpdatePluginConfig:
         assert len(backup_files) == 0
 
     def test_put_invalid_type_422(self, client, fake_plugins_dir):
-        payload = {"enabled": "not_a_bool", "port": 5000}
+        # Framework fields like "enabled" are not validated against plugin
+        # schema; invalid values are corrected on next load. Test that
+        # plugin-defined fields still reject invalid types.
+        payload = {"port": "not_an_int", "label": "Test"}
         resp = client.put("/api/v1/plugins/test-plugin/config", json=payload)
         assert resp.status_code == 422
         detail = resp.json()["detail"]
         assert "errors" in detail
-        assert any("boolean" in e for e in detail["errors"])
 
     def test_put_out_of_range_422(self, client, fake_plugins_dir):
         payload = {"enabled": True, "port": 100}
@@ -145,7 +146,12 @@ class TestGetPluginSchema:
         assert body["name"] == "test-plugin"
         assert body["schema"] is not None
         assert body["schema"]["version"] == 1
+        # enabled (framework), port, label
         assert len(body["schema"]["fields"]) == 3
+        # enabled should be marked as framework-managed
+        enabled_field = next(f for f in body["schema"]["fields"] if f["key"] == "enabled")
+        assert enabled_field["framework"] is True
+        assert enabled_field["default"] is True
 
     def test_get_schema_no_schema(self, client, fake_plugins_dir):
         plugin_dir = fake_plugins_dir / "no-schema"
@@ -156,7 +162,12 @@ class TestGetPluginSchema:
 
         resp = client.get("/api/v1/plugins/no-schema/config/schema")
         assert resp.status_code == 200
-        assert resp.json()["schema"] is None
+        schema = resp.json()["schema"]
+        # framework injects enabled even when plugin has no schema
+        assert schema is not None
+        assert len(schema["fields"]) == 1
+        assert schema["fields"][0]["key"] == "enabled"
+        assert schema["fields"][0]["framework"] is True
 
     def test_get_schema_unknown_plugin_404(self, client, fake_plugins_dir):
         resp = client.get("/api/v1/plugins/unknown-plugin/config/schema")

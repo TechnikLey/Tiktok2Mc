@@ -18,14 +18,6 @@
   "config_schema": {
     "version": 1,
     "fields": [
-      {
-        "key": "enabled",
-        "type": "boolean",
-        "default": true,
-        "label": "Enable Plugin",
-        "help": "Turn this test plugin on or off",
-        "category": "General"
-      }
     ]
   }
 }

@@ -19,14 +19,6 @@
     "version": 1,
     "fields": [
       {
-        "key": "enabled",
-        "type": "boolean",
-        "default": false,
-        "label": "Enable Plugin",
-        "help": "Turn Spotify control on or off",
-        "category": "General"
-      },
-      {
         "key": "client_id",
         "type": "string",
         "default": "",
