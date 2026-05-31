@@ -108,7 +108,13 @@
 - **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **518 total: 513 passed, 5 skipped, 0 failures** (SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
+- **744 total: 739 passed, 5 skipped, 0 failures** (513 Python + 226 GUI frontend; SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
+- **GUI frontend (Vitest + JSDOM):** 226 tests across 5 test files:
+  - `helpers.test.js` — 43 utility function tests (escapeHtml, toTitle, formatUptime, getPluginStatus, validatePassword, etc.)
+  - `config-editor.test.js` — 44 ConfigEditor method tests (open/close, getValue/setValue, validate, computeDiff, etc.)
+  - `plugin-config-editor.test.js` — 47 PluginConfigEditor tests (schema-driven validation, groupByCategory, field search, etc.)
+  - `actions-editor.test.js` — 36 ActionsEditor tests (add/remove commands, trigger management, gift picker, raw editor, etc.)
+  - `dashboard.test.js` — 56 dashboard/API helper tests (fetchJSON, log, loadHealth, wizard flow, update checking, log streaming, etc.)
 - CI workflow `test.yml` on push/PR to `main` (~9s runtime)
 - Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation, plugin config system, schema validation, YAML round-trip preservation, theme, overlay utils, actions validator (44 tests), smoke tests for all 8 plugin manifests, **hook system (3 event hooks: random, spotify, example_hook)**
 - **BackupManager** (core/backup.py): 30 standalone tests covering create, restore, list, dedup, coalescing, retention, category detection, edge cases
@@ -209,7 +215,7 @@ All previously identified critical bugs are now resolved in the codebase.
 | `src/core/api/services/actions.py` | 421 | MEDIUM — ActionsService (parse/serialize) tested via API only |
 
 ### Other Gaps
-- **GUI (frontend):** Zero tests across `index.html`, `app.js` (2154 lines), `style.css`, `actions-editor.js` (636 lines)
+- **GUI (frontend):** **COVERED** — 226 Vitest+JSDOM tests across `app.js` (2154 lines), `actions-editor.js` (636 lines), `index.html`
 - **All 7 plugin implementations:** Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration)
 - **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): Hook loader tests exist but no functional tests
 - **Compiled binary update flow:** `update.py` has 34 E2E tests but no compiled binary test (update.exe → start.exe → restart)
@@ -287,7 +293,6 @@ All previously identified critical bugs are now resolved in the codebase.
 - BackupManager standalone tests
 - build.py compilation tests
 - End-to-end update test with mock GitHub server
-- Actions editor frontend tests
 
 ### Build & Packaging
 - Dedicated test build step in CI (on PRs, not just tags)
@@ -357,9 +362,10 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 - Refactored `update.py` to avoid module-level side effects.
 - All 513 tests pass (up from 460/11 failures).
 
-### 13. GUI Frontend Tests [IN PROGRESS]
-- Zero tests for `index.html`, `app.js` (2154 lines), `style.css`, `actions-editor.js` (636 lines).
-- Manual-only testing; any future regression goes undetected.
+### 13. ~~GUI Frontend Tests~~ **DONE**
+- 226 Vitest+JSDOM tests covering `app.js` (2154 lines), `actions-editor.js` (636 lines), `index.html`.
+- 5 test files: helpers (43), config-editor (44), plugin-config-editor (47), actions-editor (36), dashboard (56).
+- Tests run via `npm test` (vitest) in `templates/gui/`.
 
 ### 14. Documentation Refresh ⬅️ LAST STEP BEFORE RELEASE
 - `CHANGELOG.md`: update test count (513 vs stale 285), add `Unreleased` entries for the above fixes.
@@ -369,4 +375,4 @@ Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) grea
 
 ---
 
-*Last updated: 2026-05-31* (updated for v1.0.0-dev — 513 tests pass, E2E update tests added, module-level import bugs fixed)
+*Last updated: 2026-05-31* (updated for v1.0.0-dev — 739 total tests: 513 Python + 226 GUI frontend; all Green)
