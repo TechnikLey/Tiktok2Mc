@@ -194,15 +194,15 @@ timer:
 
 ### Available plugins
 
-| Plugin | What it does | OBS URL |
-|--------|-------------|---------|
-| **Timer** | Countdown timer. Can pause on player death. | `http://localhost:29189` |
-| **Death Counter** | Counts player deaths. Updates automatically. | `http://localhost:29190` |
-| **Win Counter** | Tracks wins and losses. | `http://localhost:29191` |
-| **Like Goal** | Progress bar for stream likes. | `http://localhost:29193` |
-| **Overlay Text** | Shows custom text messages on stream. | `http://localhost:29186/?overlay=default` |
-| **Spotify Control** | Viewers control your Spotify via chat. | `http://localhost:29194` |
-| **Channel Points** | Loyalty points for active viewers. | `http://localhost:29195` |
+| Plugin | What it does | Overlay URL |
+|--------|-------------|-------------|
+| **Timer** | Countdown timer. Can pause on player death. | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
+| **Death Counter** | Counts player deaths. Updates automatically. | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
+| **Win Counter** | Tracks wins and losses. | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
+| **Like Goal** | Progress bar for stream likes. | `http://127.0.0.1:29185/api/v1/plugins/like-goal/overlay` |
+| **Overlay Text** | Shows custom text messages on stream. | `http://127.0.0.1:29185/api/v1/plugins/overlay-text/overlay` |
+| **Spotify Control** | Viewers control your Spotify via chat. | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
+| **Channel Points** | Loyalty points for active viewers. | `http://127.0.0.1:29185/api/v1/plugins/channel-points/overlay` |
 
 > **Note:** Everything starts disabled. Only turn on what you actually need.
 
@@ -231,9 +231,9 @@ A progress bar that fills as your stream accumulates likes. Configure:
 
 Shows custom text messages on your stream. Triggered by `>>` commands in `actions.mca`.
 
-You can create multiple named overlays. Each name gets its own URL:
-- `http://localhost:29186/?overlay=default`
-- `http://localhost:29186/?overlay=alerts`
+You can create multiple named overlays. Each name gets its own URL via the main API:
+- `http://127.0.0.1:29185/api/v1/plugins/overlay-text/overlay?overlay=default`
+- `http://127.0.0.1:29185/api/v1/plugins/overlay-text/overlay?overlay=alerts`
 
 Target a specific overlay from `actions.mca`:
 
@@ -249,12 +249,12 @@ Lets viewers control your Spotify playback through TikTok chat. Viewers can type
 
 **Setup:**
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app.
-2. Add `http://127.0.0.1:29194/callback` as a Redirect URI.
+2. Add `http://127.0.0.1:29185/api/v1/plugins/oauth/callback` as a Redirect URI.
 3. Copy your Client ID and Client Secret into `config.yaml` under `spotify`.
 4. Enable the plugin: `enabled: true`
 5. On first start, your browser will open for Spotify login.
 
-The overlay shows the current track with album art. Add it as an OBS Browser Source at `http://localhost:29194`.
+The overlay shows the current track with album art. Add it as an OBS Browser Source at `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay`.
 
 > You also need to enable the `$` comment command group in `config.yaml` under `comment_commands` for chat commands to work.
 
@@ -334,6 +334,31 @@ The overlays scale automatically, so any size works.
 
 ---
 
+## Actions Editor (Dashboard)
+
+The dashboard includes a **visual editor** for `actions.mca` at the "Edit Actions" button. It provides:
+
+- **Visual tab:** table of event triggers with inline command editing. Supports vanilla (`/`), RCON (`!`), script (`$`), overlay (`>>`), and named overlay (`@name>>`) command types.
+- **Add Event modal:** select from event types (follow, join, comment, likes, like_2, share) or use the gift picker with search-by-name/ID.
+- **Script dropdown:** lazy-loaded from the script registry with search.
+- **Raw tab:** textarea with live validation (debounced 400ms), diagnostics panel, save blocked on errors.
+
+> You can also edit `data/actions.mca` directly with any text editor. See [Actions and Triggers](#actions-and-triggers) for the syntax.
+
+## Configuration Editor (Dashboard)
+
+The dashboard includes a **form-based configuration editor** at the "Edit Configuration" button. It provides:
+
+- **Section navigation:** settings grouped by category (Connection, Minecraft, Streaming & Overlays, Chat & Commands, Integrations, Appearance, System).
+- **Search:** real-time filtering across setting names, descriptions, and help text.
+- **Validation:** required fields, patterns, min/max bounds, Java RAM format.
+- **Like goal triggers:** table editor with add/remove/edit rows.
+- **Comment commands:** full group editor (prefix, handler, mode, roles, cooldowns).
+- **Command overrides:** dynamic add/remove for `points_cost`, `cooldown`, `user_cooldown`, `conditional`, `url`, `handler`, `roles`.
+- **Theme editor:** hex color pickers with synced text inputs.
+- **Review Changes modal:** diff view before saving.
+- **Plugin Config Editor:** schema-driven dynamic forms for each plugin with category sidebar, field validation, search, and JSON fallback.
+
 ## Updating the Tool
 
 The tool checks for updates automatically on startup (enabled by default). If a new version is available, it downloads and installs it.
@@ -352,7 +377,7 @@ Set `update.enabled: false` in `config.yaml`.
 
 **To check for updates manually:**
 
-Visit `http://localhost:29185/api/v1/updates/check` in your browser while the tool is running.
+Open the dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in the Updates card, or visit `http://127.0.0.1:29185/api/v1/updates/check` directly.
 
 ---
 
@@ -439,7 +464,7 @@ A: Yes. The overlays are web pages. You can open them in any browser or add them
 
 **Q: How do I find gift IDs?**
 
-A: Open `core/gifts.json` in a text editor. Each gift has an `id` field.
+A: The actions editor in the dashboard includes a **gift picker** that searches gifts by name or ID with image URLs and coin cost. You can also open `core/gifts.json` directly.
 
 **Q: Can I use the tool with Twitch or YouTube?**
 

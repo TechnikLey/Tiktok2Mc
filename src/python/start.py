@@ -547,9 +547,17 @@ if UPDATE_ENABLED:
             break
 
         else:
-            log.info("\nUpdate has been installed.")
-            log.info("Please restart the program now to apply the changes.")
-            input("Press Enter to exit...")
+            log.info("\nUpdate has been installed. Restarting automatically...")
+            if getattr(sys, "frozen", False):
+                _executable = sys.executable
+                _args = [_executable] + sys.argv[1:]
+            else:
+                _executable = sys.executable
+                _args = [_executable, os.path.abspath(__file__)] + sys.argv[1:]
+            if IS_WINDOWS:
+                subprocess.Popen(_args, creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True)
+            else:
+                subprocess.Popen(_args)
             sys.exit(0)
 
 else:
@@ -943,6 +951,41 @@ async def command_loop():
 # MAIN
 # =============================================================================
 
+_RESTART_POLL_INTERVAL = 0.5
+_RESTART_POLL_TIMEOUT = 10.0
+
+
+def _wait_for_processes_stopped():
+    """Poll until all managed processes have exited, with timeout."""
+    deadline = time.time() + _RESTART_POLL_TIMEOUT
+    while time.time() < deadline:
+        if len(_processes) == 0:
+            return
+        still_alive = [(name, p) for name, p in list(_processes.items()) if p.poll() is None]
+        if not still_alive:
+            _processes.clear()
+            return
+        time.sleep(_RESTART_POLL_INTERVAL)
+    log.warning("Timeout waiting for processes to stop — forcing restart")
+
+
+def _wait_for_process_started(proc: subprocess.Popen) -> bool:
+    """Poll for process startup instead of a fixed sleep.
+
+    Returns True if the process stays alive past the poll window.
+    """
+    deadline = time.time() + _RESTART_POLL_TIMEOUT
+    alive_count = 0
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            return False
+        alive_count += 1
+        if alive_count >= 3:
+            return True
+        time.sleep(_RESTART_POLL_INTERVAL)
+    return proc.poll() is None
+
+
 def restart_app():
     """Restart the application — cross-platform.
 
@@ -967,7 +1010,9 @@ def restart_app():
     log.info("\nPerforming restart...")
     _stop_api_server()
     stop_all_processes()
-    time.sleep(3)
+
+    # Wait for processes to fully stop (polling instead of blind sleep)
+    _wait_for_processes_stopped()
 
     if getattr(sys, "frozen", False):
         executable = sys.executable
@@ -984,8 +1029,7 @@ def restart_app():
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 close_fds=True,
             )
-            time.sleep(3)
-            if proc.poll() is None:
+            if _wait_for_process_started(proc):
                 os._exit(0)
             else:
                 log.error(f"New process exited immediately with code: {proc.returncode}")

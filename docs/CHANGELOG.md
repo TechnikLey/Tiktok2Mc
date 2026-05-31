@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Update coordination signals** — `GET/PUT/DELETE /api/v1/updater/signal` for in-memory kill signaling between the updater and the main process. Dual signaling (file + API) for backward compatibility with compiled `update.exe`.
 - **Security warnings** — non-blocking log warnings when the default RCON password (`ABC1234`) is still set or when `server_host` is bound to `0.0.0.0`.
 - **Config schema validation** — the API validates configuration structure on read and write, warns about unknown top-level keys, and normalizes `config_version` to semantic versioning format.
-- **Automated test suite** — 366 tests covering API endpoints, plugin system, configuration, update checker, manifest validation, event bus, actions validator, hook system, YAML round-trip, overlay utils, and smoke tests. CI workflow runs on every push and pull request.
+- **Automated test suite** — 475 tests (460 passed, 4 skipped, 11 known fixture-isolation failures) covering API endpoints, plugin system, configuration, update checker, manifest validation, event bus, actions validator (44), hook system, YAML round-trip, overlay utils, smoke tests, BackupManager (30), bridge core (38), and update lifecycle (24). CI workflow runs on every push and pull request.
 - **Plugin manifest validation** — Pydantic model enforces kebab-case names, semver versions, valid entry points, and port declarations.
 - **Single version source of truth** — `core/version.py` centralizes all version constants. Build, upload, plugin scaffolding, and API version all import from this file.
 - **Plugin health monitoring** — watchdog thread periodically pings plugin health endpoints, auto-restarts crashed plugins, and updates registry state on failure.
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **All plugins start disabled** — opt-in model. Nothing runs unless explicitly enabled in configuration or via the API.
 - **CORS policy** — restricted from `["*"]` to localhost origins by default. Open CORS available via `create_app(cors_origins=["*"])` for development.
 - **Update signaling** — dual mechanism: compiled `update.exe` uses file-based signaling (`update_signal.tmp`), Python source uses both file and API signaling.
-- **Test suite grown from 285 to 366 tests** — added tests for actions validator (36), hook system, YAML round-trip, overlay utils, and plugin smoke tests.
+- **Test suite grown from 285 to 475 tests** — added tests for actions validator (44), hook system, YAML round-trip, overlay utils, plugin smoke tests, BackupManager (30), bridge core (38), and update lifecycle (24).
 
 ### Removed
 
@@ -59,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Config version normalization** — handles legacy integer versions, string numbers, `v`-prefixed versions, and malformed input gracefully.
 - **GUI bugs** — overlay URLs on dashboard, dismiss button on restart-pending banner, SSE log stream connected, ShutdownNow race condition resolved.
 - **Shutdown cancel race** — cancel signal now checked directly in countdown loop (1s) instead of file watcher (5s).
+- **Restart sleep race** — replaced `time.sleep(3)` with polling loop (`_wait_for_processes_stopped`, `_wait_for_process_started`) in `start.py`; configurable 0.5s interval, 10s timeout.
+- **Auto-restart after update** — update now spawns a new process and exits automatically instead of prompting for manual relaunch.
 
 ### Security
 

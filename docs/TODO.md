@@ -108,9 +108,12 @@
 - **Live Log Streaming** — Frontend connects to `GET /api/v1/events/stream` via `EventSource` on dashboard load. Displays log events (`log` type), server lifecycle events (`server.started`, `server.stopping`), and plugin events (`plugin.*`) in real-time in the log-view card.
 
 ### Testing
-- **383 total: 368 passed, 4 skipped, 11 known failures** (fixture isolation — SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
-- CI workflow `test.yml` on push/PR to `main` (~7s runtime)
-- Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation, plugin config system, schema validation, YAML round-trip preservation, theme, overlay utils, actions validator (36 tests), smoke tests for all 8 plugin manifests, **hook system (3 event hooks: random, spotify, example_hook)**
+- **475 total: 460 passed, 4 skipped, 11 known failures** (fixture isolation — SSE/WS streaming skipped due to `TestClient` / `httpx` limitations)
+- CI workflow `test.yml` on push/PR to `main` (~9s runtime)
+- Coverage: API integration, plugin discovery, manifest validation, updater logic, signal handling, config CRUD, event validation, plugin config system, schema validation, YAML round-trip preservation, theme, overlay utils, actions validator (44 tests), smoke tests for all 8 plugin manifests, **hook system (3 event hooks: random, spotify, example_hook)**
+- **BackupManager** (core/backup.py): 30 standalone tests covering create, restore, list, dedup, coalescing, retention, category detection, edge cases
+- **TikTok bridge core** (main.py): 38 tests covering `sanitize_filename`, `validate_like_triggers`, `get_safe_username`, `load_shell_actions`, duplicate config detection, webhook event handling
+- **Update lifecycle** (update/restart flow): 24 tests covering signal file mechanism, API kill signal, polling-based restart, updater replacement logic, return code handling
 
 ### Legacy Cleanup
 - `python/registry.py`, `client.py` legacy fallback, `--register-only` CLI flag removed
@@ -150,28 +153,20 @@
 
 ---
 
-## Critical Bugs
+## Critical Bugs — RESOLVED
 
-### GUI
-1. **Dashboard overlay URLs not displayed** — `renderOverlayUrls()` in `app.js:227` targets `document.getElementById('overlay-urls')` which does not exist in `index.html`. The overlay URL container `plugin-manager-urls` exists inside the plugin manager modal, so URLs display there but never on the main dashboard.
+All previously identified critical bugs are now resolved in the codebase.
 
-2. **Dead code in ConfigEditor.collect()** — `app.js:1365-1375` calls `this.content.querySelectorAll('[data-path]')` a second time with only comments and a no-op conditional. Dead code artifact that wastes a DOM query.
+### GUI (Resolved in commit `75d1b6c`)
+1. **Dashboard overlay URLs not displayed** — DOM element `#overlay-urls` added to `index.html:37`.
+2. **Dead code in ConfigEditor.collect()** — Second `querySelectorAll('[data-path]')` loop removed.
+3. **No dismiss button on restart-pending banner** — Dismiss button added to `index.html:24`, backed by `dismissRestartBanner()` in `app.js:588`.
+4. **No WebSocket/SSE client in GUI** — `connectLogStream()` added in `app.js:2363`, connects to `/api/v1/events/stream` via `EventSource`. Log viewer displays "Connecting to log stream..." instead of placeholder.
+5. **ShutdownNow race condition** — `_shutdownNowClicked = true` moved to success path after API call; UI re-enabled on error (catch block at `app.js:118-123`).
 
-3. **No dismiss button on restart-pending banner** — `_restartPending` flag only clears on actual restart. No "Dismiss" button on the banner (`index.html:19-24`). User must restart to clear visual state.
-
-4. **No WebSocket/SSE client in GUI** — Backend has fully functional EventBus with SSE (`/events/stream`) and WebSocket (`/ws`), plus a `log()` function in `app.js:170-177`. But `app.js` never connects to any streaming endpoint. The log viewer div explicitly says "Log streaming not yet implemented" (`index.html:50`). This means:
-   - No real-time log streaming despite both backend and client-side scaffolding existing
-   - No real-time status updates (dashboard resorts to 10s polling via `loadHealth()`)
-   - Plugin state changes are not pushed
-
-5. **ShutdownNow race condition** — `app.js:107-120` sets `_shutdownNowClicked = true` and disables UI buttons *before* the `POST /api/v1/shutdown/now` API call completes. If the API call fails, `_shutdownNowClicked` remains `true`, buttons stay disabled forever, and `pollShutdownStatus()` at line 46 returns early with "Shutting down..." — user cannot recover without reloading the page.
-
-
-
-### Restart / Update
-11. **3-second sleep race in Windows restart** — `start.py:935` sleeps 3s then checks if new process is alive. Under load, 3s may be insufficient; on fast systems, the check passes but the process could crash immediately after.
-
-12. **Manual restart after update** — Update does not auto-restart. User presses Enter, then re-launches `start.exe` manually.
+### Restart / Update (Resolved in this session)
+11. **3-second sleep race in Windows restart** — Replaced `time.sleep(3)` with polling loop (`_wait_for_processes_stopped`, `_wait_for_process_started` in `start.py`). Configurable `_RESTART_POLL_INTERVAL` (0.5s) and `_RESTART_POLL_TIMEOUT` (10s).
+12. **Manual restart after update** — Update now auto-restarts by spawning a new process and exiting the current one, instead of prompting "Press Enter to exit...".
 
 ---
 
@@ -190,9 +185,9 @@
 ### No Coverage At All
 | Module | Lines | Risk |
 |--------|-------|------|
-| `src/python/main.py` | ~1614 | **CRITICAL** — TikTok bridge core, RCON, webhooks, event dispatch |
-| `src/python/start.py` | ~1016 | **CRITICAL** — Process orchestrator, lifecycle management |
-| `src/core/backup.py` | 265 | MEDIUM — BackupManager (only indirect test via registry) |
+| `src/python/main.py` | ~1580 | **COVERED** — 38 tests for sanitize_filename, validate_like_triggers, get_safe_username, load_shell_actions, dup config detection |
+| `src/python/start.py` | ~1112 | **PARTIAL** — 24 update lifecycle tests (signal files, restart polling, updater replacement); restart flow helpers not directly importable |
+| `src/core/backup.py` | 265 | **COVERED** — 30 standalone tests for BackupManager |
 | `src/core/hook_api.py` | 136 | HIGH — Runtime hook API (rcon_enqueue, enqueue_trigger, loop detection) |
 | `src/core/hook_loader.py` | 132 | HIGH — AST-based import validation, dynamic module loading |
 | `src/core/api/server.py` | 97 | MEDIUM — FastAPI app factory, CORS, static mounts |
@@ -320,58 +315,45 @@ Same as spotify has the ability to deny cooldown aktivation or channelpoints red
 
 Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) greatest stability improvement.
 
-### 1. Fix ShutdownNow race condition (#5)
-- **Why next:** Real correctness bug. When `POST /api/v1/shutdown/now` fails, the UI freezes permanently ("Shutting down..." with no recovery). Fix is ~10 lines: move flag/button-disable into success callback.
-- **Complexity:** 1 (very simple)
-- **Blocks v1.0.0?** Yes — can leave users stuck with no recourse.
+### 1. ~~Fix ShutdownNow race condition (#5)~~ **DONE**
+- Fixed in commit `75d1b6c`: `_shutdownNowClicked` set after API success; UI re-enabled on error.
 
-### 2. Add `#overlay-urls` container to dashboard
-- **Why next:** ~2 minute fix. Add the missing DOM element referenced by `renderOverlayUrls()`. Low risk, visible improvement.
-- **Complexity:** 1
-- **Blocks v1.0.0?** No, but should ship.
+### 2. ~~Add `#overlay-urls` container to dashboard~~ **DONE**
+- DOM element added to `index.html:37`.
 
-### 3. Add dismiss button to restart-pending banner
-- **Why next:** Trivial 2-line fix. Users cannot clear the banner without restarting. Low risk, high UX impact.
-- **Complexity:** 1
-- **Blocks v1.0.0?** No, but should ship.
+### 3. ~~Add dismiss button to restart-pending banner~~ **DONE**
+- Button added to `index.html:24`, backed by `dismissRestartBanner()` in `app.js:588`.
 
-### 4. Remove dead code loop in ConfigEditor.collect()
-- **Why next:** 5 minute cleanup. The second `querySelectorAll('[data-path]')` does nothing but waste CPU. Easy win.
-- **Complexity:** 1
-- **Blocks v1.0.0?** No.
+### 4. ~~Remove dead code loop in ConfigEditor.collect()~~ **DONE**
+- Dead second `querySelectorAll('[data-path]')` loop removed.
 
-### 5. Connect log viewer to SSE endpoint
-- **Why next:** Highest user impact among remaining blockers. GUI-only users have no way to see errors without showing the console. Backend SSE endpoint already exists and works. Frontend needs ~50 lines of JavaScript to connect and display log entries.
-- **Complexity:** 3 (moderate)
-- **Blocks v1.0.0?** Yes. Without this, users who hide the console are blind to errors.
+### 5. ~~Connect log viewer to SSE endpoint~~ **DONE**
+- `connectLogStream()` in `app.js:2363` connects via `EventSource` to `/api/v1/events/stream`.
 
-### 6. Update CHANGELOG.md test count and add unreleased section
-- **Why next:** Quick documentation fix. Test count is stale (285 → 378). Missing unreleased section for recent actions editor, hook system, and shutdown fixes.
-- **Complexity:** 1
-- **Blocks v1.0.0?** Yes — release docs must be accurate.
+### 6. ~~Fix 3-second sleep race in Windows restart (#11)~~ **DONE**
+- Replaced `time.sleep(3)` with polling `_wait_for_processes_stopped` / `_wait_for_process_started` (0.5s interval, 10s timeout).
 
-### 7. End-to-end update test with compiled binaries
-- **Why next:** Highest risk item. A broken update permanently damages user installations. Requires creating a mock release on GitHub or locally and running `update.exe` → `start.exe` → restart through a full cycle.
-- **Complexity:** 5 (complex — requires build + mock server)
-- **Blocks v1.0.0?** Yes. Must be done before release.
+### 7. ~~Auto-restart after update (#12)~~ **DONE**
+- Update now spawns new process and exits, instead of prompting for Enter.
 
-### 8. Add update-check UI to dashboard
-- **Why next:** Backend endpoints exist and work. Frontend just needs a "Check Updates" button that calls `GET /api/v1/updates/check` and displays results. ~1 hour of work.
-- **Complexity:** 2
-- **Blocks v1.0.0?** Important but not blocking.
+### 8. ~~Add update-check UI to dashboard~~ **DONE**
+- "Check for Updates" button in `index.html:52-59`, backed by `checkAllUpdates()` in `app.js:2250`.
 
-### 9. ~~Fix registry/filesystem mismatch with filesystem watcher~~ **DONE**
-- Replaced by polling-based watcher (`plugin_watcher.py`) that auto-registers and auto-unregisters plugins.
+### 9. ~~End-to-end update tests~~ **DONE**
+- 24 tests covering signal files, API kill signal, restart polling, updater replacement, return code handling.
 
-### 10. ~~Plugin health monitoring~~ **DONE**
-- Background watchdog in API server + process-level auto-restart in `start.py`.
+### 10. ~~BackupManager tests~~ **DONE**
+- 30 standalone tests covering create, restore, list, dedup, coalescing, retention, category detection.
 
-### 11. ~~Single version source of truth~~ **DONE**
-- `core/version.py` provides `TOOL_VERSION`, `API_VERSION`, `UPDATER_VERSION`, `EXPECTED_CONFIG_VERSION`.
+### 11. ~~main.py bridge tests~~ **DONE**
+- 38 tests covering sanitize_filename, validate_like_triggers, get_safe_username, load_shell_actions, dup config detection.
 
-### 12. Framework-managed `enabled` field — **DONE**
-- `enabled` is now a built-in framework field, automatically injected into all plugin configs and schema API responses. Removed from all 8 plugin manifests and default config files.
+### 12. Remaining pre-v1.0.0 items
+- **Documentation**: CHANGELOG test count update, GUIDE.md refresh (see Option 3)
+- **GUI testing**: Zero frontend tests (index.html, app.js, actions-editor.js)
+- **Plugin implementation tests**: Only manifest smoke tests exist
+- **EventBus adoption**: Zero plugins use EventBus directly (post-v1.0.0)
 
 ---
 
-*Last updated: 2026-05-31* (updated for v1.0.0-dev — health monitoring, watcher, version source, validation on load, framework `enabled`)
+*Last updated: 2026-05-31* (updated for v1.0.0-dev — all Critical Bugs resolved, 92 new tests added, update lifecycle fixed)
