@@ -64,9 +64,9 @@ def main():
         # Definition of main files
         CORE_EXECUTABLES = [
             {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
-            {"name": "gui",            "src": "src/python/gui.py",            "dest": ""},
-            {"name": "update",         "src": "src/python/update.py",         "dest": ""},
-            {"name": "server",         "src": "src/python/server.py",         "dest": "",},
+            {"name": "gui",            "src": "src/python/gui.py",            "dest": "core"},
+            {"name": "update",         "src": "src/python/update.py",         "dest": "core"},
+            {"name": "server",         "src": "src/python/server.py",         "dest": "core"},
             {"name": "start",          "src": "src/python/start.py",          "dest": ""},
 
             {"name": "test_trigger",   "src": "tests/send_trigger.py",        "dest": "test"},

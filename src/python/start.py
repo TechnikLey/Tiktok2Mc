@@ -44,10 +44,10 @@ CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
 # -----------------------------
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
-SERVER_EXE_PATH = (BASE_DIR / f"server{SUFFIX}").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
-GUI_EXE_PATH = (BASE_DIR / f"gui{SUFFIX}").resolve()
+SERVER_EXE_PATH = (BASE_DIR / "core" / f"server{SUFFIX}").resolve()
+UPDATE_EXE_PATH = (BASE_DIR / "core" / f"update{SUFFIX}").resolve()
+GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 
 # -----------------------------

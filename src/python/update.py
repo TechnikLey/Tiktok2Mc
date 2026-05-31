@@ -126,8 +126,6 @@ WHITELIST_FILES = {
     "version.txt",
     "README.md",
     "LICENSE",
-    f"update{SUFFIX}",
-    f"server{SUFFIX}",
     f"start{SUFFIX}",
 }
 
@@ -425,7 +423,7 @@ def run_update():
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
         log.info(f"[UPDATE] New updater found ({zip_v['updater']}).")
-        new_up_src = extracted_root_path / f"update{SUFFIX}"
+        new_up_src = extracted_root_path / "core" / f"update{SUFFIX}"
         
         if new_up_src.exists():
             new_up_dest = BASE_DIR / f"update_new{SUFFIX}"

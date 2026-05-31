@@ -206,7 +206,7 @@ class TestUpdateWhitelist:
     }
     WHITELIST_FILES = {
         "version.txt", "README.md", "LICENSE",
-        "update.exe", "server.exe", "start.exe",
+        "start.exe",
     }
 
     def _should_copy(self, rel_path_str: str, file: str) -> bool:
@@ -215,7 +215,7 @@ class TestUpdateWhitelist:
         SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
         WHITELIST_FILES = {
             "version.txt", "README.md", "LICENSE",
-            f"update{SUFFIX}", f"server{SUFFIX}", f"start{SUFFIX}",
+            f"start{SUFFIX}",
         }
 
         if rel_path_str != "." and not any(
