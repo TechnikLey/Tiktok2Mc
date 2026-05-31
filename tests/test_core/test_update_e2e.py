@@ -355,6 +355,13 @@ class TestRunUpdateOrchestration:
     @contextmanager
     def _get_run_update(self, tmp_path: Path):
         """Context manager: patch module globals in update.py, yield function + paths."""
+        # Mock core.api.server BEFORE importing python.update to avoid
+        # the heavy FastAPI import chain (routes, eventbus, overlay, etc.)
+        if "core.api.server" not in sys.modules:
+            _mock_server = MagicMock()
+            _mock_server.DEFAULT_PORT = 29185
+            sys.modules["core.api.server"] = _mock_server
+
         import python.update
         base_dir = tmp_path / "install"
         base_dir.mkdir()

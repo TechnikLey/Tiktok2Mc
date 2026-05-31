@@ -165,7 +165,10 @@ class TestEventBus:
         from core.api.eventbus import event_bus
 
         q = event_bus.subscribe("singleton.test")
-        await event_bus.publish("singleton.test", {"ok": True})
-        msg = await q.get()
-        assert msg["type"] == "singleton.test"
-        assert msg["data"] == {"ok": True}
+        try:
+            await event_bus.publish("singleton.test", {"ok": True})
+            msg = await q.get()
+            assert msg["type"] == "singleton.test"
+            assert msg["data"] == {"ok": True}
+        finally:
+            event_bus.unsubscribe(q)

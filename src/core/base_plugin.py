@@ -206,6 +206,7 @@ class BasePlugin:
                 f"/plugins/{self.PLUGIN_NAME}/commands?wait=1", timeout=35
             )
             if not result:
+                time.sleep(0.1)
                 continue
             for entry in result.get("commands", []):
                 cmd = entry.get("command", "")

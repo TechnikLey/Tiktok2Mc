@@ -2,6 +2,7 @@ import sys
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,6 +10,13 @@ from fastapi.testclient import TestClient
 _src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
+
+# Mock heavy dependencies before any test imports src.python.main.
+# TikTokLive, mcrcon, and flask are slow to import and can hang in test context.
+_heavy = ["TikTokLive", "TikTokLive.events", "mcrcon", "flask"]
+for _mod in _heavy:
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
 
 from core.yaml_utils import save_yaml
 
@@ -65,3 +73,4 @@ def client():
     app = create_app()
     with TestClient(app) as tc:
         yield tc
+
