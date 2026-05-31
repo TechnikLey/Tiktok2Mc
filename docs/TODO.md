@@ -78,8 +78,8 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 
 1. **Plugin Implementation Tests** — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) across all 5 plugins and add BasePlugin edge-case tests.
 2. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates). **Do last, after all code changes frozen.**
-3. **Plugin Cross-Coupling Refactor** — remove hardcoded inter-plugin dependencies (Timer→WinCounter `send_command()`, DeathCounter→Timer pause-on-death logic). Replace with declarative `depends_on` + EventBus subscriptions. Document LikeGoal event contracts.
+3. **GUI Real-Time Dashboard** — extend WebSocket/SSE client to push live plugin state and event-command mapper diagnostics, not just logs. Add overlay preview and live theme editor.
 
 ---
 
-*Last updated: 2026-05-31 — 678 Python tests + 226 GUI frontend = 904 total | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
+*Last updated: 2026-06-01 — 700+ Python tests pass, 3 skipped | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
