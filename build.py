@@ -31,6 +31,14 @@ class Color:
 def cprint(msg, color=Color.RESET):
     log.info(f"{color}{msg}{Color.RESET}")
 
+def _kill_proc_tree(pid):
+    """Kill a process and all descendants (Windows)."""
+    if sys.platform == "win32":
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], check=False, capture_output=True)
+        except Exception:
+            pass
+
 # Enable ANSI colors on Windows
 if sys.platform == "win32":
     os.system("")  # enables ANSI escape sequences in Windows terminal
@@ -109,6 +117,11 @@ def main():
 
         cprint("CHECKPOINT: after mkdirs", Color.RED)
 
+        # Clean up stale temp dirs from previous interrupted runs
+        if PARALLEL_TEMP_DIR.exists():
+            shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
+        PARALLEL_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
         # ----- Collect Build Tasks -----
         cprint("Collecting all files to compile...", Color.CYAN)
         all_build_tasks = []
@@ -143,7 +156,7 @@ def main():
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
                 all_build_tasks.append({
-                    "name": py_file.stem + SUFFIX,
+                    "name": f"{py_file.parent.name}_{py_file.stem}{SUFFIX}",
                     "src": str(py_file),
                     "dest": dest,
                 })
@@ -261,7 +274,7 @@ def main():
                     "--onefile",
                     "--path=src",
                     str(full_src),
-                    "--name", item["name"],
+                    "--name", item["name"].replace(SUFFIX, ""),
                     "--distpath", str(t_dist),
                     "--workpath", str(t_work),
                     "--specpath", str(t_spec),
@@ -271,14 +284,25 @@ def main():
 
                 try:
                     with open(log_file, "w", encoding="utf-8") as lf:
-                        result = subprocess.run(
+                        proc = subprocess.Popen(
                             cmd,
                             stdout=lf,
                             stderr=subprocess.STDOUT,
-                            timeout=600,
                         )
-                except subprocess.TimeoutExpired:
-                    cprint(f"TIMEOUT: {item['name']} after 600s", Color.RED)
+                        try:
+                            return_code = proc.wait(timeout=600)
+                        except subprocess.TimeoutExpired:
+                            _kill_proc_tree(proc.pid)
+                            cprint(f"TIMEOUT: {item['name']} after 600s", Color.RED)
+                            if log_file.exists():
+                                cprint(log_file.read_text(errors="replace"), Color.RED)
+                            return False
+                except Exception as e:
+                    cprint(f"ERROR running PyInstaller for {item['name']}: {e}", Color.RED)
+                    return False
+
+                if return_code != 0:
+                    cprint(f"FAILED: {item['name']} (exit code {return_code})", Color.RED)
                     if log_file.exists():
                         cprint(log_file.read_text(errors="replace"), Color.RED)
                     return False
