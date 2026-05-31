@@ -199,6 +199,14 @@ class TestPluginUpdateChecker:
 
 
 class TestUpdateEndpoint:
+    @pytest.fixture(autouse=True)
+    def _clear_registry(self):
+        from core.api.registry import get_registry
+
+        reg = get_registry()
+        for p in reg.list():
+            reg.unregister(p.name)
+
     def test_updates_endpoint_returns_200(self, client):
         resp = client.get("/api/v1/plugins/updates")
         assert resp.status_code == 200
@@ -208,22 +216,12 @@ class TestUpdateEndpoint:
         assert "updates_available" in data
 
     def test_updates_endpoint_empty_when_no_plugins(self, client):
-        from core.api.registry import get_registry
-        reg = get_registry()
-        for p in reg.list():
-            reg.unregister(p.name)
-
         resp = client.get("/api/v1/plugins/updates")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 0
 
     def test_updates_endpoint_with_plugin(self, client):
-        from core.api.registry import get_registry
-        reg = get_registry()
-        for p in reg.list():
-            reg.unregister(p.name)
-
         client.post(
             "/api/v1/plugins/register",
             json={
@@ -240,11 +238,6 @@ class TestUpdateEndpoint:
         assert data["total"] == 0  # no update_url -> no entry
 
     def test_updates_endpoint_with_update_url(self, client):
-        from core.api.registry import get_registry
-        reg = get_registry()
-        for p in reg.list():
-            reg.unregister(p.name)
-
         client.post(
             "/api/v1/plugins/register",
             json={

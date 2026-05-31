@@ -2,6 +2,14 @@ import pytest
 
 
 class TestPluginFieldValidation:
+    @pytest.fixture(autouse=True)
+    def _clear_registry(self):
+        from core.api.registry import get_registry
+
+        reg = get_registry()
+        for p in reg.list():
+            reg.unregister(p.name)
+
     def test_register_empty_name_rejected(self, client):
         resp = client.post(
             "/api/v1/plugins/register",
@@ -55,6 +63,14 @@ class TestPluginEmptyList:
 
 
 class TestPluginUpsert:
+    @pytest.fixture(autouse=True)
+    def _clear_registry(self):
+        from core.api.registry import get_registry
+
+        reg = get_registry()
+        for p in reg.list():
+            reg.unregister(p.name)
+
     def test_register_with_all_fields(self, client):
         resp = client.post(
             "/api/v1/plugins/register",

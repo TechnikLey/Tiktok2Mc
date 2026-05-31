@@ -186,6 +186,14 @@ All previously identified critical bugs are now resolved in the codebase.
 
 2. **Plugin dependency ordering not enforced** — `depends_on` declared in manifests but never checked by launcher or API. Plugins start in whatever order `start.py` iterates.
 
+3. **Plugin system tightly coupled with main system** — ChannelPoints has config options inside `comment_commands` (main system config), Spotify integrates with cooldown/points systems. Plugins aren't fully self-contained — they reach into main config structures and depend on main system behavior. A proper rework should fully decouple plugins so they own their config and behavior independently.
+
+4. **Hook system needs rework before testing** — The hook system is too tightly integrated into the main system. Hooks have no updater, no version info, no manifest. Dev experience is poor. Questions to resolve:
+   - Should hooks be removed and replaced with direct plugin implementation?
+   - Does the Hook API need more power (or less) for devs?
+   - Is the Hook API up to date with the current system?
+   - Without answers here, writing tests for hooks is premature — the interface will change.
+
 7. **`core_hash` build cache is conservative** — Any change to any file in `src/core/**/*.py` invalidates all cached executables. Correct but wasteful for single-plugin changes.
 
 ---
@@ -198,8 +206,8 @@ All previously identified critical bugs are now resolved in the codebase.
 | `src/python/main.py` | ~1580 | **COVERED** — 38 tests for sanitize_filename, validate_like_triggers, get_safe_username, load_shell_actions, dup config detection |
 | `src/python/start.py` | ~1112 | **PARTIAL** — 24 update lifecycle tests (signal files, restart polling, updater replacement); restart flow helpers not directly importable |
 | `src/core/backup.py` | 265 | **COVERED** — 30 standalone tests for BackupManager |
-| `src/core/hook_api.py` | 136 | HIGH — Runtime hook API (rcon_enqueue, enqueue_trigger, loop detection) |
-| `src/core/hook_loader.py` | 132 | HIGH — AST-based import validation, dynamic module loading |
+| `src/core/hook_api.py` | 136 | HIGH — **BLOCKED:** Hook system needs rework first (see Architecture Issues #4). Test surface will change. |
+| `src/core/hook_loader.py` | 132 | HIGH — **BLOCKED:** Hook system needs rework first (see Architecture Issues #4). Test surface will change. |
 | `src/core/api/server.py` | 97 | MEDIUM — FastAPI app factory, CORS, static mounts |
 | `src/core/api/routes/system.py` | 92 | **COVERED** — 8 tests for restart/shutdown/cancel/status endpoints |
 | `src/core/api/routes/ws.py` | 71 | **COVERED** — 3 tests: event injection, ordering, disconnect cleanup |
@@ -216,8 +224,8 @@ All previously identified critical bugs are now resolved in the codebase.
 
 ### Other Gaps
 - **GUI (frontend):** **COVERED** — 226 Vitest+JSDOM tests across `app.js` (2154 lines), `actions-editor.js` (636 lines), `index.html`
-- **All 7 plugin implementations:** Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration)
-- **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): Hook loader tests exist but no functional tests
+- **All 7 plugin implementations:** **BLOCKED** — Plugin system needs decoupling rework first (see Architecture Issues #3). Only manifest smoke tests exist; zero tests for actual plugin logic (command polling, state push, overlay registration).
+- **All 3 event hooks** (`random.py`, `spotify.py`, `example_hook.py`): **BLOCKED** — Hook system needs rework first (see Architecture Issues #4). Hook loader tests exist but no functional tests.
 - **Compiled binary update flow:** `update.py` has 34 E2E tests but no compiled binary test (update.exe → start.exe → restart)
 - **SSE:** SSE stream receive tests cannot use TestClient (httpx blocking limitation); emit tests work via POST endpoint
 - **Test isolation:** Session-scoped fixtures share state across tests; `_clear_registry` fixture not consistently applied
@@ -306,72 +314,41 @@ All previously identified critical bugs are now resolved in the codebase.
 - The Installer.exe should be optional, you can still run the portable version by downloading the zip and running start.exe or the GUI directly. But for users that want a more traditional installation experience or dont have much knowledge of PC they are more comfortable when they have a setup wizard and a desktop shortcut, the installer would be a nice addition.
 
 ### Plugin system
-- Some Plugins still are to integrated in the main system or chain with other plugins exemplate:
-Channelpoints has config option in command_commands. command_commands main system but the option channelpoints are plugin related.
-Same as spotify has the ability to deny cooldown aktivation or channelpoints reduce wehen a song request not work.
+→ Moved to Architecture Issues #3 (Plugin system tightly coupled with main system). This is now a pre-release priority, not a post-v1.0.0 idea.
 
 ### Hook system
-- The hook system may be also to string implementet in the main system.
-- Dev should be able to create a hook but the hook as no updater or version Info. So we need a new or rework hook system (Should Hook remove and direct implementation in a Plugin?).
-- Need the Hook API a rework to give more power to the devs?
-- Is the Hook API up to date with the current system? Do we need to add more functions or remove some of them?
+→ Moved to Architecture Issues #4 (Hook system needs rework before testing). This is now a pre-release priority, not a post-v1.0.0 idea.
 
 ---
 
 ## Recommended Next Steps
 
-> **Port consolidation complete** — all 7 plugin Flask servers removed, communication centralized through Main API (29185).
+> **All 13 pre-release fixes are DONE.** The remaining work is architecture rework (blocks meaningful testing) and release validation.
 
-Ordered by: (1) highest release impact, (2) lowest implementation risk, (3) greatest stability improvement.
+### Next Step 1: End-to-End Update Validation 🔴 REQUIRED BLOCKER
+The single highest-risk item. Update has 58 unit/integration tests but the compiled `update.exe → start.exe → restart` flow has never been exercised across actual version boundaries. If this breaks on release, users can never receive fixes and could corrupt their installation.
+- Test with real compiled binaries across a simulated v0.x → v1.0.0 upgrade
+- Verify: file signaling, API kill signal fallback, config whitelist preservation, rollback on interruption, Windows/Linux paths
 
-### 1. ~~Fix ShutdownNow race condition (#5)~~ **DONE**
-- Fixed in commit `75d1b6c`: `_shutdownNowClicked` set after API success; UI re-enabled on error.
+### Next Step 2: Architecture Rework — Plugin Decoupling + Hook System Redesign
+Testing hooks or plugins is premature — both need rework first (see Architecture Issues #3, #4).
+- **Plugin decoupling:** Pull ChannelPoints config out of `comment_commands`, remove Spotify's hard dependency on main cooldown/points. Each plugin should own its config and behavior without reaching into main system internals.
+- **Hook system redesign:** Decide whether hooks become standalone plugins (with manifests, updaters, versioning) or get absorbed into the plugin system entirely. Resolve the Hook API surface questions before any test effort.
 
-### 2. ~~Add `#overlay-urls` container to dashboard~~ **DONE**
-- DOM element added to `index.html:37`.
+### Next Step 3: Build System Hardening
+- Single version source of truth (`core/version.py` — stop hardcoding in `build.py`)
+- Add CI build step on PRs (not just tags)
+- Clean up `upload.py` stale version
 
-### 3. ~~Add dismiss button to restart-pending banner~~ **DONE**
-- Button added to `index.html:24`, backed by `dismissRestartBanner()` in `app.js:588`.
+### Step 4 (continuous / whenever): Low-Risk Test Coverage
+Independent of the rework above, these modules can be tested now:
+- `src/core/api/updater.py` — `_download_update()`, `install_update()` untested (MEDIUM risk)
+- `src/core/api/server.py` — FastAPI app factory, CORS, static mounts (MEDIUM)
+- `build.py` — Build system, no tests (MEDIUM)
+- `src/core/api/services/actions.py` — line-parser coverage incomplete
 
-### 4. ~~Remove dead code loop in ConfigEditor.collect()~~ **DONE**
-- Dead second `querySelectorAll('[data-path]')` loop removed.
-
-### 5. ~~Connect log viewer to SSE endpoint~~ **DONE**
-- `connectLogStream()` in `app.js:2363` connects via `EventSource` to `/api/v1/events/stream`.
-
-### 6. ~~Fix 3-second sleep race in Windows restart (#11)~~ **DONE**
-- Replaced `time.sleep(3)` with polling `_wait_for_processes_stopped` / `_wait_for_process_started` (0.5s interval, 10s timeout).
-
-### 7. ~~Auto-restart after update (#12)~~ **DONE**
-- Update now spawns new process and exits, instead of prompting for Enter.
-
-### 8. ~~Add update-check UI to dashboard~~ **DONE**
-- "Check for Updates" button in `index.html:52-59`, backed by `checkAllUpdates()` in `app.js:2250`.
-
-### 9. ~~End-to-end update tests~~ **DONE**
-- 24 signal/restart lifecycle tests + 34 E2E update.py tests (config migration, whitelist, version I/O, orchestration, signals, platform paths).
-
-### 10. ~~BackupManager tests~~ **DONE**
-- 30 standalone tests covering create, restore, list, dedup, coalescing, retention, category detection.
-
-### 11. ~~main.py bridge tests~~ **DONE**
-- 38 tests covering sanitize_filename, validate_like_triggers, get_safe_username, load_shell_actions, dup config detection.
-
-### 12. ~~Fix 11 pre-existing test failures (module-level import capturing)~~ **DONE**
-- Changed `from core.paths import get_root_dir` → `import core.paths` + `core.paths.get_root_dir()` in 6 files.
-- Refactored `update.py` to avoid module-level side effects.
-- All 513 tests pass (up from 460/11 failures).
-
-### 13. ~~GUI Frontend Tests~~ **DONE**
-- 226 Vitest+JSDOM tests covering `app.js` (2154 lines), `actions-editor.js` (636 lines), `index.html`.
-- 5 test files: helpers (43), config-editor (44), plugin-config-editor (47), actions-editor (36), dashboard (56).
-- Tests run via `npm test` (vitest) in `templates/gui/`.
-
-### 14. Documentation Refresh ⬅️ LAST STEP BEFORE RELEASE
-- `CHANGELOG.md`: update test count (513 vs stale 285), add `Unreleased` entries for the above fixes.
-- `GUIDE.md`: still missing API server docs, event hooks, config versioning, actions editor docs.
-- `README.md`: minor review.
-- Do this last — code will keep changing until release.
+### Step 5 (LAST): Documentation Refresh
+Only after all code changes are frozen.
 
 ---
 

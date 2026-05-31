@@ -5,6 +5,16 @@ import pytest
 
 
 class TestPluginRegistryBackup:
+    @pytest.fixture(autouse=True)
+    def _preserve_registry_file(self, project_dir):
+        reg_file = project_dir / "api_plugin_registry.json"
+        orig = reg_file.read_bytes() if reg_file.exists() else None
+        yield
+        if orig is not None:
+            reg_file.write_bytes(orig)
+        elif reg_file.exists():
+            reg_file.unlink()
+
     def test_save_creates_backup(self, project_dir):
         from core.api.registry import PluginRegistry
 
@@ -22,21 +32,21 @@ class TestPluginRegistryBackup:
         backups = list((project_dir / "data" / "backups" / "plugin_registry").glob("*"))
         assert len(backups) >= 1
 
-    def test_corrupt_file_returns_empty_registry(self, project_dir):
+    def test_corrupt_file_returns_empty_registry(self, tmp_path):
         from core.api.registry import PluginRegistry
 
-        reg_file = project_dir / "api_plugin_registry.json"
+        reg_file = tmp_path / "api_plugin_registry.json"
         reg_file.write_text("{corrupt json", encoding="utf-8")
 
         from core.api.registry import PluginRegistry
 
-        registry = PluginRegistry(project_dir)
+        registry = PluginRegistry(tmp_path)
         assert registry.list() == []
 
-    def test_partial_corrupt_entry_skipped(self, project_dir):
+    def test_partial_corrupt_entry_skipped(self, tmp_path):
         from core.api.registry import PluginRegistry
 
-        reg_file = project_dir / "api_plugin_registry.json"
+        reg_file = tmp_path / "api_plugin_registry.json"
         reg_file.write_text(
             json.dumps([
                 {"name": "good", "path": "/a", "version": "1.0.0", "enabled": False, "level": 2, "ics": False, "description": ""},
@@ -46,13 +56,23 @@ class TestPluginRegistryBackup:
         )
         from core.api.registry import PluginRegistry
 
-        registry = PluginRegistry(project_dir)
+        registry = PluginRegistry(tmp_path)
         names = [p.name for p in registry.list()]
         assert "good" in names
         assert "bad" not in names
 
 
 class TestPluginRegistryBackupNumbering:
+    @pytest.fixture(autouse=True)
+    def _preserve_registry_file(self, project_dir):
+        reg_file = project_dir / "api_plugin_registry.json"
+        orig = reg_file.read_bytes() if reg_file.exists() else None
+        yield
+        if orig is not None:
+            reg_file.write_bytes(orig)
+        elif reg_file.exists():
+            reg_file.unlink()
+
     def test_backup_numbers_increment(self, project_dir):
         from core.api.registry import PluginRegistry
         from core.api.models import PluginRegistration
