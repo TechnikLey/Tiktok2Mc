@@ -49,7 +49,6 @@ if _src not in sys.path:
 
 from core.version import TOOL_VERSION, UPDATER_VERSION
 
-
 def main():
     start = time.time()
 
@@ -86,10 +85,8 @@ def main():
         # ----- Preparation & Directory Structure -----
         cprint("Preparing build environment...", Color.CYAN)
 
-        cprint("CHECKPOINT: before rmtree", Color.RED)
         if OUT_DIR.exists():
             shutil.rmtree(OUT_DIR)
-        cprint("CHECKPOINT: after rmtree", Color.RED)
 
         REQUIRED_DIRS = [
             EXE_CACHE_DIR, HASH_CACHE_DIR, OUT_DIR, PARALLEL_TEMP_DIR,
@@ -115,8 +112,6 @@ def main():
         for d in REQUIRED_DIRS:
             d.mkdir(parents=True, exist_ok=True)
 
-        cprint("CHECKPOINT: after mkdirs", Color.RED)
-
         # Clean up stale temp dirs from previous interrupted runs
         if PARALLEL_TEMP_DIR.exists():
             shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
@@ -134,8 +129,6 @@ def main():
                 "src": item["src"],
                 "dest": item["dest"],
             })
-
-        cprint("CHECKPOINT: before plugin discovery", Color.RED)
 
         # Find and add plugins
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
@@ -168,8 +161,6 @@ def main():
                         target_dir = OUT_DIR / dest
                         target_dir.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(extra_path, target_dir / extra_file)
-
-        cprint("CHECKPOINT: after plugin discovery", Color.RED)
 
         # ----- Execution: Parallel Build -----
         cprint(
@@ -332,8 +323,6 @@ def main():
 
             return True
 
-        cprint("CHECKPOINT: before parallel build", Color.RED)
-
         with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
             futures = {executor.submit(build_one, task): task for task in all_build_tasks}
             failed = False
@@ -348,8 +337,6 @@ def main():
 
             if failed:
                 raise RuntimeError("One or more build tasks failed.")
-
-        cprint("CHECKPOINT: after parallel build", Color.RED)
 
         # ----- Assets & Resources -----
         cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
@@ -385,8 +372,6 @@ def main():
             with ThreadPoolExecutor(max_workers=threads) as pool:
                 pool.map(copy_one, all_files)
 
-        cprint("CHECKPOINT: before asset sync", Color.RED)
-
         sync_folder("assets",          OUT_DIR / "core" / "assets")
         sync_folder("templates",       OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
@@ -396,8 +381,6 @@ def main():
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)
         sync_folder("docs", OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
-
-        cprint("CHECKPOINT: after asset sync", Color.RED)
 
         FILES = [
             ("static/css/style.css",                "core/static/css/style.css"),
@@ -447,10 +430,8 @@ def main():
         if PARALLEL_TEMP_DIR.exists():
             shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
 
-        cprint("CHECKPOINT: before pycache cleanup", Color.RED)
         for cache_dir in sorted(SCRIPT_DIR.rglob("__pycache__")):
             shutil.rmtree(cache_dir, ignore_errors=True)
-        cprint("CHECKPOINT: after pycache cleanup", Color.RED)
 
         # ----- Release / Upload Script -----
         cprint("Creating upload.py...", Color.CYAN)
