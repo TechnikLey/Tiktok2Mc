@@ -7,6 +7,7 @@ JSON store (``data/api_plugin_registry.json``).
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
@@ -29,16 +30,40 @@ from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)
 
+_HEALTH_POLL_TIMEOUT = 30.0
 
-def _write_plugin_signal(plugin_name: str, action: str) -> None:
-    """Write a signal file that start.py watches for plugin lifecycle events."""
-    runtime_dir = get_root_dir() / "core" / "runtime"
-    runtime_dir.mkdir(parents=True, exist_ok=True)
-    signal_file = runtime_dir / f"plugin_{action}_{plugin_name}"
+
+def _runtime_dir() -> Path:
+    d = get_root_dir() / "core" / "runtime"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _write_plugin_signal(plugin_name: str, action: str) -> bool:
+    """Write a signal file that start.py watches for plugin lifecycle events.
+    
+    Returns ``True`` if the signal was written successfully.
+    """
+    signal_file = _runtime_dir() / f"plugin_{action}_{plugin_name}"
     try:
         signal_file.write_text(plugin_name, encoding="utf-8")
+        return True
     except Exception as exc:
         log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
+        return False
+
+
+def _clean_plugin_signals(plugin_name: str) -> None:
+    """Remove all runtime signal files for a plugin."""
+    rd = _runtime_dir()
+    for pattern in (f"plugin_start_{plugin_name}", f"plugin_stop_{plugin_name}"):
+        p = rd / pattern
+        try:
+            if p.exists():
+                p.unlink()
+        except Exception as exc:
+            log.warning("Failed to clean signal %s: %s", p, exc)
+
 
 router = APIRouter(tags=["Plugins"])
 
@@ -225,13 +250,19 @@ async def enable_plugin(name: str):
         if plugin.enabled:
             log.info("Plugin '%s' is already enabled — returning current state", name)
             return plugin
-        result = registry.update(name, enabled=True)
+        # Write signal FIRST so start.py sees it immediately
+        if not _write_plugin_signal(name, "start"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to write start signal for plugin '{name}'",
+            )
+        # Only update registry after signal was written successfully
+        result = registry.update(name, enabled=True, health_status="healthy")
         if result is None:
             log.error("Enable plugin '%s': registry.update returned None after get succeeded", name)
             raise HTTPException(
                 status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
             )
-        _write_plugin_signal(name, "start")
         log.info("Plugin '%s' enabled and start signal written", name)
         return result
     except HTTPException:
@@ -255,13 +286,19 @@ async def disable_plugin(name: str):
         if not plugin.enabled:
             log.info("Plugin '%s' is already disabled — returning current state", name)
             return plugin
-        result = registry.update(name, enabled=False)
+        # Write signal FIRST so start.py sees it immediately
+        if not _write_plugin_signal(name, "stop"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to write stop signal for plugin '{name}'",
+            )
+        # Only update registry after signal was written successfully
+        result = registry.update(name, enabled=False, health_status="unknown")
         if result is None:
             log.error("Disable plugin '%s': registry.update returned None after get succeeded", name)
             raise HTTPException(
                 status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
             )
-        _write_plugin_signal(name, "stop")
         log.info("Plugin '%s' disabled and stop signal written", name)
         return result
     except HTTPException:
@@ -295,11 +332,10 @@ async def get_plugin(name: str):
 
 @router.put("/plugins/{name}", response_model=PluginRegistration)
 async def update_plugin(name: str, body: PluginUpdateRequest):
-    """Partially update a plugin's properties (e.g. enable/disable)."""
+    """Partially update a plugin's properties (e.g. enable/disable, health)."""
     try:
         registry = get_registry()
-        result = registry.update(
-            name,
+        kwargs: dict[str, Any] = dict(
             enabled=body.enabled,
             level=body.level,
             ics=body.ics,
@@ -314,7 +350,12 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
             update_url=body.update_url,
             author=body.author,
             homepage=body.homepage,
+            health_status=body.health_status,
+            last_heartbeat=body.last_heartbeat,
         )
+        # Strip None values so registry.update only touches provided fields
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        result = registry.update(name, **kwargs)
         if result is None:
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
         return result
@@ -330,11 +371,18 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
 
 @router.delete("/plugins/{name}")
 async def unregister_plugin(name: str):
-    """Remove a plugin from the registry."""
+    """Remove a plugin from the registry, stop its process, and clean up signals."""
     try:
+        # 1. Write stop signal so start.py terminates the running process
+        _write_plugin_signal(name, "stop")
+        _clean_plugin_signals(name)
+
+        # 2. Remove from registry
         registry = get_registry()
         if not registry.unregister(name):
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
+        log.info("Plugin '%s' unregistered, process stopped, signals cleaned", name)
         return {"status": "unregistered", "name": name}
     except HTTPException:
         raise

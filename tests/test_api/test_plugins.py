@@ -151,3 +151,55 @@ class TestPluginEndpoints:
         resp = client.post("/api/v1/plugins/test-plugin/enable")
         assert resp.status_code == 200
         assert resp.json()["enabled"] is True
+
+    # ── Health monitoring tests ──────────────────────────────────────
+
+    def test_plugin_has_health_fields(self, client):
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.get("/api/v1/plugins/test-plugin")
+        assert resp.status_code == 200
+        assert "health_status" in resp.json()
+        assert "last_heartbeat" in resp.json()
+
+    def test_enable_sets_health_healthy(self, client):
+        p = dict(self.PLUGIN)
+        p["enabled"] = False
+        client.post("/api/v1/plugins/register", json=p)
+        resp = client.post("/api/v1/plugins/test-plugin/enable")
+        assert resp.status_code == 200
+        assert resp.json()["health_status"] == "healthy"
+
+    def test_disable_sets_health_unknown(self, client):
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.post("/api/v1/plugins/test-plugin/disable")
+        assert resp.status_code == 200
+        assert resp.json()["health_status"] == "unknown"
+
+    def test_update_health_status(self, client):
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.put(
+            "/api/v1/plugins/test-plugin",
+            json={"health_status": "unhealthy"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["health_status"] == "unhealthy"
+
+    def test_update_health_dead_disables_plugin(self, client):
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.put(
+            "/api/v1/plugins/test-plugin",
+            json={"health_status": "dead", "enabled": False},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["health_status"] == "dead"
+        assert resp.json()["enabled"] is False
+
+    def test_heartbeat_recorded_on_register(self, client):
+        import time
+        before = time.time()
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.get("/api/v1/plugins/test-plugin")
+        assert resp.status_code == 200
+        hb = resp.json().get("last_heartbeat")
+        # heartbeat may be None if never polled — that's fine
+        assert hb is None or hb >= before

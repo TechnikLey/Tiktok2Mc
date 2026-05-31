@@ -134,6 +134,12 @@ class PluginRegistration(BaseModel):
     updated_at: Optional[float] = Field(
         None, description="Unix timestamp of last update"
     )
+    health_status: str = Field(
+        "unknown", description="Current health: unknown, healthy, unhealthy, dead"
+    )
+    last_heartbeat: Optional[float] = Field(
+        None, description="Unix timestamp of last successful health check"
+    )
 
     @classmethod
     def from_manifest(
@@ -163,6 +169,8 @@ class PluginRegisterRequest(BaseModel):
     update_url: str = ""
     author: str = ""
     homepage: str = ""
+    health_status: str = "unknown"
+    last_heartbeat: Optional[float] = None
 
 
 class PluginUpdateRequest(BaseModel):
@@ -182,6 +190,8 @@ class PluginUpdateRequest(BaseModel):
     update_url: Optional[str] = None
     author: Optional[str] = None
     homepage: Optional[str] = None
+    health_status: Optional[str] = None
+    last_heartbeat: Optional[float] = None
 
 
 class PluginListResponse(BaseModel):

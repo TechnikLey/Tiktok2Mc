@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from .routes import api_router
 from .eventbus import event_bus
 from .models import API_VERSION
+from .plugin_health import get_health_monitor
 from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)
@@ -23,8 +24,10 @@ async def lifespan(app: FastAPI):
         "CORS origin restricted to localhost — "
         "use create_app(cors_origins=[\"*\"]) to open for development"
     )
+    await get_health_monitor().start()
     await event_bus.publish("server.started", {"version": API_VERSION})
     yield
+    await get_health_monitor().stop()
     await event_bus.publish("server.stopping", {})
     log.info("API server shutting down ...")
 

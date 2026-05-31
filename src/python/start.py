@@ -709,6 +709,11 @@ if overlay_names:
     for name in overlay_names:
         log.info(f"  {name}: http://127.0.0.1:29185/api/v1/plugins/{name}/overlay")
 
+# Start plugin health checker background thread
+_health_thread = threading.Thread(target=_plugin_health_check_loop, daemon=True)
+_health_thread.start()
+log.info("Plugin health checker started")
+
 # =============================================================================
 # STATE
 # =============================================================================
@@ -793,6 +798,56 @@ async def shutdown_countdown():
     _clear_shutdown_status()
     sys.stdin.close()
     os._exit(0)
+
+# =============================================================================
+# PLUGIN HEALTH CHECKER
+# =============================================================================
+
+_PLUGIN_HEALTH_INTERVAL = 15.0
+_AUTO_RESTART_PLUGINS = True
+
+
+def _plugin_health_check_loop():
+    """Background thread: periodically checks plugin processes and reports
+    health status to the API registry."""
+    while True:
+        time.sleep(_PLUGIN_HEALTH_INTERVAL)
+        dead_plugins = []
+        for name, proc in list(processes.items()):
+            if proc is not None and proc.poll() is not None:
+                dead_plugins.append(name)
+
+        for name in dead_plugins:
+            log.warning("Plugin '%s' process died (exit code %d) — updating registry", name, processes[name].poll())
+            stop_process(name)
+            try:
+                data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
+                req = urllib.request.Request(
+                    f"{_API_BASE_URL}/plugins/{name}",
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="PUT",
+                )
+                with urllib.request.urlopen(req, timeout=5):
+                    log.info("Plugin '%s' marked as dead in registry", name)
+            except Exception as exc:
+                log.warning("Failed to update health for plugin '%s': %s", name, exc)
+
+            if _AUTO_RESTART_PLUGINS:
+                log.info("Auto-restarting plugin '%s' ...", name)
+                _write_plugin_signal_api(name, "start")
+
+
+def _write_plugin_signal_api(plugin_name: str, action: str) -> bool:
+    """Write a plugin signal file (used start.py-side when API may be down)."""
+    try:
+        signal_file = RUNTIME_DIR / f"plugin_{action}_{plugin_name}"
+        signal_file.write_text(plugin_name, encoding="utf-8")
+        return True
+    except Exception as exc:
+        log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
+        return False
+
 
 # =============================================================================
 # FILE WATCHER

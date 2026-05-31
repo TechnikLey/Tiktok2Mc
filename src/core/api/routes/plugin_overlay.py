@@ -99,9 +99,16 @@ async def poll_commands(name: str):
     """Poll and clear pending commands for a plugin.
 
     Called periodically by the plugin process to receive
-    commands from other components.
+    commands from other components.  Also records a heartbeat
+    timestamp so the health monitor can track liveness.
     """
     cmds = command_queue.dequeue_all(name)
+    # Record heartbeat for health monitoring
+    try:
+        from core.api.registry import get_registry
+        get_registry().update(name, last_heartbeat=__import__("time").time())
+    except Exception:
+        pass
     return {"commands": cmds}
 
 
@@ -121,9 +128,16 @@ async def update_plugin_state(name: str, body: dict):
     Called by the plugin process whenever its state changes.
     The state is cached for late-joining SSE clients and also
     published to the EventBus for real-time SSE streaming.
+    Also records a heartbeat for health monitoring.
     """
     state = body.get("state", {})
     state_store.set_state(name, state)
+    # Record heartbeat for health monitoring
+    try:
+        from core.api.registry import get_registry
+        get_registry().update(name, last_heartbeat=__import__("time").time())
+    except Exception:
+        pass
     await event_bus.publish(f"plugin.{name}.state_update", state)
     return {"status": "ok"}
 
