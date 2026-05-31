@@ -71,4 +71,12 @@ Some plugins are not fully decoupled and still depend on each other's internal b
 
 ---
 
+## 📋 Next 3 Steps
+
+1. **Plugin Implementation Tests** — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) across all 5 plugins and add BasePlugin edge-case tests.
+2. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates). **Do last, after all code changes frozen.**
+3. **Plugin Cross-Coupling Refactor** — remove hardcoded inter-plugin dependencies (Timer→WinCounter `send_command()`, DeathCounter→Timer pause-on-death logic). Replace with declarative `depends_on` + EventBus subscriptions. Document LikeGoal event contracts.
+
+---
+
 *Last updated: 2026-05-31 — 678 Python tests + 226 GUI frontend = 904 total | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
