@@ -28,11 +28,11 @@ API-Key auth for `server_host: 0.0.0.0` deployments: `api_key` config field, mid
 ### 4. Plugin Implementation Tests
 Only manifest smoke tests exist for plugins. No tests for command handlers (play, pause, add_win, player_death, etc.) across all 5 plugins. High regression risk.
 
-### 5. GUI Installer *(in progress)*
-Windows NSIS installer (`installer/install.nsi`). Setup wizard, desktop/start menu shortcuts, startup registration, uninstall. Built via `python build.py --installer`.
+### 5. GUI Installer *(done)*
+Windows NSIS installer (`installer/install.nsi`). Setup wizard, desktop/start menu shortcuts, startup registration, uninstall. Built via `python build.py --installer`. 13 tests.
 
-### 6. Spotify OAuth Flow Helper
-GUI assistant that walks users through Spotify Developer app creation, redirect URI setup, and token exchange. Most complex plugin, most painful setup.
+### 6. Spotify OAuth Flow Helper *(done)*
+CLI wizard (`src/python/spotify_setup.py`) that guides users through Spotify OAuth: opens browser, runs local callback server, exchanges code for tokens, saves to config. Also supports `--refresh` mode. 16 tests.
 
 ---
 
@@ -59,6 +59,8 @@ GUI assistant that walks users through Spotify Developer app creation, redirect 
 - **GUI Installer** (`installer/install.nsi`, `build.py --installer`): NSIS Modern UI 2 script with setup wizard, desktop/start menu shortcuts, startup registration, uninstall.
 - **API Authentication** (`server.py`, `config.yaml`, `start.py`): `api_key` config field, middleware on non-localhost, server_host control, 0.0.0.0 warning, 6 tests.
 - **Plugin Lifecycle Tests** (`test_lifecycle.py`, `test_auth.py`): 20 tests for signal files, manifest discovery, API enable/disable, health check pattern, bridge init.
+- **GUI Installer** (`installer/install.nsi`, `build.py --installer`): NSIS Modern UI 2 script with setup wizard, shortcuts, startup registration, uninstall. 13 tests.
+- **Spotify OAuth Flow Helper** (`src/python/spotify_setup.py`): CLI wizard for Spotify Developer app setup, browser OAuth, local callback server, token exchange, `--refresh` mode. 16 tests.
 
 ---
 
@@ -88,4 +90,4 @@ GUI assistant that walks users through Spotify Developer app creation, redirect 
 
 ---
 
-*Last updated: 2026-05-31 — 609 Python tests + 226 GUI frontend = 835 total | Current: Plugin Implementation Tests. Next: GUI Installer → Spotify OAuth Flow Helper.*
+*Last updated: 2026-05-31 — 638 Python tests + 226 GUI frontend = 864 total | Current: Plugin Implementation Tests. Next: Documentation Rewrite.*

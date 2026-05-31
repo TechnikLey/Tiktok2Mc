@@ -31,6 +31,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "gui": dict,
     "update": dict,
     "overlay": dict,
+    "spotify": dict,
 }
 
 

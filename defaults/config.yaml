@@ -356,3 +356,24 @@ update:
   #  0  = delete all logs after each update
   #  -1 = never delete logs
   max_update_logs: 20
+
+# ===========================================================================
+#  SPOTIFY INTEGRATION
+# ===========================================================================
+# Spotify playback control via the Spotify plugin.
+# Run  python src/python/spotify_setup.py  to generate tokens automatically.
+#
+#   enabled:       true/false to enable Spotify commands
+#   client_id:     Your Spotify Developer app Client ID
+#   client_secret: Your Spotify Developer app Client Secret
+#   redirect_uri:  Must match exactly in your Spotify app settings
+#
+# After OAuth setup, access_token and refresh_token are populated automatically.
+spotify:
+  enabled: false
+  client_id: ""
+  client_secret: ""
+  redirect_uri: "http://localhost:8888/callback"
+  access_token: ""
+  refresh_token: ""
+  token_expires_at: 0
