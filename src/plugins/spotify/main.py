@@ -572,12 +572,13 @@ class SpotifyControlPlugin(BasePlugin):
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
     body {{
         background: transparent;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         overflow: hidden;
         width: 100vw;
         height: 100vh;
         display: flex;
         align-items: stretch;
+        -webkit-font-smoothing: antialiased;
     }}
     #player {{
         display: none;

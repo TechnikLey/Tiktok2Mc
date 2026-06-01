@@ -4,86 +4,87 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok2Mc Dashboard</title>
-    <link rel="stylesheet" href="./style.css?v=3">
+    <link rel="stylesheet" href="./design-system.css?v=1">
+    <link rel="stylesheet" href="./style.css?v=4">
 </head>
 <body>
     <header>
         <h1>TikTok2Mc Dashboard</h1>
-        <div style="display:flex;align-items:center;gap:0.75rem;">
+        <div class="header-actions">
             <div id="status-pill" class="offline">Connecting...</div>
-            <button class="btn btn-danger" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="promptShutdown()">Shutdown</button>
+            <button class="btn btn--danger btn--sm" onclick="promptShutdown()">Shutdown</button>
         </div>
     </header>
 
     <main id="dashboard" class="hidden">
-        <div id="restart-pending-banner" class="card hidden" style="border-left: 3px solid var(--warning); background: rgba(255,167,38,0.05);">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="color:var(--warning);font-weight:500;">Restart pending — some changes require a restart to take effect.</span>
-                <div style="display:flex;gap:0.5rem;">
-                    <button class="btn btn-primary" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="triggerRestart()">Restart Now</button>
-                    <button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.85rem;" onclick="dismissRestartBanner()">Dismiss</button>
+        <div id="restart-pending-banner" class="card hidden restart-banner">
+            <div class="restart-banner__inner">
+                <span class="restart-banner__text">Restart pending — some changes require a restart to take effect.</span>
+                <div class="restart-banner__actions">
+                    <button class="btn btn--primary btn--sm" onclick="triggerRestart()">Restart Now</button>
+                    <button class="btn btn--secondary btn--sm" onclick="dismissRestartBanner()">Dismiss</button>
                 </div>
             </div>
         </div>
-        <div class="card">
-            <h2>System Status</h2>
-            <div id="system-info" class="muted">Loading...</div>
-        </div>
-
-        <div class="card">
-            <h2>Plugins</h2>
-            <div id="plugin-summary" class="muted">Loading...</div>
-            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="openPluginManager()">Manage Plugins</button>
-            <div id="overlay-urls" style="margin-top:1rem;"></div>
-        </div>
-
-        <!-- Live Plugin Health -->
-        <div class="card">
-            <h2>Live Plugin Health</h2>
-            <div class="muted">Real-time health and heartbeat status for all plugins.</div>
-            <div id="live-plugin-grid" style="margin-top:0.75rem;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:0.6rem;"></div>
-            <div id="live-plugin-empty" class="muted" style="margin-top:0.75rem;font-size:0.85rem;">Waiting for data...</div>
-        </div>
-
-        <div class="card">
-            <h2>Actions (actions.mca)</h2>
-            <div class="muted">Configure Twitch/TikTok event triggers and commands.</div>
-            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="actionsEditor.open()">Edit Actions</button>
-        </div>
-
-        <div class="card">
-            <h2>Event Reactions</h2>
-            <div class="muted">Automatically control plugins when things happen. For example: pause music when you die in Minecraft.</div>
-            <div id="reactions-summary" class="muted" style="margin-top:0.5rem;font-weight:500;color:var(--text-secondary);">Loading...</div>
-            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="reactionEditor.open()">Manage Reactions</button>
-        </div>
-
-        <!-- Recent Reactions Activity -->
-        <div class="card">
-            <h2>Recent Activity</h2>
-            <div class="muted">Live feed of reactions firing right now.</div>
-            <div id="live-reactions-feed" style="margin-top:0.75rem;max-height:220px;overflow-y:auto;"></div>
-            <div id="live-reactions-empty" class="muted" style="margin-top:0.5rem;font-size:0.85rem;text-align:center;padding:1rem 0;">No reaction activity yet. Create a reaction and trigger an event to see it here.</div>
-        </div>
-
-        <div class="card">
-            <h2>Configuration</h2>
-            <div id="config-summary" class="muted">Loading...</div>
-            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="editor.open(currentConfig)">Edit Configuration</button>
-        </div>
-
-        <div class="card" id="updates-card">
-            <h2>Updates</h2>
-            <div id="updates-summary">
-                <div class="muted">No update information available.</div>
-                <button class="btn btn-primary" style="margin-top:1rem;width:100%;" id="btn-check-updates" onclick="checkAllUpdates()">Check for Updates</button>
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2>System Status</h2>
+                <div id="system-info" class="muted">Loading...</div>
             </div>
-            <div id="updates-detail" class="hidden" style="margin-top:1rem;"></div>
-        </div>
 
-        <div class="card">
-            <h2>Live Log</h2>
-            <div id="log-view">Connecting to log stream...</div>
+            <div class="card">
+                <h2>Plugins</h2>
+                <div id="plugin-summary" class="muted">Loading...</div>
+                <button class="btn btn--primary dashboard-btn-full" onclick="openPluginManager()">Manage Plugins</button>
+                <div id="overlay-urls" class="dashboard-overlay-urls"></div>
+            </div>
+
+            <div class="card">
+                <h2>Live Plugin Health</h2>
+                <div class="muted">Real-time health and heartbeat status for all plugins.</div>
+                <div id="live-plugin-grid" class="live-grid"></div>
+                <div id="live-plugin-empty" class="muted live-plugin-empty">Waiting for data...</div>
+            </div>
+
+            <div class="card">
+                <h2>Actions (actions.mca)</h2>
+                <div class="muted">Configure Twitch/TikTok event triggers and commands.</div>
+                <button class="btn btn--primary dashboard-btn-full" onclick="actionsEditor.open()">Edit Actions</button>
+            </div>
+
+            <div class="card">
+                <h2>Event Reactions</h2>
+                <div class="muted">Automatically control plugins when things happen. For example: pause music when you die in Minecraft.</div>
+                <div id="reactions-summary" class="muted reactions-summary">Loading...</div>
+                <button class="btn btn--primary dashboard-btn-full" onclick="reactionEditor.open()">Manage Reactions</button>
+            </div>
+
+            <div class="card">
+                <h2>Recent Activity</h2>
+                <div class="muted">Live feed of reactions firing right now.</div>
+                <div id="live-reactions-feed" class="live-feed"></div>
+                <div id="live-reactions-empty" class="muted text-center" style="padding: 1rem 0;">No reaction activity yet. Create a reaction and trigger an event to see it here.</div>
+            </div>
+
+            <div class="card">
+                <h2>Configuration</h2>
+                <div id="config-summary" class="muted">Loading...</div>
+                <button class="btn btn--primary dashboard-btn-full" onclick="editor.open(currentConfig)">Edit Configuration</button>
+            </div>
+
+            <div class="card" id="updates-card">
+                <h2>Updates</h2>
+                <div id="updates-summary">
+                    <div class="muted">No update information available.</div>
+                    <button class="btn btn--primary dashboard-btn-full" id="btn-check-updates" onclick="checkAllUpdates()">Check for Updates</button>
+                </div>
+                <div id="updates-detail" class="hidden updates-detail"></div>
+            </div>
+
+            <div class="card">
+                <h2>Live Log</h2>
+                <div id="log-view">Connecting to log stream...</div>
+            </div>
         </div>
     </main>
 
@@ -94,23 +95,20 @@
             <div class="wizard-steps" id="wizard-steps"></div>
             <div id="wizard-content"></div>
             <div class="wizard-actions">
-                <button class="btn btn-secondary" id="wizard-back">Back</button>
-                <button class="btn btn-primary" id="wizard-next">Next</button>
+                <button class="btn btn--secondary" id="wizard-back">Back</button>
+                <button class="btn btn--primary" id="wizard-next">Next</button>
             </div>
         </div>
     </div>
 
     <!-- Restart Dialog -->
     <div id="restart-dialog" class="wizard-overlay hidden">
-        <div class="wizard-card" style="text-align:center;">
-            <h2 style="border:none;padding:0;">Setup Complete</h2>
-            <p class="muted" style="margin-bottom:1.5rem;">
-                Your settings have been saved.<br>
-                The tool must be restarted for changes to take effect.
-            </p>
-            <div style="display:flex;gap:1rem;justify-content:center;">
-                <button class="btn btn-primary" id="btn-restart-now">Restart Now</button>
-                <button class="btn btn-secondary" id="btn-restart-later">Later</button>
+        <div class="wizard-card text-center">
+            <h2 class="dialog-title">Setup Complete</h2>
+            <p class="muted dialog-desc">Your settings have been saved.<br>The tool must be restarted for changes to take effect.</p>
+            <div class="dialog-actions-center">
+                <button class="btn btn--primary" id="btn-restart-now">Restart Now</button>
+                <button class="btn btn--secondary" id="btn-restart-later">Later</button>
             </div>
         </div>
     </div>
@@ -120,13 +118,13 @@
         <div class="plugin-layout">
             <div class="plugin-topbar">
                 <h2>Plugin Management</h2>
-                <div style="display:flex;gap:0.5rem;">
-                    <button class="btn btn-secondary" onclick="closePluginManager()">Close</button>
+                <div class="header-actions">
+                    <button class="btn btn--secondary" onclick="closePluginManager()">Close</button>
                 </div>
             </div>
             <div class="plugin-body" id="plugin-manager-body">
                 <div id="plugin-manager-table"></div>
-                <div id="plugin-manager-urls" style="margin-top:1.5rem;"></div>
+                <div id="plugin-manager-urls" class="updates-detail"></div>
             </div>
         </div>
     </div>
@@ -142,9 +140,9 @@
                         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                         <input type="text" id="editor-search" placeholder="Search settings..." oninput="editor.onSearch(this.value)">
                     </div>
-                    <div style="display:flex;gap:0.5rem;">
-                        <button class="btn btn-secondary" onclick="editor.close()">Close</button>
-                        <button class="btn btn-primary" id="config-editor-save" onclick="editor.save()" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary" onclick="editor.close()">Close</button>
+                        <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled>Save Changes</button>
                     </div>
                 </div>
                 <div class="editor-content" id="editor-content"></div>
@@ -161,9 +159,9 @@
             <button class="actions-tab active" id="actions-tab-visual">Visual Editor</button>
             <button class="actions-tab" id="actions-tab-raw">Raw</button>
           </div>
-          <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-secondary" id="actions-editor-close">Close</button>
-            <button class="btn btn-primary" id="actions-editor-save" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
+          <div class="header-actions">
+            <button class="btn btn--secondary" id="actions-editor-close">Close</button>
+            <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled>Save Changes</button>
           </div>
         </div>
 
@@ -172,13 +170,13 @@
           <div class="actions-table-panel">
             <div class="actions-table-header">
               <h3>Event Triggers</h3>
-              <button class="btn btn-secondary" id="actions-add-trigger" style="font-size:0.85rem;padding:0.4rem 0.8rem;">+ Add Event</button>
+              <button class="btn btn--secondary btn--sm" id="actions-add-trigger">+ Add Event</button>
             </div>
             <table class="actions-table">
               <thead><tr>
-                <th style="width:70px;">Type</th>
-                <th style="width:140px;">Name</th>
-                <th style="width:80px;">Status</th>
+                <th class="actions-col-type">Type</th>
+                <th class="actions-col-name">Name</th>
+                <th class="actions-col-status">Status</th>
                 <th>Commands</th>
               </tr></thead>
               <tbody id="actions-table-body"></tbody>
@@ -193,14 +191,14 @@
         <div id="actions-raw-panel" class="actions-body hidden">
           <div class="actions-raw-header">
             <h3>Raw Editor</h3>
-            <div class="muted" style="font-size:0.85rem;">Edit actions.mca directly. Syntax is checked on every keystroke.</div>
+            <div class="muted text-sm">Edit actions.mca directly. Syntax is checked on every keystroke.</div>
           </div>
           <textarea id="actions-raw-text" class="actions-raw-textarea" spellcheck="false" oninput="actionsEditor._onRawInput()"></textarea>
           <div class="raw-diag">
             <div id="actions-raw-diag-list"></div>
             <div class="raw-footer">
               <div id="actions-raw-status" class="raw-status"></div>
-              <button class="btn btn-primary" id="actions-raw-save-btn" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Save Raw</button>
+              <button class="btn btn--primary btn--sm" id="actions-raw-save-btn">Save Raw</button>
             </div>
           </div>
         </div>
@@ -208,8 +206,8 @@
     </div>
 
     <!-- Add Event Modal -->
-    <div id="actions-add-modal" class="wizard-overlay hidden" style="z-index:250;">
-      <div class="modal-card" style="max-width:560px;">
+    <div id="actions-add-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card">
         <h3>Add Event Trigger</h3>
         <div class="form-group">
           <label>Trigger Type</label>
@@ -241,9 +239,9 @@
 
         <div id="actions-add-error" class="modal-error hidden"></div>
         <div class="modal-actions">
-          <button class="btn btn-secondary" id="actions-add-event-cancel">Cancel</button>
-          <button class="btn btn-primary" id="actions-add-event-confirm">Add Event</button>
-          <button class="btn btn-primary hidden" id="actions-add-gift-confirm" disabled>Add Gift Trigger</button>
+          <button class="btn btn--secondary" id="actions-add-event-cancel">Cancel</button>
+          <button class="btn btn--primary" id="actions-add-event-confirm">Add Event</button>
+          <button class="btn btn--primary hidden" id="actions-add-gift-confirm" disabled>Add Gift Trigger</button>
         </div>
       </div>
     </div>
@@ -265,13 +263,13 @@
               <div class="reactions-subtitle">When something happens, automatically control your plugins</div>
             </div>
             <div class="reactions-search-wrap">
-              <svg viewBox="0 0 24 24" style="position:absolute;left:0.7rem;top:50%;transform:translateY(-50%);width:16px;height:16px;fill:var(--text-secondary);pointer-events:none;"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <svg class="search-icon-inline" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
               <input type="text" id="reaction-search" placeholder="Search reactions..." oninput="reactionEditor.onSearch(this.value)">
             </div>
-            <div style="display:flex;gap:0.5rem;">
-              <button class="btn btn-primary" id="reaction-add" onclick="reactionEditor.startCreate()">+ Create Reaction</button>
-              <button class="btn btn-primary" id="reaction-save" onclick="reactionEditor.save()" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
-              <button class="btn btn-secondary" id="reaction-close">Close</button>
+            <div class="header-actions">
+              <button class="btn btn--primary" id="reaction-add" onclick="reactionEditor.startCreate()">+ Create Reaction</button>
+              <button class="btn btn--primary btn-save-disabled" id="reaction-save" onclick="reactionEditor.save()" disabled>Save Changes</button>
+              <button class="btn btn--secondary" id="reaction-close">Close</button>
             </div>
           </div>
           <!-- Content -->
@@ -281,28 +279,28 @@
     </div>
 
     <!-- Reaction Wizard (Create / Edit) -->
-    <div id="reaction-wizard" class="wizard-overlay hidden" style="z-index:250;">
-      <div class="wizard-card" style="max-width:720px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0;">
+    <div id="reaction-wizard" class="wizard-overlay hidden modal-z-250">
+      <div class="wizard-card reaction-wizard-card">
         <div class="wizard-header">
           <h2 id="reaction-wizard-title">Create Reaction</h2>
           <div class="wizard-steps-bar" id="reaction-wizard-steps"></div>
         </div>
-        <div class="wizard-body" id="reaction-wizard-body" style="overflow-y:auto;flex:1;padding:1.5rem;"></div>
-        <div class="wizard-footer" id="reaction-wizard-footer" style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-top:1px solid var(--border);">
-          <button class="btn btn-secondary" id="reaction-wizard-back">Back</button>
-          <button class="btn btn-primary" id="reaction-wizard-next">Next</button>
+        <div class="wizard-body reaction-wizard-body" id="reaction-wizard-body"></div>
+        <div class="wizard-footer" id="reaction-wizard-footer">
+          <button class="btn btn--secondary" id="reaction-wizard-back">Back</button>
+          <button class="btn btn--primary" id="reaction-wizard-next">Next</button>
         </div>
       </div>
     </div>
 
     <!-- Reaction Delete Confirm -->
-    <div id="reaction-delete-modal" class="wizard-overlay hidden" style="z-index:300;">
-      <div class="wizard-card" style="text-align:center;max-width:420px;">
-        <h2 style="border:none;padding:0;color:var(--danger);">Delete Reaction?</h2>
-        <p id="reaction-delete-message" class="muted" style="margin-bottom:1.5rem;"></p>
-        <div style="display:flex;gap:1rem;justify-content:center;">
-          <button class="btn btn-secondary" id="reaction-delete-cancel">Cancel</button>
-          <button class="btn btn-danger" id="reaction-delete-confirm">Delete</button>
+    <div id="reaction-delete-modal" class="wizard-overlay hidden modal-z-300">
+      <div class="wizard-card text-center modal-sm">
+        <h2 class="dialog-title text-danger">Delete Reaction?</h2>
+        <p id="reaction-delete-message" class="muted dialog-desc"></p>
+        <div class="dialog-actions-center">
+          <button class="btn btn--secondary" id="reaction-delete-cancel">Cancel</button>
+          <button class="btn btn--danger" id="reaction-delete-confirm">Delete</button>
         </div>
       </div>
     </div>
@@ -318,9 +316,9 @@
                         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                         <input type="text" id="plugin-editor-search" placeholder="Search settings..." oninput="pluginEditor.onSearch(this.value)">
                     </div>
-                    <div style="display:flex;gap:0.5rem;">
-                        <button class="btn btn-secondary" onclick="pluginEditor.close()">Close</button>
-                        <button class="btn btn-primary" id="plugin-editor-save" onclick="pluginEditor.save()" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary" onclick="pluginEditor.close()">Close</button>
+                        <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled>Save Changes</button>
                     </div>
                 </div>
                 <div class="editor-content" id="plugin-editor-content"></div>
@@ -329,66 +327,66 @@
     </div>
 
     <!-- Plugin Review Modal -->
-    <div id="plugin-review-modal" class="wizard-overlay hidden" style="z-index:250;">
+    <div id="plugin-review-modal" class="wizard-overlay hidden modal-z-250">
         <div class="modal-card">
             <h3>Review Changes</h3>
-            <div id="plugin-review-body" style="flex:1;overflow-y:auto;"></div>
+            <div id="plugin-review-body" class="modal-scroll"></div>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="pluginEditor.hideReview()">Back</button>
-                <button class="btn btn-primary" onclick="pluginEditor.confirmSave()">Confirm Save</button>
+                <button class="btn btn--secondary" onclick="pluginEditor.hideReview()">Back</button>
+                <button class="btn btn--primary" onclick="pluginEditor.confirmSave()">Confirm Save</button>
             </div>
         </div>
     </div>
 
     <!-- Review Modal -->
-    <div id="review-modal" class="wizard-overlay hidden" style="z-index:250;">
+    <div id="review-modal" class="wizard-overlay hidden modal-z-250">
         <div class="modal-card">
             <h3>Review Changes</h3>
-            <div id="review-body" style="flex:1;overflow-y:auto;"></div>
+            <div id="review-body" class="modal-scroll"></div>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="editor.hideReview()">Back</button>
-                <button class="btn btn-primary" onclick="editor.confirmSave()">Confirm Save</button>
+                <button class="btn btn--secondary" onclick="editor.hideReview()">Back</button>
+                <button class="btn btn--primary" onclick="editor.confirmSave()">Confirm Save</button>
             </div>
         </div>
     </div>
 
     <!-- Shutdown Countdown Overlay -->
-    <div id="shutdown-overlay" class="wizard-overlay hidden" style="z-index: 350;">
-        <div class="wizard-card" style="text-align:center;max-width:420px;">
-            <h2 style="border:none;padding:0;color:var(--danger);">Application Shutdown</h2>
-            <p class="muted" style="margin:1rem 0 0.5rem 0;">Shutdown in:</p>
-            <div id="shutdown-countdown-display" style="font-size:3rem;font-weight:700;color:var(--accent);margin:0.5rem 0 1.5rem 0;">--</div>
-            <div style="display:flex;gap:1rem;justify-content:center;">
-                <button class="btn btn-primary" id="btn-shutdown-now" style="background:var(--danger);color:#fff;">Shutdown Now</button>
-                <button class="btn btn-secondary" id="btn-shutdown-cancel">Cancel Shutdown</button>
+    <div id="shutdown-overlay" class="wizard-overlay hidden modal-z-350">
+        <div class="wizard-card text-center modal-sm">
+            <h2 class="dialog-title text-danger">Application Shutdown</h2>
+            <p class="muted">Shutdown in:</p>
+            <div id="shutdown-countdown-display" class="shutdown-countdown">--</div>
+            <div class="dialog-actions-center">
+                <button class="btn btn--danger" id="btn-shutdown-now">Shutdown Now</button>
+                <button class="btn btn--secondary" id="btn-shutdown-cancel">Cancel Shutdown</button>
             </div>
         </div>
     </div>
 
     <!-- Confirmation Dialog -->
-    <div id="confirm-dialog" class="wizard-overlay hidden" style="z-index: 300;">
-        <div class="wizard-card" style="text-align:center;max-width:420px;">
-            <h2 id="confirm-title" style="border:none;padding:0;">Confirm</h2>
-            <p id="confirm-message" class="muted" style="margin-bottom:1.5rem;"></p>
-            <div style="display:flex;gap:1rem;justify-content:center;">
-                <button class="btn btn-secondary" id="btn-confirm-cancel">Cancel</button>
-                <button class="btn btn-primary" id="btn-confirm-ok">Confirm</button>
+    <div id="confirm-dialog" class="wizard-overlay hidden modal-z-300">
+        <div class="wizard-card text-center modal-sm">
+            <h2 id="confirm-title" class="dialog-title">Confirm</h2>
+            <p id="confirm-message" class="muted dialog-desc"></p>
+            <div class="dialog-actions-center">
+                <button class="btn btn--secondary" id="btn-confirm-cancel">Cancel</button>
+                <button class="btn btn--primary" id="btn-confirm-ok">Confirm</button>
             </div>
         </div>
     </div>
 
     <!-- Unsaved Changes Modal -->
-    <div id="unsaved-changes-modal" class="wizard-overlay hidden" style="z-index:400;">
-      <div class="wizard-card" style="text-align:center;max-width:480px;">
-        <h2 style="border:none;padding:0;color:var(--warning);">Unsaved Changes</h2>
-        <p class="muted" style="margin:1rem 0 1.5rem 0;">
+    <div id="unsaved-changes-modal" class="wizard-overlay hidden modal-z-400">
+      <div class="wizard-card text-center modal-md">
+        <h2 class="dialog-title text-warning">Unsaved Changes</h2>
+        <p class="muted dialog-desc">
           You have unsaved changes in one or more editors.<br>
           What would you like to do?
         </p>
-        <div style="display:flex;flex-direction:column;gap:0.75rem;">
-          <button class="btn btn-primary" id="btn-unsaved-save-exit" style="padding:0.7rem 1rem;font-size:0.95rem;">Save and Exit</button>
-          <button class="btn btn-danger" id="btn-unsaved-exit-no-save" style="padding:0.7rem 1rem;font-size:0.95rem;">Exit Without Saving</button>
-          <button class="btn btn-secondary" id="btn-unsaved-cancel" style="padding:0.7rem 1rem;font-size:0.95rem;">Cancel</button>
+        <div class="dialog-actions-stack">
+          <button class="btn btn--primary btn--full" id="btn-unsaved-save-exit">Save and Exit</button>
+          <button class="btn btn--danger btn--full" id="btn-unsaved-exit-no-save">Exit Without Saving</button>
+          <button class="btn btn--secondary btn--full" id="btn-unsaved-cancel">Cancel</button>
         </div>
       </div>
     </div>

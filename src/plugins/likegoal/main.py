@@ -96,7 +96,7 @@ class LikeGoalPlugin(BasePlugin):
 
     def get_overlay_html(self) -> str:
         return f"""<!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -109,8 +109,9 @@ class LikeGoalPlugin(BasePlugin):
         justify-content: center;
         align-items: center;
         height: 100vh;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         overflow: hidden;
+        -webkit-font-smoothing: antialiased;
     }}
     .container {{
         width: 100%;
@@ -123,7 +124,7 @@ class LikeGoalPlugin(BasePlugin):
         font-size: clamp(14px, 3vw, 20px);
         font-weight: 700;
         color: var(--text);
-        text-shadow: 0 0 10px var(--danger);
+        text-shadow: 0 0 12px var(--danger);
         margin-bottom: 10px;
         letter-spacing: 1px;
         opacity: 0.9;
@@ -135,14 +136,16 @@ class LikeGoalPlugin(BasePlugin):
         border: 2px solid rgba(255, 255, 255, 0.1);
         position: relative;
         overflow: hidden;
-        box-shadow: inset 0 0 20px #000;
+        border-radius: 6px;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
     }}
     .bar-fill {{
         height: 100%;
         width: 0%;
         background: linear-gradient(90deg, var(--accent), var(--accent2));
         transition: width 0.5s ease-out;
-        box-shadow: 0 0 20px var(--accent);
+        border-radius: 6px;
+        box-shadow: 0 0 16px var(--accent);
     }}
     .text-overlay {{
         position: absolute;
@@ -154,7 +157,7 @@ class LikeGoalPlugin(BasePlugin):
         font-size: 22px;
         font-weight: 900;
         text-align: center;
-        text-shadow: 2px 2px 4px #000;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         z-index: 10;
     }}
 </style>

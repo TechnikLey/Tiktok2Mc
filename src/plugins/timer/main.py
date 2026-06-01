@@ -207,7 +207,7 @@ class TimerPlugin(BasePlugin):
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
     body {{
         background: transparent;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         overflow: hidden;
         width: 100vw;
         height: 100vh;
@@ -216,6 +216,7 @@ class TimerPlugin(BasePlugin):
         align-items: center;
         -webkit-app-region: drag;
         user-select: none;
+        -webkit-font-smoothing: antialiased;
     }}
     #display {{
         font-size: 70vh;
@@ -223,6 +224,7 @@ class TimerPlugin(BasePlugin):
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
         color: var(--text);
+        transition: color 0.3s ease;
     }}
     .warning {{ color: var(--warning) !important; }}
     .blink {{ color: var(--blink) !important; animation: syncFlash 1s infinite steps(1); }}

@@ -98,18 +98,18 @@ class DeathCounterPlugin(BasePlugin):
 <html>
 <head>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
 {self.theme_style}
         body, html {{
             background: var(--background); margin: 0; padding: 0;
             width: 100%; height: 100%; display: flex;
             flex-direction: column; justify-content: center; align-items: center;
             overflow: hidden; font-family: 'Inter', sans-serif; color: var(--text);
-            user-select: none;
+            user-select: none; -webkit-font-smoothing: antialiased;
         }}
-        .label {{ font-size: 12vh; font-weight: 700; opacity: 0.7; letter-spacing: 1.5vw; margin-bottom: -2vh; }}
-        .count {{ font-size: 65vh; font-weight: 900; line-height: 1; }}
-        .bump {{ transform: scale(1.05); transition: 0.1s; }}
+        .label {{ font-size: 12vh; font-weight: 700; opacity: 0.6; letter-spacing: 1.5vw; margin-bottom: -2vh; }}
+        .count {{ font-size: 65vh; font-weight: 900; line-height: 1; transition: transform 0.1s ease; }}
+        .bump {{ transform: scale(1.05); }}
     </style>
 </head>
 <body>

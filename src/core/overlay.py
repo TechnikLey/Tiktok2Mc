@@ -62,16 +62,17 @@ HTML_TEMPLATE = """
             align-items: center;
             height: 100vh;
             color: var(--text);
-            font-family: 'Segoe UI', Arial, sans-serif;
-            text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8), 1px -1px 3px rgba(0,0,0,0.8), -1px 1px 3px rgba(0,0,0,0.8);
+            -webkit-font-smoothing: antialiased;
         }}
         #container {{
             text-align: center;
             opacity: 0;
             transition: opacity {{ fade_in }}ms ease-in-out;
         }}
-        h1 {{ font-size: 70px; margin: 0; color: var(--text); }}
-        p {{ font-size: 30px; margin: 0; color: var(--text); }}
+        h1 {{ font-size: 70px; margin: 0; color: var(--text); font-weight: 700; }}
+        p {{ font-size: 30px; margin: 0; color: var(--text); font-weight: 400; }}
         .show {{ opacity: 1 !important; }}
     </style>
 </head>

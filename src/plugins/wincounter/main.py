@@ -122,11 +122,12 @@ class WinCounterPlugin(BasePlugin):
 {self.theme_style}
         body {{
             background-color: var(--background); color: var(--text);
-            font-family: 'Consolas', monospace; margin: 0;
+            font-family: 'Inter', 'Consolas', monospace; margin: 0;
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             height: 100vh; width: 100vw;
             overflow: hidden; user-select: none;
+            -webkit-font-smoothing: antialiased;
         }}
         .container {{
             display: flex; align-items: center;
@@ -141,11 +142,15 @@ class WinCounterPlugin(BasePlugin):
             font-size: 10vmin;
             color: var(--muted);
         }}
+        .separator {{
+            color: var(--separator);
+            opacity: 0.5;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
-        <span>Wins:</span><span id="wins">0</span><span style="color: var(--separator);">|</span><span id="needed">10</span>
+        <span>Wins:</span><span id="wins">0</span><span class="separator">|</span><span id="needed">10</span>
     </div>
     <div class="record-section">Record Low: <span id="record_low">0</span></div>
     <script>
