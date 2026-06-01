@@ -149,8 +149,10 @@ def main():
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
+                # Plugin executables keep their original stem name (e.g. main.exe)
+                # so that start.py can find them at plugins/<name>/main.exe
                 all_build_tasks.append({
-                    "name": f"{py_file.parent.name}_{py_file.stem}{SUFFIX}",
+                    "name": f"{py_file.stem}{SUFFIX}",
                     "src": str(py_file),
                     "dest": dest,
                 })

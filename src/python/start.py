@@ -800,7 +800,7 @@ if OVERLAY_ENABLED and _builtin_overlay_names:
     for name in _builtin_overlay_names:
         log.info(f"  {name}: http://127.0.0.1:29185/api/v1/overlay?overlay={name}&chroma=1")
 
-_plugin_overlay_names = [app.name for app in PLUGIN_REGISTRY if app.enabled]
+_plugin_overlay_names = [app.name for app in PLUGIN_REGISTRY if app.enable]
 if _plugin_overlay_names:
     log.info("\n[OVERLAYS] Plugin overlay URLs:")
     for name in _plugin_overlay_names:
