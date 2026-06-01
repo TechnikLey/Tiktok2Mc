@@ -786,15 +786,67 @@ class ConfigEditor {
     // Scroll to first section
     const first = this.content.querySelector('.section-card');
     if (first) { this.scrollTo(first.id); }
+    this._updateSaveButton();
+    this._attachInputListeners();
   }
 
   isDirty() {
     return JSON.stringify(this.data) !== JSON.stringify(this.original);
   }
 
+  _updateSaveButton() {
+    const btn = document.getElementById('config-editor-save');
+    if (!btn) return;
+    const dirty = this.isDirty();
+    btn.disabled = !dirty;
+    btn.style.opacity = dirty ? '1' : '0.5';
+    btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
+  }
+
+  _attachInputListeners() {
+    if (this._inputHandler) return;
+    this._inputHandler = (e) => {
+      if (e.target.closest && e.target.closest('.editor-content')) {
+        if (this._inputTimer) clearTimeout(this._inputTimer);
+        this._inputTimer = setTimeout(() => {
+          this.collect();
+          this._updateSaveButton();
+        }, 150);
+      }
+    };
+    this.content.addEventListener('input', this._inputHandler);
+    this.content.addEventListener('change', this._inputHandler);
+  }
+
+  _detachInputListeners() {
+    if (!this._inputHandler) return;
+    this.content.removeEventListener('input', this._inputHandler);
+    this.content.removeEventListener('change', this._inputHandler);
+    this._inputHandler = null;
+    if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
+  }
+
   close() {
+    if (this.isDirty()) {
+      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
+        if (!confirmed) return;
+        this._detachInputListeners();
+        this._resetData();
+        this._updateSaveButton();
+        document.getElementById('config-editor').classList.add('hidden');
+        document.getElementById('review-modal').classList.add('hidden');
+      });
+      return;
+    }
+    this._detachInputListeners();
     document.getElementById('config-editor').classList.add('hidden');
     document.getElementById('review-modal').classList.add('hidden');
+  }
+
+  _resetData() {
+    this.data = JSON.parse(JSON.stringify(this.original));
+    this.unknownKeys = {};
+    this.extractUnknownKeys();
   }
 
   extractUnknownKeys() {
@@ -1496,6 +1548,7 @@ class ConfigEditor {
       await putJSON('/config', { config: this.data, backup: true });
       this.original = JSON.parse(JSON.stringify(this.data));
       currentConfig = JSON.parse(JSON.stringify(this.data));
+      this._updateSaveButton();
       this.close();
       await loadConfig();
       this.showToast('Configuration saved successfully.', 'success');
@@ -1592,13 +1645,59 @@ class PluginConfigEditor {
     this.render();
     document.getElementById('plugin-config-editor').classList.remove('hidden');
     this.setupScrollSpy();
+    this._updateSaveButton();
+    this._attachInputListeners();
   }
 
   isDirty() {
     return JSON.stringify(this.config) !== JSON.stringify(this.original);
   }
 
+  _updateSaveButton() {
+    const btn = document.getElementById('plugin-editor-save');
+    if (!btn) return;
+    const dirty = this.isDirty();
+    btn.disabled = !dirty;
+    btn.style.opacity = dirty ? '1' : '0.5';
+    btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
+  }
+
+  _attachInputListeners() {
+    if (this._inputHandler) return;
+    this._inputHandler = (e) => {
+      if (e.target.closest && e.target.closest('.editor-content')) {
+        if (this._inputTimer) clearTimeout(this._inputTimer);
+        this._inputTimer = setTimeout(() => {
+          this.collect();
+          this._updateSaveButton();
+        }, 150);
+      }
+    };
+    this.content.addEventListener('input', this._inputHandler);
+    this.content.addEventListener('change', this._inputHandler);
+  }
+
+  _detachInputListeners() {
+    if (!this._inputHandler) return;
+    this.content.removeEventListener('input', this._inputHandler);
+    this.content.removeEventListener('change', this._inputHandler);
+    this._inputHandler = null;
+    if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
+  }
+
   close() {
+    if (this.isDirty()) {
+      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
+        if (!confirmed) return;
+        this._detachInputListeners();
+        this.config = JSON.parse(JSON.stringify(this.original));
+        this._updateSaveButton();
+        document.getElementById('plugin-config-editor').classList.add('hidden');
+        document.getElementById('plugin-review-modal').classList.add('hidden');
+      });
+      return;
+    }
+    this._detachInputListeners();
     document.getElementById('plugin-config-editor').classList.add('hidden');
     document.getElementById('plugin-review-modal').classList.add('hidden');
   }
@@ -2046,6 +2145,7 @@ class PluginConfigEditor {
       payload._backup = true;
       await putJSON(`/plugins/${encodeURIComponent(this.pluginName)}/config`, payload);
       this.original = JSON.parse(JSON.stringify(this.config));
+      this._updateSaveButton();
       this.close();
       await loadPlugins();
       this.showToast('Plugin configuration saved successfully.', 'success');
@@ -2077,6 +2177,7 @@ class PluginConfigEditor {
       payload._backup = true;
       await putJSON(`/plugins/${encodeURIComponent(this.pluginName)}/config`, payload);
       this.original = JSON.parse(JSON.stringify(this.config));
+      this._updateSaveButton();
       this.close();
       await loadPlugins();
       this.showToast('Plugin configuration saved successfully.', 'success');
@@ -2924,6 +3025,7 @@ async function _saveAllEditors() {
     await putJSON('/config', { config: editor.data, backup: true });
     editor.original = JSON.parse(JSON.stringify(editor.data));
     currentConfig = JSON.parse(JSON.stringify(editor.data));
+    editor._updateSaveButton();
   }
   if (pluginEditor.isDirty()) {
     pluginEditor.collect();
@@ -2931,6 +3033,7 @@ async function _saveAllEditors() {
     payload._backup = true;
     await putJSON(`/plugins/${encodeURIComponent(pluginEditor.pluginName)}/config`, payload);
     pluginEditor.original = JSON.parse(JSON.stringify(pluginEditor.config));
+    pluginEditor._updateSaveButton();
   }
 }
 

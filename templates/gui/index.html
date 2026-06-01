@@ -128,7 +128,7 @@
                     </div>
                     <div style="display:flex;gap:0.5rem;">
                         <button class="btn btn-secondary" onclick="editor.close()">Close</button>
-                        <button class="btn btn-primary" onclick="editor.save()">Save Changes</button>
+                        <button class="btn btn-primary" id="config-editor-save" onclick="editor.save()" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
                     </div>
                 </div>
                 <div class="editor-content" id="editor-content"></div>
@@ -147,7 +147,7 @@
           </div>
           <div style="display:flex;gap:0.5rem;">
             <button class="btn btn-secondary" id="actions-editor-close">Close</button>
-            <button class="btn btn-primary" id="actions-editor-save">Save Changes</button>
+            <button class="btn btn-primary" id="actions-editor-save" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
           </div>
         </div>
 
@@ -304,7 +304,7 @@
                     </div>
                     <div style="display:flex;gap:0.5rem;">
                         <button class="btn btn-secondary" onclick="pluginEditor.close()">Close</button>
-                        <button class="btn btn-primary" onclick="pluginEditor.save()">Save Changes</button>
+                        <button class="btn btn-primary" id="plugin-editor-save" onclick="pluginEditor.save()" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
                     </div>
                 </div>
                 <div class="editor-content" id="plugin-editor-content"></div>

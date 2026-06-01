@@ -66,6 +66,7 @@ class ActionsEditor {
     this.activeTab = 'visual';
     this.switchTab('visual');
     await this.load();
+    this._updateSaveButton();
   }
 
   async close() {
@@ -73,8 +74,17 @@ class ActionsEditor {
       const confirmed = await showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger');
       if (!confirmed) return;
       this.isDirty = false;
+      this._updateSaveButton();
     }
     this.el.classList.add('hidden');
+  }
+
+  _updateSaveButton() {
+    const btn = document.getElementById('actions-editor-save');
+    if (!btn) return;
+    btn.disabled = !this.isDirty;
+    btn.style.opacity = this.isDirty ? '1' : '0.5';
+    btn.style.cursor = this.isDirty ? 'pointer' : 'not-allowed';
   }
 
   /* ── Data Loading ── */
@@ -84,6 +94,7 @@ class ActionsEditor {
       const data = await fetchJSON('/actions');
       this.triggers = data.triggers || [];
       this.isDirty = false;
+      this._updateSaveButton();
       this.renderTable();
     } catch (e) {
       showToast('Failed to load actions: ' + e.message, 'error');
@@ -351,6 +362,7 @@ class ActionsEditor {
     if (index < 0 || index >= this.triggers.length) return;
     this.triggers.splice(index, 1);
     this.isDirty = true;
+    this._updateSaveButton();
     if (this.triggers.length === 0) {
       this.selectedIndex = -1;
       this.renderTable();
@@ -368,6 +380,7 @@ class ActionsEditor {
     if (this.triggers[index]) {
       this.triggers[index].enabled = !this.triggers[index].enabled;
       this.isDirty = true;
+    this._updateSaveButton();
       this.renderTable();
     }
   }
@@ -377,6 +390,7 @@ class ActionsEditor {
     if (cmd) {
       cmd[field] = value;
       this.isDirty = true;
+    this._updateSaveButton();
       this.renderTable();
     }
   }
@@ -387,6 +401,7 @@ class ActionsEditor {
     if (!t.commands) t.commands = [];
     t.commands.push({ type: 'vanilla', command: '', multiplier: 1, title: '', subtitle: '', duration: 3, overlay_name: 'default' });
     this.isDirty = true;
+    this._updateSaveButton();
     this.renderDetail(ti);
     this.renderTable();
   }
@@ -396,6 +411,7 @@ class ActionsEditor {
     if (!t) return;
     t.commands.splice(ci, 1);
     this.isDirty = true;
+    this._updateSaveButton();
     this.renderDetail(ti);
     this.renderTable();
   }
@@ -507,6 +523,7 @@ class ActionsEditor {
       commands: [{ type: 'vanilla', command: '', multiplier: 1, title: '', subtitle: '', duration: 3, overlay_name: 'default' }]
     });
     this.isDirty = true;
+    this._updateSaveButton();
     this.renderTable();
     this.selectTrigger(this.triggers.length - 1);
     this._closeAddModal();
@@ -547,6 +564,7 @@ class ActionsEditor {
       const body = { triggers: this.triggers };
       await putJSON('/actions', body);
       this.isDirty = false;
+      this._updateSaveButton();
       showToast('Actions saved successfully.', 'success');
       await this.load();
     } catch (e) {
@@ -561,6 +579,7 @@ class ActionsEditor {
     this._rawInputTimer = setTimeout(() => this._validateRawContent(), 400);
     if (this.rawTextarea && this.rawTextarea.value !== this.rawContent) {
       this.isDirty = true;
+    this._updateSaveButton();
     }
   }
 
@@ -629,6 +648,7 @@ class ActionsEditor {
 
       this.rawContent = content;
       this.isDirty = false;
+      this._updateSaveButton();
       this._renderRawDiagnostics(result.diagnostics || []);
       this._updateRawStatus(result.diagnostics || []);
       showToast('Raw actions saved.', 'success');
