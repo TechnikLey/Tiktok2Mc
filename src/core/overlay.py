@@ -56,7 +56,7 @@ HTML_TEMPLATE = """
 {{ theme_style }}
         body {{
             margin: 0; padding: 0; overflow: hidden;
-            background-color: {% if chroma %}{{ chroma_color }}{% else %}transparent{% endif %};
+            {{ chroma_background }}
             display: flex;
             justify-content: center;
             align-items: center;
@@ -259,17 +259,19 @@ class OverlayManager:
         theme = load_plugin_theme(cfg, "overlay_text")
         theme_style = theme_css(theme)
 
+        chroma_background = (
+            f"background-color: {theme['background']};"
+            if chroma
+            else "background-color: transparent;"
+        )
         return (
             HTML_TEMPLATE
             .replace("{{ theme_style }}", theme_style)
-            .replace("{{ chroma_color }}", theme["background"])
+            .replace("{{ chroma_background }}", chroma_background)
             .replace("{{ display_mode }}", str(cfg.get("display_mode", "overwrite")))
             .replace("{{ fade_in }}", str(cfg.get("fade_in", 500)))
             .replace("{{ fade_out }}", str(cfg.get("fade_out", 500)))
             .replace("{{ overlay_name }}", overlay_name)
-            .replace("{% if chroma %}", "")
-            .replace("{% else %}", "<!--" if not chroma else "")
-            .replace("{% endif %}", "-->" if not chroma else "")
         )
 
     # -- Dispatch --------------------------------------------------------

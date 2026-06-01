@@ -14,7 +14,7 @@ router = APIRouter(tags=["Overlay"])
 
 
 @router.get("/overlay")
-async def serve_overlay(overlay: str = "default", chroma: bool = True):
+async def serve_overlay(overlay: str = "default", chroma: bool = False):
     """Serve the rendered overlay HTML for the built-in overlay subsystem.
 
     Intended for use as an OBS Browser Source or pywebview URL.
