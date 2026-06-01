@@ -2247,27 +2247,32 @@ class EventCommandsEditor {
     if (!this.list) return;
     const events = Object.keys(this.data);
     if (!events.length) {
-      this.list.innerHTML = '<div class="muted" style="padding:1rem;text-align:center;">No mappings defined. Click "+ Add Mapping" to create one.</div>';
+      this.list.innerHTML = '<div class="ecm-empty">No mappings defined. Click "+ Add Mapping" to create one.</div>';
       return;
     }
 
     let html = '';
     for (const event of events) {
       const actions = this.data[event] || [];
-      html += `<div class="section-card" style="padding:0.75rem 1rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-          <div style="display:flex;align-items:center;gap:0.5rem;flex:1;">
-            <select onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" style="min-width:220px;font-weight:600;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.3rem 0.5rem;">
+      const isCustom = !this.knownEvents.includes(event);
+      html += `<div class="ecm-card">
+        <div class="ecm-card-header">
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;flex:1;">
+            <span class="ecm-event-label">Event</span>
+            <select onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" class="ecm-event-select">
               ${this.knownEvents.map(ev => `<option value="${escapeHtml(ev)}" ${ev === event ? 'selected' : ''}>${escapeHtml(ev)}</option>`).join('')}
-              <option value="__custom__" ${!this.knownEvents.includes(event) ? 'selected' : ''}>Custom...</option>
+              <option value="__custom__" ${isCustom ? 'selected' : ''}>Custom...</option>
             </select>
-            ${!this.knownEvents.includes(event) ? `<input type="text" value="${escapeHtml(event)}" onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" style="min-width:180px;margin-left:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.3rem 0.5rem;">` : ''}
+            ${isCustom ? `<input type="text" value="${escapeHtml(event)}" onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" class="ecm-event-input" placeholder="custom.event.name">` : ''}
           </div>
           <button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="eventCommandsEditor.removeEvent('${escapeHtml(event)}')">Remove</button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:0.4rem;padding-left:1rem;border-left:2px solid var(--border);">
+        <div class="ecm-card-body">
+          ${actions.length ? `<div class="ecm-actions-header"><span>Plugin</span><span>Command</span><span>Arguments</span><span></span></div>` : ''}
           ${actions.map((action, idx) => this.renderAction(event, action, idx)).join('')}
-          <button class="btn btn-secondary" style="font-size:0.8rem;padding:0.3rem 0.6rem;align-self:flex-start;" onclick="eventCommandsEditor.addAction('${escapeHtml(event)}')">+ Add Action</button>
+          <div class="ecm-add-action">
+            <button class="btn btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.8rem;" onclick="eventCommandsEditor.addAction('${escapeHtml(event)}')">+ Add Action</button>
+          </div>
         </div>
       </div>`;
     }
@@ -2281,21 +2286,27 @@ class EventCommandsEditor {
     const commands = this.knownTargets[currentTarget] || [];
     const argsJson = action.args ? JSON.stringify(action.args) : '{}';
 
-    return `<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-      <span style="font-size:0.85rem;color:var(--text-secondary);">Target:</span>
-      <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'target', this.value)" style="background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.25rem 0.4rem;font-size:0.85rem;">
-        <option value="">— select —</option>
-        ${targets.map(t => `<option value="${escapeHtml(t)}" ${t === currentTarget ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
-      </select>
-      <span style="font-size:0.85rem;color:var(--text-secondary);margin-left:0.25rem;">Command:</span>
-      <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'command', this.value)" style="background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.25rem 0.4rem;font-size:0.85rem;">
-        <option value="">— select —</option>
-        ${commands.map(c => `<option value="${escapeHtml(c)}" ${c === currentCommand ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-        ${!commands.includes(currentCommand) && currentCommand ? `<option value="${escapeHtml(currentCommand)}" selected>${escapeHtml(currentCommand)}</option>` : ''}
-      </select>
-      <span style="font-size:0.85rem;color:var(--text-secondary);margin-left:0.25rem;">Args:</span>
-      <input type="text" value="${escapeHtml(argsJson)}" onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'args', this.value)" style="width:120px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:0.25rem 0.4rem;font-size:0.85rem;font-family:monospace;" title="JSON object, e.g. {&quot;amount&quot;:1}">
-      <button class="btn-icon" style="font-size:1rem;color:var(--danger);" onclick="eventCommandsEditor.removeAction('${escapeHtml(event)}', ${idx})">&times;</button>
+    return `<div class="ecm-action-row">
+      <div class="ecm-field">
+        <label>Plugin</label>
+        <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'target', this.value)">
+          <option value="">— select —</option>
+          ${targets.map(t => `<option value="${escapeHtml(t)}" ${t === currentTarget ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="ecm-field">
+        <label>Command</label>
+        <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'command', this.value)">
+          <option value="">— select —</option>
+          ${commands.map(c => `<option value="${escapeHtml(c)}" ${c === currentCommand ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+          ${!commands.includes(currentCommand) && currentCommand ? `<option value="${escapeHtml(currentCommand)}" selected>${escapeHtml(currentCommand)}</option>` : ''}
+        </select>
+      </div>
+      <div class="ecm-field">
+        <label>Arguments</label>
+        <input type="text" value="${escapeHtml(argsJson)}" placeholder='{"amount":1}' onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'args', this.value)" title="JSON object, e.g. {&quot;amount&quot;:1}">
+      </div>
+      <button class="btn-icon" style="color:var(--danger);font-size:1.2rem;padding:0.2rem;" onclick="eventCommandsEditor.removeAction('${escapeHtml(event)}', ${idx})" title="Remove Action">&times;</button>
     </div>`;
   }
 
@@ -2321,7 +2332,7 @@ class EventCommandsEditor {
     if (oldEvent === newEvent) return;
     if (!newEvent || newEvent === '__custom__') return;
     if (newEvent in this.data) {
-      showToast('An mapping for this event already exists.', 'error');
+      showToast('A mapping for this event already exists.', 'error');
       this.render();
       return;
     }

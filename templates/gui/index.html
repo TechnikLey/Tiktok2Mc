@@ -233,7 +233,7 @@
 
     <!-- Event-Commands Editor -->
     <div id="event-commands-editor" class="editor-overlay hidden">
-      <div class="actions-layout">
+      <div class="ecm-layout">
         <div class="actions-topbar">
           <h2>Event-Command Mapper</h2>
           <div style="display:flex;gap:0.5rem;">
@@ -241,16 +241,11 @@
             <button class="btn btn-primary" id="event-commands-save">Save Changes</button>
           </div>
         </div>
-        <div class="actions-body" style="padding:1rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-            <h3 style="margin:0;">Mappings</h3>
-            <button class="btn btn-secondary" id="event-commands-add" style="font-size:0.85rem;padding:0.4rem 0.8rem;">+ Add Mapping</button>
-          </div>
-          <div id="event-commands-list" style="display:flex;flex-direction:column;gap:0.75rem;"></div>
-          <div class="muted" style="margin-top:1rem;font-size:0.85rem;">
-            When an EventBus event matches the key on the left, every action on the right is dispatched to the target plugin.
-          </div>
+        <div class="ecm-toolbar">
+          <h3 style="margin:0;font-size:1rem;font-weight:500;color:var(--text-secondary);">Mappings</h3>
+          <button class="btn btn-secondary" id="event-commands-add" style="font-size:0.85rem;padding:0.4rem 0.8rem;">+ Add Mapping</button>
         </div>
+        <div class="ecm-scroll" id="event-commands-list"></div>
       </div>
     </div>
 

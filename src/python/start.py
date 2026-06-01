@@ -759,11 +759,41 @@ BUILTIN_REGISTRY: list[AppConfig] = [
     AppConfig(name="App", path=APP_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="Minecraft Server", path=SERVER_EXE_PATH, enable=True, level=2, ics=False),
     AppConfig(name="GUI", path=GUI_EXE_PATH, enable=GUI_ENABLED, level=2, ics=False),
-    AppConfig(name="Overlay", path=OVERLAY_EXE_PATH, enable=OVERLAY_ENABLED, level=2, ics=False),
+    AppConfig(name="Overlay", path=OVERLAY_EXE_PATH, enable=OVERLAY_ENABLED, level=2, ics=True),
 ]
+
+
+def _gui_lockfile_exists() -> bool:
+    """Return True if another GUI instance is already running."""
+    lockfile = BASE_DIR / "tmp" / "gui.lock"
+    if not lockfile.exists():
+        return False
+    try:
+        pid = int(lockfile.read_text().strip())
+        if IS_WINDOWS:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x0400, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                return False
+            else:
+                return True
+    except Exception:
+        return False
+
 
 for registry in (BUILTIN_REGISTRY, PLUGIN_REGISTRY):
     for app in registry:
+        if app.name == "GUI" and _gui_lockfile_exists():
+            log.info("GUI is already running — skipping second instance.")
+            continue
         if LOG_LEVEL == 0:
             start_exe(
                 path=app.path,
@@ -798,7 +828,7 @@ _builtin_overlay_names = [o.get("name", "default") for o in _builtin_overlay_nam
 if OVERLAY_ENABLED and _builtin_overlay_names:
     log.info("\n[OVERLAYS] Built-in overlay URLs:")
     for name in _builtin_overlay_names:
-        log.info(f"  {name}: http://127.0.0.1:29185/api/v1/overlay?overlay={name}&chroma=1")
+        log.info(f"  {name}: http://127.0.0.1:29185/api/v1/overlay?overlay={name}")
 
 _plugin_overlay_names = [app.name for app in PLUGIN_REGISTRY if app.enable]
 if _plugin_overlay_names:

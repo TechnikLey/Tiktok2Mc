@@ -176,6 +176,40 @@ class TestLauncherAPICloseFlow:
         assert api.close_requested() is False
 
 
+class TestGuiAlreadyRunning:
+    """Tests for the single-instance guard."""
+
+    def test_no_lockfile_means_not_running(self, monkeypatch, tmp_path):
+        from python.gui import _gui_already_running, GUI_LOCKFILE
+        monkeypatch.setattr("python.gui.GUI_LOCKFILE", tmp_path / "nonexistent.lock")
+        assert _gui_already_running() is False
+
+    def test_lockfile_with_own_pid_is_not_running(self, monkeypatch, tmp_path):
+        from python.gui import _gui_already_running
+        lockfile = tmp_path / "gui.lock"
+        import os
+        lockfile.write_text(str(os.getpid()))
+        monkeypatch.setattr("python.gui.GUI_LOCKFILE", lockfile)
+        assert _gui_already_running() is False
+
+    def test_main_exits_when_another_instance_running(self, monkeypatch):
+        """main() should exit immediately if another GUI is already running."""
+        opened_urls = []
+
+        def mock_open(url, **kwargs):
+            opened_urls.append(url)
+
+        monkeypatch.setattr("python.gui._open_window", mock_open)
+        monkeypatch.setattr("python.gui._gui_already_running", lambda: True)
+        monkeypatch.setattr("sys.argv", ["gui.py"])
+
+        from python.gui import main
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        assert len(opened_urls) == 0
+
+
 class TestGuiStartup:
     """Tests verifying GUI can start without API dependency."""
 
@@ -193,11 +227,12 @@ class TestGuiStartup:
         """When API is offline, main() should call _open_window with launcher.html."""
         opened_urls = []
 
-        def mock_open(url):
+        def mock_open(url, **kwargs):
             opened_urls.append(url)
 
         monkeypatch.setattr("python.gui._open_window", mock_open)
         monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+        monkeypatch.setattr("python.gui._gui_already_running", lambda: False)
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
@@ -210,11 +245,12 @@ class TestGuiStartup:
         """When API is already running, main() should open the dashboard directly."""
         opened_urls = []
 
-        def mock_open(url):
+        def mock_open(url, **kwargs):
             opened_urls.append(url)
 
         monkeypatch.setattr("python.gui._open_window", mock_open)
         monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
+        monkeypatch.setattr("python.gui._gui_already_running", lambda: False)
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main

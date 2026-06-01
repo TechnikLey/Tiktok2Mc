@@ -14,6 +14,7 @@ import time
 import urllib.request
 import urllib.error
 import subprocess
+import threading
 import atexit
 from pathlib import Path
 
@@ -49,6 +50,9 @@ SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 START_EXE = (BASE_DIR.parent / f"start{SUFFIX}").resolve()
 
 _full_system_proc = None
+_window = None
+
+GUI_LOCKFILE = BASE_DIR / "tmp" / "gui.lock"
 
 
 def _api_ready(timeout: float = 1.0) -> bool:
@@ -158,6 +162,53 @@ def _cleanup_processes():
 atexit.register(_cleanup_processes)
 
 
+def _acquire_lock() -> None:
+    """Write a lockfile so start.py can detect a running GUI."""
+    try:
+        GUI_LOCKFILE.parent.mkdir(parents=True, exist_ok=True)
+        GUI_LOCKFILE.write_text(str(os.getpid()))
+        atexit.register(_release_lock)
+    except Exception as exc:
+        log.warning("Could not acquire GUI lockfile: %s", exc)
+
+
+def _release_lock() -> None:
+    try:
+        if GUI_LOCKFILE.exists():
+            pid = int(GUI_LOCKFILE.read_text().strip())
+            if pid == os.getpid():
+                GUI_LOCKFILE.unlink()
+    except Exception:
+        pass
+
+
+def _gui_already_running() -> bool:
+    """Return True if another GUI instance is already running."""
+    if not GUI_LOCKFILE.exists():
+        return False
+    try:
+        pid = int(GUI_LOCKFILE.read_text().strip())
+        if pid == os.getpid():
+            return False
+        if IS_WINDOWS:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x0400, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                return False
+            else:
+                return True
+    except Exception:
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="TikTok2Mc GUI")
     parser.add_argument("--gui-hidden", action="store_true", help="Run without window")
@@ -167,27 +218,34 @@ def main() -> None:
         log.info("GUI hidden mode — exiting.")
         sys.exit(0)
 
+    if _gui_already_running():
+        log.info("Another GUI instance is already running — exiting.")
+        sys.exit(0)
+
+    _acquire_lock()
+
     log.info("Starting GUI launcher...")
 
     # If API is already running, go straight to the full dashboard
     if _api_ready(timeout=2.0):
         log.info("API server already running — opening dashboard at %s", GUI_URL)
-        _open_window(GUI_URL)
+        _open_window(GUI_URL, is_launcher=False)
         return
 
     # Otherwise show the launcher page
     if not LAUNCHER_HTML.exists():
         log.error("Launcher HTML not found at %s", LAUNCHER_HTML)
         # Fallback: try to open API URL anyway
-        _open_window(GUI_URL)
+        _open_window(GUI_URL, is_launcher=False)
         return
 
     log.info("API offline — showing launcher at %s", LAUNCHER_HTML)
-    _open_window(str(LAUNCHER_HTML))
+    _open_window(str(LAUNCHER_HTML), is_launcher=True)
 
 
-def _open_window(url: str) -> None:
+def _open_window(url: str, is_launcher: bool = False) -> None:
     """Open pywebview window with the given URL."""
+    global _window
     try:
         import webview
     except ImportError as exc:
@@ -197,7 +255,7 @@ def _open_window(url: str) -> None:
 
     launcher_api = LauncherAPI()
 
-    window = webview.create_window(
+    _window = webview.create_window(
         "TikTok2Mc",
         url,
         width=1280,
@@ -206,11 +264,26 @@ def _open_window(url: str) -> None:
         js_api=launcher_api,
     )
 
+    if is_launcher:
+        def _poll_api():
+            while True:
+                time.sleep(2.0)
+                try:
+                    if _api_ready(timeout=1.0):
+                        if _window is not None and hasattr(_window, "load_url"):
+                            _window.load_url(GUI_URL)
+                            log.info("API came online — switched to dashboard.")
+                        break
+                except Exception as exc:
+                    log.debug("Poll error: %s", exc)
+        t = threading.Thread(target=_poll_api, daemon=True)
+        t.start()
+
     def _on_closing():
         # Allow window to close normally; process cleanup is handled by atexit
         return True
 
-    window.events.closing += _on_closing
+    _window.events.closing += _on_closing
     webview.start(debug=False)
 
 
