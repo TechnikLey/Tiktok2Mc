@@ -373,7 +373,7 @@ def main():
                 pool.map(copy_one, all_files)
 
         sync_folder("assets",          OUT_DIR / "core" / "assets")
-        sync_folder("templates",       OUT_DIR / "core" / "templates")
+        sync_folder("templates",       OUT_DIR / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
         sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
         # Copy plugin hooks as raw .py (not compiled to .exe — imported in-process)
