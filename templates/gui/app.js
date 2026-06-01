@@ -1127,7 +1127,6 @@ class ConfigEditor {
 
   buildGroupCard(path, g, i) {
     const p = `${path}[${i}]`;
-    if (Array.isArray(g.commands_config)) g.commands_config = {};
     const roles = (g.allowed_roles || []).map(r => `<span class="tag-chip">${escapeHtml(r)}</span>`).join('');
     return `<div class="group-card" id="${p.replace(/[^a-zA-Z0-9]/g, '_')}">
       <div class="group-header"><h4>Group ${i + 1} — Prefix "${escapeHtml(g.prefix || '')}"</h4><button class="btn-icon" onclick="editor.removeArrayItem('${path}', ${i})">Remove</button></div>
@@ -1442,7 +1441,9 @@ class ConfigEditor {
     let target = this.data;
     for (let i = 0; i < keys.length - 1; i++) {
       const k = keys[i];
-      if (!(k in target)) target[k] = {};
+      if (!(k in target)) {
+        target[k] = /^\d+$/.test(keys[i + 1]) ? [] : {};
+      }
       target = target[k];
     }
     target[keys[keys.length - 1]] = value;
@@ -1567,7 +1568,10 @@ class ConfigEditor {
         const p = path ? `${path}.${k}` : k;
         const v = obj?.[k];
         const o = orig?.[k];
-        if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+        // Type mismatch: one is an array, the other is not (includes object vs array)
+        if (Array.isArray(v) !== Array.isArray(o)) {
+          if (JSON.stringify(v) !== JSON.stringify(o)) changes.push({ path: p, old: JSON.stringify(o), new: JSON.stringify(v) });
+        } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
           walk(v, o, p);
         } else if (Array.isArray(v)) {
           if (JSON.stringify(v) !== JSON.stringify(o)) changes.push({ path: p, old: JSON.stringify(o), new: JSON.stringify(v) });
