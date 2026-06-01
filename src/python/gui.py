@@ -25,16 +25,6 @@ if _src not in sys.path:
 from core.paths import get_base_dir, get_root_dir
 from core.api.server import DEFAULT_PORT
 
-# Hide console window on Windows when gui.exe is launched directly by the user.
-# When launched by start.exe, the TIKTOK2MC_GUI_LAUNCHED_BY_START env var is set,
-# so the console remains visible according to log_level settings.
-if sys.platform == "win32" and not os.environ.get("TIKTOK2MC_GUI_LAUNCHED_BY_START"):
-    try:
-        import ctypes
-        ctypes.windll.kernel32.FreeConsole()
-    except Exception:
-        pass
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

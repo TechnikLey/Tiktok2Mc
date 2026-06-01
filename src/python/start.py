@@ -309,11 +309,6 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
             kwargs = {}
             flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
             kwargs["creationflags"] = flags
-            # Set env var so gui.exe knows it was launched by start.exe
-            # and should keep its console window visible
-            env = os.environ.copy()
-            env["TIKTOK2MC_GUI_LAUNCHED_BY_START"] = "1"
-            kwargs["env"] = env
             proc = subprocess.Popen(cmd, **kwargs)
             processes[name] = proc
         elif SESSION_TOOL == "tmux":
@@ -623,7 +618,7 @@ if UPDATE_ENABLED:
             log.info("Continuing...")
             break
 
-        else:
+        elif result == 0:
             log.info("\nUpdate has been installed. Restarting automatically...")
             if getattr(sys, "frozen", False):
                 _executable = sys.executable
@@ -631,11 +626,17 @@ if UPDATE_ENABLED:
             else:
                 _executable = sys.executable
                 _args = [_executable, os.path.abspath(__file__)] + sys.argv[1:]
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
             if IS_WINDOWS:
-                subprocess.Popen(_args, creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True)
+                subprocess.Popen(_args, creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True, env=env)
             else:
-                subprocess.Popen(_args)
+                subprocess.Popen(_args, env=env)
             sys.exit(0)
+
+        else:
+            log.error("Updater failed with exit code %s. Aborting update.", result)
+            break
 
 else:
     log.info("Automatic updates are disabled.")
