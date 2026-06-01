@@ -309,6 +309,11 @@ def start_exe(path, name, hidden=False, gui_hidden=None):
             kwargs = {}
             flags = subprocess.CREATE_NO_WINDOW if hidden else subprocess.CREATE_NEW_CONSOLE
             kwargs["creationflags"] = flags
+            # Set env var so gui.exe knows it was launched by start.exe
+            # and should keep its console window visible
+            env = os.environ.copy()
+            env["TIKTOK2MC_GUI_LAUNCHED_BY_START"] = "1"
+            kwargs["env"] = env
             proc = subprocess.Popen(cmd, **kwargs)
             processes[name] = proc
         elif SESSION_TOOL == "tmux":
