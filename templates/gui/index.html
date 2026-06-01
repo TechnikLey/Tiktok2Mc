@@ -44,9 +44,10 @@
         </div>
 
         <div class="card">
-            <h2>Event-Command Mapper</h2>
-            <div class="muted">Wire EventBus events to plugin commands (e.g. pause music on death).</div>
-            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="eventCommandsEditor.open()">Edit Mappings</button>
+            <h2>Event Reactions</h2>
+            <div class="muted">Automatically control plugins when things happen. For example: pause music when you die in Minecraft.</div>
+            <div id="reactions-summary" class="muted" style="margin-top:0.5rem;font-weight:500;color:var(--text-secondary);">Loading...</div>
+            <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="reactionEditor.open()">Manage Reactions</button>
         </div>
 
         <div class="card">
@@ -231,21 +232,62 @@
       </div>
     </div>
 
-    <!-- Event-Commands Editor -->
-    <div id="event-commands-editor" class="editor-overlay hidden">
-      <div class="ecm-layout">
-        <div class="actions-topbar">
-          <h2>Event-Command Mapper</h2>
-          <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-secondary" id="event-commands-close">Close</button>
-            <button class="btn btn-primary" id="event-commands-save">Save Changes</button>
+    <!-- Reaction Editor -->
+    <div id="reaction-editor" class="editor-overlay hidden">
+      <div class="reactions-layout">
+        <!-- Sidebar -->
+        <nav class="reactions-sidebar" id="reaction-sidebar">
+          <div class="sidebar-header">Filter by Category</div>
+          <div class="sidebar-group" id="reaction-sidebar-categories"></div>
+        </nav>
+        <!-- Main -->
+        <div class="reactions-main">
+          <!-- Topbar -->
+          <div class="reactions-topbar">
+            <div class="reactions-topbar-left">
+              <h2>Event Reactions</h2>
+              <div class="reactions-subtitle">When something happens, automatically control your plugins</div>
+            </div>
+            <div class="reactions-search-wrap">
+              <svg viewBox="0 0 24 24" style="position:absolute;left:0.7rem;top:50%;transform:translateY(-50%);width:16px;height:16px;fill:var(--text-secondary);pointer-events:none;"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <input type="text" id="reaction-search" placeholder="Search reactions..." oninput="reactionEditor.onSearch(this.value)">
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+              <button class="btn btn-primary" id="reaction-add" onclick="reactionEditor.startCreate()">+ Create Reaction</button>
+              <button class="btn btn-primary" id="reaction-save" onclick="reactionEditor.save()" style="opacity:0.5;cursor:not-allowed;" disabled>Save Changes</button>
+              <button class="btn btn-secondary" id="reaction-close">Close</button>
+            </div>
           </div>
+          <!-- Content -->
+          <div class="reactions-content" id="reaction-content"></div>
         </div>
-        <div class="ecm-toolbar">
-          <h3 style="margin:0;font-size:1rem;font-weight:500;color:var(--text-secondary);">Mappings</h3>
-          <button class="btn btn-secondary" id="event-commands-add" style="font-size:0.85rem;padding:0.4rem 0.8rem;">+ Add Mapping</button>
+      </div>
+    </div>
+
+    <!-- Reaction Wizard (Create / Edit) -->
+    <div id="reaction-wizard" class="wizard-overlay hidden" style="z-index:250;">
+      <div class="wizard-card" style="max-width:720px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0;">
+        <div class="wizard-header">
+          <h2 id="reaction-wizard-title">Create Reaction</h2>
+          <div class="wizard-steps-bar" id="reaction-wizard-steps"></div>
         </div>
-        <div class="ecm-scroll" id="event-commands-list"></div>
+        <div class="wizard-body" id="reaction-wizard-body" style="overflow-y:auto;flex:1;padding:1.5rem;"></div>
+        <div class="wizard-footer" id="reaction-wizard-footer" style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-top:1px solid var(--border);">
+          <button class="btn btn-secondary" id="reaction-wizard-back">Back</button>
+          <button class="btn btn-primary" id="reaction-wizard-next">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reaction Delete Confirm -->
+    <div id="reaction-delete-modal" class="wizard-overlay hidden" style="z-index:300;">
+      <div class="wizard-card" style="text-align:center;max-width:420px;">
+        <h2 style="border:none;padding:0;color:var(--danger);">Delete Reaction?</h2>
+        <p id="reaction-delete-message" class="muted" style="margin-bottom:1.5rem;"></p>
+        <div style="display:flex;gap:1rem;justify-content:center;">
+          <button class="btn btn-secondary" id="reaction-delete-cancel">Cancel</button>
+          <button class="btn btn-danger" id="reaction-delete-confirm">Delete</button>
+        </div>
       </div>
     </div>
 

@@ -2172,47 +2172,117 @@ class PluginConfigEditor {
   }
 }
 
-class EventCommandsEditor {
+class ReactionEditor {
   constructor() {
-    this.el = document.getElementById('event-commands-editor');
-    this.list = document.getElementById('event-commands-list');
-    this.closeBtn = document.getElementById('event-commands-close');
-    this.saveBtn = document.getElementById('event-commands-save');
-    this.addBtn = document.getElementById('event-commands-add');
+    this.el = document.getElementById('reaction-editor');
+    this.wizardEl = document.getElementById('reaction-wizard');
+    this.content = document.getElementById('reaction-content');
+    this.sidebar = document.getElementById('reaction-sidebar-categories');
     this.data = {};
     this.original = {};
-    this.isDirty = false;
+    this._dirty = false;
+    this.searchQuery = '';
+    this.activeCategory = 'all';
 
-    this.knownEvents = [
-      'minecraft.player_death',
-      'minecraft.player_respawn',
-      'timer.started',
-      'timer.paused',
-      'timer.resumed',
-      'timer.reset',
-      'timer.tick',
-      'timer.zero',
-      'timer.milestone',
-      'server.started',
-      'server.stopping'
-    ];
+    // Wizard state
+    this.wizardStep = 0; // 0=event, 1=plugin+command, 2=args+confirm
+    this.wizardEditing = null; // null = creating, {event, idx} = editing
+    this.wizardDraft = { event: '', plugin: '', command: '', args: {} };
 
-    this.knownTargets = {
-      'timer': ['start', 'pause', 'resume', 'reset', 'add_time', 'set_time'],
-      'spotify-control': ['play', 'pause', 'next', 'previous', 'volume', 'volume_up', 'volume_down', 'shuffle', 'repeat', 'save', 'playtrack'],
-      'win-counter': ['add_win', 'remove_win'],
-      'death-counter': ['player_death'],
-      'like-goal': ['tiktok_event']
+    // Human-readable catalogs
+    this.eventCatalog = {
+      // TikTok
+      'tiktok.follow': { name: 'New Follower', desc: 'When someone follows your TikTok account', category: 'tiktok', icon: '👤' },
+      'tiktok.join': { name: 'Viewer Joins', desc: 'When someone joins your live stream', category: 'tiktok', icon: '🚪' },
+      'tiktok.comment': { name: 'New Comment', desc: 'When someone sends a chat message', category: 'tiktok', icon: '💬' },
+      'tiktok.like': { name: 'New Like', desc: 'When someone likes your stream', category: 'tiktok', icon: '❤️' },
+      'tiktok.share': { name: 'New Share', desc: 'When someone shares your stream', category: 'tiktok', icon: '🔗' },
+      'tiktok.gift': { name: 'Gift Received', desc: 'When someone sends a gift', category: 'tiktok', icon: '🎁' },
+      // Minecraft
+      'minecraft.player_death': { name: 'Player Dies', desc: 'When you or another player dies', category: 'minecraft', icon: '💀' },
+      'minecraft.player_respawn': { name: 'Player Respawns', desc: 'When a player respawns after dying', category: 'minecraft', icon: '✨' },
+      // Timer
+      'timer.started': { name: 'Timer Starts', desc: 'When the countdown timer starts', category: 'timer', icon: '▶️' },
+      'timer.paused': { name: 'Timer Pauses', desc: 'When the countdown timer is paused', category: 'timer', icon: '⏸️' },
+      'timer.resumed': { name: 'Timer Resumes', desc: 'When the countdown timer resumes', category: 'timer', icon: '▶️' },
+      'timer.reset': { name: 'Timer Resets', desc: 'When the countdown timer is reset', category: 'timer', icon: '🔄' },
+      'timer.tick': { name: 'Timer Ticks', desc: 'Every second while the timer is running', category: 'timer', icon: '⏱️' },
+      'timer.zero': { name: 'Timer Hits Zero', desc: 'When the countdown reaches zero', category: 'timer', icon: '⏰' },
+      'timer.milestone': { name: 'Timer Milestone', desc: 'When the timer passes a configured milestone', category: 'timer', icon: '🎯' },
+      // Server
+      'server.started': { name: 'Server Starts', desc: 'When the Minecraft server finishes starting', category: 'server', icon: '🟢' },
+      'server.stopping': { name: 'Server Stopping', desc: 'When the Minecraft server begins to shut down', category: 'server', icon: '🛑' },
     };
+
+    this.pluginCatalog = {
+      'timer': { name: 'Timer', desc: 'Countdown or count-up timer overlay', icon: '⏱️' },
+      'spotify-control': { name: 'Spotify', desc: 'Control music playback', icon: '🎵' },
+      'win-counter': { name: 'Win Counter', desc: 'Track wins or scores', icon: '🏆' },
+      'death-counter': { name: 'Death Counter', desc: 'Count player deaths', icon: '💀' },
+      'like-goal': { name: 'Like Goal', desc: 'Track like milestones', icon: '❤️' },
+    };
+
+    this.commandCatalog = {
+      'timer': {
+        'start': { name: 'Start Timer', desc: 'Begin the countdown from the current time', args: {} },
+        'pause': { name: 'Pause Timer', desc: 'Pause the countdown', args: {} },
+        'resume': { name: 'Resume Timer', desc: 'Continue a paused countdown', args: {} },
+        'reset': { name: 'Reset Timer', desc: 'Reset the timer to its starting value', args: {} },
+        'add_time': { name: 'Add Time', desc: 'Add seconds to the current timer', args: { seconds: { type: 'number', label: 'Seconds to add', default: 10, min: 1 } } },
+        'set_time': { name: 'Set Time', desc: 'Set the timer to a specific number of seconds', args: { seconds: { type: 'number', label: 'Seconds to set', default: 60, min: 0 } } },
+      },
+      'spotify-control': {
+        'play': { name: 'Play Music', desc: 'Start or resume playback', args: {} },
+        'pause': { name: 'Pause Music', desc: 'Pause the current track', args: {} },
+        'next': { name: 'Next Track', desc: 'Skip to the next song', args: {} },
+        'previous': { name: 'Previous Track', desc: 'Go back to the previous song', args: {} },
+        'volume': { name: 'Set Volume', desc: 'Change playback volume', args: { level: { type: 'number', label: 'Volume level (0–100)', default: 50, min: 0, max: 100 } } },
+        'volume_up': { name: 'Volume Up', desc: 'Increase the volume', args: {} },
+        'volume_down': { name: 'Volume Down', desc: 'Decrease the volume', args: {} },
+        'shuffle': { name: 'Toggle Shuffle', desc: 'Turn shuffle on or off', args: {} },
+        'repeat': { name: 'Toggle Repeat', desc: 'Turn repeat on or off', args: {} },
+        'save': { name: 'Save Track', desc: 'Save the currently playing song to your library', args: {} },
+        'playtrack': { name: 'Play Specific Track', desc: 'Search for and play a song', args: { query: { type: 'string', label: 'Song name or URL', default: '', placeholder: 'Never Gonna Give You Up' } } },
+      },
+      'win-counter': {
+        'add_win': { name: 'Add Win', desc: 'Increase the win count', args: { amount: { type: 'number', label: 'How many wins', default: 1, min: 1 } } },
+        'remove_win': { name: 'Remove Win', desc: 'Decrease the win count', args: { amount: { type: 'number', label: 'How many to remove', default: 1, min: 1 } } },
+      },
+      'death-counter': {
+        'player_death': { name: 'Count Death', desc: 'Increase the death counter', args: {} },
+      },
+      'like-goal': {
+        'tiktok_event': { name: 'Trigger Like Goal', desc: 'Register a TikTok event toward the like goal', args: {} },
+      },
+    };
+
+    this.categoryLabels = {
+      all: 'All Reactions',
+      tiktok: 'TikTok Events',
+      minecraft: 'Minecraft Events',
+      timer: 'Timer Events',
+      server: 'Server Events',
+      custom: 'Custom Events',
+    };
+
+    this.templates = [
+      { event: 'minecraft.player_death', plugin: 'spotify-control', command: 'pause', args: {}, title: 'Pause Music on Death', desc: 'Automatically pause Spotify when you die in Minecraft.' },
+      { event: 'timer.zero', plugin: 'win-counter', command: 'add_win', args: { amount: 1 }, title: 'Add Win on Timer', desc: 'Award a win when the countdown timer hits zero.' },
+      { event: 'tiktok.gift', plugin: 'timer', command: 'add_time', args: { seconds: 30 }, title: 'Add Time on Gift', desc: 'Add 30 seconds to the timer every time someone sends a gift.' },
+    ];
 
     this._bindEvents();
   }
 
   _bindEvents() {
-    this.closeBtn?.addEventListener('click', () => this.close());
-    this.saveBtn?.addEventListener('click', () => this.save());
-    this.addBtn?.addEventListener('click', () => this.addMapping());
+    document.getElementById('reaction-close')?.addEventListener('click', () => this.close());
+    document.getElementById('reaction-add')?.addEventListener('click', () => this.startCreate());
+    document.getElementById('reaction-wizard-back')?.addEventListener('click', () => this.wizardBack());
+    document.getElementById('reaction-wizard-next')?.addEventListener('click', () => this.wizardNext());
+    document.getElementById('reaction-delete-cancel')?.addEventListener('click', () => this._hideDeleteModal());
   }
+
+  /* ─── Public API ─── */
 
   async open() {
     this.el.classList.remove('hidden');
@@ -2220,10 +2290,11 @@ class EventCommandsEditor {
   }
 
   close() {
-    if (this.isDirty) {
+    if (this._dirty) {
       showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
         if (!confirmed) return;
-        this.isDirty = false;
+        this._dirty = false;
+        this._updateSaveButton();
         this.el.classList.add('hidden');
       });
       return;
@@ -2236,154 +2307,227 @@ class EventCommandsEditor {
       const res = await fetchJSON('/event-commands');
       this.data = JSON.parse(JSON.stringify(res.event_commands || {}));
       this.original = JSON.parse(JSON.stringify(this.data));
-      this.isDirty = false;
-      this.render();
+      this._dirty = false;
+      this._updateSaveButton();
+      this._updateDashboardSummary();
+      this.renderSidebar();
+      this.renderList();
     } catch (e) {
-      showToast('Failed to load event commands: ' + e.message, 'error');
+      showToast('Failed to load reactions: ' + e.message, 'error');
     }
   }
 
-  render() {
-    if (!this.list) return;
-    const events = Object.keys(this.data);
-    if (!events.length) {
-      this.list.innerHTML = '<div class="ecm-empty">No mappings defined. Click "+ Add Mapping" to create one.</div>';
+  isDirty() {
+    return this._dirty;
+  }
+
+  onSearch(q) {
+    this.searchQuery = q.trim().toLowerCase();
+    this.renderList();
+  }
+
+  /* ─── Dashboard summary ─── */
+
+  _updateDashboardSummary() {
+    const el = document.getElementById('reactions-summary');
+    if (!el) return;
+    const count = Object.keys(this.data).reduce((sum, k) => sum + (this.data[k]?.length || 0), 0);
+    if (count === 0) {
+      el.innerHTML = '<span style="color:var(--text-secondary);">No reactions set up yet.</span>';
+    } else {
+      el.innerHTML = `<span style="color:var(--success);">${count} reaction${count === 1 ? '' : 's'}</span> <span style="color:var(--text-secondary);">configured</span>`;
+    }
+  }
+
+  _updateSaveButton() {
+    const btn = document.getElementById('reaction-save');
+    if (!btn) return;
+    btn.disabled = !this._dirty;
+    btn.style.opacity = this._dirty ? '1' : '0.5';
+    btn.style.cursor = this._dirty ? 'pointer' : 'not-allowed';
+  }
+
+  /* ─── Sidebar / Filters ─── */
+
+  renderSidebar() {
+    const categories = ['all', 'tiktok', 'minecraft', 'timer', 'server', 'custom'];
+    let html = '';
+    for (const cat of categories) {
+      const count = this._countInCategory(cat);
+      const active = this.activeCategory === cat ? 'active' : '';
+      html += `<div class="sidebar-filter ${active}" onclick="reactionEditor.setCategory('${cat}')">
+        <span>${escapeHtml(this.categoryLabels[cat])}</span>
+        <span class="badge">${count}</span>
+      </div>`;
+    }
+    this.sidebar.innerHTML = html;
+  }
+
+  setCategory(cat) {
+    this.activeCategory = cat;
+    this.renderSidebar();
+    this.renderList();
+  }
+
+  _countInCategory(cat) {
+    if (cat === 'all') {
+      return Object.keys(this.data).reduce((sum, k) => sum + (this.data[k]?.length || 0), 0);
+    }
+    let count = 0;
+    for (const event of Object.keys(this.data)) {
+      const info = this.eventCatalog[event];
+      if (cat === 'custom' && (!info || info.category === 'custom')) count += (this.data[event]?.length || 0);
+      else if (info && info.category === cat) count += (this.data[event]?.length || 0);
+    }
+    return count;
+  }
+
+  /* ─── List Rendering ─── */
+
+  renderList() {
+    const allEvents = Object.keys(this.data);
+    const filtered = allEvents.filter(event => {
+      const actions = this.data[event] || [];
+      if (!actions.length) return false;
+      const info = this.eventCatalog[event] || { name: event, category: 'custom' };
+      if (this.activeCategory !== 'all') {
+        if (this.activeCategory === 'custom') {
+          if (info.category && info.category !== 'custom') return false;
+        } else if (info.category !== this.activeCategory) {
+          return false;
+        }
+      }
+      if (this.searchQuery) {
+        const q = this.searchQuery;
+        const name = (info.name || event).toLowerCase();
+        const hasMatch = name.includes(q) || actions.some(a => {
+          const plugin = (this.pluginCatalog[a.target]?.name || a.target || '').toLowerCase();
+          const cmd = (this.commandCatalog[a.target]?.[a.command]?.name || a.command || '').toLowerCase();
+          return plugin.includes(q) || cmd.includes(q);
+        });
+        if (!hasMatch) return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      this.renderEmptyState();
       return;
     }
 
     let html = '';
-    for (const event of events) {
+    for (const event of filtered) {
       const actions = this.data[event] || [];
-      const isCustom = !this.knownEvents.includes(event);
-      html += `<div class="ecm-card">
-        <div class="ecm-card-header">
-          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;flex:1;">
-            <span class="ecm-event-label">Event</span>
-            <select onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" class="ecm-event-select">
-              ${this.knownEvents.map(ev => `<option value="${escapeHtml(ev)}" ${ev === event ? 'selected' : ''}>${escapeHtml(ev)}</option>`).join('')}
-              <option value="__custom__" ${isCustom ? 'selected' : ''}>Custom...</option>
-            </select>
-            ${isCustom ? `<input type="text" value="${escapeHtml(event)}" onchange="eventCommandsEditor.renameEvent('${escapeHtml(event)}', this.value)" class="ecm-event-input" placeholder="custom.event.name">` : ''}
+      const info = this.eventCatalog[event] || { name: event, category: 'custom', icon: '⚡' };
+      const catClass = `reaction-category-${info.category || 'custom'}`;
+      const catLabel = this.categoryLabels[info.category] || 'Custom';
+
+      for (let idx = 0; idx < actions.length; idx++) {
+        const action = actions[idx];
+        const pluginInfo = this.pluginCatalog[action.target] || { name: action.target, icon: '🔌' };
+        const cmdInfo = (this.commandCatalog[action.target] || {})[action.command] || { name: action.command };
+
+        html += `<div class="reaction-card">
+          <div class="reaction-card-header">
+            <div class="reaction-meta">
+              <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
+              <span style="font-size:0.75rem;color:var(--text-secondary);">Event: ${escapeHtml(info.name)}</span>
+            </div>
+            <div class="reaction-card-actions">
+              <button class="reaction-btn-sm reaction-btn-test" onclick="reactionEditor.testReaction('${escapeHtml(event)}', ${idx})">Test</button>
+              <button class="reaction-btn-sm reaction-btn-edit" onclick="reactionEditor.startEdit('${escapeHtml(event)}', ${idx})">Edit</button>
+              <button class="reaction-btn-sm reaction-btn-delete" onclick="reactionEditor.confirmDelete('${escapeHtml(event)}', ${idx})">Delete</button>
+            </div>
           </div>
-          <button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="eventCommandsEditor.removeEvent('${escapeHtml(event)}')">Remove</button>
-        </div>
-        <div class="ecm-card-body">
-          ${actions.length ? `<div class="ecm-actions-header"><span>Plugin</span><span>Command</span><span>Arguments</span><span></span></div>` : ''}
-          ${actions.map((action, idx) => this.renderAction(event, action, idx)).join('')}
-          <div class="ecm-add-action">
-            <button class="btn btn-secondary" style="font-size:0.85rem;padding:0.4rem 0.8rem;" onclick="eventCommandsEditor.addAction('${escapeHtml(event)}')">+ Add Action</button>
+          <div class="reaction-card-body">
+            <div class="reaction-flow">
+              <div class="reaction-when">
+                <span style="font-size:1.1rem;">${info.icon || '⚡'}</span>
+                <span>${escapeHtml(info.name)}</span>
+              </div>
+              <span class="reaction-arrow">→</span>
+              <div class="reaction-then">
+                <span style="font-size:1.1rem;">${pluginInfo.icon || '🔌'}</span>
+                <span>${escapeHtml(cmdInfo.name)}</span>
+              </div>
+            </div>
+            ${Object.keys(action.args || {}).length ? `<div class="reaction-meta" style="margin-top:0.5rem;font-size:0.78rem;">Options: ${escapeHtml(JSON.stringify(action.args))}</div>` : ''}
           </div>
-        </div>
+        </div>`;
+      }
+    }
+    this.content.innerHTML = html;
+  }
+
+  renderEmptyState() {
+    const isSearch = this.searchQuery !== '';
+    const isFilter = this.activeCategory !== 'all';
+    if (isSearch || isFilter) {
+      this.content.innerHTML = `<div class="reaction-empty">
+        <h3>No reactions found</h3>
+        <p>Try a different search term or category filter.</p>
       </div>`;
-    }
-    this.list.innerHTML = html;
-  }
-
-  renderAction(event, action, idx) {
-    const targets = Object.keys(this.knownTargets);
-    const currentTarget = action.target || '';
-    const currentCommand = action.command || '';
-    const commands = this.knownTargets[currentTarget] || [];
-    const argsJson = action.args ? JSON.stringify(action.args) : '{}';
-
-    return `<div class="ecm-action-row">
-      <div class="ecm-field">
-        <label>Plugin</label>
-        <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'target', this.value)">
-          <option value="">— select —</option>
-          ${targets.map(t => `<option value="${escapeHtml(t)}" ${t === currentTarget ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="ecm-field">
-        <label>Command</label>
-        <select onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'command', this.value)">
-          <option value="">— select —</option>
-          ${commands.map(c => `<option value="${escapeHtml(c)}" ${c === currentCommand ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-          ${!commands.includes(currentCommand) && currentCommand ? `<option value="${escapeHtml(currentCommand)}" selected>${escapeHtml(currentCommand)}</option>` : ''}
-        </select>
-      </div>
-      <div class="ecm-field">
-        <label>Arguments</label>
-        <input type="text" value="${escapeHtml(argsJson)}" placeholder='{"amount":1}' onchange="eventCommandsEditor.updateAction('${escapeHtml(event)}', ${idx}, 'args', this.value)" title="JSON object, e.g. {&quot;amount&quot;:1}">
-      </div>
-      <button class="btn-icon" style="color:var(--danger);font-size:1.2rem;padding:0.2rem;" onclick="eventCommandsEditor.removeAction('${escapeHtml(event)}', ${idx})" title="Remove Action">&times;</button>
-    </div>`;
-  }
-
-  addMapping() {
-    let i = 1;
-    let name = 'minecraft.player_death';
-    while (name in this.data) {
-      name = `new.event_${i}`;
-      i++;
-    }
-    this.data[name] = [{ target: '', command: '', args: {} }];
-    this.isDirty = true;
-    this.render();
-  }
-
-  removeEvent(event) {
-    delete this.data[event];
-    this.isDirty = true;
-    this.render();
-  }
-
-  renameEvent(oldEvent, newEvent) {
-    if (oldEvent === newEvent) return;
-    if (!newEvent || newEvent === '__custom__') return;
-    if (newEvent in this.data) {
-      showToast('A mapping for this event already exists.', 'error');
-      this.render();
       return;
     }
-    this.data[newEvent] = this.data[oldEvent];
-    delete this.data[oldEvent];
-    this.isDirty = true;
-    this.render();
-  }
-
-  addAction(event) {
-    if (!this.data[event]) this.data[event] = [];
-    this.data[event].push({ target: '', command: '', args: {} });
-    this.isDirty = true;
-    this.render();
-  }
-
-  removeAction(event, idx) {
-    if (!this.data[event]) return;
-    this.data[event].splice(idx, 1);
-    if (this.data[event].length === 0) {
-      delete this.data[event];
+    let html = `<div class="reaction-empty">
+      <h3>No reactions yet</h3>
+      <p>Reactions let you automatically control plugins when something happens. For example: "When I die in Minecraft, pause my Spotify music." Pick a template below or create your own.</p>
+      <div class="reaction-templates">`;
+    for (const t of this.templates) {
+      const ev = this.eventCatalog[t.event] || { name: t.event, icon: '⚡' };
+      const pl = this.pluginCatalog[t.plugin] || { name: t.plugin, icon: '🔌' };
+      html += `<div class="reaction-template-card" onclick="reactionEditor.useTemplate(${JSON.stringify(t).replace(/"/g, '&quot;')})">
+        <div class="reaction-template-icon">${ev.icon} ${pl.icon}</div>
+        <h4>${escapeHtml(t.title)}</h4>
+        <p>${escapeHtml(t.desc)}</p>
+      </div>`;
     }
-    this.isDirty = true;
-    this.render();
+    html += `</div>
+      <button class="btn btn-primary" style="margin-top:1.5rem;padding:0.7rem 1.4rem;" onclick="reactionEditor.startCreate()">Create Your First Reaction</button>
+    </div>`;
+    this.content.innerHTML = html;
   }
 
-  updateAction(event, idx, field, value) {
-    if (!this.data[event] || !this.data[event][idx]) return;
-    if (field === 'args') {
-      try {
-        this.data[event][idx].args = value.trim() ? JSON.parse(value) : {};
-      } catch (e) {
-        showToast('Invalid JSON in args: ' + e.message, 'error');
-        return;
-      }
-    } else {
-      this.data[event][idx][field] = value;
-      if (field === 'target') {
-        this.data[event][idx].command = '';
-      }
-    }
-    this.isDirty = true;
-    this.render();
+  /* ─── Actions ─── */
+
+  useTemplate(t) {
+    this.wizardEditing = null;
+    this.wizardStep = 0;
+    this.wizardDraft = { event: t.event, plugin: t.plugin, command: t.command, args: JSON.parse(JSON.stringify(t.args || {})) };
+    this._openWizard();
+    this.wizardStep = 2; // skip to confirmation since template is complete
+    this._renderWizard();
+  }
+
+  startCreate() {
+    this.wizardEditing = null;
+    this.wizardStep = 0;
+    this.wizardDraft = { event: '', plugin: '', command: '', args: {} };
+    this._openWizard();
+    this._renderWizard();
+  }
+
+  startEdit(event, idx) {
+    const action = this.data[event]?.[idx];
+    if (!action) return;
+    this.wizardEditing = { event, idx };
+    this.wizardStep = 0;
+    this.wizardDraft = {
+      event: event,
+      plugin: action.target || '',
+      command: action.command || '',
+      args: JSON.parse(JSON.stringify(action.args || {}))
+    };
+    this._openWizard();
+    this._renderWizard();
   }
 
   async save() {
-    // Validate before saving
+    // Validate: every action must have a target and command
     for (const [event, actions] of Object.entries(this.data)) {
       for (const action of actions) {
         if (!action.target || !action.command) {
-          showToast(`Missing target or command in mapping for "${event}"`, 'error');
+          showToast(`Incomplete reaction for "${event}". Please edit and fix it before saving.`, 'error');
           return;
         }
       }
@@ -2391,16 +2535,333 @@ class EventCommandsEditor {
     try {
       await putJSON('/event-commands', { event_commands: this.data });
       this.original = JSON.parse(JSON.stringify(this.data));
-      this.isDirty = false;
-      showToast('Event-Command mappings saved.', 'success');
-      this.close();
+      this._dirty = false;
+      this._updateSaveButton();
+      this._updateDashboardSummary();
+      showToast('Reactions saved successfully.', 'success');
     } catch (e) {
       showToast('Save failed: ' + e.message, 'error');
+      throw e;
     }
+  }
+
+  async testReaction(event, idx) {
+    const action = this.data[event]?.[idx];
+    if (!action) return;
+    try {
+      await postJSON('/events', { type: event, data: { test: true } });
+      showToast(`Test event sent for "${event}". Check if the plugin reacted.`, 'info');
+    } catch (e) {
+      showToast('Test failed: ' + e.message, 'error');
+    }
+  }
+
+  confirmDelete(event, idx) {
+    const action = this.data[event]?.[idx];
+    if (!action) return;
+    const evInfo = this.eventCatalog[event] || { name: event };
+    const plInfo = this.pluginCatalog[action.target] || { name: action.target };
+    const cmdInfo = (this.commandCatalog[action.target] || {})[action.command] || { name: action.command };
+    const msg = `Delete reaction: "${evInfo.name} → ${cmdInfo.name}"? This cannot be undone.`;
+    document.getElementById('reaction-delete-message').textContent = msg;
+    document.getElementById('reaction-delete-modal').classList.remove('hidden');
+    const confirmBtn = document.getElementById('reaction-delete-confirm');
+    const newBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+    newBtn.addEventListener('click', () => {
+      this._hideDeleteModal();
+      this._deleteReaction(event, idx);
+    });
+  }
+
+  _hideDeleteModal() {
+    document.getElementById('reaction-delete-modal').classList.add('hidden');
+  }
+
+  _deleteReaction(event, idx) {
+    if (!this.data[event]) return;
+    this.data[event].splice(idx, 1);
+    if (this.data[event].length === 0) {
+      delete this.data[event];
+    }
+    this._dirty = true;
+    this._updateSaveButton();
+    this.renderSidebar();
+    this.renderList();
+    showToast('Reaction deleted.', 'info');
+  }
+
+  /* ─── Wizard ─── */
+
+  _openWizard() {
+    this.wizardEl.classList.remove('hidden');
+  }
+
+  _closeWizard() {
+    this.wizardEl.classList.add('hidden');
+  }
+
+  _renderWizard() {
+    const titleEl = document.getElementById('reaction-wizard-title');
+    const stepsEl = document.getElementById('reaction-wizard-steps');
+    const bodyEl = document.getElementById('reaction-wizard-body');
+    const backBtn = document.getElementById('reaction-wizard-back');
+    const nextBtn = document.getElementById('reaction-wizard-next');
+
+    titleEl.textContent = this.wizardEditing ? 'Edit Reaction' : 'Create Reaction';
+    stepsEl.innerHTML = [0, 1, 2].map(i => {
+      let cls = '';
+      if (i === this.wizardStep) cls = 'active';
+      else if (i < this.wizardStep) cls = 'done';
+      return `<div class="wizard-step-dot ${cls}"></div>`;
+    }).join('');
+
+    backBtn.style.visibility = this.wizardStep === 0 ? 'hidden' : 'visible';
+    backBtn.textContent = 'Back';
+    nextBtn.textContent = this.wizardStep === 2 ? (this.wizardEditing ? 'Save Changes' : 'Create Reaction') : 'Next';
+    nextBtn.disabled = false;
+
+    if (this.wizardStep === 0) {
+      bodyEl.innerHTML = this._renderStepEvent();
+    } else if (this.wizardStep === 1) {
+      bodyEl.innerHTML = this._renderStepCommand();
+    } else {
+      bodyEl.innerHTML = this._renderStepConfirm();
+    }
+  }
+
+  _renderStepEvent() {
+    const groups = {
+      tiktok: { label: 'TikTok Events', items: [] },
+      minecraft: { label: 'Minecraft Events', items: [] },
+      timer: { label: 'Timer Events', items: [] },
+      server: { label: 'Server Events', items: [] },
+    };
+    for (const [key, info] of Object.entries(this.eventCatalog)) {
+      const g = groups[info.category];
+      if (g) g.items.push({ key, ...info });
+    }
+
+    let html = `<h3>Step 1: Choose what triggers the reaction</h3>
+    <p class="muted-desc">Pick the event that should cause something to happen. You can also type a custom event name for advanced use.</p>`;
+
+    for (const g of Object.values(groups)) {
+      if (!g.items.length) continue;
+      html += `<div style="margin-bottom:1.25rem;"><strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">${escapeHtml(g.label)}</strong>`;
+      html += `<div class="event-grid" style="margin-top:0.5rem;">`;
+      for (const item of g.items) {
+        const selected = this.wizardDraft.event === item.key ? 'selected' : '';
+        html += `<div class="event-option ${selected}" onclick="reactionEditor.selectEvent('${escapeHtml(item.key)}')">
+          <span class="event-icon">${item.icon}</span>
+          <h4>${escapeHtml(item.name)}</h4>
+          <p>${escapeHtml(item.desc)}</p>
+        </div>`;
+      }
+      html += `</div></div>`;
+    }
+
+    // Custom event input
+    const customVal = this.wizardDraft.event && !this.eventCatalog[this.wizardDraft.event] ? escapeHtml(this.wizardDraft.event) : '';
+    html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+      <strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">Advanced</strong>
+      <p class="muted-desc">Use a custom event name if you are integrating with external tools or custom plugins.</p>
+      <input type="text" id="custom-event-input" value="${customVal}" placeholder="custom.event.name" style="width:100%;padding:0.6rem 0.8rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.9rem;" oninput="reactionEditor.onCustomEventInput(this.value)" onchange="reactionEditor.selectEvent(this.value, true)">
+    </div>`;
+
+    return html;
+  }
+
+  _renderStepCommand() {
+    let html = `<h3>Step 2: Choose what happens</h3>
+    <p class="muted-desc">Select the plugin and the command that should run when <strong>${escapeHtml((this.eventCatalog[this.wizardDraft.event]?.name) || this.wizardDraft.event)}</strong> occurs.</p>`;
+
+    // Plugin selection
+    html += `<div style="margin-bottom:1rem;"><strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">1. Pick a Plugin</strong></div>`;
+    html += `<div class="plugin-grid" style="margin-bottom:1.5rem;">`;
+    for (const [key, info] of Object.entries(this.pluginCatalog)) {
+      const selected = this.wizardDraft.plugin === key ? 'selected' : '';
+      html += `<div class="plugin-option ${selected}" onclick="reactionEditor.selectPlugin('${escapeHtml(key)}')">
+        <div style="font-size:1.5rem;">${info.icon}</div>
+        <div class="plugin-option-name">${escapeHtml(info.name)}</div>
+        <div class="plugin-option-desc">${escapeHtml(info.desc)}</div>
+      </div>`;
+    }
+    html += `</div>`;
+
+    // Command selection
+    if (this.wizardDraft.plugin) {
+      const commands = this.commandCatalog[this.wizardDraft.plugin] || {};
+      html += `<div style="margin-bottom:1rem;"><strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">2. Pick a Command</strong></div>`;
+      html += `<div class="command-grid">`;
+      for (const [key, info] of Object.entries(commands)) {
+        const selected = this.wizardDraft.command === key ? 'selected' : '';
+        html += `<div class="command-option ${selected}" onclick="reactionEditor.selectCommand('${escapeHtml(key)}')">
+          <h4>${escapeHtml(info.name)}</h4>
+          <p>${escapeHtml(info.desc)}</p>
+        </div>`;
+      }
+      html += `</div>`;
+    } else {
+      html += `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);border:1px dashed var(--border);border-radius:8px;">Select a plugin above to see available commands.</div>`;
+    }
+
+    return html;
+  }
+
+  _renderStepConfirm() {
+    const evInfo = this.eventCatalog[this.wizardDraft.event] || { name: this.wizardDraft.event, icon: '⚡', desc: 'Custom event' };
+    const plInfo = this.pluginCatalog[this.wizardDraft.plugin] || { name: this.wizardDraft.plugin, icon: '🔌' };
+    const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[this.wizardDraft.command] || { name: this.wizardDraft.command, desc: '' };
+
+    let html = `<h3>Step 3: Review and fine-tune</h3>
+    <p class="muted-desc">Make sure everything looks right. Some commands let you set extra options below.</p>`;
+
+    html += `<div class="reaction-preview">
+      <div class="reaction-preview-label">Preview</div>
+      <div class="reaction-preview-flow">
+        <div class="reaction-when"><span style="font-size:1.1rem;">${evInfo.icon}</span> <span>${escapeHtml(evInfo.name)}</span></div>
+        <span class="reaction-arrow">→</span>
+        <div class="reaction-then"><span style="font-size:1.1rem;">${plInfo.icon}</span> <span>${escapeHtml(cmdInfo.name)}</span></div>
+      </div>
+    </div>`;
+
+    // Dynamic args form
+    const argSchema = cmdInfo.args || {};
+    const hasArgs = Object.keys(argSchema).length > 0;
+    if (hasArgs) {
+      html += `<div class="args-form" style="margin-top:1.25rem;">`;
+      html += `<strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.75rem;">Options</strong>`;
+      for (const [argKey, spec] of Object.entries(argSchema)) {
+        const currentVal = this.wizardDraft.args[argKey] !== undefined ? this.wizardDraft.args[argKey] : (spec.default !== undefined ? spec.default : '');
+        const id = `arg_${argKey}`;
+        html += `<div class="form-group">`;
+        html += `<label for="${id}">${escapeHtml(spec.label || argKey)}</label>`;
+        if (spec.type === 'number') {
+          html += `<input type="number" id="${id}" value="${escapeHtml(String(currentVal))}" ${spec.min !== undefined ? `min="${spec.min}"` : ''} ${spec.max !== undefined ? `max="${spec.max}"` : ''}>`;
+        } else if (spec.type === 'select') {
+          html += `<select id="${id}">${(spec.options || []).map(o => `<option value="${escapeHtml(o)}" ${o === currentVal ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select>`;
+        } else {
+          html += `<input type="text" id="${id}" value="${escapeHtml(String(currentVal))}" placeholder="${escapeHtml(spec.placeholder || '')}">`;
+        }
+        if (spec.hint) html += `<div class="hint">${escapeHtml(spec.hint)}</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    return html;
+  }
+
+  /* ─── Wizard interactions ─── */
+
+  selectEvent(key, isCustom = false) {
+    this.wizardDraft.event = key;
+    this._renderWizard();
+  }
+
+  onCustomEventInput(value) {
+    // Update draft without re-rendering so the input keeps focus
+    this.wizardDraft.event = value;
+  }
+
+  selectPlugin(key) {
+    this.wizardDraft.plugin = key;
+    this.wizardDraft.command = '';
+    this.wizardDraft.args = {};
+    this._renderWizard();
+  }
+
+  selectCommand(key) {
+    this.wizardDraft.command = key;
+    const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[key] || {};
+    // Pre-fill defaults
+    this.wizardDraft.args = {};
+    for (const [k, spec] of Object.entries(cmdInfo.args || {})) {
+      if (spec.default !== undefined) this.wizardDraft.args[k] = spec.default;
+    }
+    this._renderWizard();
+  }
+
+  wizardBack() {
+    if (this.wizardStep > 0) {
+      this.wizardStep--;
+      this._renderWizard();
+    }
+  }
+
+  wizardNext() {
+    if (this.wizardStep === 0) {
+      if (!this.wizardDraft.event) {
+        showToast('Please select an event first.', 'error');
+        return;
+      }
+    } else if (this.wizardStep === 1) {
+      if (!this.wizardDraft.plugin || !this.wizardDraft.command) {
+        showToast('Please select a plugin and a command.', 'error');
+        return;
+      }
+    } else if (this.wizardStep === 2) {
+      this._collectArgs();
+      this._commitWizard();
+      return;
+    }
+    this.wizardStep++;
+    this._renderWizard();
+  }
+
+  _collectArgs() {
+    const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[this.wizardDraft.command] || {};
+    const schema = cmdInfo.args || {};
+    for (const key of Object.keys(schema)) {
+      const el = document.getElementById(`arg_${key}`);
+      if (!el) continue;
+      const spec = schema[key];
+      if (spec.type === 'number') {
+        const v = parseFloat(el.value);
+        this.wizardDraft.args[key] = isNaN(v) ? (spec.default || 0) : v;
+      } else {
+        this.wizardDraft.args[key] = el.value;
+      }
+    }
+  }
+
+  _commitWizard() {
+    const { event, plugin, command, args } = this.wizardDraft;
+    if (!event || !plugin || !command) {
+      showToast('Incomplete reaction. Please fill all steps.', 'error');
+      return;
+    }
+
+    const newAction = { target: plugin, command, args: JSON.parse(JSON.stringify(args || {})) };
+
+    if (this.wizardEditing) {
+      // Edit existing
+      const { event: oldEvent, idx } = this.wizardEditing;
+      if (oldEvent === event) {
+        this.data[event][idx] = newAction;
+      } else {
+        // Event changed: remove from old, add to new
+        this.data[oldEvent].splice(idx, 1);
+        if (this.data[oldEvent].length === 0) delete this.data[oldEvent];
+        if (!this.data[event]) this.data[event] = [];
+        this.data[event].push(newAction);
+      }
+    } else {
+      // Create new
+      if (!this.data[event]) this.data[event] = [];
+      this.data[event].push(newAction);
+    }
+
+    this._dirty = true;
+    this._updateSaveButton();
+    this._closeWizard();
+    this.renderSidebar();
+    this.renderList();
+    showToast(this.wizardEditing ? 'Reaction updated.' : 'Reaction created.', 'success');
   }
 }
 
-const eventCommandsEditor = new EventCommandsEditor();
+const reactionEditor = new ReactionEditor();
 const pluginEditor = new PluginConfigEditor();
 const actionsEditor = new ActionsEditor();
 
@@ -2418,7 +2879,7 @@ if (typeof pywebview === 'undefined' || !pywebview.api) {
 }
 
 function isAnyEditorDirty() {
-  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || eventCommandsEditor.isDirty;
+  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || reactionEditor.isDirty();
 }
 
 /* Detect close requests from pywebview's on_closing (deadlock-free polling) */
@@ -2451,10 +2912,10 @@ async function _saveAllEditors() {
       throw new Error('Actions editor could not be saved — check for errors.');
     }
   }
-  if (eventCommandsEditor.isDirty) {
-    await eventCommandsEditor.save();
-    if (eventCommandsEditor.isDirty) {
-      throw new Error('Event-Command editor could not be saved — check for errors.');
+  if (reactionEditor.isDirty()) {
+    await reactionEditor.save();
+    if (reactionEditor.isDirty()) {
+      throw new Error('Reaction editor could not be saved — check for errors.');
     }
   }
   if (editor.isDirty()) {
@@ -2651,6 +3112,7 @@ async function init() {
   await loadStatus();
   await loadConfig();
   await loadPlugins();
+  await reactionEditor.load();
   updateRestartBanner();
   connectLogStream();
   checkAllUpdates();
