@@ -47,7 +47,7 @@ SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
 APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
 SERVER_EXE_PATH = (BASE_DIR / "core" / f"server{SUFFIX}").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / "core" / f"update{SUFFIX}").resolve()
+UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 OVERLAY_EXE_PATH = (BASE_DIR / "core" / f"overlay{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
