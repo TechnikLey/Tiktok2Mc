@@ -106,6 +106,17 @@ class TestActionBlockingInLauncher:
     HTML/JS directly.
     """
 
+    def _load_launcher_html(self):
+        root = Path(__file__).resolve().parent.parent.parent
+        candidates = [
+            root / "src" / "core" / "templates" / "gui" / "launcher.html",
+            root / "core" / "templates" / "gui" / "launcher.html",
+        ]
+        for p in candidates:
+            if p.exists():
+                return p.read_text(encoding="utf-8")
+        raise FileNotFoundError("launcher.html not found in any known location")
+
     def test_launcher_api_blocks_actions_when_offline(self):
         """When API is offline, actions requiring the API should be disabled.
 
@@ -113,16 +124,14 @@ class TestActionBlockingInLauncher:
         - The actions-blocked banner is shown
         - Buttons are visually disabled
         """
-        launcher_html = Path(__file__).resolve().parent.parent.parent / "templates" / "gui" / "launcher.html"
-        content = launcher_html.read_text(encoding="utf-8")
+        content = self._load_launcher_html()
         assert "actions-blocked" in content
         assert "API server is not running" in content
         assert 'id="actions-blocked"' in content
 
     def test_launcher_shows_start_buttons_when_offline(self):
         """The launcher must show Start API and Start Full System buttons."""
-        launcher_html = Path(__file__).resolve().parent.parent.parent / "templates" / "gui" / "launcher.html"
-        content = launcher_html.read_text(encoding="utf-8")
+        content = self._load_launcher_html()
         assert "btn-start-api" in content
         assert "btn-start-full" in content
         assert "Start API Server" in content
@@ -130,7 +139,6 @@ class TestActionBlockingInLauncher:
 
     def test_launcher_navigates_to_dashboard_when_online(self):
         """When API comes online, launcher should navigate to full dashboard."""
-        launcher_html = Path(__file__).resolve().parent.parent.parent / "templates" / "gui" / "launcher.html"
-        content = launcher_html.read_text(encoding="utf-8")
+        content = self._load_launcher_html()
         assert "/gui/index.html" in content
         assert "window.location.href" in content

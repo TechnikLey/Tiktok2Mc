@@ -107,11 +107,9 @@ def create_app(
             return await call_next(request)
 
     # Serve the central GUI dashboard at /gui
-    # Release layout: core/templates/gui/   Dev layout: templates/gui/
+    # Templates live under core/templates/ in both dev and release layouts
     root = get_root_dir()
     gui_dir = root / "core" / "templates" / "gui"
-    if not gui_dir.exists():
-        gui_dir = root / "templates" / "gui"
     if gui_dir.exists():
         app.mount(
             "/gui",

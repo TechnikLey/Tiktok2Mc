@@ -37,7 +37,10 @@ BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
 API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
 GUI_URL = f"{API_URL}/gui/index.html"
-LAUNCHER_HTML = ROOT_DIR / "templates" / "gui" / "launcher.html"
+# Try release layout first, then dev layout (src/core/templates/)
+LAUNCHER_HTML = ROOT_DIR / "core" / "templates" / "gui" / "launcher.html"
+if not LAUNCHER_HTML.exists():
+    LAUNCHER_HTML = ROOT_DIR / "src" / "core" / "templates" / "gui" / "launcher.html"
 
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
