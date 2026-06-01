@@ -117,18 +117,6 @@ class TestActionBlockingInLauncher:
                 return p.read_text(encoding="utf-8")
         raise FileNotFoundError("launcher.html not found in any known location")
 
-    def test_launcher_api_blocks_actions_when_offline(self):
-        """When API is offline, actions requiring the API should be disabled.
-
-        This is enforced by the launcher.html UI:
-        - The actions-blocked banner is shown
-        - Buttons are visually disabled
-        """
-        content = self._load_launcher_html()
-        assert "actions-blocked" in content
-        assert "API server is not running" in content
-        assert 'id="actions-blocked"' in content
-
     def test_launcher_shows_start_buttons_when_offline(self):
         """The launcher must show Start API and Start Full System buttons."""
         content = self._load_launcher_html()
@@ -142,3 +130,9 @@ class TestActionBlockingInLauncher:
         content = self._load_launcher_html()
         assert "/gui/index.html" in content
         assert "window.location.href" in content
+
+    def test_launcher_no_stop_button_on_offline_page(self):
+        """The offline launcher should not show a stop button."""
+        content = self._load_launcher_html()
+        assert "btn-stop-api" not in content
+        assert "Stop API" not in content

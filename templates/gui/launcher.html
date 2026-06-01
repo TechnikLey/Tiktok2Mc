@@ -119,12 +119,10 @@
             margin-top: 0.5rem;
         }
         .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-        .btn-danger {
-            background: rgba(248, 113, 113, 0.15);
-            color: var(--danger);
-            border: 1px solid rgba(248, 113, 113, 0.3);
+        .btn-secondary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
-        .btn-danger:hover { background: rgba(248, 113, 113, 0.25); }
         .spinner {
             width: 16px;
             height: 16px;
@@ -156,15 +154,15 @@
             color: var(--accent);
             border: 1px solid rgba(96, 165, 250, 0.2);
         }
-        .actions-blocked {
+        .hint {
             margin-top: 1rem;
-            padding: 1rem;
+            padding: 0.75rem;
             border-radius: 8px;
-            background: rgba(248, 113, 113, 0.05);
-            border: 1px solid rgba(248, 113, 113, 0.15);
+            background: rgba(251, 191, 36, 0.05);
+            border: 1px solid rgba(251, 191, 36, 0.15);
+            font-size: 0.8rem;
+            color: var(--warning);
             text-align: center;
-            font-size: 0.85rem;
-            color: var(--danger);
         }
     </style>
 </head>
@@ -177,7 +175,7 @@
 
         <div class="card">
             <div class="status-row">
-                <span class="status-label">API Server Status</span>
+                <span class="status-label">System Status</span>
                 <span id="status-pill" class="status-pill offline">
                     <span class="dot"></span>
                     <span id="status-text">Offline</span>
@@ -192,14 +190,10 @@
                 Start Full System
             </button>
 
-            <button id="btn-stop-api" class="btn btn-danger" style="margin-top:0.5rem;" onclick="stopApi()">
-                Stop API Server
-            </button>
-
             <div id="message-area" style="display:none;"></div>
 
-            <div id="actions-blocked" class="actions-blocked" style="display:none;">
-                API server is not running. Start the API to enable actions and configuration.
+            <div id="api-hint" class="hint" style="display:none;">
+                API server is not running. Start it to enable the dashboard.
             </div>
         </div>
 
@@ -214,7 +208,7 @@
         const API_URL = 'http://127.0.0.1:29185/api/v1/health';
         const GUI_URL = 'http://127.0.0.1:29185/gui/index.html';
         let pollInterval = null;
-        let apiRunning = false;
+        let isStarting = false;
 
         function setStatus(state, text) {
             const pill = document.getElementById('status-pill');
@@ -228,129 +222,170 @@
             area.textContent = msg;
             area.className = 'message ' + type;
             area.style.display = 'block';
-            setTimeout(() => { area.style.display = 'none'; }, 5000);
+            setTimeout(() => { area.style.display = 'none'; }, 6000);
         }
 
-        function setButtons(apiOn) {
-            apiRunning = apiOn;
-            document.getElementById('btn-start-api').disabled = apiOn;
-            document.getElementById('btn-start-full').disabled = apiOn;
-            document.getElementById('btn-stop-api').disabled = !apiOn;
-            document.getElementById('actions-blocked').style.display = apiOn ? 'none' : 'block';
+        function setButtons(busy) {
+            document.getElementById('btn-start-api').disabled = busy;
+            document.getElementById('btn-start-full').disabled = busy;
         }
 
         async function checkApi() {
             try {
-                const resp = await fetch(API_URL, { method: 'GET', mode: 'no-cors' });
-                // no-cors means we can't read status, so we rely on not throwing
-                setStatus('online', 'Running');
-                setButtons(true);
+                await fetch(API_URL, { method: 'GET', mode: 'cors', cache: 'no-store' });
                 return true;
             } catch (e) {
-                setStatus('offline', 'Offline');
-                setButtons(false);
                 return false;
             }
         }
 
+        async function waitForApi(maxAttempts, onReady) {
+            let attempts = 0;
+            const poll = setInterval(async () => {
+                if (isStarting === false) {
+                    clearInterval(poll);
+                    return;
+                }
+                const ready = await checkApi();
+                attempts++;
+                if (ready) {
+                    clearInterval(poll);
+                    onReady();
+                } else if (attempts > maxAttempts) {
+                    clearInterval(poll);
+                    isStarting = false;
+                    setButtons(false);
+                    setStatus('offline', 'Offline');
+                    showMessage('Server did not start within timeout. Check logs.', 'error');
+                }
+            }, 500);
+        }
+
         async function startApi() {
+            if (isStarting) return;
+            isStarting = true;
+            setButtons(true);
+
             const btn = document.getElementById('btn-start-api');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Starting...';
-            setStatus('starting', 'Starting...');
+            const originalText = btn.textContent;
+            btn.innerHTML = '<span class="spinner"></span> Starting API...';
+            setStatus('starting', 'Starting API...');
 
             try {
-                if (window.pywebview && pywebview.api) {
-                    await pywebview.api.start_api();
-                } else {
-                    // Fallback for browser testing
-                    showMessage('pywebview API not available in browser', 'error');
+                // Check if pywebview API is available
+                if (typeof pywebview === 'undefined' || !pywebview.api) {
+                    showMessage('This page must be opened via the TikTok2Mc GUI application.', 'error');
+                    isStarting = false;
+                    setButtons(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', 'Offline');
                     return;
                 }
 
-                // Poll until API is ready
-                let attempts = 0;
-                const poll = setInterval(async () => {
-                    const ready = await checkApi();
-                    attempts++;
-                    if (ready) {
-                        clearInterval(poll);
-                        showMessage('API server started successfully', 'success');
-                        // Small delay then navigate to full GUI
-                        setTimeout(() => {
-                            window.location.href = GUI_URL;
-                        }, 800);
-                    } else if (attempts > 40) {
-                        clearInterval(poll);
-                        showMessage('API server did not start within timeout', 'error');
-                        setStatus('offline', 'Offline');
-                    }
-                }, 500);
+                const result = await pywebview.api.start_api();
+                if (result === 'already_running') {
+                    showMessage('API is already running', 'success');
+                    window.location.href = GUI_URL;
+                    return;
+                }
+                if (result === 'missing' || String(result).startsWith('missing:')) {
+                    showMessage('Application executable not found. Run a build first.', 'error');
+                    isStarting = false;
+                    setButtons(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', 'Offline');
+                    return;
+                }
+                if (String(result).startsWith('error:')) {
+                    showMessage('Failed to start: ' + result, 'error');
+                    isStarting = false;
+                    setButtons(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', 'Offline');
+                    return;
+                }
+
+                // Poll until ready
+                waitForApi(40, () => {
+                    isStarting = false;
+                    showMessage('API server started', 'success');
+                    setTimeout(() => { window.location.href = GUI_URL; }, 600);
+                });
             } catch (e) {
-                showMessage('Failed to start API: ' + e.message, 'error');
+                showMessage('Error: ' + (e.message || e), 'error');
+                isStarting = false;
+                setButtons(false);
+                btn.textContent = originalText;
                 setStatus('offline', 'Offline');
-                btn.disabled = false;
-                btn.innerHTML = 'Start API Server';
             }
         }
 
         async function startFullSystem() {
+            if (isStarting) return;
+            isStarting = true;
+            setButtons(true);
+
             const btn = document.getElementById('btn-start-full');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Starting...';
-            setStatus('starting', 'Starting...');
+            const originalText = btn.textContent;
+            btn.innerHTML = '<span class="spinner"></span> Starting Full System...';
+            setStatus('starting', 'Starting Full System...');
 
             try {
-                if (window.pywebview && pywebview.api) {
-                    await pywebview.api.start_full_system();
-                } else {
-                    showMessage('pywebview API not available in browser', 'error');
+                if (typeof pywebview === 'undefined' || !pywebview.api) {
+                    showMessage('This page must be opened via the TikTok2Mc GUI application.', 'error');
+                    isStarting = false;
+                    setButtons(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', 'Offline');
                     return;
                 }
 
-                let attempts = 0;
-                const poll = setInterval(async () => {
-                    const ready = await checkApi();
-                    attempts++;
-                    if (ready) {
-                        clearInterval(poll);
-                        showMessage('Full system started successfully', 'success');
-                        setTimeout(() => {
-                            window.location.href = GUI_URL;
-                        }, 800);
-                    } else if (attempts > 60) {
-                        clearInterval(poll);
-                        showMessage('Full system did not start within timeout', 'error');
-                        setStatus('offline', 'Offline');
-                    }
-                }, 500);
-            } catch (e) {
-                showMessage('Failed to start full system: ' + e.message, 'error');
-                setStatus('offline', 'Offline');
-                btn.disabled = false;
-                btn.innerHTML = 'Start Full System';
-            }
-        }
-
-        async function stopApi() {
-            const btn = document.getElementById('btn-stop-api');
-            btn.disabled = true;
-
-            try {
-                if (window.pywebview && pywebview.api) {
-                    await pywebview.api.stop_api();
+                const result = await pywebview.api.start_full_system();
+                if (result === 'already_running') {
+                    showMessage('Full system is already running', 'success');
+                    window.location.href = GUI_URL;
+                    return;
                 }
-                showMessage('API server stopped', 'info');
-                setStatus('offline', 'Offline');
-                setButtons(false);
+                if (result === 'missing' || String(result).startsWith('missing:')) {
+                    showMessage('Application executable not found. Run a build first.', 'error');
+                    isStarting = false;
+                    setButtons(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', 'Offline');
+                    return;
+                }
+                if (String(result).startsWith('error:')) {
+                    showMessage('Failed to start: ' + result, 'error');
+                    isStarting = false;
+                    setButtons(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', 'Offline');
+                    return;
+                }
+
+                waitForApi(60, () => {
+                    isStarting = false;
+                    showMessage('Full system started', 'success');
+                    setTimeout(() => { window.location.href = GUI_URL; }, 600);
+                });
             } catch (e) {
-                showMessage('Failed to stop API: ' + e.message, 'error');
+                showMessage('Error: ' + (e.message || e), 'error');
+                isStarting = false;
+                setButtons(false);
+                btn.textContent = originalText;
+                setStatus('offline', 'Offline');
             }
         }
 
-        // Initial check and start polling
-        checkApi();
-        pollInterval = setInterval(checkApi, 2000);
+        // Initial check
+        checkApi().then(ready => {
+            if (ready) {
+                setStatus('online', 'Running');
+                window.location.href = GUI_URL;
+            } else {
+                document.getElementById('api-hint').style.display = 'block';
+            }
+        });
     </script>
 </body>
 </html>
