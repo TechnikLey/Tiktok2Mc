@@ -806,11 +806,6 @@ if _plugin_overlay_names:
     for name in _plugin_overlay_names:
         log.info(f"  {name}: http://127.0.0.1:29185/api/v1/plugins/{name}/overlay")
 
-# Start plugin health checker background thread
-_health_thread = threading.Thread(target=_plugin_health_check_loop, daemon=True)
-_health_thread.start()
-log.info("Plugin health checker started")
-
 # =============================================================================
 # STATE
 # =============================================================================
@@ -945,6 +940,11 @@ def _write_plugin_signal_api(plugin_name: str, action: str) -> bool:
         log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
         return False
 
+
+# Start plugin health checker background thread
+_health_thread = threading.Thread(target=_plugin_health_check_loop, daemon=True)
+_health_thread.start()
+log.info("Plugin health checker started")
 
 # =============================================================================
 # FILE WATCHER
