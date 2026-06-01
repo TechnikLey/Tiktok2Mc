@@ -45,12 +45,9 @@ if not LAUNCHER_HTML.exists():
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 # gui.exe lives in build/release/core/ (release) or src/python/ (dev)
-# app.exe lives next to gui.exe in core/
 # start.exe lives one directory above gui.exe (build/release/)
-APP_EXE = (BASE_DIR / f"app{SUFFIX}").resolve()
 START_EXE = (BASE_DIR.parent / f"start{SUFFIX}").resolve()
 
-_api_proc = None
 _full_system_proc = None
 
 
@@ -85,36 +82,7 @@ class LauncherAPI:
         self._close_requested = False
 
     # ---- Server control ----
-    def start_api(self) -> str:
-        """Start the API server process (core/app)."""
-        global _api_proc, _full_system_proc
-        if _api_ready(timeout=2.0):
-            return "already_running"
-
-        if _full_system_proc is not None:
-            return "full_system_active"
-
-        if not APP_EXE.exists():
-            return f"missing:{APP_EXE}"
-
-        try:
-            if IS_WINDOWS:
-                _api_proc = subprocess.Popen(
-                    [str(APP_EXE)],
-                    creationflags=subprocess.CREATE_NEW_CONSOLE,
-                )
-            else:
-                log_file = BASE_DIR / "logs" / "api_server.log"
-                log_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(log_file, "w", encoding="utf-8") as lf:
-                    _api_proc = subprocess.Popen([str(APP_EXE)], stdout=lf, stderr=lf)
-            log.info("API server process started (PID %s)", _api_proc.pid if _api_proc else "?")
-            return "started"
-        except Exception as e:
-            log.error("Failed to start API server: %s", e)
-            return f"error:{e}"
-
-    def start_full_system(self) -> str:
+    def start_system(self) -> str:
         """Start the full system (start.exe)."""
         global _full_system_proc, _api_proc
         if _full_system_proc is not None:
@@ -140,27 +108,9 @@ class LauncherAPI:
             log.error("Failed to start full system: %s", e)
             return f"error:{e}"
 
-    def stop_api(self) -> str:
-        """Stop the API server process."""
-        global _api_proc, _full_system_proc
-        stopped = False
-
-        if _api_proc is not None and _api_proc.poll() is None:
-            try:
-                if IS_WINDOWS:
-                    subprocess.run(
-                        ["taskkill", "/F", "/PID", str(_api_proc.pid), "/T"],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        check=False,
-                    )
-                else:
-                    _api_proc.terminate()
-                stopped = True
-            except Exception as e:
-                log.warning("Failed to terminate API process: %s", e)
-            _api_proc = None
-
+    def stop_system(self) -> str:
+        """Stop the system process."""
+        global _full_system_proc
         if _full_system_proc is not None and _full_system_proc.poll() is None:
             try:
                 if IS_WINDOWS:
@@ -172,12 +122,11 @@ class LauncherAPI:
                     )
                 else:
                     _full_system_proc.terminate()
-                stopped = True
+                _full_system_proc = None
+                return "stopped"
             except Exception as e:
-                log.warning("Failed to terminate full system process: %s", e)
-            _full_system_proc = None
-
-        return "stopped" if stopped else "not_running"
+                log.warning("Failed to terminate system process: %s", e)
+        return "not_running"
 
     def get_api_status(self) -> str:
         """Return current API server status."""
@@ -185,28 +134,25 @@ class LauncherAPI:
             return "running"
         if _full_system_proc is not None and _full_system_proc.poll() is None:
             return "starting"
-        if _api_proc is not None and _api_proc.poll() is None:
-            return "starting"
         return "offline"
 
 
 def _cleanup_processes():
     """Terminate any spawned processes on GUI exit."""
-    global _api_proc, _full_system_proc
-    for proc in (_api_proc, _full_system_proc):
-        if proc is not None and proc.poll() is None:
-            try:
-                if IS_WINDOWS:
-                    subprocess.run(
-                        ["taskkill", "/F", "/PID", str(proc.pid), "/T"],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        check=False,
-                    )
-                else:
-                    proc.terminate()
-            except Exception:
-                pass
+    global _full_system_proc
+    if _full_system_proc is not None and _full_system_proc.poll() is None:
+        try:
+            if IS_WINDOWS:
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(_full_system_proc.pid), "/T"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            else:
+                _full_system_proc.terminate()
+        except Exception:
+            pass
 
 
 atexit.register(_cleanup_processes)

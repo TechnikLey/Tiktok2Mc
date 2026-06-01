@@ -112,17 +112,6 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
-        .btn-secondary {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            margin-top: 0.5rem;
-        }
-        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-        .btn-secondary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
         .spinner {
             width: 16px;
             height: 16px;
@@ -182,24 +171,20 @@
                 </span>
             </div>
 
-            <button id="btn-start-api" class="btn btn-primary" onclick="startApi()">
-                Start API Server
-            </button>
-
-            <button id="btn-start-full" class="btn btn-secondary" onclick="startFullSystem()">
-                Start Full System
+            <button id="btn-start" class="btn btn-primary" onclick="startSystem()">
+                Start System
             </button>
 
             <div id="message-area" style="display:none;"></div>
 
             <div id="api-hint" class="hint" style="display:none;">
-                API server is not running. Start it to enable the dashboard.
+                System is not running. Start it to open the dashboard.
             </div>
         </div>
 
         <div class="card" style="text-align:center; padding:1rem;">
             <p style="font-size:0.8rem; color:var(--muted);">
-                When the API server is running, the full dashboard will open automatically.
+                When the system is running, the full dashboard will open automatically.
             </p>
         </div>
     </div>
@@ -207,7 +192,6 @@
     <script>
         const API_URL = 'http://127.0.0.1:29185/api/v1/health';
         const GUI_URL = 'http://127.0.0.1:29185/gui/index.html';
-        let pollInterval = null;
         let isStarting = false;
 
         function setStatus(state, text) {
@@ -225,9 +209,8 @@
             setTimeout(() => { area.style.display = 'none'; }, 6000);
         }
 
-        function setButtons(busy) {
-            document.getElementById('btn-start-api').disabled = busy;
-            document.getElementById('btn-start-full').disabled = busy;
+        function setButton(busy) {
+            document.getElementById('btn-start').disabled = busy;
         }
 
         async function checkApi() {
@@ -254,37 +237,36 @@
                 } else if (attempts > maxAttempts) {
                     clearInterval(poll);
                     isStarting = false;
-                    setButtons(false);
+                    setButton(false);
                     setStatus('offline', 'Offline');
-                    showMessage('Server did not start within timeout. Check logs.', 'error');
+                    showMessage('System did not start within timeout. Check logs.', 'error');
                 }
             }, 500);
         }
 
-        async function startApi() {
+        async function startSystem() {
             if (isStarting) return;
             isStarting = true;
-            setButtons(true);
+            setButton(true);
 
-            const btn = document.getElementById('btn-start-api');
+            const btn = document.getElementById('btn-start');
             const originalText = btn.textContent;
-            btn.innerHTML = '<span class="spinner"></span> Starting API...';
-            setStatus('starting', 'Starting API...');
+            btn.innerHTML = '<span class="spinner"></span> Starting...';
+            setStatus('starting', 'Starting...');
 
             try {
-                // Check if pywebview API is available
                 if (typeof pywebview === 'undefined' || !pywebview.api) {
                     showMessage('This page must be opened via the TikTok2Mc GUI application.', 'error');
                     isStarting = false;
-                    setButtons(false);
+                    setButton(false);
                     btn.textContent = originalText;
                     setStatus('offline', 'Offline');
                     return;
                 }
 
-                const result = await pywebview.api.start_api();
+                const result = await pywebview.api.start_system();
                 if (result === 'already_running') {
-                    showMessage('API is already running', 'success');
+                    showMessage('System is already running', 'success');
                     window.location.href = GUI_URL;
                     return;
                 }
@@ -292,7 +274,7 @@
                     const path = String(result).replace('missing:', '');
                     showMessage('Executable not found:\n' + path, 'error');
                     isStarting = false;
-                    setButtons(false);
+                    setButton(false);
                     btn.textContent = originalText;
                     setStatus('offline', 'Offline');
                     return;
@@ -300,66 +282,7 @@
                 if (String(result).startsWith('error:')) {
                     showMessage('Failed to start: ' + result, 'error');
                     isStarting = false;
-                    setButtons(false);
-                    btn.textContent = originalText;
-                    setStatus('offline', 'Offline');
-                    return;
-                }
-
-                // Poll until ready
-                waitForApi(40, () => {
-                    isStarting = false;
-                    showMessage('API server started', 'success');
-                    setTimeout(() => { window.location.href = GUI_URL; }, 600);
-                });
-            } catch (e) {
-                showMessage('Error: ' + (e.message || e), 'error');
-                isStarting = false;
-                setButtons(false);
-                btn.textContent = originalText;
-                setStatus('offline', 'Offline');
-            }
-        }
-
-        async function startFullSystem() {
-            if (isStarting) return;
-            isStarting = true;
-            setButtons(true);
-
-            const btn = document.getElementById('btn-start-full');
-            const originalText = btn.textContent;
-            btn.innerHTML = '<span class="spinner"></span> Starting Full System...';
-            setStatus('starting', 'Starting Full System...');
-
-            try {
-                if (typeof pywebview === 'undefined' || !pywebview.api) {
-                    showMessage('This page must be opened via the TikTok2Mc GUI application.', 'error');
-                    isStarting = false;
-                    setButtons(false);
-                    btn.textContent = originalText;
-                    setStatus('offline', 'Offline');
-                    return;
-                }
-
-                const result = await pywebview.api.start_full_system();
-                if (result === 'already_running') {
-                    showMessage('Full system is already running', 'success');
-                    window.location.href = GUI_URL;
-                    return;
-                }
-                if (result === 'missing' || String(result).startsWith('missing:')) {
-                    const path = String(result).replace('missing:', '');
-                    showMessage('Executable not found:\n' + path, 'error');
-                    isStarting = false;
-                    setButtons(false);
-                    btn.textContent = originalText;
-                    setStatus('offline', 'Offline');
-                    return;
-                }
-                if (String(result).startsWith('error:')) {
-                    showMessage('Failed to start: ' + result, 'error');
-                    isStarting = false;
-                    setButtons(false);
+                    setButton(false);
                     btn.textContent = originalText;
                     setStatus('offline', 'Offline');
                     return;
@@ -367,13 +290,13 @@
 
                 waitForApi(60, () => {
                     isStarting = false;
-                    showMessage('Full system started', 'success');
+                    showMessage('System started', 'success');
                     setTimeout(() => { window.location.href = GUI_URL; }, 600);
                 });
             } catch (e) {
                 showMessage('Error: ' + (e.message || e), 'error');
                 isStarting = false;
-                setButtons(false);
+                setButton(false);
                 btn.textContent = originalText;
                 setStatus('offline', 'Offline');
             }

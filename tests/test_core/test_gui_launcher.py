@@ -23,7 +23,6 @@ from python.gui import (
     LauncherAPI,
     _api_ready,
     IS_WINDOWS,
-    APP_EXE,
     START_EXE,
 )
 
@@ -69,76 +68,32 @@ class TestLauncherAPIStatus:
         api = LauncherAPI()
         assert api.get_api_status() == "running"
 
-    def test_status_starting_when_api_process_alive(self, monkeypatch):
+    def test_status_starting_when_system_process_alive(self, monkeypatch):
         monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
         mock_proc = MagicMock()
         mock_proc.poll.return_value = None
-        monkeypatch.setattr("python.gui._api_proc", mock_proc)
-        monkeypatch.setattr("python.gui._full_system_proc", None)
+        monkeypatch.setattr("python.gui._full_system_proc", mock_proc)
         api = LauncherAPI()
         assert api.get_api_status() == "starting"
 
 
-class TestLauncherAPIStartApi:
-    """Tests for LauncherAPI.start_api."""
+class TestLauncherAPIStartSystem:
+    """Tests for LauncherAPI.start_system."""
 
-    def test_returns_already_running_when_api_ready(self, monkeypatch):
-        monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
+    def test_returns_already_running_when_system_running(self, monkeypatch):
+        monkeypatch.setattr("python.gui._full_system_proc", MagicMock())
         api = LauncherAPI()
-        assert api.start_api() == "already_running"
-
-    def test_returns_missing_when_app_exe_not_found(self, monkeypatch, tmp_path):
-        fake_exe = tmp_path / "nonexistent.exe"
-        monkeypatch.setattr("python.gui.APP_EXE", fake_exe)
-        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
-        api = LauncherAPI()
-        result = api.start_api()
-        assert result.startswith("missing:")
-
-    def test_starts_process_when_api_offline(self, monkeypatch, tmp_path):
-        fake_exe = tmp_path / "app.exe"
-        fake_exe.write_text("")  # Create empty file so exists() returns True
-        monkeypatch.setattr("python.gui.APP_EXE", fake_exe)
-        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
-        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
-
-        mock_popen = MagicMock()
-        mock_popen.return_value.pid = 12345
-        monkeypatch.setattr("subprocess.Popen", mock_popen)
-
-        api = LauncherAPI()
-        result = api.start_api()
-        assert result == "started"
-        mock_popen.assert_called_once()
-
-    def test_returns_error_on_process_failure(self, monkeypatch, tmp_path):
-        fake_exe = tmp_path / "app.exe"
-        fake_exe.write_text("")
-        monkeypatch.setattr("python.gui.APP_EXE", fake_exe)
-        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
-
-        monkeypatch.setattr(
-            "subprocess.Popen",
-            MagicMock(side_effect=OSError("Permission denied"))
-        )
-
-        api = LauncherAPI()
-        result = api.start_api()
-        assert result.startswith("error:")
-
-
-class TestLauncherAPIStartFullSystem:
-    """Tests for LauncherAPI.start_full_system."""
+        assert api.start_system() == "already_running"
 
     def test_returns_missing_when_start_exe_not_found(self, monkeypatch, tmp_path):
         fake_exe = tmp_path / "nonexistent.bin"
         monkeypatch.setattr("python.gui.START_EXE", fake_exe)
         monkeypatch.setattr("python.gui._full_system_proc", None)
         api = LauncherAPI()
-        result = api.start_full_system()
+        result = api.start_system()
         assert result.startswith("missing:")
 
-    def test_starts_full_system_process(self, monkeypatch, tmp_path):
+    def test_starts_system_process(self, monkeypatch, tmp_path):
         fake_exe = tmp_path / "start.exe"
         fake_exe.write_text("")
         monkeypatch.setattr("python.gui.START_EXE", fake_exe)
@@ -150,46 +105,56 @@ class TestLauncherAPIStartFullSystem:
         monkeypatch.setattr("subprocess.Popen", mock_popen)
 
         api = LauncherAPI()
-        result = api.start_full_system()
+        result = api.start_system()
         assert result == "started"
         mock_popen.assert_called_once()
 
+    def test_returns_error_on_process_failure(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "start.exe"
+        fake_exe.write_text("")
+        monkeypatch.setattr("python.gui.START_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._full_system_proc", None)
+
+        monkeypatch.setattr(
+            "subprocess.Popen",
+            MagicMock(side_effect=OSError("Permission denied"))
+        )
+
+        api = LauncherAPI()
+        result = api.start_system()
+        assert result.startswith("error:")
+
 
 class TestLauncherAPIStop:
-    """Tests for LauncherAPI.stop_api."""
+    """Tests for LauncherAPI.stop_system."""
 
     def test_returns_not_running_when_no_process(self):
         api = LauncherAPI()
-        assert api.stop_api() == "not_running"
+        assert api.stop_system() == "not_running"
 
-    def test_stops_api_process(self, monkeypatch):
+    def test_stops_system_process(self, monkeypatch):
         mock_proc = MagicMock()
         mock_proc.poll.return_value = None
-        monkeypatch.setattr("python.gui._api_proc", mock_proc)
-        monkeypatch.setattr("python.gui._full_system_proc", None)
+        monkeypatch.setattr("python.gui._full_system_proc", mock_proc)
         monkeypatch.setattr("python.gui.IS_WINDOWS", True)
 
         mock_run = MagicMock()
         monkeypatch.setattr("subprocess.run", mock_run)
 
         api = LauncherAPI()
-        assert api.stop_api() == "stopped"
+        assert api.stop_system() == "stopped"
         mock_run.assert_called_once()
 
-    def test_stops_both_processes(self, monkeypatch):
-        mock_api = MagicMock()
-        mock_api.poll.return_value = None
-        mock_full = MagicMock()
-        mock_full.poll.return_value = None
-        monkeypatch.setattr("python.gui._api_proc", mock_api)
-        monkeypatch.setattr("python.gui._full_system_proc", mock_full)
+    def test_stops_system_process_on_linux(self, monkeypatch):
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        monkeypatch.setattr("python.gui._full_system_proc", mock_proc)
         monkeypatch.setattr("python.gui.IS_WINDOWS", False)
 
         api = LauncherAPI()
-        result = api.stop_api()
+        result = api.stop_system()
         assert result == "stopped"
-        mock_api.terminate.assert_called_once()
-        mock_full.terminate.assert_called_once()
+        mock_proc.terminate.assert_called_once()
 
 
 class TestLauncherAPICloseFlow:

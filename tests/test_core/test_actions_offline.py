@@ -117,13 +117,11 @@ class TestActionBlockingInLauncher:
                 return p.read_text(encoding="utf-8")
         raise FileNotFoundError("launcher.html not found in any known location")
 
-    def test_launcher_shows_start_buttons_when_offline(self):
-        """The launcher must show Start API and Start Full System buttons."""
+    def test_launcher_shows_start_button_when_offline(self):
+        """The launcher must show a Start System button."""
         content = self._load_launcher_html()
-        assert "btn-start-api" in content
-        assert "btn-start-full" in content
-        assert "Start API Server" in content
-        assert "Start Full System" in content
+        assert "btn-start" in content
+        assert "Start System" in content
 
     def test_launcher_navigates_to_dashboard_when_online(self):
         """When API comes online, launcher should navigate to full dashboard."""
@@ -134,5 +132,5 @@ class TestActionBlockingInLauncher:
     def test_launcher_no_stop_button_on_offline_page(self):
         """The offline launcher should not show a stop button."""
         content = self._load_launcher_html()
-        assert "btn-stop-api" not in content
-        assert "Stop API" not in content
+        assert "btn-stop" not in content
+        assert "Stop" not in content
