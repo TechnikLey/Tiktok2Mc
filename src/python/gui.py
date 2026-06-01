@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """TikTok2Mc — Central GUI (pywebview shell).
 
-Opens the dashboard served by the central API server at /gui.
-Supports --gui-hidden for headless / DCS mode.
+Opens a local launcher dashboard that works without the API server.
+Users can start the API server on-demand from within the GUI.
+Supports --gui-hidden for headless mode.
 """
 
 import sys
@@ -12,13 +13,16 @@ import logging
 import time
 import urllib.request
 import urllib.error
+import subprocess
+import atexit
+from pathlib import Path
 
 # Ensure src/ is on the path for development runs.
 _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.paths import get_base_dir
+from core.paths import get_base_dir, get_root_dir
 from core.api.server import DEFAULT_PORT
 
 logging.basicConfig(
@@ -30,22 +34,176 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 BASE_DIR = get_base_dir()
+ROOT_DIR = get_root_dir()
 API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
 GUI_URL = f"{API_URL}/gui/index.html"
+LAUNCHER_HTML = ROOT_DIR / "templates" / "gui" / "launcher.html"
+
+IS_WINDOWS = sys.platform == "win32"
+SUFFIX = ".exe" if IS_WINDOWS else ".bin"
+APP_EXE = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
+START_EXE = (BASE_DIR / f"start{SUFFIX}").resolve()
+
+_api_proc = None
+_full_system_proc = None
 
 
-def _api_ready(timeout: float = 20.0) -> bool:
-    """Poll the API health endpoint until it responds or timeout expires."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+def _api_ready(timeout: float = 1.0) -> bool:
+    """Quick check if the API health endpoint responds."""
+    try:
+        with urllib.request.urlopen(f"{API_URL}/api/v1/health", timeout=timeout) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+class LauncherAPI:
+    """JS-accessible API for the launcher page.
+
+    Methods are callable from JavaScript via pywebview.api.*().
+    All methods must be synchronous (no I/O, no evaluate_js).
+    """
+
+    def __init__(self):
+        self._approved = False
+        self._close_requested = False
+
+    # ---- Close flow ----
+    def approve_close(self):
+        self._approved = True
+
+    def close_requested(self) -> bool:
+        return self._close_requested
+
+    def reset_close_request(self):
+        self._close_requested = False
+
+    # ---- Server control ----
+    def start_api(self) -> str:
+        """Start the API server process (core/app)."""
+        global _api_proc, _full_system_proc
+        if _api_ready(timeout=2.0):
+            return "already_running"
+
+        if _full_system_proc is not None:
+            return "full_system_active"
+
+        if not APP_EXE.exists():
+            return f"missing:{APP_EXE}"
+
         try:
-            with urllib.request.urlopen(f"{API_URL}/api/v1/health", timeout=1) as resp:
-                if resp.status == 200:
-                    return True
-        except Exception:
-            pass
-        time.sleep(0.5)
-    return False
+            if IS_WINDOWS:
+                _api_proc = subprocess.Popen(
+                    [str(APP_EXE)],
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                )
+            else:
+                log_file = BASE_DIR / "logs" / "api_server.log"
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_file, "w", encoding="utf-8") as lf:
+                    _api_proc = subprocess.Popen([str(APP_EXE)], stdout=lf, stderr=lf)
+            log.info("API server process started (PID %s)", _api_proc.pid if _api_proc else "?")
+            return "started"
+        except Exception as e:
+            log.error("Failed to start API server: %s", e)
+            return f"error:{e}"
+
+    def start_full_system(self) -> str:
+        """Start the full system (start.exe)."""
+        global _full_system_proc, _api_proc
+        if _full_system_proc is not None:
+            return "already_running"
+
+        if not START_EXE.exists():
+            return f"missing:{START_EXE}"
+
+        try:
+            if IS_WINDOWS:
+                _full_system_proc = subprocess.Popen(
+                    [str(START_EXE)],
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                )
+            else:
+                log_file = BASE_DIR / "logs" / "full_system.log"
+                log_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_file, "w", encoding="utf-8") as lf:
+                    _full_system_proc = subprocess.Popen([str(START_EXE)], stdout=lf, stderr=lf)
+            log.info("Full system process started (PID %s)", _full_system_proc.pid if _full_system_proc else "?")
+            return "started"
+        except Exception as e:
+            log.error("Failed to start full system: %s", e)
+            return f"error:{e}"
+
+    def stop_api(self) -> str:
+        """Stop the API server process."""
+        global _api_proc, _full_system_proc
+        stopped = False
+
+        if _api_proc is not None and _api_proc.poll() is None:
+            try:
+                if IS_WINDOWS:
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(_api_proc.pid), "/T"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    _api_proc.terminate()
+                stopped = True
+            except Exception as e:
+                log.warning("Failed to terminate API process: %s", e)
+            _api_proc = None
+
+        if _full_system_proc is not None and _full_system_proc.poll() is None:
+            try:
+                if IS_WINDOWS:
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(_full_system_proc.pid), "/T"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    _full_system_proc.terminate()
+                stopped = True
+            except Exception as e:
+                log.warning("Failed to terminate full system process: %s", e)
+            _full_system_proc = None
+
+        return "stopped" if stopped else "not_running"
+
+    def get_api_status(self) -> str:
+        """Return current API server status."""
+        if _api_ready(timeout=1.0):
+            return "running"
+        if _full_system_proc is not None and _full_system_proc.poll() is None:
+            return "starting"
+        if _api_proc is not None and _api_proc.poll() is None:
+            return "starting"
+        return "offline"
+
+
+def _cleanup_processes():
+    """Terminate any spawned processes on GUI exit."""
+    global _api_proc, _full_system_proc
+    for proc in (_api_proc, _full_system_proc):
+        if proc is not None and proc.poll() is None:
+            try:
+                if IS_WINDOWS:
+                    subprocess.run(
+                        ["taskkill", "/F", "/PID", str(proc.pid), "/T"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    proc.terminate()
+            except Exception:
+                pass
+
+
+atexit.register(_cleanup_processes)
 
 
 def main() -> None:
@@ -57,13 +215,27 @@ def main() -> None:
         log.info("GUI hidden mode — exiting.")
         sys.exit(0)
 
-    log.info("Waiting for API server (%s) ...", API_URL)
-    if not _api_ready():
-        log.error("API server not reachable within timeout. GUI cannot start.")
-        input("Press Enter to exit...")
-        sys.exit(1)
+    log.info("Starting GUI launcher...")
 
-    log.info("Starting GUI at %s", GUI_URL)
+    # If API is already running, go straight to the full dashboard
+    if _api_ready(timeout=2.0):
+        log.info("API server already running — opening dashboard at %s", GUI_URL)
+        _open_window(GUI_URL)
+        return
+
+    # Otherwise show the launcher page
+    if not LAUNCHER_HTML.exists():
+        log.error("Launcher HTML not found at %s", LAUNCHER_HTML)
+        # Fallback: try to open API URL anyway
+        _open_window(GUI_URL)
+        return
+
+    log.info("API offline — showing launcher at %s", LAUNCHER_HTML)
+    _open_window(str(LAUNCHER_HTML))
+
+
+def _open_window(url: str) -> None:
+    """Open pywebview window with the given URL."""
     try:
         import webview
     except ImportError as exc:
@@ -71,41 +243,21 @@ def main() -> None:
         input("Press Enter to exit...")
         sys.exit(1)
 
-    class _CloseApi:
-        """JS-accessible API for the unsaved-changes close flow.
-
-        Methods are callable from JavaScript via pywebview.api.*().
-        All methods must be synchronous (no I/O, no evaluate_js).
-        """
-
-        def __init__(self):
-            self._approved = False
-            self._close_requested = False
-
-        def approve_close(self):
-            self._approved = True
-
-        def close_requested(self) -> bool:
-            return self._close_requested
-
-        def reset_close_request(self):
-            self._close_requested = False
-
-    close_api = _CloseApi()
+    launcher_api = LauncherAPI()
 
     window = webview.create_window(
         "TikTok2Mc",
-        GUI_URL,
+        url,
         width=1280,
         height=800,
         min_size=(800, 600),
-        js_api=close_api,
+        js_api=launcher_api,
     )
 
     def _on_closing():
-        if close_api._approved:
+        if launcher_api._approved:
             return True
-        close_api._close_requested = True
+        launcher_api._close_requested = True
         return False
 
     window.events.closing += _on_closing

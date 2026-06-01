@@ -82,7 +82,7 @@ FunctionEnd
 Function StartupPageLeave
   ${NSD_GetState} $StartupCheckbox $0
   StrCmp $0 "1" "" +2
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" "$INSTDIR\start.exe"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" "$INSTDIR\core\gui.exe"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
 FunctionEnd
 
@@ -111,7 +111,7 @@ Section "TikTok2MC" SEC_APP
   WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
   WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
-  WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\start.exe,0"
+  WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\core\gui.exe,0"
   WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "UninstallString" "$INSTDIR\uninstall.exe"
   WriteRegDword HKLM "${PRODUCT_UNINSTALL_KEY}" "NoModify" 1
   WriteRegDword HKLM "${PRODUCT_UNINSTALL_KEY}" "NoRepair" 1
@@ -121,12 +121,13 @@ Section "TikTok2MC" SEC_APP
 SectionEnd
 
 Section "Desktop Shortcut" SEC_DESKTOP
-  CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\start.exe" "" "$INSTDIR\start.exe" 0
+  CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\core\gui.exe" "" "$INSTDIR\core\gui.exe" 0
 SectionEnd
 
 Section "Start Menu Shortcut" SEC_STARTMENU
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\TikTok2MC.lnk" "$INSTDIR\start.exe" "" "$INSTDIR\start.exe" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\TikTok2MC.lnk" "$INSTDIR\core\gui.exe" "" "$INSTDIR\core\gui.exe" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Start Full System.lnk" "$INSTDIR\start.exe" "" "$INSTDIR\start.exe" 0
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
 SectionEnd
 

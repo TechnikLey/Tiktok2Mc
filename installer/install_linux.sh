@@ -86,9 +86,22 @@ cat > "$DESKTOP_FILE" << 'EOF'
 [Desktop Entry]
 Name=TikTok2Mc
 Comment=Connect TikTok Live to Minecraft
-Exec=/opt/TikTok2Mc/start.bin
+Exec=/opt/TikTok2Mc/core/gui.bin
 Icon=/opt/TikTok2Mc/core/assets/icon.png
 Terminal=false
+Type=Application
+Categories=Game;Network;
+EOF
+
+# Also create a "Start Full System" desktop entry
+FULLSYSTEM_FILE="/usr/share/applications/tiktok2mc-fullsystem.desktop"
+cat > "$FULLSYSTEM_FILE" << 'EOF'
+[Desktop Entry]
+Name=TikTok2Mc (Full System)
+Comment=Start the complete TikTok2Mc stack including API and Minecraft server
+Exec=/opt/TikTok2Mc/start.bin
+Icon=/opt/TikTok2Mc/core/assets/icon.png
+Terminal=true
 Type=Application
 Categories=Game;Network;
 EOF
@@ -111,6 +124,7 @@ fi
 echo "Removing TikTok2Mc..."
 rm -rf /opt/TikTok2Mc
 rm -f /usr/share/applications/tiktok2mc.desktop
+rm -f /usr/share/applications/tiktok2mc-fullsystem.desktop
 rm -f /usr/local/bin/tiktok2mc
 echo "TikTok2Mc has been uninstalled."
 EOF

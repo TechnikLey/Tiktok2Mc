@@ -1,0 +1,259 @@
+"""Tests for GUI offline-first startup and on-demand API control.
+
+These tests verify that:
+1. gui.py can start without an API server running
+2. The LauncherAPI correctly starts/stops the API server
+3. Action blocking works when API is offline
+"""
+
+import sys
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch, PropertyMock
+import pytest
+
+_src = Path(__file__).resolve().parent.parent.parent / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))
+
+# Mock webview before importing gui.py
+sys.modules["webview"] = MagicMock()
+
+from python.gui import (
+    LauncherAPI,
+    _api_ready,
+    IS_WINDOWS,
+    APP_EXE,
+    START_EXE,
+)
+
+
+class TestApiReady:
+    """Tests for the _api_ready health check."""
+
+    def test_api_ready_when_health_endpoint_responds(self, monkeypatch):
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        # urlopen is used as a context manager
+        mock_cm = MagicMock(__enter__=MagicMock(return_value=mock_resp), __exit__=MagicMock(return_value=False))
+        monkeypatch.setattr("urllib.request.urlopen", MagicMock(return_value=mock_cm))
+        assert _api_ready(timeout=1.0) is True
+
+    def test_api_ready_false_when_connection_fails(self, monkeypatch):
+        import urllib.request
+        monkeypatch.setattr(
+            urllib.request, "urlopen",
+            MagicMock(side_effect=urllib.error.URLError("Connection refused"))
+        )
+        assert _api_ready(timeout=0.1) is False
+
+    def test_api_ready_false_on_timeout(self, monkeypatch):
+        import urllib.request
+        monkeypatch.setattr(
+            urllib.request, "urlopen",
+            MagicMock(side_effect=TimeoutError())
+        )
+        assert _api_ready(timeout=0.1) is False
+
+
+class TestLauncherAPIStatus:
+    """Tests for LauncherAPI.get_api_status."""
+
+    def test_status_offline_when_nothing_running(self, monkeypatch):
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+        api = LauncherAPI()
+        assert api.get_api_status() == "offline"
+
+    def test_status_running_when_api_responds(self, monkeypatch):
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
+        api = LauncherAPI()
+        assert api.get_api_status() == "running"
+
+    def test_status_starting_when_api_process_alive(self, monkeypatch):
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        monkeypatch.setattr("python.gui._api_proc", mock_proc)
+        monkeypatch.setattr("python.gui._full_system_proc", None)
+        api = LauncherAPI()
+        assert api.get_api_status() == "starting"
+
+
+class TestLauncherAPIStartApi:
+    """Tests for LauncherAPI.start_api."""
+
+    def test_returns_already_running_when_api_ready(self, monkeypatch):
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
+        api = LauncherAPI()
+        assert api.start_api() == "already_running"
+
+    def test_returns_missing_when_app_exe_not_found(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "nonexistent.exe"
+        monkeypatch.setattr("python.gui.APP_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+        api = LauncherAPI()
+        result = api.start_api()
+        assert result.startswith("missing:")
+
+    def test_starts_process_when_api_offline(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "app.exe"
+        fake_exe.write_text("")  # Create empty file so exists() returns True
+        monkeypatch.setattr("python.gui.APP_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
+
+        mock_popen = MagicMock()
+        mock_popen.return_value.pid = 12345
+        monkeypatch.setattr("subprocess.Popen", mock_popen)
+
+        api = LauncherAPI()
+        result = api.start_api()
+        assert result == "started"
+        mock_popen.assert_called_once()
+
+    def test_returns_error_on_process_failure(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "app.exe"
+        fake_exe.write_text("")
+        monkeypatch.setattr("python.gui.APP_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+
+        monkeypatch.setattr(
+            "subprocess.Popen",
+            MagicMock(side_effect=OSError("Permission denied"))
+        )
+
+        api = LauncherAPI()
+        result = api.start_api()
+        assert result.startswith("error:")
+
+
+class TestLauncherAPIStartFullSystem:
+    """Tests for LauncherAPI.start_full_system."""
+
+    def test_returns_missing_when_start_exe_not_found(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "nonexistent.bin"
+        monkeypatch.setattr("python.gui.START_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._full_system_proc", None)
+        api = LauncherAPI()
+        result = api.start_full_system()
+        assert result.startswith("missing:")
+
+    def test_starts_full_system_process(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "start.exe"
+        fake_exe.write_text("")
+        monkeypatch.setattr("python.gui.START_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._full_system_proc", None)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
+
+        mock_popen = MagicMock()
+        mock_popen.return_value.pid = 67890
+        monkeypatch.setattr("subprocess.Popen", mock_popen)
+
+        api = LauncherAPI()
+        result = api.start_full_system()
+        assert result == "started"
+        mock_popen.assert_called_once()
+
+
+class TestLauncherAPIStop:
+    """Tests for LauncherAPI.stop_api."""
+
+    def test_returns_not_running_when_no_process(self):
+        api = LauncherAPI()
+        assert api.stop_api() == "not_running"
+
+    def test_stops_api_process(self, monkeypatch):
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        monkeypatch.setattr("python.gui._api_proc", mock_proc)
+        monkeypatch.setattr("python.gui._full_system_proc", None)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
+
+        mock_run = MagicMock()
+        monkeypatch.setattr("subprocess.run", mock_run)
+
+        api = LauncherAPI()
+        assert api.stop_api() == "stopped"
+        mock_run.assert_called_once()
+
+    def test_stops_both_processes(self, monkeypatch):
+        mock_api = MagicMock()
+        mock_api.poll.return_value = None
+        mock_full = MagicMock()
+        mock_full.poll.return_value = None
+        monkeypatch.setattr("python.gui._api_proc", mock_api)
+        monkeypatch.setattr("python.gui._full_system_proc", mock_full)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", False)
+
+        api = LauncherAPI()
+        result = api.stop_api()
+        assert result == "stopped"
+        mock_api.terminate.assert_called_once()
+        mock_full.terminate.assert_called_once()
+
+
+class TestLauncherAPICloseFlow:
+    """Tests for the unsaved-changes close flow (backward compatibility)."""
+
+    def test_approve_close_sets_flag(self):
+        api = LauncherAPI()
+        api.approve_close()
+        assert api._approved is True
+
+    def test_close_requested_initially_false(self):
+        api = LauncherAPI()
+        assert api.close_requested() is False
+
+    def test_reset_close_request_clears_flag(self):
+        api = LauncherAPI()
+        api._close_requested = True
+        api.reset_close_request()
+        assert api.close_requested() is False
+
+
+class TestGuiStartup:
+    """Tests verifying GUI can start without API dependency."""
+
+    def test_gui_py_imports_without_api_dependency(self):
+        """Verify gui.py does not crash on import even if API is offline."""
+        # The import at module level already happened in test setup
+        # If we got here, the module imported successfully without API
+        assert "python.gui" in sys.modules
+
+    def test_launcher_html_exists(self):
+        from python.gui import LAUNCHER_HTML
+        assert LAUNCHER_HTML.exists(), f"Launcher HTML not found at {LAUNCHER_HTML}"
+
+    def test_main_opens_launcher_when_api_offline(self, monkeypatch):
+        """When API is offline, main() should call _open_window with launcher.html."""
+        opened_urls = []
+
+        def mock_open(url):
+            opened_urls.append(url)
+
+        monkeypatch.setattr("python.gui._open_window", mock_open)
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
+        monkeypatch.setattr("sys.argv", ["gui.py"])
+
+        from python.gui import main
+        main()
+
+        assert len(opened_urls) == 1
+        assert "launcher.html" in opened_urls[0]
+
+    def test_main_opens_dashboard_when_api_online(self, monkeypatch):
+        """When API is already running, main() should open the dashboard directly."""
+        opened_urls = []
+
+        def mock_open(url):
+            opened_urls.append(url)
+
+        monkeypatch.setattr("python.gui._open_window", mock_open)
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
+        monkeypatch.setattr("sys.argv", ["gui.py"])
+
+        from python.gui import main
+        main()
+
+        assert len(opened_urls) == 1
+        assert "/gui/index.html" in opened_urls[0]

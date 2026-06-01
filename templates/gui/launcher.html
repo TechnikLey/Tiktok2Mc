@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok2Mc Launcher</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --card: #181b21;
+            --border: #2a2e36;
+            --text: #e4e6eb;
+            --muted: #9ca3af;
+            --accent: #60a5fa;
+            --accent-hover: #3b82f6;
+            --danger: #f87171;
+            --success: #34d399;
+            --warning: #fbbf24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 520px;
+            width: 100%;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .logo h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .logo p {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .status-label {
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-pill.online {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--success);
+        }
+        .status-pill.offline {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--danger);
+        }
+        .status-pill.starting {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--warning);
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            margin-top: 0.5rem;
+        }
+        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-danger {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+        .btn-danger:hover { background: rgba(248, 113, 113, 0.25); }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        .message.error {
+            background: rgba(248, 113, 113, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+        .message.success {
+            background: rgba(52, 211, 153, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+        .message.info {
+            background: rgba(96, 165, 250, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(96, 165, 250, 0.2);
+        }
+        .actions-blocked {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(248, 113, 113, 0.05);
+            border: 1px solid rgba(248, 113, 113, 0.15);
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>TikTok2Mc</h1>
+            <p>Connect your TikTok Live stream to Minecraft</p>
+        </div>
+
+        <div class="card">
+            <div class="status-row">
+                <span class="status-label">API Server Status</span>
+                <span id="status-pill" class="status-pill offline">
+                    <span class="dot"></span>
+                    <span id="status-text">Offline</span>
+                </span>
+            </div>
+
+            <button id="btn-start-api" class="btn btn-primary" onclick="startApi()">
+                Start API Server
+            </button>
+
+            <button id="btn-start-full" class="btn btn-secondary" onclick="startFullSystem()">
+                Start Full System
+            </button>
+
+            <button id="btn-stop-api" class="btn btn-danger" style="margin-top:0.5rem;" onclick="stopApi()">
+                Stop API Server
+            </button>
+
+            <div id="message-area" style="display:none;"></div>
+
+            <div id="actions-blocked" class="actions-blocked" style="display:none;">
+                API server is not running. Start the API to enable actions and configuration.
+            </div>
+        </div>
+
+        <div class="card" style="text-align:center; padding:1rem;">
+            <p style="font-size:0.8rem; color:var(--muted);">
+                When the API server is running, the full dashboard will open automatically.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:29185/api/v1/health';
+        const GUI_URL = 'http://127.0.0.1:29185/gui/index.html';
+        let pollInterval = null;
+        let apiRunning = false;
+
+        function setStatus(state, text) {
+            const pill = document.getElementById('status-pill');
+            const label = document.getElementById('status-text');
+            pill.className = 'status-pill ' + state;
+            label.textContent = text;
+        }
+
+        function showMessage(msg, type) {
+            const area = document.getElementById('message-area');
+            area.textContent = msg;
+            area.className = 'message ' + type;
+            area.style.display = 'block';
+            setTimeout(() => { area.style.display = 'none'; }, 5000);
+        }
+
+        function setButtons(apiOn) {
+            apiRunning = apiOn;
+            document.getElementById('btn-start-api').disabled = apiOn;
+            document.getElementById('btn-start-full').disabled = apiOn;
+            document.getElementById('btn-stop-api').disabled = !apiOn;
+            document.getElementById('actions-blocked').style.display = apiOn ? 'none' : 'block';
+        }
+
+        async function checkApi() {
+            try {
+                const resp = await fetch(API_URL, { method: 'GET', mode: 'no-cors' });
+                // no-cors means we can't read status, so we rely on not throwing
+                setStatus('online', 'Running');
+                setButtons(true);
+                return true;
+            } catch (e) {
+                setStatus('offline', 'Offline');
+                setButtons(false);
+                return false;
+            }
+        }
+
+        async function startApi() {
+            const btn = document.getElementById('btn-start-api');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Starting...';
+            setStatus('starting', 'Starting...');
+
+            try {
+                if (window.pywebview && pywebview.api) {
+                    await pywebview.api.start_api();
+                } else {
+                    // Fallback for browser testing
+                    showMessage('pywebview API not available in browser', 'error');
+                    return;
+                }
+
+                // Poll until API is ready
+                let attempts = 0;
+                const poll = setInterval(async () => {
+                    const ready = await checkApi();
+                    attempts++;
+                    if (ready) {
+                        clearInterval(poll);
+                        showMessage('API server started successfully', 'success');
+                        // Small delay then navigate to full GUI
+                        setTimeout(() => {
+                            window.location.href = GUI_URL;
+                        }, 800);
+                    } else if (attempts > 40) {
+                        clearInterval(poll);
+                        showMessage('API server did not start within timeout', 'error');
+                        setStatus('offline', 'Offline');
+                    }
+                }, 500);
+            } catch (e) {
+                showMessage('Failed to start API: ' + e.message, 'error');
+                setStatus('offline', 'Offline');
+                btn.disabled = false;
+                btn.innerHTML = 'Start API Server';
+            }
+        }
+
+        async function startFullSystem() {
+            const btn = document.getElementById('btn-start-full');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Starting...';
+            setStatus('starting', 'Starting...');
+
+            try {
+                if (window.pywebview && pywebview.api) {
+                    await pywebview.api.start_full_system();
+                } else {
+                    showMessage('pywebview API not available in browser', 'error');
+                    return;
+                }
+
+                let attempts = 0;
+                const poll = setInterval(async () => {
+                    const ready = await checkApi();
+                    attempts++;
+                    if (ready) {
+                        clearInterval(poll);
+                        showMessage('Full system started successfully', 'success');
+                        setTimeout(() => {
+                            window.location.href = GUI_URL;
+                        }, 800);
+                    } else if (attempts > 60) {
+                        clearInterval(poll);
+                        showMessage('Full system did not start within timeout', 'error');
+                        setStatus('offline', 'Offline');
+                    }
+                }, 500);
+            } catch (e) {
+                showMessage('Failed to start full system: ' + e.message, 'error');
+                setStatus('offline', 'Offline');
+                btn.disabled = false;
+                btn.innerHTML = 'Start Full System';
+            }
+        }
+
+        async function stopApi() {
+            const btn = document.getElementById('btn-stop-api');
+            btn.disabled = true;
+
+            try {
+                if (window.pywebview && pywebview.api) {
+                    await pywebview.api.stop_api();
+                }
+                showMessage('API server stopped', 'info');
+                setStatus('offline', 'Offline');
+                setButtons(false);
+            } catch (e) {
+                showMessage('Failed to stop API: ' + e.message, 'error');
+            }
+        }
+
+        // Initial check and start polling
+        checkApi();
+        pollInterval = setInterval(checkApi, 2000);
+    </script>
+</body>
+</html>
