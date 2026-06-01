@@ -764,7 +764,7 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
     if ctx.main_loop is not None:
         data = {"type": event_type, "user": user, **extra}
         asyncio.run_coroutine_threadsafe(
-            event_bus.publish("tiktok.event", data), ctx.main_loop
+            event_bus.publish(f"tiktok.{event_type}", data), ctx.main_loop
         )
 
 
@@ -818,12 +818,16 @@ async def _event_bridge_worker():
     No plugin names are hardcoded — third-party plugins work the
     same way as official ones by declaring subscriptions.
     """
-    q = event_bus.subscribe("tiktok.event")
+    q = event_bus.subscribe()  # all events — tiktok events now have individual types
     subscriptions = _load_event_subscriptions()
     log.info("[EVENT-BRIDGE] Started (declarative).")
     while True:
         msg = await q.get()
         try:
+            event_type = msg.get("type", "")
+            if not event_type.startswith("tiktok."):
+                continue
+
             data = msg.get("data", {})
             ev_type = data.get("type")
             user = data.get("user")

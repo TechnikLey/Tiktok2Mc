@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +35,8 @@ log = logging.getLogger(__name__)
 DEFAULT_CONFIG_PATH = Path("defaults/event_commands.yaml")
 DATA_CONFIG_PATH = Path("data/event_commands.yaml")
 
+MAX_HISTORY = 50
+
 
 class EventCommandMapper:
     """Background task that listens to EventBus events and dispatches commands."""
@@ -40,6 +44,8 @@ class EventCommandMapper:
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
         self._running = False
+        self._history: deque[dict[str, Any]] = deque(maxlen=MAX_HISTORY)
+        self._dispatch_counts: dict[str, int] = {}
 
     # ------------------------------------------------------------------
     #  Config helpers
@@ -76,6 +82,22 @@ class EventCommandMapper:
             save_yaml(data_path, {"event_commands": {}})
 
     # ------------------------------------------------------------------
+    #  Diagnostics
+    # ------------------------------------------------------------------
+
+    def get_diagnostics(self) -> dict[str, Any]:
+        """Return current mapper diagnostics for dashboard consumers."""
+        mappings = self._load_mappings()
+        total_reactions = sum(len(actions) for actions in mappings.values())
+        return {
+            "active": self._running,
+            "total_events": len(mappings),
+            "total_reactions": total_reactions,
+            "recent_dispatches": list(self._history),
+            "dispatch_counts": dict(self._dispatch_counts),
+        }
+
+    # ------------------------------------------------------------------
     #  Dispatch
     # ------------------------------------------------------------------
 
@@ -98,11 +120,29 @@ class EventCommandMapper:
 
             try:
                 command_queue.enqueue(target, command, **args)
+                self._history.append({
+                    "timestamp": time.time(),
+                    "event": event_type,
+                    "target": target,
+                    "command": command,
+                    "args": args,
+                    "status": "ok",
+                })
+                self._dispatch_counts[event_type] = self._dispatch_counts.get(event_type, 0) + 1
                 log.info(
                     "[ECM] Dispatched %s → %s/%s (args=%s)",
                     event_type, target, command, args,
                 )
             except Exception as exc:
+                self._history.append({
+                    "timestamp": time.time(),
+                    "event": event_type,
+                    "target": target,
+                    "command": command,
+                    "args": args,
+                    "status": "error",
+                    "error": str(exc),
+                })
                 log.error(
                     "[ECM] Failed to dispatch %s → %s/%s: %s",
                     event_type, target, command, exc,

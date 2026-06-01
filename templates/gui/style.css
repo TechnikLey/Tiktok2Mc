@@ -496,6 +496,52 @@ input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; backg
 .reaction-preview-label { font-size:0.75rem; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.4rem; }
 .reaction-preview-flow { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; font-size:0.95rem; }
 
+/* ─── Live Dashboard Widgets ─── */
+.live-plugin-pill {
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+.live-plugin-pill:hover { border-color: var(--border-hover); }
+.live-plugin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-healthy { background: var(--success); box-shadow: 0 0 0 2px rgba(76,175,80,0.2); }
+.dot-unhealthy { background: var(--warning); box-shadow: 0 0 0 2px rgba(255,167,38,0.2); }
+.dot-dead { background: var(--danger); box-shadow: 0 0 0 2px rgba(255,107,107,0.2); }
+.dot-disabled { background: var(--text-secondary); opacity: 0.5; }
+.dot-unknown { background: var(--border); }
+.live-plugin-name { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-plugin-hb { color: var(--text-secondary); font-size: 0.75rem; margin-left: auto; }
+
+.live-reaction-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+  animation: fadeIn 0.4s ease;
+}
+.live-reaction-item:last-child { margin-bottom: 0; }
+.feed-ok { background: rgba(76,175,80,0.06); border-left: 2px solid var(--success); }
+.feed-error { background: rgba(255,107,107,0.06); border-left: 2px solid var(--danger); }
+.live-reaction-time { color: var(--text-secondary); font-size: 0.75rem; min-width: 52px; }
+.live-reaction-icon { font-size: 1rem; }
+.live-reaction-text { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
 /* Responsive */
 @media (max-width: 768px) {
   .reactions-layout { flex-direction: column; }

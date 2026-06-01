@@ -37,6 +37,14 @@
             <div id="overlay-urls" style="margin-top:1rem;"></div>
         </div>
 
+        <!-- Live Plugin Health -->
+        <div class="card">
+            <h2>Live Plugin Health</h2>
+            <div class="muted">Real-time health and heartbeat status for all plugins.</div>
+            <div id="live-plugin-grid" style="margin-top:0.75rem;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:0.6rem;"></div>
+            <div id="live-plugin-empty" class="muted" style="margin-top:0.75rem;font-size:0.85rem;">Waiting for data...</div>
+        </div>
+
         <div class="card">
             <h2>Actions (actions.mca)</h2>
             <div class="muted">Configure Twitch/TikTok event triggers and commands.</div>
@@ -48,6 +56,14 @@
             <div class="muted">Automatically control plugins when things happen. For example: pause music when you die in Minecraft.</div>
             <div id="reactions-summary" class="muted" style="margin-top:0.5rem;font-weight:500;color:var(--text-secondary);">Loading...</div>
             <button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="reactionEditor.open()">Manage Reactions</button>
+        </div>
+
+        <!-- Recent Reactions Activity -->
+        <div class="card">
+            <h2>Recent Activity</h2>
+            <div class="muted">Live feed of reactions firing right now.</div>
+            <div id="live-reactions-feed" style="margin-top:0.75rem;max-height:220px;overflow-y:auto;"></div>
+            <div id="live-reactions-empty" class="muted" style="margin-top:0.5rem;font-size:0.85rem;text-align:center;padding:1rem 0;">No reaction activity yet. Create a reaction and trigger an event to see it here.</div>
         </div>
 
         <div class="card">

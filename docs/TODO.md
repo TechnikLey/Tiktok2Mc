@@ -51,6 +51,8 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 - ✅ **LikeGoal** — publishes `likegoal.milestone` and `likegoal.progress` events. Removed direct TikTok event dependency; now consumes `add_likes` commands via API.
 - ✅ **SpotifyControl** — publishes `spotify.track_changed`, `spotify.play`, `spotify.pause` events.
 - ✅ **Event-Command Mapper** — central wiring via `data/event_commands.yaml` maps any EventBus event to plugin commands without coupling.
+  - ✅ **TikTok EventBus publishing fix** — `tiktok.follow`, `tiktok.like`, `tiktok.gift`, `tiktok.join`, `tiktok.comment`, `tiktok.share` now publish as distinct event types (e.g. `tiktok.follow`) instead of all being bundled under `tiktok.event`. This makes them actually usable in Event-Command Mapper / Event Reactions.
+  - ✅ **Event Reactions GUI redesign** — complete UX overhaul of the Event-Command Mapper frontend. Replaced technical "Mappings/Actions" UI with a guided 3-step wizard, visual reaction cards, category filters, search, templates, and contextual descriptions. First-time users can now understand the system without documentation.
 
 ### Security
 - ~~Spotify `client_secret` validation and encrypted storage~~ ✅ Done (see CHANGE_HISTORY.md)
@@ -60,7 +62,9 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 - ~~Plugin sandboxing / resource limits~~ ✅ Done (see CHANGE_HISTORY.md)
 
 ### GUI
-- WebSocket/SSE client for real-time dashboard updates (beyond log streaming)
+- ~~WebSocket/SSE client for real-time dashboard updates (beyond log streaming)~~ ✅ Done — DashboardPublisher pushes `dashboard.plugin_states`, `dashboard.ecm_diagnostics`, and `dashboard.reactions_activity` every 5s via the existing SSE stream.
+- ~~Event-Command Mapper UX overhaul~~ ✅ Done — replaced with Event Reactions wizard + visual cards.
+- ~~Save-button state sync across all editors~~ ✅ Done.
 - Overlay preview + live theme editor
 - Integrated Minecraft server console (RCON terminal)
 - Mobile-responsive web dashboard variant
@@ -77,9 +81,9 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 ## 📋 Next 3 Steps
 
 1. **Plugin Implementation Tests** — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) across all 5 plugins and add BasePlugin edge-case tests.
-2. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions), `README.md` (API server, actions editor), `CHANGELOG.md` (test counts, dates). **Do last, after all code changes frozen.**
-3. **GUI Real-Time Dashboard** — extend WebSocket/SSE client to push live plugin state and event-command mapper diagnostics, not just logs. Add overlay preview and live theme editor.
+2. **Overlay Preview + Live Theme Editor** — add an in-dashboard preview for overlay text and a quick colour editor tied to the live overlay system.
+3. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions, Event Reactions, live dashboard), `README.md` (API server, actions editor, Event Reactions), `CHANGELOG.md` (test counts, dates). **Do last, after all code changes frozen.**
 
 ---
 
-*Last updated: 2026-06-01 — 608 Python tests pass, 3 skipped | Current: Plugin Implementation Tests → Documentation Rewrite (DO LAST).*
+*Last updated: 2026-06-01 — Event Reactions GUI shipped, TikTok EventBus fix merged, Save-button state sync applied to all editors, Live Dashboard (plugin health + reactions activity) shipped | Current: Plugin Implementation Tests → Overlay Preview + Live Theme Editor → Documentation Rewrite (DO LAST).*

@@ -3201,12 +3201,115 @@ function connectLogStream() {
         log('API server stopping', 'warn');
       } else if (type.startsWith('plugin.')) {
         log('Plugin: ' + (payload.msg || type), payload.level || 'info');
+      } else if (type === 'dashboard.plugin_states') {
+        renderLivePluginGrid(payload.plugins || {});
+      } else if (type === 'dashboard.reactions_activity') {
+        renderLiveReactionsFeed(payload.recent || []);
+      } else if (type === 'dashboard.ecm_diagnostics') {
+        updateEcmDiagnostics(payload);
       }
     } catch (_) {}
   };
   _sseSource.onerror = () => {
     log('Log stream disconnected — retrying...', 'warn');
   };
+}
+
+/* ─── Live Dashboard Widgets ─── */
+
+let _livePluginData = {};
+let _liveReactionFeed = [];
+
+function renderLivePluginGrid(plugins) {
+  _livePluginData = plugins;
+  const container = document.getElementById('live-plugin-grid');
+  const empty = document.getElementById('live-plugin-empty');
+  if (!container) return;
+  const names = Object.keys(plugins);
+  if (!names.length) {
+    container.innerHTML = '';
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  let html = '';
+  for (const name of names) {
+    const p = plugins[name];
+    const health = p.health_status || 'unknown';
+    const enabled = p.enabled;
+    const hb = p.last_heartbeat;
+    let hbText = '—';
+    if (hb) {
+      const secs = Math.floor((Date.now() / 1000) - hb);
+      if (secs < 10) hbText = 'now';
+      else if (secs < 60) hbText = secs + 's ago';
+      else if (secs < 3600) hbText = Math.floor(secs / 60) + 'm ago';
+      else hbText = Math.floor(secs / 3600) + 'h ago';
+    }
+
+    let statusDot = 'dot-unknown';
+    if (!enabled) statusDot = 'dot-disabled';
+    else if (health === 'healthy') statusDot = 'dot-healthy';
+    else if (health === 'unhealthy') statusDot = 'dot-unhealthy';
+    else if (health === 'dead') statusDot = 'dot-dead';
+
+    html += `<div class="live-plugin-pill">
+      <span class="live-plugin-dot ${statusDot}"></span>
+      <span class="live-plugin-name">${escapeHtml(p.display_name || name)}</span>
+      <span class="live-plugin-hb">${escapeHtml(hbText)}</span>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderLiveReactionsFeed(recent) {
+  const container = document.getElementById('live-reactions-feed');
+  const empty = document.getElementById('live-reactions-empty');
+  if (!container) return;
+  if (!recent.length) {
+    container.innerHTML = '';
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  // Prepend new items, keep max 20
+  for (const item of recent.reverse()) {
+    const exists = _liveReactionFeed.some(r =>
+      r.timestamp === item.timestamp && r.event === item.event && r.command === item.command
+    );
+    if (!exists) _liveReactionFeed.unshift(item);
+  }
+  if (_liveReactionFeed.length > 20) _liveReactionFeed = _liveReactionFeed.slice(0, 20);
+
+  let html = '';
+  for (const item of _liveReactionFeed.slice(0, 10)) {
+    const time = new Date(item.timestamp * 1000).toLocaleTimeString();
+    const evInfo = reactionEditor.eventCatalog[item.event] || { name: item.event, icon: '⚡' };
+    const plInfo = reactionEditor.pluginCatalog[item.target] || { name: item.target, icon: '🔌' };
+    const cmdInfo = (reactionEditor.commandCatalog[item.target] || {})[item.command] || { name: item.command };
+    const statusCls = item.status === 'ok' ? 'feed-ok' : 'feed-error';
+    html += `<div class="live-reaction-item ${statusCls}">
+      <span class="live-reaction-time">${escapeHtml(time)}</span>
+      <span class="live-reaction-icon">${evInfo.icon || '⚡'}</span>
+      <span class="live-reaction-text">${escapeHtml(evInfo.name)} → ${escapeHtml(plInfo.icon || '🔌')} ${escapeHtml(cmdInfo.name)}</span>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function updateEcmDiagnostics(payload) {
+  // Update the reactions summary on the dashboard card if it shows 0
+  const summary = document.getElementById('reactions-summary');
+  if (summary && payload.total_reactions !== undefined) {
+    const count = payload.total_reactions;
+    if (count === 0) {
+      summary.innerHTML = '<span style="color:var(--text-secondary);">No reactions set up yet.</span>';
+    } else {
+      summary.innerHTML = `<span style="color:var(--success);">${count} reaction${count === 1 ? '' : 's'}</span> <span style="color:var(--text-secondary);">configured</span>`;
+    }
+  }
 }
 
 /* ─── Init ─── */
