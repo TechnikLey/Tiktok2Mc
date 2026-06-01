@@ -44,8 +44,11 @@ if not LAUNCHER_HTML.exists():
 
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
-APP_EXE = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
-START_EXE = (BASE_DIR / f"start{SUFFIX}").resolve()
+# gui.exe lives in build/release/core/ (release) or src/python/ (dev)
+# app.exe lives next to gui.exe in core/
+# start.exe lives one directory above gui.exe (build/release/)
+APP_EXE = (BASE_DIR / f"app{SUFFIX}").resolve()
+START_EXE = (BASE_DIR.parent / f"start{SUFFIX}").resolve()
 
 _api_proc = None
 _full_system_proc = None
@@ -258,10 +261,8 @@ def _open_window(url: str) -> None:
     )
 
     def _on_closing():
-        if launcher_api._approved:
-            return True
-        launcher_api._close_requested = True
-        return False
+        # Allow window to close normally; process cleanup is handled by atexit
+        return True
 
     window.events.closing += _on_closing
     webview.start(debug=False)

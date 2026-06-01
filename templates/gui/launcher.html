@@ -289,7 +289,8 @@
                     return;
                 }
                 if (result === 'missing' || String(result).startsWith('missing:')) {
-                    showMessage('Application executable not found. Run a build first.', 'error');
+                    const path = String(result).replace('missing:', '');
+                    showMessage('Executable not found:\n' + path, 'error');
                     isStarting = false;
                     setButtons(false);
                     btn.textContent = originalText;
@@ -347,7 +348,8 @@
                     return;
                 }
                 if (result === 'missing' || String(result).startsWith('missing:')) {
-                    showMessage('Application executable not found. Run a build first.', 'error');
+                    const path = String(result).replace('missing:', '');
+                    showMessage('Executable not found:\n' + path, 'error');
                     isStarting = false;
                     setButtons(false);
                     btn.textContent = originalText;
