@@ -72,9 +72,9 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 ### Testing
 - Frontend/GUI integration tests (Playwright or similar)
 
-### Build & Packaging
-- Identify and strip dead modules from PyInstaller builds
-- Automated release notes generation from CHANGELOG
+### Stability & Logging
+- ~~Plugin registry backup spam~~ ✅ Done — removed per-save backup from `PluginRegistry._save()`. Now only one startup backup is created when the registry file already exists.
+- ~~Built-in app health-check noise~~ ✅ Done — `start.py` health-check loop now skips built-in apps (`App`, `Minecraft Server`, `GUI`, `Overlay`) instead of trying to update them in the plugin registry. Also URL-encodes all plugin names in API calls to prevent "control characters in URL" errors.
 
 ---
 
@@ -86,4 +86,4 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 
 ---
 
-*Last updated: 2026-06-01 — Event Reactions GUI shipped, TikTok EventBus fix merged, Save-button state sync applied to all editors, Live Dashboard (plugin health + reactions activity) shipped | Current: Plugin Implementation Tests → Overlay Preview + Live Theme Editor → Documentation Rewrite (DO LAST).*
+*Last updated: 2026-06-01 — Event Reactions GUI shipped, TikTok EventBus fix merged, Save-button state sync applied to all editors, Live Dashboard shipped, Registry backup spam fixed, Built-in app health-check noise fixed | Current: Plugin Implementation Tests → Overlay Preview + Live Theme Editor → Documentation Rewrite (DO LAST).*

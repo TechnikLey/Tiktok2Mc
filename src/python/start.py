@@ -18,6 +18,7 @@ import os
 import json
 import enum
 import urllib.error
+import urllib.parse
 import urllib.request
 import shlex
 import asyncio
@@ -929,6 +930,10 @@ _PLUGIN_HEALTH_INTERVAL = 15.0
 _AUTO_RESTART_PLUGINS = True
 
 
+# Built-in apps are not registered in the plugin registry — skip them in health checks
+_BUILTIN_APP_NAMES = {"App", "Minecraft Server", "GUI", "Overlay"}
+
+
 def _plugin_health_check_loop():
     """Background thread: periodically checks plugin processes and reports
     health status to the API registry."""
@@ -936,6 +941,8 @@ def _plugin_health_check_loop():
         time.sleep(_PLUGIN_HEALTH_INTERVAL)
         dead_plugins = []
         for name, proc in list(processes.items()):
+            if name in _BUILTIN_APP_NAMES:
+                continue
             if proc is not None and proc.poll() is not None:
                 dead_plugins.append(name)
 
@@ -943,9 +950,10 @@ def _plugin_health_check_loop():
             log.warning("Plugin '%s' process died (exit code %d) — updating registry", name, processes[name].poll())
             stop_process(name)
             try:
+                encoded_name = urllib.parse.quote(name, safe="")
                 data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
                 req = urllib.request.Request(
-                    f"{_API_BASE_URL}/plugins/{name}",
+                    f"{_API_BASE_URL}/plugins/{encoded_name}",
                     data=data,
                     headers={"Content-Type": "application/json"},
                     method="PUT",
@@ -1021,8 +1029,9 @@ async def check_and_run():
                 log.info(f"\nPlugin start signal detected for '{plugin_name}'.")
                 try:
                     # Re-fetch plugin details from API
+                    encoded_name = urllib.parse.quote(plugin_name, safe="")
                     with urllib.request.urlopen(
-                        f"{_API_BASE_URL}/plugins/{plugin_name}", timeout=3
+                        f"{_API_BASE_URL}/plugins/{encoded_name}", timeout=3
                     ) as resp:
                         if resp.status == 200:
                             data = json.loads(resp.read().decode("utf-8"))

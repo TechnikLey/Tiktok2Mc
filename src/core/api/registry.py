@@ -34,6 +34,14 @@ class PluginRegistry:
         self._plugins: dict[str, PluginRegistration] = {}
         self._lock = threading.Lock()
         self._load()
+        # One-time backup on startup (not on every save)
+        if self._file.exists():
+            try:
+                get_backup_manager().create_backup(
+                    self._file, category="plugin_registry"
+                )
+            except Exception as exc:
+                log.warning("Failed to create startup registry backup: %s", exc)
 
     # ------------------------------------------------------------------
     # Public API
@@ -122,15 +130,6 @@ class PluginRegistry:
         data = [p.model_dump(mode="json") for p in self._plugins.values()]
         tmp = self._file.with_suffix(".json.tmp")
         try:
-            # Backup existing file before overwriting
-            if self._file.exists():
-                try:
-                    get_backup_manager().create_backup(
-                        self._file, category="plugin_registry"
-                    )
-                except Exception as exc:
-                    log.warning("Failed to create registry backup: %s", exc)
-
             with tmp.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
                 fh.flush()
