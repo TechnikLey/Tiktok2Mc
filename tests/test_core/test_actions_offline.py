@@ -109,7 +109,7 @@ class TestActionBlockingInLauncher:
     def _load_launcher_html(self):
         root = Path(__file__).resolve().parent.parent.parent
         candidates = [
-            root / "src" / "core" / "templates" / "gui" / "launcher.html",
+            root / "templates" / "gui" / "launcher.html",
             root / "core" / "templates" / "gui" / "launcher.html",
         ]
         for p in candidates:
