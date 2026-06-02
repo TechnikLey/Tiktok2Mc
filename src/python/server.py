@@ -5,8 +5,9 @@ import shutil
 import platform
 import zipfile
 import urllib.request
+import os
 from pathlib import Path
-from core.paths import get_base_dir
+from core.paths import get_root_dir
 import logging
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
@@ -23,133 +24,172 @@ log = logging.getLogger(__name__)
 # EULA acceptance, and the MinecraftServerAPI plugin.
 # ==================================================
 
-# === Base paths ===
-BASE_DIR = get_base_dir()
+def _is_interactive() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
 
-SERVER_DIR = (BASE_DIR / "server" / "mc").resolve()
-CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
-SERVER_JAR = (SERVER_DIR / "server.jar").resolve()
 
-# --- Java detection and auto-download---
-_bundled_java = (BASE_DIR / "server" / "java" / "bin" / "java.exe").resolve()
-if _bundled_java.exists():
-    JAVA_EXE = _bundled_java
-else:
+def _wait_or_skip(prompt: str = "Press Enter to continue..."):
+    if _is_interactive():
+        try:
+            input(prompt)
+        except (EOFError, KeyboardInterrupt):
+            pass
+
+
+def _find_java(root_dir: Path) -> Path | None:
+    bundled = root_dir / "server" / "java" / "bin" / "java.exe"
+    if bundled.exists():
+        return bundled.resolve()
+    system_java = shutil.which("java")
+    if system_java:
+        return Path(system_java).resolve()
     if platform.system() == "Windows":
-        _system_java = shutil.which("java")
-        if _system_java:
-            JAVA_EXE = Path(_system_java).resolve()
-        else:
-            java_dir = BASE_DIR / "server" / "java"
-            java_bin = java_dir / "bin" / "java.exe"
-            if not java_bin.exists():
-                log.info("No bundled Java found and none in PATH. Downloading OpenJDK 21 for Windows...")
-                # Adoptium Temurin 21 JRE (portable ZIP, x64)
-                jdk_url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip"
-                zip_path = BASE_DIR / "server" / "java_download.zip"
-                try:
-                    urllib.request.urlretrieve(jdk_url, zip_path)
-                    log.info("Download complete. Extracting...")
-                    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                        zip_ref.extractall(java_dir)
-                    for sub in java_dir.iterdir():
-                        if sub.is_dir() and (sub / "bin" / "java.exe").exists():
-                            for item in sub.iterdir():
-                                target = java_dir / item.name
-                                if not target.exists():
-                                    item.rename(target)
-                            shutil.rmtree(sub)
-                            break
+        java_dir = root_dir / "server" / "java"
+        java_bin = java_dir / "bin" / "java.exe"
+        if not java_bin.exists():
+            log.info("No bundled Java found and none in PATH. Downloading OpenJDK 21 for Windows...")
+            jdk_url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip"
+            zip_path = java_dir / "java_download.zip"
+            try:
+                urllib.request.urlretrieve(jdk_url, zip_path)
+                log.info("Download complete. Extracting...")
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(java_dir)
+                for sub in java_dir.iterdir():
+                    if sub.is_dir() and (sub / "bin" / "java.exe").exists():
+                        for item in sub.iterdir():
+                            target = java_dir / item.name
+                            if not target.exists():
+                                item.rename(target)
+                        shutil.rmtree(sub)
+                        break
+                zip_path.unlink()
+                log.info("Java extraction complete.")
+                if java_bin.exists():
+                    return java_bin.resolve()
+            except Exception as e:
+                log.warning(f"Failed to download/extract Java: {e}")
+                if zip_path.exists():
                     zip_path.unlink()
-                    log.info("Java extraction complete.")
-                except Exception as e:
-                    log.info(f"Failed to download/extract Java: {e}")
-                    sys.exit(1)
-            JAVA_EXE = java_bin
+        if java_bin.exists():
+            return java_bin.resolve()
     else:
-        _system_java = shutil.which("java")
-        if _system_java:
-            JAVA_EXE = Path(_system_java).resolve()
-        else:
-            log.info("Java not found. Attempting to install...")
-            _install_cmds = {
-                "apt": ["sudo", "apt", "install", "-y", "openjdk-21-jre-headless"],
-                "dnf": ["sudo", "dnf", "install", "-y", "java-21-openjdk-headless"],
-                "pacman": ["sudo", "pacman", "-S", "--noconfirm", "jre-openjdk"],
-                "zypper": ["sudo", "zypper", "install", "-y", "java-21-openjdk-headless"],
-            }
-            _installed = False
-            for pkg_mgr, cmd in _install_cmds.items():
-                if shutil.which(pkg_mgr):
-                    log.info(f"Using {pkg_mgr} to install Java...")
-                    result = subprocess.run(cmd)
+        log.info("Java not found. Attempting to install via package manager...")
+        install_cmds = {
+            "apt": ["sudo", "apt", "install", "-y", "openjdk-21-jre-headless"],
+            "dnf": ["sudo", "dnf", "install", "-y", "java-21-openjdk-headless"],
+            "pacman": ["sudo", "pacman", "-S", "--noconfirm", "jre-openjdk"],
+            "zypper": ["sudo", "zypper", "install", "-y", "java-21-openjdk-headless"],
+        }
+        for pkg_mgr, cmd in install_cmds.items():
+            if shutil.which(pkg_mgr):
+                log.info(f"Using {pkg_mgr} to install Java...")
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
                     if result.returncode == 0 and shutil.which("java"):
-                        JAVA_EXE = Path(shutil.which("java")).resolve()
-                        _installed = True
-                        log.info(f"Java installed successfully: {JAVA_EXE}")
-                    break
+                        java_path = Path(shutil.which("java")).resolve()
+                        log.info(f"Java installed successfully: {java_path}")
+                        return java_path
+                    else:
+                        log.warning(f"{pkg_mgr} install failed:\n{result.stderr}")
+                except Exception as e:
+                    log.warning(f"Package manager {pkg_mgr} failed: {e}")
+                break
+        log.info("\nJava could not be installed automatically.")
+        log.info("Please install Java 21 manually:")
+        log.info("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
+        log.info("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
+        log.info("  Arch Linux    : sudo pacman -S jre-openjdk")
+        log.info("  openSUSE      : sudo zypper install java-21-openjdk-headless")
+        log.info("  macOS         : brew install openjdk@21")
+    return None
 
-            if not _installed:
-                log.info("\nError: Java could not be installed automatically.")
-                log.info("Please install Java 21 manually:")
-                log.info("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
-                log.info("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
-                log.info("  Arch Linux    : sudo pacman -S jre-openjdk")
-                log.info("  openSUSE      : sudo zypper install java-21-openjdk-headless")
-                log.info("  macOS         : brew install openjdk@21")
-                sys.exit(1)
 
+ROOT_DIR = get_root_dir()
+SERVER_DIR = (ROOT_DIR / "server" / "mc").resolve()
+CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
+SERVER_JAR = (SERVER_DIR / "server.jar").resolve()
 SERVER_PROPERTIES = (SERVER_DIR / "server.properties").resolve()
-IGNORE_RCON_FILE = (BASE_DIR / "config" / ".ignore_rcon_warning").resolve()
+IGNORE_RCON_FILE = (ROOT_DIR / "config" / ".ignore_rcon_warning").resolve()
 PLUGINS_DIR = (SERVER_DIR / "plugins").resolve()
 CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resolve()
 
-if not CONFIGSERVERAPI_FILE.exists():
-    log.info(f"Error: MinecraftServerAPI config file not found at {CONFIGSERVERAPI_FILE}")
+# === Java detection ===
+JAVA_EXE = _find_java(ROOT_DIR)
+if JAVA_EXE is None:
+    log.error("No Java runtime available. Cannot start Minecraft server.")
+    log.error("server.jar path: %s", SERVER_JAR)
+    _wait_or_skip()
     sys.exit(1)
+
+# === MinecraftServerAPI config — create default if missing ===
+if not CONFIGSERVERAPI_FILE.exists():
+    log.info("MinecraftServerAPI config not found at %s — creating default.", CONFIGSERVERAPI_FILE)
+    CONFIGSERVERAPI_FILE.parent.mkdir(parents=True, exist_ok=True)
+    yaml_obj = YAML(typ="rt")
+    yaml_obj.preserve_quotes = True
+    yaml_obj.indent(mapping=2, sequence=4, offset=2)
+    yaml_obj.width = 120
+    default_cfg = CommentedMap()
+    default_cfg["port"] = 29187
+    default_cfg["webhooks"] = {"urls": ["http://127.0.0.1:29188"]}
+    try:
+        with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
+            yaml_obj.dump(default_cfg, f)
+        log.info("Default MinecraftServerAPI config created.")
+    except Exception as e:
+        log.warning("Failed to write default config: %s", e)
 
 # === Load configuration ===
+Xms = "1G"
+Xmx = "1G"
+MC_PORT = 25565
+WEBSERVERPORT = 29188
+APIPORT = 29187
+MINECRAFTSERVERAPI_ENABLED = True
+SERVER_HOST = "127.0.0.1"
+
 try:
-    if not CONFIG_FILE.exists():
-        raise FileNotFoundError(f"Config missing: {CONFIG_FILE}")
-
-    cfg = load_yaml(CONFIG_FILE)
-
-    Xms = cfg.get("java", {}).get("xms", "1G")
-    Xmx = cfg.get("java", {}).get("xmx", "1G")
-    MC_PORT = int(os.environ.get("RESOLVED_PORT_MC_GAME_PORT", cfg.get("java", {}).get("port", 25565)))
-    WEBSERVERPORT = int(os.environ.get("RESOLVED_PORT_WEBHOOK_PORT", cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)))
-    APIPORT = int(os.environ.get("RESOLVED_PORT_MCSERVER_API_PORT", cfg.get("minecraft_server_api", {}).get("api_port", 29187)))
-    MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
-    # Server host for binding (default: local only; set to "0.0.0.0" to allow network access)
-    SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-
+    if CONFIG_FILE.exists():
+        cfg = load_yaml(CONFIG_FILE)
+        Xms = cfg.get("java", {}).get("xms", "1G")
+        Xmx = cfg.get("java", {}).get("xmx", "1G")
+        MC_PORT = int(os.environ.get("RESOLVED_PORT_MC_GAME_PORT",
+                       cfg.get("java", {}).get("port", 25565)))
+        WEBSERVERPORT = int(os.environ.get("RESOLVED_PORT_WEBHOOK_PORT",
+                           cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)))
+        APIPORT = int(os.environ.get("RESOLVED_PORT_MCSERVER_API_PORT",
+                       cfg.get("minecraft_server_api", {}).get("api_port", 29187)))
+        MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
+        SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+    else:
+        log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
 except Exception as e:
-    log.info(f"Config error: {e}")
-    input("Press Enter to continue...")
-    sys.exit(1)
+    log.warning("Failed to load config: %s — using defaults.", e)
 
-yaml_obj = YAML(typ="rt")
-yaml_obj.preserve_quotes = True
-yaml_obj.indent(mapping=2, sequence=4, offset=2)
-yaml_obj.width = 120
+# === Ensure MinecraftServerAPI config is in sync ===
+if CONFIGSERVERAPI_FILE.exists():
+    try:
+        yaml_obj = YAML(typ="rt")
+        yaml_obj.preserve_quotes = True
+        yaml_obj.indent(mapping=2, sequence=4, offset=2)
+        yaml_obj.width = 120
+        with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
+            cfg_api = yaml_obj.load(f) or CommentedMap()
+    except Exception:
+        cfg_api = CommentedMap()
 
-try:
-    with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
-        cfg_api = yaml_obj.load(f) or CommentedMap()
-except Exception:
-    cfg_api = CommentedMap()
+    webhook = cfg_api.setdefault("webhooks", {})
+    webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
 
-webhook = cfg_api.setdefault("webhooks", {})
-webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
+    if APIPORT != cfg_api.get("port", 29187):
+        cfg_api["port"] = int(APIPORT)
 
-if APIPORT != cfg_api.get("port", 29187):
-    cfg_api["port"] = int(APIPORT)
-else:
-    log.info("API Port is up to date.")
-
-with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
-    yaml_obj.dump(cfg_api, f)
+    try:
+        with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
+            yaml_obj.dump(cfg_api, f)
+    except Exception as e:
+        log.warning("Failed to write MinecraftServerAPI config: %s", e)
 
 # === Enable / disable MinecraftServerAPI plugin ===
 plugin_name = "MinecraftServerAPI-1.21.x.jar"
@@ -157,42 +197,43 @@ plugin_file = PLUGINS_DIR / plugin_name
 disabled_file = plugin_file.with_stem(plugin_file.stem + ".disabled")
 
 if not MINECRAFTSERVERAPI_ENABLED:
-    # Plugin file exists and is active -> disable it
     if plugin_file.exists():
-        plugin_file.rename(disabled_file)
-        log.info(f"{plugin_name} has been disabled.")
-    # Plugin is already disabled
+        try:
+            plugin_file.rename(disabled_file)
+            log.info(f"{plugin_name} has been disabled.")
+        except Exception as e:
+            log.warning(f"Failed to disable {plugin_name}: {e}")
     elif disabled_file.exists():
         log.info(f"{plugin_name} is already disabled.")
-    # Plugin file not found at all
     else:
         log.info(f"{plugin_name} not found.")
 else:
-    # Re-enable disabled plugin
     if disabled_file.exists():
-        disabled_file.rename(plugin_file)
-        log.info(f"{plugin_name} has been re-enabled.")
+        try:
+            disabled_file.rename(plugin_file)
+            log.info(f"{plugin_name} has been re-enabled.")
+        except Exception as e:
+            log.warning(f"Failed to re-enable {plugin_name}: {e}")
     elif plugin_file.exists():
         log.info("No plugin disable requested.")
     else:
         log.info("Plugin not found, activation failed.")
 
 # === RCON settings ===
-RCON = cfg.get("rcon", {})
+RCON = cfg.get("rcon", {}) if 'cfg' in dir() else {}
 RCON_ENABLED = RCON.get("enabled", False)
 RCON_PASSWORD = RCON.get("password", "")
 RCON_PORT = RCON.get("port", 25575)
 
 # === Pre-flight checks ===
-if not JAVA_EXE.exists():
-    log.info("Java not found!")
-    sys.exit(1)
 if not SERVER_JAR.exists():
-    log.info("server.jar not found!")
+    log.warning("server.jar not found at %s", SERVER_JAR)
+    log.warning("Place a valid Minecraft server.jar in that directory and restart.")
+    _wait_or_skip()
     sys.exit(1)
 
-# === Warning if RCON is disabled ===
-if not RCON_ENABLED and not IGNORE_RCON_FILE.exists():
+# === RCON disabled warning (only in interactive mode) ===
+if not RCON_ENABLED and not IGNORE_RCON_FILE.exists() and _is_interactive():
     log.info("\nWARNING: RCON is disabled!")
     log.info("Some features may not work correctly without RCON.")
     log.info("It is recommended to enable RCON in the config file unless you know exactly what you are doing.\n")
@@ -200,61 +241,75 @@ if not RCON_ENABLED and not IGNORE_RCON_FILE.exists():
     log.info("  continue  - Start the server anyway")
     log.info("  ignore    - Do not show this warning again")
     log.info("  break     - Abort startup\n")
-
-    proceed = False
-    while not proceed:
-        choice = input("Your choice: ").strip().lower()
-        if choice == "continue":
-            proceed = True
-        elif choice == "ignore":
-            with IGNORE_RCON_FILE.open("w", encoding="utf-8") as f:
-                f.write("ignore RCON warning")
-            log.info("RCON warning will be ignored in the future.")
-            proceed = True
-        elif choice == "break":
-            log.info("Startup aborted by user.")
-            sys.exit(0)
-        else:
-            log.info("Invalid input. Please type: continue, ignore, or break.")
+    while True:
+        try:
+            choice = input("Your choice: ").strip().lower()
+            if choice == "continue":
+                break
+            elif choice == "ignore":
+                try:
+                    with IGNORE_RCON_FILE.open("w", encoding="utf-8") as f:
+                        f.write("ignore RCON warning")
+                    log.info("RCON warning will be ignored in the future.")
+                except Exception as e:
+                    log.warning("Could not write ignore file: %s", e)
+                break
+            elif choice == "break":
+                log.info("Startup aborted by user.")
+                sys.exit(0)
+            else:
+                log.info("Invalid input. Please type: continue, ignore, or break.")
+        except (EOFError, KeyboardInterrupt):
+            break
+elif not RCON_ENABLED and not _is_interactive():
+    log.info("RCON is disabled — continuing (non-interactive mode).")
 
 # === Accept EULA ===
 EULA_FILE = SERVER_DIR / "eula.txt"
 if not EULA_FILE.exists():
-    with EULA_FILE.open("w", encoding="utf-8") as f:
-        f.write("eula=true\n")
+    try:
+        with EULA_FILE.open("w", encoding="utf-8") as f:
+            f.write("eula=true\n")
+        log.info("EULA accepted automatically.")
+    except Exception as e:
+        log.warning("Could not write eula.txt: %s", e)
 
 # === Update server.properties ===
 def set_server_property(file_path: Path, key, value):
-    if not file_path.exists():
+    try:
+        if not file_path.exists():
+            with file_path.open("w", encoding="utf-8") as f:
+                f.write("")
+
+        with file_path.open("r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+
+        found = False
+        for i, line in enumerate(lines):
+            if line.startswith(f"{key}="):
+                lines[i] = f"{key}={value}"
+                found = True
+                break
+
+        if not found:
+            lines.append(f"{key}={value}")
+
         with file_path.open("w", encoding="utf-8") as f:
-            f.write("")
+            f.write("\n".join(lines))
+    except Exception as e:
+        log.warning("Failed to set server property %s: %s", key, e)
 
-    with file_path.open("r", encoding="utf-8") as f:
-        lines = f.read().splitlines()
-
-    found = False
-    for i, line in enumerate(lines):
-        if line.startswith(f"{key}="):
-            lines[i] = f"{key}={value}"
-            found = True
-            break
-
-    if not found:
-        lines.append(f"{key}={value}")
-
-    with file_path.open("w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
 
 set_server_property(SERVER_PROPERTIES, "enable-rcon", str(RCON_ENABLED).lower())
 set_server_property(SERVER_PROPERTIES, "rcon.password", RCON_PASSWORD)
 set_server_property(SERVER_PROPERTIES, "rcon.port", RCON_PORT)
 set_server_property(SERVER_PROPERTIES, "server-port", MC_PORT)
 
-# === Password check ===
+# === Empty RCON password warning ===
 if RCON_ENABLED and not RCON_PASSWORD:
-    log.info("\nWARNING: Your RCON password is not set!")
-    log.info("Please set it in config.yaml or use the setup wizard.\n")
-    input("Press Enter to continue...")
+    log.warning("RCON password is not set! Set one in config.yaml or use the setup wizard.")
+    if _is_interactive():
+        _wait_or_skip()
 
 # === Start Minecraft server ===
 log.info("\n--- Minecraft Server ---")
@@ -265,8 +320,21 @@ log.info(f"Port:  {MC_PORT}")
 log.info("------------------------\n")
 
 try:
-    subprocess.run([str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"], cwd=str(SERVER_DIR))
+    proc = subprocess.run(
+        [str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"],
+        cwd=str(SERVER_DIR),
+    )
+    if proc.returncode != 0:
+        log.warning("Minecraft server exited with code %s", proc.returncode)
+except FileNotFoundError:
+    log.error("Java executable not found: %s", JAVA_EXE)
+    _wait_or_skip()
+    sys.exit(1)
 except KeyboardInterrupt:
     log.info("\nServer was stopped manually.")
+except Exception as e:
+    log.error("Failed to start Minecraft server: %s", e)
+    _wait_or_skip()
+    sys.exit(1)
 
 log.info("\nServer stopped.")

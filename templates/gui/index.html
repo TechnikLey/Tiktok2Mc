@@ -97,6 +97,22 @@
                 <h2>Live Log</h2>
                 <div id="log-view">Connecting to log stream...</div>
             </div>
+
+            <div class="card" id="console-card">
+                <h2>Minecraft Console</h2>
+                <div class="console-toolbar">
+                    <span id="console-status" class="console-status offline">Disconnected</span>
+                    <button class="btn btn--sm btn--secondary" id="btn-console-connect" onclick="consoleTerminal.toggleConnection()">Connect</button>
+                    <button class="btn btn--sm btn--secondary" id="btn-console-clear" onclick="consoleTerminal.clear()">Clear</button>
+                </div>
+                <div id="console-output" class="console-output">
+                    <div class="console-line muted">Click "Connect" to open an RCON session.</div>
+                </div>
+                <div class="console-input-row">
+                    <span class="console-prompt">&gt;</span>
+                    <input type="text" id="console-input" class="console-input" placeholder="Enter Minecraft command..." disabled autocomplete="off" spellcheck="false">
+                </div>
+            </div>
         </div>
     </main>
 

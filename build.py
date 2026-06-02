@@ -178,66 +178,120 @@ def main():
                     h.update(chunk)
             return h.hexdigest()
 
-        def hash_core_tree():
-            """Return a SHA-256 hash over every file under src/core/.
-
-            Any change to any core file invalidates the cache for ALL
-            executables, preventing stale builds when transitive
-            dependencies change.
+        def _resolve_module(module: str, src_root: Path) -> str | None:
+            """Resolve a dotted module name to a relative path under *src_root*.
+            
+            Returns a relative path (to SCRIPT_DIR) or None if external.
             """
-            h = hashlib.sha256()
-            core_root = SCRIPT_DIR / "src" / "core"
-            if core_root.exists():
-                for f in sorted(core_root.rglob("*")):
-                    if f.is_file():
-                        h.update(f.relative_to(SCRIPT_DIR).as_posix().encode())
-                        h.update(sha256_file(f).encode())
-            return h.hexdigest()
-
-        core_tree_hash = hash_core_tree()
-
-        def _add_core_dep(module, deps):
-            """Resolve a 'core.xxx.yyy' import to actual file paths (relative to SCRIPT_DIR)."""
             rel = module.replace(".", "/")
-            base = SCRIPT_DIR / "src"
-            py_file = base / f"{rel}.py"
-            if py_file.exists():
-                deps.add(str(py_file.relative_to(SCRIPT_DIR)))
-            init_file = base / rel / "__init__.py"
-            if init_file.exists():
-                deps.add(str(init_file.relative_to(SCRIPT_DIR)))
-            parts = rel.split("/")
-            for i in range(1, len(parts)):
-                parent_init = base / "/".join(parts[:i]) / "__init__.py"
-                if parent_init.exists():
-                    deps.add(str(parent_init.relative_to(SCRIPT_DIR)))
+            for candidate in [f"{rel}.py", f"{rel}/__init__.py"]:
+                path = src_root / candidate
+                if path.exists():
+                    return str(path.relative_to(SCRIPT_DIR))
+            return None
 
-        def resolve_core_imports(source_path):
-            """Return set of core file paths that source_path imports directly."""
-            deps = set()
-            try:
-                with open(source_path, "rb") as f:
-                    tree = ast.parse(f.read())
+        def _parent_inits(module: str) -> list[str]:
+            """Return ``__init__.py`` paths for each parent package of *module*."""
+            result: list[str] = []
+            parts = module.replace(".", "/").split("/")
+            for i in range(1, len(parts)):
+                init = SCRIPT_DIR / "src" / "/".join(parts[:i]) / "__init__.py"
+                if init.exists():
+                    result.append(str(init.relative_to(SCRIPT_DIR)))
+            return result
+
+        def _try_resolve_local(module: str, src_root: Path, source_path: Path) -> list[str]:
+            """Resolve *module* to local file paths under *src_root*.
+            
+            Handles relative and absolute imports.  Returns relative paths
+            (to SCRIPT_DIR), including parent ``__init__.py`` files.
+            """
+            resolved: list[str] = []
+
+            # --- Relative imports ---
+            if module.startswith("."):
+                parts = module.split(".")
+                dots = len(parts[0])
+                rel_parts = parts[1:] if len(parts) > 1 else []
+                try:
+                    src_rel = source_path.resolve().relative_to(SCRIPT_DIR)
+                except ValueError:
+                    return resolved
+                pkg_parts = list(src_rel.parent.parts)
+                for _ in range(dots - 1):
+                    if pkg_parts:
+                        pkg_parts.pop()
+                if not pkg_parts:
+                    return resolved
+                base = SCRIPT_DIR / Path(*pkg_parts)
+                if rel_parts:
+                    sub = "/".join(rel_parts)
+                    for candidate in [f"{sub}.py", f"{sub}/__init__.py"]:
+                        p = base / candidate
+                        if p.exists():
+                            resolved.append(str(p.relative_to(SCRIPT_DIR)))
+                else:
+                    init = base / "__init__.py"
+                    if init.exists():
+                        resolved.append(str(init.relative_to(SCRIPT_DIR)))
+                return resolved
+
+            # --- Absolute imports ---
+            path = _resolve_module(module, src_root)
+            if path:
+                resolved.append(path)
+                resolved.extend(_parent_inits(module))
+            return resolved
+
+        def resolve_transitive_imports(source_path: Path) -> set[str]:
+            """Walk the static import graph of *source_path* and return all files
+            under ``src/`` that are reachable, as relative paths to *SCRIPT_DIR*.
+            
+            Only ``core.*`` and local ``src/`` imports are followed — stdlib and
+            third-party modules are ignored.
+            """
+            src_root = SCRIPT_DIR / "src"
+            if not src_root.exists():
+                return set()
+
+            visited: set[str] = set()
+            queue: list[Path] = [source_path.resolve()]
+
+            while queue:
+                path = queue.pop()
+                try:
+                    rel = str(path.resolve().relative_to(SCRIPT_DIR))
+                except ValueError:
+                    continue
+                if rel in visited:
+                    continue
+                visited.add(rel)
+
+                try:
+                    with open(path, "rb") as f:
+                        tree = ast.parse(f.read())
+                except SyntaxError:
+                    continue
+
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Import):
                         for alias in node.names:
-                            if alias.name == "core" or alias.name.startswith("core."):
-                                _add_core_dep(alias.name, deps)
+                            for r in _try_resolve_local(alias.name, src_root, path):
+                                if r not in visited:
+                                    queue.append(SCRIPT_DIR / r)
                     elif isinstance(node, ast.ImportFrom):
-                        if node.module and (node.module == "core" or node.module.startswith("core.")):
-                            _add_core_dep(node.module, deps)
-                            base_path = SCRIPT_DIR / "src" / node.module.replace(".", "/")
-                            for alias in node.names:
-                                if alias.name != "*":
-                                    sub_mod = base_path / f"{alias.name}.py"
-                                    if sub_mod.exists():
-                                        deps.add(str(sub_mod.relative_to(SCRIPT_DIR)))
-                                    sub_init = base_path / alias.name / "__init__.py"
-                                    if sub_init.exists():
-                                        deps.add(str(sub_init.relative_to(SCRIPT_DIR)))
-            except SyntaxError:
-                pass
-            return deps
+                        if node.module:
+                            for r in _try_resolve_local(node.module, src_root, path):
+                                if r not in visited:
+                                    queue.append(SCRIPT_DIR / r)
+                        if node.level:
+                            dots = "." * node.level
+                            mod = dots + (node.module or "")
+                            for r in _try_resolve_local(mod, src_root, path):
+                                if r not in visited:
+                                    queue.append(SCRIPT_DIR / r)
+
+            return visited
 
         def build_one(item):
             full_src = Path(item["src"]).resolve()
@@ -251,12 +305,12 @@ def main():
             current_hash = sha256_file(full_src)
             need_build = True
 
-            # Compute dependency-inclusive hash
-            deps = resolve_core_imports(full_src)
+            # Hash the transitive dependency tree (no broad core_tree_hash)
+            deps = resolve_transitive_imports(full_src)
             dep_hasher = hashlib.sha256()
             dep_hasher.update(current_hash.encode())
-            dep_hasher.update(core_tree_hash.encode())
             for dep in sorted(deps):
+                dep_hasher.update(dep.encode())  # path string catches added/removed deps
                 dep_path = SCRIPT_DIR / dep
                 if dep_path.exists():
                     dep_hasher.update(sha256_file(dep_path).encode())

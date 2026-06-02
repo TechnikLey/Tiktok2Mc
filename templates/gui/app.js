@@ -3444,6 +3444,140 @@ async function sendTestOverlay() {
   }
 }
 
+/* ─── Minecraft Console Terminal ─── */
+
+const consoleTerminal = {
+  _history: [],
+  _historyIdx: -1,
+  _connected: false,
+
+  async toggleConnection() {
+    if (this._connected) {
+      await this.disconnect();
+    } else {
+      await this.connect();
+    }
+  },
+
+  async connect() {
+    const btn = document.getElementById('btn-console-connect');
+    const input = document.getElementById('console-input');
+    const status = document.getElementById('console-status');
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+    try {
+      const res = await fetch(API + '/rcon/connect', { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Connection failed');
+      this._connected = true;
+      status.textContent = 'Connected';
+      status.className = 'console-status connected';
+      btn.textContent = 'Disconnect';
+      input.disabled = false;
+      input.focus();
+      this._print('Connected to RCON. Type a command and press Enter.', 'system');
+    } catch (e) {
+      this._print('Connection failed: ' + e.message, 'error');
+      btn.textContent = 'Connect';
+      status.textContent = 'Disconnected';
+      status.className = 'console-status offline';
+    } finally {
+      btn.disabled = false;
+    }
+  },
+
+  async disconnect() {
+    const btn = document.getElementById('btn-console-connect');
+    const input = document.getElementById('console-input');
+    const status = document.getElementById('console-status');
+    btn.disabled = true;
+    try {
+      await fetch(API + '/rcon/disconnect', { method: 'POST' });
+    } catch (_) {}
+    this._connected = false;
+    status.textContent = 'Disconnected';
+    status.className = 'console-status offline';
+    btn.textContent = 'Connect';
+    input.disabled = true;
+    this._print('Disconnected from RCON.', 'system');
+    btn.disabled = false;
+  },
+
+  async sendCommand(cmd) {
+    if (!cmd.trim()) return;
+    this._print('> ' + cmd, 'input');
+    try {
+      const res = await fetch(API + '/rcon/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Command failed');
+      const data = await res.json();
+      if (data.response) {
+        this._print(data.response, 'output');
+      } else {
+        this._print('(no output)', 'output');
+      }
+    } catch (e) {
+      this._print('Error: ' + e.message, 'error');
+      if (e.message.includes('Not connected') || e.message.includes('RCON not connected')) {
+        this._connected = false;
+        const status = document.getElementById('console-status');
+        const btn = document.getElementById('btn-console-connect');
+        const input = document.getElementById('console-input');
+        status.textContent = 'Disconnected';
+        status.className = 'console-status offline';
+        btn.textContent = 'Connect';
+        input.disabled = true;
+      }
+    }
+  },
+
+  _print(text, cls = 'output') {
+    const output = document.getElementById('console-output');
+    const line = document.createElement('div');
+    line.className = 'console-line console-line--' + cls;
+    line.textContent = text;
+    output.appendChild(line);
+    output.scrollTop = output.scrollHeight;
+  },
+
+  clear() {
+    const output = document.getElementById('console-output');
+    output.innerHTML = '';
+    this._print('Console cleared.', 'system');
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('console-input');
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const cmd = input.value;
+      consoleTerminal._history.push(cmd);
+      consoleTerminal._historyIdx = consoleTerminal._history.length;
+      input.value = '';
+      consoleTerminal.sendCommand(cmd);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (consoleTerminal._historyIdx > 0) {
+        consoleTerminal._historyIdx--;
+        input.value = consoleTerminal._history[consoleTerminal._historyIdx];
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (consoleTerminal._historyIdx < consoleTerminal._history.length - 1) {
+        consoleTerminal._historyIdx++;
+        input.value = consoleTerminal._history[consoleTerminal._historyIdx];
+      } else {
+        consoleTerminal._historyIdx = consoleTerminal._history.length;
+        input.value = '';
+      }
+    }
+  });
+});
+
 /* ─── Init ─── */
 async function init() {
   await loadHealth();

@@ -1636,3 +1636,90 @@ input[type="color"] {
 .overlay-editor-test-form input:focus {
   border-color: var(--color-accent);
 }
+
+/* ─── Minecraft Console Terminal ─── */
+#console-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.console-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.console-status {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.console-status.connected {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.console-status.offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.console-output {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: #0d1117;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  min-height: 200px;
+  max-height: 360px;
+  overflow-y: auto;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.console-line { margin-bottom: 1px; }
+.console-line--output { color: #c9d1d9; }
+.console-line--input { color: #58a6ff; }
+.console-line--error { color: #f85149; }
+.console-line--system { color: #8b949e; font-style: italic; }
+
+.console-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  background: #0d1117;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+}
+
+.console-prompt {
+  font-family: var(--font-mono);
+  color: #58a6ff;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.console-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #c9d1d9;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  outline: none;
+  caret-color: #58a6ff;
+}
+.console-input::placeholder {
+  color: #484f58;
+}
+.console-input:disabled {
+  opacity: 0.4;
+}
