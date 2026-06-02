@@ -68,23 +68,21 @@ def _prompt_input(label: str, required: bool = True) -> str:
 
 def _get_config_file() -> Path:
     root = get_root_dir()
-    return root / "config" / "config.yaml"
+    return root / "src" / "plugins" / "spotify" / "config.yaml"
 
 
 def _load_spotify_config() -> dict[str, Any]:
     cfg = load_config(_get_config_file())
-    return cfg.get("spotify", {})
+    return cfg
 
 
 def _save_spotify_config(data: dict[str, Any]) -> None:
     cfg_file = _get_config_file()
-    cfg = load_config(cfg_file)
     # Encrypt sensitive fields before persisting
     for key in ("client_secret", "access_token", "refresh_token"):
         if key in data and data[key]:
             data[key] = secure_storage.encrypt(data[key])
-    cfg["spotify"] = data
-    save_yaml(cfg_file, cfg)
+    save_yaml(cfg_file, data)
     print(f"\n[OK] Spotify config saved to {cfg_file}")
 
 

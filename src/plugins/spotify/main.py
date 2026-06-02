@@ -12,7 +12,6 @@ from pathlib import Path
 import requests
 import logging
 from core.base_plugin import BasePlugin
-from core.paths import get_config_file
 from core.yaml_utils import load_yaml, save_yaml
 from core.secure_storage import secure_storage
 
@@ -50,7 +49,7 @@ class SpotifyClient:
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
-        self.config_path = Path(config_path) if config_path else get_config_file()
+        self.config_path = Path(config_path) if config_path else Path(__file__).resolve().parent / "config.yaml"
         self.access_token = None
         self.refresh_token = None
         self.expires_at = 0
@@ -61,10 +60,9 @@ class SpotifyClient:
         with self._token_lock:
             try:
                 cfg = load_yaml(self.config_path)
-                spotify_cfg = cfg.get("spotify", {})
-                self.access_token = secure_storage.decrypt(spotify_cfg.get("access_token")) or None
-                self.refresh_token = secure_storage.decrypt(spotify_cfg.get("refresh_token")) or None
-                self.expires_at = spotify_cfg.get("token_expires_at", 0)
+                self.access_token = secure_storage.decrypt(cfg.get("access_token")) or None
+                self.refresh_token = secure_storage.decrypt(cfg.get("refresh_token")) or None
+                self.expires_at = cfg.get("token_expires_at", 0)
             except Exception as e:
                 log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
@@ -72,11 +70,9 @@ class SpotifyClient:
         with self._token_lock:
             try:
                 cfg = load_yaml(self.config_path)
-                if "spotify" not in cfg:
-                    cfg["spotify"] = {}
-                cfg["spotify"]["access_token"] = secure_storage.encrypt(self.access_token) or ""
-                cfg["spotify"]["refresh_token"] = secure_storage.encrypt(self.refresh_token) or ""
-                cfg["spotify"]["token_expires_at"] = int(self.expires_at) if self.expires_at else 0
+                cfg["access_token"] = secure_storage.encrypt(self.access_token) or ""
+                cfg["refresh_token"] = secure_storage.encrypt(self.refresh_token) or ""
+                cfg["token_expires_at"] = int(self.expires_at) if self.expires_at else 0
                 save_yaml(self.config_path, cfg)
             except Exception as e:
                 log.info(f"[SPOTIFY] Failed to save tokens: {e}")

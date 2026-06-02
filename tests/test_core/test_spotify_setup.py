@@ -120,22 +120,17 @@ class TestConfigIntegration:
     """Verify the script interacts with config.yaml correctly."""
 
     def test_saves_to_spotify_section(self, tmp_path):
-        """Simulate what _save_spotify_config does."""
+        """Simulate what _save_spotify_config does with plugin-local config."""
         config_file = tmp_path / "config.yaml"
-        config_file.write_text("config_version: '1.0'\n", encoding="utf-8")
+        config_file.write_text("client_id: ''\nclient_secret: ''\n", encoding="utf-8")
 
-        # Read, modify, write (same pattern as the script)
         from core.utils import load_config
         from core.yaml_utils import save_yaml
 
         cfg = load_config(config_file)
-        cfg["spotify"] = {
-            "enabled": True,
-            "client_id": "abc",
-            "access_token": "tok",
-        }
+        cfg["client_id"] = "abc"
+        cfg["access_token"] = "tok"
         save_yaml(config_file, cfg)
 
         result = load_config(config_file)
-        assert result["spotify"]["enabled"] is True
-        assert result["spotify"]["client_id"] == "abc"
+        assert result["client_id"] == "abc"

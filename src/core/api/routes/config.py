@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from core.api.models import ConfigResponse, ConfigUpdateRequest
 from core.api.services import ApiService
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Config"])
 
@@ -23,6 +27,7 @@ async def get_config():
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        log.exception("Failed to read config")
         raise HTTPException(status_code=500, detail=str(e))
     return ConfigResponse(path=str(svc.config_path), config=cfg)
 
@@ -33,5 +38,6 @@ async def update_config(body: ConfigUpdateRequest):
     try:
         svc.write_config(body.config, backup=body.backup)
     except Exception as e:
+        log.exception("Failed to write config")
         raise HTTPException(status_code=500, detail=str(e))
     return ConfigResponse(path=str(svc.config_path), config=body.config)

@@ -21,3 +21,8 @@ theme:
   text: "#ffffff"
   accent: "#1db954"
   accent2: "#1ed760"
+
+# OAuth tokens — populated automatically by the OAuth flow
+access_token: ""
+refresh_token: ""
+token_expires_at: 0

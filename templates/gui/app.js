@@ -601,13 +601,15 @@ const SECTION_ORDER = [
   'overlay',
   'theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
+  'plugin_sandbox',
+  'port_policy','api_key',
   'comment_commands','random_triggers'
 ];
 
 const CATEGORIES = {
-  'Connection': ['tiktok','rcon','server_host','control_method'],
+  'Connection': ['tiktok','rcon','server_host','control_method','api_key'],
   'Minecraft': ['java','minecraft_server_api'],
-  'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui'],
+  'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy'],
   'Appearance': ['overlay','theme'],
   'Chat & Commands': ['comment_commands','random_triggers']
 };
@@ -628,7 +630,10 @@ const SECTION_META = {
   server_host: { title: 'Server Address', desc: 'Controls which network interfaces the tool listens on.', category: 'Connection' },
   control_method: { title: 'Control Method', desc: 'How the tool communicates with your streaming software.', category: 'Connection' },
   auto_update_config: { title: 'Auto-Update Config', desc: 'Automatically merge new options when the tool updates.', category: 'System' },
-  show_sudo_warning: { title: 'Sudo Warning', desc: 'Linux only. Warns if running without sudo, which can cause permission issues.', category: 'System' }
+  show_sudo_warning: { title: 'Sudo Warning', desc: 'Linux only. Warns if running without sudo, which can cause permission issues.', category: 'System' },
+  port_policy: { title: 'Port Policy', desc: 'Controls what happens when a required port is already in use. Can auto-resolve to the next free port.', category: 'System' },
+  api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'Connection' },
+  plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' }
 };
 
 const HELP_TEXT = {
@@ -689,7 +694,17 @@ const HELP_TEXT = {
   'overlay.cooldown': 'Seconds to wait after max_fails before allowing new messages again.',
   'overlay.overlays': 'Named overlay slots. Each slot can have its own OBS Browser Source URL. "default" is required and used when no specific overlay is requested.',
   'overlay.theme.background': 'Background colour of the overlay window. Also used as the chroma key colour.',
-  'overlay.theme.text': 'Text colour shown in the overlay.'
+  'overlay.theme.text': 'Text colour shown in the overlay.',
+  'port_policy.auto_resolve': 'When enabled, automatically find the next free port if the default port is already in use. When disabled, logs an error and exits.',
+  'port_policy.session_only': 'When enabled, resolved ports are used only for the current session. When disabled, resolved ports are saved permanently to the config.',
+  'port_policy.max_offset': 'How many ports to try before giving up. -1 means unlimited.',
+  'api_key': 'Optional API key for authentication. When set, all non-localhost requests must include the X-API-Key header. Leave empty to disable authentication.',
+  'plugin_sandbox.enabled': 'Enable sandboxing to restrict plugin subprocess resources.',
+  'plugin_sandbox.max_memory_mb': 'Maximum RAM per plugin process in megabytes.',
+  'plugin_sandbox.max_cpu_time': 'Maximum CPU seconds per plugin (Linux only).',
+  'plugin_sandbox.max_files': 'Maximum open file descriptors per plugin (Linux only).',
+  'plugin_sandbox.max_processes': 'Maximum child processes per plugin (Linux only).',
+  'plugin_sandbox.priority_class': 'Windows process priority for plugin subprocesses. below_normal reduces impact on the main tool.'
 };
 
 const FIELD_META = {
@@ -740,7 +755,17 @@ const FIELD_META = {
   'comment_commands.groups[].cooldown': { basic: false, type: 'number', min: 0 },
   'comment_commands.groups[].user_cooldown': { basic: false, type: 'number', min: 0 },
   'comment_commands.groups[].trigger_comment_event': { basic: false, type: 'bool' },
-  'comment_commands.groups[].url': { basic: false, type: 'text' }
+  'comment_commands.groups[].url': { basic: false, type: 'text' },
+  'api_key': { basic: true, type: 'password' },
+  'port_policy.auto_resolve': { basic: true, type: 'bool' },
+  'port_policy.session_only': { basic: true, type: 'bool' },
+  'port_policy.max_offset': { basic: false, type: 'number', min: -1 },
+  'plugin_sandbox.enabled': { basic: true, type: 'bool' },
+  'plugin_sandbox.max_memory_mb': { basic: false, type: 'number', min: 1 },
+  'plugin_sandbox.max_cpu_time': { basic: false, type: 'number', min: 0 },
+  'plugin_sandbox.max_files': { basic: false, type: 'number', min: 1 },
+  'plugin_sandbox.max_processes': { basic: false, type: 'number', min: 1 },
+  'plugin_sandbox.priority_class': { basic: false, type: 'select', options: ['below_normal', 'idle'] }
 };
 
 function getMeta(path) {
@@ -761,6 +786,7 @@ class ConfigEditor {
     this.data = {};
     this.original = {};
     this.unknownKeys = {};
+    this.originalUnknownKeys = {};
     this.searchQuery = '';
     this.errors = new Map();
     this.sidebar = document.getElementById('editor-sidebar');
@@ -774,6 +800,7 @@ class ConfigEditor {
     this.original = JSON.parse(JSON.stringify(config));
     this.data = JSON.parse(JSON.stringify(config));
     this.unknownKeys = {};
+    this.originalUnknownKeys = {};
     this.errors.clear();
     this.extractUnknownKeys();
     this.searchQuery = '';
@@ -845,8 +872,7 @@ class ConfigEditor {
 
   _resetData() {
     this.data = JSON.parse(JSON.stringify(this.original));
-    this.unknownKeys = {};
-    this.extractUnknownKeys();
+    this.unknownKeys = JSON.parse(JSON.stringify(this.originalUnknownKeys));
   }
 
   extractUnknownKeys() {
@@ -858,7 +884,9 @@ class ConfigEditor {
       }
       if (!this.knownTop.has(key)) {
         this.unknownKeys[key] = this.data[key];
+        this.originalUnknownKeys[key] = this.data[key];
         delete this.data[key];
+        delete this.original[key];
       }
     }
   }

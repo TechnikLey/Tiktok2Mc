@@ -38,7 +38,7 @@ MINIMAL_CONFIG = {
     "gui": {},
     "update": {},
     "overlay": {},
-    "spotify": {},
+    "plugin_sandbox": {},
 }
 
 

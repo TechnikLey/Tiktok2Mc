@@ -1375,11 +1375,6 @@ async def run_bot():
         log.info("Error in load_config")
         sys.exit(1)
 
-    # Fetch registered comment handlers from API for prefix→plugin routing
-    ctx.comment_handler_map = _fetch_comment_handlers()
-    if ctx.comment_handler_map:
-        log.info("[COMMENT] Registered handlers: %s", ctx.comment_handler_map)
-
     # TikTok username check: ask user if still default
     default_user = "your_tiktok_username"
     if ctx.tiktok_user == default_user:
@@ -1390,6 +1385,11 @@ async def run_bot():
             log.info(f"[TIKTOK] Username set to @{ctx.tiktok_user} (session only).")
         else:
             log.info(f"[TIKTOK] No input - using default '{default_user}'.")
+
+    # Fetch registered comment handlers from API for prefix→plugin routing
+    ctx.comment_handler_map = _fetch_comment_handlers()
+    if ctx.comment_handler_map:
+        log.info("[COMMENT] Registered handlers: %s", ctx.comment_handler_map)
 
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)
