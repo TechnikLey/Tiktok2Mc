@@ -73,9 +73,50 @@
   - Removed `shell_actions.txt` from build release files and documentation
   - Added `tests/test_core/test_actions_service.py` (9 tests) and expanded existing test coverage for shell parsing
 
+### GUI: Event Reactions Redesign & Live Dashboard
+- **Event Reactions (redesigned Event-Command Mapper)** — replaced the technical "Mappings/Actions" UI with a guided 3-step wizard:
+  - Visual reaction cards with category filters, search, and templates
+  - Human-readable event/plugin/command catalogs with icons
+  - Live preview bar and contextual descriptions
+  - Test button on every reaction card
+  - Backend data model unchanged (YAML compat preserved via `data/event_commands.yaml`)
+- **TikTok EventBus publishing fix** — `tiktok.follow`, `tiktok.like`, `tiktok.gift`, `tiktok.join`, `tiktok.comment`, `tiktok.share` now publish as distinct event types (e.g. `tiktok.follow`) instead of all being bundled under `tiktok.event`. Makes them usable in Event-Command Mapper / Event Reactions.
+- **Live Dashboard** — new `DashboardPublisher` (`src/core/api/dashboard_publisher.py`) pushes `plugin_states`, `ecm_diagnostics`, and `reactions_activity` every 5s via the existing SSE stream. New "Live Plugin Health" card with color-coded status pills and "Recent Activity" card with live reaction feed.
+- **Save-button state sync** — Config Editor, Plugin Config Editor, and Actions Editor: dynamic Save button enabled only when dirty, real-time input listeners with debounce, unsaved-changes dialog on close.
+- **Single-instance guard** — GUI prevents multiple instances via named mutex; auto-switches to dashboard on second launch.
+- **Improved event_bus GUI** — better visualization of EventBus activity in the dashboard.
+
+### UI/UX Redesign (Unified Design System)
+- **Design system tokens** — new `templates/gui/design-system.css` with centralized CSS custom properties for colors, spacing, typography, radius, shadows, transitions, z-index, animations, focus-visible, and reduced-motion.
+- **Style.css refactor** — 1912 lines rewritten to use design system tokens with BEM-style class naming (`btn--primary`, `card--status`, etc.).
+- **Launcher redesign** — unified accent color from blue (#60a5fa) to amber (#f5c518), replaced all inline CSS with proper classes, added pulse animation on status dots, subtle gradient background.
+- **Legacy compatibility** — CSS variable aliases (--bg, --surface, etc.) and button class aliases (.btn-primary, .btn-secondary) maintained for backward compatibility with dynamically generated HTML.
+- **Overlay refinements** — Inter font stack, antialiasing, smoother transitions applied to deathcounter, timer, likegoal, wincounter, spotify, and core overlay templates.
+- **Modal z-index fix** — raised modal z-indices from 250 to 350-500 so they always appear above editor overlays.
+- **Translation cleanup** — German labels in HTML templates translated to English.
+- **False-positive diff fix** — `comment_commands.groups` diff detection: `setValue` now creates arrays (not objects) for numeric-index paths, `computeDiff` detects type mismatches properly, `buildGroupCard` no longer mutates `commands_config` from array to object.
+
+### Build System Improvements
+- **Core_hash cache scoping** — build cache now invalidates on any `src/core/` change instead of only when specific files change, preventing stale builds from partial cache hits.
+- **Config schema drift detection** — `_validate_config_schema` in `src/core/api/services/__init__.py` now skips missing keys during validation instead of raising `ValueError` (HTTP 500), allowing legacy configs to save without error.
+- **Increased build parallelism** — `ThreadPoolExecutor` max_workers increased for faster PyInstaller compilation.
+
+### Spotify: Plugin-Local Config Migration
+- Removed `spotify` section from `defaults/config.yaml` — Spotify tokens, client_id, and client_secret now live in `src/plugins/spotify/config.yaml`.
+- `SpotifyClient` updated to read/write tokens from plugin-local config via `core.yaml_utils`.
+- `spotify_setup.py` updated to write to plugin-local config path.
+- GUI updated: added `plugin_sandbox`, `port_policy`, and `api_key` sections to `SECTION_ORDER`, `CATEGORIES`, and `SECTION_META` with corresponding `FIELD_META` and `HELP_TEXT`.
+- `unknownKeys` tracking fix: preserved `originalUnknownKeys` across state resets.
+
+### Stability & Logging
+- **Plugin registry backup spam eliminated** — removed per-save backup from `PluginRegistry._save()`. Only one startup backup is created when the registry file already exists.
+- **Built-in app health-check noise fixed** — `start.py` health-check loop now skips built-in apps (`App`, `Minecraft Server`, `GUI`, `Overlay`) instead of trying to update them in the plugin registry. URL-encodes all plugin names in API calls to prevent "control characters in URL" errors.
+- **API config save hardening** — missing config keys (e.g. `api_key` in legacy configs) no longer cause HTTP 500. `_validate_config_schema` skips missing keys instead of raising `ValueError`.
+
 ### Test & Build Hardening
 - **Test suite stability fix** — fixed infinite tight-loop in `test_base_plugin.py` (2 tests calling `_command_polling_loop` without exit condition). Added `time.sleep(0.1)` safety guard in `BasePlugin._command_polling_loop`. Mocked heavy imports (`TikTokLive`, `mcrcon`, `flask`) in `conftest.py` to prevent test hangs. Configured `pytest-timeout = 40s`.
 - **End-to-end update validation** (`tests/test_core/test_update_integration.py`) — version boundary upgrade, signal lifecycle, restart flow, rollback, platform paths. 24 tests.
+- **Spotify test migration** — `test_spotify_setup.py` updated for plugin-local config path.
 
 ---
 
@@ -195,4 +236,4 @@
 
 ---
 
-*Last updated: 2026-06-01*
+*Last updated: 2026-06-02*

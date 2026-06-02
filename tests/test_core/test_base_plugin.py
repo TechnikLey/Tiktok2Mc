@@ -233,6 +233,40 @@ class TestBasePluginCommandPolling:
         p._command_polling_loop()
         assert ("unknown", {}) in p.seen
 
+    def test_handler_registration_replaces_existing(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        calls = []
+        p.register_handler("cmd", lambda args: calls.append(1))
+        p.register_handler("cmd", lambda args: calls.append(2))
+        dispatch = {"commands": [{"command": "cmd", "args": {}}]}
+        call_count = [0]
+        def mock_get(path, timeout=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return dispatch
+            p._running = False
+            return {"commands": []}
+        monkeypatch.setattr(p, "api_get", mock_get)
+        p._running = True
+        p._command_polling_loop()
+        assert calls == [2]
+
+    def test_save_window_state(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._state_file.parent.mkdir(parents=True, exist_ok=True)
+        p.save_window_state(1024, 768)
+        assert p._state_file.exists()
+        import json
+        data = json.loads(p._state_file.read_text(encoding="utf-8"))
+        assert data["width"] == 1024
+        assert data["height"] == 768
+
+    def test_polling_stops_when_not_running(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._running = False
+        p._command_polling_loop()
+        # Should return immediately without calling api_get
+
 
 class TestTimerPlugin:
     """TimerPlugin logic (no HTTP, no window)."""
@@ -263,8 +297,13 @@ class TestTimerPlugin:
 
     # -- commands --------------------------------------------------------
 
+    def _mock_http(self, t, monkeypatch):
+        monkeypatch.setattr(t, "push_state", lambda: None)
+        monkeypatch.setattr(t, "api_post", lambda path, data: True)
+
     def test_start(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
+        self._mock_http(t, monkeypatch)
         t._is_paused = True
         t._start()
         assert not t._is_paused
@@ -272,12 +311,14 @@ class TestTimerPlugin:
 
     def test_pause(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
+        self._mock_http(t, monkeypatch)
         t._start()
         t._pause()
         assert t._is_paused
 
     def test_resume(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
+        self._mock_http(t, monkeypatch)
         t._start()
         t._pause()
         t._resume()
@@ -286,6 +327,7 @@ class TestTimerPlugin:
 
     def test_reset(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
+        self._mock_http(t, monkeypatch)
         t._current = 100
         t._reset()
         assert t._current == 300
@@ -293,11 +335,13 @@ class TestTimerPlugin:
 
     def test_set_time(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
+        self._mock_http(t, monkeypatch)
         t._on_set_time({"seconds": 120})
         assert t._current == 120
 
     def test_add_time(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
+        self._mock_http(t, monkeypatch)
         t._current = 100
         t._on_add_time({"seconds": 50})
         assert t._current == 150

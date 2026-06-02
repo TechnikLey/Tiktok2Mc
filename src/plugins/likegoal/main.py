@@ -49,7 +49,7 @@ class LikeGoalPlugin(BasePlugin):
         super().__init__()
         cfg = self.config
         self._display_text = cfg.get("display_text", "Like Goal")
-        self._initial_goal = int(cfg.get("initial_goal", 100_000))
+        self._initial_goal = max(int(cfg.get("initial_goal", 100_000)), 1)
         self._goal_multiplier = int(cfg.get("goal_multiplier", 2))
         self._signal_on = set(cfg.get("signal_on", ["milestone", "progress"]))
         self._manager = LikeManager(self._initial_goal, self._goal_multiplier)

@@ -91,6 +91,66 @@ class TestWinCounterPlugin:
         html = p.get_overlay_html()
         assert "win-counter" in html
 
+    def test_add_win_no_milestone_signal(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager.wins = 3
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_add_win({"amount": 1})
+        assert p._manager.wins == 4
+        assert not any(s.get("type") == "win.milestone" for s in signals)
+
+    def test_add_win_triggers_milestone_signal(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager.wins = 9
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_add_win({"amount": 3})
+        assert p._manager.wins == 2
+        assert p._manager.needed == 20
+        assert any(s.get("type") == "win.milestone" for s in signals)
+
+    def test_remove_win_no_record_low_signal(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager.record_low = -10
+        p._manager.wins = 0
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_remove_win({"amount": 1})
+        assert not any(s.get("type") == "win.record_low" for s in signals)
+
+    def test_remove_win_triggers_record_low(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager.record_low = 0
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_remove_win({"amount": 5})
+        assert p._manager.record_low == -5
+        assert any(s.get("type") == "win.record_low" for s in signals)
+
+    def test_negative_wins(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._on_remove_win({"amount": 3})
+        data = p._manager.get_data()
+        assert data["wins"] == -3
+        assert data["record_low"] == -3
+
+    def test_save_dims_partial_args(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        saved = {}
+        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        p._on_save_dims({})
+        assert saved["w"] == 600
+        assert saved["h"] == 300
+
+    def test_state_contains_all_fields(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        state = p.get_state()
+        assert "wins" in state
+        assert "needed" in state
+        assert "record_low" in state
+        assert "win_color" in state
+
 
 # =========================================================================
 # DeathCounterPlugin
@@ -138,6 +198,70 @@ class TestDeathCounterPlugin:
         p = self._make_plugin(tmp_path, monkeypatch)
         html = p.get_overlay_html()
         assert "death-counter" in html
+
+    def test_add_death_handler(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        assert "add_death" in p._handlers
+        p._on_add_death({"amount": 3})
+        assert p._manager._count == 3
+
+    def test_reset_handler(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager._count = 10
+        p._milestones_sent.add(5)
+        p._on_reset({})
+        assert p._manager._count == 0
+        assert len(p._milestones_sent) == 0
+
+    def test_milestone_fires_signal(self, tmp_path, monkeypatch):
+        from plugins.deathcounter.main import DeathCounterPlugin
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr(
+            "core.base_plugin.load_plugin_config",
+            lambda d: {"milestones": [5, 10], "signal_on": ["milestone"]},
+        )
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+        p = DeathCounterPlugin()
+        p._data_dir = tmp_path / "data"
+        p._data_dir.mkdir(parents=True, exist_ok=True)
+        p._manager._stats_path = p._data_dir / "deaths.json"
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_death({"amount": 5})
+        assert p._manager._count == 5
+        assert any(s.get("type") == "death.milestone" for s in signals)
+
+    def test_duplicate_milestone_suppressed(self, tmp_path, monkeypatch):
+        from plugins.deathcounter.main import DeathCounterPlugin
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr(
+            "core.base_plugin.load_plugin_config",
+            lambda d: {"milestones": [5], "signal_on": ["milestone"]},
+        )
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+        p = DeathCounterPlugin()
+        p._data_dir = tmp_path / "data"
+        p._data_dir.mkdir(parents=True, exist_ok=True)
+        p._manager._stats_path = p._data_dir / "deaths.json"
+        p._milestones_sent.add(5)
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_death({"amount": 10})
+        assert not any(s.get("type") == "death.milestone" for s in signals)
+
+    def test_save_dims_partial_args(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        saved = {}
+        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        p._on_save_dims({})
+        assert saved["w"] == 500
+        assert saved["h"] == 400
+
+    def test_state_after_death(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._on_death({"amount": 3})
+        state = p.get_state()
+        assert state["deaths"] == 3
 
 
 # =========================================================================
@@ -190,6 +314,70 @@ class TestLikeGoalPlugin:
         html = p.get_overlay_html()
         assert "like-goal" in html
 
+    def test_reset_handler(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._manager.likes = 150
+        p._on_reset({})
+        data = p._manager.get_data()
+        assert data["likes"] == 0
+        assert data["goal"] == 100
+
+    def test_add_likes_zero_delta(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_add_likes({"amount": 0})
+        assert p._manager.get_data()["likes"] == 0
+        assert not any(s.get("type") == "likegoal.progress" for s in signals)
+        assert not any(s.get("type") == "likegoal.milestone" for s in signals)
+
+    def test_progress_signal_no_milestone(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_add_likes({"amount": 25})
+        assert p._manager.get_data()["likes"] == 25
+        assert any(s.get("type") == "likegoal.progress" for s in signals)
+        assert not any(s.get("type") == "likegoal.milestone" for s in signals)
+
+    def test_milestone_signal_on_rollover(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        signals = []
+        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        p._on_add_likes({"amount": 150})
+        data = p._manager.get_data()
+        assert data["likes"] == 50
+        assert data["goal"] == 200
+        assert any(s.get("type") == "likegoal.milestone" for s in signals)
+
+    def test_multiplier_zero(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch, goal_multiplier=0)
+        p._on_add_likes({"amount": 250})
+        data = p._manager.get_data()
+        assert data["likes"] == 0
+        assert data["goal"] == 100
+
+    def test_multiplier_one(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch, goal_multiplier=1, initial_goal=100)
+        p._on_add_likes({"amount": 250})
+        data = p._manager.get_data()
+        assert data["likes"] == 150  # 250 - 100 = 150, then 150 < 200 so stops
+        assert data["goal"] == 200  # 100 + 100 = 200
+
+    def test_save_dims(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        saved = {}
+        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        p._on_save_dims({"width": 1920, "height": 1080})
+        assert saved["w"] == 1920
+        assert saved["h"] == 1080
+
+    def test_initial_goal_zero_clamped(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch, initial_goal=0)
+        assert p._initial_goal == 1
+        assert p._manager.initial_goal == 1
+        assert p._manager.goal == 1
+
 
 # =========================================================================
 # SpotifyControlPlugin
@@ -238,3 +426,35 @@ class TestSpotifyControlPlugin:
         ]
         for cmd in handlers:
             assert cmd in p._handlers, f"Handler '{cmd}' not registered"
+
+    def test_on_volume_no_level(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        prev = getattr(p._client, "set_volume", None)
+        calls = []
+        if prev:
+            monkeypatch.setattr(p._client, "set_volume", lambda v: calls.append(v))
+        p._on_volume({})
+        assert len(calls) == 0
+
+    def test_on_comment_empty_text(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._on_comment({})  # should not raise
+
+    def test_on_comment_no_command(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._on_comment({"text": "   "})  # whitespace only, should not raise
+
+    def test_search_and_play_empty(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        result = p._search_and_play("")
+        assert result["status"] == "not_found"
+
+    def test_search_and_play_artist_only(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        result = p._search_and_play("TestArtist - ")
+        assert result["status"] == "not_found"
+
+    def test_volume_up_down_registered(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        assert "volume_up" in p._handlers
+        assert "volume_down" in p._handlers
