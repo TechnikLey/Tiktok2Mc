@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 import shutil
 import logging
@@ -21,6 +20,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "server_host": str,
     "api_key": str,
     "control_method": str,
+    "port_policy": dict,
     "shutdown": dict,
     "java": dict,
     "rcon": dict,
@@ -31,7 +31,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "gui": dict,
     "update": dict,
     "overlay": dict,
-    "spotify": dict,
+    "plugin_sandbox": dict,
 }
 
 
@@ -145,9 +145,7 @@ class ApiService:
         If *backup* is ``True`` the previous file is copied to a versioned
         backup (``config.yaml.v1.bak``, ``config.yaml.v2.bak``, …).
         """
-        # Upgrade to current baseline version before validation
-        if "config_version" in data:
-            data["config_version"] = EXPECTED_CONFIG_VERSION
+        data["config_version"] = EXPECTED_CONFIG_VERSION
 
         # Load existing config to preserve comments/formatting
         existing = load_yaml(self.config_path) if self.config_path.exists() else CommentedMap()

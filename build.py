@@ -178,6 +178,24 @@ def main():
                     h.update(chunk)
             return h.hexdigest()
 
+        def hash_core_tree():
+            """Return a SHA-256 hash over every file under src/core/.
+
+            Any change to any core file invalidates the cache for ALL
+            executables, preventing stale builds when transitive
+            dependencies change.
+            """
+            h = hashlib.sha256()
+            core_root = SCRIPT_DIR / "src" / "core"
+            if core_root.exists():
+                for f in sorted(core_root.rglob("*")):
+                    if f.is_file():
+                        h.update(f.relative_to(SCRIPT_DIR).as_posix().encode())
+                        h.update(sha256_file(f).encode())
+            return h.hexdigest()
+
+        core_tree_hash = hash_core_tree()
+
         def _add_core_dep(module, deps):
             """Resolve a 'core.xxx.yyy' import to actual file paths (relative to SCRIPT_DIR)."""
             rel = module.replace(".", "/")
@@ -237,6 +255,7 @@ def main():
             deps = resolve_core_imports(full_src)
             dep_hasher = hashlib.sha256()
             dep_hasher.update(current_hash.encode())
+            dep_hasher.update(core_tree_hash.encode())
             for dep in sorted(deps):
                 dep_path = SCRIPT_DIR / dep
                 if dep_path.exists():
