@@ -1,18 +1,19 @@
 # TikTok to Minecraft Integration
 
 > [!IMPORTANT]
+>
 > # v1.0.0 — Coming Soon
 >
 > A major rewrite is in active development. v1.0.0 will ship:
 >
-> - **Graphical User Interface** — manage everything through a GUI. 
+> * **Graphical User Interface** — manage everything through a GUI.
 >   No more editing YAML, actions files, or configs by hand.
-> - **Plugin overhaul** — each plugin becomes a true standalone module.
+> * **Plugin overhaul** — each plugin becomes a true standalone module.
 >   Enable only what you need (opt-in). Timer, Death Counter, and Win
 >   Counter are no longer hardwired together.
-> - **Unified API server** — one central backend instead of a dozen
+> * **Unified API server** — one central backend instead of a dozen
 >   separate executables. Drastically fewer ports and better stability.
-> - **Quality of Life** — first-run setup wizard, live log viewer,
+> * **Quality of Life** — first-run setup wizard, live log viewer,
 >   overlay previews, theme editor with color pickers, Spotify setup
 >   assistant, and integrated trigger testing.
 >
@@ -25,8 +26,11 @@
 > Existing users can continue using v0.5.0 — it remains
 > stable and supported for day-to-day streaming.
 >
-> **Release date:** Unknown. Quality over speed.
+> **Estimated release:** likely within the next **1–2 weeks**, assuming
+> testing and final polishing go as planned.
+>
 > See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for current progress.
+
 
 Connect your TikTok Live stream to a Minecraft server. Gifts, follows, and likes from your viewers trigger real-time commands in the game.
 
