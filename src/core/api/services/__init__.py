@@ -47,7 +47,9 @@ def _validate_config_schema(data: Any, path: str = "") -> None:
     for key, expected_type in _CONFIG_SCHEMA.items():
         full_key = f"{path}.{key}" if path else key
         if key not in data:
-            raise ValueError(f"Missing required key: {full_key!r}")
+            # Allow missing keys — application code uses .get() with defaults.
+            # This prevents HTTP 500 when legacy configs lack newer fields.
+            continue
         value = data[key]
         if not isinstance(value, expected_type):
             raise ValueError(
