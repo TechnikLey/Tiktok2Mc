@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
 | Aspekt | Bedeutung | Beispiel |
 |--------|-----------|----------|
-| **Port Eindeutigkeit** | Jedes GUI-Plugin braucht eindeutigen Port | GUI: 29185, Timer: 29189, LikeGoal: 29193 |
+| **Port Eindeutigkeit** | Jedes GUI-Plugin braucht eindeutigen Port | GUI: 29185, Timer: 29189, DeathCounter: 29190 |
 | **Threading** | Flask muss in Thread laufen, damit Window nicht blockiert | `daemon=True` ist wichtig |
 | **SSE für Live-Updates** | Server-Sent Events für kontinuierliche Daten | `/stream` für Like-Counter |
 | **CORS** | Bei Browser-Quellen: `Access-Control-Allow-Origin: *` nötig | Streaming-Software Browser-Source |

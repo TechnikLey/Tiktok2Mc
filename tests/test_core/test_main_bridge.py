@@ -82,10 +82,6 @@ class TestGetSafeUsername:
 
 
 # =========================================================================
-# validate_like_triggers — REMOVED as part of plugin decoupling.
-# Like triggers now live in the like-goal plugin config, validated by the plugin itself.
-# =========================================================================
-# =========================================================================
 # Webhook handling
 # =========================================================================
 

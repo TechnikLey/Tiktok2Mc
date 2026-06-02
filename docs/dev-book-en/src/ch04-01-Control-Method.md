@@ -102,7 +102,7 @@ register_plugin(AppConfig(
 **`ics=False`** = Plugin only runs as an HTTP server (DCS)
 
 > [!NOTE]
-> All built-in plugins (Timer, DeathCounter, WinCounter, LikeGoal, OverlayTxt) have `ics=True`.
+> All built-in plugins (Timer, DeathCounter, WinCounter, OverlayTxt) have `ics=True`.
 
 ---
 

@@ -18,7 +18,6 @@ Streaming Tool
   │   ├─ Timer (countdown tracker)
   │   ├─ DeathCounter (death counter)
   │   ├─ WinCounter (win counter)
-  │   ├─ LikeGoal (like milestone tracker)
   │   └─ OverlayTxt (text overlay for OBS)
   │
   └─ Custom Plugins (user-defined)
@@ -34,7 +33,7 @@ Streaming Tool
 | Category | Location | Purpose | Examples |
 |----------|----------|---------|----------|
 | **Modules (core)** | `src/core/` | Infrastructure & core logic | validator, models, utils, paths, cli |
-| **Built-in plugins** | `src/plugins/` | Standard functions | Timer, DeathCounter, WinCounter, LikeGoal, OverlayTxt |
+| **Built-in plugins** | `src/plugins/` | Standard functions | Timer, DeathCounter, WinCounter, OverlayTxt |
 | **Custom plugins** | `plugins/` (user) | User-defined extensions | Your own plugins |
 
 ---

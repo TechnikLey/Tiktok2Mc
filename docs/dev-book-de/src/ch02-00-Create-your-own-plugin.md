@@ -16,7 +16,6 @@ Ein **Plugin** ist ein unabhängiges Python-Programm, das sich in das Streaming 
 
 **Built-in Plugins (Beispiele):**
 - **DeathCounter**: Zählt Tode, sendet an Minecraft
-- **LikeGoal**: Verwaltet Like-Ziele
 - **Timer**: Countdown-Timer
 - **WinCounter**: Siege zählen
 

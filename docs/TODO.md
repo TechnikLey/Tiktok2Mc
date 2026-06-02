@@ -20,13 +20,6 @@
 
 ---
 
-## 🟡 HIGH — Should Ship Before v1.0.0
-
-### 2. Plugin Implementation Tests
-Only manifest smoke tests exist for plugins. No tests for command handlers (play, pause, add_win, player_death, etc.) across all 5 plugins. High regression risk.
-
----
-
 ## 🔵 TEST COVERAGE — Known Gaps
 
 | Module | Lines | Risk | Status |
@@ -59,40 +52,11 @@ Only manifest smoke tests exist for plugins. No tests for command handlers (play
 
 ## 🟠 IMPORTANT — Plugin Coupling & Unfinished Work
 
-> These are **not** out-of-scope ideas. They are real structural issues that need to be addressed before v1.0.0, tracked here because they span multiple plugins.
-
-### Plugin Cross-Coupling
-All plugins now use the EventBus for communication. No hardcoded inter-plugin dependencies remain:
-- ✅ **Timer** — publishes `timer.*` events (started, paused, zero, milestone, tick).
-- ✅ **WinCounter** — publishes `win.milestone` and `win.record_low` events. Removed `decrement_on_death` (was DeathCounter coupling).
-- ✅ **DeathCounter** — publishes `death.milestone` events with configurable milestones.
-- ✅ **LikeGoal** — publishes `likegoal.milestone` and `likegoal.progress` events. Removed direct TikTok event dependency; now consumes `add_likes` commands via API.
-- ✅ **SpotifyControl** — publishes `spotify.track_changed`, `spotify.play`, `spotify.pause` events.
-- ✅ **Event-Command Mapper** — central wiring via `data/event_commands.yaml` maps any EventBus event to plugin commands without coupling.
-  - ✅ **TikTok EventBus publishing fix** — `tiktok.follow`, `tiktok.like`, `tiktok.gift`, `tiktok.join`, `tiktok.comment`, `tiktok.share` now publish as distinct event types (e.g. `tiktok.follow`) instead of all being bundled under `tiktok.event`. This makes them actually usable in Event-Command Mapper / Event Reactions.
-  - ✅ **Event Reactions GUI redesign** — complete UX overhaul of the Event-Command Mapper frontend. Replaced technical "Mappings/Actions" UI with a guided 3-step wizard, visual reaction cards, category filters, search, templates, and contextual descriptions. First-time users can now understand the system without documentation.
-
-### Security
-- ~~Spotify `client_secret` validation and encrypted storage~~ ✅ Done (see CHANGE_HISTORY.md)
-- ~~Download integrity verification (checksummed artifacts)~~ ✅ Done (see CHANGE_HISTORY.md)
-
-### Architecture
-- ~~Plugin sandboxing / resource limits~~ ✅ Done (see CHANGE_HISTORY.md)
-
 ### GUI
-- ~~WebSocket/SSE client for real-time dashboard updates (beyond log streaming)~~ ✅ Done — DashboardPublisher pushes `dashboard.plugin_states`, `dashboard.ecm_diagnostics`, and `dashboard.reactions_activity` every 5s via the existing SSE stream.
-- ~~Event-Command Mapper UX overhaul~~ ✅ Done — replaced with Event Reactions wizard + visual cards.
-- ~~Save-button state sync across all editors~~ ✅ Done.
-- Overlay preview + live theme editor
 - Integrated Minecraft server console (RCON terminal)
-- Mobile-responsive web dashboard variant
 
 ### Testing
 - Frontend/GUI integration tests (Playwright or similar)
-
-### Stability & Logging
-- ~~Plugin registry backup spam~~ ✅ Done — removed per-save backup from `PluginRegistry._save()`. Now only one startup backup is created when the registry file already exists.
-- ~~Built-in app health-check noise~~ ✅ Done — `start.py` health-check loop now skips built-in apps (`App`, `Minecraft Server`, `GUI`, `Overlay`) instead of trying to update them in the plugin registry. Also URL-encodes all plugin names in API calls to prevent "control characters in URL" errors.
 
 ---
 
@@ -101,22 +65,18 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 ### Priority: High
 | Item | Reason | Est. Complexity |
 |------|--------|----------------|
-| `AIPrompt.md` stale file paths | References `~/core/gifts.json` (moved to `~/defaults/gifts.json`) and ambiguous `~/config/config.yaml` path | Trivial |
-| `docs/dev-book-en/` and `docs/dev-book-de/` reference old architecture | Still documents self-registration plugins, legacy registry, old plugin system | Medium |
 | `config.yaml` inline comments may reference old port values or removed sections | Template was updated piecemeal; spot-check needed for stale references | Low |
 
 ### Priority: Medium
 | Item | Reason | Est. Complexity |
 |------|--------|----------------|
 | No build system tests | `build.py` (615 lines) has 0 tests; cross-platform cache invalidation, installer generation, upload all untested | Large |
-| Plugin command handler tests missing | Only manifest smoke tests exist across all 5 plugins — no tests for play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc. | Medium |
 | GUI frontend integration tests missing | Vitest unit tests exist (6 files) but no Playwright/Cypress E2E against real API | Large |
 
 ### Priority: Low
 | Item | Reason | Est. Complexity |
 |------|--------|----------------|
 | SSE/WS receive tests blocked | httpx TestClient limitation prevents SSE stream receive testing; WebSocket client tests skipped | Small |
-| `docs/ROADMAP.md` severely stale | Lists completed features as missing, wrong test counts; consider archiving | Trivial |
 
 ---
 
@@ -143,12 +103,4 @@ All plugins now use the EventBus for communication. No hardcoded inter-plugin de
 
 ---
 
-## 📋 Next 3 Steps
-
-1. **Plugin Implementation Tests** — expand command handler tests (play, pause, add_win, player_death, player_respawn, reset, volume, shuffle, repeat, etc.) across all 5 plugins and add BasePlugin edge-case tests.
-2. **Documentation Rewrite** — update `GUIDE.md` (event bus routing, hook system, declarative subscriptions, Event Reactions, live dashboard), `README.md` (API server, actions editor, Event Reactions), `CHANGELOG.md` (test counts, dates). **Do last, after all code changes frozen.**
-3. **Finalize for v1.0.0 release** — freeze code, run final test pass, compile release binaries, generate checksums, publish.
-
----
-
-*Last updated: 2026-06-02 — UI/UX Design System shipped, Spotify plugin-local config migrated, Build cache invalidation fixed, Config schema drift fixed, API config save hardening, Comment_commands.groups false-positive fix applied | Current: Plugin Implementation Tests → Overlay Preview + Live Theme Editor → Documentation Rewrite (DO LAST).*
+*Last updated: 2026-06-02 — Cleaned: removed completed sections (Plugin Cross-Coupling, Security, Architecture, Stability & Logging, Overlay Preview), removed stale "Plugin Implementation Tests" section and TECHNICAL DEBT row, removed "Completed Since Last Update" and "Next Steps" sections.*

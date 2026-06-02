@@ -17,10 +17,6 @@ EXPECTED_PLUGINS: dict[str, dict[str, object]] = {
         "dir": "deathcounter",
         "display_name": "Death Counter",
     },
-    "like-goal": {
-        "dir": "likegoal",
-        "display_name": "Like Goal",
-    },
     "spotify-control": {
         "dir": "spotify",
         "display_name": "Spotify Control",

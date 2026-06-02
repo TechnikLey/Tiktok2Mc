@@ -11,7 +11,7 @@
 ### Plugin Decoupling & Architecture
 - **Declarative Event Routing** — `main.py` no longer hardcodes plugin names. Events are published to EventBus; `_event_bridge_worker()` reads `event_subscriptions` from every `plugin.json` and routes automatically. Third-party plugins receive events the same way as official ones.
 - **Removed ChannelPoints Plugin** — `src/plugins/channelpoints/` deleted entirely (281 lines). The main system no longer manages economy/points.
-- **Removed hardcoded `like-goal` coupling** — `validate_like_triggers()` and `likegoal_queue` removed from `main.py`. Like events go through EventBus → EventBridge.
+- **Removed LikeGoal Plugin entirely** — `src/plugins/likegoal/` deleted (3 files, 192+ lines). All event subscriptions, theme defaults, configuration schemas, test coverage, overlay templates, GUI catalog entries, and documentation references removed.
 - **Removed hardcoded `overlay-text` coupling** — `overlay_utils.py` made plugin-agnostic with optional `plugin_name` parameter.
 - **Promoted `overlay-text` to built-in core subsystem** — `src/plugins/overlaytxt/` deleted entirely. New `src/core/overlay.py` manages config (global `config.yaml`), circuit breakers, HTML rendering, and direct EventBus dispatch. New `src/python/overlay.py` standalone window process. Dedicated API routes at `/api/v1/overlay/*`. Removed plugin manifest, config schema, and lifecycle indirection.
 - **Removed `points_cost` from comment commands** — was a ChannelPoints-specific leak into the core command framework.
@@ -37,14 +37,14 @@
 ### EventBus Adoption
 - `EventBridge` worker added: subscribes to EventBus, translates `tiktok.*` events to plugin commands via `command_queue.enqueue()`
 - `event_subscriptions` field added to `PluginManifest` model
-- `channel-points` and `like-goal` manifests updated with `event_subscriptions`
+- `channel-points` manifests updated with `event_subscriptions`
 
 ### Plugin Architecture Modernisation
 - **`BasePlugin` base class** (`src/core/base_plugin.py`) — shared config load, theme, API helpers (`api_post`, `api_get`, `push_state`, `register_handler`), command polling, state push, window state, overlay registration. 18 tests.
 - **Timer completely rewritten** — fully decoupled. Publishes `timer.*` events to EventBus. Removed `depends_on`, `auto_win`, `pause_on_death`.
 - **WinCounter rewritten** — fully decoupled. Publishes `win.milestone` and `win.record_low` events. Removed `decrement_on_death` (was DeathCounter coupling). Config: `initial_needed`, `milestone_increment`, `signal_on`.
 - **DeathCounter rewritten** — fully decoupled. Publishes `death.milestone` events. Config: `milestones`, `signal_on`.
-- **LikeGoal rewritten** — fully decoupled. Publishes `likegoal.milestone` and `likegoal.progress` events. Removed direct TikTok event dependency; now consumes `add_likes` commands via API.
+<!-- LikeGoal was rewritten but has since been removed entirely -->
 - **SpotifyControl modernised** — publishes `spotify.track_changed`, `spotify.play`, `spotify.pause` events. Config: `signal_on`.
 - **Plugin dependency ordering** — topological sort in `AppConfig`, `depends_on` field, enforced on register/put/enable. 30 tests.
 
@@ -85,13 +85,14 @@
 - **Save-button state sync** — Config Editor, Plugin Config Editor, and Actions Editor: dynamic Save button enabled only when dirty, real-time input listeners with debounce, unsaved-changes dialog on close.
 - **Single-instance guard** — GUI prevents multiple instances via named mutex; auto-switches to dashboard on second launch.
 - **Improved event_bus GUI** — better visualization of EventBus activity in the dashboard.
+- **Overlay Preview + Live Theme Editor** — `POST /api/v1/overlay/preview` endpoint accepts `theme_overrides` for live preview rendering. Dashboard preview iframe card with Refresh + Send Test buttons. Config editor "Overlay Text" section live preview with 600ms debounced auto-refresh on color input changes. In-editor test message form (title, subtitle, duration). Built-in overlay URLs shown alongside plugin URLs in dashboard.
 
 ### UI/UX Redesign (Unified Design System)
 - **Design system tokens** — new `templates/gui/design-system.css` with centralized CSS custom properties for colors, spacing, typography, radius, shadows, transitions, z-index, animations, focus-visible, and reduced-motion.
 - **Style.css refactor** — 1912 lines rewritten to use design system tokens with BEM-style class naming (`btn--primary`, `card--status`, etc.).
 - **Launcher redesign** — unified accent color from blue (#60a5fa) to amber (#f5c518), replaced all inline CSS with proper classes, added pulse animation on status dots, subtle gradient background.
 - **Legacy compatibility** — CSS variable aliases (--bg, --surface, etc.) and button class aliases (.btn-primary, .btn-secondary) maintained for backward compatibility with dynamically generated HTML.
-- **Overlay refinements** — Inter font stack, antialiasing, smoother transitions applied to deathcounter, timer, likegoal, wincounter, spotify, and core overlay templates.
+- **Overlay refinements** — Inter font stack, antialiasing, smoother transitions applied to deathcounter, timer, wincounter, spotify, and core overlay templates.
 - **Modal z-index fix** — raised modal z-indices from 250 to 350-500 so they always appear above editor overlays.
 - **Translation cleanup** — German labels in HTML templates translated to English.
 - **False-positive diff fix** — `comment_commands.groups` diff detection: `setValue` now creates arrays (not objects) for numeric-index paths, `computeDiff` detects type mismatches properly, `buildGroupCard` no longer mutates `commands_config` from array to object.

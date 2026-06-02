@@ -248,7 +248,6 @@ Nur diese Verzeichnisse werden verarbeitet:
 * `server`
 * `config`
 * `plugins/deathcounter`
-* `plugins/likegoal`
 * `plugins/overlaytxt`
 * `plugins/timer`
 * `plugins/wincounter`
@@ -273,7 +272,7 @@ Nur diese Dateien auf der obersten Ebene werden übernommen:
 Das Update betrifft damit nur genau die Bereiche, die explizit freigegeben sind.
 
 ```Python
-WHITELIST_DIRS = {"core", "scripts", "config", "plugins/deathcounter", "plugins/likegoal", "plugins/overlaytxt", "plugins/timer", "plugins/wincounter"}
+WHITELIST_DIRS = {"core", "scripts", "config", "plugins/deathcounter", "plugins/overlaytxt", "plugins/timer", "plugins/wincounter"}
 WHITELIST_FILES = {"version.txt", "README.md", "LICENSE", "update.exe", "server.exe", "start.exe", "plugins/registry.exe", "plugins/plugin_updater.exe"}
 ```
 

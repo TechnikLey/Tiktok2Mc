@@ -257,7 +257,6 @@ After the build process, the finished project version is created in the `build/r
 │   ├── gifts.json
 │   ├── gui.exe
 │   ├── lib
-│   ├── LikeGoal.exe
 │   ├── mcServerAPI.exe
 │   ├── Overlaytxt.exe
 │   ├── PortChecker.exe
@@ -301,7 +300,6 @@ Included are, among others:
 
 * `app.exe`
 * `gui.exe`
-* `LikeGoal.exe`
 * `mcServerAPI.exe`
 * `Overlaytxt.exe`
 * `PortChecker.exe`

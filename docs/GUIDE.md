@@ -141,31 +141,6 @@ follow:>>New Follower!|{user} is now following you!|5
 
 You can control which triggers are eligible in `config.yaml` under `random_triggers`.
 
-### Like triggers
-
-Like triggers fire when your stream reaches a certain number of likes. You set these up in two places:
-
-1. **`config.yaml`** — under `like_goal.triggers`, set how many likes between triggers.
-2. **`actions.mca`** — add a line using the trigger name to define what happens.
-
-Example:
-
-In `config.yaml`:
-```yaml
-like_goal:
-  triggers:
-    - id: likes_standard
-      every: 100
-      function: likes
-```
-
-In `actions.mca`:
-```
-likes:/execute at @a run summon minecraft:creeper ~ ~ ~
-```
-
-Every 100 likes, a Creeper spawns.
-
 ### Commenting out lines
 
 Lines starting with `#` are ignored. Use this to temporarily disable an action:
@@ -200,11 +175,8 @@ timer:
 | **Timer** | Countdown timer. Can pause on player death. | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
 | **Death Counter** | Counts player deaths. Updates automatically. | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
 | **Win Counter** | Tracks wins and losses. | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
-| **Like Goal** | Progress bar for stream likes. | `http://127.0.0.1:29185/api/v1/plugins/like-goal/overlay` |
 | **Overlay Text** | Shows custom text messages on stream. | `http://127.0.0.1:29185/api/v1/plugins/overlay-text/overlay` |
 | **Spotify Control** | Viewers control your Spotify via chat. | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
-| **Channel Points** | Loyalty points for active viewers. | `http://127.0.0.1:29185/api/v1/plugins/channel-points/overlay` |
-
 > **Note:** Everything starts disabled. Only turn on what you actually need.
 
 ### Timer
@@ -220,13 +192,6 @@ Automatically counts player deaths. No setup needed beyond enabling it. The coun
 ### Win Counter
 
 Tracks wins and losses. You can add wins via webhook or chat command. Enable `decrement_on_death` if you want deaths to subtract from the win count.
-
-### Like Goal
-
-A progress bar that fills as your stream accumulates likes. Configure:
-- `initial_goal` — how many likes to reach the first goal
-- `goal_multiplier` — what happens after a goal is reached (0 = reset, 1 = add same amount, 2+ = multiply)
-- `display_text` — text shown above the bar
 
 ### Overlay Text
 
@@ -258,18 +223,6 @@ Lets viewers control your Spotify playback through TikTok chat. Viewers can type
 The overlay shows the current track with album art. Add it as an OBS Browser Source at `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay`.
 
 > You also need to enable the `$` comment command group in `config.yaml` under `comment_commands` for chat commands to work.
-
-### Channel Points
-
-A loyalty system that awards points to active viewers automatically. Viewers earn points by interacting (commenting, liking, following, etc.).
-
-Configure:
-- `award_amount` — points earned per interval
-- `award_interval_seconds` — how often points are awarded
-- `ping_timeout_minutes` — how long after last interaction a viewer stays active
-- `leaderboard_count` — how many top viewers to show on the overlay
-
-No additional setup needed. Enable it and it starts working.
 
 ---
 
@@ -353,7 +306,7 @@ The dashboard includes a **form-based configuration editor** at the "Edit Config
 - **Section navigation:** settings grouped by category (Connection, Minecraft, Streaming & Overlays, Chat & Commands, Integrations, Appearance, System).
 - **Search:** real-time filtering across setting names, descriptions, and help text.
 - **Validation:** required fields, patterns, min/max bounds, Java RAM format.
-- **Like goal triggers:** table editor with add/remove/edit rows.
+<!-- Like goal triggers removed with LikeGoal plugin -->
 - **Comment commands:** full group editor (prefix, handler, mode, roles, cooldowns).
 - **Command overrides:** dynamic add/remove for `points_cost`, `cooldown`, `user_cooldown`, `conditional`, `url`, `handler`, `roles`.
 - **Theme editor:** hex color pickers with synced text inputs.

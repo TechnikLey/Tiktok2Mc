@@ -248,7 +248,6 @@ Only these directories are processed:
 * `server`
 * `config`
 * `plugins/deathcounter`
-* `plugins/likegoal`
 * `plugins/overlaytxt`
 * `plugins/timer`
 * `plugins/wincounter`
@@ -273,7 +272,7 @@ Only these top-level files are copied:
 The update therefore only affects areas that have been explicitly whitelisted.
 
 ```python
-WHITELIST_DIRS = {"core", "scripts", "config", "plugins/deathcounter", "plugins/likegoal", "plugins/overlaytxt", "plugins/timer", "plugins/wincounter"}
+WHITELIST_DIRS = {"core", "scripts", "config", "plugins/deathcounter", "plugins/overlaytxt", "plugins/timer", "plugins/wincounter"}
 WHITELIST_FILES = {"version.txt", "README.md", "LICENSE", "update.exe", "server.exe", "start.exe", "plugins/registry.exe", "plugins/plugin_updater.exe"}
 ```
 

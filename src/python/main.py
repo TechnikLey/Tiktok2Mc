@@ -1255,7 +1255,7 @@ def create_client(user):
             total_since_start = event.total - ctx.start_likes
         try:
             now = time.time()
-            # Throttle like-goal events to ~1 per 3 seconds
+            # Throttle like events to ~1 per 3 seconds
             if not hasattr(ctx, "_last_like_event"):
                 ctx._last_like_event = 0
             if now - ctx._last_like_event >= 3:

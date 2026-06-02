@@ -69,7 +69,7 @@ Jedes Plugin hat seinen eigenen Port, definiert in `config.yaml`:
 | Timer | 29189 | `timer.port` |
 | DeathCounter | 29190 | `death_counter.port` |
 | WinCounter | 29191 | `win_counter.port` |
-| LikeGoal | 29193 | `like_goal.port` |
+
 
 > [!IMPORTANT]
 > Jeder Port muss **eindeutig** sein. Wenn zwei Plugins den gleichen Port nutzen, schlägt der Start fehl.
@@ -115,7 +115,7 @@ es.onmessage = (e) => {
 };
 ```
 
-Dieses Muster wird von **DeathCounter**, **WinCounter**, **LikeGoal** und **OverlayTxt** verwendet.
+Dieses Muster wird von **DeathCounter**, **WinCounter** und **OverlayTxt** verwendet.
 
 ---
 

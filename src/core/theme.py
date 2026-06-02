@@ -1,11 +1,4 @@
 _DEFAULT_THEMES = {
-    "like_goal": {
-        "background": "#050505",
-        "text": "#ffffff",
-        "accent": "#00f5ff",
-        "accent2": "#8a2be2",
-        "danger": "#ff4d4d",
-    },
     "death_counter": {
         "background": "#000000",
         "text": "#8ef3ff",
@@ -49,7 +42,7 @@ def load_plugin_theme(plugin_cfg: dict, plugin_key: str) -> dict:
     plugin_cfg:
         The dict returned by ``load_plugin_config(plugin_dir)``.
     plugin_key:
-        Canonical theme key (e.g. ``"spotify"``, ``"like_goal"``) used
+        Canonical theme key (e.g. ``"spotify"``) used
         to look up built-in fallback colors.
     """
     defaults = _DEFAULT_THEMES.get(plugin_key, {})

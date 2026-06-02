@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
 | Aspect | Meaning | Example |
 |--------|---------|---------|
-| **Port uniqueness** | Every GUI plugin needs a unique port | GUI: 29185, Timer: 29189, LikeGoal: 29193 |
+| **Port uniqueness** | Every GUI plugin needs a unique port | GUI: 29185, Timer: 29189, DeathCounter: 29190 |
 | **Threading** | Flask must run in a thread so the window doesn't block | `daemon=True` is important |
 | **SSE for live updates** | Server-Sent Events for continuous data | `/stream` for like counters |
 | **CORS** | For browser sources: `Access-Control-Allow-Origin: *` required | Streaming software browser source |

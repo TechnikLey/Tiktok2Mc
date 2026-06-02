@@ -66,6 +66,18 @@
                 <div id="live-reactions-empty" class="muted text-center" style="padding: 1rem 0;">No reaction activity yet. Create a reaction and trigger an event to see it here.</div>
             </div>
 
+            <div class="card" id="overlay-preview-card">
+                <h2>Overlay Preview</h2>
+                <div class="muted">Live preview of the built-in overlay text.</div>
+                <div id="overlay-preview-iframe-wrap" class="overlay-preview-wrap">
+                    <iframe id="overlay-preview-iframe" class="overlay-preview-iframe" sandbox="allow-scripts" srcdoc="<html><body style='margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;color:#666;font-family:sans-serif;font-size:14px;'>Loading preview...</body></html>"></iframe>
+                </div>
+                <div class="overlay-preview-toolbar">
+                    <button class="btn btn--primary btn--sm" onclick="sendTestOverlay()">Send Test</button>
+                    <button class="btn btn--secondary btn--sm" onclick="refreshOverlayPreview()">Refresh</button>
+                </div>
+            </div>
+
             <div class="card">
                 <h2>Configuration</h2>
                 <div id="config-summary" class="muted">Loading...</div>

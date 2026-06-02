@@ -10,7 +10,7 @@ The tool is nearly ready for its v1.0.0 release. All major features are implemen
 * **Desktop GUI** — manage everything from a visual dashboard: config editor, actions editor, plugin manager, setup wizard
 * **Event Reactions** — a visual editor that lets you decide what happens when events occur (no files to edit)
 * **Live Dashboard** — see plugin health, recent activity, and system status in real time
-* **Stream overlays** — timer, death counter, win counter, like goal, Spotify info, channel points, and text overlays for OBS
+* **Stream overlays** — timer, death counter, win counter, Spotify info, and text overlays for OBS
 * **Chat commands** — viewers can trigger actions by typing in chat, with role-based permissions and cooldowns
 * **Spotify integration** — connect your Spotify account, let viewers control playback, show album art on stream
 * **Installers** — one-click setup for Windows (NSIS) and Linux (shell installer with desktop entry)

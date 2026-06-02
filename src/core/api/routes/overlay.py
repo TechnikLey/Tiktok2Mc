@@ -52,6 +52,21 @@ async def overlay_event_stream():
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.post("/overlay/preview")
+async def overlay_preview(body: dict):
+    """Render a preview of the overlay HTML with optional theme overrides.
+
+    Used by the GUI live theme editor to show real-time preview without
+    saving configuration changes.
+    """
+    mgr = get_overlay_manager()
+    overlay_name = body.get("overlay_name", "default")
+    chroma = body.get("chroma", True)
+    theme_overrides = body.get("theme", None)
+    html = mgr.render_html(overlay_name=overlay_name, chroma=chroma, theme_overrides=theme_overrides)
+    return {"html": html}
+
+
 @router.post("/overlay/display")
 async def overlay_display(body: dict):
     """Display text on a built-in overlay.

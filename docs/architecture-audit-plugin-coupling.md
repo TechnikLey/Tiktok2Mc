@@ -62,7 +62,7 @@ The plugin ecosystem is **moderately coupled**. Cross-plugin dependencies are mi
 | 7 | `core/overlay_utils.py` | `overlay-text` | `PLUGIN_NAME = "overlay-text"` (line 13) — constant hardcodes plugin name | **Critical** |
 | 8 | `core/overlay_utils.py` | `overlay-text` | `manifest.get("name") == "overlay-text"` (line 22) — filesystem scan for specific plugin | **Critical** |
 | 9 | `core/overlay_utils.py` | `overlay-text` | `load_plugin_config(plugin_dir)` (line 58) — loads overlay-text config directly from disk | **Critical** |
-| 10 | `core/theme.py` | 7 plugins | `_DEFAULT_THEMES` dict contains hardcoded keys: `"like_goal"`, `"death_counter"`, `"win_counter"`, `"timer"`, `"overlay_text"`, `"spotify"`, `"channel_points"` | Medium |
+| 10 | `core/theme.py` | 6 plugins | `_DEFAULT_THEMES` dict contains hardcoded keys: `"death_counter"`, `"win_counter"`, `"timer"`, `"overlay_text"`, `"spotify"`, `"channel_points"` | Medium |
 | 11 | `core/api/services/__init__.py` | `minecraft_server_api` | `"minecraft_server_api": dict` in global config validation schema | Medium |
 
 #### C. Plugin-specific config sections in `defaults/config.yaml`
@@ -298,7 +298,7 @@ This means the **main system owns knowledge** of Spotify's internal command voca
 | # | Coupling | Severity | Target Phase |
 |---|----------|----------|--------------|
 | 1 | `main.py` hardcodes `channel-points` on every event | ✅ **RESOLVED** — EventBridge worker translates EventBus events to plugin commands |
-| 2 | `main.py` hardcodes `like-goal` for like triggers | ✅ **RESOLVED** — like events published to EventBus; EventBridge enqueues `add_likes` commands |
+| 2 | `like-goal` plugin | ✅ **REMOVED** — entire LikeGoal plugin and all references deleted |
 | 3 | `overlay_utils.py` hardcoded to `overlay-text` | ✅ **RESOLVED** — `send_overlay_text()` now accepts `plugin_name` parameter |
 | 4 | Plugin-specific command definitions in `comment_commands` config | 🟡 Medium | Phase C |
 | 5 | `random_triggers` in main config | 🟡 Medium | Phase C |

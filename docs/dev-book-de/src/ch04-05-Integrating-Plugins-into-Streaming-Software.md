@@ -41,10 +41,10 @@ Die Streaming-Tools (OBS, Streamlabs, etc.) brauchen Zugriff auf deine Plugins:
 
 **Praktisches Beispiel:**
 
-Der Like-Counter läuft auf Port 29193:
+Ein Counter-Plugin läuft auf Port 29189:
 
 ```python
-# likegoal.py
+# counter.py
 @app.route("/")
 def index():
     return f"""

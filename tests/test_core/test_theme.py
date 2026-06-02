@@ -16,13 +16,6 @@ class TestLoadPluginTheme:
         assert result["text"] == "#ffffff"  # default preserved
         assert result["accent"] == "#1db954"  # default preserved
 
-    def test_partial_override(self):
-        cfg = {"theme": {"accent": "#DEADBEEF"}}
-        result = load_plugin_theme(cfg, "like_goal")
-        assert result["accent"] == "#DEADBEEF"
-        assert result["background"] == "#050505"
-        assert result["accent2"] == "#8a2be2"
-
     def test_full_override(self):
         cfg = {
             "theme": {

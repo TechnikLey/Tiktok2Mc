@@ -8,7 +8,7 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 - **Follow alerts** — New followers trigger commands, overlay messages, or special effects.
 - **Like milestones** — Every 100 likes (or whatever you set), run a command. Celebrate big milestones.
 - **Chat commands** — Let viewers type commands in chat to control the game or your Spotify playback.
-- **Stream overlays** — Show death counts, win counters, like goals, timers, and Spotify info on your stream.
+- **Stream overlays** — Show death counts, win counters, timers, and Spotify info on your stream.
 - **Auto-updates** — The tool checks for updates on startup and installs them automatically.
 
 Everything is controlled through simple text files. No programming required.
@@ -95,10 +95,8 @@ Still in `config/config.yaml`, each plugin has an `enabled:` setting. By default
 | Timer | Countdown timer for your stream | `http://localhost:29189` |
 | Death Counter | Shows how many times the player has died | `http://localhost:29190` |
 | Win Counter | Tracks wins and losses | `http://localhost:29191` |
-| Like Goal | Progress bar for stream likes | `http://localhost:29193` |
 | Overlay Text | Text notifications on stream | `http://localhost:29186/?overlay=default` |
 | Spotify Control | Let viewers control your Spotify | `http://localhost:29194` |
-| Channel Points | Loyalty points for active viewers | `http://localhost:29195` |
 
 Every setting has a comment above it explaining what it does. Read the comments carefully.
 

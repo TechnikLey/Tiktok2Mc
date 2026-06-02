@@ -254,10 +254,16 @@ class OverlayManager:
 
     # -- HTML rendering --------------------------------------------------
 
-    def render_html(self, overlay_name: str = "default", chroma: bool = True) -> str:
-        """Render the overlay HTML page for *overlay_name*."""
+    def render_html(self, overlay_name: str = "default", chroma: bool = True, theme_overrides: dict | None = None) -> str:
+        """Render the overlay HTML page for *overlay_name*.
+
+        If *theme_overrides* is given it is merged on top of the resolved
+        theme so callers can preview live theme changes without saving.
+        """
         cfg = self.config.to_dict()
         theme = load_plugin_theme(cfg, "overlay_text")
+        if theme_overrides:
+            theme = {**theme, **theme_overrides}
         theme_style = theme_css(theme)
 
         chroma_background = (

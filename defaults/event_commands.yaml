@@ -39,7 +39,6 @@
 #              spotify-control
 #              death-counter
 #              win-counter
-#              like-goal
 #
 #  COMMANDS — Each plugin declares the commands it understands by
 #             calling register_handler("command_name", ...) in its
@@ -56,8 +55,7 @@
 #                add_win, remove_win
 #              death-counter:
 #                player_death
-#              like-goal:
-#                tiktok_event
+#
 #
 # -------------------------------------------------------------------
 # EXAMPLES

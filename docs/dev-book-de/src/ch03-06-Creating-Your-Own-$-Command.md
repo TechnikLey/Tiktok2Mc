@@ -324,7 +324,7 @@ Zeigt einen Overlay-Text im Stream an. Du kannst damit aus deinem Hook heraus ei
 **Beispiel:**
 ```python
 api.send_overlay_text("Neuer Follower!", f"{user} ist jetzt dabei!", 5)
-api.send_overlay_text("Like-Ziel erreicht!", "", 4, overlay_name="likegoal")
+api.send_overlay_text("Ziel erreicht!", "", 4, overlay_name="default")
 ```
 
 Gibt `True` zurück, wenn das Senden erfolgreich war, sonst `False` (z.B. wenn das Overlay nicht erreichbar ist).

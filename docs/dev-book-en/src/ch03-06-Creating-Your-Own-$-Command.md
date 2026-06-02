@@ -323,7 +323,7 @@ Displays overlay text on the stream. You can use this to show a title and option
 **Example:**
 ```python
 api.send_overlay_text("New Follower!", f"{user} just joined!", 5)
-api.send_overlay_text("Like goal reached!", "", 4, overlay_name="likegoal")
+api.send_overlay_text("Milestone reached!", "", 4, overlay_name="default")
 ```
 
 Returns `True` if sending was successful, otherwise `False` (e.g. if the overlay is not reachable).

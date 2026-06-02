@@ -253,19 +253,33 @@ async function loadPlugins() {
   }
 }
 
-function renderOverlayUrls() {
+function     renderOverlayUrls() {
   const containers = [
     document.getElementById('overlay-urls'),
     document.getElementById('plugin-manager-urls')
   ];
+  // Built-in overlay URLs
+  let html = '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">Built-in Overlay</h3>';
+  const base = location.origin + '/api/v1/overlay';
+  const overlayNames = ['default'];
+  if (currentConfig.overlay && Array.isArray(currentConfig.overlay.overlays)) {
+    for (const o of currentConfig.overlay.overlays) {
+      if (o.name && !overlayNames.includes(o.name)) overlayNames.push(o.name);
+    }
+  }
+  for (const name of overlayNames) {
+    const u = `${base}?overlay=${name}&chroma=1`;
+    html += `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
+  }
+  // Plugin overlay URLs
   const en = currentPlugins.filter(p => p.enabled && p.port > 0);
-  const html = en.length
-    ? '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">OBS Browser Sources</h3>' +
-      en.map(p => {
-        const u = `http://localhost:${p.port}`;
-        return `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(p.display_name || p.name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
-      }).join('')
-    : '';
+  if (en.length) {
+    html += '<h3 style="margin:0.8rem 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">Plugin Overlays</h3>';
+    html += en.map(p => {
+      const u = `http://localhost:${p.port}`;
+      return `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(p.display_name || p.name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
+    }).join('');
+  }
   for (const c of containers) {
     if (c) c.innerHTML = html;
   }
@@ -843,6 +857,14 @@ class ConfigEditor {
     };
     this.content.addEventListener('input', this._inputHandler);
     this.content.addEventListener('change', this._inputHandler);
+    // Overlay preview auto-refresh when inputs change
+    if (this._overlayInputHandler) return;
+    this._overlayInputHandler = (e) => {
+      if (!document.getElementById('overlay-preview-editor-frame')) return;
+      if (this._overlayTimer) clearTimeout(this._overlayTimer);
+      this._overlayTimer = setTimeout(() => this.refreshEditorPreview(), 600);
+    };
+    this.content.addEventListener('input', this._overlayInputHandler);
   }
 
   _detachInputListeners() {
@@ -851,6 +873,11 @@ class ConfigEditor {
     this.content.removeEventListener('change', this._inputHandler);
     this._inputHandler = null;
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
+    if (this._overlayInputHandler) {
+      this.content.removeEventListener('input', this._overlayInputHandler);
+      this._overlayInputHandler = null;
+    }
+    if (this._overlayTimer) { clearTimeout(this._overlayTimer); this._overlayTimer = null; }
   }
 
   close() {
@@ -979,6 +1006,8 @@ class ConfigEditor {
     let body = '';
     if (key === 'theme') {
       body = this.buildThemeEditor(key, value);
+    } else if (key === 'overlay') {
+      body = this.buildOverlayEditor(key, value);
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       body = this.buildObjectFields(key, value);
     } else if (Array.isArray(value)) {
@@ -1295,7 +1324,7 @@ class ConfigEditor {
   }
 
   buildThemeEditor(path, theme) {
-    const pluginKeys = new Set(['like_goal','death_counter','win_counter','timer','spotify','channel_points']);
+    const pluginKeys = new Set(['death_counter','win_counter','timer','spotify']);
     let html = '';
     for (const [plugin, colors] of Object.entries(theme || {})) {
       if (pluginKeys.has(plugin)) continue; // plugin colors are managed in their own configs
@@ -1312,6 +1341,30 @@ class ConfigEditor {
       html += '</div>';
     }
     return html;
+  }
+
+  buildOverlayEditor(path, overlay) {
+    const fields = this.buildObjectFields(path, overlay);
+    const bgId = 'f_' + (path + '.theme.background').replace(/[^a-zA-Z0-9]/g, '_');
+    const txtId = 'f_' + (path + '.theme.text').replace(/[^a-zA-Z0-9]/g, '_');
+    return fields + `
+      <div class="overlay-editor-preview">
+        <h4>Live Preview</h4>
+        <div class="overlay-editor-preview-wrap">
+          <iframe id="overlay-preview-editor-frame" sandbox="allow-scripts" srcdoc="<html><body style='margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;color:#666;font-family:sans-serif;font-size:14px;'>Adjust colors above to see preview</body></html>"></iframe>
+        </div>
+        <div class="overlay-editor-toolbar">
+          <button class="btn btn--primary btn--sm" onclick="editor.refreshEditorPreview()" type="button">Update Preview</button>
+          <button class="btn btn--secondary btn--sm" onclick="sendTestOverlay()" type="button">Send Test</button>
+          <span style="font-size:0.78rem;color:var(--text-secondary);margin-left:auto;">Colors update on input, then click Refresh</span>
+        </div>
+        <div class="overlay-editor-test-form">
+          <input type="text" id="overlay-test-title" value="Hello Stream!" placeholder="Title" style="flex:2;">
+          <input type="text" id="overlay-test-subtitle" value="from Viewer123" placeholder="Subtitle" style="flex:2;">
+          <input type="number" id="overlay-test-duration" value="3" placeholder="Secs" min="1" max="30" style="width:70px;">
+          <button class="btn btn--primary btn--sm" onclick="sendTestOverlay()" type="button">Send</button>
+        </div>
+      </div>`;
   }
 
   buildPrimitiveArray(path, arr) {
@@ -1619,6 +1672,25 @@ class ConfigEditor {
     t.textContent = msg;
     c.appendChild(t);
     setTimeout(() => t.remove(), 4000);
+  }
+
+  async refreshEditorPreview() {
+    const frame = document.getElementById('overlay-preview-editor-frame');
+    if (!frame) return;
+    this.collect();
+    const overlay = this.data.overlay || {};
+    const theme = (overlay.theme || {});
+    try {
+      const res = await fetch(API + '/overlay/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chroma: true, theme: { background: theme.background, text: theme.text } })
+      });
+      const data = await res.json();
+      frame.srcdoc = data.html;
+    } catch (e) {
+      this.showToast('Preview update failed: ' + e.message, 'error');
+    }
   }
 }
 
@@ -2352,7 +2424,6 @@ class ReactionEditor {
       'spotify-control': { name: 'Spotify', desc: 'Control music playback', icon: '🎵' },
       'win-counter': { name: 'Win Counter', desc: 'Track wins or scores', icon: '🏆' },
       'death-counter': { name: 'Death Counter', desc: 'Count player deaths', icon: '💀' },
-      'like-goal': { name: 'Like Goal', desc: 'Track like milestones', icon: '❤️' },
     };
 
     this.commandCatalog = {
@@ -2383,9 +2454,6 @@ class ReactionEditor {
       },
       'death-counter': {
         'player_death': { name: 'Count Death', desc: 'Increase the death counter', args: {} },
-      },
-      'like-goal': {
-        'tiktok_event': { name: 'Trigger Like Goal', desc: 'Register a TikTok event toward the like goal', args: {} },
       },
     };
 
@@ -3344,6 +3412,38 @@ function updateEcmDiagnostics(payload) {
   }
 }
 
+/* ─── Overlay Preview ─── */
+
+async function refreshOverlayPreview() {
+  const frame = document.getElementById('overlay-preview-iframe');
+  if (!frame) return;
+  try {
+    const overlay = currentConfig.overlay || {};
+    const theme = overlay.theme || {};
+    const res = await fetch(API + '/overlay/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chroma: true, theme: { background: theme.background, text: theme.text } })
+    });
+    const data = await res.json();
+    frame.srcdoc = data.html;
+  } catch (e) {
+    // Preview iframe will show the fallback error state
+  }
+}
+
+async function sendTestOverlay() {
+  const title = (document.getElementById('overlay-test-title')?.value || '').trim() || 'Hello Stream!';
+  const subtitle = (document.getElementById('overlay-test-subtitle')?.value || '').trim() || '';
+  const duration = parseInt(document.getElementById('overlay-test-duration')?.value) || 3;
+  try {
+    await postJSON('/overlay/display', { title, subtitle, duration, overlay_name: 'default' });
+    showToast('Test overlay sent!', 'success');
+  } catch (e) {
+    showToast('Failed to send test overlay: ' + e.message, 'error');
+  }
+}
+
 /* ─── Init ─── */
 async function init() {
   await loadHealth();
@@ -3356,6 +3456,7 @@ async function init() {
   checkAllUpdates();
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
+  refreshOverlayPreview();
   setInterval(loadHealth, 10000);
   setInterval(loadStatus, 10000);
   setInterval(loadPlugins, 5000);

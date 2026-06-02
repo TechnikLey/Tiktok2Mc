@@ -257,7 +257,6 @@ Nach dem Build-Prozess entsteht im Ordner `build/release/` die fertige Projektve
 │   ├── gifts.json
 │   ├── gui.exe
 │   ├── lib
-│   ├── LikeGoal.exe
 │   ├── mcServerAPI.exe
 │   ├── Overlaytxt.exe
 │   ├── PortChecker.exe
@@ -301,7 +300,6 @@ Enthalten sind unter anderem:
 
 * `app.exe`
 * `gui.exe`
-* `LikeGoal.exe`
 * `mcServerAPI.exe`
 * `Overlaytxt.exe`
 * `PortChecker.exe`
