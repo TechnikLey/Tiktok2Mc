@@ -285,7 +285,8 @@ async def enable_plugin(name: str):
                 detail=f"Failed to write start signal for plugin '{name}'",
             )
         # Only update registry after signal was written successfully
-        result = registry.update(name, enabled=True, health_status="healthy")
+        # Use "starting" — the first heartbeat will promote to healthy.
+        result = registry.update(name, enabled=True, health_status="starting")
         if result is None:
             log.error("Enable plugin '%s': registry.update returned None after get succeeded", name)
             raise HTTPException(
@@ -439,8 +440,11 @@ async def set_comment_handler(name: str, body: CommentHandler):
         plugin = registry.get(name)
         if not plugin:
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
-        plugin.comment_handler = body
-        registry.update(name, {"comment_handler": body})
+        result = registry.update(name, comment_handler=body)
+        if result is None:
+            raise HTTPException(
+                status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
+            )
         log.info("Comment handler for '%s': prefix=%s", name, body.prefix)
         return {"status": "updated", "plugin": name, "handler": body.model_dump()}
     except HTTPException:
@@ -454,12 +458,16 @@ async def set_comment_handler(name: str, body: CommentHandler):
 async def remove_comment_handler(name: str):
     """Remove a plugin's comment handler."""
     try:
+        from core.api.registry import _UNSET
         registry = get_registry()
         plugin = registry.get(name)
         if not plugin:
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
-        plugin.comment_handler = None
-        registry.update(name, {"comment_handler": None})
+        result = registry.update(name, comment_handler=_UNSET)
+        if result is None:
+            raise HTTPException(
+                status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
+            )
         log.info("Comment handler removed for '%s'", name)
         return {"status": "removed", "plugin": name}
     except HTTPException:

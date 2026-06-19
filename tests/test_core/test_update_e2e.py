@@ -363,6 +363,8 @@ class TestRunUpdateOrchestration:
             sys.modules["core.api.server"] = _mock_server
 
         import python.update
+        from core.backup import BackupManager, _backup_manager as _bm_ref
+
         base_dir = tmp_path / "install"
         base_dir.mkdir()
         config_dir = base_dir / "config"
@@ -376,6 +378,10 @@ class TestRunUpdateOrchestration:
         temp_dir = tmp_path / "_update_tmp"
         temp_dir.mkdir()
 
+        # Create a BackupManager rooted at base_dir so backups stay inside
+        # the test's tmp_path and relative_to() works in assertions.
+        test_bm = BackupManager(root_dir=base_dir)
+
         with patch.object(python.update, "BASE_DIR", base_dir), \
              patch.object(python.update, "CONFIG_FILE", user_config), \
              patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config), \
@@ -387,7 +393,9 @@ class TestRunUpdateOrchestration:
              patch.object(python.update, "AUTO_MODE", True), \
              patch.object(python.update, "get_base_dir", return_value=base_dir), \
              patch.object(python.update, "wait_for_key"), \
-             patch.object(python.update, "log"):
+             patch.object(python.update, "log"), \
+             patch("core.backup._backup_manager", test_bm), \
+             patch("core.backup.get_backup_manager", return_value=test_bm):
             yield python.update.run_update, base_dir, temp_dir
 
     def test_up_to_date_skips_update(self, tmp_path):

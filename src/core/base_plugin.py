@@ -223,13 +223,31 @@ class BasePlugin:
 
     # -- tick loop ----------------------------------------------------------
 
+    _HEARTBEAT_INTERVAL = 30  # seconds between heartbeat pings
+
     def _tick_loop(self):
-        """Background thread: calls ``on_tick`` once per second."""
+        """Background thread: calls ``on_tick`` once per second.
+
+        Also sends a heartbeat ping to the API every
+        ``_HEARTBEAT_INTERVAL`` seconds so the health monitor does not
+        mark an idle plugin as unhealthy.
+        """
+        heartbeat_counter = 0
         while self._running:
             try:
                 self.on_tick()
             except Exception as e:
                 log.exception("[%s] Tick failed: %s", self.PLUGIN_NAME, e)
+            heartbeat_counter += 1
+            if heartbeat_counter >= self._HEARTBEAT_INTERVAL:
+                heartbeat_counter = 0
+                try:
+                    self.api_get(
+                        f"/plugins/{self.PLUGIN_NAME}/commands?wait=0",
+                        timeout=5,
+                    )
+                except Exception:
+                    pass
             time.sleep(1)
 
     # -- subclass hooks -----------------------------------------------------

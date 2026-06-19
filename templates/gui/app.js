@@ -33,10 +33,31 @@ async function putJSON(path, body) {
 let _shutdownPollInterval = null;
 let _shutdownTriggered = false;
 let _shutdownNowClicked = false;
+let _shutdownApiFailCount = 0;
+let _healthIntervalId = null;
+let _statusIntervalId = null;
+let _pluginsIntervalId = null;
+let _closePollIntervalId = null;
+
+function _stopDashboardPolling() {
+  if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
+  if (_statusIntervalId) { clearInterval(_statusIntervalId); _statusIntervalId = null; }
+  if (_pluginsIntervalId) { clearInterval(_pluginsIntervalId); _pluginsIntervalId = null; }
+}
+
+function _closeWindowForShutdown() {
+  _stopDashboardPolling();
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  try { window.close(); } catch (_) {}
+  if (typeof pywebview !== 'undefined' && pywebview.api) {
+    try { pywebview.api.approve_close(); } catch (_) {}
+  }
+}
 
 async function pollShutdownStatus() {
   try {
     const data = await fetchJSON('/shutdown/status');
+    _shutdownApiFailCount = 0;
     const overlay = document.getElementById('shutdown-overlay');
     const display = document.getElementById('shutdown-countdown-display');
     const shutdownNowBtn = document.getElementById('btn-shutdown-now');
@@ -61,17 +82,19 @@ async function pollShutdownStatus() {
       display.textContent = 'Shutting down...';
       shutdownNowBtn.disabled = true;
       cancelBtn.disabled = true;
+      _stopDashboardPolling();
       if (_shutdownPollInterval) {
         clearInterval(_shutdownPollInterval);
         _shutdownPollInterval = null;
       }
     } else if (state === 'complete') {
-      overlay.classList.add('hidden');
+      display.textContent = 'Shutdown complete. Closing...';
       _shutdownTriggered = false;
       if (_shutdownPollInterval) {
         clearInterval(_shutdownPollInterval);
         _shutdownPollInterval = null;
       }
+      _closeWindowForShutdown();
     } else if (_shutdownTriggered) {
       // Backend hasn't processed our request yet (file watcher has 5s delay)
       display.textContent = 'Preparing shutdown...';
@@ -86,12 +109,18 @@ async function pollShutdownStatus() {
       }
     }
   } catch (e) {
-    // If API fails during shutdown, keep showing overlay
+    // If API fails during shutdown, the backend is likely gone.
+    // After 3 consecutive failures, close the window.
     if (_shutdownTriggered || _shutdownNowClicked) {
+      _shutdownApiFailCount++;
       const overlay = document.getElementById('shutdown-overlay');
       const display = document.getElementById('shutdown-countdown-display');
       overlay.classList.remove('hidden');
       display.textContent = _shutdownNowClicked ? 'Shutting down...' : 'Preparing shutdown...';
+      if (_shutdownApiFailCount >= 3) {
+        display.textContent = 'Backend stopped. Closing window...';
+        _closeWindowForShutdown();
+      }
     }
   }
 }
@@ -586,18 +615,50 @@ async function wizardSave() {
   } finally { nextBtn.disabled = false; nextBtn.textContent = 'Save'; }
 }
 async function triggerRestart() {
-  _restartPending = false;
+  _restartPending = true;
   updateRestartBanner();
   try {
     const res = await fetch('/api/v1/restart', { method: 'POST' });
     if (res.ok) {
       document.querySelector('#restart-dialog .wizard-card').innerHTML = '<h2 style="border:none;padding:0;">Restarting...</h2><p class="muted">Please wait while the tool restarts.</p>';
+      // Stop dashboard polling — the API is about to go away.
+      _stopDashboardPolling();
+      // Poll the health endpoint; when it responds again the new
+      // API server is up and we can reload the dashboard.
+      _waitForApiAfterRestart();
     } else {
+      _restartPending = false;
+      updateRestartBanner();
       showToast('Restart signal failed. Please restart manually.', 'error');
     }
   } catch (e) {
+    _restartPending = false;
+    updateRestartBanner();
     showToast('Restart signal failed. Please restart manually.', 'error');
   }
+}
+
+function _waitForApiAfterRestart(maxAttempts = 90) {
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    attempts++;
+    try {
+      const resp = await fetch('/api/v1/health', { cache: 'no-store' });
+      if (resp.ok) {
+        clearInterval(poll);
+        // API is back — reload the dashboard.
+        window.location.reload();
+      }
+    } catch (_) {
+      // API still down — keep waiting.
+    }
+    if (attempts > maxAttempts) {
+      clearInterval(poll);
+      document.querySelector('#restart-dialog .wizard-card').innerHTML =
+        '<h2 style="border:none;padding:0;">Restart Timed Out</h2>' +
+        '<p class="muted">The tool did not come back within 90 seconds. Please close and reopen the GUI manually.</p>';
+    }
+  }, 1000);
 }
 function dismissRestartBanner() {
   _restartPending = false;
@@ -3281,13 +3342,23 @@ async function applyUpdates() {
 
 /* ─── SSE Log Streaming ─── */
 let _sseSource = null;
+let _sseReconnectTimer = null;
+let _sseReconnectDelay = 2000;
 
 function connectLogStream() {
   if (_sseSource) {
     _sseSource.close();
   }
+  if (_sseReconnectTimer) {
+    clearTimeout(_sseReconnectTimer);
+    _sseReconnectTimer = null;
+  }
   const ep = '/api/v1/events/stream';
   _sseSource = new EventSource(ep);
+  _sseSource.onopen = () => {
+    // Reset backoff on successful connection.
+    _sseReconnectDelay = 2000;
+  };
   _sseSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
@@ -3312,6 +3383,20 @@ function connectLogStream() {
   };
   _sseSource.onerror = () => {
     log('Log stream disconnected — retrying...', 'warn');
+    // EventSource auto-reconnects, but if the server is gone for long
+    // it gives up.  We manually reconnect with backoff.
+    if (_sseSource) {
+      _sseSource.close();
+      _sseSource = null;
+    }
+    if (_sseReconnectTimer) clearTimeout(_sseReconnectTimer);
+    _sseReconnectTimer = setTimeout(() => {
+      // Don't reconnect if we're shutting down or restarting.
+      if (_shutdownTriggered || _shutdownNowClicked) return;
+      connectLogStream();
+    }, _sseReconnectDelay);
+    // Exponential backoff up to 10s.
+    _sseReconnectDelay = Math.min(_sseReconnectDelay * 1.5, 10000);
   };
 }
 
@@ -3579,11 +3664,11 @@ async function init() {
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
   refreshOverlayPreview();
-  setInterval(loadHealth, 10000);
-  setInterval(loadStatus, 10000);
-  setInterval(loadPlugins, 5000);
+  _healthIntervalId = setInterval(loadHealth, 10000);
+  _statusIntervalId = setInterval(loadStatus, 10000);
+  _pluginsIntervalId = setInterval(loadPlugins, 5000);
   if (typeof pywebview !== 'undefined' && pywebview.api) {
-    setInterval(_pollCloseRequest, 200);
+    _closePollIntervalId = setInterval(_pollCloseRequest, 200);
   }
 }
 init();

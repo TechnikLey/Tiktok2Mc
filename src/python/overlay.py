@@ -84,7 +84,18 @@ def main() -> None:
     if args.gui_hidden:
         log.info("GUI hidden mode — overlay HTML served by API only.")
         # Keep the process alive so the API knows overlay is managed.
+        # Check for a shutdown signal so we don't have to be killed.
+        shutdown_signal = BASE_DIR / "core" / "runtime" / "shutdown"
+        shutdown_now_signal = BASE_DIR / "core" / "runtime" / "shutdown_now"
         while True:
+            if shutdown_signal.exists() or shutdown_now_signal.exists():
+                log.info("Shutdown signal detected — overlay process exiting.")
+                try:
+                    shutdown_signal.unlink(missing_ok=True)
+                    shutdown_now_signal.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                sys.exit(0)
             time.sleep(1)
         return
 

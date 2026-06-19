@@ -10,6 +10,7 @@
 # ==================================================
 
 import sys
+import os
 import asyncio
 import re
 import shutil
@@ -109,6 +110,7 @@ class BotContext:
         self.tiktok_lock = threading.Lock()
         self.gift_lock = threading.Lock()
         self.follow_lock = threading.Lock()
+        self.comment_cmd_lock = threading.Lock()
         self.rcon_pool_lock = asyncio.Lock()
 
         # RCON state
@@ -695,7 +697,26 @@ def handle_minecraft_events():
 
     return {"status": "processed"}, 200
 
+
 API_BASE = "http://127.0.0.1:29185/api/v1"
+
+
+# ==========================================
+# Webhook endpoint for MinecraftServerAPI
+# ==========================================
+def _publish_event(event_type: str, event_data: dict) -> None:
+    """Forward a Minecraft event to the central EventBus via API."""
+    body = json.dumps({"type": event_type, "data": event_data}).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except Exception as exc:
+        log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
 
 
 def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) -> None:
@@ -711,6 +732,7 @@ def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) 
         log.debug("Routed '%s' to plugin '%s'", cmd_text, plugin_name)
     except Exception as exc:
         log.info("Failed to route comment to plugin '%s': %s", plugin_name, exc)
+
 
 
 def _fetch_comment_handlers() -> dict[str, str]:
@@ -883,148 +905,151 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
     if not ctx.comment_cmd_enable or not ctx.comment_cmd_groups:
         return suppress
 
-    now = time.time()
-    gcd = ctx.comment_cmd_global_cooldown
-    if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
-        remaining = gcd - (now - ctx.comment_cmd_global_last)
-        log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
-        return True
-
-    gucd = ctx.comment_cmd_global_user_cooldown
-    if gucd > 0:
-        last_user = ctx.comment_cmd_global_user_last.get(username, 0)
-        if now - last_user < gucd:
-            remaining = gucd - (now - last_user)
-            log.info(f"{log_prefix} {username} blocked by global user cooldown ({remaining:.1f}s left)")
+    # The cooldown dicts are mutated from multiple TikTok event threads and
+    # the /test_comment Flask endpoint; guard them with a lock.
+    with ctx.comment_cmd_lock:
+        now = time.time()
+        gcd = ctx.comment_cmd_global_cooldown
+        if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
+            remaining = gcd - (now - ctx.comment_cmd_global_last)
+            log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
             return True
 
-    for group in ctx.comment_cmd_groups:
-        prefix = group["prefix"]
-        if not prefix or not comment_text.startswith(prefix):
-            continue
-        cmd_text = comment_text[len(prefix):].strip()
-        if not cmd_text:
-            continue
+        gucd = ctx.comment_cmd_global_user_cooldown
+        if gucd > 0:
+            last_user = ctx.comment_cmd_global_user_last.get(username, 0)
+            if now - last_user < gucd:
+                remaining = gucd - (now - last_user)
+                log.info(f"{log_prefix} {username} blocked by global user cooldown ({remaining:.1f}s left)")
+                return True
 
-        allowed = False
-        if "all" in group["roles"]:
-            allowed = True
-        elif "moderator" in group["roles"] and is_moderator:
-            allowed = True
-        elif "superfan" in group["roles"] and is_super_fan:
-            allowed = True
-        elif "fanclub" in group["roles"] and in_fanclub:
-            allowed = True
+        for group in ctx.comment_cmd_groups:
+            prefix = group["prefix"]
+            if not prefix or not comment_text.startswith(prefix):
+                continue
+            cmd_text = comment_text[len(prefix):].strip()
+            if not cmd_text:
+                continue
 
-        if not allowed:
-            log.info(f"{log_prefix} {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+            allowed = False
+            if "all" in group["roles"]:
+                allowed = True
+            elif "moderator" in group["roles"] and is_moderator:
+                allowed = True
+            elif "superfan" in group["roles"] and is_super_fan:
+                allowed = True
+            elif "fanclub" in group["roles"] and in_fanclub:
+                allowed = True
+
+            if not allowed:
+                log.info(f"{log_prefix} {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                if not group.get("trigger_comment_event", True):
+                    suppress = True
+                continue
+
+            base_cmd = cmd_text.split()[0].lower()
+            if group["mode"] == "deny-all":
+                if base_cmd not in group["commands"]:
+                    log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                    if not group.get("trigger_comment_event", True):
+                        suppress = True
+                    continue
+            else:
+                if base_cmd in group["commands"]:
+                    log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                    if not group.get("trigger_comment_event", True):
+                        suppress = True
+                    continue
+
+            ccfg = group.get("commands_config", {}).get(base_cmd, {})
+
+            cmd_roles = ccfg.get("roles")
+            if cmd_roles:
+                cmd_allowed = False
+                if "all" in cmd_roles:
+                    cmd_allowed = True
+                elif "moderator" in cmd_roles and is_moderator:
+                    cmd_allowed = True
+                elif "superfan" in cmd_roles and is_super_fan:
+                    cmd_allowed = True
+                elif "fanclub" in cmd_roles and in_fanclub:
+                    cmd_allowed = True
+                if not cmd_allowed:
+                    log.info(f"{log_prefix} {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                    if not group.get("trigger_comment_event", True):
+                        suppress = True
+                    continue
+
+            cd = ccfg.get("cooldown", group["cooldown"])
+            ucd = ccfg.get("user_cooldown", group["user_cooldown"])
+            if cd > 0:
+                last = ctx.comment_cmd_last_global.get(prefix, 0)
+                if now - last < cd:
+                    remaining = cd - (now - last)
+                    log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
+                    if not group.get("trigger_comment_event", True):
+                        suppress = True
+                    continue
+            if ucd > 0:
+                last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
+                if now - last_user < ucd:
+                    remaining = ucd - (now - last_user)
+                    log.info(f"{log_prefix} {username} blocked by user cooldown ({remaining:.1f}s left)")
+                    if not group.get("trigger_comment_event", True):
+                        suppress = True
+                    continue
+
+            conditional = ccfg.get("conditional", False)
+
+            cmd_url = ccfg.get("url", group.get("url", ""))
+            cmd_handler = ccfg.get("handler", group.get("handler", ""))
+            log.info(f"{log_prefix} {username} -> {cmd_text} (prefix '{prefix}')")
+
+            if not conditional:
+                ctx.comment_cmd_last_global[prefix] = now
+                ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                ctx.comment_cmd_global_last = now
+                ctx.comment_cmd_global_user_last[username] = now
+
+            if len(ctx.comment_cmd_last_global) > 1000:
+                cutoff = now - 3600
+                ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
+            if len(ctx.comment_cmd_last_user) > 1000:
+                cutoff = now - 3600
+                ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
+
+            # 1. API-registered handler (declarative, dynamic)
+            plugin_name = ctx.comment_handler_map.get(prefix)
+            if plugin_name:
+                _dispatch_comment_to_plugin(plugin_name, cmd_text, username)
+            # 2. Legacy RCON handler
+            elif cmd_handler == "rcon":
+                ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+            # 3. Legacy HTTP handler (backward compat)
+            elif cmd_handler == "http" and cmd_url:
+                if conditional:
+                    resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
+                    if resp_data and resp_data.get("found", False):
+                        ctx.comment_cmd_last_global[prefix] = now
+                        ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
+                        ctx.comment_cmd_global_last = now
+                        ctx.comment_cmd_global_user_last[username] = now
+                        mode_label = resp_data.get("mode", "replace")
+                        if mode_label == "queue":
+                            log.info(f"{log_prefix} {username} → '{base_cmd}' successful — conditional response: mode={mode_label}")
+                    else:
+                        log.info(f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered")
+                else:
+                    url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
+                    url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
+                    threading.Thread(
+                        target=_dispatch_comment_http,
+                        args=(url, username, cmd_text),
+                        daemon=True
+                    ).start()
+
             if not group.get("trigger_comment_event", True):
                 suppress = True
-            continue
-
-        base_cmd = cmd_text.split()[0].lower()
-        if group["mode"] == "deny-all":
-            if base_cmd not in group["commands"]:
-                log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
-                if not group.get("trigger_comment_event", True):
-                    suppress = True
-                continue
-        else:
-            if base_cmd in group["commands"]:
-                log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
-                if not group.get("trigger_comment_event", True):
-                    suppress = True
-                continue
-
-        ccfg = group.get("commands_config", {}).get(base_cmd, {})
-
-        cmd_roles = ccfg.get("roles")
-        if cmd_roles:
-            cmd_allowed = False
-            if "all" in cmd_roles:
-                cmd_allowed = True
-            elif "moderator" in cmd_roles and is_moderator:
-                cmd_allowed = True
-            elif "superfan" in cmd_roles and is_super_fan:
-                cmd_allowed = True
-            elif "fanclub" in cmd_roles and in_fanclub:
-                cmd_allowed = True
-            if not cmd_allowed:
-                log.info(f"{log_prefix} {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
-                if not group.get("trigger_comment_event", True):
-                    suppress = True
-                continue
-
-        cd = ccfg.get("cooldown", group["cooldown"])
-        ucd = ccfg.get("user_cooldown", group["user_cooldown"])
-        if cd > 0:
-            last = ctx.comment_cmd_last_global.get(prefix, 0)
-            if now - last < cd:
-                remaining = cd - (now - last)
-                log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
-                if not group.get("trigger_comment_event", True):
-                    suppress = True
-                continue
-        if ucd > 0:
-            last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
-            if now - last_user < ucd:
-                remaining = ucd - (now - last_user)
-                log.info(f"{log_prefix} {username} blocked by user cooldown ({remaining:.1f}s left)")
-                if not group.get("trigger_comment_event", True):
-                    suppress = True
-                continue
-
-        conditional = ccfg.get("conditional", False)
-
-        cmd_url = ccfg.get("url", group.get("url", ""))
-        cmd_handler = ccfg.get("handler", group.get("handler", ""))
-        log.info(f"{log_prefix} {username} -> {cmd_text} (prefix '{prefix}')")
-
-        if not conditional:
-            ctx.comment_cmd_last_global[prefix] = now
-            ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-            ctx.comment_cmd_global_last = now
-            ctx.comment_cmd_global_user_last[username] = now
-
-        if len(ctx.comment_cmd_last_global) > 1000:
-            cutoff = now - 3600
-            ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
-        if len(ctx.comment_cmd_last_user) > 1000:
-            cutoff = now - 3600
-            ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
-
-        # 1. API-registered handler (declarative, dynamic)
-        plugin_name = ctx.comment_handler_map.get(prefix)
-        if plugin_name:
-            _dispatch_comment_to_plugin(plugin_name, cmd_text, username)
-        # 2. Legacy RCON handler
-        elif cmd_handler == "rcon":
-            ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
-        # 3. Legacy HTTP handler (backward compat)
-        elif cmd_handler == "http" and cmd_url:
-            if conditional:
-                resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
-                if resp_data and resp_data.get("found", False):
-                    ctx.comment_cmd_last_global[prefix] = now
-                    ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                    ctx.comment_cmd_global_last = now
-                    ctx.comment_cmd_global_user_last[username] = now
-                    mode_label = resp_data.get("mode", "replace")
-                    if mode_label == "queue":
-                        log.info(f"{log_prefix} {username} → '{base_cmd}' successful — conditional response: mode={mode_label}")
-                else:
-                    log.info(f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered")
-            else:
-                url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
-                url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
-                threading.Thread(
-                    target=_dispatch_comment_http,
-                    args=(url, username, cmd_text),
-                    daemon=True
-                ).start()
-
-        if not group.get("trigger_comment_event", True):
-            suppress = True
 
     return suppress
 

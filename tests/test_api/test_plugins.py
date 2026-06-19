@@ -167,7 +167,9 @@ class TestPluginEndpoints:
         client.post("/api/v1/plugins/register", json=p)
         resp = client.post("/api/v1/plugins/test-plugin/enable")
         assert resp.status_code == 200
-        assert resp.json()["health_status"] == "healthy"
+        # Health is "starting" until the first heartbeat arrives;
+        # the health monitor promotes it to "healthy" later.
+        assert resp.json()["health_status"] == "starting"
 
     def test_disable_sets_health_unknown(self, client):
         client.post("/api/v1/plugins/register", json=self.PLUGIN)

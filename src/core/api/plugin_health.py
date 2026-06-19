@@ -17,7 +17,11 @@ from core.api.eventbus import event_bus
 log = logging.getLogger(__name__)
 
 _HEALTH_CHECK_INTERVAL = 15.0
-_HEARTBEAT_TIMEOUT = 60.0
+# Heartbeat timeout must be comfortably longer than the longest idle poll
+# cycle.  BasePlugin long-polls commands with a 35s timeout; if no commands
+# arrive the poll returns empty and records a heartbeat every ~35s.  A 90s
+# timeout gives a 2.5x safety margin before marking a plugin unhealthy.
+_HEARTBEAT_TIMEOUT = 90.0
 
 
 class PluginHealthMonitor:
@@ -70,6 +74,9 @@ class PluginHealthMonitor:
                     plugin.name, age, new_status,
                 )
                 registry.update(plugin.name, health_status=new_status)
+            elif age <= _HEARTBEAT_TIMEOUT and plugin.health_status in ("starting", "unknown"):
+                # Promote to healthy once a recent heartbeat is seen.
+                registry.update(plugin.name, health_status="healthy")
 
 
 _health_monitor: PluginHealthMonitor | None = None

@@ -20,6 +20,11 @@ log = logging.getLogger(__name__)
 
 STORAGE_FILENAME = "api_plugin_registry.json"
 
+# Sentinel used to distinguish "explicitly set to None" from "not provided"
+# in ``PluginRegistry.update(**updates)``.  ``None`` means "leave unchanged";
+# ``_UNSET`` means "clear this field".
+_UNSET = object()
+
 
 class PluginRegistry:
     """Thread-safe, file-persisted plugin registry.
@@ -89,7 +94,9 @@ class PluginRegistry:
         """Partial update of a plugin entry.
 
         Only the supplied keyword arguments are changed; everything
-        else is preserved.
+        else is preserved.  Pass ``_UNSET`` as the value for a field
+        to explicitly set it to ``None`` (e.g. clearing
+        ``comment_handler``).
         """
         with self._lock:
             plugin = self._plugins.get(name)
@@ -97,6 +104,12 @@ class PluginRegistry:
                 return None
             changed = False
             for key, value in updates.items():
+                if value is _UNSET:
+                    if hasattr(plugin, key):
+                        if getattr(plugin, key) is not None:
+                            setattr(plugin, key, None)
+                            changed = True
+                    continue
                 if value is not None and hasattr(plugin, key):
                     old = getattr(plugin, key)
                     if old != value:

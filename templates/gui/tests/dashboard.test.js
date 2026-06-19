@@ -165,21 +165,28 @@ describe('loadPlugins', () => {
 describe('renderOverlayUrls', () => {
   beforeEach(() => {
     currentPlugins = [];
+    currentConfig = {};
   });
 
   it('renders OBS URLs for enabled plugins with ports', () => {
     currentPlugins = [{ name: 'test', enabled: true, port: 29186, display_name: 'Test' }];
     renderOverlayUrls();
     const container = document.getElementById('overlay-urls');
-    expect(container.innerHTML).toContain('OBS Browser Sources');
+    // The function always renders the built-in overlay section ...
+    expect(container.innerHTML).toContain('Built-in Overlay');
+    // ... and adds plugin overlay URLs for enabled plugins with ports.
     expect(container.innerHTML).toContain('localhost:29186');
   });
 
-  it('shows empty when no plugins with ports', () => {
+  it('shows built-in overlay even when no plugins with ports', () => {
     currentPlugins = [{ name: 'test', enabled: true, port: 0 }];
     renderOverlayUrls();
     const container = document.getElementById('overlay-urls');
-    expect(container.innerHTML).toBe('');
+    // The built-in overlay URL is always rendered.
+    expect(container.innerHTML).toContain('Built-in Overlay');
+    expect(container.innerHTML).toContain('overlay=default');
+    // No plugin overlay URLs should appear.
+    expect(container.innerHTML).not.toContain('Plugin Overlays');
   });
 });
 

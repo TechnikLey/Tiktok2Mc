@@ -389,8 +389,8 @@ def run_update():
             log.error("[FAIL] No matching release asset found for this platform.")
             sys.exit(5)
 
-            if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
-            TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        TEMP_DIR.mkdir(parents=True, exist_ok=True)
         archive_path = TEMP_DIR / archive_name
         download_with_progress(asset["url"], archive_path)
 
@@ -507,7 +507,7 @@ def run_update():
                 f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
                 timeout=2,
             )
-            if resp.status == 200 and resp.json().get("signal") is None:
+            if resp.status_code == 200 and resp.json().get("signal") is None:
                 break  # acknowledged via API
         except Exception:
             pass

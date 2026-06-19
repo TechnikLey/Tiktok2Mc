@@ -24,12 +24,15 @@ async def websocket_endpoint(ws: WebSocket):
     """
     await ws.accept()
 
-    q = event_bus.subscribe()
-    subscribed_to_all = True
-    active_types: set[str] = set()
+    # Shared mutable state guarded by a lock so reader and writer agree
+    # on which queue is active.  ``nonlocal`` reassignment alone races
+    # with the writer's ``await q.get()``.
+    state = {
+        "q": event_bus.subscribe(),
+    }
+    state_lock = asyncio.Lock()
 
     async def reader():
-        nonlocal subscribed_to_all, active_types
         try:
             while True:
                 raw = await ws.receive_text()
@@ -39,33 +42,37 @@ async def websocket_endpoint(ws: WebSocket):
                     continue
 
                 if cmd.get("type") == "subscribe":
-                    event_bus.unsubscribe(q)
                     types = cmd.get("events", [])
-                    if types:
-                        active_types = set(types)
-                        subscribed_to_all = False
-                        q = event_bus.subscribe(*types)
-                    else:
-                        subscribed_to_all = True
-                        q = event_bus.subscribe()
-                        active_types.clear()
+                    async with state_lock:
+                        old_q = state["q"]
+                        if types:
+                            new_q = event_bus.subscribe(*types)
+                        else:
+                            new_q = event_bus.subscribe()
+                        state["q"] = new_q
+                    # Unsubscribe the old queue after installing the new
+                    # one so the writer never reads from a dead queue.
+                    event_bus.unsubscribe(old_q)
         except WebSocketDisconnect:
             pass
 
     async def writer():
         try:
             while True:
+                async with state_lock:
+                    current_q = state["q"]
                 try:
-                    msg = await asyncio.wait_for(q.get(), timeout=30)
+                    msg = await asyncio.wait_for(current_q.get(), timeout=30)
                     await ws.send_json(msg)
                 except asyncio.TimeoutError:
                     await ws.send_json({"type": "ping"})
         except WebSocketDisconnect:
             pass
-        finally:
-            event_bus.unsubscribe(q)
 
     try:
         await asyncio.gather(reader(), writer())
     except Exception:
-        event_bus.unsubscribe(q)
+        pass
+    finally:
+        async with state_lock:
+            event_bus.unsubscribe(state["q"])

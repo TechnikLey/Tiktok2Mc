@@ -28,11 +28,16 @@ multiprocessing.freeze_support()
 # Pre-import uvicorn (and its multiprocessing C-extension deps) in the
 # main thread so the API server thread does not trigger a late load of
 # _multiprocessing from a non-main thread after a self-restart.
+# Failures are logged (not silently swallowed) so bundling problems are
+# diagnosed early instead of causing cryptic errors in the API thread.
+import logging as _logging
+_pre_log = _logging.getLogger("start.preimport")
 try:
     import uvicorn
     from core.api import create_app
-except Exception:
-    pass
+except Exception as _exc:
+    _pre_log.warning("Failed to pre-import uvicorn/core.api: %s", _exc)
+    _pre_log.warning("The API server thread may fail later — check PyInstaller hidden imports.")
 
 from datetime import datetime
 from core.models import AppConfig
@@ -259,6 +264,11 @@ os.environ.update(ports_to_env(_resolved))
 if not _port_policy.session_only:
     from core.port_scanner import persist_to_config
     persist_to_config(_resolved, CONFIG_FILE)
+
+# API base URL — derived from resolved ports so it is available to the
+# update loop (which runs before the API server section further below).
+_API_PORT = _resolved.get("api_port", DEFAULT_PORT)
+_API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
 
 # -----------------------------
 # Process dictionary
@@ -517,6 +527,7 @@ def stop_all_processes():
             except Exception as e:
                 log.info(f"Failed to terminate process {name}: {e}")
     processes.clear()
+    linux_sessions.clear()
     log.info("\nSnap! All processes have been dusted... (Thanos style).")
 
 # -----------------------------
@@ -657,9 +668,6 @@ else:
 # =============================================================================
 # API SERVER — start in background before anything needs it
 # =============================================================================
-
-_API_PORT = _resolved.get("api_port", DEFAULT_PORT)
-_API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
 
 _uvicorn_server = None
 
@@ -927,7 +935,9 @@ async def shutdown_countdown():
     log.info("\nShutting down now!")
     _shutdown_state = ShutdownState.SHUTTING_DOWN
     _write_shutdown_status(0)
-    stop_all_processes()
+    # Use _force_stop_all (unconditional) instead of stop_all_processes
+    # (which respects ALLOW_CLOSE).  Shutdown must always kill children.
+    _force_stop_all()
     _stop_api_server()
     _shutdown_state = ShutdownState.COMPLETE
     _clear_shutdown_status()
@@ -1010,8 +1020,11 @@ async def check_and_run():
             if not file.is_file():
                 continue
             name = file.stem.lower()
-            file.unlink(missing_ok=True)
+            # Process the signal FIRST, then delete it.  This avoids a
+            # race where deleting shutdown_cancel before setting the
+            # event causes shutdown_countdown to miss the cancel.
             if name == "shutdown":
+                file.unlink(missing_ok=True)
                 if not AUTO_SHUTDOWN_ENABLED:
                     log.info("Shutdown signal detected, but Auto shutdown is disabled.")
                     continue
@@ -1020,23 +1033,26 @@ async def check_and_run():
                     log.info(f"\nShutdown detected. System will shut down in {SHUTDOWN_DELAY_SECONDS} seconds.")
                     _shutdown_countdown_task = asyncio.create_task(shutdown_countdown())
             elif name == "shutdown_now":
+                file.unlink(missing_ok=True)
                 log.info("\nImmediate shutdown signal detected.")
                 _shutdown_state = ShutdownState.SHUTTING_DOWN
                 if _shutdown_countdown_task is not None:
                     _shutdown_countdown_task.cancel()
                     _shutdown_countdown_task = None
                 _write_shutdown_status(0)
-                stop_all_processes()
+                _force_stop_all()
                 _stop_api_server()
                 _shutdown_state = ShutdownState.COMPLETE
                 _clear_shutdown_status()
                 sys.stdin.close()
                 os._exit(0)
             elif name == "restart":
+                file.unlink(missing_ok=True)
                 log.info("\nRestart signal detected. Requesting clean restart...")
                 restart_app()
                 return
             elif name.startswith("plugin_start_"):
+                file.unlink(missing_ok=True)
                 plugin_name = name[len("plugin_start_"):]
                 log.info(f"\nPlugin start signal detected for '{plugin_name}'.")
                 try:
@@ -1057,12 +1073,19 @@ async def check_and_run():
                 except Exception as exc:
                     log.warning(f"Failed to start plugin '{plugin_name}' from signal: {exc}")
             elif name == "shutdown_cancel":
-                log.info("\nShutdown cancel signal detected.")
+                # Set the event BEFORE deleting the file so
+                # shutdown_countdown sees at least one of the two signals.
                 shutdown_cancel_event.set()
+                file.unlink(missing_ok=True)
+                log.info("\nShutdown cancel signal detected.")
             elif name.startswith("plugin_stop_"):
+                file.unlink(missing_ok=True)
                 plugin_name = name[len("plugin_stop_"):]
                 log.info(f"\nPlugin stop signal detected for '{plugin_name}'.")
                 stop_process(plugin_name)
+            else:
+                # Unknown signal file — clean it up
+                file.unlink(missing_ok=True)
         await asyncio.sleep(5)
 
 # =============================================================================
@@ -1141,18 +1164,18 @@ def _force_stop_all():
 def restart_app():
     """Restart the application — cross-platform.
 
-    This implementation follows PyInstaller best practices and Python
-    standard patterns for process restart:
+    Both Windows and Linux use ``subprocess.Popen`` to spawn a fully
+    independent new process, then exit the current process via
+    ``os._exit(0)``.  This ensures:
 
-    - Windows: Uses subprocess.Popen with CREATE_NEW_CONSOLE to spawn
-      a fully independent new process, then exits the current process.
-      This ensures the PyInstaller bootloader initializes correctly in
-      the new process.
+    - All child processes are killed first (``_force_stop_all``).
+    - The new process has a clean process tree (no orphaned children).
+    - The PyInstaller bootloader initialises correctly in the new
+      process.
 
-    - Linux: Uses os.execv to replace the current process image in-place,
-      which is the standard Unix pattern for process restart.
-
-    Both platforms preserve sys.argv and working directory.
+    Earlier versions used ``os.execv`` on Linux, but that only
+    replaces the current process image and leaves child processes
+    (Minecraft server, plugins, GUI) running orphaned.
     """
     global _restart_in_progress
     if _restart_in_progress:
@@ -1175,41 +1198,31 @@ def restart_app():
         executable = sys.executable
         args = [executable, os.path.abspath(__file__)] + sys.argv[1:]
 
-    if IS_WINDOWS:
-        try:
+    try:
+        if IS_WINDOWS:
             proc = subprocess.Popen(
                 args,
                 cwd=str(BASE_DIR),
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
                 close_fds=True,
             )
-            if _wait_for_process_started(proc):
-                os._exit(0)
-            else:
-                log.error(f"New process exited immediately with code: {proc.returncode}")
-                _restart_in_progress = False
-                sys.exit(1)
-        except Exception as exc:
-            log.error("Restart failed: %s", exc)
+        else:
+            proc = subprocess.Popen(
+                args,
+                cwd=str(BASE_DIR),
+                start_new_session=True,
+                close_fds=True,
+            )
+        if _wait_for_process_started(proc):
+            os._exit(0)
+        else:
+            log.error(f"New process exited immediately with code: {proc.returncode}")
             _restart_in_progress = False
             sys.exit(1)
-    else:
-        try:
-            os.chdir(str(BASE_DIR))
-            os.execv(executable, args)
-        except OSError:
-            try:
-                subprocess.Popen(
-                    args,
-                    cwd=str(BASE_DIR),
-                    start_new_session=True,
-                    close_fds=True,
-                )
-                os._exit(0)
-            except Exception as exc:
-                log.error("Restart failed: %s", exc)
-                _restart_in_progress = False
-                sys.exit(1)
+    except Exception as exc:
+        log.error("Restart failed: %s", exc)
+        _restart_in_progress = False
+        sys.exit(1)
 
 
 async def main():
