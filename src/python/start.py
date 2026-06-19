@@ -22,6 +22,18 @@ import urllib.parse
 import urllib.request
 import shlex
 import asyncio
+import multiprocessing  # <-- forces PyInstaller to bundle _multiprocessing.pyd
+multiprocessing.freeze_support()
+
+# Pre-import uvicorn (and its multiprocessing C-extension deps) in the
+# main thread so the API server thread does not trigger a late load of
+# _multiprocessing from a non-main thread after a self-restart.
+try:
+    import uvicorn
+    from core.api import create_app
+except Exception:
+    pass
+
 from datetime import datetime
 from core.models import AppConfig
 from core.utils import load_config
@@ -298,8 +310,8 @@ def _build_display_env_screen():
 def start_exe(path, name, hidden=False, gui_hidden=None):
     """Starts an executable in its own window (Windows) or tmux/screen session (Linux)."""
     if not path.exists():
-        if ALLOW_CLOSE:
-            log.info(f"[-] Houston, we have a problem: {path} is missing. Did it run away?")
+        log.error("[%s] Executable not found: %s", name, path)
+        log.error("[%s] The tool may not function correctly. Check your installation.", name)
         return
     try:
         cmd = [str(path)]
@@ -1083,19 +1095,6 @@ _RESTART_POLL_INTERVAL = 0.5
 _RESTART_POLL_TIMEOUT = 10.0
 
 
-def _wait_for_processes_stopped():
-    """Poll until all managed processes have exited, with timeout."""
-    deadline = time.time() + _RESTART_POLL_TIMEOUT
-    while time.time() < deadline:
-        if len(_processes) == 0:
-            return
-        still_alive = [(name, p) for name, p in list(_processes.items()) if p.poll() is None]
-        if not still_alive:
-            _processes.clear()
-            return
-        time.sleep(_RESTART_POLL_INTERVAL)
-    log.warning("Timeout waiting for processes to stop — forcing restart")
-
 
 def _wait_for_process_started(proc: subprocess.Popen) -> bool:
     """Poll for process startup instead of a fixed sleep.
@@ -1112,6 +1111,31 @@ def _wait_for_process_started(proc: subprocess.Popen) -> bool:
             return True
         time.sleep(_RESTART_POLL_INTERVAL)
     return proc.poll() is None
+
+
+def _kill_process(proc, name: str) -> None:
+    """Kill a single process (with tree on Windows)."""
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        if IS_WINDOWS:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(proc.pid), "/T"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        else:
+            proc.terminate()
+        log.info("%s terminated.", name)
+    except Exception as e:
+        log.warning("Failed to terminate %s: %s", name, e)
+
+
+def _force_stop_all():
+    """Kill all child processes unconditionally (used during restart)."""
+    log.info("Stopping all child processes ...")
+    for name, proc in list(processes.items()):
+        _kill_process(proc, name)
+    processes.clear()
 
 
 def restart_app():
@@ -1136,11 +1160,13 @@ def restart_app():
     _restart_in_progress = True
 
     log.info("\nPerforming restart...")
-    _stop_api_server()
-    stop_all_processes()
 
-    # Wait for processes to fully stop (polling instead of blind sleep)
-    _wait_for_processes_stopped()
+    # Stop API server first so it releases the port
+    _stop_api_server()
+    time.sleep(0.5)
+
+    # Kill all child processes unconditionally (ignore ALLOW_CLOSE during restart)
+    _force_stop_all()
 
     if getattr(sys, "frozen", False):
         executable = sys.executable
@@ -1211,30 +1237,31 @@ async def main():
 # EVENT DEFINITIONS (ENTRY POINT)
 # =============================================================================
 
-if ALLOW_CLOSE:
-    log.info("\nAll programs have been started.")
+if __name__ == "__main__":
+    if ALLOW_CLOSE:
+        log.info("\nAll programs have been started.")
 
-    # Show active sessions on Linux immediately (not after exit)
-    if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
-        log.info(f"\n--- Active {SESSION_TOOL} sessions ---")
-        for s in linux_sessions:
-            if SESSION_TOOL == "tmux":
-                log.info(f"  tmux attach -t {s}")
-            elif SESSION_TOOL == "screen":
-                log.info(f"  screen -r {s}")
-        log.info("-----------------------------------")
+        # Show active sessions on Linux immediately (not after exit)
+        if not IS_WINDOWS and SESSION_TOOL and linux_sessions:
+            log.info(f"\n--- Active {SESSION_TOOL} sessions ---")
+            for s in linux_sessions:
+                if SESSION_TOOL == "tmux":
+                    log.info(f"  tmux attach -t {s}")
+                elif SESSION_TOOL == "screen":
+                    log.info(f"  screen -r {s}")
+            log.info("-----------------------------------")
 
-    asyncio.run(main())
+        asyncio.run(main())
 
-    # Clean up all child processes (atexit handlers are skipped by os._exit)
-    stop_all_processes()
-    _stop_api_server()
+        # Clean up all child processes (atexit handlers are skipped by os._exit)
+        stop_all_processes()
+        _stop_api_server()
 
-    # Force exit — asyncio.to_thread(input) leaves a non-daemon thread
-    # pool thread that keeps the process alive after the event loop finishes.
-    sys.stdin.close()
-    os._exit(0)
+        # Force exit — asyncio.to_thread(input) leaves a non-daemon thread
+        # pool thread that keeps the process alive after the event loop finishes.
+        sys.stdin.close()
+        os._exit(0)
 
-else:
-    # AllowClose=False -> script exits itself, EXEs continue running quietly
-    pass
+    else:
+        # AllowClose=False -> script exits itself, EXEs continue running quietly
+        pass

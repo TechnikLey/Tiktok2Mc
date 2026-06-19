@@ -70,7 +70,7 @@
                 <h2>Overlay Preview</h2>
                 <div class="muted">Live preview of the built-in overlay text.</div>
                 <div id="overlay-preview-iframe-wrap" class="overlay-preview-wrap">
-                    <iframe id="overlay-preview-iframe" class="overlay-preview-iframe" sandbox="allow-scripts" srcdoc="<html><body style='margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;color:#666;font-family:sans-serif;font-size:14px;'>Loading preview...</body></html>"></iframe>
+                    <iframe id="overlay-preview-iframe" class="overlay-preview-iframe" src="/api/v1/overlay" sandbox="allow-scripts allow-same-origin"></iframe>
                 </div>
                 <div class="overlay-preview-toolbar">
                     <button class="btn btn--primary btn--sm" onclick="sendTestOverlay()">Send Test</button>

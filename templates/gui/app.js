@@ -3417,19 +3417,7 @@ function updateEcmDiagnostics(payload) {
 async function refreshOverlayPreview() {
   const frame = document.getElementById('overlay-preview-iframe');
   if (!frame) return;
-  try {
-    const overlay = currentConfig.overlay || {};
-    const theme = overlay.theme || {};
-    const res = await fetch(API + '/overlay/preview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chroma: true, theme: { background: theme.background, text: theme.text } })
-    });
-    const data = await res.json();
-    frame.srcdoc = data.html;
-  } catch (e) {
-    // Preview iframe will show the fallback error state
-  }
+  frame.src = '/api/v1/overlay?_t=' + Date.now();
 }
 
 async function sendTestOverlay() {

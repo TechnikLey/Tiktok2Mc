@@ -347,6 +347,7 @@ def main():
                     "--specpath", str(t_spec),
                     "--noconfirm",
                     "--log-level", "ERROR",
+                    "--hidden-import=_multiprocessing",
                 ]
                 if item.get("windowed"):
                     cmd.append("--noconsole")
