@@ -199,15 +199,188 @@ function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-pr
   });
 }
 
-/* ─── Logging ─── */
-function log(msg, level = 'info') {
-  const view = document.getElementById('log-view');
-  const line = document.createElement('div');
-  line.className = 'log-line log-' + level;
-  line.textContent = new Date().toLocaleTimeString() + '  ' + msg;
-  view.appendChild(line);
-  view.scrollTop = view.scrollHeight;
+/* ─── Live Log ─── */
+class LiveLog {
+  constructor() {
+    this.view = document.getElementById('log-view');
+    this.status = document.getElementById('log-status');
+    this.visibleCount = document.getElementById('log-visible-count');
+    this.searchInput = document.getElementById('log-search');
+    this.entries = [];
+    this.maxEntries = 500;
+    this.paused = false;
+    this.filter = 'all';
+    this.searchQuery = '';
+    this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0 };
+    this._bindFilters();
+    this.render();
+  }
+
+  _normalizeLevel(level) {
+    const l = String(level || 'info').toLowerCase();
+    if (l === 'warn') return 'warning';
+    if (l === 'err') return 'error';
+    if (['info','warning','error','debug'].includes(l)) return l;
+    return 'info';
+  }
+
+  _bindFilters() {
+    const buttons = document.getElementById('log-filter-buttons');
+    if (!buttons) return;
+    buttons.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('log-filter-btn')) return;
+      this.setFilter(e.target.getAttribute('data-level'));
+      buttons.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+    });
+  }
+
+  setFilter(level) {
+    this.filter = level || 'all';
+    this.render();
+  }
+
+  onSearch(query) {
+    this.searchQuery = (query || '').toLowerCase().trim();
+    this.render();
+  }
+
+  togglePause() {
+    this.paused = !this.paused;
+    const btn = document.getElementById('log-pause-btn');
+    if (btn) {
+      btn.textContent = this.paused ? 'Resume' : 'Pause';
+      btn.classList.toggle('btn--primary', this.paused);
+      btn.classList.toggle('btn--secondary', !this.paused);
+    }
+    if (this.status) {
+      this.status.textContent = this.paused ? 'Log stream paused' : 'Log stream connected';
+    }
+  }
+
+  setConnected(connected) {
+    if (this.status) {
+      this.status.textContent = this.paused
+        ? 'Log stream paused'
+        : (connected ? 'Log stream connected' : 'Log stream disconnected — retrying...');
+    }
+  }
+
+  clear() {
+    this.entries = [];
+    this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0 };
+    this.render();
+  }
+
+  export() {
+    const lines = this.entries.map(e => `[${e.time}] [${e.level.toUpperCase()}] ${e.source ? '(' + e.source + ') ' : ''}${e.message}`);
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tiktok2mc-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  add(message, level = 'info', source = '') {
+    if (this.paused) return;
+    const entry = {
+      id: Date.now() + '-' + Math.random().toString(36).slice(2),
+      time: new Date().toLocaleTimeString(),
+      timestamp: Date.now(),
+      message: message,
+      level: this._normalizeLevel(level),
+      source: source || ''
+    };
+    this.entries.push(entry);
+    if (this.entries.length > this.maxEntries) {
+      const removed = this.entries.shift();
+      this.levelCounts[removed.level] = Math.max(0, this.levelCounts[removed.level] - 1);
+      this.levelCounts.all = Math.max(0, this.levelCounts.all - 1);
+    }
+    this.levelCounts[entry.level]++;
+    this.levelCounts.all++;
+    this._updateStats();
+    if (this._matches(entry)) {
+      const el = this._renderEntry(entry);
+      this.view.appendChild(el);
+      this._trimVisible();
+      this._scrollToBottom();
+    }
+    this._updateVisibleCount();
+  }
+
+  _matches(entry) {
+    if (this.filter !== 'all' && entry.level !== this.filter) return false;
+    if (this.searchQuery) {
+      const text = (entry.message + ' ' + entry.source + ' ' + entry.level).toLowerCase();
+      return text.includes(this.searchQuery);
+    }
+    return true;
+  }
+
+  _renderEntry(entry) {
+    const line = document.createElement('div');
+    line.className = 'log-line log-' + entry.level;
+    line.setAttribute('data-id', entry.id);
+    line.setAttribute('data-level', entry.level);
+    line.innerHTML = `<span class="log-time">${escapeHtml(entry.time)}</span><span class="log-badge log-badge-${entry.level}">${entry.level.toUpperCase()}</span>${entry.source ? '<span class="log-source">' + escapeHtml(entry.source) + '</span>' : ''}<span class="log-message">${escapeHtml(entry.message)}</span>`;
+    return line;
+  }
+
+  _trimVisible() {
+    while (this.view.children.length > this.maxEntries) {
+      this.view.removeChild(this.view.firstChild);
+    }
+  }
+
+  _scrollToBottom() {
+    const autoScroll = document.getElementById('log-autoscroll');
+    if (!autoScroll || autoScroll.checked) {
+      this.view.scrollTop = this.view.scrollHeight;
+    }
+  }
+
+  _updateStats() {
+    for (const level of Object.keys(this.levelCounts)) {
+      const el = document.getElementById('stat-' + level);
+      if (el) el.textContent = this.levelCounts[level];
+    }
+  }
+
+  _updateVisibleCount() {
+    if (this.visibleCount) {
+      const visible = Array.from(this.view.children).filter(c => !c.classList.contains('hidden')).length;
+      this.visibleCount.textContent = visible + ' / ' + this.entries.length + ' shown';
+    }
+  }
+
+  render() {
+    if (!this.view) return;
+    this.view.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    let visible = 0;
+    for (const entry of this.entries) {
+      if (this._matches(entry)) {
+        fragment.appendChild(this._renderEntry(entry));
+        visible++;
+      }
+    }
+    this.view.appendChild(fragment);
+    this._updateStats();
+    this._updateVisibleCount();
+    this._scrollToBottom();
+  }
 }
+
+function log(msg, level = 'info') {
+  liveLog.add(msg, level);
+}
+
+const liveLog = new LiveLog();
 
 function showToast(msg, type = 'info') {
   const c = document.getElementById('toast-container');
@@ -3396,6 +3569,7 @@ function connectLogStream() {
   _sseSource.onopen = () => {
     // Reset backoff on successful connection.
     _sseReconnectDelay = 2000;
+    liveLog.setConnected(true);
   };
   _sseSource.onmessage = (event) => {
     try {
@@ -3403,30 +3577,33 @@ function connectLogStream() {
       const type = data.type || '';
       const payload = data.data || {};
       if (type === 'log') {
-        log(payload.msg || payload.message || '', payload.level || 'info');
+        liveLog.add(payload.msg || payload.message || '', payload.level || 'info', payload.source || '');
+      } else if (type === 'server.console') {
+        if (payload.line) {
+          consoleTerminal._print(payload.line, 'server');
+        }
       } else if (type === 'server.restarting') {
-        log('Backend restart started', 'warn');
+        liveLog.add('Backend restart started', 'warning', 'server');
         _showRestartOverlay();
       } else if (type === 'server.started') {
-        log('API server started (v' + (payload.version || '?') + ')', 'info');
+        liveLog.add('API server started (v' + (payload.version || '?') + ')', 'info', 'server');
         if (_restartPending) {
           window.location.reload();
         }
       } else if (type === 'server.stopping') {
-        log('API server stopping', 'warn');
+        liveLog.add('API server stopping', 'warning', 'server');
       } else if (type.startsWith('plugin.')) {
-        log('Plugin: ' + (payload.msg || type), payload.level || 'info');
+        liveLog.add(payload.msg || type, payload.level || 'info', payload.plugin || 'plugin');
       } else if (type === 'dashboard.plugin_states') {
         renderLivePluginGrid(payload.plugins || {});
-      } else if (type === 'dashboard.reactions_activity') {
-        renderLiveReactionsFeed(payload.recent || []);
       } else if (type === 'dashboard.ecm_diagnostics') {
         updateEcmDiagnostics(payload);
       }
     } catch (_) {}
   };
   _sseSource.onerror = () => {
-    log('Log stream disconnected — retrying...', 'warn');
+    liveLog.add('Log stream disconnected — retrying...', 'warning', 'sse');
+    liveLog.setConnected(false);
     // EventSource auto-reconnects, but if the server is gone for long
     // it gives up.  We manually reconnect with backoff.
     if (_sseSource) {
@@ -3447,7 +3624,6 @@ function connectLogStream() {
 /* ─── Live Dashboard Widgets ─── */
 
 let _livePluginData = {};
-let _liveReactionFeed = [];
 
 function renderLivePluginGrid(plugins) {
   _livePluginData = plugins;
@@ -3492,42 +3668,6 @@ function renderLivePluginGrid(plugins) {
   container.innerHTML = html;
 }
 
-function renderLiveReactionsFeed(recent) {
-  const container = document.getElementById('live-reactions-feed');
-  const empty = document.getElementById('live-reactions-empty');
-  if (!container) return;
-  if (!recent.length) {
-    container.innerHTML = '';
-    if (empty) empty.classList.remove('hidden');
-    return;
-  }
-  if (empty) empty.classList.add('hidden');
-
-  // Prepend new items, keep max 20
-  for (const item of recent.reverse()) {
-    const exists = _liveReactionFeed.some(r =>
-      r.timestamp === item.timestamp && r.event === item.event && r.command === item.command
-    );
-    if (!exists) _liveReactionFeed.unshift(item);
-  }
-  if (_liveReactionFeed.length > 20) _liveReactionFeed = _liveReactionFeed.slice(0, 20);
-
-  let html = '';
-  for (const item of _liveReactionFeed.slice(0, 10)) {
-    const time = new Date(item.timestamp * 1000).toLocaleTimeString();
-    const evInfo = reactionEditor.eventCatalog[item.event] || { name: item.event, icon: '⚡' };
-    const plInfo = reactionEditor.pluginCatalog[item.target] || { name: item.target, icon: '🔌' };
-    const cmdInfo = (reactionEditor.commandCatalog[item.target] || {})[item.command] || { name: item.command };
-    const statusCls = item.status === 'ok' ? 'feed-ok' : 'feed-error';
-    html += `<div class="live-reaction-item ${statusCls}">
-      <span class="live-reaction-time">${escapeHtml(time)}</span>
-      <span class="live-reaction-icon">${evInfo.icon || '⚡'}</span>
-      <span class="live-reaction-text">${escapeHtml(evInfo.name)} → ${escapeHtml(plInfo.icon || '🔌')} ${escapeHtml(cmdInfo.name)}</span>
-    </div>`;
-  }
-  container.innerHTML = html;
-}
-
 function updateEcmDiagnostics(payload) {
   // Update the reactions summary on the dashboard card if it shows 0
   const summary = document.getElementById('reactions-summary');
@@ -3541,14 +3681,7 @@ function updateEcmDiagnostics(payload) {
   }
 }
 
-/* ─── Overlay Preview ─── */
-
-async function refreshOverlayPreview() {
-  const frame = document.getElementById('overlay-preview-iframe');
-  if (!frame) return;
-  frame.src = '/api/v1/overlay?_t=' + Date.now();
-}
-
+/* ─── Overlay Test (kept for config editor preview) ─── */
 async function sendTestOverlay() {
   const title = (document.getElementById('overlay-test-title')?.value || '').trim() || 'Hello Stream!';
   const subtitle = (document.getElementById('overlay-test-subtitle')?.value || '').trim() || '';
@@ -3707,7 +3840,6 @@ async function init() {
   checkAllUpdates();
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
-  refreshOverlayPreview();
   _healthIntervalId = setInterval(loadHealth, 10000);
   _statusIntervalId = setInterval(loadStatus, 10000);
   _pluginsIntervalId = setInterval(loadPlugins, 5000);

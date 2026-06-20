@@ -85,14 +85,6 @@ class DashboardPublisher:
                         ecm_diag,
                     )
 
-                    # Also push a dedicated reactions-activity event
-                    # that the GUI can show as a live feed
-                    recent = ecm_diag.get("recent_dispatches", [])
-                    if recent:
-                        await event_bus.publish(
-                            "dashboard.reactions_activity",
-                            {"recent": recent},
-                        )
 
             except asyncio.CancelledError:
                 break

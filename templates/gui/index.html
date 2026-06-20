@@ -60,25 +60,6 @@
             </div>
 
             <div class="card">
-                <h2>Recent Activity</h2>
-                <div class="muted">Live feed of reactions firing right now.</div>
-                <div id="live-reactions-feed" class="live-feed"></div>
-                <div id="live-reactions-empty" class="muted text-center" style="padding: 1rem 0;">No reaction activity yet. Create a reaction and trigger an event to see it here.</div>
-            </div>
-
-            <div class="card" id="overlay-preview-card">
-                <h2>Overlay Preview</h2>
-                <div class="muted">Live preview of the built-in overlay text.</div>
-                <div id="overlay-preview-iframe-wrap" class="overlay-preview-wrap">
-                    <iframe id="overlay-preview-iframe" class="overlay-preview-iframe" src="/api/v1/overlay" sandbox="allow-scripts allow-same-origin"></iframe>
-                </div>
-                <div class="overlay-preview-toolbar">
-                    <button class="btn btn--primary btn--sm" onclick="sendTestOverlay()">Send Test</button>
-                    <button class="btn btn--secondary btn--sm" onclick="refreshOverlayPreview()">Refresh</button>
-                </div>
-            </div>
-
-            <div class="card">
                 <h2>Configuration</h2>
                 <div id="config-summary" class="muted">Loading...</div>
                 <button class="btn btn--primary dashboard-btn-full" onclick="editor.open(currentConfig)">Edit Configuration</button>
@@ -93,9 +74,46 @@
                 <div id="updates-detail" class="hidden updates-detail"></div>
             </div>
 
-            <div class="card">
-                <h2>Live Log</h2>
-                <div id="log-view">Connecting to log stream...</div>
+            <div class="card log-card">
+                <div class="log-header">
+                    <h2>Live Log</h2>
+                    <div class="log-stats" id="log-stats">
+                        <span class="log-stat" data-level="all" title="Total entries"><span class="log-stat-count" id="stat-all">0</span> All</span>
+                        <span class="log-stat log-stat--info" data-level="info" title="Info entries"><span class="log-stat-count" id="stat-info">0</span> Info</span>
+                        <span class="log-stat log-stat--warn" data-level="warning" title="Warning entries"><span class="log-stat-count" id="stat-warning">0</span> Warn</span>
+                        <span class="log-stat log-stat--err" data-level="error" title="Error entries"><span class="log-stat-count" id="stat-error">0</span> Error</span>
+                        <span class="log-stat log-stat--debug" data-level="debug" title="Debug entries"><span class="log-stat-count" id="stat-debug">0</span> Debug</span>
+                    </div>
+                </div>
+                <div class="log-toolbar">
+                    <div class="log-filter-group">
+                        <label class="log-filter-label">Filter:</label>
+                        <div class="log-filter-buttons" id="log-filter-buttons">
+                            <button class="log-filter-btn active" data-level="all">All</button>
+                            <button class="log-filter-btn" data-level="info">Info</button>
+                            <button class="log-filter-btn" data-level="warning">Warning</button>
+                            <button class="log-filter-btn" data-level="error">Error</button>
+                            <button class="log-filter-btn" data-level="debug">Debug</button>
+                        </div>
+                    </div>
+                    <div class="log-search">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="log-search" placeholder="Search logs..." oninput="liveLog.onSearch(this.value)">
+                    </div>
+                    <div class="log-actions">
+                        <button class="btn btn--sm btn--secondary" id="log-pause-btn" onclick="liveLog.togglePause()">Pause</button>
+                        <button class="btn btn--sm btn--secondary" onclick="liveLog.clear()">Clear</button>
+                        <button class="btn btn--sm btn--secondary" onclick="liveLog.export()">Export</button>
+                        <label class="log-autoscroll" title="Auto-scroll to newest entries">
+                            <input type="checkbox" id="log-autoscroll" checked> Auto-scroll
+                        </label>
+                    </div>
+                </div>
+                <div id="log-view" class="log-view"></div>
+                <div class="log-footer">
+                    <span class="muted" id="log-status">Connecting to log stream...</span>
+                    <span class="muted" id="log-visible-count"></span>
+                </div>
             </div>
 
             <div class="card" id="console-card">
@@ -423,6 +441,6 @@
     <div class="toast-container" id="toast-container"></div>
 
     <script src="./actions-editor.js?v=1"></script>
-    <script src="./app.js?v=3"></script>
+    <script src="./app.js?v=4"></script>
 </body>
 </html>
