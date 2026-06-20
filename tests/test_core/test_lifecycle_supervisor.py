@@ -134,6 +134,16 @@ class TestRestart:
             await supervisor.restart()
 
 
+class TestShutdownFromCountdown:
+    @pytest.mark.asyncio
+    async def test_shutdown_allowed_from_countdown(self, supervisor):
+        supervisor.state = SupervisorState.COUNTDOWN
+        with patch.object(supervisor, "stop_all", new=AsyncMock()):
+            with patch.object(supervisor, "stop_api_server", new=AsyncMock()):
+                await supervisor.shutdown()
+        assert supervisor.state == SupervisorState.COMPLETE
+
+
 class TestShutdown:
     @pytest.mark.asyncio
     async def test_full_shutdown_stops_api_and_children(self, supervisor):

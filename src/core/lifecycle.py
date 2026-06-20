@@ -740,10 +740,28 @@ class ProcessSupervisor:
         If *restart* is True, the GUI shell is kept alive and the supervisor
         will transition back to RUNNING after restarting backend services.
         """
+        # COUNTDOWN is also allowed because shutdown_countdown calls this after
+        # the timer expires, and an immediate shutdown cancels an active countdown.
         self._assert_state(
-            {SupervisorState.IDLE, SupervisorState.STARTING, SupervisorState.RUNNING},
+            {
+                SupervisorState.IDLE,
+                SupervisorState.STARTING,
+                SupervisorState.RUNNING,
+                SupervisorState.COUNTDOWN,
+            },
             "shut down" if not restart else "restart",
         )
+        if self.state == SupervisorState.COUNTDOWN:
+            log.info("[SUPERVISOR] Cancelling active shutdown countdown")
+            self.clear_shutdown_status()
+
+        if self.state in {
+            SupervisorState.SHUTTING_DOWN,
+            SupervisorState.RESTARTING,
+            SupervisorState.COMPLETE,
+        }:
+            log.info("[SUPERVISOR] Shutdown/restart already in progress")
+            return
 
         if delay > 0 and not restart:
             # Console countdown handled by caller; just sleep here.

@@ -2,9 +2,10 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from fastapi.staticfiles import StaticFiles
@@ -56,13 +57,18 @@ async def lifespan(app: FastAPI):
         log.warning("Could not read RCON config — console will auto-configure on first request")
 
     await event_bus.publish("server.started", {"version": API_VERSION})
-    yield
-    await get_rcon_service().disconnect()
-    await get_dashboard_publisher().stop()
-    await get_event_command_mapper().stop()
-    await get_health_monitor().stop()
-    await event_bus.publish("server.stopping", {})
-    log.info("API server shutting down ...")
+    try:
+        yield
+    except asyncio.CancelledError:
+        # Expected when the supervisor cancels the API server task during shutdown.
+        pass
+    finally:
+        await get_rcon_service().disconnect()
+        await get_dashboard_publisher().stop()
+        await get_event_command_mapper().stop()
+        await get_health_monitor().stop()
+        await event_bus.publish("server.stopping", {})
+        log.info("API server shutting down ...")
 
 
 def create_app(
@@ -107,6 +113,16 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    class CancelledErrorMiddleware(BaseHTTPMiddleware):
+        """Suppress CancelledError spam when clients disconnect or the server shuts down."""
+        async def dispatch(self, request, call_next):
+            try:
+                return await call_next(request)
+            except asyncio.CancelledError:
+                return Response(status_code=499)
+
+    app.add_middleware(CancelledErrorMiddleware)
 
     app.include_router(api_router)
 

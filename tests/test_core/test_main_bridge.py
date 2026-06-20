@@ -5,7 +5,9 @@ a live TikTok connection or RCON server.
 """
 
 import asyncio
+import datetime
 import json
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -216,3 +218,45 @@ class TestRuntimeReloadWatcher:
         assert "actions" in calls
         assert not cfg_signal.exists()
         assert not act_signal.exists()
+
+
+class TestUpdateDailyRevenue:
+    def test_writes_daily_revenue(self, tmp_path, monkeypatch):
+        from src.python.main import update_daily_revenue, ctx
+
+        log_file = tmp_path / "data" / "revenue_log.jsonl"
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        monkeypatch.setattr(ctx, "gift_value_usd", 12.34)
+        monkeypatch.setattr(ctx, "gift_day_start_value", 0)
+        monkeypatch.setattr(ctx, "gift_current_log_date", today)
+        monkeypatch.setattr(ctx, "gift_lock", threading.Lock())
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+
+        update_daily_revenue()
+
+        assert log_file.exists()
+        lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+        data = json.loads(lines[-1])
+        assert data["estimated_revenue_usd"] == 12.34
+        assert data["date"] == today
+
+    def test_updates_existing_entry(self, tmp_path, monkeypatch):
+        from src.python.main import update_daily_revenue, ctx
+
+        log_file = tmp_path / "data" / "revenue_log.jsonl"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        log_file.write_text(json.dumps({"date": today, "estimated_revenue_usd": 5.0}) + "\n", encoding="utf-8")
+
+        monkeypatch.setattr(ctx, "gift_value_usd", 20.0)
+        monkeypatch.setattr(ctx, "gift_day_start_value", 0)
+        monkeypatch.setattr(ctx, "gift_current_log_date", today)
+        monkeypatch.setattr(ctx, "gift_lock", threading.Lock())
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+
+        update_daily_revenue()
+
+        lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 1
+        data = json.loads(lines[0])
+        assert data["estimated_revenue_usd"] == 20.0

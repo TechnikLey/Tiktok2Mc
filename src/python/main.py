@@ -1414,6 +1414,53 @@ def create_client(user):
 # ========================
 # Counter for gift revenue estimation
 # ========================
+def update_daily_revenue():
+    """Persist the estimated daily gift revenue to a JSONL log.
+
+    The log lives at ``data/revenue_log.jsonl``. Each day gets one entry
+    with the difference between the current ``ctx.gift_value_usd`` and the
+    value recorded at the start of that day.
+    """
+    file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    with ctx.gift_lock:
+        if ctx.gift_current_log_date != today:
+            ctx.gift_day_start_value = ctx.gift_value_usd
+            ctx.gift_current_log_date = today
+
+        daily_value = ctx.gift_value_usd - ctx.gift_day_start_value
+
+        new_entry = {
+            "date": today,
+            "estimated_revenue_usd": round(daily_value, 2),
+        }
+
+        entries = []
+        if file_path.exists():
+            with file_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+
+        updated = False
+        for i, entry in enumerate(entries):
+            if entry.get("date") == today:
+                entries[i] = new_entry
+                updated = True
+                break
+
+        if not updated:
+            entries.append(new_entry)
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with file_path.open("w", encoding="utf-8") as f:
+            for entry in entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
 async def gift_revenue_counter():
     while True:
         await asyncio.sleep(ctx.autosave_interval_seconds)
@@ -1575,7 +1622,7 @@ async def run_bot():
         ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop,
         ctx.config, ctx.valid_functions,
     )
-    load_event_hooks(ctx.hook_api, ctx.config)
+    load_event_hooks(ctx.hook_api, config=ctx.config)
 
     # Clear any stale reload signals from a previous run before the watcher starts.
     for sig in (RELOAD_CONFIG_SIGNAL, RELOAD_ACTIONS_SIGNAL):
