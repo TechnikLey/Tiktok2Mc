@@ -80,6 +80,26 @@ class TestPluginEndpoints:
         resp = client.delete("/api/v1/plugins/nonexistent")
         assert resp.status_code == 404
 
+    def test_restart_plugin_writes_signals(self, client):
+        from core.paths import get_runtime_dir
+
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.post("/api/v1/plugins/test-plugin/restart")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "restart_requested"
+        assert resp.json()["name"] == "test-plugin"
+
+        runtime = get_runtime_dir()
+        assert (runtime / "plugin_stop_test-plugin").exists()
+        assert (runtime / "plugin_start_test-plugin").exists()
+
+        (runtime / "plugin_stop_test-plugin").unlink(missing_ok=True)
+        (runtime / "plugin_start_test-plugin").unlink(missing_ok=True)
+
+    def test_restart_plugin_not_found(self, client):
+        resp = client.post("/api/v1/plugins/nonexistent/restart")
+        assert resp.status_code == 404
+
     def test_register_plugin_requires_name(self, client):
         resp = client.post("/api/v1/plugins/register", json={})
         assert resp.status_code == 422

@@ -563,12 +563,25 @@ class ActionsEditor {
 
       const body = { triggers: this.triggers };
       await putJSON('/actions', body);
+      await this._askAndReloadActions();
       this.isDirty = false;
       this._updateSaveButton();
-      showToast('Actions saved successfully.', 'success');
       await this.load();
     } catch (e) {
       showToast('Failed to save: ' + e.message, 'error');
+    }
+  }
+
+  async _askAndReloadActions() {
+    let sendReload = false;
+    if (currentConfig && currentConfig.rcon && currentConfig.rcon.enabled) {
+      sendReload = confirm('Actions saved. Send /reload to the Minecraft server now?');
+    }
+    await postJSON('/reload', { config: false, actions: true, send_minecraft_reload: sendReload });
+    if (sendReload) {
+      showToast('Actions saved and /reload sent to Minecraft.', 'success');
+    } else {
+      showToast('Actions saved. Run /reload in Minecraft or restart the server to apply.', 'info');
     }
   }
 
@@ -651,7 +664,7 @@ class ActionsEditor {
       this._updateSaveButton();
       this._renderRawDiagnostics(result.diagnostics || []);
       this._updateRawStatus(result.diagnostics || []);
-      showToast('Raw actions saved.', 'success');
+      await this._askAndReloadActions();
     } catch (e) {
       showToast('Failed to save raw: ' + e.message, 'error');
     }

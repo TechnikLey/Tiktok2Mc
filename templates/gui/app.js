@@ -607,8 +607,11 @@ async function wizardSave() {
     cfg.rcon.password = wizardData.rcon_password;
     cfg.rcon.enabled = true;
     await putJSON('/config', { config: cfg, backup: true });
-    log('Setup saved successfully.');
-    showRestartDialog('Setup Complete', 'Your settings have been saved. The tool must be restarted for changes to take effect.');
+    await postJSON('/reload', {});
+    log('Setup saved and applied.');
+    hideWizard();
+    await loadConfig();
+    showToast('Setup complete — settings applied.', 'success');
   } catch (e) {
     log('Failed to save setup: ' + e.message, 'err');
     showToast('Failed to save: ' + e.message, 'error');
@@ -1703,9 +1706,8 @@ class ConfigEditor {
       this._updateSaveButton();
       this.close();
       await loadConfig();
-      this.showToast('Configuration saved successfully.', 'success');
-      _restartPending = true;
-      showRestartDialog('Configuration Saved', 'Some configuration changes require a restart.');
+      await postJSON('/reload', {});
+      this.showToast('Configuration saved and applied.', 'success');
     } catch (e) {
       this.showToast('Save failed: ' + e.message, 'error');
     }
@@ -3177,6 +3179,7 @@ async function _handleCloseRequest() {
 }
 
 async function _saveAllEditors() {
+  let pluginChanged = false;
   if (actionsEditor.isDirty) {
     await actionsEditor.save();
     if (actionsEditor.isDirty) {
@@ -3204,6 +3207,13 @@ async function _saveAllEditors() {
     await putJSON(`/plugins/${encodeURIComponent(pluginEditor.pluginName)}/config`, payload);
     pluginEditor.original = JSON.parse(JSON.stringify(pluginEditor.config));
     pluginEditor._updateSaveButton();
+    pluginChanged = true;
+  }
+
+  await postJSON('/reload', {});
+  if (pluginChanged) {
+    await postJSON(`/plugins/${encodeURIComponent(pluginEditor.pluginName)}/restart`, {});
+    showToast('Changes applied and plugin restart requested.', 'success');
   }
 }
 

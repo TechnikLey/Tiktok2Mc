@@ -30,7 +30,7 @@ from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, C
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics, Severity
-from core.paths import get_base_dir
+from core.paths import get_base_dir, get_runtime_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
@@ -52,6 +52,9 @@ BASE_DIR = get_base_dir()
 CONFIG_FILE = (BASE_DIR.parent / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR.parent / "data" / "actions.mca").resolve()
 FOLLOWED_USERS_FILE = (BASE_DIR.parent / "data" / "followed_users.txt").resolve()
+RUNTIME_DIR = get_runtime_dir()
+RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
+RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
 
 class BotContext:
     """Central state container for the TikTok-to-Minecraft bridge."""
@@ -116,9 +119,14 @@ class BotContext:
         # RCON state
         self.rcon_connection = None
         self.last_rcon_attempt = 0
+        self.rcon_enabled = False
 
         # TikTok state
         self.disable_tiktok_connect = False
+        self.tiktok_client = None
+
+        # Event bridge subscriptions (reloaded at runtime)
+        self.event_subscriptions = {}
 
         # Gift tracking
         self.gift_value_usd = 0
@@ -150,8 +158,12 @@ _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
 # SETUP & HELPER FUNCTIONS
 # ==========================================
 
-def _check_dup_cmd_config():
-    """Check raw YAML for duplicate keys in commands_config sections."""
+def _validate_dup_cmd_config():
+    """Validate raw YAML for duplicate keys in commands_config sections.
+
+    Raises ``ValueError`` if duplicates are found so callers can decide
+    whether to exit the process or simply abort a runtime reload.
+    """
     try:
         text = CONFIG_FILE.read_text(encoding="utf-8")
     except Exception:
@@ -182,8 +194,153 @@ def _check_dup_cmd_config():
                     seen[key] = j + 1
             j += 1
     if found:
-        input("Press Enter to exit...")
+        raise ValueError("Duplicate keys detected in commands_config sections")
+
+
+def _check_dup_cmd_config():
+    """Startup check: abort the process if duplicate command keys exist."""
+    try:
+        _validate_dup_cmd_config()
+    except ValueError as exc:
+        log.error(str(exc))
+        if sys.stdin.isatty():
+            try:
+                input("Press Enter to exit...")
+            except (EOFError, OSError):
+                pass
         sys.exit(1)
+
+
+def _apply_config(config: dict) -> None:
+    """Apply a loaded config dict to the bridge context."""
+    ctx.config = config
+
+    ctx.mc_host = config.get("server_host", "127.0.0.1")
+    ctx.mc_pass = config.get("rcon", {}).get("password", "")
+    ctx.mc_port = config.get("rcon", {}).get("port", 25575)
+    ctx.rcon_enabled = bool(config.get("rcon", {}).get("enabled", False))
+    ctx.server_host = config.get("server_host", "127.0.0.1")
+    ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
+    ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
+    ctx.mcserver_api_port = int(
+        os.environ.get(
+            "RESOLVED_PORT_WEBHOOK_PORT",
+            config.get("minecraft_server_api", {}).get("web_server_port", 29188),
+        )
+    )
+    ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
+
+    ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
+    ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
+    raw_path = str(ft_cfg.get("file", "data/followed_users.txt"))
+    ctx.follow_tracking_file = (BASE_DIR.parent / raw_path).resolve()
+    ctx._followed_cache = set()
+    if ctx.follow_tracking_file.exists():
+        with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
+            ctx._followed_cache = set(line.strip().lower() for line in f if line.strip())
+        log.info(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
+    if ctx.follow_tracking_mode == "per_stream":
+        ctx.follow_tracking_file.write_text("")
+        ctx._followed_cache.clear()
+        log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
+
+    comment_cmd_cfg = config.get("comment_commands", {})
+    ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
+    ctx.comment_cmd_global_cooldown = max(0, int(comment_cmd_cfg.get("cooldown", 0)))
+    ctx.comment_cmd_global_user_cooldown = max(0, int(comment_cmd_cfg.get("user_cooldown", 0)))
+    raw_groups = comment_cmd_cfg.get("groups", None)
+    if raw_groups is None:
+        raw_groups = [{
+            "enabled": True,
+            "prefix": comment_cmd_cfg.get("prefix", "#"),
+            "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
+            "mode": comment_cmd_cfg.get("mode", "deny-all"),
+            "commands": comment_cmd_cfg.get("commands", []),
+            "handler": "rcon",
+            "url": "",
+        }]
+        log.info("[CONFIG] comment_commands: using legacy single-group format")
+    ctx.comment_cmd_groups = []
+    ctx.comment_cmd_all_prefixes = set()
+    seen_prefixes = set()
+    for g in raw_groups:
+        prefix = str(g.get("prefix", "#"))
+        ctx.comment_cmd_all_prefixes.add(prefix)
+        enabled = bool(g.get("enabled", True))
+        if not enabled:
+            log.info(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
+            continue
+        if prefix in seen_prefixes:
+            log.warning(f"comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
+            continue
+        seen_prefixes.add(prefix)
+        raw_roles = g.get("allowed_roles", ["moderator"])
+        roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()] if isinstance(raw_roles, list) else ["moderator"]
+        mode = str(g.get("mode", "deny-all")).lower()
+        raw_commands = g.get("commands", [])
+        commands = []
+        seen_cmd = set()
+        dup_warn_count = 0
+        dup_warn_max = 5
+        if isinstance(raw_commands, list):
+            for item in raw_commands:
+                if isinstance(item, str):
+                    cname = item.strip().lower()
+                    if cname:
+                        if cname in seen_cmd:
+                            dup_warn_count += 1
+                            if dup_warn_count <= dup_warn_max:
+                                log.warning(f"comment_commands group '{prefix}': '{cname}' listed multiple times in commands")
+                        seen_cmd.add(cname)
+                        commands.append(cname)
+        if dup_warn_count > dup_warn_max:
+            remaining = dup_warn_count - dup_warn_max
+            log.warning(f"comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed")
+        commands_config = {}
+        raw_config = g.get("commands_config", {})
+        if isinstance(raw_config, dict):
+            for cname, ccfg in raw_config.items():
+                cname = cname.strip().lower()
+                if cname and isinstance(ccfg, dict):
+                    commands_config[cname] = ccfg
+        handler = str(g.get("handler", "rcon")).lower()
+        url = str(g.get("url", ""))
+        cooldown = max(0, int(g.get("cooldown", 0)))
+        user_cooldown = max(0, int(g.get("user_cooldown", 0)))
+        if mode == "allow-all" and not commands and handler == "rcon":
+            log.warning(f"comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
+        trigger_comment = g.get("trigger_comment_event", True)
+
+        # Warn about commands_config entries that can never be used
+        cmd_warn_count = 0
+        cmd_warn_max = 5
+        for cname in commands_config:
+            if mode == "deny-all" and cname not in commands:
+                cmd_warn_count += 1
+                if cmd_warn_count <= cmd_warn_max:
+                    log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match")
+            elif mode == "allow-all" and cname in commands:
+                cmd_warn_count += 1
+                if cmd_warn_count <= cmd_warn_max:
+                    log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode")
+        if cmd_warn_count > cmd_warn_max:
+            remaining = cmd_warn_count - cmd_warn_max
+            log.warning(f"comment_commands group '{prefix}': {remaining} further command config warnings suppressed")
+
+        ctx.comment_cmd_groups.append({
+            "prefix": prefix,
+            "roles": roles,
+            "mode": mode,
+            "commands": commands,
+            "commands_config": commands_config,
+            "handler": handler,
+            "url": url,
+            "cooldown": cooldown,
+            "user_cooldown": user_cooldown,
+            "trigger_comment_event": trigger_comment,
+        })
+
+    ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
 
 
 def load_config():
@@ -196,133 +353,7 @@ def load_config():
 
     try:
         config = load_yaml(CONFIG_FILE)
-        ctx.config = config
-
-        ctx.mc_host = config.get("server_host", "127.0.0.1")
-        ctx.mc_pass = config.get("rcon", {}).get("password", "")
-        ctx.mc_port = config.get("rcon", {}).get("port", 25575)
-        ctx.server_host = config.get("server_host", "127.0.0.1")
-        ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
-        ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
-        ctx.mcserver_api_port = int(
-            os.environ.get(
-                "RESOLVED_PORT_WEBHOOK_PORT",
-                config.get("minecraft_server_api", {}).get("web_server_port", 29188),
-            )
-        )
-        ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
-
-        ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
-        ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
-        raw_path = str(ft_cfg.get("file", "data/followed_users.txt"))
-        ctx.follow_tracking_file = (BASE_DIR.parent / raw_path).resolve()
-        ctx._followed_cache = set()
-        if ctx.follow_tracking_file.exists():
-            with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
-                ctx._followed_cache = set(line.strip().lower() for line in f if line.strip())
-            log.info(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
-        if ctx.follow_tracking_mode == "per_stream":
-            ctx.follow_tracking_file.write_text("")
-            ctx._followed_cache.clear()
-            log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
-
-        comment_cmd_cfg = config.get("comment_commands", {})
-        ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
-        ctx.comment_cmd_global_cooldown = max(0, int(comment_cmd_cfg.get("cooldown", 0)))
-        ctx.comment_cmd_global_user_cooldown = max(0, int(comment_cmd_cfg.get("user_cooldown", 0)))
-        raw_groups = comment_cmd_cfg.get("groups", None)
-        if raw_groups is None:
-            raw_groups = [{
-                "enabled": True,
-                "prefix": comment_cmd_cfg.get("prefix", "#"),
-                "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
-                "mode": comment_cmd_cfg.get("mode", "deny-all"),
-                "commands": comment_cmd_cfg.get("commands", []),
-                "handler": "rcon",
-                "url": "",
-            }]
-            log.info("[CONFIG] comment_commands: using legacy single-group format")
-        ctx.comment_cmd_groups = []
-        ctx.comment_cmd_all_prefixes = set()
-        seen_prefixes = set()
-        for g in raw_groups:
-            prefix = str(g.get("prefix", "#"))
-            ctx.comment_cmd_all_prefixes.add(prefix)
-            enabled = bool(g.get("enabled", True))
-            if not enabled:
-                log.info(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
-                continue
-            if prefix in seen_prefixes:
-                log.warning(f"comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
-                continue
-            seen_prefixes.add(prefix)
-            raw_roles = g.get("allowed_roles", ["moderator"])
-            roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()] if isinstance(raw_roles, list) else ["moderator"]
-            mode = str(g.get("mode", "deny-all")).lower()
-            raw_commands = g.get("commands", [])
-            commands = []
-            seen_cmd = set()
-            dup_warn_count = 0
-            dup_warn_max = 5
-            if isinstance(raw_commands, list):
-                for item in raw_commands:
-                    if isinstance(item, str):
-                        cname = item.strip().lower()
-                        if cname:
-                            if cname in seen_cmd:
-                                dup_warn_count += 1
-                                if dup_warn_count <= dup_warn_max:
-                                    log.warning(f"comment_commands group '{prefix}': '{cname}' listed multiple times in commands")
-                            seen_cmd.add(cname)
-                            commands.append(cname)
-            if dup_warn_count > dup_warn_max:
-                remaining = dup_warn_count - dup_warn_max
-                log.warning(f"comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed")
-            commands_config = {}
-            raw_config = g.get("commands_config", {})
-            if isinstance(raw_config, dict):
-                for cname, ccfg in raw_config.items():
-                    cname = cname.strip().lower()
-                    if cname and isinstance(ccfg, dict):
-                        commands_config[cname] = ccfg
-            handler = str(g.get("handler", "rcon")).lower()
-            url = str(g.get("url", ""))
-            cooldown = max(0, int(g.get("cooldown", 0)))
-            user_cooldown = max(0, int(g.get("user_cooldown", 0)))
-            if mode == "allow-all" and not commands and handler == "rcon":
-                log.warning(f"comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
-            trigger_comment = g.get("trigger_comment_event", True)
-
-            # Warn about commands_config entries that can never be used
-            cmd_warn_count = 0
-            cmd_warn_max = 5
-            for cname in commands_config:
-                if mode == "deny-all" and cname not in commands:
-                    cmd_warn_count += 1
-                    if cmd_warn_count <= cmd_warn_max:
-                        log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match")
-                elif mode == "allow-all" and cname in commands:
-                    cmd_warn_count += 1
-                    if cmd_warn_count <= cmd_warn_max:
-                        log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode")
-            if cmd_warn_count > cmd_warn_max:
-                remaining = cmd_warn_count - cmd_warn_max
-                log.warning(f"comment_commands group '{prefix}': {remaining} further command config warnings suppressed")
-
-            ctx.comment_cmd_groups.append({
-                "prefix": prefix,
-                "roles": roles,
-                "mode": mode,
-                "commands": commands,
-                "commands_config": commands_config,
-                "handler": handler,
-                "url": url,
-                "cooldown": cooldown,
-                "user_cooldown": user_cooldown,
-                "trigger_comment_event": trigger_comment,
-            })
-
-        ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
+        _apply_config(config)
         return True
     except Exception as e:
         log.error(f"Config error: {e}")
@@ -841,7 +872,7 @@ async def _event_bridge_worker():
     same way as official ones by declaring subscriptions.
     """
     q = event_bus.subscribe()  # all events — tiktok events now have individual types
-    subscriptions = _load_event_subscriptions()
+    ctx.event_subscriptions = _load_event_subscriptions()
     log.info("[EVENT-BRIDGE] Started (declarative).")
     while True:
         msg = await q.get()
@@ -861,6 +892,7 @@ async def _event_bridge_worker():
 
             # Find all plugins that subscribe to this event
             recipients: set[str] = set()
+            subscriptions = ctx.event_subscriptions
             for pattern, plugin_names in subscriptions.items():
                 if _match_event(full_event_type, pattern):
                     recipients.update(plugin_names)
@@ -1387,6 +1419,112 @@ async def gift_revenue_counter():
         await asyncio.sleep(ctx.autosave_interval_seconds)
         await asyncio.to_thread(update_daily_revenue)
 
+
+# ==========================================
+# RUNTIME RELOAD
+# ==========================================
+
+async def reload_config():
+    """Reload config.yaml at runtime without restarting the bridge."""
+    log.info("[RELOAD] Config reload requested")
+    try:
+        _validate_dup_cmd_config()
+        new_config = load_yaml(CONFIG_FILE)
+        old_user = ctx.tiktok_user
+        _apply_config(new_config)
+
+        if ctx.hook_api is not None:
+            ctx.hook_api.update_runtime_state(
+                config=ctx.config,
+                valid_functions=ctx.valid_functions,
+            )
+
+        ctx.comment_handler_map = _fetch_comment_handlers()
+        ctx.event_subscriptions = _load_event_subscriptions()
+
+        # Force the RCON worker to reconnect with the new settings.
+        ctx.rcon_connection = None
+
+        if old_user != ctx.tiktok_user and ctx.tiktok_client is not None:
+            try:
+                ctx.tiktok_client.stop()
+            except Exception:
+                pass
+
+        log.info("[RELOAD] Config reloaded successfully")
+    except Exception as e:
+        log.error("[RELOAD] Config reload failed: %s", e)
+
+
+async def reload_actions(send_minecraft_reload: bool = False):
+    """Reload actions.mca at runtime without restarting the bridge.
+
+    ``send_minecraft_reload`` asks the bridge to push ``/reload`` to the
+    Minecraft server via RCON after the datapack has been regenerated.
+    """
+    log.info("[RELOAD] Actions reload requested (send /reload: %s)", send_minecraft_reload)
+    try:
+        diags = validate_file(ACTIONS_FILE, raise_on_error=False)
+        if any(d.severity == Severity.ERROR for d in diags):
+            log.error("[RELOAD] actions.mca contains errors; reload aborted")
+            print_diagnostics(diags)
+            return
+
+        generate_datapack()
+        if ctx.hook_api is not None:
+            ctx.hook_api.update_runtime_state(valid_functions=ctx.valid_functions)
+
+        if send_minecraft_reload:
+            if ctx.rcon_enabled:
+                try:
+                    ctx.rcon_queue.put_nowait((["/reload"], "system"))
+                    log.info("[RELOAD] Sent /reload to Minecraft server")
+                except asyncio.QueueFull:
+                    log.warning("[RELOAD] RCON queue full; could not send /reload")
+            else:
+                log.info(
+                    "[RELOAD] /reload requested but RCON disabled; "
+                    "vanilla action changes require a Minecraft server restart or manual /reload"
+                )
+
+        log.info("[RELOAD] Actions reloaded successfully")
+    except Exception as e:
+        log.error("[RELOAD] Actions reload failed: %s", e)
+
+
+def _read_signal_options(path: Path) -> dict:
+    """Read a JSON signal payload, defaulting to ``send_minecraft_reload=True``."""
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+        if text.startswith("{"):
+            return json.loads(text)
+    except Exception:
+        pass
+    return {"send_minecraft_reload": True}
+
+
+async def _reload_signal_watcher():
+    """Poll runtime signal files and trigger in-process reloads."""
+    while True:
+        await asyncio.sleep(1)
+        try:
+            if RELOAD_CONFIG_SIGNAL.exists():
+                try:
+                    RELOAD_CONFIG_SIGNAL.unlink()
+                except Exception:
+                    pass
+                await reload_config()
+            if RELOAD_ACTIONS_SIGNAL.exists():
+                options = _read_signal_options(RELOAD_ACTIONS_SIGNAL)
+                try:
+                    RELOAD_ACTIONS_SIGNAL.unlink()
+                except Exception:
+                    pass
+                await reload_actions(send_minecraft_reload=options.get("send_minecraft_reload", True))
+        except Exception as e:
+            log.error("[RELOAD] Signal watcher error: %s", e)
+
+
 # ==========================================
 # MAIN ENTRY POINT
 # ==========================================
@@ -1442,12 +1580,20 @@ async def run_bot():
     )
     load_event_hooks(ctx.hook_api, ctx.config)
 
+    # Clear any stale reload signals from a previous run before the watcher starts.
+    for sig in (RELOAD_CONFIG_SIGNAL, RELOAD_ACTIONS_SIGNAL):
+        try:
+            sig.unlink(missing_ok=True)
+        except Exception:
+            pass
+
     threading.Thread(target=run_signal_server, daemon=True).start()
 
     asyncio.create_task(trigger_worker())
     asyncio.create_task(rcon_worker())
     asyncio.create_task(_event_bridge_worker())
     asyncio.create_task(gift_revenue_counter())
+    asyncio.create_task(_reload_signal_watcher())
 
     while True:
         with ctx.tiktok_lock:
@@ -1458,6 +1604,7 @@ async def run_bot():
 
         ctx.start_likes = None
         client = create_client(ctx.tiktok_user)
+        ctx.tiktok_client = client
 
         try:
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")

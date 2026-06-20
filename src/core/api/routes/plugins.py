@@ -404,6 +404,31 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Restart ──────────────────────────────────────────────────────────
+
+
+@router.post("/plugins/{name}/restart")
+async def restart_plugin(name: str):
+    """Restart a plugin process by writing stop/start signals for start.py."""
+    try:
+        registry = get_registry()
+        plugin = registry.get(name)
+        if not plugin:
+            raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
+        _clean_plugin_signals(name)
+        _write_plugin_signal(name, "stop")
+        _write_plugin_signal(name, "start")
+
+        log.info("Plugin '%s' restart requested", name)
+        return {"status": "restart_requested", "name": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Failed to restart plugin '%s'", name)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Unregister ───────────────────────────────────────────────────────
 
 

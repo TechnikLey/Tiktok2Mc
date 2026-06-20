@@ -8,6 +8,7 @@ from .events import router as events_router
 from .ws import router as ws_router
 from .updater import router as updater_router
 from .system import router as system_router
+from .reload import router as reload_router
 from .actions import router as actions_router
 from .plugin_overlay import router as plugin_overlay_router
 from .overlay import router as overlay_router
@@ -24,6 +25,7 @@ api_router.include_router(events_router)
 api_router.include_router(ws_router)
 api_router.include_router(updater_router)
 api_router.include_router(system_router)
+api_router.include_router(reload_router)
 api_router.include_router(actions_router)
 api_router.include_router(overlay_router)
 api_router.include_router(plugin_overlay_router)

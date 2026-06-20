@@ -4,6 +4,7 @@ Tests pure functions and simple behaviors that do not require
 a live TikTok connection or RCON server.
 """
 
+import asyncio
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -173,3 +174,45 @@ class TestGenerateDatapackShell:
              patch("src.python.main.ACTIONS_FILE", actions_file):
             generate_datapack()
         assert ctx.shell_actions_cache.get("12345") == ["echo hi", "echo hi", "echo hi"]
+
+
+# =========================================================================
+# Runtime reload signal watcher
+# =========================================================================
+
+class TestRuntimeReloadWatcher:
+    @pytest.mark.asyncio
+    async def test_watcher_triggers_config_and_actions_reload(self, tmp_path, monkeypatch):
+        from src.python import main as main_mod
+
+        cfg_signal = tmp_path / "reload_config"
+        act_signal = tmp_path / "reload_actions"
+        monkeypatch.setattr(main_mod, "RELOAD_CONFIG_SIGNAL", cfg_signal)
+        monkeypatch.setattr(main_mod, "RELOAD_ACTIONS_SIGNAL", act_signal)
+
+        calls = []
+
+        async def fake_reload_config():
+            calls.append("config")
+
+        async def fake_reload_actions(**_kwargs):
+            calls.append("actions")
+
+        monkeypatch.setattr(main_mod, "reload_config", fake_reload_config)
+        monkeypatch.setattr(main_mod, "reload_actions", fake_reload_actions)
+
+        cfg_signal.write_text("reload", encoding="utf-8")
+        act_signal.write_text("reload", encoding="utf-8")
+
+        task = asyncio.create_task(main_mod._reload_signal_watcher())
+        await asyncio.sleep(1.2)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        assert "config" in calls
+        assert "actions" in calls
+        assert not cfg_signal.exists()
+        assert not act_signal.exists()

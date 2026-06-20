@@ -31,6 +31,11 @@ def get_config_file() -> Path:
     root = get_root_dir()
     return (root / "config" / "config.yaml").resolve()
 
+
+def get_runtime_dir() -> Path:
+    root = get_root_dir()
+    return (root / "core" / "runtime").resolve()
+
 def get_plugin_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent

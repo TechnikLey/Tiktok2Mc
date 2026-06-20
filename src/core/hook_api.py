@@ -115,3 +115,14 @@ class HookAPI:
 
     def get_valid_functions(self) -> set[str]:
         return self._valid_functions
+
+    def update_runtime_state(
+        self,
+        config: dict | None = None,
+        valid_functions: set[str] | None = None,
+    ) -> None:
+        """Update references to runtime state after a live reload."""
+        if config is not None:
+            self._config = config
+        if valid_functions is not None:
+            self._valid_functions = valid_functions
