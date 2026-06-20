@@ -127,6 +127,8 @@ class ManagedProcess:
     env: dict[str, str] | None = None
     # Optional post-spawn callback (e.g. sandbox limits).
     post_spawn: Callable[[subprocess.Popen], None] | None = None
+    # If False, the supervisor knows about the process but will not start it.
+    enabled: bool = True
     # Runtime state
     state: ProcessState = field(default=ProcessState.STOPPED)
     proc: subprocess.Popen | None = field(default=None, repr=False)
@@ -315,11 +317,13 @@ class ProcessSupervisor:
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
         post_spawn: Callable[[subprocess.Popen], None] | None = None,
+        enabled: bool = True,
     ) -> ManagedProcess:
         """Register a process to be managed.
 
         Registration does not start the process; call ``start`` or
-        ``start_all`` afterwards.
+        ``start_all`` afterwards.  Disabled processes are tracked but
+        not started automatically.
         """
         with self._lock:
             if name in self._processes:
@@ -332,6 +336,7 @@ class ProcessSupervisor:
                 cwd=cwd,
                 env=env,
                 post_spawn=post_spawn,
+                enabled=enabled,
             )
             self._processes[name] = proc
             return proc
@@ -366,6 +371,10 @@ class ProcessSupervisor:
         proc = self.get(name)
         if proc is None:
             log.error("[SUPERVISOR] Unknown process: %s", name)
+            return False
+
+        if not proc.enabled:
+            log.info("[SUPERVISOR] %s is disabled — not starting", name)
             return False
 
         with self._lock:
@@ -476,8 +485,14 @@ class ProcessSupervisor:
                     )
 
     async def start_all(self) -> dict[str, bool]:
-        """Start all registered non-shell backend processes in parallel."""
-        names = [proc.name for proc in self.list_processes() if not proc.shell]
+        """Start all registered non-shell backend processes in parallel.
+
+        Disabled processes are tracked but skipped.
+        """
+        names = [
+            proc.name for proc in self.list_processes()
+            if not proc.shell and proc.enabled
+        ]
         results_list = await asyncio.gather(
             *(self.start(name) for name in names),
             return_exceptions=True,

@@ -3,6 +3,7 @@ import subprocess
 import sys
 import shutil
 import platform
+import re
 import zipfile
 import urllib.request
 import os
@@ -36,18 +37,62 @@ def _wait_or_skip(prompt: str = "Press Enter to continue..."):
             pass
 
 
+_MIN_JAVA_VERSION = 17
+
+
+def _java_major_version(java_path: Path) -> int | None:
+    """Return the major Java version reported by ``java -version``, or None."""
+    try:
+        result = subprocess.run(
+            [str(java_path), "-version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        output = result.stderr or result.stdout
+        # Lines look like: openjdk version "17.0.8"  or  java version "1.8.0_xxx"
+        match = re.search(r'version "([^"]+)"', output)
+        if not match:
+            return None
+        version_str = match.group(1)
+        parts = version_str.split(".")
+        if parts[0] == "1" and len(parts) > 1:
+            return int(parts[1])
+        return int(parts[0])
+    except Exception as exc:
+        log.debug("Could not determine Java version for %s: %s", java_path, exc)
+        return None
+
+
+def _java_is_usable(java_path: Path) -> bool:
+    """Return True if ``java_path`` exists and is new enough for the server."""
+    if not java_path.exists():
+        return False
+    major = _java_major_version(java_path)
+    return major is not None and major >= _MIN_JAVA_VERSION
+
+
 def _find_java(root_dir: Path) -> Path | None:
     bundled = root_dir / "server" / "java" / "bin" / "java.exe"
-    if bundled.exists():
+    if _java_is_usable(bundled):
         return bundled.resolve()
+
     system_java = shutil.which("java")
     if system_java:
-        return Path(system_java).resolve()
+        system_path = Path(system_java).resolve()
+        if _java_is_usable(system_path):
+            return system_path
+        log.warning(
+            "System Java at %s is too old (need %d+). Looking for a suitable runtime...",
+            system_path, _MIN_JAVA_VERSION,
+        )
+
     if platform.system() == "Windows":
         java_dir = root_dir / "server" / "java"
         java_bin = java_dir / "bin" / "java.exe"
-        if not java_bin.exists():
-            log.info("No bundled Java found and none in PATH. Downloading OpenJDK 21 for Windows...")
+        if not _java_is_usable(java_bin):
+            log.info("No suitable Java found. Downloading OpenJDK 21 for Windows...")
+            java_dir.mkdir(parents=True, exist_ok=True)
             jdk_url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip"
             zip_path = java_dir / "java_download.zip"
             try:
@@ -65,13 +110,11 @@ def _find_java(root_dir: Path) -> Path | None:
                         break
                 zip_path.unlink()
                 log.info("Java extraction complete.")
-                if java_bin.exists():
-                    return java_bin.resolve()
             except Exception as e:
                 log.warning(f"Failed to download/extract Java: {e}")
                 if zip_path.exists():
                     zip_path.unlink()
-        if java_bin.exists():
+        if _java_is_usable(java_bin):
             return java_bin.resolve()
     else:
         log.info("Java not found. Attempting to install via package manager...")
@@ -88,15 +131,16 @@ def _find_java(root_dir: Path) -> Path | None:
                     result = subprocess.run(cmd, capture_output=True, text=True)
                     if result.returncode == 0 and shutil.which("java"):
                         java_path = Path(shutil.which("java")).resolve()
-                        log.info(f"Java installed successfully: {java_path}")
-                        return java_path
+                        if _java_is_usable(java_path):
+                            log.info(f"Java installed successfully: {java_path}")
+                            return java_path
                     else:
                         log.warning(f"{pkg_mgr} install failed:\n{result.stderr}")
                 except Exception as e:
                     log.warning(f"Package manager {pkg_mgr} failed: {e}")
                 break
         log.info("\nJava could not be installed automatically.")
-        log.info("Please install Java 21 manually:")
+        log.info(f"Please install Java {_MIN_JAVA_VERSION} or newer manually:")
         log.info("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
         log.info("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
         log.info("  Arch Linux    : sudo pacman -S jre-openjdk")
@@ -313,7 +357,7 @@ if RCON_ENABLED and not RCON_PASSWORD:
 
 # === Start Minecraft server ===
 log.info("\n--- Minecraft Server ---")
-log.info(f"RAM:   {Xms} → {Xmx}")
+log.info(f"RAM:   {Xms} -> {Xmx}")
 log.info(f"Java:  {JAVA_EXE}")
 log.info(f"Path:  {SERVER_DIR}")
 log.info(f"Port:  {MC_PORT}")
@@ -326,6 +370,7 @@ try:
     )
     if proc.returncode != 0:
         log.warning("Minecraft server exited with code %s", proc.returncode)
+        sys.exit(proc.returncode)
 except FileNotFoundError:
     log.error("Java executable not found: %s", JAVA_EXE)
     _wait_or_skip()

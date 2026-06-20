@@ -511,9 +511,12 @@ def _register_plugins(plugins: list[AppConfig]) -> None:
             cmd,
             hidden=hidden,
             post_spawn=post_spawn,
+            enabled=app.enable,
         )
         if app.enable:
             log.info("Registered plugin: %s", app.name)
+        else:
+            log.info("Registered plugin: %s (disabled)", app.name)
 
 
 _register_builtin_processes()

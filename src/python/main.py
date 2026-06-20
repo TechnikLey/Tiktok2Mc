@@ -1570,7 +1570,6 @@ async def run_bot():
         return
 
     generate_datapack()
-    ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
 
     ctx.hook_api = HookAPI(
         ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop,

@@ -56,6 +56,11 @@ class TestProcessRegistration:
         proc = supervisor.get("gui")
         assert proc.shell is True
 
+    def test_register_disabled_process(self, supervisor):
+        supervisor.register("disabled", [sys.executable, "-c", "print('ok')"], enabled=False)
+        proc = supervisor.get("disabled")
+        assert proc.enabled is False
+
     def test_unregister(self, supervisor):
         supervisor.register("test", [sys.executable, "-c", "print('ok')"])
         supervisor.unregister("test")
@@ -83,6 +88,18 @@ class TestProcessStartStop:
     async def test_stop_missing_process(self, supervisor):
         # Should not raise.
         await supervisor.stop("nonexistent")
+
+    @pytest.mark.asyncio
+    async def test_start_skips_disabled_process(self, supervisor, tmp_path):
+        script = tmp_path / "sleep.py"
+        script.write_text("import time; time.sleep(30)", encoding="utf-8")
+        supervisor.register("disabled", [sys.executable, str(script)], enabled=False)
+
+        result = await supervisor.start("disabled")
+        assert result is False
+        proc = supervisor.get("disabled")
+        assert proc.state == ProcessState.STOPPED
+        assert proc.proc is None
 
 
 class TestRestart:

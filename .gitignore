@@ -5,6 +5,7 @@ dist/*
 upload.py
 __pycache__/
 *.pyc
+*.dll
 data/api_plugin_registry.json*
 .coverage
 core/runtime/restart
@@ -18,3 +19,5 @@ data/.enc_key
 data/backups/
 node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json
 tmp/gui.lock
+server/
+
