@@ -2,10 +2,9 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from fastapi.staticfiles import StaticFiles
@@ -114,13 +113,25 @@ def create_app(
         allow_headers=["*"],
     )
 
-    class CancelledErrorMiddleware(BaseHTTPMiddleware):
+    class CancelledErrorMiddleware:
         """Suppress CancelledError spam when clients disconnect or the server shuts down."""
-        async def dispatch(self, request, call_next):
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
             try:
-                return await call_next(request)
+                await self.app(scope, receive, send)
             except asyncio.CancelledError:
-                return Response(status_code=499)
+                # Client disconnected or the supervisor is shutting down.
+                # Send a 499 (client closed request) if possible, then stop.
+                try:
+                    await send({"type": "http.response.start", "status": 499, "headers": []})
+                    await send({"type": "http.response.body", "body": b""})
+                except Exception:
+                    pass
 
     app.add_middleware(CancelledErrorMiddleware)
 
