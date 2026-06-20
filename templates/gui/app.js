@@ -608,7 +608,12 @@ async function wizardSave() {
     cfg.rcon.enabled = true;
     await putJSON('/config', { config: cfg, backup: true });
     await postJSON('/reload', {});
-    log('Setup saved and applied.');
+    if (cfg.rcon && cfg.rcon.password) {
+      await postJSON('/server/restart', {});
+      log('Setup saved and Minecraft Server restart requested.');
+    } else {
+      log('Setup saved and applied.');
+    }
     hideWizard();
     await loadConfig();
     showToast('Setup complete — settings applied.', 'success');
@@ -1700,6 +1705,10 @@ class ConfigEditor {
   async confirmSave() {
     this.hideReview();
     try {
+      const oldRcon = (this.original || {}).rcon || {};
+      const newRcon = (this.data || {}).rcon || {};
+      const rconPasswordSet = !oldRcon.password && newRcon.password;
+
       await putJSON('/config', { config: this.data, backup: true });
       this.original = JSON.parse(JSON.stringify(this.data));
       currentConfig = JSON.parse(JSON.stringify(this.data));
@@ -1707,6 +1716,9 @@ class ConfigEditor {
       this.close();
       await loadConfig();
       await postJSON('/reload', {});
+      if (rconPasswordSet) {
+        await postJSON('/server/restart', {});
+      }
       this.showToast('Configuration saved and applied.', 'success');
     } catch (e) {
       this.showToast('Save failed: ' + e.message, 'error');
@@ -3180,6 +3192,7 @@ async function _handleCloseRequest() {
 
 async function _saveAllEditors() {
   let pluginChanged = false;
+  let rconPasswordSet = false;
   if (actionsEditor.isDirty) {
     await actionsEditor.save();
     if (actionsEditor.isDirty) {
@@ -3193,8 +3206,11 @@ async function _saveAllEditors() {
     }
   }
   if (editor.isDirty()) {
+    const oldRcon = (editor.original || {}).rcon || {};
     editor.collect();
     editor.mergeUnknownKeys();
+    const newRcon = (editor.data || {}).rcon || {};
+    rconPasswordSet = !oldRcon.password && newRcon.password;
     await putJSON('/config', { config: editor.data, backup: true });
     editor.original = JSON.parse(JSON.stringify(editor.data));
     currentConfig = JSON.parse(JSON.stringify(editor.data));
@@ -3211,6 +3227,9 @@ async function _saveAllEditors() {
   }
 
   await postJSON('/reload', {});
+  if (rconPasswordSet) {
+    await postJSON('/server/restart', {});
+  }
   if (pluginChanged) {
     await postJSON(`/plugins/${encodeURIComponent(pluginEditor.pluginName)}/restart`, {});
     showToast('Changes applied and plugin restart requested.', 'success');

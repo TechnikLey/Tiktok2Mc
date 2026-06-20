@@ -621,6 +621,16 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
 RUNTIME_DIR = (ROOT_DIR / "core" / "runtime").resolve()
 
 
+async def _restart_server_process() -> None:
+    """Stop and restart the Minecraft Server child process."""
+    try:
+        await supervisor.stop("Minecraft Server")
+        await supervisor.start("Minecraft Server")
+        log.info("Minecraft Server restarted")
+    except Exception as exc:
+        log.exception("Failed to restart Minecraft Server: %s", exc)
+
+
 async def check_and_run() -> None:
     """Poll runtime signal files and dispatch commands to the supervisor."""
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
@@ -656,6 +666,12 @@ async def check_and_run() -> None:
                 if supervisor.state in (SupervisorState.RUNNING, SupervisorState.IDLE):
                     asyncio.create_task(event_bus.publish("server.restarting", {"version": API_VERSION}))
                     asyncio.create_task(supervisor.restart())
+
+            elif name == "restart_server":
+                file.unlink(missing_ok=True)
+                log.info("\nRestart server signal detected. Restarting Minecraft Server...")
+                if supervisor.state in (SupervisorState.RUNNING, SupervisorState.IDLE, SupervisorState.STARTING):
+                    asyncio.create_task(_restart_server_process())
 
             elif name == "shutdown_cancel":
                 shutdown_cancel_event.set()

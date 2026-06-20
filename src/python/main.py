@@ -1538,16 +1538,14 @@ async def run_bot():
         log.info("Error in load_config")
         sys.exit(1)
 
-    # TikTok username check: ask user if still default
+    # TikTok username check: warn if still default, but do not block startup.
     default_user = "your_tiktok_username"
     if ctx.tiktok_user == default_user:
-        log.info(f"\n[TIKTOK] Your TikTok username is still the default '{default_user}'.")
-        inp = input("  Enter your TikTok username (press Enter to keep the default): ").strip()
-        if inp:
-            ctx.tiktok_user = inp
-            log.info(f"[TIKTOK] Username set to @{ctx.tiktok_user} (session only).")
-        else:
-            log.info(f"[TIKTOK] No input - using default '{default_user}'.")
+        log.warning(
+            "[TIKTOK] Username is still the default '%s'. "
+            "Set it via the GUI wizard or config.yaml; the bridge will connect once it is provided.",
+            default_user,
+        )
 
     # Fetch registered comment handlers from API for prefix→plugin routing
     ctx.comment_handler_map = _fetch_comment_handlers()
@@ -1599,6 +1597,11 @@ async def run_bot():
         with ctx.tiktok_lock:
             _disabled = ctx.disable_tiktok_connect
         if _disabled:
+            await asyncio.sleep(ctx.reconnect_delay)
+            continue
+
+        if ctx.tiktok_user == default_user or not ctx.tiktok_user:
+            log.info("[TIKTOK] No valid username configured yet. Waiting for config reload...")
             await asyncio.sleep(ctx.reconnect_delay)
             continue
 

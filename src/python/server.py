@@ -308,8 +308,8 @@ set_server_property(SERVER_PROPERTIES, "server-port", MC_PORT)
 # === Empty RCON password warning ===
 if RCON_ENABLED and not RCON_PASSWORD:
     log.warning("RCON password is not set! Set one in config.yaml or use the setup wizard.")
-    if _is_interactive():
-        _wait_or_skip()
+    log.info("Starting Minecraft server with RCON disabled until a password is configured.")
+    set_server_property(SERVER_PROPERTIES, "enable-rcon", "false")
 
 # === Start Minecraft server ===
 log.info("\n--- Minecraft Server ---")

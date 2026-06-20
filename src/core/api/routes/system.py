@@ -110,3 +110,20 @@ async def shutdown_cancel():
     except Exception as e:
         log.exception("Failed to cancel shutdown")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/server/restart")
+async def restart_server():
+    """Request a restart of the Minecraft Server process.
+
+    The supervisor (start.py) watches for the ``restart_server`` runtime
+    signal and restarts only the ``Minecraft Server`` child process.
+    """
+    try:
+        signal_file = _runtime_dir() / "restart_server"
+        signal_file.write_text("restart", encoding="utf-8")
+        log.info("Minecraft Server restart requested via API")
+        return {"status": "server_restart_requested"}
+    except Exception as e:
+        log.exception("Failed to request Minecraft Server restart")
+        raise HTTPException(status_code=500, detail=str(e))
