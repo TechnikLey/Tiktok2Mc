@@ -7,6 +7,8 @@ validated, and persisted entirely by the API layer.
 from __future__ import annotations
 
 import json
+import os
+import sys
 import time
 import threading
 import logging
@@ -146,9 +148,31 @@ class PluginRegistry:
             with tmp.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
                 fh.flush()
-            tmp.replace(self._file)
+                os.fsync(fh.fileno())
+            self._atomic_replace(tmp, self._file)
         except Exception as exc:
             log.error("Failed to save plugin registry: %s", exc)
+
+    @staticmethod
+    def _atomic_replace(src: Path, dst: Path) -> None:
+        """Atomically replace *dst* with *src*.
+
+        On Windows, ``os.replace`` cannot overwrite a file that is currently
+        open in another process.  We first attempt a normal replace; if that
+        fails with a permission error we remove the destination and retry.
+        """
+        try:
+            src.replace(dst)
+            return
+        except PermissionError:
+            if sys.platform != "win32" or not dst.exists():
+                raise
+        try:
+            dst.unlink()
+        except PermissionError:
+            # Another process still holds the file open; give up cleanly.
+            raise
+        src.replace(dst)
 
 
 # ------------------------------------------------------------------

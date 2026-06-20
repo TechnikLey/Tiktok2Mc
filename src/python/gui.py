@@ -52,7 +52,7 @@ START_EXE = (BASE_DIR.parent / f"start{SUFFIX}").resolve()
 _full_system_proc = None
 _window = None
 
-GUI_LOCKFILE = BASE_DIR / "tmp" / "gui.lock"
+GUI_LOCKFILE = (ROOT_DIR / "tmp" / "gui.lock").resolve()
 
 
 def _api_ready(timeout: float = 1.0) -> bool:
@@ -113,24 +113,46 @@ class LauncherAPI:
             return f"error:{e}"
 
     def stop_system(self) -> str:
-        """Stop the system process."""
+        """Stop the system process gracefully via API, then force-kill if needed."""
         global _full_system_proc
-        if _full_system_proc is not None and _full_system_proc.poll() is None:
-            try:
-                if IS_WINDOWS:
-                    subprocess.run(
-                        ["taskkill", "/F", "/PID", str(_full_system_proc.pid), "/T"],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        check=False,
-                    )
-                else:
-                    _full_system_proc.terminate()
-                _full_system_proc = None
-                return "stopped"
-            except Exception as e:
-                log.warning("Failed to terminate system process: %s", e)
-        return "not_running"
+        if _full_system_proc is None or _full_system_proc.poll() is not None:
+            return "not_running"
+
+        # Prefer graceful shutdown through the API.
+        try:
+            req = urllib.request.Request(
+                f"{API_URL}/api/v1/shutdown/now",
+                method="POST",
+                headers={"Content-Type": "application/json"},
+                data=b"{}",
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    # Give the supervisor a few seconds to shut down cleanly.
+                    for _ in range(40):
+                        if _full_system_proc.poll() is not None:
+                            _full_system_proc = None
+                            return "stopped"
+                        time.sleep(0.25)
+        except Exception:
+            pass
+
+        # Force kill if still running.
+        try:
+            if IS_WINDOWS:
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", str(_full_system_proc.pid), "/T"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            else:
+                _full_system_proc.terminate()
+            _full_system_proc = None
+            return "stopped"
+        except Exception as e:
+            log.warning("Failed to terminate system process: %s", e)
+            return "error"
 
     def get_api_status(self) -> str:
         """Return current API server status."""
@@ -144,19 +166,38 @@ class LauncherAPI:
 def _cleanup_processes():
     """Terminate any spawned processes on GUI exit."""
     global _full_system_proc
-    if _full_system_proc is not None and _full_system_proc.poll() is None:
-        try:
-            if IS_WINDOWS:
-                subprocess.run(
-                    ["taskkill", "/F", "/PID", str(_full_system_proc.pid), "/T"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=False,
-                )
-            else:
-                _full_system_proc.terminate()
-        except Exception:
-            pass
+    if _full_system_proc is None or _full_system_proc.poll() is not None:
+        return
+
+    # Try graceful shutdown first.
+    try:
+        req = urllib.request.Request(
+            f"{API_URL}/api/v1/shutdown/now",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            data=b"{}",
+        )
+        urllib.request.urlopen(req, timeout=3.0)
+        for _ in range(20):
+            if _full_system_proc.poll() is not None:
+                return
+            time.sleep(0.25)
+    except Exception:
+        pass
+
+    # Force kill if still running.
+    try:
+        if IS_WINDOWS:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(_full_system_proc.pid), "/T"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            _full_system_proc.terminate()
+    except Exception:
+        pass
 
 
 atexit.register(_cleanup_processes)

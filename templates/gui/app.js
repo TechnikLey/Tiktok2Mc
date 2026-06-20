@@ -614,49 +614,58 @@ async function wizardSave() {
     showToast('Failed to save: ' + e.message, 'error');
   } finally { nextBtn.disabled = false; nextBtn.textContent = 'Save'; }
 }
+function _showRestartOverlay() {
+  _stopDashboardPolling();
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  const card = document.querySelector('#restart-dialog .wizard-card');
+  if (card) {
+    card.innerHTML = '<h2 style="border:none;padding:0;">Restarting...</h2><p class="muted">Please wait while the backend services restart.</p>';
+  }
+  document.getElementById('restart-dialog').classList.remove('hidden');
+}
+
 async function triggerRestart() {
   _restartPending = true;
   updateRestartBanner();
   try {
     const res = await fetch('/api/v1/restart', { method: 'POST' });
     if (res.ok) {
-      document.querySelector('#restart-dialog .wizard-card').innerHTML = '<h2 style="border:none;padding:0;">Restarting...</h2><p class="muted">Please wait while the tool restarts.</p>';
-      // Stop dashboard polling — the API is about to go away.
-      _stopDashboardPolling();
-      // Poll the health endpoint; when it responds again the new
-      // API server is up and we can reload the dashboard.
-      _waitForApiAfterRestart();
+      _showRestartOverlay();
+      // The supervisor keeps the API server alive and publishes
+      // server.restarting / server.started events via SSE.  If the
+      // browser misses the events, fall back to a timeout.
+      _waitForRestartCompletion();
     } else {
       _restartPending = false;
       updateRestartBanner();
       showToast('Restart signal failed. Please restart manually.', 'error');
+      document.getElementById('restart-dialog').classList.add('hidden');
     }
   } catch (e) {
     _restartPending = false;
     updateRestartBanner();
     showToast('Restart signal failed. Please restart manually.', 'error');
+    document.getElementById('restart-dialog').classList.add('hidden');
   }
 }
 
-function _waitForApiAfterRestart(maxAttempts = 90) {
-  let attempts = 0;
-  const poll = setInterval(async () => {
-    attempts++;
-    try {
-      const resp = await fetch('/api/v1/health', { cache: 'no-store' });
-      if (resp.ok) {
-        clearInterval(poll);
-        // API is back — reload the dashboard.
-        window.location.reload();
-      }
-    } catch (_) {
-      // API still down — keep waiting.
+function _waitForRestartCompletion(timeoutMs = 90000) {
+  const start = Date.now();
+  const timer = setInterval(() => {
+    if (!_restartPending) {
+      clearInterval(timer);
+      return;
     }
-    if (attempts > maxAttempts) {
-      clearInterval(poll);
-      document.querySelector('#restart-dialog .wizard-card').innerHTML =
-        '<h2 style="border:none;padding:0;">Restart Timed Out</h2>' +
-        '<p class="muted">The tool did not come back within 90 seconds. Please close and reopen the GUI manually.</p>';
+    if (Date.now() - start > timeoutMs) {
+      clearInterval(timer);
+      _restartPending = false;
+      updateRestartBanner();
+      const card = document.querySelector('#restart-dialog .wizard-card');
+      if (card) {
+        card.innerHTML =
+          '<h2 style="border:none;padding:0;">Restart Timed Out</h2>' +
+          '<p class="muted">The tool did not report restart completion within 90 seconds. Please close and reopen the GUI manually.</p>';
+      }
     }
   }, 1000);
 }
@@ -3366,8 +3375,14 @@ function connectLogStream() {
       const payload = data.data || {};
       if (type === 'log') {
         log(payload.msg || payload.message || '', payload.level || 'info');
+      } else if (type === 'server.restarting') {
+        log('Backend restart started', 'warn');
+        _showRestartOverlay();
       } else if (type === 'server.started') {
         log('API server started (v' + (payload.version || '?') + ')', 'info');
+        if (_restartPending) {
+          window.location.reload();
+        }
       } else if (type === 'server.stopping') {
         log('API server stopping', 'warn');
       } else if (type.startsWith('plugin.')) {
@@ -3392,7 +3407,7 @@ function connectLogStream() {
     if (_sseReconnectTimer) clearTimeout(_sseReconnectTimer);
     _sseReconnectTimer = setTimeout(() => {
       // Don't reconnect if we're shutting down or restarting.
-      if (_shutdownTriggered || _shutdownNowClicked) return;
+      if (_shutdownTriggered || _shutdownNowClicked || _restartPending) return;
       connectLogStream();
     }, _sseReconnectDelay);
     // Exponential backoff up to 10s.

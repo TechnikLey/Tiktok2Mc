@@ -1,5 +1,6 @@
 """System control endpoints (restart, shutdown signals)."""
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 import core.paths
+from core.lifecycle import get_supervisor, SupervisorState, shutdown_cancel_event
 
 log = logging.getLogger(__name__)
 
@@ -21,40 +23,59 @@ def _runtime_dir() -> Path:
 
 @router.post("/restart")
 async def restart_system():
-    """Write a restart signal that start.py picks up via file watcher."""
+    """Request a clean restart of the backend services.
+
+    The GUI shell survives the restart and reloads when the API comes back.
+    """
+    supervisor = get_supervisor()
+    if supervisor.state not in {
+        SupervisorState.IDLE,
+        SupervisorState.STARTING,
+        SupervisorState.RUNNING,
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot restart while supervisor is in state {supervisor.state.value}",
+        )
     try:
-        signal_file = _runtime_dir() / "restart"
-        signal_file.write_text("", encoding="utf-8")
-        log.info("Restart signal written to %s", signal_file)
+        asyncio.create_task(supervisor.restart())
+        log.info("Restart requested via API")
         return {"status": "restart_requested"}
     except Exception as e:
-        log.exception("Failed to write restart signal")
+        log.exception("Failed to request restart")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/shutdown")
 async def shutdown_system():
-    """Write a shutdown signal that start.py picks up via file watcher."""
+    """Request a graceful shutdown with countdown."""
+    supervisor = get_supervisor()
+    if supervisor.state == SupervisorState.SHUTTING_DOWN:
+        return {"status": "shutdown_already_requested"}
+    if supervisor.state == SupervisorState.COMPLETE:
+        raise HTTPException(status_code=409, detail="Already shut down")
     try:
-        signal_file = _runtime_dir() / "shutdown"
-        signal_file.write_text("", encoding="utf-8")
-        log.info("Shutdown signal written to %s", signal_file)
+        asyncio.create_task(supervisor.shutdown_countdown())
+        log.info("Shutdown requested via API (delay %ss)", supervisor.shutdown_delay)
         return {"status": "shutdown_requested"}
     except Exception as e:
-        log.exception("Failed to write shutdown signal")
+        log.exception("Failed to request shutdown")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/shutdown/now")
 async def shutdown_now():
-    """Write an immediate shutdown signal — skips countdown entirely."""
+    """Request an immediate shutdown — skips countdown entirely."""
+    supervisor = get_supervisor()
+    if supervisor.state == SupervisorState.COMPLETE:
+        raise HTTPException(status_code=409, detail="Already shut down")
     try:
-        signal_file = _runtime_dir() / "shutdown_now"
-        signal_file.write_text("", encoding="utf-8")
-        log.info("Immediate shutdown signal written to %s", signal_file)
+        shutdown_cancel_event.set()
+        asyncio.create_task(supervisor.shutdown())
+        log.info("Immediate shutdown requested via API")
         return {"status": "shutdown_now"}
     except Exception as e:
-        log.exception("Failed to write immediate shutdown signal")
+        log.exception("Failed to request immediate shutdown")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -81,12 +102,11 @@ async def shutdown_status():
 
 @router.post("/shutdown/cancel")
 async def shutdown_cancel():
-    """Cancel an active shutdown countdown by writing a cancel signal."""
+    """Cancel an active shutdown countdown."""
     try:
-        signal_file = _runtime_dir() / "shutdown_cancel"
-        signal_file.write_text("", encoding="utf-8")
-        log.info("Shutdown cancel signal written to %s", signal_file)
+        shutdown_cancel_event.set()
+        log.info("Shutdown cancel requested via API")
         return {"status": "cancel_requested"}
     except Exception as e:
-        log.exception("Failed to write shutdown cancel signal")
+        log.exception("Failed to cancel shutdown")
         raise HTTPException(status_code=500, detail=str(e))
