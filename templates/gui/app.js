@@ -513,6 +513,7 @@ function renderPluginManager() {
 }
 
 function openPluginManager() {
+  _hideAllEditors();
   renderPluginManager();
   document.getElementById('plugin-manager').classList.remove('hidden');
 }
@@ -614,8 +615,24 @@ async function promptShutdown() {
   }
 }
 
+function openConfigEditor() {
+  // Ensure currentConfig is loaded before opening
+  if (currentConfig && Object.keys(currentConfig).length > 0) {
+    editor.open(currentConfig);
+  } else {
+    // Reload config first
+    fetchJSON('/config').then(data => {
+      currentConfig = data.config || {};
+      editor.open(currentConfig);
+    }).catch(() => {
+      editor.open(currentConfig); // open with whatever we have
+    });
+  }
+}
+
 async function loadConfig() {
   const el = document.getElementById('config-summary');
+  if (!el) return;
   try {
     const data = await fetchJSON('/config');
     currentConfig = data.config || {};
@@ -3579,7 +3596,7 @@ function connectLogStream() {
       if (type === 'log') {
         liveLog.add(payload.msg || payload.message || '', payload.level || 'info', payload.source || '');
       } else if (type === 'server.console') {
-        if (payload.line) {
+        if (payload.line && consoleTerminal._connected) {
           consoleTerminal._print(payload.line, 'server');
         }
       } else if (type === 'server.restarting') {
@@ -3828,8 +3845,55 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+/* ─── Sidebar ─── */
+let _sidebarCollapsed = false;
+function toggleSidebar() {
+  _sidebarCollapsed = !_sidebarCollapsed;
+  document.querySelector('.sidebar').classList.toggle('collapsed', _sidebarCollapsed);
+}
+
+/* ─── Editor helpers (show/hide editors within app-layout) ─── */
+function _hideAllEditors() {
+  document.querySelectorAll('.editor-overlay').forEach(el => el.classList.add('hidden'));
+}
+
+function _syncDashboardVisibility() {
+  const anyOpen = document.querySelector('.editor-overlay:not(.hidden)');
+  document.getElementById('dashboard').classList.toggle('dashboard-hidden', !!anyOpen);
+  // Deactivate editor nav items when no editor is open
+  if (!anyOpen) {
+    document.querySelectorAll('.nav-item[data-view="actions"], .nav-item[data-view="reactions"], .nav-item[data-view="settings"]').forEach(el => el.classList.remove('active'));
+  }
+}
+
+function _initEditorVisibilityObserver() {
+  const observer = new MutationObserver(_syncDashboardVisibility);
+  document.querySelectorAll('.editor-overlay').forEach(el => {
+    observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+  });
+  _syncDashboardVisibility();
+}
+
+/* ─── Sidebar Navigation ─── */
+function switchView(viewId) {
+  _hideAllEditors();
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.nav-item[data-view="${viewId}"]`)?.classList.add('active');
+  document.getElementById('view-' + viewId)?.classList.add('active');
+}
+
+/* For nav items that open an editor (Actions/Reactions/Settings) */
+function switchToEditor(viewId, openFn) {
+  _hideAllEditors();
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.nav-item[data-view="${viewId}"]`)?.classList.add('active');
+  openFn();
+}
+
 /* ─── Init ─── */
 async function init() {
+  _initEditorVisibilityObserver();
   await loadHealth();
   await loadStatus();
   await loadConfig();

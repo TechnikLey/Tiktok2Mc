@@ -5,78 +5,113 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok2Mc Dashboard</title>
     <link rel="stylesheet" href="./design-system.css?v=1">
-    <link rel="stylesheet" href="./style.css?v=4">
+    <link rel="stylesheet" href="./style.css?v=5">
 </head>
 <body>
-    <header>
-        <h1>TikTok2Mc Dashboard</h1>
-        <div class="header-actions">
-            <div id="status-pill" class="offline">Connecting...</div>
-            <button class="btn btn--danger btn--sm" onclick="promptShutdown()">Shutdown</button>
-        </div>
-    </header>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h1 class="sidebar-title">TikTok2Mc</h1>
+                <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+                </button>
+            </div>
 
-    <main id="dashboard" class="hidden">
-        <div id="restart-pending-banner" class="card hidden restart-banner">
-            <div class="restart-banner__inner">
-                <span class="restart-banner__text">Restart pending — some changes require a restart to take effect.</span>
-                <div class="restart-banner__actions">
-                    <button class="btn btn--primary btn--sm" onclick="triggerRestart()">Restart Now</button>
-                    <button class="btn btn--secondary btn--sm" onclick="dismissRestartBanner()">Dismiss</button>
+            <nav class="sidebar-nav">
+                <a class="nav-item active" data-view="status" onclick="switchView('status')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/></svg>
+                    <span class="nav-label">Status</span>
+                </a>
+                <a class="nav-item" data-view="plugins" onclick="switchView('plugins')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
+                    <span class="nav-label">Plugins</span>
+                </a>
+                <a class="nav-item" data-view="actions" onclick="switchToEditor('actions', () => actionsEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 000-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z" fill="currentColor"/></svg>
+                    <span class="nav-label">Actions</span>
+                </a>
+                <a class="nav-item" data-view="reactions" onclick="switchToEditor('reactions', () => reactionEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" fill="currentColor"/></svg>
+                    <span class="nav-label">Reactions</span>
+                </a>
+                <a class="nav-item" data-view="settings" onclick="switchToEditor('settings', openConfigEditor)">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
+                    <span class="nav-label">Settings</span>
+                </a>
+                <a class="nav-item" data-view="log" onclick="switchView('log')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" fill="currentColor"/></svg>
+                    <span class="nav-label">Live Log</span>
+                </a>
+                <a class="nav-item" data-view="console" onclick="switchView('console')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm7.5-5.18l-1.41 1.41L12 15.59l3.5-3.5-1.41-1.41L12 12.82l-2.09-2.09-1.41 1.41L11.5 12.82zM7.5 14h4v1.5h-4V14z" fill="currentColor"/></svg>
+                    <span class="nav-label">Console</span>
+                </a>
+                <a class="nav-item" data-view="updates" onclick="switchView('updates')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>
+                    <span class="nav-label">Updates</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div id="status-pill" class="offline">Connecting...</div>
+                <button class="btn btn--danger btn--sm" onclick="promptShutdown()">Shutdown</button>
+            </div>
+        </aside>
+
+        <main id="dashboard" class="dashboard-content hidden">
+            <div id="restart-pending-banner" class="restart-banner hidden">
+                <div class="restart-banner__inner">
+                    <span class="restart-banner__text">Restart pending — some changes require a restart to take effect.</span>
+                    <div class="restart-banner__actions">
+                        <button class="btn btn--primary btn--sm" onclick="triggerRestart()">Restart Now</button>
+                        <button class="btn btn--secondary btn--sm" onclick="dismissRestartBanner()">Dismiss</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="dashboard-grid">
-            <div class="card">
-                <h2>System Status</h2>
-                <div id="system-info" class="muted">Loading...</div>
-            </div>
 
-            <div class="card">
-                <h2>Plugins</h2>
-                <div id="plugin-summary" class="muted">Loading...</div>
-                <button class="btn btn--primary dashboard-btn-full" onclick="openPluginManager()">Manage Plugins</button>
-                <div id="overlay-urls" class="dashboard-overlay-urls"></div>
-            </div>
-
-            <div class="card">
-                <h2>Live Plugin Health</h2>
-                <div class="muted">Real-time health and heartbeat status for all plugins.</div>
-                <div id="live-plugin-grid" class="live-grid"></div>
-                <div id="live-plugin-empty" class="muted live-plugin-empty">Waiting for data...</div>
-            </div>
-
-            <div class="card">
-                <h2>Actions (actions.mca)</h2>
-                <div class="muted">Configure Twitch/TikTok event triggers and commands.</div>
-                <button class="btn btn--primary dashboard-btn-full" onclick="actionsEditor.open()">Edit Actions</button>
-            </div>
-
-            <div class="card">
-                <h2>Event Reactions</h2>
-                <div class="muted">Automatically control plugins when things happen. For example: pause music when you die in Minecraft.</div>
-                <div id="reactions-summary" class="muted reactions-summary">Loading...</div>
-                <button class="btn btn--primary dashboard-btn-full" onclick="reactionEditor.open()">Manage Reactions</button>
-            </div>
-
-            <div class="card">
-                <h2>Configuration</h2>
-                <div id="config-summary" class="muted">Loading...</div>
-                <button class="btn btn--primary dashboard-btn-full" onclick="editor.open(currentConfig)">Edit Configuration</button>
-            </div>
-
-            <div class="card" id="updates-card">
-                <h2>Updates</h2>
-                <div id="updates-summary">
-                    <div class="muted">No update information available.</div>
-                    <button class="btn btn--primary dashboard-btn-full" id="btn-check-updates" onclick="checkAllUpdates()">Check for Updates</button>
+            <!-- ─── Status ─── -->
+            <div class="view active" id="view-status">
+                <div class="view-header">
+                    <h2>Status</h2>
                 </div>
-                <div id="updates-detail" class="hidden updates-detail"></div>
+
+                <section class="view-section">
+                    <h3>System Status</h3>
+                    <div id="system-info" class="text-muted">Loading...</div>
+                </section>
+
+                <section class="view-section">
+                    <h3>Plugin Health</h3>
+                    <div id="live-plugin-grid" class="live-grid"></div>
+                    <div id="live-plugin-empty" class="text-muted" style="margin-top:8px;font-size:var(--text-sm);">Waiting for data...</div>
+                </section>
             </div>
 
-            <div class="card log-card">
-                <div class="log-header">
+            <!-- ─── Plugins ─── -->
+            <div class="view" id="view-plugins">
+                <div class="view-header">
+                    <h2>Plugins</h2>
+                </div>
+
+                <section class="view-section">
+                    <h3>Plugin Summary</h3>
+                    <div id="plugin-summary" class="text-muted">Loading...</div>
+                    <button class="btn btn--primary" style="margin-top:16px" onclick="openPluginManager()">Open Plugin Manager</button>
+                </section>
+
+                <section class="view-section">
+                    <h3>Overlay URLs</h3>
+                    <div id="overlay-urls" class="overlay-urls"></div>
+                </section>
+            </div>
+
+            <!-- ─── Log ─── -->
+            <div class="view" id="view-log">
+                <div class="view-header">
                     <h2>Live Log</h2>
+                </div>
+
+                <div class="log-toolbar">
                     <div class="log-stats" id="log-stats">
                         <span class="log-stat" data-level="all" title="Total entries"><span class="log-stat-count" id="stat-all">0</span> All</span>
                         <span class="log-stat log-stat--info" data-level="info" title="Info entries"><span class="log-stat-count" id="stat-info">0</span> Info</span>
@@ -84,10 +119,14 @@
                         <span class="log-stat log-stat--err" data-level="error" title="Error entries"><span class="log-stat-count" id="stat-error">0</span> Error</span>
                         <span class="log-stat log-stat--debug" data-level="debug" title="Debug entries"><span class="log-stat-count" id="stat-debug">0</span> Debug</span>
                     </div>
+                    <div class="log-search">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="log-search" placeholder="Search logs..." oninput="liveLog.onSearch(this.value)">
+                    </div>
                 </div>
-                <div class="log-toolbar">
+                <div class="log-filter-bar">
                     <div class="log-filter-group">
-                        <label class="log-filter-label">Filter:</label>
+                        <label class="log-filter-label">Level:</label>
                         <div class="log-filter-buttons" id="log-filter-buttons">
                             <button class="log-filter-btn active" data-level="all">All</button>
                             <button class="log-filter-btn" data-level="info">Info</button>
@@ -95,10 +134,6 @@
                             <button class="log-filter-btn" data-level="error">Error</button>
                             <button class="log-filter-btn" data-level="debug">Debug</button>
                         </div>
-                    </div>
-                    <div class="log-search">
-                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                        <input type="text" id="log-search" placeholder="Search logs..." oninput="liveLog.onSearch(this.value)">
                     </div>
                     <div class="log-actions">
                         <button class="btn btn--sm btn--secondary" id="log-pause-btn" onclick="liveLog.togglePause()">Pause</button>
@@ -111,17 +146,20 @@
                 </div>
                 <div id="log-view" class="log-view"></div>
                 <div class="log-footer">
-                    <span class="muted" id="log-status">Connecting to log stream...</span>
-                    <span class="muted" id="log-visible-count"></span>
+                    <span class="text-muted" id="log-status">Connecting to log stream...</span>
+                    <span class="text-muted" id="log-visible-count"></span>
                 </div>
             </div>
 
-            <div class="card" id="console-card">
-                <h2>Minecraft Console</h2>
-                <div class="console-toolbar">
-                    <span id="console-status" class="console-status offline">Disconnected</span>
-                    <button class="btn btn--sm btn--secondary" id="btn-console-connect" onclick="consoleTerminal.toggleConnection()">Connect</button>
-                    <button class="btn btn--sm btn--secondary" id="btn-console-clear" onclick="consoleTerminal.clear()">Clear</button>
+            <!-- ─── Console ─── -->
+            <div class="view" id="view-console">
+                <div class="view-header">
+                    <h2>Minecraft Console</h2>
+                    <div class="console-toolbar">
+                        <span id="console-status" class="console-status offline">Disconnected</span>
+                        <button class="btn btn--sm btn--secondary" id="btn-console-connect" onclick="consoleTerminal.toggleConnection()">Connect</button>
+                        <button class="btn btn--sm btn--secondary" id="btn-console-clear" onclick="consoleTerminal.clear()">Clear</button>
+                    </div>
                 </div>
                 <div id="console-output" class="console-output">
                     <div class="console-line muted">Click "Connect" to open an RCON session.</div>
@@ -131,8 +169,22 @@
                     <input type="text" id="console-input" class="console-input" placeholder="Enter Minecraft command..." disabled autocomplete="off" spellcheck="false">
                 </div>
             </div>
-        </div>
-    </main>
+
+            <!-- ─── Updates ─── -->
+            <div class="view" id="view-updates">
+                <div class="view-header">
+                    <h2>Updates</h2>
+                </div>
+
+                <section class="view-section">
+                    <button class="btn btn--primary" onclick="checkAllUpdates()">Check for Updates</button>
+                    <div id="updates-summary" style="margin-top:var(--space-4)">
+                        <span class="text-muted">No update information available.</span>
+                    </div>
+                    <div id="updates-detail" class="hidden" style="margin-top:var(--space-4)"></div>
+                </section>
+            </div>
+        </main>
 
     <!-- First-Run Wizard -->
     <div id="wizard" class="wizard-overlay hidden">
@@ -442,5 +494,6 @@
 
     <script src="./actions-editor.js?v=1"></script>
     <script src="./app.js?v=4"></script>
+</div>
 </body>
 </html>
