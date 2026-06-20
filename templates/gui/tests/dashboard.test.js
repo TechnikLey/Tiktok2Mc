@@ -512,12 +512,9 @@ describe('updatePasswordMeter', () => {
 /* ─── checkAllUpdates ─── */
 describe('checkAllUpdates', () => {
   beforeEach(() => {
-    // Restore updates-summary since init() -> checkAllUpdates() replaces innerHTML
     const summary = document.getElementById('updates-summary');
     if (summary) {
-      summary.innerHTML =
-        '<div class="muted">No update information available.</div>' +
-        '<button class="btn btn-primary" style="margin-top:1rem;width:100%;" id="btn-check-updates">Check for Updates</button>';
+      summary.innerHTML = '<span class="text-muted">No update information available.</span>';
     }
   });
 
@@ -528,8 +525,6 @@ describe('checkAllUpdates', () => {
         ? { current_version: '1.0.0', update_available: false }
         : { updates_available: 0, plugins: [] }),
     });
-    const btn = document.getElementById('btn-check-updates');
-    btn.disabled = false;
     await checkAllUpdates();
     const summary = document.getElementById('updates-summary');
     expect(summary.innerHTML).toContain('All up to date');

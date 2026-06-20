@@ -421,10 +421,24 @@ async function loadStatus() {
     const el = document.getElementById('system-info');
     if (!el) return;
     el.innerHTML =
-      '<div class="field-row"><span>Server</span><span class="status-enabled">' + escapeHtml(data.server) + '</span></div>' +
-      '<div class="field-row"><span>Plugins</span><span>' + data.plugins_active + ' / ' + data.plugins_total + ' active</span></div>' +
-      '<div class="field-row"><span>Config</span><span>' + (data.config_loaded ? 'Loaded' : 'Not loaded') + '</span></div>' +
-      '<div class="field-row"><span>Uptime</span><span>' + formatUptime(data.uptime_seconds) + '</span></div>';
+      '<div class="status-grid">' +
+        '<div class="status-card">' +
+          '<span class="status-card__label">Server</span>' +
+          '<span class="status-card__value">' + escapeHtml(data.server) + '</span>' +
+        '</div>' +
+        '<div class="status-card">' +
+          '<span class="status-card__label">Plugins Active</span>' +
+          '<span class="status-card__value">' + data.plugins_active + ' / ' + data.plugins_total + '</span>' +
+        '</div>' +
+        '<div class="status-card">' +
+          '<span class="status-card__label">Configuration</span>' +
+          '<span class="status-card__value' + (data.config_loaded ? ' success' : ' danger') + '">' + (data.config_loaded ? 'Loaded' : 'Not loaded') + '</span>' +
+        '</div>' +
+        '<div class="status-card">' +
+          '<span class="status-card__label">Uptime</span>' +
+          '<span class="status-card__value">' + formatUptime(data.uptime_seconds) + '</span>' +
+        '</div>' +
+      '</div>';
   } catch (e) {
     const el = document.getElementById('system-info');
     if (el) el.innerHTML = '<span class="log-err">Failed to load status: ' + escapeHtml(e.message) + '</span>';
@@ -1125,14 +1139,6 @@ class ConfigEditor {
     };
     this.content.addEventListener('input', this._inputHandler);
     this.content.addEventListener('change', this._inputHandler);
-    // Overlay preview auto-refresh when inputs change
-    if (this._overlayInputHandler) return;
-    this._overlayInputHandler = (e) => {
-      if (!document.getElementById('overlay-preview-editor-frame')) return;
-      if (this._overlayTimer) clearTimeout(this._overlayTimer);
-      this._overlayTimer = setTimeout(() => this.refreshEditorPreview(), 600);
-    };
-    this.content.addEventListener('input', this._overlayInputHandler);
   }
 
   _detachInputListeners() {
@@ -1141,11 +1147,6 @@ class ConfigEditor {
     this.content.removeEventListener('change', this._inputHandler);
     this._inputHandler = null;
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
-    if (this._overlayInputHandler) {
-      this.content.removeEventListener('input', this._overlayInputHandler);
-      this._overlayInputHandler = null;
-    }
-    if (this._overlayTimer) { clearTimeout(this._overlayTimer); this._overlayTimer = null; }
   }
 
   close() {
@@ -1613,26 +1614,7 @@ class ConfigEditor {
 
   buildOverlayEditor(path, overlay) {
     const fields = this.buildObjectFields(path, overlay);
-    const bgId = 'f_' + (path + '.theme.background').replace(/[^a-zA-Z0-9]/g, '_');
-    const txtId = 'f_' + (path + '.theme.text').replace(/[^a-zA-Z0-9]/g, '_');
-    return fields + `
-      <div class="overlay-editor-preview">
-        <h4>Live Preview</h4>
-        <div class="overlay-editor-preview-wrap">
-          <iframe id="overlay-preview-editor-frame" sandbox="allow-scripts" srcdoc="<html><body style='margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;color:#666;font-family:sans-serif;font-size:14px;'>Adjust colors above to see preview</body></html>"></iframe>
-        </div>
-        <div class="overlay-editor-toolbar">
-          <button class="btn btn--primary btn--sm" onclick="editor.refreshEditorPreview()" type="button">Update Preview</button>
-          <button class="btn btn--secondary btn--sm" onclick="sendTestOverlay()" type="button">Send Test</button>
-          <span style="font-size:0.78rem;color:var(--text-secondary);margin-left:auto;">Colors update on input, then click Refresh</span>
-        </div>
-        <div class="overlay-editor-test-form">
-          <input type="text" id="overlay-test-title" value="Hello Stream!" placeholder="Title" style="flex:2;">
-          <input type="text" id="overlay-test-subtitle" value="from Viewer123" placeholder="Subtitle" style="flex:2;">
-          <input type="number" id="overlay-test-duration" value="3" placeholder="Secs" min="1" max="30" style="width:70px;">
-          <button class="btn btn--primary btn--sm" onclick="sendTestOverlay()" type="button">Send</button>
-        </div>
-      </div>`;
+    return fields;
   }
 
   buildPrimitiveArray(path, arr) {
@@ -1948,24 +1930,6 @@ class ConfigEditor {
     setTimeout(() => t.remove(), 4000);
   }
 
-  async refreshEditorPreview() {
-    const frame = document.getElementById('overlay-preview-editor-frame');
-    if (!frame) return;
-    this.collect();
-    const overlay = this.data.overlay || {};
-    const theme = (overlay.theme || {});
-    try {
-      const res = await fetch(API + '/overlay/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chroma: true, theme: { background: theme.background, text: theme.text } })
-      });
-      const data = await res.json();
-      frame.srcdoc = data.html;
-    } catch (e) {
-      this.showToast('Preview update failed: ' + e.message, 'error');
-    }
-  }
 }
 
 const editor = new ConfigEditor();
@@ -3455,11 +3419,9 @@ document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
 let _updateData = null;
 
 async function checkAllUpdates() {
-  const btn = document.getElementById('btn-check-updates');
   const summary = document.getElementById('updates-summary');
   const detail = document.getElementById('updates-detail');
-  if (btn) btn.disabled = true;
-  if (summary) summary.innerHTML = '<span class="muted">Checking for updates...</span>';
+  if (summary) summary.innerHTML = '<span class="text-muted">Checking for updates...</span>';
   if (detail) detail.classList.add('hidden');
 
   try {
@@ -3473,8 +3435,6 @@ async function checkAllUpdates() {
   } catch (e) {
     if (summary) summary.innerHTML = '<span class="log-err">Update check failed.</span>';
     log('Update check failed: ' + e.message, 'err');
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
@@ -3489,49 +3449,54 @@ function _renderUpdateResults() {
   const pluginAvail = plugins && plugins.updates_available > 0;
   const total = (toolAvail ? 1 : 0) + (pluginAvail ? plugins.updates_available : 0);
 
+  let html = '<div class="update-actions">' +
+    '<button class="btn btn--primary" onclick="checkAllUpdates()">Check for Updates</button>' +
+    '</div>';
+
   if (!toolAvail && !pluginAvail) {
-    summary.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-      '<span style="color:var(--success);font-weight:500;">All up to date</span>' +
-      '<span class="muted" style="font-size:0.85rem;">' +
-      (tool ? 'Tool v' + tool.current_version : '') +
-      '</span></div>' +
-      '<button class="btn btn-primary" style="margin-top:1rem;width:100%;" onclick="checkAllUpdates()">Check for Updates</button>';
+    html +=
+      '<div class="update-status update-status--ok">' +
+      '<span class="update-status__icon">✓</span>' +
+      '<div><span class="update-status__text">All up to date</span>' +
+      (tool ? '<span class="update-status__version">v' + tool.current_version + '</span>' : '') +
+      '</div></div>';
+    summary.innerHTML = html;
     detail.classList.add('hidden');
     return;
   }
 
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-    '<span style="color:var(--warning);font-weight:500;">' + total + ' update(s) available</span>' +
-    '<span class="muted" style="font-size:0.85rem;">' +
-    (tool ? 'Tool v' + tool.current_version : '') +
-    '</span></div>' +
-    '<button class="btn btn-primary" style="margin-top:0.75rem;width:100%;" onclick="applyUpdates()">Apply Updates (Restart)</button>' +
-    '<button class="btn btn-secondary" style="margin-top:0.5rem;width:100%;" onclick="checkAllUpdates()">Check Again</button>';
+  html +=
+    '<div class="update-status update-status--avail">' +
+    '<span class="update-status__icon">!</span>' +
+    '<div><span class="update-status__text">' + total + ' update(s) available</span>' +
+    (tool ? '<span class="update-status__version">v' + tool.current_version + '</span>' : '') +
+    '</div></div>' +
+    '<button class="btn btn--primary" style="width:100%;" onclick="applyUpdates()">Apply Updates (Restart)</button>';
 
   summary.innerHTML = html;
 
-  // Detail panel
   let detailHtml = '';
   if (toolAvail) {
     detailHtml +=
       '<div class="update-item">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-      '<div><strong>TikTok2Mc</strong><br><span class="muted" style="font-size:0.85rem;">' +
-      tool.current_version + ' → <strong style="color:var(--accent);">' + tool.latest_version + '</strong></span></div>' +
-      (tool.release_url ? '<a href="' + escapeHtml(tool.release_url) + '" target="_blank" class="btn btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.85rem;text-decoration:none;">View Release</a>' : '') +
-      '</div></div>';
+      '<div class="update-item__info">' +
+      '<strong>TikTok2Mc</strong>' +
+      '<span class="update-item__version">' + tool.current_version + ' → <strong>' + tool.latest_version + '</strong></span>' +
+      '</div>' +
+      (tool.release_url ? '<a href="' + escapeHtml(tool.release_url) + '" target="_blank" class="btn btn--secondary btn--sm">View Release</a>' : '') +
+      '</div>';
   }
   if (pluginAvail && plugins.plugins) {
     for (const p of plugins.plugins) {
       if (!p.update_available) continue;
       detailHtml +=
         '<div class="update-item">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<div><strong>' + escapeHtml(p.display_name || p.name) + '</strong><br><span class="muted" style="font-size:0.85rem;">' +
-        p.current_version + ' → <strong style="color:var(--accent);">' + p.latest_version + '</strong></span></div>' +
-        (p.error ? '<span class="log-err" style="font-size:0.85rem;">' + escapeHtml(p.error) + '</span>' : '') +
-        '</div></div>';
+        '<div class="update-item__info">' +
+        '<strong>' + escapeHtml(p.display_name || p.name) + '</strong>' +
+        '<span class="update-item__version">' + p.current_version + ' → <strong>' + p.latest_version + '</strong></span>' +
+        '</div>' +
+        (p.error ? '<span class="log-err">' + escapeHtml(p.error) + '</span>' : '') +
+        '</div>';
     }
   }
   detail.innerHTML = detailHtml;
@@ -3539,8 +3504,6 @@ function _renderUpdateResults() {
 }
 
 async function applyUpdates() {
-  const btn = document.querySelector('#updates-card .btn-primary');
-  if (btn) btn.disabled = true;
   log('Installing plugin updates...', 'info');
   let result = null;
   try {
@@ -3557,8 +3520,6 @@ async function applyUpdates() {
   } catch (e) {
     log('Plugin update install failed: ' + e.message, 'err');
     showToast('Plugin update install failed: ' + e.message, 'error');
-  } finally {
-    if (btn) btn.disabled = false;
   }
   showRestartDialog(
     'Apply Updates',
@@ -3671,17 +3632,19 @@ function renderLivePluginGrid(plugins) {
     }
 
     let statusDot = 'dot-unknown';
-    if (!enabled) statusDot = 'dot-disabled';
-    else if (health === 'healthy') statusDot = 'dot-healthy';
-    else if (health === 'unhealthy') statusDot = 'dot-unhealthy';
-    else if (health === 'dead') statusDot = 'dot-dead';
+    let healthClass = 'health-unknown';
+    if (!enabled) { statusDot = 'dot-disabled'; healthClass = 'health-disabled'; }
+    else if (health === 'healthy') { statusDot = 'dot-healthy'; healthClass = 'health-healthy'; }
+    else if (health === 'unhealthy') { statusDot = 'dot-unhealthy'; healthClass = 'health-unhealthy'; }
+    else if (health === 'dead') { statusDot = 'dot-dead'; healthClass = 'health-dead'; }
 
-    html += `<div class="live-plugin-pill">
+    html += `<div class="live-plugin-pill ${healthClass}">
       <span class="live-plugin-dot ${statusDot}"></span>
       <span class="live-plugin-name">${escapeHtml(p.display_name || name)}</span>
       <span class="live-plugin-hb">${escapeHtml(hbText)}</span>
     </div>`;
   }
+  container.className = 'plugin-health-grid';
   container.innerHTML = html;
 }
 
@@ -3695,19 +3658,6 @@ function updateEcmDiagnostics(payload) {
     } else {
       summary.innerHTML = `<span style="color:var(--success);">${count} reaction${count === 1 ? '' : 's'}</span> <span style="color:var(--text-secondary);">configured</span>`;
     }
-  }
-}
-
-/* ─── Overlay Test (kept for config editor preview) ─── */
-async function sendTestOverlay() {
-  const title = (document.getElementById('overlay-test-title')?.value || '').trim() || 'Hello Stream!';
-  const subtitle = (document.getElementById('overlay-test-subtitle')?.value || '').trim() || '';
-  const duration = parseInt(document.getElementById('overlay-test-duration')?.value) || 3;
-  try {
-    await postJSON('/overlay/display', { title, subtitle, duration, overlay_name: 'default' });
-    showToast('Test overlay sent!', 'success');
-  } catch (e) {
-    showToast('Failed to send test overlay: ' + e.message, 'error');
   }
 }
 
