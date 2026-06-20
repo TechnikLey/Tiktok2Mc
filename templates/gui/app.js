@@ -3796,10 +3796,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ─── Sidebar ─── */
-let _sidebarCollapsed = false;
-function toggleSidebar() {
-  _sidebarCollapsed = !_sidebarCollapsed;
-  document.querySelector('.sidebar').classList.toggle('collapsed', _sidebarCollapsed);
+let _sidebarMode = 0;
+const SIDEBAR_MODES = ['full', 'icons', 'hide'];
+function cycleSidebar() {
+  _sidebarMode = (_sidebarMode + 1) % 3;
+  const sidebar = document.querySelector('.sidebar');
+  sidebar.classList.remove('full', 'icons', 'hide');
+  sidebar.classList.add(SIDEBAR_MODES[_sidebarMode]);
+  document.querySelector('.app-layout').classList.toggle('sidebar-hidden', _sidebarMode === 2);
+}
+function _initSidebarReveal() {
+  document.querySelector('.app-layout')?.addEventListener('click', (e) => {
+    if (_sidebarMode === 2 && e.clientX < 10) {
+      cycleSidebar();
+    }
+  });
 }
 
 /* ─── Editor helpers (show/hide editors within app-layout) ─── */
@@ -3844,6 +3855,7 @@ function switchToEditor(viewId, openFn) {
 /* ─── Init ─── */
 async function init() {
   _initEditorVisibilityObserver();
+  _initSidebarReveal();
   await loadHealth();
   await loadStatus();
   await loadConfig();

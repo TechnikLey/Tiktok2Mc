@@ -5,8 +5,7 @@ describe('ActionsEditor', () => {
     actionsEditor.triggers = [];
     actionsEditor.selectedIndex = -1;
     actionsEditor.isDirty = false;
-    actionsEditor.rawContent = '';
-    actionsEditor.activeTab = 'visual';
+    actionsEditor.isDirty = false;
   });
 
   /* ─── addCmd / removeCmd / updateCmd ─── */
@@ -146,19 +145,6 @@ describe('ActionsEditor', () => {
       actionsEditor.triggers = [];
       actionsEditor._addTrigger('   ', 'Event');
       expect(actionsEditor.triggers).toHaveLength(0);
-    });
-  });
-
-  /* ─── switchTab ─── */
-  describe('switchTab', () => {
-    it('switches to visual tab', () => {
-      actionsEditor.switchTab('visual');
-      expect(actionsEditor.activeTab).toBe('visual');
-    });
-
-    it('switches to raw tab', () => {
-      actionsEditor.switchTab('raw');
-      expect(actionsEditor.activeTab).toBe('raw');
     });
   });
 

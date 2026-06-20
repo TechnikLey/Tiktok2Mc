@@ -3,8 +3,6 @@ class ActionsEditor {
     this.triggers = [];
     this.selectedIndex = -1;
     this.isDirty = false;
-    this.rawContent = '';
-    this.activeTab = 'visual';
     this.gifts = [];
     this.giftSearch = '';
     this.availableScripts = [];
@@ -12,14 +10,7 @@ class ActionsEditor {
     this.el = document.getElementById('actions-editor');
     this.tableBody = document.getElementById('actions-table-body');
     this.detailPanel = document.getElementById('actions-detail');
-    this.rawTextarea = document.getElementById('actions-raw-text');
-    this.rawDiag = document.getElementById('actions-raw-diag');
-    this.rawDiagList = document.getElementById('actions-raw-diag-list');
-    this.rawSaveBtn = document.getElementById('actions-raw-save-btn');
-    this.rawStatus = document.getElementById('actions-raw-status');
     this.addBtn = document.getElementById('actions-add-trigger');
-    this.visualTab = document.getElementById('actions-tab-visual');
-    this.rawTab = document.getElementById('actions-tab-raw');
     this.closeBtn = document.getElementById('actions-editor-close');
     this.saveBtn = document.getElementById('actions-editor-save');
 
@@ -46,9 +37,6 @@ class ActionsEditor {
     this.closeBtn?.addEventListener('click', () => this.close());
     this.saveBtn?.addEventListener('click', () => this.save());
     this.addBtn?.addEventListener('click', () => this.openAddModal());
-    this.visualTab?.addEventListener('click', () => this.switchTab('visual'));
-    this.rawTab?.addEventListener('click', () => this.switchTab('raw'));
-
     this.addTypeSelect?.addEventListener('change', () => this._onAddTypeChange());
     this.addGiftSearch?.addEventListener('input', () => this._renderGiftList());
     this.addGiftConfirm?.addEventListener('click', () => this._confirmAddGift());
@@ -63,8 +51,6 @@ class ActionsEditor {
     this.el.classList.remove('hidden');
     this.selectedIndex = -1;
     this.isDirty = false;
-    this.activeTab = 'visual';
-    this.switchTab('visual');
     await this.load();
     this._updateSaveButton();
   }
@@ -113,29 +99,7 @@ class ActionsEditor {
     }
   }
 
-  async loadRaw() {
-    try {
-      const data = await fetchJSON('/actions/raw');
-      this.rawContent = data.content || '';
-      this.rawTextarea.value = this.rawContent;
-      this.rawTextarea.disabled = false;
-      this._renderRawDiagnostics(data.diagnostics || []);
-      this._updateRawStatus(data.diagnostics || []);
-    } catch (e) {
-      showToast('Failed to load raw actions: ' + e.message, 'error');
-    }
-  }
-
   /* ── Tab Switching ── */
-
-  switchTab(tab) {
-    this.activeTab = tab;
-    this.visualTab?.classList.toggle('active', tab === 'visual');
-    this.rawTab?.classList.toggle('active', tab === 'raw');
-    document.getElementById('actions-visual-panel')?.classList.toggle('hidden', tab !== 'visual');
-    document.getElementById('actions-raw-panel')?.classList.toggle('hidden', tab !== 'raw');
-    if (tab === 'raw') this.loadRaw();
-  }
 
   /* ── Table Rendering ── */
 
@@ -543,11 +507,7 @@ class ActionsEditor {
   /* ── Save ── */
 
   async save() {
-    if (this.activeTab === 'raw') {
-      await this._saveRaw();
-    } else {
-      await this._saveVisual();
-    }
+    await this._saveVisual();
   }
 
   async _saveVisual() {
@@ -585,88 +545,5 @@ class ActionsEditor {
     }
   }
 
-  /* ── Raw Editor ── */
-
-  async _onRawInput() {
-    if (this._rawInputTimer) clearTimeout(this._rawInputTimer);
-    this._rawInputTimer = setTimeout(() => this._validateRawContent(), 400);
-    if (this.rawTextarea && this.rawTextarea.value !== this.rawContent) {
-      this.isDirty = true;
-    this._updateSaveButton();
-    }
-  }
-
-  async _validateRawContent() {
-    const content = this.rawTextarea?.value || '';
-    try {
-      const resp = await fetch(API + '/actions/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
-      });
-      if (!resp.ok) return;
-      const data = await resp.json();
-      this._renderRawDiagnostics(data.diagnostics || []);
-      this._updateRawStatus(data.diagnostics || []);
-    } catch (_) {}
-  }
-
-  _renderRawDiagnostics(diags) {
-    if (!this.rawDiagList) return;
-    if (!diags.length) {
-      this.rawDiagList.innerHTML = '<div class="raw-diag-item raw-diag-ok">No issues found.</div>';
-      return;
-    }
-    this.rawDiagList.innerHTML = diags.map(d => {
-      const cls = d.severity === 'ERROR' ? 'raw-diag-error'
-        : d.severity === 'WARNING' ? 'raw-diag-warning' : 'raw-diag-info';
-      const loc = d.line != null ? `Line ${d.line + 1}` : '';
-      return `<div class="raw-diag-item ${cls}">${loc}: ${escapeHtml(d.message)}</div>`;
-    }).join('');
-  }
-
-  _updateRawStatus(diags) {
-    if (!this.rawStatus) return;
-    const errors = diags.filter(d => d.severity === 'ERROR').length;
-    const warnings = diags.filter(d => d.severity === 'WARNING').length;
-    if (errors > 0) {
-      this.rawStatus.innerHTML = `<span class="raw-status-error">${errors} error(s) — save blocked</span>`;
-      this.rawSaveBtn.disabled = true;
-    } else {
-      this.rawStatus.innerHTML = warnings > 0
-        ? `<span class="raw-status-warn">${warnings} warning(s)</span>`
-        : '<span class="raw-status-ok">No errors — can save</span>';
-      this.rawSaveBtn.disabled = false;
-    }
-  }
-
-  async _saveRaw() {
-    try {
-      const content = this.rawTextarea.value;
-      const resp = await fetch(API + '/actions/raw', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
-      });
-      const result = await resp.json();
-
-      if (!resp.ok) {
-        // Server rejected (likely 422 due to syntax errors)
-        const diags = result.diagnostics || [];
-        this._renderRawDiagnostics(diags);
-        this._updateRawStatus(diags);
-        showToast('Save blocked — fix syntax errors first.', 'error');
-        return;
-      }
-
-      this.rawContent = content;
-      this.isDirty = false;
-      this._updateSaveButton();
-      this._renderRawDiagnostics(result.diagnostics || []);
-      this._updateRawStatus(result.diagnostics || []);
-      await this._askAndReloadActions();
-    } catch (e) {
-      showToast('Failed to save raw: ' + e.message, 'error');
-    }
-  }
+  /* ── Raw Editor ── (removed) */
 }

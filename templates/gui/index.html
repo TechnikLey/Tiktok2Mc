@@ -12,8 +12,9 @@
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <h1 class="sidebar-title">TikTok2Mc</h1>
-                <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
-                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+                <button class="sidebar-toggle" onclick="cycleSidebar()" title="Toggle sidebar">
+                    <svg class="toggle-full" viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+                    <svg class="toggle-icons" viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
                 </button>
             </div>
 
@@ -57,6 +58,7 @@
                 <button class="btn btn--danger btn--sm" onclick="promptShutdown()">Shutdown</button>
             </div>
         </aside>
+        <div class="sidebar-reveal" onclick="cycleSidebar()" title="Show sidebar"></div>
 
         <main id="dashboard" class="dashboard-content hidden">
             <div id="restart-pending-banner" class="restart-banner hidden">
@@ -252,10 +254,6 @@
       <div class="actions-layout">
         <div class="actions-topbar">
           <h2>Actions Editor</h2>
-          <div class="actions-tabs">
-            <button class="actions-tab active" id="actions-tab-visual">Visual Editor</button>
-            <button class="actions-tab" id="actions-tab-raw">Raw</button>
-          </div>
           <div class="header-actions">
             <button class="btn btn--secondary" id="actions-editor-close">Close</button>
             <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled>Save Changes</button>
@@ -281,22 +279,6 @@
           </div>
           <div id="actions-detail" class="actions-detail hidden">
             <div id="actions-detail-content"></div>
-          </div>
-        </div>
-
-        <!-- Raw Panel -->
-        <div id="actions-raw-panel" class="actions-body hidden">
-          <div class="actions-raw-header">
-            <h3>Raw Editor</h3>
-            <div class="muted text-sm">Edit actions.mca directly. Syntax is checked on every keystroke.</div>
-          </div>
-          <textarea id="actions-raw-text" class="actions-raw-textarea" spellcheck="false" oninput="actionsEditor._onRawInput()"></textarea>
-          <div class="raw-diag">
-            <div id="actions-raw-diag-list"></div>
-            <div class="raw-footer">
-              <div id="actions-raw-status" class="raw-status"></div>
-              <button class="btn btn--primary btn--sm" id="actions-raw-save-btn">Save Raw</button>
-            </div>
           </div>
         </div>
       </div>
