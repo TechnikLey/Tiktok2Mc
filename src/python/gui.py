@@ -85,6 +85,16 @@ class LauncherAPI:
     def reset_close_request(self):
         self._close_requested = False
 
+    def close_app(self) -> str:
+        """Destroy the GUI window immediately so the process exits."""
+        global _window
+        if _window is not None:
+            try:
+                _window.destroy()
+            except Exception as e:
+                log.warning("Failed to destroy window: %s", e)
+        return "closing"
+
     # ---- Server control ----
     def start_system(self) -> str:
         """Start the full system (start.exe)."""

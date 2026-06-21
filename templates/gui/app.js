@@ -53,7 +53,7 @@ function _closeWindowForShutdown() {
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
   try { window.close(); } catch (_) {}
   if (typeof pywebview !== 'undefined' && pywebview.api) {
-    try { pywebview.api.approve_close(); } catch (_) {}
+    try { pywebview.api.close_app(); } catch (_) {}
   }
 }
 
