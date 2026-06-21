@@ -55,7 +55,7 @@ def main():
     try:
         # ----- Configuration -----
         MAX_THREADS = min(16, (os.cpu_count() or 4))
-        MAX_COPY_THREADS = 16
+        MAX_COPY_THREADS = min(32, (os.cpu_count() or 4) * 4)
         BUILD_INSTALLER = "--installer" in sys.argv
 
         IS_WINDOWS = sys.platform == "win32"
