@@ -754,29 +754,34 @@ select.invalid { border-color: var(--color-danger) !important; }
 /* ─── Config Editor Overlay ─── */
 /* ─── Plugins Inline Config ─── */
 #plugins-config-section.hidden { display: none; }
+#plugins-config-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
 .plugins-config-layout {
   display: flex;
   flex: 1;
   overflow: hidden;
-  min-height: 400px;
-  height: 100%;
+  min-height: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg);
 }
 .plugins-config-layout .editor-sidebar {
   width: 220px;
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
-  height: 100%;
+  flex-shrink: 0;
   overflow-y: auto;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
 }
 .plugins-config-layout .editor-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  min-height: 0;
 }
 .plugins-config-layout .editor-topbar {
   position: sticky;
@@ -950,6 +955,7 @@ select.invalid { border-color: var(--color-danger) !important; }
   border-radius: var(--radius-xl);
   margin-bottom: var(--space-6);
   transition: box-shadow var(--transition-fast);
+  scroll-margin-top: 70px;
 }
 .section-card:focus-within { box-shadow: 0 0 0 2px var(--color-accent-subtle); }
 .section-header {
