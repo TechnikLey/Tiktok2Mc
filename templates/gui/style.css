@@ -291,7 +291,7 @@ body {
 
 /* ─── Views ─── */
 .view { display: none; }
-.view.active { display: block; }
+.view.active { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow-y: auto; }
 
 .view-header {
   margin-bottom: var(--space-6);
@@ -1016,6 +1016,33 @@ input[type="color"] {
   font-size: var(--text-base);
   min-width: 80px;
   flex: 1;
+}
+
+/* ─── Overlay Slots Editor ─── */
+.overlay-slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.overlay-slot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.overlay-slot-row .btn-icon {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+.overlay-slot-row .btn-icon:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
 }
 
 /* ─── Icon Button ─── */

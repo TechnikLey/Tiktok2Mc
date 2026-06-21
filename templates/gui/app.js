@@ -1334,6 +1334,8 @@ class ConfigEditor {
       } else if (Array.isArray(v)) {
         if (path === 'comment_commands.groups') {
           html += this.buildGroupEditor(path, v);
+        } else if (path === 'overlay.overlays') {
+          html += this.buildOverlaySlotsEditor(path, v);
         } else if (path === 'random_triggers.triggers') {
           html += this.buildTagEditor(path, v, { label: 'Triggers', suggestions: ['likes','like_2','follow','join','comment','gift','share'] });
         } else if (path.endsWith('.commands')) {
@@ -1374,6 +1376,13 @@ class ConfigEditor {
     } else if (meta.type === 'select') {
       const onch = path.endsWith('.handler') ? ' onchange="editor.render()"' : '';
       inputHtml = `<select id="${id}" data-path="${path}" data-type="string"${onch}>${meta.options.map(o => `<option value="${o}" ${value === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+    } else if (meta.type === 'color') {
+      const colorVal = value || '#000000';
+      const colorId = id + '_cp';
+      inputHtml = `<div class="color-row">
+        <input type="color" id="${colorId}" value="${colorVal}" data-path="${path}" data-type="string" oninput="document.getElementById('${id}').value=this.value; editor.onFieldInput()">
+        <input type="text" id="${id}" value="${colorVal}" style="width:120px;padding:0.45rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;" oninput="document.getElementById('${colorId}').value=this.value; editor.onFieldInput()" data-path="${path}" data-type="string">
+      </div>`;
     } else if (meta.type === 'password') {
       inputHtml = `<input type="password" id="${id}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string">`;
     } else if (meta.type === 'number') {
@@ -1452,6 +1461,47 @@ class ConfigEditor {
   }
 
   removeArrayItem(path, index) {
+    const arr = this.getValue(path) || [];
+    arr.splice(index, 1);
+    this.setValue(path, arr);
+    this.render();
+  }
+
+  onFieldInput() {
+    this.collect();
+    this._updateSaveButton();
+  }
+
+  buildOverlaySlotsEditor(path, slots) {
+    const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
+    const help = getHelp(path);
+    const rows = (slots || []).map((slot, i) => {
+      const nameId = id + '_name_' + i;
+      const urlId = id + '_url_' + i;
+      return `<div class="overlay-slot-row">
+        <input type="text" id="${nameId}" value="${escapeHtml(slot.name || '')}" placeholder="Slot name" data-path="${path}[${i}].name" data-type="string" oninput="editor.onFieldInput()" style="width:140px;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">
+        <input type="text" id="${urlId}" value="${escapeHtml(slot.url || '')}" placeholder="OBS Browser Source URL" data-path="${path}[${i}].url" data-type="string" oninput="editor.onFieldInput()" style="flex:1;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">
+        <button class="btn-icon" onclick="editor.removeOverlaySlot('${path}', ${i})" title="Remove slot">&times;</button>
+      </div>`;
+    }).join('');
+    return `<div class="editor-field full-width" data-path="${path}">
+      <div class="field-label">Overlay Slots</div>
+      <div class="field-widget">
+        <div class="overlay-slots-list" id="${id}_list">${rows}</div>
+        <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="editor.addOverlaySlot('${path}')">+ Add Slot</button>
+        ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
+      </div>
+    </div>`;
+  }
+
+  addOverlaySlot(path) {
+    const arr = this.getValue(path) || [];
+    arr.push({ name: '', url: '' });
+    this.setValue(path, arr);
+    this.render();
+  }
+
+  removeOverlaySlot(path, index) {
     const arr = this.getValue(path) || [];
     arr.splice(index, 1);
     this.setValue(path, arr);
