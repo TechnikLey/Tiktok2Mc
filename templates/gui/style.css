@@ -191,34 +191,10 @@ body {
 .nav-subitem.active::before {
   background: var(--color-accent);
 }
+.sidebar.icons .nav-sublist,
 .sidebar.hide .nav-sublist,
+.sidebar.icons .nav-chevron,
 .sidebar.hide .nav-chevron {
-  display: none !important;
-}
-.sidebar.icons .nav-sublist {
-  display: none;
-}
-.sidebar.icons .nav-sublist.expanded {
-  display: block;
-  max-height: 160px;
-  overflow-y: auto;
-}
-.sidebar.icons .nav-subitem {
-  padding: var(--space-2) var(--space-2);
-  justify-content: center;
-  font-size: 0;
-}
-.sidebar.icons .nav-subitem::after {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-text-muted);
-}
-.sidebar.icons .nav-subitem.active::after {
-  background: var(--color-accent);
-}
-.sidebar.icons .nav-chevron {
   display: none !important;
 }
 

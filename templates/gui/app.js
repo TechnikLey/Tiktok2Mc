@@ -48,10 +48,6 @@ function _stopDashboardPolling() {
   if (_tiktokStatusIntervalId) { clearInterval(_tiktokStatusIntervalId); _tiktokStatusIntervalId = null; }
 }
 
-async function _triggerBackendShutdown() {
-  try { await fetch(API + '/shutdown/now', { method: 'POST' }); } catch (_) {}
-}
-
 function _closeWindowForShutdown() {
   _stopDashboardPolling();
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
@@ -74,7 +70,7 @@ function startLocalShutdownCountdown() {
   cancelBtn.disabled = false;
 
   if (_shutdownCountdownInterval) clearInterval(_shutdownCountdownInterval);
-  _shutdownCountdownInterval = setInterval(async () => {
+  _shutdownCountdownInterval = setInterval(() => {
     _shutdownCountdownValue--;
     if (_shutdownCountdownValue <= 0) {
       clearInterval(_shutdownCountdownInterval);
@@ -82,7 +78,6 @@ function startLocalShutdownCountdown() {
       display.textContent = 'Shutting down...';
       shutdownNowBtn.disabled = true;
       cancelBtn.disabled = true;
-      await _triggerBackendShutdown();
       _closeWindowForShutdown();
       return;
     }
@@ -90,7 +85,7 @@ function startLocalShutdownCountdown() {
   }, 1000);
 }
 
-document.getElementById('btn-shutdown-now').addEventListener('click', async () => {
+document.getElementById('btn-shutdown-now').addEventListener('click', () => {
   if (_shutdownCountdownInterval) {
     clearInterval(_shutdownCountdownInterval);
     _shutdownCountdownInterval = null;
@@ -98,7 +93,6 @@ document.getElementById('btn-shutdown-now').addEventListener('click', async () =
   document.getElementById('shutdown-countdown-display').textContent = 'Shutting down...';
   document.getElementById('btn-shutdown-now').disabled = true;
   document.getElementById('btn-shutdown-cancel').disabled = true;
-  await _triggerBackendShutdown();
   _closeWindowForShutdown();
 });
 
@@ -512,9 +506,10 @@ function renderPluginManager() {
 let _pluginNavExpanded = false;
 
 function togglePluginNav() {
-  // Auto-expand sidebar from icons mode so plugin names are readable
+  // Plugin sub-nav only works in full sidebar mode
   if (_sidebarMode === 1) {
-    _setSidebarMode(0);
+    switchView('plugins');
+    return;
   }
   _pluginNavExpanded = !_pluginNavExpanded;
   document.querySelector('.nav-item[data-view="plugins"]').classList.toggle('expanded', _pluginNavExpanded);
