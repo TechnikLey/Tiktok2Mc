@@ -287,12 +287,12 @@ comment_commands:
 console:
   # Visibility level:
   #   0 — Off:       Hides everything
-  #   1 — Silent:    Hides console, keeps GUI and overlays
-  #   2 — Standard:  Shows main windows (recommended)
+  #   1 — Silent:    Hides console, keeps GUI and overlays (recommended)
+  #   2 — Standard:  Shows main windows
   #   3 — Advanced:  Also shows background services
   #   4 — Debug:     Shows all enabled processes
   #   5 — Override:  Shows every process (even disabled ones, debugging only)
-  log_level: 2
+  log_level: 1
 
   # Show the main console window.
   visible: true

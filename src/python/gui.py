@@ -99,7 +99,7 @@ class LauncherAPI:
             if IS_WINDOWS:
                 _full_system_proc = subprocess.Popen(
                     [str(START_EXE)],
-                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             else:
                 log_file = BASE_DIR / "logs" / "full_system.log"
