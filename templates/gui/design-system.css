@@ -22,7 +22,7 @@
   --color-info: #3b82f6;
   --color-info-subtle: rgba(59, 130, 246, 0.1);
 
-/* ── Legacy Variable Aliases (used by app.js inline styles) ── */
+  /* ── Legacy Variable Aliases (used by app.js inline styles) ── */
   --bg: var(--color-bg);
   --surface: var(--color-surface);
   --elevated: var(--color-elevated);
@@ -100,6 +100,28 @@
   --z-overlay: 300;
   --z-modal: 400;
   --z-toast: 500;
+}
+
+[data-theme="light"] {
+  --color-bg: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-elevated: #f0f0f0;
+  --color-input: #e8e8e8;
+  --color-border: #d4d4d4;
+  --color-border-hover: #b0b0b0;
+  --color-text: #1a1a1a;
+  --color-text-muted: #666666;
+  --color-accent: #d4a017;
+  --color-accent-hover: #b88a0e;
+  --color-accent-subtle: rgba(212, 160, 23, 0.1);
+  --color-danger: #dc2626;
+  --color-danger-subtle: rgba(220, 38, 38, 0.08);
+  --color-success: #16a34a;
+  --color-success-subtle: rgba(22, 163, 74, 0.08);
+  --color-warning: #d97706;
+  --color-warning-subtle: rgba(217, 119, 6, 0.08);
+  --color-info: #2563eb;
+  --color-info-subtle: rgba(37, 99, 235, 0.08);
 }
 
 /* ── Reset ── */

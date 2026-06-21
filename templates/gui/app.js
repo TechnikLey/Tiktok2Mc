@@ -36,11 +36,20 @@ let _healthIntervalId = null;
 let _statusIntervalId = null;
 let _pluginsIntervalId = null;
 let _closePollIntervalId = null;
+let _uptimeIntervalId = null;
+let _lastTiktokEventTime = 0;
+let _tiktokStatusIntervalId = null;
 
 function _stopDashboardPolling() {
   if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
   if (_statusIntervalId) { clearInterval(_statusIntervalId); _statusIntervalId = null; }
   if (_pluginsIntervalId) { clearInterval(_pluginsIntervalId); _pluginsIntervalId = null; }
+  if (_uptimeIntervalId) { clearInterval(_uptimeIntervalId); _uptimeIntervalId = null; }
+  if (_tiktokStatusIntervalId) { clearInterval(_tiktokStatusIntervalId); _tiktokStatusIntervalId = null; }
+}
+
+async function _triggerBackendShutdown() {
+  try { await fetch(API + '/shutdown/now', { method: 'POST' }); } catch (_) {}
 }
 
 function _closeWindowForShutdown() {
@@ -65,12 +74,15 @@ function startLocalShutdownCountdown() {
   cancelBtn.disabled = false;
 
   if (_shutdownCountdownInterval) clearInterval(_shutdownCountdownInterval);
-  _shutdownCountdownInterval = setInterval(() => {
+  _shutdownCountdownInterval = setInterval(async () => {
     _shutdownCountdownValue--;
     if (_shutdownCountdownValue <= 0) {
       clearInterval(_shutdownCountdownInterval);
       _shutdownCountdownInterval = null;
       display.textContent = 'Shutting down...';
+      shutdownNowBtn.disabled = true;
+      cancelBtn.disabled = true;
+      await _triggerBackendShutdown();
       _closeWindowForShutdown();
       return;
     }
@@ -78,12 +90,15 @@ function startLocalShutdownCountdown() {
   }, 1000);
 }
 
-document.getElementById('btn-shutdown-now').addEventListener('click', () => {
+document.getElementById('btn-shutdown-now').addEventListener('click', async () => {
   if (_shutdownCountdownInterval) {
     clearInterval(_shutdownCountdownInterval);
     _shutdownCountdownInterval = null;
   }
   document.getElementById('shutdown-countdown-display').textContent = 'Shutting down...';
+  document.getElementById('btn-shutdown-now').disabled = true;
+  document.getElementById('btn-shutdown-cancel').disabled = true;
+  await _triggerBackendShutdown();
   _closeWindowForShutdown();
 });
 
@@ -96,7 +111,7 @@ document.getElementById('btn-shutdown-cancel').addEventListener('click', () => {
 });
 
 /* ─── Dialogs ─── */
-function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-primary') {
+function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-primary', messageClass = '') {
   return new Promise((resolve) => {
     const dlg = document.getElementById('confirm-dialog');
     const titleEl = document.getElementById('confirm-title');
@@ -106,6 +121,7 @@ function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-pr
 
     titleEl.textContent = title;
     msgEl.textContent = message;
+    msgEl.className = 'muted dialog-desc' + (messageClass ? ' ' + messageClass : '');
     okBtn.textContent = okText;
     okBtn.className = 'btn ' + okClass;
 
@@ -343,11 +359,24 @@ function formatUptime(seconds) {
   return s + 's';
 }
 
+let _uptimeData = { baseSeconds: 0, lastFetch: 0 };
+
+function _updateUptimeDisplay() {
+  const el = document.getElementById('uptime-value');
+  if (!el) return;
+  const now = Date.now();
+  const elapsed = (now - _uptimeData.lastFetch) / 1000;
+  const total = _uptimeData.baseSeconds + elapsed;
+  el.textContent = formatUptime(total);
+}
+
 async function loadStatus() {
   try {
     const data = await fetchJSON('/status');
     const el = document.getElementById('system-info');
     if (!el) return;
+    _uptimeData.baseSeconds = data.uptime_seconds || 0;
+    _uptimeData.lastFetch = Date.now();
     el.innerHTML =
       '<div class="status-grid">' +
         '<div class="status-card">' +
@@ -364,12 +393,45 @@ async function loadStatus() {
         '</div>' +
         '<div class="status-card">' +
           '<span class="status-card__label">Uptime</span>' +
-          '<span class="status-card__value">' + formatUptime(data.uptime_seconds) + '</span>' +
+          '<span class="status-card__value" id="uptime-value">' + formatUptime(data.uptime_seconds) + '</span>' +
+        '</div>' +
+        '<div class="status-card">' +
+          '<span class="status-card__label">TikTok Stream</span>' +
+          '<span class="status-card__value" id="tiktok-status-value">Checking...</span>' +
         '</div>' +
       '</div>';
+    _updateTiktokStatusDisplay();
   } catch (e) {
     const el = document.getElementById('system-info');
     if (el) el.innerHTML = '<span class="log-err">Failed to load status: ' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+function _updateTiktokStatusDisplay() {
+  const el = document.getElementById('tiktok-status-value');
+  const pill = document.getElementById('tiktok-status-pill');
+  if (!el || !pill) return;
+  const tiktok = currentConfig.tiktok || {};
+  const hasUser = tiktok.user && tiktok.user !== 'your_tiktok_username';
+  if (!hasUser) {
+    el.textContent = 'Not configured';
+    el.className = 'status-card__value danger';
+    pill.textContent = 'No User';
+    pill.className = 'tiktok-status offline';
+    return;
+  }
+  const now = Date.now();
+  const lastEvent = _lastTiktokEventTime;
+  if (lastEvent && (now - lastEvent < 30000)) {
+    el.textContent = 'Connected';
+    el.className = 'status-card__value success';
+    pill.textContent = 'Live';
+    pill.className = 'tiktok-status online';
+  } else {
+    el.textContent = 'Configured';
+    el.className = 'status-card__value';
+    pill.textContent = 'Configured';
+    pill.className = 'tiktok-status connecting';
   }
 }
 
@@ -450,6 +512,10 @@ function renderPluginManager() {
 let _pluginNavExpanded = false;
 
 function togglePluginNav() {
+  // Auto-expand sidebar from icons mode so plugin names are readable
+  if (_sidebarMode === 1) {
+    _setSidebarMode(0);
+  }
   _pluginNavExpanded = !_pluginNavExpanded;
   document.querySelector('.nav-item[data-view="plugins"]').classList.toggle('expanded', _pluginNavExpanded);
   document.getElementById('plugin-subnav').classList.toggle('expanded', _pluginNavExpanded);
@@ -492,11 +558,25 @@ function copyUrl(btn, url) {
   });
 }
 
+const BUILTIN_PLUGINS = ['deathcounter', 'wincounter', 'timer', 'spotify', 'spotifycontrol'];
+
+function isBuiltinPlugin(name) {
+  const normalized = name.toLowerCase().replace(/[-_]/g, '');
+  return BUILTIN_PLUGINS.includes(normalized);
+}
+
 async function promptEnablePlugin(name, displayName) {
+  const isBuiltin = isBuiltinPlugin(name);
+  let message = `Do you want to enable "${displayName || name}"?`;
+  if (!isBuiltin) {
+    message = `WARNING: This plugin is from an external source and could potentially be harmful. Only enable it if you trust the developer.`;
+  }
   const confirmed = await showConfirmDialog(
     'Enable Plugin',
-    `Do you want to enable "${displayName || name}"?`,
-    'Enable'
+    message,
+    'Enable',
+    isBuiltin ? 'btn-primary' : 'btn-danger',
+    isBuiltin ? '' : 'text-danger'
   );
   if (!confirmed) return;
   try {
@@ -606,7 +686,8 @@ function showWizard() {
   wizardStep = 0;
   wizardData = {
     tiktok_user: (currentConfig.tiktok || {}).user || '',
-    rcon_password: (currentConfig.rcon || {}).password || ''
+    rcon_password: (currentConfig.rcon || {}).password || '',
+    advanced: currentConfig.config_advanced || false
   };
   renderWizardStep();
 }
@@ -650,10 +731,10 @@ function renderWizardStep() {
   const content = document.getElementById('wizard-content');
   const backBtn = document.getElementById('wizard-back');
   const nextBtn = document.getElementById('wizard-next');
-  steps.innerHTML = [0, 1, 2].map(i => `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`).join('');
+  steps.innerHTML = [0, 1, 2, 3].map(i => `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`).join('');
   backBtn.disabled = wizardStep === 0;
   backBtn.style.visibility = wizardStep === 0 ? 'hidden' : 'visible';
-  nextBtn.textContent = wizardStep === 2 ? 'Save' : 'Next';
+  nextBtn.textContent = wizardStep === 3 ? 'Save' : 'Next';
   if (wizardStep === 0) {
     content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Welcome! Let's get your stream connected. Enter your TikTok username below.</p>
       <div class="form-group"><label>TikTok Username (without @)</label>
@@ -668,11 +749,19 @@ function renderWizardStep() {
       <div class="strength-label" id="strength-label">Enter a password to see strength</div>
       <div class="hint">Choose any password you prefer. Strength meter is for guidance only.</div></div>`;
     setTimeout(updatePasswordMeter, 0);
+  } else if (wizardStep === 2) {
+    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Enable advanced settings to access more configuration options. These can break functionality if misconfigured.</p>
+      <div class="form-group" style="display:flex;align-items:center;gap:1rem;">
+        <input type="checkbox" class="toggle" id="w-advanced-enabled" ${wizardData.advanced ? 'checked' : ''}>
+        <label for="w-advanced-enabled" style="margin:0;cursor:pointer;">Enable Advanced Features</label>
+      </div>
+      <p class="muted" style="font-size:0.85rem;margin-top:1rem;color:var(--color-danger);font-weight:600;">Warning: Advanced settings can break functionality if misconfigured. Only enable if you understand the risks.</p>`;
   } else {
     content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Review your settings before saving.</p>
       <div style="background:var(--input-bg);padding:1rem;border-radius:8px;margin-bottom:1rem;">
       <div class="field-row"><span>TikTok User</span><span>${escapeHtml(wizardData.tiktok_user || '—')}</span></div>
-      <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '********' : 'Not set'}</span></div></div>
+      <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '********' : 'Not set'}</span></div>
+      <div class="field-row"><span>Advanced Features</span><span>${wizardData.advanced ? 'Enabled' : 'Disabled'}</span></div></div>
       <p class="muted" style="font-size:0.85rem;margin:0;">Plugins are disabled by default. You can enable them later from the dashboard.</p>`;
   }
 }
@@ -724,10 +813,52 @@ async function wizardNext() {
   } else if (wizardStep === 1) {
     const passInput = document.getElementById('w-rcon-password');
     wizardData.rcon_password = passInput.value;
+  } else if (wizardStep === 2) {
+    const adv = document.getElementById('w-advanced-enabled')?.checked || false;
+    if (adv && !wizardData.advanced) {
+      const confirmed = await _confirmAdvancedInWizard();
+      if (!confirmed) return;
+    }
+    wizardData.advanced = adv;
   }
-  if (wizardStep === 2) { await wizardSave(); return; }
+  if (wizardStep === 3) { await wizardSave(); return; }
   wizardStep++;
   renderWizardStep();
+}
+
+function _confirmAdvancedInWizard() {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('advanced-confirm-dialog');
+    const input = document.getElementById('advanced-confirm-input');
+    let okBtn = document.getElementById('advanced-confirm-ok');
+    let cancelBtn = document.getElementById('advanced-confirm-cancel');
+    if (!dlg || !input || !okBtn || !cancelBtn) { resolve(false); return; }
+    input.value = '';
+    dlg.classList.remove('hidden');
+    okBtn.disabled = true;
+
+    const onInput = () => { okBtn.disabled = input.value.trim() !== 'I understand the risks'; };
+    input.addEventListener('input', onInput);
+
+    const cleanup = () => {
+      dlg.classList.add('hidden');
+      input.removeEventListener('input', onInput);
+      const newOk = okBtn.cloneNode(true);
+      const newCancel = cancelBtn.cloneNode(true);
+      okBtn.parentNode.replaceChild(newOk, okBtn);
+      cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+    };
+
+    const handleOk = () => {
+      if (input.value.trim() !== 'I understand the risks') return;
+      cleanup();
+      resolve(true);
+    };
+    const handleCancel = () => { cleanup(); resolve(false); };
+
+    okBtn.addEventListener('click', handleOk);
+    cancelBtn.addEventListener('click', handleCancel);
+  });
 }
 async function wizardSave() {
   const nextBtn = document.getElementById('wizard-next');
@@ -741,6 +872,7 @@ async function wizardSave() {
     if (!cfg.rcon) cfg.rcon = {};
     cfg.rcon.password = wizardData.rcon_password;
     cfg.rcon.enabled = true;
+    cfg.config_advanced = wizardData.advanced || false;
     await putJSON('/config', { config: cfg, backup: true });
     await postJSON('/reload', {});
     if (cfg.rcon && cfg.rcon.password) {
@@ -2976,6 +3108,7 @@ class ReactionEditor {
     document.getElementById('reaction-add')?.addEventListener('click', () => this.startCreate());
     document.getElementById('reaction-wizard-back')?.addEventListener('click', () => this.wizardBack());
     document.getElementById('reaction-wizard-next')?.addEventListener('click', () => this.wizardNext());
+    document.getElementById('reaction-wizard-cancel')?.addEventListener('click', () => this._closeWizard());
     document.getElementById('reaction-delete-cancel')?.addEventListener('click', () => this._hideDeleteModal());
   }
 
@@ -3830,6 +3963,9 @@ function connectLogStream() {
         liveLog.add('API server stopping', 'warning', 'server');
       } else if (type.startsWith('plugin.')) {
         liveLog.add(payload.msg || type, payload.level || 'info', payload.plugin || 'plugin');
+      } else if (type.startsWith('tiktok.')) {
+        _lastTiktokEventTime = Date.now();
+        _updateTiktokStatusDisplay();
       } else if (type === 'dashboard.plugin_states') {
         renderLivePluginGrid(payload.plugins || {});
       } else if (type === 'dashboard.ecm_diagnostics') {
@@ -4122,6 +4258,9 @@ function switchView(viewId) {
     renderPluginManager();
     populatePluginSubnav();
   }
+  if (viewId === 'overlays') {
+    renderOverlayUrls();
+  }
 }
 
 /* For nav items that open an editor (Actions/Reactions/Settings) */
@@ -4132,8 +4271,31 @@ function switchToEditor(viewId, openFn) {
   openFn();
 }
 
+/* ─── Theme Toggle ─── */
+function _initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'dark'); // default to dark for this app
+  document.documentElement.setAttribute('data-theme', theme);
+  _updateThemeLabel(theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  _updateThemeLabel(next);
+}
+
+function _updateThemeLabel(theme) {
+  const label = document.getElementById('theme-label');
+  if (label) label.textContent = theme === 'dark' ? 'Light' : 'Dark';
+}
+
 /* ─── Init ─── */
 async function init() {
+  _initTheme();
   _initEditorVisibilityObserver();
   _initSidebarReveal();
   await loadHealth();
@@ -4149,6 +4311,19 @@ async function init() {
   _healthIntervalId = setInterval(loadHealth, 10000);
   _statusIntervalId = setInterval(loadStatus, 10000);
   _pluginsIntervalId = setInterval(loadPlugins, 5000);
+  _uptimeIntervalId = setInterval(() => {
+    const activeView = document.querySelector('.view.active');
+    if (activeView && activeView.id === 'view-status') {
+      _updateUptimeDisplay();
+    }
+    _updateTiktokStatusDisplay();
+  }, 1000);
+  _tiktokStatusIntervalId = setInterval(() => {
+    const now = Date.now();
+    if (_lastTiktokEventTime && (now - _lastTiktokEventTime >= 30000)) {
+      _updateTiktokStatusDisplay();
+    }
+  }, 5000);
   if (typeof pywebview !== 'undefined' && pywebview.api) {
     _closePollIntervalId = setInterval(_pollCloseRequest, 200);
   }

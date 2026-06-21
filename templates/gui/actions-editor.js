@@ -162,8 +162,9 @@ class ActionsEditor {
     html += `<div class="detail-commands"><h4>Commands</h4>`;
 
     (t.commands || []).forEach((cmd, ci) => {
+      const typeLabels = { vanilla: 'Minecraft Command', rcon: 'Server Command (RCON)', script: 'Script', overlay: 'Overlay', named_overlay: 'Named Overlay', shell: 'Shell' };
       const typeOpts = ['vanilla', 'rcon', 'script', 'overlay', 'named_overlay', 'shell'].map(ot =>
-        `<option value="${ot}" ${ot === cmd.type ? 'selected' : ''}>${ot}</option>`
+        `<option value="${ot}" ${ot === cmd.type ? 'selected' : ''}>${typeLabels[ot] || ot}</option>`
       ).join('');
 
       html += `<div class="detail-command" data-cmd-index="${ci}">
@@ -386,7 +387,49 @@ class ActionsEditor {
     this._hideAddError();
     this.addModal.classList.remove('hidden');
     this.addTypeSelect.value = 'event';
+    this._populateEventSelect();
     this._onAddTypeChange();
+  }
+
+  _populateEventSelect() {
+    const select = document.getElementById('actions-add-event-name');
+    const customInput = document.getElementById('actions-add-event-custom');
+    if (!select) return;
+    // Build set of known events plus any existing custom triggers
+    const known = ['follow','join','comment','likes','like_2','share'];
+    const existing = new Set();
+    for (const t of this.triggers) {
+      if (t.type === 'Event' || t.type === 'Custom') {
+        const name = (t.name || '').toLowerCase().replace(/^'|'$/g, '');
+        if (name && !known.includes(name)) existing.add(name);
+      }
+    }
+    // Sort custom like triggers numerically
+    const customLikes = Array.from(existing).filter(n => n.startsWith('like_')).sort((a,b) => {
+      const na = parseInt(a.replace('like_','')) || 0;
+      const nb = parseInt(b.replace('like_','')) || 0;
+      return na - nb;
+    });
+    const others = Array.from(existing).filter(n => !n.startsWith('like_')).sort();
+    let html = '';
+    for (const ev of known) html += `<option value="${ev}">${ev.charAt(0).toUpperCase() + ev.slice(1)}</option>`;
+    if (customLikes.length) {
+      html += `<optgroup label="Custom Likes">`;
+      for (const ev of customLikes) html += `<option value="${ev}">${ev}</option>`;
+      html += `</optgroup>`;
+    }
+    if (others.length) {
+      html += `<optgroup label="Custom Events">`;
+      for (const ev of others) html += `<option value="${ev}">${ev}</option>`;
+      html += `</optgroup>`;
+    }
+    html += `<option value="__custom__">Custom</option>`;
+    select.innerHTML = html;
+    select.onchange = () => {
+      const isCustom = select.value === '__custom__';
+      if (customInput) customInput.classList.toggle('hidden', !isCustom);
+      if (isCustom && customInput) customInput.focus();
+    };
   }
 
   _closeAddModal() {
@@ -460,10 +503,19 @@ class ActionsEditor {
     if (type === 'gift') return;
     if (type !== 'event') {
       this._addTrigger(type, 'Custom');
-    } else {
-      const eventName = this.addEventName?.value || type;
-      this._addTrigger(eventName, 'Event');
+      return;
     }
+    const select = document.getElementById('actions-add-event-name');
+    const customInput = document.getElementById('actions-add-event-custom');
+    let eventName = select?.value || '';
+    if (eventName === '__custom__') {
+      eventName = customInput?.value?.trim() || '';
+    }
+    if (!eventName) {
+      this._showAddError('Please select or enter an event name.');
+      return;
+    }
+    this._addTrigger(eventName, 'Event');
   }
 
   _addTrigger(name, type) {

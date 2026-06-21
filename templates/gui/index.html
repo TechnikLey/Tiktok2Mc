@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok2Mc Dashboard</title>
-    <link rel="stylesheet" href="./design-system.css?v=1">
-    <link rel="stylesheet" href="./style.css?v=5">
+    <link rel="stylesheet" href="./design-system.css?v=3">
+    <link rel="stylesheet" href="./style.css?v=7">
 </head>
 <body>
     <div class="app-layout">
@@ -32,6 +32,10 @@
                     <svg class="nav-chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" fill="currentColor"/></svg>
                 </a>
                 <div class="nav-sublist" id="plugin-subnav"></div>
+                <a class="nav-item" data-view="overlays" onclick="switchView('overlays')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="currentColor"/></svg>
+                    <span class="nav-label">Overlays</span>
+                </a>
                 <a class="nav-item" data-view="actions" onclick="switchToEditor('actions', () => actionsEditor.open())">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 000-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z" fill="currentColor"/></svg>
                     <span class="nav-label">Actions</span>
@@ -59,8 +63,16 @@
             </nav>
 
             <div class="sidebar-footer">
-                <div id="status-pill" class="offline">Connecting...</div>
+                <div class="sidebar-status-row">
+                    <div id="status-pill" class="offline">Connecting...</div>
+                    <div id="tiktok-status-pill" class="tiktok-status offline" title="TikTok Live connection status">Offline</div>
+                </div>
                 <button class="btn btn--danger btn--sm" onclick="promptShutdown()">Shutdown</button>
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+                    <svg class="theme-icon-light" viewBox="0 0 24 24" width="14" height="14"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 000-1.41.996.996 0 00-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 000 1.41.996.996 0 001.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06z" fill="currentColor"/></svg>
+                    <svg class="theme-icon-dark" viewBox="0 0 24 24" width="14" height="14"><path d="M9 2c-1.05 0-2.05.16-3 .46 1.69 1.23 2.8 3.24 2.8 5.54 0 3.87-3.13 7-7 7-.57 0-1.13-.07-1.67-.2C2.72 18.84 6.5 22 11 22c5.52 0 10-4.48 10-10S16.52 2 11 2z" fill="currentColor"/></svg>
+                    <span id="theme-label">Dark</span>
+                </button>
             </div>
         </aside>
         <div class="sidebar-reveal" title="Show sidebar"></div>
@@ -103,10 +115,6 @@
                     <section class="view-section">
                         <h3>Plugin Management</h3>
                         <div id="plugin-manager-table"></div>
-                    </section>
-                    <section class="view-section">
-                        <h3>Overlay URLs</h3>
-                        <div id="overlay-urls" class="overlay-urls"></div>
                     </section>
                 </div>
 
@@ -197,6 +205,17 @@
                     <span class="console-prompt">&gt;</span>
                     <input type="text" id="console-input" class="console-input" placeholder="Enter Minecraft command..." disabled autocomplete="off" spellcheck="false">
                 </div>
+            </div>
+
+            <!-- ─── Overlays ─── -->
+            <div class="view" id="view-overlays">
+                <div class="view-header">
+                    <h2>Overlays</h2>
+                </div>
+                <section class="view-section">
+                    <h3>Overlay URLs</h3>
+                    <div id="overlay-urls" class="overlay-urls"></div>
+                </section>
             </div>
 
             <!-- ─── Updates ─── -->
@@ -301,8 +320,8 @@
         <div class="form-group">
           <label>Trigger Type</label>
           <select id="actions-add-type" class="form-select">
-            <option value="event">Event (follow, join, comment, likes, etc.)</option>
-            <option value="gift">Gift (visual picker from database)</option>
+            <option value="event">Event</option>
+            <option value="gift">Gift</option>
           </select>
         </div>
 
@@ -314,9 +333,10 @@
             <option value="join">Join</option>
             <option value="comment">Comment</option>
             <option value="likes">Likes</option>
-            <option value="like_2">Like_2 (milestone)</option>
+            <option value="like_2">Like_2</option>
             <option value="share">Share</option>
           </select>
+          <input type="text" id="actions-add-event-custom" class="form-input hidden" placeholder="Enter custom event name..." style="margin-top:0.5rem;">
         </div>
 
         <!-- Gift panel -->
@@ -376,7 +396,10 @@
         <div class="wizard-body reaction-wizard-body" id="reaction-wizard-body"></div>
         <div class="wizard-footer" id="reaction-wizard-footer">
           <button class="btn btn--secondary" id="reaction-wizard-back">Back</button>
-          <button class="btn btn--primary" id="reaction-wizard-next">Next</button>
+          <div style="display:flex;gap:var(--space-3);">
+            <button class="btn btn--secondary" id="reaction-wizard-cancel">Cancel</button>
+            <button class="btn btn--primary" id="reaction-wizard-next">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -500,8 +523,8 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="./actions-editor.js?v=1"></script>
-    <script src="./app.js?v=4"></script>
+    <script src="./actions-editor.js?v=3"></script>
+    <script src="./app.js?v=6"></script>
 </div>
 </body>
 </html>
