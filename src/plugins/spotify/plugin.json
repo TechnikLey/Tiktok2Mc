@@ -44,6 +44,7 @@
         "type": "string",
         "default": "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control",
         "label": "Redirect URI",
+        "advanced": true,
         "category": "Authentication"
       },
       {
@@ -52,6 +53,7 @@
         "default": "",
         "label": "Device ID",
         "help": "Leave empty to use the currently active Spotify device",
+        "advanced": true,
         "category": "Playback"
       },
       {
@@ -83,6 +85,7 @@
         },
         "label": "Signal On",
         "help": "Events published to the EventBus via POST /api/v1/events",
+        "advanced": true,
         "category": "Events"
       },
       {

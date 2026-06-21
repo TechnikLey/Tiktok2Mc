@@ -74,6 +74,7 @@
         },
         "label": "Reset On",
         "help": "Events that trigger an automatic reset: zero = timer hits zero; manual = reset command; command = any set_time/add_time command",
+        "advanced": true,
         "category": "Timer"
       },
       {
@@ -86,6 +87,7 @@
         },
         "label": "Signal On",
         "help": "Timer events published to the EventBus via POST /api/v1/events. Consumers (hooks, other plugins) can subscribe without coupling.",
+        "advanced": true,
         "category": "Events"
       },
       {
@@ -98,6 +100,7 @@
         },
         "label": "Milestones (seconds)",
         "help": "List of times (seconds) at which a timer.milestone event is emitted. Count-down triggers at or below; count-up triggers at or above.",
+        "advanced": true,
         "category": "Events"
       },
       {

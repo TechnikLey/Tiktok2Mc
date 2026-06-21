@@ -46,6 +46,7 @@
         },
         "label": "Signal On",
         "help": "Events published to the EventBus via POST /api/v1/events",
+        "advanced": true,
         "category": "Events"
       },
       {
