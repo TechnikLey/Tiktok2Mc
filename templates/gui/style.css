@@ -573,6 +573,7 @@ tr:last-child td { border-bottom: none; }
   border-radius: var(--radius-md);
   padding: var(--space-3);
   line-height: var(--leading-mono);
+  user-select: text;
 }
 .log-line {
   display: flex;
@@ -1247,6 +1248,7 @@ input[type="color"] {
   pointer-events: auto;
   animation: toast-enter var(--transition-enter) both;
   max-width: 400px;
+  white-space: pre-wrap;
 }
 .toast.error { border-left-color: var(--color-danger); }
 .toast.success { border-left-color: var(--color-success); }
@@ -2238,9 +2240,10 @@ input[type="color"] {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
+  user-select: text;
 }
 
-.console-line { margin-bottom: 1px; }
+.console-line { margin-bottom: 1px; user-select: text; }
 .console-line--output { color: #c9d1d9; }
 .console-line--input { color: #58a6ff; }
 .console-line--error { color: #f85149; }

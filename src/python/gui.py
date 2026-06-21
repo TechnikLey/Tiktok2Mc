@@ -95,6 +95,22 @@ class LauncherAPI:
                 log.warning("Failed to destroy window: %s", e)
         return "closing"
 
+    def download_file(self, content: str, filename: str) -> str:
+        """Save content to the user's Downloads folder and return the path."""
+        import os
+        downloads = Path.home() / "Downloads"
+        try:
+            downloads.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            downloads = Path.home()
+        path = downloads / filename
+        try:
+            path.write_text(content, encoding="utf-8")
+            return str(path)
+        except Exception as e:
+            log.warning("Failed to save file: %s", e)
+            return f"error:{e}"
+
     # ---- Server control ----
     def start_system(self) -> str:
         """Start the full system (start.exe)."""
@@ -313,6 +329,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         height=800,
         min_size=(800, 600),
         js_api=launcher_api,
+        text_select=True,
     )
 
     if is_launcher:

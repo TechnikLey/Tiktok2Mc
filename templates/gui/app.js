@@ -212,15 +212,31 @@ class LiveLog {
 
   export() {
     const lines = this.entries.map(e => `[${e.time}] [${e.level.toUpperCase()}] ${e.source ? '(' + e.source + ') ' : ''}${e.message}`);
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const content = lines.join('\n');
+    const filename = `tiktok2mc-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+
+    // Use pywebview API if available (saves to Downloads), otherwise try browser download.
+    if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.download_file) {
+      pywebview.api.download_file(content, filename).then(path => {
+        if (path && !path.startsWith('error:')) {
+          showToast('Log exported successfully.\n' + path, 'success');
+        } else {
+          showToast('Export failed.', 'error');
+        }
+      });
+      return;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tiktok2mc-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToast('Log exported successfully.', 'success');
   }
 
   add(message, level = 'info', source = '') {
@@ -4059,6 +4075,58 @@ function updateEcmDiagnostics(payload) {
 
 /* ─── Minecraft Console Terminal ─── */
 
+function parseMinecraftColors(text) {
+  const colors = {
+    '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
+    '4': '#AA0000', '5': '#AA00AA', '6': '#FFAA00', '7': '#AAAAAA',
+    '8': '#555555', '9': '#5555FF', 'a': '#55FF55', 'b': '#55FFFF',
+    'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF',
+  };
+  const formats = {
+    'l': 'font-weight:bold;',
+    'm': 'text-decoration:line-through;',
+    'n': 'text-decoration:underline;',
+    'o': 'font-style:italic;',
+  };
+
+  let html = '';
+  let open = false;
+  let styleParts = [];
+
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '§' && i + 1 < text.length) {
+      const code = text[i + 1].toLowerCase();
+      if (colors[code] !== undefined || formats[code] !== undefined || code === 'r') {
+        if (open) {
+          html += '</span>';
+          open = false;
+        }
+        if (code === 'r') {
+          styleParts = [];
+        } else {
+          if (colors[code]) {
+            styleParts = styleParts.filter(s => !s.startsWith('color:'));
+            styleParts.push('color:' + colors[code] + ';');
+          }
+          if (formats[code]) {
+            styleParts.push(formats[code]);
+          }
+          html += '<span style="' + styleParts.join('') + '">';
+          open = true;
+        }
+        i++;
+        continue;
+      }
+    }
+    html += text[i]
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+  if (open) html += '</span>';
+  return html;
+}
+
 const consoleTerminal = {
   _history: [],
   _historyIdx: -1,
@@ -4148,7 +4216,11 @@ const consoleTerminal = {
     const output = document.getElementById('console-output');
     const line = document.createElement('div');
     line.className = 'console-line console-line--' + cls;
-    line.textContent = text;
+    if (text.includes('§')) {
+      line.innerHTML = parseMinecraftColors(text);
+    } else {
+      line.textContent = text;
+    }
     output.appendChild(line);
     output.scrollTop = output.scrollHeight;
   },
