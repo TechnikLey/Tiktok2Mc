@@ -281,7 +281,9 @@ def start_UPDATE_EXE_PATH():
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
     log_dir = ROOT_DIR / "logs" / "update_logs"
     if IS_WINDOWS:
-        proc = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        update_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
+        flags = subprocess.CREATE_NO_WINDOW if update_hidden else subprocess.CREATE_NEW_CONSOLE
+        proc = subprocess.Popen(cmd, creationflags=flags)
     else:
         log.info("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -362,7 +364,9 @@ if UPDATE_ENABLED:
             # PyInstaller 6.9+ requires reset env for processes that outlive us.
             env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
             if IS_WINDOWS:
-                subprocess.Popen(_args, creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True, env=env)
+                restart_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
+                flags = subprocess.CREATE_NO_WINDOW if restart_hidden else subprocess.CREATE_NEW_CONSOLE
+                subprocess.Popen(_args, creationflags=flags, close_fds=True, env=env)
             else:
                 subprocess.Popen(_args, env=env, start_new_session=True, close_fds=True)
             sys.exit(0)
@@ -567,6 +571,19 @@ async def _check_plugin_updates() -> None:
         return None
 
     data = await asyncio.to_thread(_fetch)
+    if data and data.get("updates_available", 0) > 0:
+        log.info(
+            "[UPDATES] %d plugin update(s) available:",
+            data["updates_available"],
+        )
+        for p in data.get("plugins", []):
+            if p.get("update_available") and p.get("display_name"):
+                log.info(
+                    "  - %s: %s -> %s",
+                    p["display_name"],
+                    p.get("current_version", "?"),
+                    p.get("latest_version", "?"),
+                )
 
 
 async def _fetch_plugin_path(plugin_name: str) -> str:
@@ -603,19 +620,6 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
             raise
 
     await asyncio.to_thread(_put)
-    if data and data.get("updates_available", 0) > 0:
-        log.info(
-            "[UPDATES] %d plugin update(s) available:",
-            data["updates_available"],
-        )
-        for p in data.get("plugins", []):
-            if p.get("update_available") and p.get("display_name"):
-                log.info(
-                    "  - %s: %s -> %s",
-                    p["display_name"],
-                    p.get("current_version", "?"),
-                    p.get("latest_version", "?"),
-                )
 
 
 # -----------------------------

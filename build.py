@@ -124,11 +124,14 @@ def main():
         # Add main EXEs
         for item in CORE_EXECUTABLES:
             suffix = item.get("suffix", SUFFIX)
-            all_build_tasks.append({
+            task = {
                 "name": item["name"] + suffix,
                 "src": item["src"],
                 "dest": item["dest"],
-            })
+            }
+            if item.get("windowed"):
+                task["windowed"] = True
+            all_build_tasks.append(task)
 
         # Find and add plugins
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
@@ -306,6 +309,10 @@ def main():
 
             # Hash the transitive dependency tree (no broad core_tree_hash)
             deps = resolve_transitive_imports(full_src)
+
+            # Include build.py itself so flag changes force a full rebuild
+            build_py = SCRIPT_DIR / "build.py"
+
             dep_hasher = hashlib.sha256()
             dep_hasher.update(current_hash.encode())
             for dep in sorted(deps):
@@ -315,6 +322,8 @@ def main():
                     dep_hasher.update(sha256_file(dep_path).encode())
                 else:
                     dep_hasher.update(b"")
+            if build_py.exists():
+                dep_hasher.update(sha256_file(build_py).encode())
             combined_hash = dep_hasher.hexdigest()
 
             if (hash_file.exists() and dep_hash_file.exists() and cache_exe.exists()):
