@@ -60,3 +60,19 @@ async def restart_server():
     except Exception as e:
         log.exception("Failed to request Minecraft Server restart")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/shutdown/now")
+async def shutdown_now():
+    """Trigger immediate shutdown of the entire application."""
+    import sys
+    import threading
+
+    log.info("Shutdown requested via API – calling sys.exit")
+
+    def _exit():
+        sys.exit(0)
+
+    # Give the HTTP response a moment to leave the wire, then exit.
+    threading.Timer(0.3, _exit).start()
+    return {"status": "shutdown_requested"}
