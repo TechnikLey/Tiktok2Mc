@@ -11,7 +11,6 @@ class ActionsEditor {
     this.tableBody = document.getElementById('actions-table-body');
     this.detailPanel = document.getElementById('actions-detail');
     this.addBtn = document.getElementById('actions-add-trigger');
-    this.closeBtn = document.getElementById('actions-editor-close');
     this.saveBtn = document.getElementById('actions-editor-save');
 
     // Add modal elements
@@ -34,7 +33,6 @@ class ActionsEditor {
   }
 
   _bindEvents() {
-    this.closeBtn?.addEventListener('click', () => this.close());
     this.saveBtn?.addEventListener('click', () => this.save());
     this.addBtn?.addEventListener('click', () => this.openAddModal());
     this.addTypeSelect?.addEventListener('change', () => this._onAddTypeChange());

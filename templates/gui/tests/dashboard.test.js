@@ -138,7 +138,7 @@ describe('loadStatus', () => {
 
 /* ─── loadPlugins ─── */
 describe('loadPlugins', () => {
-  it('renders plugin summary and manager', async () => {
+  it('renders plugin manager table', async () => {
     globalThis.fetch = async () => ({
       ok: true, status: 200, statusText: 'OK',
       json: async () => ({
@@ -147,17 +147,10 @@ describe('loadPlugins', () => {
         ],
       }),
     });
-    const summary = document.getElementById('plugin-summary');
     await loadPlugins();
-    expect(summary.textContent).toContain('1 plugins (1 enabled).');
     expect(currentPlugins).toHaveLength(1);
-  });
-
-  it('shows failed message on error', async () => {
-    globalThis.fetch = async () => { throw new Error('fail'); };
-    const summary = document.getElementById('plugin-summary');
-    await loadPlugins();
-    expect(summary.textContent).toBe('Failed to load plugins.');
+    const table = document.getElementById('plugin-manager-table');
+    expect(table.innerHTML).toContain('spotify');
   });
 });
 
@@ -358,18 +351,28 @@ describe('showWizard / hideWizard', () => {
   });
 });
 
-/* ─── openPluginManager / closePluginManager ─── */
-describe('openPluginManager / closePluginManager', () => {
-  it('opens plugin manager', () => {
-    openPluginManager();
-    const el = document.getElementById('plugin-manager');
-    expect(el.classList.contains('hidden')).toBe(false);
+/* ─── togglePluginNav / populatePluginSubnav ─── */
+describe('togglePluginNav / populatePluginSubnav', () => {
+  beforeEach(() => {
+    currentPlugins = [
+      { name: 'spotify', display_name: 'Spotify' },
+      { name: 'timer', display_name: 'Timer' },
+    ];
+    document.body.innerHTML += '<div id="plugin-subnav"></div>';
+    document.querySelector('.nav-item[data-view="plugins"]')?.classList.remove('expanded');
   });
 
-  it('closes plugin manager', () => {
-    closePluginManager();
-    const el = document.getElementById('plugin-manager');
-    expect(el.classList.contains('hidden')).toBe(true);
+  it('populates plugin sub-nav', () => {
+    populatePluginSubnav();
+    const items = document.querySelectorAll('.nav-subitem');
+    expect(items.length).toBe(2);
+    expect(items[0].textContent).toBe('Spotify');
+  });
+
+  it('toggles plugin nav expansion', () => {
+    togglePluginNav();
+    expect(document.querySelector('.nav-item[data-view="plugins"]').classList.contains('expanded')).toBe(true);
+    expect(document.getElementById('plugin-subnav').classList.contains('expanded')).toBe(true);
   });
 });
 

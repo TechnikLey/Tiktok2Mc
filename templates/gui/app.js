@@ -451,28 +451,20 @@ function getPluginStatus(p) {
 }
 
 async function loadPlugins() {
-  const summary = document.getElementById('plugin-summary');
   try {
     const data = await fetchJSON('/plugins');
     currentPlugins = data.plugins || [];
-    const enabled = currentPlugins.filter(p => p.enabled).length;
-    if (summary) {
-      summary.textContent = currentPlugins.length
-        ? `${currentPlugins.length} plugins (${enabled} enabled).`
-        : 'No plugins found.';
-    }
     renderPluginManager();
     renderOverlayUrls();
+    populatePluginSubnav();
   } catch (e) {
-    if (summary) summary.textContent = 'Failed to load plugins.';
     log('Plugins load failed: ' + e.message, 'err');
   }
 }
 
-function     renderOverlayUrls() {
+function renderOverlayUrls() {
   const containers = [
-    document.getElementById('overlay-urls'),
-    document.getElementById('plugin-manager-urls')
+    document.getElementById('overlay-urls')
   ];
   // Built-in overlay URLs
   let html = '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">Built-in Overlay</h3>';
@@ -519,21 +511,49 @@ function renderPluginManager() {
       <td data-label="Version">${p.version || '-'}</td>
       <td data-label="Port">${p.port || '-'}</td>
       <td data-label="Status"><span class="plugin-status ${status.cls}">${status.label}</span></td>
-      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="pluginEditor.open('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td>
+      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="pluginEditor.openInline('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td>
     </tr>`;
   }
   html += '</tbody></table>';
   tableDiv.innerHTML = html;
 }
 
-function openPluginManager() {
-  _hideAllEditors();
-  renderPluginManager();
-  document.getElementById('plugin-manager').classList.remove('hidden');
+/* ─── Plugin View & Sub-nav ─── */
+let _pluginNavExpanded = false;
+
+function togglePluginNav() {
+  _pluginNavExpanded = !_pluginNavExpanded;
+  document.querySelector('.nav-item[data-view="plugins"]').classList.toggle('expanded', _pluginNavExpanded);
+  document.getElementById('plugin-subnav').classList.toggle('expanded', _pluginNavExpanded);
+  switchView('plugins');
 }
 
-function closePluginManager() {
-  document.getElementById('plugin-manager').classList.add('hidden');
+function populatePluginSubnav() {
+  const container = document.getElementById('plugin-subnav');
+  if (!container) return;
+  container.innerHTML = currentPlugins.map(p =>
+    `<div class="nav-subitem" data-plugin="${p.name}" onclick="openInlinePluginConfig('${p.name}', '${escapeHtml(p.display_name || p.name)}')">${escapeHtml(p.display_name || p.name)}</div>`
+  ).join('');
+}
+
+function openInlinePluginConfig(pluginName, displayName) {
+  // Close any other editors first
+  _hideAllEditors();
+  // Deactivate other nav items
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
+  // Update sub-nav active state
+  document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
+  const sub = document.querySelector(`.nav-subitem[data-plugin="${pluginName}"]`);
+  if (sub) sub.classList.add('active');
+  // Expand plugin nav
+  if (!_pluginNavExpanded) togglePluginNav();
+  // Open config inline
+  pluginEditor.openInline(pluginName, displayName);
+}
+
+function closeInlinePluginConfig() {
+  pluginEditor.closeInline();
 }
 
 function copyUrl(btn, url) {
@@ -1957,17 +1977,34 @@ class PluginConfigEditor {
     this.searchQuery = '';
     this.sidebar = document.getElementById('plugin-editor-sidebar');
     this.content = document.getElementById('plugin-editor-content');
+    this.searchInput = document.getElementById('plugin-editor-search');
+    this.saveBtn = document.getElementById('plugin-editor-save');
     this.activeCategory = null;
     this.hasSchema = false;
+    this._inlineMode = false;
   }
 
-  async open(pluginName, displayName) {
-    this.pluginName = pluginName;
-    this.displayName = displayName || pluginName;
-    this.searchQuery = '';
-    document.getElementById('plugin-editor-search').value = '';
-    this.errors.clear();
+  _swapElements(inline) {
+    this._inlineMode = inline;
+    if (inline) {
+      this._origSidebar = this.sidebar;
+      this._origContent = this.content;
+      this._origSearchInput = this.searchInput;
+      this._origSaveBtn = this.saveBtn;
+      this.sidebar = document.getElementById('plugins-config-sidebar');
+      this.content = document.getElementById('plugins-config-content');
+      this.searchInput = document.getElementById('plugins-config-search');
+      this.saveBtn = document.getElementById('plugins-config-save');
+    } else {
+      this.sidebar = this._origSidebar || document.getElementById('plugin-editor-sidebar');
+      this.content = this._origContent || document.getElementById('plugin-editor-content');
+      this.searchInput = this._origSearchInput || document.getElementById('plugin-editor-search');
+      this.saveBtn = this._origSaveBtn || document.getElementById('plugin-editor-save');
+      this._origSidebar = this._origContent = this._origSearchInput = this._origSaveBtn = null;
+    }
+  }
 
+  async _loadConfig(pluginName) {
     try {
       const [cfgRes, schemaRes] = await Promise.all([
         fetchJSON(`/plugins/${encodeURIComponent(pluginName)}/config`),
@@ -1980,6 +2017,21 @@ class PluginConfigEditor {
     } catch (e) {
       log('Failed to load plugin config: ' + e.message, 'err');
       this.showToast('Failed to load config: ' + e.message, 'error');
+      throw e;
+    }
+  }
+
+  async open(pluginName, displayName) {
+    this._swapElements(false);
+    this.pluginName = pluginName;
+    this.displayName = displayName || pluginName;
+    this.searchQuery = '';
+    this.searchInput.value = '';
+    this.errors.clear();
+
+    try {
+      await this._loadConfig(pluginName);
+    } catch (e) {
       return;
     }
 
@@ -1991,12 +2043,43 @@ class PluginConfigEditor {
     this._attachInputListeners();
   }
 
+  async openInline(pluginName, displayName) {
+    this._swapElements(true);
+    this.pluginName = pluginName;
+    this.displayName = displayName || pluginName;
+    this.searchQuery = '';
+    this.searchInput.value = '';
+    this.errors.clear();
+
+    try {
+      await this._loadConfig(pluginName);
+    } catch (e) {
+      return;
+    }
+
+    document.getElementById('plugins-config-title').textContent = escapeHtml(this.displayName) + ' Configuration';
+    // Hide plugin list, show config section
+    document.getElementById('plugin-list-section').classList.add('hidden');
+    document.getElementById('plugins-config-section').classList.remove('hidden');
+    this.render();
+    this.setupScrollSpy();
+    this._updateSaveButton();
+    this._attachInputListeners();
+  }
+
+  onInlineSearch(query) {
+    this.searchQuery = query.toLowerCase();
+    this.renderContent();
+  }
+
   isDirty() {
     return JSON.stringify(this.config) !== JSON.stringify(this.original);
   }
 
   _updateSaveButton() {
-    const btn = document.getElementById('plugin-editor-save');
+    const btn = this._inlineMode
+      ? document.getElementById('plugins-config-save')
+      : document.getElementById('plugin-editor-save');
     if (!btn) return;
     const dirty = this.isDirty();
     btn.disabled = !dirty;
@@ -2028,6 +2111,10 @@ class PluginConfigEditor {
   }
 
   close() {
+    if (this._inlineMode) {
+      this.closeInline();
+      return;
+    }
     if (this.isDirty()) {
       showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
         if (!confirmed) return;
@@ -2042,6 +2129,31 @@ class PluginConfigEditor {
     this._detachInputListeners();
     document.getElementById('plugin-config-editor').classList.add('hidden');
     document.getElementById('plugin-review-modal').classList.add('hidden');
+  }
+
+  closeInline() {
+    if (this.isDirty()) {
+      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Go back anyway?', 'Go Back', 'btn-danger').then(confirmed => {
+        if (!confirmed) return;
+        this._detachInputListeners();
+        this.config = JSON.parse(JSON.stringify(this.original));
+        this._updateSaveButton();
+        this._hideInline();
+      });
+      return;
+    }
+    this._detachInputListeners();
+    this._hideInline();
+  }
+
+  _hideInline() {
+    document.getElementById('plugins-config-section').classList.add('hidden');
+    document.getElementById('plugin-list-section').classList.remove('hidden');
+    document.getElementById('plugin-review-modal').classList.add('hidden');
+    // Deactivate sub-nav items
+    document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
+    // Reactivate the plugins nav item
+    document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
   }
 
   /* ─── Rendering ─── */
@@ -2714,7 +2826,6 @@ class ReactionEditor {
   }
 
   _bindEvents() {
-    document.getElementById('reaction-close')?.addEventListener('click', () => this.close());
     document.getElementById('reaction-add')?.addEventListener('click', () => this.startCreate());
     document.getElementById('reaction-wizard-back')?.addEventListener('click', () => this.wizardBack());
     document.getElementById('reaction-wizard-next')?.addEventListener('click', () => this.wizardNext());
@@ -3732,8 +3843,6 @@ const consoleTerminal = {
       const data = await res.json();
       if (data.response) {
         this._print(data.response, 'output');
-      } else {
-        this._print('(no output)', 'output');
       }
     } catch (e) {
       this._print('Error: ' + e.message, 'error');
@@ -3798,17 +3907,28 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ─── Sidebar ─── */
 let _sidebarMode = 0;
 const SIDEBAR_MODES = ['full', 'icons', 'hide'];
-function cycleSidebar() {
-  _sidebarMode = (_sidebarMode + 1) % 3;
+function _setSidebarMode(mode) {
+  _sidebarMode = mode;
   const sidebar = document.querySelector('.sidebar');
   sidebar.classList.remove('full', 'icons', 'hide');
   sidebar.classList.add(SIDEBAR_MODES[_sidebarMode]);
   document.querySelector('.app-layout').classList.toggle('sidebar-hidden', _sidebarMode === 2);
 }
+function cycleSidebar() {
+  // Toggle between full (0) and icons (1)
+  _setSidebarMode(_sidebarMode === 0 ? 1 : 0);
+}
+function hideSidebar() {
+  _setSidebarMode(2);
+}
 function _initSidebarReveal() {
+  const reveal = document.querySelector('.sidebar-reveal');
+  reveal?.addEventListener('click', () => {
+    if (_sidebarMode === 2) _setSidebarMode(0);
+  });
   document.querySelector('.app-layout')?.addEventListener('click', (e) => {
-    if (_sidebarMode === 2 && e.clientX < 10) {
-      cycleSidebar();
+    if (_sidebarMode === 2 && e.clientX < 18) {
+      _setSidebarMode(0);
     }
   });
 }
@@ -3838,10 +3958,23 @@ function _initEditorVisibilityObserver() {
 /* ─── Sidebar Navigation ─── */
 function switchView(viewId) {
   _hideAllEditors();
+  // Close inline plugin config if open
+  const inlineSection = document.getElementById('plugins-config-section');
+  if (inlineSection && !inlineSection.classList.contains('hidden')) {
+    inlineSection.classList.add('hidden');
+    document.getElementById('plugin-list-section')?.classList.remove('hidden');
+    pluginEditor._detachInputListeners();
+    document.getElementById('plugin-review-modal')?.classList.add('hidden');
+    document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
+  }
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelector(`.nav-item[data-view="${viewId}"]`)?.classList.add('active');
   document.getElementById('view-' + viewId)?.classList.add('active');
+  if (viewId === 'plugins') {
+    renderPluginManager();
+    populatePluginSubnav();
+  }
 }
 
 /* For nav items that open an editor (Actions/Reactions/Settings) */

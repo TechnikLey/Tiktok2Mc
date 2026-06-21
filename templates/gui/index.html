@@ -14,7 +14,10 @@
                 <h1 class="sidebar-title">TikTok2Mc</h1>
                 <button class="sidebar-toggle" onclick="cycleSidebar()" title="Toggle sidebar">
                     <svg class="toggle-full" viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
-                    <svg class="toggle-icons" viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+                    <svg class="toggle-icons" viewBox="0 0 24 24" width="20" height="20"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" fill="currentColor"/></svg>
+                </button>
+                <button class="sidebar-hide-btn" onclick="hideSidebar()" title="Hide sidebar">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/></svg>
                 </button>
             </div>
 
@@ -23,10 +26,12 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/></svg>
                     <span class="nav-label">Status</span>
                 </a>
-                <a class="nav-item" data-view="plugins" onclick="switchToEditor('plugins', openPluginManager)">
+                <a class="nav-item" data-view="plugins" onclick="togglePluginNav()">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
                     <span class="nav-label">Plugins</span>
+                    <svg class="nav-chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" fill="currentColor"/></svg>
                 </a>
+                <div class="nav-sublist" id="plugin-subnav"></div>
                 <a class="nav-item" data-view="actions" onclick="switchToEditor('actions', () => actionsEditor.open())">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 000-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z" fill="currentColor"/></svg>
                     <span class="nav-label">Actions</span>
@@ -58,7 +63,7 @@
                 <button class="btn btn--danger btn--sm" onclick="promptShutdown()">Shutdown</button>
             </div>
         </aside>
-        <div class="sidebar-reveal" onclick="cycleSidebar()" title="Show sidebar"></div>
+        <div class="sidebar-reveal" title="Show sidebar"></div>
 
         <main id="dashboard" class="dashboard-content hidden">
             <div id="restart-pending-banner" class="restart-banner hidden">
@@ -91,20 +96,41 @@
 
             <!-- ─── Plugins ─── -->
             <div class="view" id="view-plugins">
-                <div class="view-header">
-                    <h2>Plugins</h2>
+                <div id="plugin-list-section">
+                    <div class="view-header">
+                        <h2>Plugins</h2>
+                    </div>
+                    <section class="view-section">
+                        <h3>Plugin Management</h3>
+                        <div id="plugin-manager-table"></div>
+                    </section>
+                    <section class="view-section">
+                        <h3>Overlay URLs</h3>
+                        <div id="overlay-urls" class="overlay-urls"></div>
+                    </section>
                 </div>
 
-                <section class="view-section">
-                    <h3>Plugin Summary</h3>
-                    <div id="plugin-summary" class="text-muted">Loading...</div>
-                    <button class="btn btn--primary" style="margin-top:16px" onclick="openPluginManager()">Open Plugin Manager</button>
-                </section>
-
-                <section class="view-section">
-                    <h3>Overlay URLs</h3>
-                    <div id="overlay-urls" class="overlay-urls"></div>
-                </section>
+                <div id="plugins-config-section" class="hidden">
+                    <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
+                        <h2 id="plugins-config-title">Configuration</h2>
+                        <button class="btn btn--secondary" onclick="closeInlinePluginConfig()">← Back to Plugins</button>
+                    </div>
+                    <div class="plugins-config-layout">
+                        <nav class="editor-sidebar" id="plugins-config-sidebar"></nav>
+                        <div class="editor-main">
+                            <div class="editor-topbar">
+                                <div class="editor-search">
+                                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                    <input type="text" id="plugins-config-search" placeholder="Search settings..." oninput="pluginEditor.onInlineSearch(this.value)">
+                                </div>
+                                <div class="header-actions">
+                                    <button class="btn btn--primary btn-save-disabled" id="plugins-config-save" onclick="pluginEditor.save()" disabled>Save Changes</button>
+                                </div>
+                            </div>
+                            <div class="editor-content" id="plugins-config-content"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- ─── Log ─── -->
@@ -212,22 +238,6 @@
         </div>
     </div>
 
-    <!-- Plugin Manager -->
-    <div id="plugin-manager" class="editor-overlay hidden">
-        <div class="plugin-layout">
-            <div class="plugin-topbar">
-                <h2>Plugin Management</h2>
-                <div class="header-actions">
-                    <button class="btn btn--secondary" onclick="closePluginManager()">Close</button>
-                </div>
-            </div>
-            <div class="plugin-body" id="plugin-manager-body">
-                <div id="plugin-manager-table"></div>
-                <div id="plugin-manager-urls" class="updates-detail"></div>
-            </div>
-        </div>
-    </div>
-
     <!-- Config Editor -->
     <div id="config-editor" class="editor-overlay hidden">
         <div class="editor-layout">
@@ -240,7 +250,6 @@
                         <input type="text" id="editor-search" placeholder="Search settings..." oninput="editor.onSearch(this.value)">
                     </div>
                     <div class="header-actions">
-                        <button class="btn btn--secondary" onclick="editor.close()">Close</button>
                         <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled>Save Changes</button>
                     </div>
                 </div>
@@ -255,7 +264,6 @@
         <div class="actions-topbar">
           <h2>Actions Editor</h2>
           <div class="header-actions">
-            <button class="btn btn--secondary" id="actions-editor-close">Close</button>
             <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled>Save Changes</button>
           </div>
         </div>
@@ -348,7 +356,6 @@
             <div class="header-actions">
               <button class="btn btn--primary" id="reaction-add" onclick="reactionEditor.startCreate()">+ Create Reaction</button>
               <button class="btn btn--primary btn-save-disabled" id="reaction-save" onclick="reactionEditor.save()" disabled>Save Changes</button>
-              <button class="btn btn--secondary" id="reaction-close">Close</button>
             </div>
           </div>
           <!-- Content -->
@@ -396,7 +403,6 @@
                         <input type="text" id="plugin-editor-search" placeholder="Search settings..." oninput="pluginEditor.onSearch(this.value)">
                     </div>
                     <div class="header-actions">
-                        <button class="btn btn--secondary" onclick="pluginEditor.close()">Close</button>
                         <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled>Save Changes</button>
                     </div>
                 </div>

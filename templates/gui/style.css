@@ -67,16 +67,16 @@ body {
 .sidebar.icons { width: 56px; }
 .sidebar.icons .sidebar-title,
 .sidebar.icons .nav-label { display: none; }
-.sidebar.icons .sidebar-toggle { width: 100%; }
+.sidebar.icons .sidebar-toggle { width: auto; }
 .sidebar.icons .toggle-full { display: none; }
 .sidebar.icons .toggle-icons { display: block; }
-.sidebar.icons .sidebar-brand { justify-content: center; padding: var(--space-4) var(--space-2); }
+.sidebar.icons .sidebar-brand { justify-content: center; padding: var(--space-4) var(--space-2); gap: var(--space-1); }
 .sidebar.icons .nav-item { justify-content: center; padding: var(--space-3) 0; }
 .sidebar.icons .nav-icon { margin: 0; width: 20px; height: 20px; }
-.sidebar.icons .sidebar-footer { align-items: center; padding: var(--space-3) var(--space-2); }
-.sidebar.icons .sidebar-footer .btn--danger { width: 32px; height: 32px; padding: 0; font-size: 0; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; }
-.sidebar.icons .sidebar-footer .btn--danger::after { content: '⏻'; font-size: var(--text-lg); }
-.sidebar.icons #status-pill { width: 8px; height: 8px; padding: 0; font-size: 0; border-radius: var(--radius-full); min-width: 0; }
+.sidebar.icons .sidebar-footer { align-items: center; padding: var(--space-3) var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+.sidebar.icons .sidebar-footer .btn--danger { width: 32px; height: 32px; padding: 0; font-size: 0; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; line-height: 1; border: none; min-width: 32px; }
+.sidebar.icons .sidebar-footer .btn--danger::after { content: '⏻'; font-size: 18px; line-height: 1; }
+.sidebar.icons #status-pill { width: 10px; height: 10px; padding: 0; font-size: 0; border-radius: var(--radius-full); min-width: 10px; display: inline-block; line-height: 1; }
 
 .sidebar.hide { width: 0; min-width: 0; padding: 0; overflow: hidden; border: none; flex: 0; }
 .sidebar.hide + .sidebar-reveal { display: block; }
@@ -113,6 +113,82 @@ body {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
 }
+.nav-chevron {
+  margin-left: auto;
+  transition: transform var(--transition-fast);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.nav-item.expanded .nav-chevron {
+  transform: rotate(90deg);
+}
+
+/* ─── Sub-nav (plugin list) ─── */
+.nav-sublist {
+  display: none;
+  overflow: hidden;
+  margin: 0 var(--space-2);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border-left: 2px solid var(--color-border);
+}
+.nav-sublist.expanded {
+  display: block;
+}
+.nav-subitem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-8);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 0;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid transparent;
+}
+.nav-subitem:first-child {
+  margin-top: var(--space-1);
+}
+.nav-subitem:last-child {
+  margin-bottom: var(--space-1);
+}
+.nav-subitem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 2px;
+  background: transparent;
+  border-radius: 1px;
+  transition: background var(--transition-fast);
+}
+.nav-subitem:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+.nav-subitem:hover::before {
+  background: var(--color-text-muted);
+}
+.nav-subitem.active {
+  color: var(--color-accent);
+  background: transparent;
+}
+.nav-subitem.active::before {
+  background: var(--color-accent);
+}
+.sidebar.icons .nav-sublist,
+.sidebar.hide .nav-sublist,
+.sidebar.icons .nav-chevron,
+.sidebar.hide .nav-chevron {
+  display: none !important;
+}
+
 .nav-icon {
   flex-shrink: 0;
   opacity: 0.7;
@@ -149,14 +225,56 @@ body {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 16px;
   z-index: 100;
   cursor: pointer;
   background: transparent;
   transition: background var(--transition-fast);
+  border-right: 2px solid transparent;
 }
 .sidebar-reveal:hover {
   background: var(--color-accent-subtle);
+  border-right-color: var(--color-accent);
+}
+.sidebar-reveal::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.sidebar-reveal:hover::after {
+  opacity: 1;
+  background: var(--color-accent);
+}
+
+/* ─── Sidebar Hide Button (icons mode only) ─── */
+.sidebar-hide-btn {
+  display: none;
+}
+.sidebar.icons .sidebar-hide-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.sidebar.icons .sidebar-hide-btn:hover {
+  color: var(--color-text);
+  background: var(--color-elevated);
 }
 
 /* ─── Dashboard Content ─── */
@@ -583,6 +701,40 @@ select.invalid { border-color: var(--color-danger) !important; }
 .btn-copy.copied { background: var(--color-success) !important; color: #fff !important; }
 
 /* ─── Config Editor Overlay ─── */
+/* ─── Plugins Inline Config ─── */
+#plugins-config-section.hidden { display: none; }
+.plugins-config-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 400px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+.plugins-config-layout .editor-sidebar {
+  width: 220px;
+}
+.plugins-config-layout .editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.plugins-config-layout .editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.plugins-config-layout .editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
 .editor-overlay {
   display: none;
   flex: 1;
@@ -1874,21 +2026,28 @@ input[type="color"] {
   .sidebar.icons .sidebar-footer,
   .sidebar.hide .sidebar-footer { flex-direction: row; padding: var(--space-2) var(--space-3); display: flex; }
   .sidebar.icons .sidebar-footer .btn--danger,
-  .sidebar.hide .sidebar-footer .btn--danger { font-size: var(--text-sm); width: auto; padding: var(--space-1) var(--space-3); }
+  .sidebar.hide .sidebar-footer .btn--danger { font-size: var(--text-sm); width: auto; padding: var(--space-1) var(--space-3); border-radius: var(--radius-md); height: auto; min-width: auto; line-height: inherit; }
   .sidebar.icons .sidebar-footer .btn--danger::after,
   .sidebar.hide .sidebar-footer .btn--danger::after { content: none; }
   .sidebar.icons #status-pill,
-  .sidebar.hide #status-pill { font-size: var(--text-xs); width: auto; padding: var(--space-1) var(--space-3); }
+  .sidebar.hide #status-pill { font-size: var(--text-xs); width: auto; height: auto; padding: var(--space-1) var(--space-3); min-width: auto; display: inline-block; }
   .sidebar.icons .toggle-full,
   .sidebar.hide .toggle-full { display: inline; }
   .sidebar.icons .toggle-icons,
   .sidebar.hide .toggle-icons { display: none; }
   .sidebar.icons .sidebar-toggle,
   .sidebar.hide .sidebar-toggle { width: auto; }
+  .sidebar.icons .sidebar-hide-btn,
+  .sidebar.hide .sidebar-hide-btn { display: none; }
   .sidebar.hide + .sidebar-reveal { display: none; }
   .sidebar-footer { display: none; }
   .dashboard-content { padding: var(--space-4); }
 
+  #plugins-config-section .view-header { flex-direction: column; align-items: flex-start !important; gap: var(--space-2); }
+  .plugins-config-layout { flex-direction: column; }
+  .plugins-config-layout .editor-sidebar { width: 100%; max-height: 160px; border-right: none; border-bottom: 1px solid var(--color-border); }
+  .plugins-config-layout .editor-topbar { flex-direction: column; align-items: flex-start; }
+  .plugins-config-layout .editor-search { max-width: none; width: 100%; }
   .editor-layout { flex-direction: column; }
   .editor-sidebar { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--color-border); }
   .editor-field { grid-template-columns: 1fr; }
