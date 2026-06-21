@@ -738,8 +738,9 @@ function renderWizardStep() {
       <div class="hint">The username you use when going live on TikTok.</div></div>`;
   } else if (wizardStep === 1) {
     content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Set a password for the Minecraft RCON connection.</p>
-      <div class="form-group"><label>RCON Password</label>
+      <div class="form-group"><label>RCON Password <span style="color:var(--color-danger);">*</span></label>
       <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Password" oninput="updatePasswordMeter()">
+      <div class="inline-error" id="err-rcon-password">Please enter a password.</div>
       <div class="strength-meter"><div class="strength-segment"></div><div class="strength-segment"></div><div class="strength-segment"></div></div>
       <div class="strength-label" id="strength-label">Enter a password to see strength</div>
       <div class="hint">Choose any password you prefer. Strength meter is for guidance only.</div></div>`;
@@ -807,7 +808,13 @@ async function wizardNext() {
     wizardData.tiktok_user = user;
   } else if (wizardStep === 1) {
     const passInput = document.getElementById('w-rcon-password');
-    wizardData.rcon_password = passInput.value;
+    const pass = passInput.value.trim();
+    if (!pass) {
+      passInput.classList.add('invalid');
+      document.getElementById('err-rcon-password').classList.add('visible');
+      return;
+    }
+    wizardData.rcon_password = pass;
   } else if (wizardStep === 2) {
     const adv = document.getElementById('w-advanced-enabled')?.checked || false;
     if (adv && !wizardData.advanced) {
