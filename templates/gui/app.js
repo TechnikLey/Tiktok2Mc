@@ -974,9 +974,7 @@ document.getElementById('wizard-next').addEventListener('click', wizardNext);
 const SECTION_ORDER = [
   'tiktok','rcon','server_host','control_method',
   'java','minecraft_server_api',
-  'console',
-  'overlay',
-  'theme',
+  'console','overlay','theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
   'port_policy','api_key',
@@ -984,10 +982,9 @@ const SECTION_ORDER = [
 ];
 
 const CATEGORIES = {
-  'Connection': ['tiktok','rcon','server_host','control_method','api_key'],
+  'Connection': ['tiktok','rcon','server_host','control_method'],
   'Minecraft': ['java','minecraft_server_api'],
-  'System': ['console','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy'],
-  'Appearance': ['overlay','theme'],
+  'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
   'Chat & Commands': ['comment_commands','random_triggers']
 };
 
@@ -1000,8 +997,8 @@ const SECTION_META = {
   console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
   minecraft_server_api: { title: 'Minecraft Server API', desc: 'Handles communication between the tool and the Minecraft server. Required for player death/respawn detection.', category: 'Minecraft' },
   gui: { title: 'Dashboard', desc: 'The graphical user interface is served by the central API server and shown in a window.', category: 'System' },
-  overlay: { title: 'Overlay Text', desc: 'Built-in overlay subsystem for displaying text messages on stream. Runs as a core component, not a plugin.', category: 'Appearance' },
-  theme: { title: 'Overlay Colors', desc: 'Customize colors for overlays. All values are CSS hex codes like #ff0000.', category: 'Appearance' },
+  overlay: { title: 'Overlay Text', desc: 'Built-in overlay subsystem for displaying text messages on stream. Runs as a core component, not a plugin.', category: 'System' },
+  theme: { title: 'Overlay Colors', desc: 'Customize colors for overlays. All values are CSS hex codes like #ff0000.', category: 'System' },
   update: { title: 'Auto-Updater', desc: 'Checks for new versions on startup and installs them automatically. Strongly recommended.', category: 'System' },
   shutdown: { title: 'Auto-Shutdown', desc: 'Automatically shuts down the tool after your live stream ends.', category: 'System' },
   server_host: { title: 'Server Address', desc: 'Controls which network interfaces the tool listens on.', category: 'Connection' },
@@ -1009,7 +1006,7 @@ const SECTION_META = {
   auto_update_config: { title: 'Auto-Update Config', desc: 'Automatically merge new options when the tool updates.', category: 'System' },
   show_sudo_warning: { title: 'Sudo Warning', desc: 'Linux only. Warns if running without sudo, which can cause permission issues.', category: 'System' },
   port_policy: { title: 'Port Policy', desc: 'Controls what happens when a required port is already in use. Can auto-resolve to the next free port.', category: 'System' },
-  api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'Connection' },
+  api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'System' },
   plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' }
 };
 
@@ -1128,6 +1125,8 @@ const FIELD_META = {
   'overlay.overlays': { basic: true, type: 'json' },
   'overlay.theme.background': { basic: true, type: 'color' },
   'overlay.theme.text': { basic: true, type: 'color' },
+  'theme': { basic: true },
+  'comment_commands.groups': { basic: true },
   'comment_commands.groups[].enabled': { basic: true, type: 'bool' },
   'comment_commands.groups[].prefix': { basic: true, type: 'text' },
   'comment_commands.groups[].handler': { basic: true, type: 'select', options: ['rcon','http'] },
