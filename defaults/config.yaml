@@ -27,6 +27,13 @@ config_version: 1.0
 # =============================================================================
 
 # ---------------------------------------------------------------------------
+#  ADVANCED MODE (WEB GUI)
+# ---------------------------------------------------------------------------
+# This key is managed by the Web GUI and has no effect on
+# the backend. Do NOT change it manually unless you know what you are doing.
+config_advanced: false
+
+# ---------------------------------------------------------------------------
 #  AUTO-UPDATE CONFIG
 # ---------------------------------------------------------------------------
 # When enabled (recommended), new configuration options introduced by updates
@@ -158,15 +165,12 @@ tiktok:
   #         "per_stream" — Resets the tracked list every time the tool starts.
   #                        Each stream starts fresh.
   #
-  #   file: Path to the tracked-followers file (default: data/followed_users.txt)
-  #
   # NOTE: Only new follows that happen while the tool is running AND
   # connected to a live stream are tracked. Users who already followed
   # before the tool was running cannot be detected — they will trigger
   # a follow action the first time they follow during a tracked stream.
   follow_tracking:
     mode: "all_time"
-    file: "data/followed_users.txt"
 
 # ===========================================================================
 #  COMMENT COMMANDS

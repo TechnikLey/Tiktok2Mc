@@ -1027,7 +1027,7 @@ const FIELD_META = {
   'config_version': { basic: false, readonly: true, type: 'text' },
   'auto_update_config': { basic: true, type: 'bool' },
   'show_sudo_warning': { basic: false, type: 'bool' },
-  'server_host': { basic: true, type: 'text', required: true },
+  'server_host': { basic: false, type: 'text', required: true },
   'control_method': { basic: true, type: 'select', options: ['DCS','ICS'] },
   'shutdown.enabled': { basic: true, type: 'bool' },
   'shutdown.delay_seconds': { basic: true, type: 'number', min: 0, max: 3600 },
@@ -1038,45 +1038,48 @@ const FIELD_META = {
   'rcon.password': { basic: true, type: 'password', required: true },
   'rcon.port': { basic: false, type: 'number', min: 1, max: 65535 },
   'tiktok.user': { basic: true, type: 'text', required: true },
-  'tiktok.reconnect_delay_seconds': { basic: false, type: 'number', min: 0 },
-  'tiktok.autosave_interval_seconds': { basic: false, type: 'number', min: 1 },
-  'tiktok.follow_tracking.mode': { basic: false, type: 'select', options: ['all_time','per_stream'] },
-  'tiktok.follow_tracking.file': { basic: false, type: 'text' },
+  'tiktok.reconnect_delay_seconds': { basic: true, type: 'number', min: 0 },
+  'tiktok.autosave_interval_seconds': { basic: true, type: 'number', min: 1 },
+  'tiktok.follow_tracking': { basic: true },
+  'tiktok.follow_tracking.mode': { basic: true, type: 'select', options: ['all_time','per_stream'] },
+
+  'comment_commands': { basic: true },
   'comment_commands.enabled': { basic: true, type: 'bool' },
-  'comment_commands.cooldown': { basic: false, type: 'number', min: 0 },
-  'comment_commands.user_cooldown': { basic: false, type: 'number', min: 0 },
-  'random_triggers.mode': { basic: false, type: 'select', options: ['deny-all','allow-all'] },
+  'comment_commands.cooldown': { basic: true, type: 'number', min: 0 },
+  'comment_commands.user_cooldown': { basic: true, type: 'number', min: 0 },
+  'random_triggers': { basic: true },
+  'random_triggers.mode': { basic: true, type: 'select', options: ['deny-all','allow-all'] },
   'console.log_level': { basic: false, type: 'number', min: 0, max: 5 },
   'console.visible': { basic: false, type: 'bool' },
   'console.allow_close': { basic: false, type: 'bool' },
-  'minecraft_server_api.enabled': { basic: true, type: 'bool' },
+  'minecraft_server_api.enabled': { basic: false, type: 'bool' },
   'minecraft_server_api.api_port': { basic: false, type: 'number', min: 1, max: 65535 },
   'minecraft_server_api.web_server_port': { basic: false, type: 'number', min: 1, max: 65535 },
   'gui.enabled': { basic: true, type: 'bool' },
   'update.enabled': { basic: true, type: 'bool' },
-  'update.max_update_logs': { basic: false, type: 'number' },
+  'update.max_update_logs': { basic: true, type: 'number' },
   'overlay.enabled': { basic: true, type: 'bool' },
   'overlay.display_mode': { basic: true, type: 'select', options: ['overwrite','queue'] },
-  'overlay.fade_in': { basic: false, type: 'number', min: 0 },
-  'overlay.fade_out': { basic: false, type: 'number', min: 0 },
-  'overlay.max_fails': { basic: false, type: 'number', min: 1 },
-  'overlay.cooldown': { basic: false, type: 'number', min: 0 },
-  'overlay.overlays': { basic: false, type: 'json' },
-  'overlay.theme.background': { basic: false, type: 'color' },
-  'overlay.theme.text': { basic: false, type: 'color' },
-  'comment_commands.groups[].enabled': { basic: false, type: 'bool' },
-  'comment_commands.groups[].prefix': { basic: false, type: 'text' },
-  'comment_commands.groups[].handler': { basic: false, type: 'select', options: ['rcon','http'] },
-  'comment_commands.groups[].mode': { basic: false, type: 'select', options: ['deny-all','allow-all'] },
-  'comment_commands.groups[].cooldown': { basic: false, type: 'number', min: 0 },
-  'comment_commands.groups[].user_cooldown': { basic: false, type: 'number', min: 0 },
-  'comment_commands.groups[].trigger_comment_event': { basic: false, type: 'bool' },
-  'comment_commands.groups[].url': { basic: false, type: 'text' },
-  'api_key': { basic: true, type: 'password' },
-  'port_policy.auto_resolve': { basic: true, type: 'bool' },
-  'port_policy.session_only': { basic: true, type: 'bool' },
+  'overlay.fade_in': { basic: true, type: 'number', min: 0 },
+  'overlay.fade_out': { basic: true, type: 'number', min: 0 },
+  'overlay.max_fails': { basic: true, type: 'number', min: 1 },
+  'overlay.cooldown': { basic: true, type: 'number', min: 0 },
+  'overlay.overlays': { basic: true, type: 'json' },
+  'overlay.theme.background': { basic: true, type: 'color' },
+  'overlay.theme.text': { basic: true, type: 'color' },
+  'comment_commands.groups[].enabled': { basic: true, type: 'bool' },
+  'comment_commands.groups[].prefix': { basic: true, type: 'text' },
+  'comment_commands.groups[].handler': { basic: true, type: 'select', options: ['rcon','http'] },
+  'comment_commands.groups[].mode': { basic: true, type: 'select', options: ['deny-all','allow-all'] },
+  'comment_commands.groups[].cooldown': { basic: true, type: 'number', min: 0 },
+  'comment_commands.groups[].user_cooldown': { basic: true, type: 'number', min: 0 },
+  'comment_commands.groups[].trigger_comment_event': { basic: true, type: 'bool' },
+  'comment_commands.groups[].url': { basic: true, type: 'text' },
+  'api_key': { basic: false, type: 'password' },
+  'port_policy.auto_resolve': { basic: false, type: 'bool' },
+  'port_policy.session_only': { basic: false, type: 'bool' },
   'port_policy.max_offset': { basic: false, type: 'number', min: -1 },
-  'plugin_sandbox.enabled': { basic: true, type: 'bool' },
+  'plugin_sandbox.enabled': { basic: false, type: 'bool' },
   'plugin_sandbox.max_memory_mb': { basic: false, type: 'number', min: 1 },
   'plugin_sandbox.max_cpu_time': { basic: false, type: 'number', min: 0 },
   'plugin_sandbox.max_files': { basic: false, type: 'number', min: 1 },
@@ -1110,6 +1113,7 @@ class ConfigEditor {
     this.knownTop = new Set(Object.keys(SECTION_META));
     this.activeSection = null;
     this.originalTypes = {}; // track original types for commands_config etc.
+    this._advancedMode = localStorage.getItem('config_advanced_mode') === 'true';
   }
 
   open(config) {
@@ -1118,6 +1122,11 @@ class ConfigEditor {
     this.unknownKeys = {};
     this.originalUnknownKeys = {};
     this.errors.clear();
+    // Read config_advanced from file before extractUnknownKeys removes it
+    if (typeof config.config_advanced === 'boolean') {
+      this._advancedMode = config.config_advanced;
+      localStorage.setItem('config_advanced_mode', String(this._advancedMode));
+    }
     this.extractUnknownKeys();
     this.searchQuery = '';
     document.getElementById('editor-search').value = '';
@@ -1130,6 +1139,7 @@ class ConfigEditor {
     const first = this.content.querySelector('.section-card');
     if (first) { this.scrollTo(first.id); }
     this._updateSaveButton();
+    this._updateAdvancedUI();
     this._attachInputListeners();
   }
 
@@ -1169,6 +1179,72 @@ class ConfigEditor {
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
   }
 
+  _isFieldAdvanced(path) {
+    const meta = getMeta(path);
+    return meta.basic === false;
+  }
+
+  _toggleAdvanced() {
+    if (this._advancedMode) {
+      this._advancedMode = false;
+      localStorage.setItem('config_advanced_mode', 'false');
+      this._updateAdvancedUI();
+      this.render();
+    } else {
+      this._unlockAdvanced();
+    }
+  }
+
+  _unlockAdvanced() {
+    const dlg = document.getElementById('advanced-confirm-dialog');
+    if (!dlg) return;
+    const input = document.getElementById('advanced-confirm-input');
+    if (!input) return;
+
+    input.value = '';
+    dlg.classList.remove('hidden');
+
+    const okBtn = document.getElementById('advanced-confirm-ok');
+    const cancelBtn = document.getElementById('advanced-confirm-cancel');
+    if (okBtn) okBtn.disabled = true;
+
+    const onInput = () => {
+      const btn = document.getElementById('advanced-confirm-ok');
+      if (btn) btn.disabled = input.value.trim() !== 'I understand the risks';
+    };
+    input.addEventListener('input', onInput);
+
+    const cleanup = () => {
+      dlg.classList.add('hidden');
+      input.removeEventListener('input', onInput);
+    };
+
+    const handleOk = () => {
+      if (input.value.trim() !== 'I understand the risks') return;
+      cleanup();
+      this._advancedMode = true;
+      localStorage.setItem('config_advanced_mode', 'true');
+      this._updateAdvancedUI();
+      this.render();
+    };
+    const handleCancel = () => { cleanup(); };
+
+    if (okBtn) { okBtn.addEventListener('click', handleOk); }
+    if (cancelBtn) { cancelBtn.addEventListener('click', handleCancel); }
+  }
+
+  _updateAdvancedUI() {
+    const btn = document.getElementById('config-advanced-btn');
+    if (!btn) return;
+    if (this._advancedMode) {
+      btn.textContent = 'Advanced ✓';
+      btn.classList.add('active');
+    } else {
+      btn.textContent = 'Advanced';
+      btn.classList.remove('active');
+    }
+  }
+
   close() {
     if (this.isDirty()) {
       showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
@@ -1193,7 +1269,7 @@ class ConfigEditor {
 
   extractUnknownKeys() {
     for (const key of Object.keys(this.data)) {
-      if (key === 'config_version') {
+      if (key === 'config_version' || key === 'config_advanced') {
         delete this.data[key];
         delete this.original[key];
         continue;
@@ -1319,6 +1395,10 @@ class ConfigEditor {
       const path = `${prefix}.${k}`;
       const meta = getMeta(path);
       if (this.searchQuery && !this.fieldMatchesSearch(path, k)) continue;
+      if (meta.basic === false && !this._advancedMode) {
+        html += this._buildLockedField(k, path, getHelp(path));
+        continue;
+      }
       if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
         // Nested object (e.g., follow_tracking)
         html += `<div style="margin-bottom:1rem;"><strong style="font-size:0.9rem;color:var(--text);">${escapeHtml(toTitle(k))}</strong>`;
@@ -1361,8 +1441,26 @@ class ConfigEditor {
     return false;
   }
 
+  _buildLockedField(key, path, help) {
+    const label = toTitle(key);
+    return `<div class="editor-field editor-field--locked" onclick="editor._unlockAdvanced()">
+      <div class="field-label">
+        <span class="lock-icon">🔒</span> ${escapeHtml(label)}
+      </div>
+      <div class="field-widget">
+        <div class="locked-overlay">
+          <span class="locked-text">Advanced setting — <a href="#" onclick="event.preventDefault();editor._unlockAdvanced()">unlock advanced features</a> to edit</span>
+        </div>
+        ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
+      </div>
+    </div>`;
+  }
+
   buildField(key, value, path) {
     const meta = getMeta(path);
+    if (meta.basic === false && !this._advancedMode) {
+      return this._buildLockedField(key, path, getHelp(path));
+    }
     const label = toTitle(key);
     const help = getHelp(path);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
@@ -1392,8 +1490,10 @@ class ConfigEditor {
     }
 
     const err = this.errors.get(path) || '';
-    return `<div class="editor-field" data-path="${path}">
-      <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}</div>
+    const isAdvanced = meta.basic === false;
+    const fieldCls = isAdvanced ? 'editor-field editor-field--has-advanced' : 'editor-field';
+    return `<div class="${fieldCls}" data-path="${path}">
+      <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}${isAdvanced ? '<span class="advanced-badge" title="Advanced setting">!</span>' : ''}</div>
       <div class="field-widget">
         ${inputHtml}
         ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
@@ -1951,6 +2051,8 @@ class ConfigEditor {
       const newRcon = (this.data || {}).rcon || {};
       const rconPasswordSet = !oldRcon.password && newRcon.password;
 
+      // Persist config_advanced into the saved file
+      this.data.config_advanced = this._advancedMode;
       await putJSON('/config', { config: this.data, backup: true });
       this.original = JSON.parse(JSON.stringify(this.data));
       currentConfig = JSON.parse(JSON.stringify(this.data));
@@ -2032,6 +2134,7 @@ class PluginConfigEditor {
     this.activeCategory = null;
     this.hasSchema = false;
     this._inlineMode = false;
+    this._advancedMode = localStorage.getItem('plugin_config_advanced_mode') === 'true';
   }
 
   _swapElements(inline) {
@@ -2090,6 +2193,7 @@ class PluginConfigEditor {
     document.getElementById('plugin-config-editor').classList.remove('hidden');
     this.setupScrollSpy();
     this._updateSaveButton();
+    this._updateAdvancedUI();
     this._attachInputListeners();
   }
 
@@ -2114,6 +2218,7 @@ class PluginConfigEditor {
     this.render();
     this.setupScrollSpy();
     this._updateSaveButton();
+    this._updateAdvancedUI();
     this._attachInputListeners();
   }
 
@@ -2206,6 +2311,70 @@ class PluginConfigEditor {
     document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
   }
 
+  _toggleAdvanced() {
+    if (this._advancedMode) {
+      this._advancedMode = false;
+      localStorage.setItem('plugin_config_advanced_mode', 'false');
+      this._updateAdvancedUI();
+      this.render();
+    } else {
+      this._unlockAdvanced();
+    }
+  }
+
+  _unlockAdvanced() {
+    const dlg = document.getElementById('advanced-confirm-dialog');
+    if (!dlg) return;
+    const input = document.getElementById('advanced-confirm-input');
+    if (!input) return;
+
+    input.value = '';
+    dlg.classList.remove('hidden');
+
+    const okBtn = document.getElementById('advanced-confirm-ok');
+    const cancelBtn = document.getElementById('advanced-confirm-cancel');
+    if (okBtn) okBtn.disabled = true;
+
+    const onInput = () => {
+      const btn = document.getElementById('advanced-confirm-ok');
+      if (btn) btn.disabled = input.value.trim() !== 'I understand the risks';
+    };
+    input.addEventListener('input', onInput);
+
+    const cleanup = () => {
+      dlg.classList.add('hidden');
+      input.removeEventListener('input', onInput);
+    };
+
+    const handleOk = () => {
+      if (input.value.trim() !== 'I understand the risks') return;
+      cleanup();
+      this._advancedMode = true;
+      localStorage.setItem('plugin_config_advanced_mode', 'true');
+      this._updateAdvancedUI();
+      this.render();
+    };
+    const handleCancel = () => { cleanup(); };
+
+    if (okBtn) { okBtn.addEventListener('click', handleOk); }
+    if (cancelBtn) { cancelBtn.addEventListener('click', handleCancel); }
+  }
+
+  _updateAdvancedUI() {
+    const inlineBtn = document.getElementById('plugins-config-advanced-btn');
+    const overlayBtn = document.getElementById('plugin-editor-advanced-btn');
+    [inlineBtn, overlayBtn].forEach(btn => {
+      if (!btn) return;
+      if (this._advancedMode) {
+        btn.textContent = 'Advanced ✓';
+        btn.classList.add('active');
+      } else {
+        btn.textContent = 'Advanced';
+        btn.classList.remove('active');
+      }
+    });
+  }
+
   /* ─── Rendering ─── */
 
   render() {
@@ -2276,6 +2445,21 @@ class PluginConfigEditor {
   /* ─── Schema Field Builders ─── */
 
   buildSchemaField(field, value) {
+    if (field.advanced && !this._advancedMode) {
+      const label = field.label || toTitle(field.key.split('.').pop());
+      const help = field.help || '';
+      return `<div class="editor-field editor-field--locked" onclick="pluginEditor._unlockAdvanced()">
+        <div class="field-label">
+          <span class="lock-icon">🔒</span> ${escapeHtml(label)}
+        </div>
+        <div class="field-widget">
+          <div class="locked-overlay">
+            <span class="locked-text">Advanced setting — <a href="#" onclick="event.preventDefault();pluginEditor._unlockAdvanced()">unlock advanced features</a> to edit</span>
+          </div>
+          ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
+        </div>
+      </div>`;
+    }
     const path = field.key;
     const id = 'pf_' + path.replace(/[^a-zA-Z0-9]/g, '_');
     const isReq = field.required;
@@ -2317,8 +2501,10 @@ class PluginConfigEditor {
       widget = `<input type="text" id="${id}" value="${escapeHtml(value !== undefined ? String(value) : '')}" data-path="${escapeHtml(path)}" data-type="string">`;
     }
 
-    return `<div class="editor-field" data-path="${escapeHtml(path)}">
-      <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}</div>
+    const isAdvanced = field.advanced;
+    const fieldCls = isAdvanced ? 'editor-field editor-field--has-advanced' : 'editor-field';
+    return `<div class="${fieldCls}" data-path="${escapeHtml(path)}">
+      <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}${isAdvanced ? '<span class="advanced-badge" title="Advanced setting">!</span>' : ''}</div>
       <div class="field-widget">
         ${widget}
         ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}

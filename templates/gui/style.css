@@ -922,6 +922,14 @@ select.invalid { border-color: var(--color-danger) !important; }
 }
 .editor-field.full-width { grid-template-columns: 1fr; }
 .editor-field.full-width .field-label { margin-bottom: var(--space-2); padding-top: 0; }
+.editor-field--locked { opacity: 0.55; cursor: pointer; transition: opacity 0.2s; }
+.editor-field--locked:hover { opacity: 0.85; }
+.editor-field--locked .lock-icon { font-size: 0.85rem; margin-right: 0.3rem; }
+.editor-field--locked .locked-overlay { padding: 1rem; background: var(--color-elevated); border: 1px dashed var(--color-border); border-radius: var(--radius-md); text-align: center; }
+.editor-field--locked .locked-text { font-size: 0.85rem; color: var(--color-text-muted); }
+.editor-field--locked .locked-text a { color: var(--color-accent); }
+
+.advanced-badge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--color-danger); color: #fff; font-size: 0.75rem; font-weight: 700; margin-left: 0.4rem; cursor: help; vertical-align: middle; line-height: 1; }
 .field-label {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);

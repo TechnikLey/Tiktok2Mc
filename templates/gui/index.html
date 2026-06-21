@@ -124,6 +124,7 @@
                                     <input type="text" id="plugins-config-search" placeholder="Search settings..." oninput="pluginEditor.onInlineSearch(this.value)">
                                 </div>
                                 <div class="header-actions">
+                                    <button class="btn btn-advanced" id="plugins-config-advanced-btn" onclick="pluginEditor._toggleAdvanced()">Advanced</button>
                                     <button class="btn btn--primary btn-save-disabled" id="plugins-config-save" onclick="pluginEditor.save()" disabled>Save Changes</button>
                                 </div>
                             </div>
@@ -250,6 +251,7 @@
                         <input type="text" id="editor-search" placeholder="Search settings..." oninput="editor.onSearch(this.value)">
                     </div>
                     <div class="header-actions">
+                        <button class="btn btn-advanced" id="config-advanced-btn" onclick="editor._toggleAdvanced()">Advanced</button>
                         <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled>Save Changes</button>
                     </div>
                 </div>
@@ -403,6 +405,7 @@
                         <input type="text" id="plugin-editor-search" placeholder="Search settings..." oninput="pluginEditor.onSearch(this.value)">
                     </div>
                     <div class="header-actions">
+                        <button class="btn btn-advanced" id="plugin-editor-advanced-btn" onclick="pluginEditor._toggleAdvanced()">Advanced</button>
                         <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled>Save Changes</button>
                     </div>
                 </div>
@@ -472,6 +475,24 @@
           <button class="btn btn--primary btn--full" id="btn-unsaved-save-exit">Save and Exit</button>
           <button class="btn btn--danger btn--full" id="btn-unsaved-exit-no-save">Exit Without Saving</button>
           <button class="btn btn--secondary btn--full" id="btn-unsaved-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Settings Confirmation Dialog -->
+    <div id="advanced-confirm-dialog" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:500px;">
+        <h3 style="color:var(--danger);margin-top:0;">⚠️ Advanced Settings</h3>
+        <p style="color:var(--text-muted);">
+          These settings can break functionality if misconfigured. Only continue if you understand the risks.
+        </p>
+        <p style="color:var(--danger);font-weight:600;font-size:0.95rem;">
+          Type <code style="background:var(--input-bg);padding:0.15rem 0.4rem;border-radius:3px;">I understand the risks</code> to confirm:
+        </p>
+        <input type="text" id="advanced-confirm-input" style="width:100%;padding:0.5rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;margin-bottom:1rem;" placeholder="Type confirmation phrase...">
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="advanced-confirm-cancel">Cancel</button>
+          <button class="btn btn--danger" id="advanced-confirm-ok" disabled>Unlock Advanced</button>
         </div>
       </div>
     </div>
