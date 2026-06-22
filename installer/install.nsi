@@ -1,4 +1,4 @@
-; TikTok2MC — Windows Installer (NSIS Modern UI 2)
+﻿; TikTok2MC — Windows Installer (NSIS Modern UI 2)
 ; =================================================
 ; Supports Basic and Advanced installation modes.
 
@@ -132,18 +132,18 @@ Function InstallTypeCreate
   ${NSD_CreateLabel} 0 0 100% 20u "$(INSTALLTYPE_HEADER)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 10 25 100% 10u "$(INSTALLTYPE_BASIC)"
+  ${NSD_CreateRadioButton} 10 25 100% 12u "$(INSTALLTYPE_BASIC)"
   Pop $hBasicRadio
   ${NSD_OnClick} $hBasicRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 25 37 100% 10u "$(INSTALLTYPE_BASIC_DESC)"
+  ${NSD_CreateLabel} 25 40 100% 24u "$(INSTALLTYPE_BASIC_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 10 55 100% 10u "$(INSTALLTYPE_ADVANCED)"
+  ${NSD_CreateRadioButton} 10 68 100% 12u "$(INSTALLTYPE_ADVANCED)"
   Pop $hAdvancedRadio
   ${NSD_OnClick} $hAdvancedRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 25 67 100% 10u "$(INSTALLTYPE_ADVANCED_DESC)"
+  ${NSD_CreateLabel} 25 83 100% 24u "$(INSTALLTYPE_ADVANCED_DESC)"
   Pop $0
 
   ; Default: Basic
@@ -265,11 +265,11 @@ Function GuiModeCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateRadioButton} 10 0 100% 10u "$(GUI_GUI)"
+  ${NSD_CreateRadioButton} 10 0 100% 14u "$(GUI_GUI)"
   Pop $hGuiModeGui
   ${NSD_OnClick} $hGuiModeGui GuiModeRadioClick
 
-  ${NSD_CreateRadioButton} 10 20 100% 10u "$(GUI_START)"
+  ${NSD_CreateRadioButton} 10 20 100% 14u "$(GUI_START)"
   Pop $hGuiModeStart
   ${NSD_OnClick} $hGuiModeStart GuiModeRadioClick
 
