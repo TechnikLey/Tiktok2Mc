@@ -84,26 +84,9 @@ Var hApiPortText
 
 Var StartupCheckbox
 
-; ---- Radio button mutual exclusion ----
-Function InstallTypeRadioClick
-  Pop $R0
-  ${NSD_GetState} $hBasicRadio $R1
-  ${If} $R1 == ${BST_CHECKED}
-    ${NSD_Uncheck} $hAdvancedRadio
-  ${Else}
-    ${NSD_Uncheck} $hBasicRadio
-  ${EndIf}
-FunctionEnd
-
-Function GuiModeRadioClick
-  Pop $R0
-  ${NSD_GetState} $hGuiModeGui $R1
-  ${If} $R1 == ${BST_CHECKED}
-    ${NSD_Uncheck} $hGuiModeStart
-  ${Else}
-    ${NSD_Uncheck} $hGuiModeGui
-  ${EndIf}
-FunctionEnd
+; ---- Radio button mutual exclusion is handled automatically by Windows
+; when BS_AUTORADIOBUTTON controls are created consecutively in tab order.
+; No custom click handlers needed.
 
 ; =============================================================
 ; PAGE: Installation Type (Basic / Advanced)
@@ -129,21 +112,24 @@ Function InstallTypeCreate
   nsDialogs::Create 1018
   Pop $0
 
+  ; Header label
   ${NSD_CreateLabel} 0 0 100% 20u "$(INSTALLTYPE_HEADER)"
   Pop $0
 
+  ; Radio buttons MUST be created consecutively (no other controls between them)
+  ; so Windows groups them correctly for automatic mutual exclusion.
   ${NSD_CreateRadioButton} 0 22 100% 16u "$(INSTALLTYPE_BASIC)"
   Pop $hBasicRadio
-  ${NSD_OnClick} $hBasicRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 0 40 100% 28u "$(INSTALLTYPE_BASIC_DESC)"
+  ${NSD_CreateRadioButton} 0 74 100% 16u "$(INSTALLTYPE_ADVANCED)"
+  Pop $hAdvancedRadio
+
+  ; Description labels are created AFTER all radio buttons so they do not
+  ; break the radio button tab-order grouping.
+  ${NSD_CreateLabel} 0 40 100% 32u "$(INSTALLTYPE_BASIC_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 72 100% 16u "$(INSTALLTYPE_ADVANCED)"
-  Pop $hAdvancedRadio
-  ${NSD_OnClick} $hAdvancedRadio InstallTypeRadioClick
-
-  ${NSD_CreateLabel} 0 90 100% 28u "$(INSTALLTYPE_ADVANCED_DESC)"
+  ${NSD_CreateLabel} 0 92 100% 32u "$(INSTALLTYPE_ADVANCED_DESC)"
   Pop $0
 
   ; Default: Basic
@@ -269,18 +255,18 @@ Function GuiModeCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 0 100% 20u "$(GUI_GUI)"
+  ; Radio buttons first (consecutive for auto-grouping)
+  ${NSD_CreateRadioButton} 0 20 100% 16u "$(GUI_GUI)"
   Pop $hGuiModeGui
-  ${NSD_OnClick} $hGuiModeGui GuiModeRadioClick
 
-  ${NSD_CreateLabel} 0 24 100% 20u "$(GUI_GUI_DESC)"
+  ${NSD_CreateRadioButton} 0 64 100% 16u "$(GUI_START)"
+  Pop $hGuiModeStart
+
+  ; Description labels after radio buttons
+  ${NSD_CreateLabel} 0 38 100% 24u "$(GUI_GUI_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 52 100% 20u "$(GUI_START)"
-  Pop $hGuiModeStart
-  ${NSD_OnClick} $hGuiModeStart GuiModeRadioClick
-
-  ${NSD_CreateLabel} 0 76 100% 20u "$(GUI_START_DESC)"
+  ${NSD_CreateLabel} 0 82 100% 24u "$(GUI_START_DESC)"
   Pop $0
 
   ; Default: GUI Mode (true)
