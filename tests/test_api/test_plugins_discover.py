@@ -120,17 +120,18 @@ class TestPluginDiscoveryEndpoint:
 
     def test_no_registry_mutation_from_discovery(self, client, project_dir):
         """Verify that discovery does not register or unregister plugins."""
-        _create_manifest(project_dir, "mutant")
+        from core.api.registry import get_registry
 
         # Before discovery — registry is empty
-        before = client.get("/api/v1/plugins")
-        assert before.json()["total"] == 0
+        reg = get_registry()
+        assert len(reg.list()) == 0
 
-        # Run discovery
-        client.get("/api/v1/plugins/discover")
+        _create_manifest(project_dir, "mutant")
+        try:
+            # Run discovery (read-only)
+            client.get("/api/v1/plugins/discover")
 
-        # After discovery — registry must still be empty
-        after = client.get("/api/v1/plugins")
-        assert after.json()["total"] == 0
-
-        _clean_plugins(project_dir)
+            # After discovery — registry must still be empty
+            assert len(reg.list()) == 0
+        finally:
+            _clean_plugins(project_dir)
