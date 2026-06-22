@@ -41,26 +41,11 @@ Page custom InstallTypeCreate InstallTypeLeave
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 
-; Advanced-only pages
-PageEx custom
-  PageCallbacks SkipIfBasic AdvancedComponentsCreate AdvancedComponentsLeave
-  Caption "Components"
-PageExEnd
-
-PageEx custom
-  PageCallbacks SkipIfBasic GuiModeCreate GuiModeLeave
-  Caption "GUI Default Mode"
-PageExEnd
-
-PageEx custom
-  PageCallbacks SkipIfBasic JavaPortCreate JavaPortLeave
-  Caption "Java & Port"
-PageExEnd
-
-PageEx custom
-  PageCallbacks "" StartupPageCreate StartupPageLeave
-  Caption "Startup"
-PageExEnd
+; Advanced-only pages (skip logic inside each Create function)
+Page custom AdvancedComponentsCreate AdvancedComponentsLeave
+Page custom GuiModeCreate GuiModeLeave
+Page custom JavaPortCreate JavaPortLeave
+Page custom StartupPageCreate StartupPageLeave
 
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
@@ -98,19 +83,6 @@ Var hJavaPathText
 Var hApiPortText
 
 Var StartupCheckbox
-
-; ---------- Helper: Skip Pages ----------
-Function SkipIfBasic
-  ${If} $InstallType == 0
-    Abort
-  ${EndIf}
-FunctionEnd
-
-Function SkipIfAdvanced
-  ${If} $InstallType == 1
-    Abort
-  ${EndIf}
-FunctionEnd
 
 ; ---- Radio button mutual exclusion ----
 Function InstallTypeRadioClick
@@ -212,6 +184,9 @@ LangString COMP_MC ${LANG_GERMAN} "Minecraft Server (server.jar, tools)"
 LangString COMP_DOCS ${LANG_GERMAN} "Dokumentation (GUIDE, CHANGELOG, dev-books)"
 
 Function AdvancedComponentsCreate
+  ${If} $InstallType == 0
+    Abort
+  ${EndIf}
   !insertmacro MUI_HEADER_TEXT "$(COMP_TITLE)" "$(COMP_SUBTITLE)"
   nsDialogs::Create 1018
   Pop $0
@@ -283,6 +258,9 @@ LangString GUI_GUI ${LANG_GERMAN} "GUI-Modus (gui.exe) — Öffnet die grafische
 LangString GUI_START ${LANG_GERMAN} "Full System Modus (start.exe) — Startet den vollständigen Stack inklusive API und Minecraft-Server"
 
 Function GuiModeCreate
+  ${If} $InstallType == 0
+    Abort
+  ${EndIf}
   !insertmacro MUI_HEADER_TEXT "$(GUI_TITLE)" "$(GUI_SUBTITLE)"
   nsDialogs::Create 1018
   Pop $0
@@ -331,6 +309,9 @@ LangString JAVA_PATH_LABEL ${LANG_GERMAN} "Java-Programmpfad (leer lassen für A
 LangString JAVA_PORT_LABEL ${LANG_GERMAN} "API-Server-Port (Standard: 29185):"
 
 Function JavaPortCreate
+  ${If} $InstallType == 0
+    Abort
+  ${EndIf}
   !insertmacro MUI_HEADER_TEXT "$(JAVA_TITLE)" "$(JAVA_SUBTITLE)"
   nsDialogs::Create 1018
   Pop $0
@@ -419,13 +400,16 @@ Section "TikTok2MC" SEC_APP
 
   ; ---- Advanced mode: remove unselected components ----
   ${If} $InstallType == 1
-    ${If} $AdvancedComponents & 1 == 0
+    IntOp $0 $AdvancedComponents & 1
+    ${If} $0 == 0
       RMDir /r "$INSTDIR\plugins"
     ${EndIf}
-    ${If} $AdvancedComponents & 2 == 0
+    IntOp $0 $AdvancedComponents & 2
+    ${If} $0 == 0
       RMDir /r "$INSTDIR\server"
     ${EndIf}
-    ${If} $AdvancedComponents & 4 == 0
+    IntOp $0 $AdvancedComponents & 4
+    ${If} $0 == 0
       RMDir /r "$INSTDIR\docs"
     ${EndIf}
 

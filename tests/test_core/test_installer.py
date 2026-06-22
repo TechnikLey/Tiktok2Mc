@@ -53,10 +53,14 @@ class TestInstallerScript:
         assert "JavaPortCreate" in content
         assert "AutostartModeCreate" not in content
 
-    def test_nsis_script_has_skip_helpers(self):
+    def test_nsis_script_has_skip_logic_in_create_functions(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
-        assert "SkipIfBasic" in content
-        assert "SkipIfAdvanced" in content
+        assert "SkipIfBasic" not in content
+        assert "SkipIfAdvanced" not in content
+        # Skip logic is inline: each advanced Create function checks InstallType
+        assert "AdvancedComponentsCreate" in content
+        assert "GuiModeCreate" in content
+        assert "JavaPortCreate" in content
 
     def test_nsis_script_has_product_definitions(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
@@ -93,8 +97,8 @@ class TestInstallerScript:
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         assert "StartupPageCreate" in content
         assert "StartupPageLeave" in content
-        # Startup page shows for both modes (no SkipIfAdvanced)
-        assert 'PageCallbacks "" StartupPageCreate StartupPageLeave' in content
+        # Startup page uses simple Page custom (no skip logic inside)
+        assert "Page custom StartupPageCreate StartupPageLeave" in content
         # Autostart respects GUI mode in Advanced
         assert "GuiDefaultMode" in content
 
