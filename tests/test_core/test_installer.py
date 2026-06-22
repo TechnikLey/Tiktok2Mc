@@ -15,6 +15,7 @@ import pytest
 # Directory where the installer script lives
 INSTALLER_DIR = Path(__file__).resolve().parent.parent.parent / "installer"
 NSIS_SCRIPT = INSTALLER_DIR / "install.nsi"
+LINUX_SCRIPT = INSTALLER_DIR / "install_linux.sh"
 
 
 class TestInstallerScript:
@@ -23,7 +24,7 @@ class TestInstallerScript:
     def test_nsis_script_exists(self):
         assert NSIS_SCRIPT.exists(), f"NSIS script not found at {NSIS_SCRIPT}"
 
-    def test_nsis_script_has_required_sections(self):
+    def test_nsis_script_has_required_pages(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         required = [
             "MUI_PAGE_WELCOME",
@@ -37,6 +38,25 @@ class TestInstallerScript:
         ]
         for section in required:
             assert section in content, f"Missing NSIS page: {section}"
+
+    def test_nsis_script_has_install_type_page(self):
+        content = NSIS_SCRIPT.read_text(encoding="utf-8")
+        assert "InstallTypeCreate" in content
+        assert "InstallTypeLeave" in content
+        assert "Basic Installation" in content
+        assert "Advanced Installation" in content
+
+    def test_nsis_script_has_advanced_pages(self):
+        content = NSIS_SCRIPT.read_text(encoding="utf-8")
+        assert "AdvancedComponentsCreate" in content
+        assert "GuiModeCreate" in content
+        assert "JavaPortCreate" in content
+        assert "AutostartModeCreate" not in content
+
+    def test_nsis_script_has_skip_helpers(self):
+        content = NSIS_SCRIPT.read_text(encoding="utf-8")
+        assert "SkipIfBasic" in content
+        assert "SkipIfAdvanced" in content
 
     def test_nsis_script_has_product_definitions(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
@@ -61,11 +81,58 @@ class TestInstallerScript:
         assert "config.yaml" in content
         assert "SetOverwrite off" in content
 
-    def test_nsis_script_has_startup_registration(self):
+    def test_nsis_script_has_gui_mode_conditional_shortcut(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
-        assert "Startup Options" in content
-        assert "WriteRegStr HKCU" in content
-        assert "Software\\Microsoft\\Windows\\CurrentVersion\\Run" in content
+        assert "GuiDefaultMode" in content
+        assert "CreateShortCut" in content
+        # Desktop shortcut respects GUI mode
+        assert '$INSTDIR\\core\\gui.exe' in content
+        assert '$INSTDIR\\start.exe' in content
+
+    def test_nsis_script_startup_page_for_both_modes(self):
+        content = NSIS_SCRIPT.read_text(encoding="utf-8")
+        assert "StartupPageCreate" in content
+        assert "StartupPageLeave" in content
+        # Startup page shows for both modes (no SkipIfAdvanced)
+        assert 'PageCallbacks "" StartupPageCreate StartupPageLeave' in content
+        # Autostart respects GUI mode in Advanced
+        assert "GuiDefaultMode" in content
+
+
+class TestLinuxInstallerScript:
+    """Verify the Linux shell installer script structure."""
+
+    def test_linux_script_exists(self):
+        assert LINUX_SCRIPT.exists(), f"Linux script not found at {LINUX_SCRIPT}"
+
+    def test_linux_script_has_install_type_selection(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "Basic Installation" in content
+        assert "Advanced Installation" in content
+        assert "INSTALL_TYPE" in content
+
+    def test_linux_script_has_advanced_options(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "GUI_MODE" in content
+        assert "JAVA_PATH" in content
+        assert "API_PORT" in content
+        assert "AUTOSTART_ENABLED" in content
+        assert "AUTOSTART_MODE" not in content
+
+    def test_linux_script_has_component_selection(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "INSTALL_PLUGINS" in content
+        assert "INSTALL_MC_SERVER" in content
+        assert "INSTALL_DOCS" in content
+
+    def test_linux_script_has_desktop_entries(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "/usr/share/applications/tiktok2mc.desktop" in content
+        assert "/usr/share/applications/tiktok2mc-fullsystem.desktop" in content
+
+    def test_linux_script_has_archive_marker(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "__ARCHIVE_BELOW__" in content
 
 
 class TestBuildPyInstallerIntegration:
@@ -78,9 +145,6 @@ class TestBuildPyInstallerIntegration:
         mock_run = MagicMock()
         monkeypatch.setattr("subprocess.run", mock_run)
 
-        # We cannot easily import build.py (it runs on import), so test the
-        # call pattern by invoking it with --help or dry-run if available.
-        # Instead, verify the NSIS command construction logic.
         nsis_cmd = [
             "makensis",
             "-DPRODUCT_VERSION=1.0.0",
@@ -93,8 +157,6 @@ class TestBuildPyInstallerIntegration:
 
     def test_build_py_warns_when_makensis_missing(self, monkeypatch, capsys):
         """When makensis is not found, build.py prints a warning."""
-        # This test documents the expected behavior; a full integration test
-        # would require running build.py with --installer.
         from build import Color, cprint
 
         captured = []
@@ -102,7 +164,6 @@ class TestBuildPyInstallerIntegration:
             captured.append((msg, color))
 
         monkeypatch.setattr("build.cprint", mock_cprint)
-        # Simulate FileNotFoundError handling path
         try:
             raise FileNotFoundError("makensis not found")
         except FileNotFoundError:
@@ -130,6 +191,8 @@ class TestInstallerPrerequisites:
 
     def test_build_release_directory_exists_or_can_be_created(self):
         build_dir = NSIS_SCRIPT.parent.parent / "build" / "release"
-        # The build directory may not exist yet (it is created by build.py),
-        # but its parent should.
         assert build_dir.parent.exists()
+
+    def test_linux_script_references_archive_marker(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "__ARCHIVE_BELOW__" in content

@@ -237,7 +237,7 @@ if not IS_WINDOWS:
 _PORT_RUNTIME_DIR = (ROOT_DIR / "core" / "runtime").resolve()
 _port_policy = PortPolicy.from_config(cfg)
 
-_results = scan_bind_ports(cfg.get("server_host", "127.0.0.1"), _port_policy)
+_results = scan_bind_ports(cfg.get("server_host", "127.0.0.1"), _port_policy, config=cfg)
 _unresolved = [r for r in _results if r.in_use and not _port_policy.auto_resolve]
 if _unresolved:
     for r in _unresolved:

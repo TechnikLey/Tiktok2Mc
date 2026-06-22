@@ -72,7 +72,21 @@ def _java_is_usable(java_path: Path) -> bool:
     return major is not None and major >= _MIN_JAVA_VERSION
 
 
-def _find_java(root_dir: Path) -> Path | None:
+def _find_java(root_dir: Path, config_path: Path | None = None) -> Path | None:
+    # First, check if config specifies a custom Java path
+    if config_path and config_path.exists():
+        try:
+            cfg = load_yaml(config_path)
+            custom_java = cfg.get("java", {}).get("path", "")
+            if custom_java:
+                custom = Path(custom_java)
+                if _java_is_usable(custom):
+                    log.info("Using custom Java path from config: %s", custom)
+                    return custom.resolve()
+                log.warning("Custom Java path from config is not usable: %s", custom)
+        except Exception as e:
+            log.warning("Failed to read custom Java path from config: %s", e)
+
     bundled = root_dir / "server" / "java" / "bin" / "java.exe"
     if _java_is_usable(bundled):
         return bundled.resolve()
@@ -159,7 +173,7 @@ PLUGINS_DIR = (SERVER_DIR / "plugins").resolve()
 CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resolve()
 
 # === Java detection ===
-JAVA_EXE = _find_java(ROOT_DIR)
+JAVA_EXE = _find_java(ROOT_DIR, CONFIG_FILE)
 if JAVA_EXE is None:
     log.error("No Java runtime available. Cannot start Minecraft server.")
     log.error("server.jar path: %s", SERVER_JAR)

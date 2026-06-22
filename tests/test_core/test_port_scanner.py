@@ -125,7 +125,7 @@ class TestScanBindPorts:
         custom_ports = [
             {"key": "test", "config_path": "test.port", "default": 9999, "desc": "test"},
         ]
-        results = scan_bind_ports("127.0.0.1", PortPolicy(auto_resolve=True), custom_ports)
+        results = scan_bind_ports("127.0.0.1", PortPolicy(auto_resolve=True), bind_ports=custom_ports)
         assert len(results) == 1
         assert results[0].key == "test"
         assert results[0].in_use is True

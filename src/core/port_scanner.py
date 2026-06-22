@@ -93,9 +93,33 @@ def find_available_port(
     return preferred + max_offset
 
 
+def _read_config_port(
+    config: dict[str, Any] | None,
+    config_path: str,
+    default: int,
+) -> int:
+    """Read a port value from a dotted config path (e.g. ``api.port``)."""
+    if not config or not config_path:
+        return default
+    parts = config_path.split(".")
+    val: Any = config
+    for part in parts:
+        if isinstance(val, dict):
+            val = val.get(part)
+        else:
+            return default
+    if val is not None:
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            pass
+    return default
+
+
 def scan_bind_ports(
     host: str,
     policy: PortPolicy,
+    config: dict[str, Any] | None = None,
     bind_ports: list[dict[str, Any]] | None = None,
 ) -> list[PortCheckResult]:
     """Check every bind port and optionally resolve conflicts.
@@ -103,10 +127,15 @@ def scan_bind_ports(
     Returns a list of ``PortCheckResult``, one per port.
     When *auto_resolve* is true, ``resolved_port`` is set to
     the next available port if the default is taken.
+
+    If *config* is provided, the ``config_path`` of each bind port
+    entry is used to look up a user-preferred port value.
     """
     results: list[PortCheckResult] = []
     for bp in bind_ports or BIND_PORTS:
-        preferred = bp["default"]
+        preferred = _read_config_port(
+            config, bp.get("config_path", ""), bp["default"]
+        )
         in_use = is_port_in_use(host, preferred)
         r = PortCheckResult(
             port=preferred,

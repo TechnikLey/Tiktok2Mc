@@ -68,6 +68,16 @@ port_policy:
   max_offset: 10
 
 # ---------------------------------------------------------------------------
+#  API SERVER CONFIGURATION
+# ---------------------------------------------------------------------------
+# The central API server address and port.
+# Interactive API documentation: http://localhost:<port>/docs
+api:
+  # Port that the central API server listens on (default: 29185).
+  # Change this if you have another service on the same port.
+  port: 29185
+
+# ---------------------------------------------------------------------------
 #  SERVER BIND ADDRESS
 # ---------------------------------------------------------------------------
 # Controls which network interfaces the servers listen on.
@@ -75,8 +85,7 @@ port_policy:
 #   "0.0.0.0"    — Allow access from other devices on your network
 #   "<IP>"       — Bind to a specific network interface
 #
-# The central API server always runs on port 29185.
-# Interactive API documentation: http://localhost:29185/docs
+# Interactive API documentation: http://localhost:<api.port>/docs
 server_host: "127.0.0.1"
 
 # ---------------------------------------------------------------------------
@@ -117,6 +126,12 @@ shutdown:
 #  MINECRAFT SERVER (JAVA)
 # ===========================================================================
 java:
+  # Custom Java executable path (optional).
+  # If set, this path is used instead of searching the system PATH.
+  # Example: "C:\Program Files\Java\jdk-21\bin\java.exe" (Windows)
+  # Example: "/usr/lib/jvm/java-21-openjdk/bin/java" (Linux)
+  path: ""
+
   # RAM allocation. 'G' = Gigabytes.
   # Using the same value for xms (initial) and xmx (maximum) is recommended.
   # Default: 4G — reduce to 2G or 1G if your system has less than 8 GB RAM.
