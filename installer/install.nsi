@@ -4,6 +4,7 @@
 
 Unicode True
 RequestExecutionLevel admin
+ManifestDPIAware true
 
 !define PRODUCT_NAME "TikTok2MC"
 !ifndef PRODUCT_VERSION
@@ -129,21 +130,21 @@ Function InstallTypeCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0 100% 20u "$(INSTALLTYPE_HEADER)"
+  ${NSD_CreateLabel} 0 0 100% 24u "$(INSTALLTYPE_HEADER)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 25 100% 12u "$(INSTALLTYPE_BASIC)"
+  ${NSD_CreateRadioButton} 0 28 100% 20u "$(INSTALLTYPE_BASIC)"
   Pop $hBasicRadio
   ${NSD_OnClick} $hBasicRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 0 40 100% 24u "$(INSTALLTYPE_BASIC_DESC)"
+  ${NSD_CreateLabel} 0 52 100% 40u "$(INSTALLTYPE_BASIC_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 68 100% 12u "$(INSTALLTYPE_ADVANCED)"
+  ${NSD_CreateRadioButton} 0 96 100% 20u "$(INSTALLTYPE_ADVANCED)"
   Pop $hAdvancedRadio
   ${NSD_OnClick} $hAdvancedRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 0 83 100% 24u "$(INSTALLTYPE_ADVANCED_DESC)"
+  ${NSD_CreateLabel} 0 120 100% 40u "$(INSTALLTYPE_ADVANCED_DESC)"
   Pop $0
 
   ; Default: Basic
@@ -191,7 +192,7 @@ Function AdvancedComponentsCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateCheckBox} 0 0 100% 12u "$(COMP_PLUGINS)"
+  ${NSD_CreateCheckBox} 0 0 100% 20u "$(COMP_PLUGINS)"
   Pop $hPluginCheck
   ${If} $AdvancedComponents & 1
     ${NSD_Check} $hPluginCheck
@@ -199,7 +200,7 @@ Function AdvancedComponentsCreate
     ${NSD_Uncheck} $hPluginCheck
   ${EndIf}
 
-  ${NSD_CreateCheckBox} 0 16 100% 12u "$(COMP_MC)"
+  ${NSD_CreateCheckBox} 0 24 100% 20u "$(COMP_MC)"
   Pop $hMCCheck
   ${If} $AdvancedComponents & 2
     ${NSD_Check} $hMCCheck
@@ -207,7 +208,7 @@ Function AdvancedComponentsCreate
     ${NSD_Uncheck} $hMCCheck
   ${EndIf}
 
-  ${NSD_CreateCheckBox} 0 32 100% 12u "$(COMP_DOCS)"
+  ${NSD_CreateCheckBox} 0 48 100% 20u "$(COMP_DOCS)"
   Pop $hDocsCheck
   ${If} $AdvancedComponents & 4
     ${NSD_Check} $hDocsCheck
@@ -269,18 +270,18 @@ Function GuiModeCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 0 100% 12u "$(GUI_GUI)"
+  ${NSD_CreateRadioButton} 0 0 100% 20u "$(GUI_GUI)"
   Pop $hGuiModeGui
   ${NSD_OnClick} $hGuiModeGui GuiModeRadioClick
 
-  ${NSD_CreateLabel} 0 14 100% 14u "$(GUI_GUI_DESC)"
+  ${NSD_CreateLabel} 0 24 100% 20u "$(GUI_GUI_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 34 100% 12u "$(GUI_START)"
+  ${NSD_CreateRadioButton} 0 52 100% 20u "$(GUI_START)"
   Pop $hGuiModeStart
   ${NSD_OnClick} $hGuiModeStart GuiModeRadioClick
 
-  ${NSD_CreateLabel} 0 48 100% 14u "$(GUI_START_DESC)"
+  ${NSD_CreateLabel} 0 76 100% 20u "$(GUI_START_DESC)"
   Pop $0
 
   ; Default: GUI Mode (true)
@@ -326,19 +327,19 @@ Function JavaPortCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0 100% 10u "$(JAVA_PATH_LABEL)"
+  ${NSD_CreateLabel} 0 0 100% 20u "$(JAVA_PATH_LABEL)"
   Pop $0
 
-  ${NSD_CreateText} 0 12 100% 12u "$JavaPath"
+  ${NSD_CreateText} 0 24 100% 16u "$JavaPath"
   Pop $hJavaPathText
 
-  ${NSD_CreateLabel} 0 35 100% 10u "$(JAVA_PORT_LABEL)"
+  ${NSD_CreateLabel} 0 52 100% 20u "$(JAVA_PORT_LABEL)"
   Pop $0
 
   ${If} $ApiPort == ""
     StrCpy $ApiPort "29185"
   ${EndIf}
-  ${NSD_CreateNumber} 0 47 30% 12u "$ApiPort"
+  ${NSD_CreateNumber} 0 76 30% 16u "$ApiPort"
   Pop $hApiPortText
 
   nsDialogs::Show
@@ -366,7 +367,7 @@ Function StartupPageCreate
   !insertmacro MUI_HEADER_TEXT "$(STARTUP_TITLE)" "$(STARTUP_SUBTITLE)"
   nsDialogs::Create 1018
   Pop $0
-  ${NSD_CreateCheckBox} 0 0 100% 12u "$(STARTUP_CHECKBOX)"
+  ${NSD_CreateCheckBox} 0 0 100% 20u "$(STARTUP_CHECKBOX)"
   Pop $StartupCheckbox
   nsDialogs::Show
 FunctionEnd
