@@ -4,7 +4,6 @@
 
 Unicode True
 RequestExecutionLevel admin
-ManifestDPIAware true
 
 !define PRODUCT_NAME "TikTok2MC"
 !ifndef PRODUCT_VERSION
@@ -130,21 +129,21 @@ Function InstallTypeCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0 100% 24u "$(INSTALLTYPE_HEADER)"
+  ${NSD_CreateLabel} 0 0 100% 20u "$(INSTALLTYPE_HEADER)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 28 100% 20u "$(INSTALLTYPE_BASIC)"
+  ${NSD_CreateRadioButton} 0 22 100% 16u "$(INSTALLTYPE_BASIC)"
   Pop $hBasicRadio
   ${NSD_OnClick} $hBasicRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 0 52 100% 40u "$(INSTALLTYPE_BASIC_DESC)"
+  ${NSD_CreateLabel} 0 40 100% 28u "$(INSTALLTYPE_BASIC_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 96 100% 20u "$(INSTALLTYPE_ADVANCED)"
+  ${NSD_CreateRadioButton} 0 72 100% 16u "$(INSTALLTYPE_ADVANCED)"
   Pop $hAdvancedRadio
   ${NSD_OnClick} $hAdvancedRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 0 120 100% 40u "$(INSTALLTYPE_ADVANCED_DESC)"
+  ${NSD_CreateLabel} 0 90 100% 28u "$(INSTALLTYPE_ADVANCED_DESC)"
   Pop $0
 
   ; Default: Basic
