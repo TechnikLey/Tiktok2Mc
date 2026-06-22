@@ -132,18 +132,18 @@ Function InstallTypeCreate
   ${NSD_CreateLabel} 0 0 100% 20u "$(INSTALLTYPE_HEADER)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 10 25 100% 12u "$(INSTALLTYPE_BASIC)"
+  ${NSD_CreateRadioButton} 0 25 100% 12u "$(INSTALLTYPE_BASIC)"
   Pop $hBasicRadio
   ${NSD_OnClick} $hBasicRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 25 40 100% 24u "$(INSTALLTYPE_BASIC_DESC)"
+  ${NSD_CreateLabel} 0 40 100% 24u "$(INSTALLTYPE_BASIC_DESC)"
   Pop $0
 
-  ${NSD_CreateRadioButton} 10 68 100% 12u "$(INSTALLTYPE_ADVANCED)"
+  ${NSD_CreateRadioButton} 0 68 100% 12u "$(INSTALLTYPE_ADVANCED)"
   Pop $hAdvancedRadio
   ${NSD_OnClick} $hAdvancedRadio InstallTypeRadioClick
 
-  ${NSD_CreateLabel} 25 83 100% 24u "$(INSTALLTYPE_ADVANCED_DESC)"
+  ${NSD_CreateLabel} 0 83 100% 24u "$(INSTALLTYPE_ADVANCED_DESC)"
   Pop $0
 
   ; Default: Basic
@@ -191,7 +191,7 @@ Function AdvancedComponentsCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateCheckBox} 10 0 100% 10u "$(COMP_PLUGINS)"
+  ${NSD_CreateCheckBox} 0 0 100% 12u "$(COMP_PLUGINS)"
   Pop $hPluginCheck
   ${If} $AdvancedComponents & 1
     ${NSD_Check} $hPluginCheck
@@ -199,7 +199,7 @@ Function AdvancedComponentsCreate
     ${NSD_Uncheck} $hPluginCheck
   ${EndIf}
 
-  ${NSD_CreateCheckBox} 10 15 100% 10u "$(COMP_MC)"
+  ${NSD_CreateCheckBox} 0 16 100% 12u "$(COMP_MC)"
   Pop $hMCCheck
   ${If} $AdvancedComponents & 2
     ${NSD_Check} $hMCCheck
@@ -207,7 +207,7 @@ Function AdvancedComponentsCreate
     ${NSD_Uncheck} $hMCCheck
   ${EndIf}
 
-  ${NSD_CreateCheckBox} 10 30 100% 10u "$(COMP_DOCS)"
+  ${NSD_CreateCheckBox} 0 32 100% 12u "$(COMP_DOCS)"
   Pop $hDocsCheck
   ${If} $AdvancedComponents & 4
     ${NSD_Check} $hDocsCheck
@@ -249,13 +249,17 @@ FunctionEnd
 ; =============================================================
 LangString GUI_TITLE ${LANG_ENGLISH} "GUI Default Mode"
 LangString GUI_SUBTITLE ${LANG_ENGLISH} "Choose the default application mode for desktop shortcuts."
-LangString GUI_GUI ${LANG_ENGLISH} "GUI Mode (gui.exe) — Opens the graphical user interface (recommended)"
-LangString GUI_START ${LANG_ENGLISH} "Full System Mode (start.exe) — Starts the complete stack including API and Minecraft server"
+LangString GUI_GUI ${LANG_ENGLISH} "GUI Mode (gui.exe)"
+LangString GUI_GUI_DESC ${LANG_ENGLISH} "Opens the graphical user interface (recommended)"
+LangString GUI_START ${LANG_ENGLISH} "Full System Mode (start.exe)"
+LangString GUI_START_DESC ${LANG_ENGLISH} "Starts the complete stack including API and Minecraft server"
 
 LangString GUI_TITLE ${LANG_GERMAN} "GUI-Standardmodus"
 LangString GUI_SUBTITLE ${LANG_GERMAN} "Wählen Sie den Standardmodus für Desktop-Verknüpfungen."
-LangString GUI_GUI ${LANG_GERMAN} "GUI-Modus (gui.exe) — Öffnet die grafische Benutzeroberfläche (empfohlen)"
-LangString GUI_START ${LANG_GERMAN} "Full System Modus (start.exe) — Startet den vollständigen Stack inklusive API und Minecraft-Server"
+LangString GUI_GUI ${LANG_GERMAN} "GUI-Modus (gui.exe)"
+LangString GUI_GUI_DESC ${LANG_GERMAN} "Öffnet die grafische Benutzeroberfläche (empfohlen)"
+LangString GUI_START ${LANG_GERMAN} "Full System Modus (start.exe)"
+LangString GUI_START_DESC ${LANG_GERMAN} "Startet den vollständigen Stack inklusive API und Minecraft-Server"
 
 Function GuiModeCreate
   ${If} $InstallType == 0
@@ -265,13 +269,19 @@ Function GuiModeCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateRadioButton} 10 0 100% 14u "$(GUI_GUI)"
+  ${NSD_CreateRadioButton} 0 0 100% 12u "$(GUI_GUI)"
   Pop $hGuiModeGui
   ${NSD_OnClick} $hGuiModeGui GuiModeRadioClick
 
-  ${NSD_CreateRadioButton} 10 20 100% 14u "$(GUI_START)"
+  ${NSD_CreateLabel} 0 14 100% 14u "$(GUI_GUI_DESC)"
+  Pop $0
+
+  ${NSD_CreateRadioButton} 0 34 100% 12u "$(GUI_START)"
   Pop $hGuiModeStart
   ${NSD_OnClick} $hGuiModeStart GuiModeRadioClick
+
+  ${NSD_CreateLabel} 0 48 100% 14u "$(GUI_START_DESC)"
+  Pop $0
 
   ; Default: GUI Mode (true)
   ${If} $GuiDefaultMode == ""
