@@ -38,11 +38,26 @@ def discover_plugins_from_manifests(base_path: str) -> list[dict[str, Any]]:
         if not manifest_file.is_file():
             continue
 
+        error = ""
         try:
             with manifest_file.open("r", encoding="utf-8") as fh:
                 raw = json.load(fh)
         except (json.JSONDecodeError, OSError) as exc:
-            log.warning("Skipping invalid manifest %s: %s", manifest_file, exc)
+            error = str(exc)
+
+        if error:
+            name = child.name
+            if name in seen_names:
+                continue
+            seen_names.add(name)
+            results.append({
+                "name": name,
+                "version": "0.0.0",
+                "entry_point": "",
+                "enabled_by_registry": False,
+                "error": error,
+            })
+            log.warning("Discovered plugin '%s' with broken manifest: %s", name, error)
             continue
 
         name = raw.get("name", "")
@@ -64,6 +79,7 @@ def discover_plugins_from_manifests(base_path: str) -> list[dict[str, Any]]:
             "version": raw.get("version", "0.0.0"),
             "entry_point": raw.get("entry_point", ""),
             "enabled_by_registry": False,
+            "error": "",
         })
 
     # Sort by name for deterministic output

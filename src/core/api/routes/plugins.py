@@ -5,6 +5,7 @@ flow.  Plugins now register via the API, which persists to its own
 JSON store (``data/api_plugin_registry.json``).
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -124,10 +125,61 @@ async def register_plugin(body: PluginRegisterRequest):
 
 @router.get("/plugins", response_model=PluginListResponse)
 async def list_plugins():
-    """Return every registered plugin."""
+    """Return every registered plugin, plus filesystem-discovered ones.
+
+    If a plugin.json is broken or missing, the plugin is still listed
+    with an ``error`` field explaining the problem.
+    """
     try:
         registry = get_registry()
         plugins = registry.list()
+
+        # Check each registered plugin's manifest for errors
+        for plugin in plugins:
+            if plugin.path:
+                plugin_dir = Path(plugin.path).parent if Path(plugin.path).is_file() else Path(plugin.path)
+                if plugin_dir.is_dir():
+                    manifest_path = plugin_dir / "plugin.json"
+                    if manifest_path.exists():
+                        try:
+                            with manifest_path.open("r", encoding="utf-8") as fh:
+                                json.load(fh)
+                        except Exception as exc:
+                            plugin.error = str(exc)
+
+        # Scan filesystem for unregistered plugins (broken manifests)
+        plugins_dir = core.paths.get_root_dir() / "src" / "plugins"
+        if not plugins_dir.is_dir():
+            plugins_dir = core.paths.get_root_dir() / "plugins"
+        if plugins_dir.is_dir():
+            for child in sorted(plugins_dir.iterdir()):
+                if not child.is_dir():
+                    continue
+                manifest_file = child / "plugin.json"
+                if not manifest_file.is_file():
+                    continue
+                name = child.name
+                if any(p.name == name for p in plugins):
+                    continue
+                error = ""
+                try:
+                    with manifest_file.open("r", encoding="utf-8") as fh:
+                        raw = json.load(fh)
+                    name = raw.get("name", child.name)
+                except Exception as exc:
+                    error = str(exc)
+                if any(p.name == name for p in plugins):
+                    continue
+                from core.api.models import PluginRegistration
+                plugins.append(PluginRegistration(
+                    name=name,
+                    display_name=name,
+                    version="0.0.0",
+                    error=error,
+                    enabled=False,
+                    path=str(child),
+                ))
+
         enabled = sum(1 for p in plugins if p.enabled)
         return PluginListResponse(
             total=len(plugins), enabled=enabled, plugins=plugins

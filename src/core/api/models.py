@@ -161,6 +161,7 @@ class PluginRegistration(BaseModel):
     last_heartbeat: Optional[float] = Field(
         None, description="Unix timestamp of last successful health check"
     )
+    error: str = Field("", description="Error message if plugin manifest is broken")
 
     @classmethod
     def from_manifest(

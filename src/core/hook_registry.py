@@ -39,6 +39,7 @@ class HookRegistration:
         plugin: str = "",
         update_url: str = "",
         source: str = "",
+        error: str = "",
         registered_at: float | None = None,
         updated_at: float | None = None,
     ) -> None:
@@ -52,6 +53,7 @@ class HookRegistration:
         self.plugin = plugin
         self.update_url = update_url
         self.source = source
+        self.error = error
         self.registered_at = registered_at or time.time()
         self.updated_at = updated_at or time.time()
 
@@ -67,6 +69,7 @@ class HookRegistration:
             "plugin": self.plugin,
             "update_url": self.update_url,
             "source": self.source,
+            "error": self.error,
             "registered_at": self.registered_at,
             "updated_at": self.updated_at,
         }
@@ -163,22 +166,27 @@ class HookRegistry:
         * Adds new hooks (enabled by default).
         * Updates version/source info for existing hooks.
         * Does **not** remove hooks — use ``stale`` check for that.
+        * Includes error info for hooks with broken manifests.
 
         Returns the number of new registrations.
         """
         count = 0
         for info in discovered:
             existing = self.get(info["name"])
+            error = info.get("_error", info.get("error", ""))
             if existing is None:
-                self.register(HookRegistration(**info))
+                reg_info = {k: v for k, v in info.items() if k != "_error"}
+                reg_info["error"] = error
+                self.register(HookRegistration(**reg_info))
                 count += 1
-            elif existing.version != info.get("version", existing.version):
+            elif existing.version != info.get("version", existing.version) or error != existing.error:
                 self.update(
                     info["name"],
                     version=info.get("version", existing.version),
                     source=info.get("source", existing.source),
                     display_name=info.get("display_name", existing.display_name),
                     description=info.get("description", existing.description),
+                    error=error,
                 )
         return count
 

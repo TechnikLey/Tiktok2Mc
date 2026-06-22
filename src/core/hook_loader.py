@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import json
 import sys
 import logging
 from pathlib import Path
@@ -101,8 +102,38 @@ def _discover_hook_dirs() -> list[dict]:
         for child in sorted(parent_dir.iterdir()):
             if not child.is_dir():
                 continue
+
             manifest = load_hook_manifest(child)
+            error = None
+            fallback_name = child.name
+
             if manifest is None:
+                hook_json = child / "hook.json"
+                if hook_json.exists():
+                    try:
+                        with hook_json.open("r", encoding="utf-8") as f:
+                            json.load(f)
+                    except Exception as exc:
+                        error = str(exc)
+                if not error:
+                    error = "hook.json is missing or invalid"
+
+                if error:
+                    hooks.append({
+                        "name": fallback_name,
+                        "version": "0.0.0",
+                        "display_name": fallback_name,
+                        "description": "",
+                        "author": "",
+                        "capabilities": [],
+                        "plugin": plugin_name,
+                        "update_url": "",
+                        "source": str(child.resolve()),
+                        "source_type": source_type,
+                        "_manifest": None,
+                        "_error": error,
+                    })
+                    log.warning("[HOOK] Hook '%s' has errors: %s", fallback_name, error)
                 continue
 
             if manifest.name in seen_names:
@@ -267,6 +298,34 @@ def load_event_hooks(
             for child in sorted(hooks_dir.iterdir()):
                 if child.is_dir():
                     m = load_hook_manifest(child)
+                    error = None
+                    if m is None:
+                        hook_json = child / "hook.json"
+                        if hook_json.exists():
+                            try:
+                                with hook_json.open("r", encoding="utf-8") as f:
+                                    json.load(f)
+                            except Exception as exc:
+                                error = str(exc)
+                        if not error:
+                            error = "hook.json is missing or invalid"
+                    if error:
+                        if not any(h["name"] == child.name for h in discovered):
+                            discovered.append({
+                                "name": child.name,
+                                "version": "0.0.0",
+                                "display_name": child.name,
+                                "description": "",
+                                "author": "",
+                                "capabilities": [],
+                                "plugin": "",
+                                "update_url": "",
+                                "source": str(child.resolve()),
+                                "source_type": "main",
+                                "_manifest": None,
+                                "_error": error,
+                            })
+                        continue
                     if m:
                         # Already caught by discover_hooks_dirs, but ensure we don't
                         # double-count
@@ -299,6 +358,7 @@ def load_event_hooks(
             "plugin": info["plugin"],
             "update_url": info["update_url"],
             "source": info["source"],
+            "_error": info.get("_error", ""),
         })
 
     new_count = registry.sync_from_discovery(hook_infos)
@@ -308,6 +368,8 @@ def load_event_hooks(
     # Load per-hook configs
     hook_configs: dict[str, dict] = {}
     for info in discovered:
+        if info.get("_error"):
+            continue
         manifest: HookManifest = info["_manifest"]
         hook_dir = Path(info["source"])
         hook_configs[manifest.name] = _ensure_hook_config(hook_dir, manifest)
@@ -319,6 +381,10 @@ def load_event_hooks(
     loaded = 0
     skipped = 0
     for info in discovered:
+        if info.get("_error"):
+            log.warning("[HOOK] Hook '%s' has errors — skipping: %s", info["name"], info["_error"])
+            skipped += 1
+            continue
         manifest: HookManifest = info["_manifest"]
         if not registry.is_enabled(manifest.name):
             log.info("[HOOK] Hook '%s' is disabled — skipping", manifest.name)

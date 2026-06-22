@@ -46,6 +46,11 @@ def _serialize_hook(reg: HookRegistration) -> dict:
         manifest = load_hook_manifest(hook_dir)
         if manifest:
             d["config_schema"] = manifest.config_schema
+    # If registry has an error but disk loaded fine, clear it
+    if d.get("error") and hook_dir:
+        manifest = load_hook_manifest(hook_dir)
+        if manifest:
+            d["error"] = ""
     return d
 
 

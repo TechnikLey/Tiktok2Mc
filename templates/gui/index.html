@@ -32,6 +32,12 @@
                     <svg class="nav-chevron" viewBox="0 0 24 24" width="14" height="14" onclick="event.stopPropagation(); togglePluginNav();"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" fill="currentColor"/></svg>
                 </a>
                 <div class="nav-sublist" id="plugin-subnav"></div>
+                <a class="nav-item" data-view="hooks" onclick="switchView('hooks')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 17H7V6h10v12zM9 8h6v2H9V8zm0 4h6v2H9v-2z" fill="currentColor"/></svg>
+                    <span class="nav-label">Hooks</span>
+                    <svg class="nav-chevron" viewBox="0 0 24 24" width="14" height="14" onclick="event.stopPropagation(); toggleHookNav();"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" fill="currentColor"/></svg>
+                </a>
+                <div class="nav-sublist" id="hook-subnav"></div>
                 <a class="nav-item" data-view="overlays" onclick="switchView('overlays')">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="currentColor"/></svg>
                     <span class="nav-label">Overlays</span>
@@ -137,6 +143,42 @@
                                 </div>
                             </div>
                             <div class="editor-content" id="plugins-config-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Hooks ─── -->
+            <div class="view" id="view-hooks">
+                <div id="hook-list-section">
+                    <div class="view-header">
+                        <h2>Hooks</h2>
+                    </div>
+                    <section class="view-section">
+                        <h3>Hook Management</h3>
+                        <div id="hook-manager-table"></div>
+                    </section>
+                </div>
+
+                <div id="hooks-config-section" class="hidden">
+                    <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
+                        <h2 id="hooks-config-title">Configuration</h2>
+                        <button class="btn btn--secondary" onclick="closeInlineHookConfig()">← Back to Hooks</button>
+                    </div>
+                    <div class="plugins-config-layout">
+                        <nav class="editor-sidebar" id="hooks-config-sidebar"></nav>
+                        <div class="editor-main">
+                            <div class="editor-topbar">
+                                <div class="editor-search">
+                                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                    <input type="text" id="hooks-config-search" placeholder="Search settings..." oninput="hookEditor.onInlineSearch(this.value)">
+                                </div>
+                                <div class="header-actions">
+                                    <button class="btn btn-advanced" id="hooks-config-advanced-btn" onclick="hookEditor._toggleAdvanced()">Advanced</button>
+                                    <button class="btn btn--primary btn-save-disabled" id="hooks-config-save" onclick="hookEditor.save()" disabled>Save Changes</button>
+                                </div>
+                            </div>
+                            <div class="editor-content" id="hooks-config-content"></div>
                         </div>
                     </div>
                 </div>
@@ -445,6 +487,18 @@
             <div class="modal-actions">
                 <button class="btn btn--secondary" onclick="pluginEditor.hideReview()">Back</button>
                 <button class="btn btn--primary" onclick="pluginEditor.confirmSave()">Confirm Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hook Review Modal -->
+    <div id="hook-review-modal" class="wizard-overlay hidden modal-z-250">
+        <div class="modal-card">
+            <h3>Review Changes</h3>
+            <div id="hook-review-body" class="modal-scroll"></div>
+            <div class="modal-actions">
+                <button class="btn btn--secondary" onclick="hookEditor.hideReview()">Back</button>
+                <button class="btn btn--primary" onclick="hookEditor.confirmSave()">Confirm Save</button>
             </div>
         </div>
     </div>
