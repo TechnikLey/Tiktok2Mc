@@ -16,7 +16,7 @@ router = APIRouter(tags=["Versions"])
 
 PAPER_API = "https://api.papermc.io/v2/projects/paper"
 
-SAFE_VERSIONS = {"1.21.11"}
+SAFE_VERSIONS = {"26.1.2"}
 
 _service: ApiService | None = None
 
@@ -66,7 +66,7 @@ class SetVersionResponse(BaseModel):
 async def list_versions():
     svc = _get_service()
     cfg = svc.read_config()
-    current_version = cfg.get("mc_version", "1.21.11")
+    current_version = cfg.get("mc_version", "26.1.2")
 
     data = _fetch_json(PAPER_API)
     raw_versions: list[str] = data.get("versions", []) if isinstance(data, dict) else []

@@ -113,7 +113,6 @@ document.getElementById('btn-shutdown-cancel').addEventListener('click', () => {
 /* ─── Server Manager Button Wiring ─── */
 document.getElementById('btn-server-switch')?.addEventListener('click', serverManagerSwitchVersion);
 document.getElementById('btn-server-add-custom')?.addEventListener('click', serverManagerAddCustom);
-document.getElementById('btn-server-remove')?.addEventListener('click', serverManagerRemoveVersion);
 document.getElementById('btn-server-refresh')?.addEventListener('click', serverManagerRefreshList);
 document.getElementById('btn-server-start')?.addEventListener('click', serverManagerStart);
 document.getElementById('btn-server-stop')?.addEventListener('click', serverManagerStop);
@@ -681,7 +680,7 @@ function renderServerManager() {
     return;
   }
 
-  let html = '<table class="server-versions-table"><thead><tr><th>Version</th><th>Status</th><th>Type</th><th>Path</th><th>Active</th><th>Actions</th></tr></thead><tbody>';
+  let html = '<table class="server-versions-table"><thead><tr><th>Version</th><th>Status</th><th>Path</th><th>Active</th><th>Actions</th></tr></thead><tbody>';
   for (const v of versions) {
     const badgeClass = v.type === 'safe' ? 'server-status-badge--safe'
                      : v.type === 'custom' ? 'server-status-badge--custom'
@@ -702,7 +701,6 @@ function renderServerManager() {
     html += `<tr>
       <td data-label="Version"><strong>${escapeHtml(v.version)}</strong></td>
       <td data-label="Status"><span class="server-status-badge ${badgeClass}">${badgeLabel}</span></td>
-      <td data-label="Type">${escapeHtml(v.type)}</td>
       <td data-label="Path"><code style="font-size:0.85rem;">${escapeHtml(v.path)}</code> ${size}</td>
       <td data-label="Active">${activeLabel}</td>
       <td data-label="Actions">${switchBtn} ${removeBtn}</td>
@@ -767,10 +765,6 @@ function serverManagerSwitchVersion() {
 
 function serverManagerAddCustom() {
   openServerCustomModal();
-}
-
-function serverManagerRemoveVersion() {
-  showToast('Select a version from the table and click its Remove button.', 'info');
 }
 
 function serverManagerRefreshList() {

@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["Servers"])
 
 PAPER_API = "https://api.papermc.io/v2/projects/paper"
-SAFE_VERSIONS = {"1.21.11"}
+SAFE_VERSIONS = {"26.1.2"}
 
 _service: ApiService | None = None
 
@@ -58,10 +58,33 @@ def _ensure_servers_dir() -> Path:
     return d
 
 
+def _read_meta(version_dir: Path) -> dict[str, Any]:
+    meta_file = version_dir / ".meta.json"
+    if meta_file.exists():
+        try:
+            return json.loads(meta_file.read_text("utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def _write_meta(version_dir: Path, meta: dict[str, Any]) -> None:
+    meta_file = version_dir / ".meta.json"
+    try:
+        meta_file.write_text(json.dumps(meta), encoding="utf-8")
+    except Exception as e:
+        log.warning("Failed to write meta for %s: %s", version_dir, e)
+
+
 def _list_installed_versions() -> list[dict[str, Any]]:
     servers_dir = _get_servers_dir()
     versions = []
     seen = set()
+
+    def _resolve_type(name: str, meta: dict) -> str:
+        if meta.get("origin") == "custom":
+            return "custom"
+        return "safe" if name in SAFE_VERSIONS else "unsafe"
 
     # Scan version-managed directories: servers/<version>/server.jar
     if servers_dir.exists():
@@ -70,10 +93,11 @@ def _list_installed_versions() -> list[dict[str, Any]]:
                 jar = subdir / "server.jar"
                 if jar.exists():
                     seen.add(subdir.name)
+                    meta = _read_meta(subdir)
                     versions.append({
                         "version": subdir.name,
                         "path": str(subdir.relative_to(get_root_dir())),
-                        "type": "safe" if subdir.name in SAFE_VERSIONS else "unsafe",
+                        "type": _resolve_type(subdir.name, meta),
                         "hasJar": True,
                         "size": jar.stat().st_size,
                     })
@@ -81,12 +105,13 @@ def _list_installed_versions() -> list[dict[str, Any]]:
     # Also recognise the legacy jar at server/mc/server.jar
     legacy_jar = _get_server_mc_dir() / "server.jar"
     if legacy_jar.exists():
-        cfg_ver = _get_active_version() or "1.21.11"
+        cfg_ver = _get_active_version() or "26.1.2"
         if cfg_ver not in seen:
+            meta = _read_meta(_get_server_mc_dir())
             versions.append({
                 "version": cfg_ver,
                 "path": str(_get_server_mc_dir().relative_to(get_root_dir())),
-                "type": "safe" if cfg_ver in SAFE_VERSIONS else "unsafe",
+                "type": _resolve_type(cfg_ver, meta),
                 "hasJar": True,
                 "size": legacy_jar.stat().st_size,
             })
@@ -173,7 +198,7 @@ class RemoveResponse(BaseModel):
 @router.get("/servers", response_model=ServersListResponse)
 async def list_servers():
     installed = _list_installed_versions()
-    active_version = _get_active_version() or "1.21.11"
+    active_version = _get_active_version() or "26.1.2"
 
     for v in installed:
         v["active"] = v["version"] == active_version
@@ -326,15 +351,30 @@ async def switch_version(body: SwitchRequest):
         log.exception("Failed to update config")
         raise HTTPException(status_code=500, detail=f"Version switched but config update failed: {e}")
 
+    # Auto-restart the Minecraft Server if it is currently running
+    restart_initiated = False
+    try:
+        from core.lifecycle import get_supervisor, ProcessState
+        supervisor = get_supervisor()
+        proc = supervisor.get("Minecraft Server")
+        if proc is not None and proc.state == ProcessState.RUNNING:
+            log.info("Version switched to %s — restarting Minecraft Server", version)
+            await supervisor.stop("Minecraft Server")
+            await supervisor.start("Minecraft Server")
+            restart_initiated = True
+    except Exception as e:
+        log.warning("Failed to auto-restart server after version switch: %s", e)
+
     is_safe = version in SAFE_VERSIONS
+    msg = f"Switched to {version}."
+    if restart_initiated:
+        msg += " Server restarted to apply changes."
+    elif not is_safe:
+        msg += " WARNING: This version is untested."
     return SwitchResponse(
         status="ok",
         version=version,
-        message=(
-            f"Switched to {version}."
-            if is_safe
-            else f"Switched to {version}. WARNING: This version is untested."
-        ),
+        message=msg,
     )
 
 
@@ -365,6 +405,7 @@ async def upload_custom_jar(
             while chunk := file.file.read(8192):
                 f.write(chunk)
         log.info("Saved custom jar to %s (%s bytes)", target_jar, target_jar.stat().st_size)
+        _write_meta(target_dir, {"origin": "custom", "originalName": file.filename})
     except Exception as e:
         log.exception("Failed to save custom jar")
         raise HTTPException(status_code=500, detail=f"Failed to save jar: {e}")

@@ -63,14 +63,8 @@ class TestShutdown:
 
 
 class TestServerRestart:
-    def test_restart_server_writes_signal(self, client, project_dir):
-        runtime_dir = project_dir / "core" / "runtime"
-        signal_file = runtime_dir / "restart_server"
-        try:
-            resp = client.post("/api/v1/server/restart")
-            assert resp.status_code == 200
-            assert resp.json() == {"status": "server_restart_requested"}
-            assert signal_file.exists()
-            assert signal_file.read_text(encoding="utf-8") == "restart"
-        finally:
-            signal_file.unlink(missing_ok=True)
+    def test_restart_server_not_registered(self, client, project_dir):
+        """New direct-supervisor restart returns 404 when server is not registered."""
+        resp = client.post("/api/v1/server/restart")
+        assert resp.status_code == 404
+        assert "not registered" in resp.json()["detail"].lower()
