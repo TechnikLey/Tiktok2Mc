@@ -17,6 +17,7 @@ from .event_commands import router as event_commands_router
 from .rcon import router as rcon_router
 from .versions import router as versions_router
 from .triggers import router as triggers_router
+from .logs import router as logs_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -36,3 +37,4 @@ api_router.include_router(event_commands_router)
 api_router.include_router(rcon_router)
 api_router.include_router(versions_router)
 api_router.include_router(triggers_router)
+api_router.include_router(logs_router)

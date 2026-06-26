@@ -23,14 +23,9 @@ if _src not in sys.path:
 from core.paths import get_base_dir
 from core.api.server import DEFAULT_PORT
 from core.yaml_utils import load_yaml
+from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stdout,
-)
-log = logging.getLogger(__name__)
+log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
 API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
@@ -125,4 +120,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    install_global_exception_hook("overlay")
+    heartbeat = start_heartbeat(log, interval=60.0)
+    try:
+        main()
+    except KeyboardInterrupt:
+        log.info("Overlay interrupted by user.")
+    except Exception:
+        handle_unhandled_exception("overlay")
+        sys.exit(1)
+    finally:
+        heartbeat.stop()

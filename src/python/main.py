@@ -34,14 +34,13 @@ from core.paths import get_base_dir, get_runtime_dir
 from core.hook_api import HookAPI, HOOK_ACTIONS
 from core.hook_loader import load_event_hooks
 from core.overlay_utils import send_overlay_text
-
 from core.yaml_utils import load_yaml
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import command_queue
 from core.plugin_config import discover_plugins_dir, load_plugin_manifest
+from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
-log = logging.getLogger(__name__)
+log = initialize_logging(__name__)
 
 # ==========================================
 # CONFIGURATION & PATHS
@@ -497,8 +496,7 @@ def generate_datapack():
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
 
     except Exception as e:
-        traceback.print_exc()
-        log.error(f"Datapack build failed: {e}")
+        log.exception("Datapack build failed: %s", e)
 
 # ================================
 # RCON WORKER
@@ -1282,10 +1280,7 @@ def create_client(user):
                     log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
 
         except Exception:
-            log.error("\n" + "!"*30)
-            log.error("ERROR IN ON_GIFT EVENT:")
-            traceback.print_exc()
-            log.error("!"*30 + "\n")
+            log.exception("ERROR IN ON_GIFT EVENT")
 
     # =========================
     # FOLLOW events
@@ -1660,10 +1655,7 @@ async def run_bot():
             await asyncio.to_thread(client.run)
 
         except Exception as e:
-            log.info("\n" + "="*50)
-            log.info("CRITICAL ERROR IN TIKTOK CLIENT:")
-            traceback.print_exc() 
-            log.info("="*50 + "\n")
+            log.exception("CRITICAL ERROR IN TIKTOK CLIENT")
 
             error_str = str(e)
             log.info(f"[..] Connection lost: {error_str}")
@@ -1684,9 +1676,16 @@ async def run_bot():
             await asyncio.sleep(2)
 
 if __name__ == "__main__":
+    install_global_exception_hook("main")
+    heartbeat = start_heartbeat(log, interval=60.0)
     try:
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
     except KeyboardInterrupt:
         log.info("\n[STOP] Script stopped manually.")
+    except Exception:
+        handle_unhandled_exception("main")
+        sys.exit(1)
+    finally:
+        heartbeat.stop()

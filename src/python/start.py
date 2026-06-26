@@ -77,14 +77,9 @@ from core.port_scanner import (
     persist_to_config,
 )
 from core.api.launcher import PluginLauncher
+from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stdout,
-)
-log = logging.getLogger(__name__)
+log = initialize_logging(__name__)
 
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -849,11 +844,17 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    install_global_exception_hook("start")
+    heartbeat = start_heartbeat(log, interval=60.0)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         log.info("\nInterrupted by user.")
+    except Exception:
+        handle_unhandled_exception("start")
+        sys.exit(1)
     finally:
+        heartbeat.stop()
         # Final cleanup if asyncio.run() exited without setting COMPLETE.
         if supervisor.state != SupervisorState.COMPLETE:
             try:

@@ -30,9 +30,9 @@ from core.api.server import DEFAULT_PORT
 from core.checksum import compute_sha256, fetch_checksum, verify_checksum
 
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+from core.logger import initialize_logging, install_global_exception_hook, handle_unhandled_exception
 
-log = logging.getLogger(__name__)
+log = initialize_logging(__name__)
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -590,5 +590,12 @@ def run_update():
     sys.exit(0)
 
 if __name__ == "__main__":
-    _init()
-    run_update()
+    install_global_exception_hook("update")
+    try:
+        _init()
+        run_update()
+    except KeyboardInterrupt:
+        log.info("Update interrupted by user.")
+    except Exception:
+        handle_unhandled_exception("update")
+        sys.exit(1)

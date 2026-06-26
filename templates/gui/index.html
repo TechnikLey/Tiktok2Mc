@@ -200,6 +200,7 @@
                         <span class="log-stat log-stat--info" data-level="info" title="Info entries"><span class="log-stat-count" id="stat-info">0</span> Info</span>
                         <span class="log-stat log-stat--warn" data-level="warning" title="Warning entries"><span class="log-stat-count" id="stat-warning">0</span> Warn</span>
                         <span class="log-stat log-stat--err" data-level="error" title="Error entries"><span class="log-stat-count" id="stat-error">0</span> Error</span>
+                        <span class="log-stat log-stat--crit" data-level="critical" title="Critical entries"><span class="log-stat-count" id="stat-critical">0</span> Critical</span>
                         <span class="log-stat log-stat--debug" data-level="debug" title="Debug entries"><span class="log-stat-count" id="stat-debug">0</span> Debug</span>
                     </div>
                     <div class="log-search">
@@ -215,6 +216,7 @@
                             <button class="log-filter-btn" data-level="info">Info</button>
                             <button class="log-filter-btn" data-level="warning">Warning</button>
                             <button class="log-filter-btn" data-level="error">Error</button>
+                            <button class="log-filter-btn" data-level="critical">Critical</button>
                             <button class="log-filter-btn" data-level="debug">Debug</button>
                         </div>
                     </div>
@@ -232,6 +234,18 @@
                     <span class="text-muted" id="log-status">Connecting to log stream...</span>
                     <span class="text-muted" id="log-visible-count"></span>
                 </div>
+
+                <section class="view-section crash-reports-section">
+                    <div class="crash-reports-header">
+                        <h3>Crash Reports</h3>
+                        <button class="btn btn--sm btn--secondary" onclick="crashReports.load()">Refresh</button>
+                    </div>
+                    <p class="muted" id="crash-reports-empty">No crash reports available.</p>
+                    <div id="crash-reports-list" class="crash-reports-list"></div>
+                    <div id="crash-report-detail" class="crash-report-detail hidden">
+                        <div id="crash-report-detail-content"></div>
+                    </div>
+                </section>
             </div>
 
             <!-- ─── Console ─── -->

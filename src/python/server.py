@@ -13,9 +13,10 @@ import logging
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from core.yaml_utils import load_yaml
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 
-log = logging.getLogger(__name__)
+log = initialize_logging(__name__)
+install_global_exception_hook("server")
 
 # ==================================================
 # server.py - Minecraft server launcher
@@ -380,6 +381,7 @@ log.info(f"Path:    {SERVER_DIR}")
 log.info(f"Port:    {MC_PORT}")
 log.info("--------------------------\n")
 
+heartbeat = start_heartbeat(log, interval=60.0)
 try:
     proc = subprocess.run(
         [str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"],
@@ -396,7 +398,10 @@ except KeyboardInterrupt:
     log.info("\nServer was stopped manually.")
 except Exception as e:
     log.error("Failed to start Minecraft server: %s", e)
+    handle_unhandled_exception("server")
     _wait_or_skip()
     sys.exit(1)
+finally:
+    heartbeat.stop()
 
 log.info("\nServer stopped.")

@@ -29,6 +29,9 @@ from core.utils import load_config
 from core.yaml_utils import save_yaml
 from core.paths import get_root_dir
 from core.secure_storage import secure_storage
+from core.logger import initialize_logging, install_global_exception_hook, handle_unhandled_exception
+
+log = initialize_logging(__name__)
 
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
@@ -83,7 +86,7 @@ def _save_spotify_config(data: dict[str, Any]) -> None:
         if key in data and data[key]:
             data[key] = secure_storage.encrypt(data[key])
     save_yaml(cfg_file, data)
-    print(f"\n[OK] Spotify config saved to {cfg_file}")
+    log.info("Spotify config saved to %s", cfg_file)
 
 
 # ── Local callback server ──────────────────────────────────────────────
@@ -130,7 +133,7 @@ def _run_callback_server(port: int) -> str | None:
     _auth_code = None
     server = HTTPServer(("127.0.0.1", port), _CallbackHandler)
     server.timeout = 120  # Wait up to 2 minutes for the callback
-    print(f"\n[OK] Waiting for callback on http://127.0.0.1:{port}/callback ...")
+    log.info("Waiting for callback on http://127.0.0.1:%s/callback ...", port)
     server.handle_request()
     return _auth_code
 
@@ -156,14 +159,14 @@ def _exchange_code(code: str, client_id: str, client_secret: str, redirect_uri: 
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
-        print(f"\n[FAIL] Token exchange failed: {e.code} {e.reason}")
+        log.error("Token exchange failed: %s %s", e.code, e.reason)
         try:
-            print(e.read().decode("utf-8"))
+            log.error(e.read().decode("utf-8"))
         except Exception:
             pass
         return None
     except Exception as e:
-        print(f"\n[FAIL] Token exchange failed: {e}")
+        log.error("Token exchange failed: %s", e)
         return None
 
 
@@ -185,7 +188,7 @@ def _refresh_token(refresh_token: str, client_id: str, client_secret: str) -> di
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.read().decode("utf-8")
     except Exception as e:
-        print(f"\n[FAIL] Token refresh failed: {e}")
+        log.error("Token refresh failed: %s", e)
         return None
 
 
@@ -200,7 +203,7 @@ def main():
         print("Spotify tokens already configured.")
         choice = input("Do you want to re-run setup? [y/N]: ").strip().lower()
         if choice != "y":
-            print("Aborted.")
+            log.info("Aborted.")
             return
 
     _print_instructions()
@@ -226,20 +229,20 @@ def main():
     })
     auth_url = f"{SPOTIFY_AUTH_URL}?{auth_params}"
 
-    print(f"\n[OK] Opening browser for authorization...")
+    print("\n[OK] Opening browser for authorization...")
     print(f"    URL: {auth_url[:80]}...")
     webbrowser.open(auth_url)
 
     # Run local callback server
     auth_code = _run_callback_server(port)
     if not auth_code:
-        print("\n[FAIL] No authorization code received. Did you approve the app in your browser?")
+        log.error("No authorization code received. Did you approve the app in your browser?")
         return
 
-    print("[OK] Authorization code received.")
+    log.info("Authorization code received.")
 
     # Exchange code for tokens
-    print("[..] Exchanging code for tokens...")
+    log.info("Exchanging code for tokens...")
     raw_response = _exchange_code(auth_code, client_id, client_secret, redirect_uri)
     if not raw_response:
         return
@@ -251,8 +254,8 @@ def main():
     expires_in = token_data.get("expires_in", 3600)
 
     if not access_token or not refresh_token:
-        print("\n[FAIL] Token response missing required fields:")
-        print(json.dumps(token_data, indent=2))
+        log.error("Token response missing required fields:")
+        log.error(json.dumps(token_data, indent=2))
         return
 
     # Save to config
@@ -270,10 +273,10 @@ def main():
     print("\n" + "=" * 60)
     print("  Spotify setup complete!")
     print("=" * 60)
-    print("\nNext steps:")
-    print("  1. Restart TikTok2MC to load the new Spotify tokens")
-    print("  2. Enable the Spotify plugin in the dashboard")
-    print("  3. Viewers can now use $play, $pause, $skip, $volume, etc.")
+    log.info("Next steps:")
+    log.info("  1. Restart TikTok2MC to load the new Spotify tokens")
+    log.info("  2. Enable the Spotify plugin in the dashboard")
+    log.info("  3. Viewers can now use $play, $pause, $skip, $volume, etc.")
 
 
 def refresh():
@@ -287,10 +290,10 @@ def refresh():
     refresh_token_val = secure_storage.decrypt(spotify_cfg.get("refresh_token")) or spotify_cfg.get("refresh_token", "")
 
     if not all([client_id, client_secret, refresh_token_val]):
-        print("[FAIL] Missing credentials. Run setup first.")
+        log.error("Missing credentials. Run setup first.")
         return
 
-    print("[..] Refreshing access token...")
+    log.info("Refreshing access token...")
     raw = _refresh_token(refresh_token_val, client_id, client_secret)
     if not raw:
         return
@@ -301,17 +304,24 @@ def refresh():
     expires_in = data.get("expires_in", 3600)
 
     if not access_token:
-        print("[FAIL] No access token in refresh response.")
+        log.error("No access token in refresh response.")
         return
 
     spotify_cfg["access_token"] = access_token
     spotify_cfg["token_expires_at"] = int(time.time()) + expires_in
     _save_spotify_config(spotify_cfg)
-    print("\n[OK] Access token refreshed.")
+    log.info("Access token refreshed.")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--refresh":
-        refresh()
-    else:
-        main()
+    install_global_exception_hook("spotify_setup")
+    try:
+        if len(sys.argv) > 1 and sys.argv[1] == "--refresh":
+            refresh()
+        else:
+            main()
+    except KeyboardInterrupt:
+        log.info("Spotify setup interrupted by user.")
+    except Exception:
+        handle_unhandled_exception("spotify_setup")
+        sys.exit(1)

@@ -25,14 +25,9 @@ if _src not in sys.path:
 
 from core.paths import get_base_dir, get_root_dir
 from core.api.server import DEFAULT_PORT
+from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stdout,
-)
-log = logging.getLogger(__name__)
+log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
@@ -356,4 +351,14 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    install_global_exception_hook("gui")
+    heartbeat = start_heartbeat(log, interval=60.0)
+    try:
+        main()
+    except KeyboardInterrupt:
+        log.info("GUI interrupted by user.")
+    except Exception:
+        handle_unhandled_exception("gui")
+        sys.exit(1)
+    finally:
+        heartbeat.stop()

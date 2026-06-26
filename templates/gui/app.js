@@ -152,8 +152,11 @@ class LiveLog {
     this.paused = false;
     this.filter = 'all';
     this.searchQuery = '';
-    this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0 };
+    this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0, critical: 0 };
+    this._sse = null;
+    this._reconnectTimer = null;
     this._bindFilters();
+    this._startSSE();
     this.render();
   }
 
@@ -161,7 +164,8 @@ class LiveLog {
     const l = String(level || 'info').toLowerCase();
     if (l === 'warn') return 'warning';
     if (l === 'err') return 'error';
-    if (['info','warning','error','debug'].includes(l)) return l;
+    if (l === 'crit') return 'critical';
+    if (['info','warning','error','debug','critical'].includes(l)) return l;
     return 'info';
   }
 
@@ -174,6 +178,61 @@ class LiveLog {
       buttons.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
       e.target.classList.add('active');
     });
+  }
+
+  _startSSE() {
+    if (this._sse) { try { this._sse.close(); } catch (_) {} }
+    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
+
+    try {
+      this._sse = new EventSource(API + '/logs/stream');
+      this._sse.onopen = () => this.setConnected(true);
+      this._sse.onmessage = (e) => {
+        if (!e.data || e.data.startsWith(':')) return;
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'log.unified') {
+            const d = msg.data || {};
+            this._addFromSSE(d.message || d.raw || '', d.level || 'info', d.name || '');
+          }
+        } catch (_) {}
+      };
+      this._sse.onerror = () => {
+        this.setConnected(false);
+        if (this._sse) { try { this._sse.close(); } catch (_) {} this._sse = null; }
+        this._reconnectTimer = setTimeout(() => this._startSSE(), 3000);
+      };
+    } catch (_) {
+      this._reconnectTimer = setTimeout(() => this._startSSE(), 5000);
+    }
+  }
+
+  _addFromSSE(message, level, source) {
+    if (this.paused) return;
+    const entry = {
+      id: Date.now() + '-' + Math.random().toString(36).slice(2),
+      time: new Date().toLocaleTimeString(),
+      timestamp: Date.now(),
+      message: message,
+      level: this._normalizeLevel(level),
+      source: source || ''
+    };
+    this.entries.push(entry);
+    if (this.entries.length > this.maxEntries) {
+      const removed = this.entries.shift();
+      this.levelCounts[removed.level] = Math.max(0, this.levelCounts[removed.level] - 1);
+      this.levelCounts.all = Math.max(0, this.levelCounts.all - 1);
+    }
+    this.levelCounts[entry.level]++;
+    this.levelCounts.all++;
+    this._updateStats();
+    if (this._matches(entry)) {
+      const el = this._renderEntry(entry);
+      this.view.appendChild(el);
+      this._trimVisible();
+      this._scrollToBottom();
+    }
+    this._updateVisibleCount();
   }
 
   setFilter(level) {
@@ -209,7 +268,7 @@ class LiveLog {
 
   clear() {
     this.entries = [];
-    this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0 };
+    this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0, critical: 0 };
     this.render();
   }
 
@@ -218,7 +277,6 @@ class LiveLog {
     const content = lines.join('\n');
     const filename = `tiktok2mc-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
 
-    // Use pywebview API if available (saves to Downloads), otherwise try browser download.
     if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.download_file) {
       pywebview.api.download_file(content, filename).then(path => {
         if (path && !path.startsWith('error:')) {
@@ -243,31 +301,7 @@ class LiveLog {
   }
 
   add(message, level = 'info', source = '') {
-    if (this.paused) return;
-    const entry = {
-      id: Date.now() + '-' + Math.random().toString(36).slice(2),
-      time: new Date().toLocaleTimeString(),
-      timestamp: Date.now(),
-      message: message,
-      level: this._normalizeLevel(level),
-      source: source || ''
-    };
-    this.entries.push(entry);
-    if (this.entries.length > this.maxEntries) {
-      const removed = this.entries.shift();
-      this.levelCounts[removed.level] = Math.max(0, this.levelCounts[removed.level] - 1);
-      this.levelCounts.all = Math.max(0, this.levelCounts.all - 1);
-    }
-    this.levelCounts[entry.level]++;
-    this.levelCounts.all++;
-    this._updateStats();
-    if (this._matches(entry)) {
-      const el = this._renderEntry(entry);
-      this.view.appendChild(el);
-      this._trimVisible();
-      this._scrollToBottom();
-    }
-    this._updateVisibleCount();
+    this._addFromSSE(message, level, source);
   }
 
   _matches(entry) {
@@ -338,6 +372,103 @@ function log(msg, level = 'info') {
 }
 
 const liveLog = new LiveLog();
+
+/* ─── Crash Reports ─── */
+class CrashReports {
+  constructor() {
+    this.container = document.getElementById('crash-reports-list');
+    this.detailView = document.getElementById('crash-report-detail');
+    this.detailContent = document.getElementById('crash-report-detail-content');
+    this.emptyState = document.getElementById('crash-reports-empty');
+    this.reports = [];
+  }
+
+  async load() {
+    try {
+      const data = await fetchJSON('/logs/crash-reports');
+      this.reports = data.reports || [];
+      this.renderList();
+    } catch (e) {
+      if (this.container) this.container.innerHTML = '<p class="muted">Failed to load crash reports.</p>';
+    }
+  }
+
+  renderList() {
+    if (!this.container) return;
+    if (!this.reports.length) {
+      this.container.innerHTML = '';
+      if (this.emptyState) this.emptyState.classList.remove('hidden');
+      return;
+    }
+    if (this.emptyState) this.emptyState.classList.add('hidden');
+    this.container.innerHTML = this.reports.map(r => `
+      <div class="crash-report-item" onclick="crashReports.open('${escapeHtml(r.filename)}')">
+        <div class="crash-report-meta">
+          <span class="crash-report-time">${escapeHtml(r.timestamp || 'Unknown')}</span>
+          <span class="crash-report-module">${escapeHtml(r.module || 'unknown')}</span>
+        </div>
+        <div class="crash-report-type">${escapeHtml(r.exception_type || 'Exception')}</div>
+      </div>
+    `).join('');
+  }
+
+  async open(filename) {
+    if (!this.detailView || !this.detailContent) return;
+    try {
+      const data = await fetchJSON('/logs/crash-reports/' + encodeURIComponent(filename));
+      this.detailContent.innerHTML = this._renderDetail(data);
+      this.detailView.classList.remove('hidden');
+    } catch (e) {
+      showToast('Failed to open crash report.', 'error');
+    }
+  }
+
+  close() {
+    if (this.detailView) this.detailView.classList.add('hidden');
+  }
+
+  _renderDetail(data) {
+    const ts = escapeHtml(data.timestamp || 'Unknown');
+    const mod = escapeHtml(data.module || 'unknown');
+    const excType = escapeHtml(data.exception_type || 'Exception');
+    const excMsg = escapeHtml(data.exception_message || '');
+    const pyVer = escapeHtml((data.python_version || '').split('\n')[0]);
+    const plat = escapeHtml(data.platform || '');
+    const stack = escapeHtml(data.stack_trace || 'No stack trace available.');
+    const logs = (data.recent_logs || []).map(l => escapeHtml(l)).join('\n');
+
+    return `
+      <div class="crash-detail-header">
+        <div>
+          <h4 class="crash-detail-title">${excType}</h4>
+          <div class="crash-detail-subtitle">${mod} &middot; ${ts}</div>
+        </div>
+        <button class="btn btn--sm btn--secondary" onclick="crashReports.close()">Close</button>
+      </div>
+      <div class="crash-detail-section">
+        <div class="crash-detail-label">Message</div>
+        <div class="crash-detail-box">${excMsg || '<span class="muted">No message</span>'}</div>
+      </div>
+      <div class="crash-detail-section">
+        <div class="crash-detail-label">Environment</div>
+        <div class="crash-detail-box crash-detail-env">
+          <div><strong>Python:</strong> ${pyVer}</div>
+          <div><strong>Platform:</strong> ${plat}</div>
+        </div>
+      </div>
+      <div class="crash-detail-section">
+        <div class="crash-detail-label">Stack Trace</div>
+        <pre class="crash-detail-box crash-detail-pre">${stack}</pre>
+      </div>
+      ${logs ? `<div class="crash-detail-section">
+        <div class="crash-detail-label">Recent Logs</div>
+        <pre class="crash-detail-box crash-detail-pre">${logs}</pre>
+      </div>` : ''}
+    `;
+  }
+}
+
+const crashReports = new CrashReports();
 
 function showToast(msg, type = 'info') {
   const c = document.getElementById('toast-container');
@@ -5330,6 +5461,9 @@ function switchView(viewId) {
   }
   if (viewId === 'overlays') {
     renderOverlayUrls();
+  }
+  if (viewId === 'log') {
+    crashReports.load();
   }
 }
 
