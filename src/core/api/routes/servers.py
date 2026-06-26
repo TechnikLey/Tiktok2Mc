@@ -61,11 +61,15 @@ def _ensure_servers_dir() -> Path:
 def _list_installed_versions() -> list[dict[str, Any]]:
     servers_dir = _get_servers_dir()
     versions = []
+    seen = set()
+
+    # Scan version-managed directories: servers/<version>/server.jar
     if servers_dir.exists():
         for subdir in sorted(servers_dir.iterdir()):
             if subdir.is_dir() and subdir.name.startswith(".") is False:
                 jar = subdir / "server.jar"
                 if jar.exists():
+                    seen.add(subdir.name)
                     versions.append({
                         "version": subdir.name,
                         "path": str(subdir.relative_to(get_root_dir())),
@@ -73,6 +77,20 @@ def _list_installed_versions() -> list[dict[str, Any]]:
                         "hasJar": True,
                         "size": jar.stat().st_size,
                     })
+
+    # Also recognise the legacy jar at server/mc/server.jar
+    legacy_jar = _get_server_mc_dir() / "server.jar"
+    if legacy_jar.exists():
+        cfg_ver = _get_active_version() or "1.21.11"
+        if cfg_ver not in seen:
+            versions.append({
+                "version": cfg_ver,
+                "path": str(_get_server_mc_dir().relative_to(get_root_dir())),
+                "type": "safe" if cfg_ver in SAFE_VERSIONS else "unsafe",
+                "hasJar": True,
+                "size": legacy_jar.stat().st_size,
+            })
+
     return versions
 
 
@@ -188,11 +206,18 @@ async def download_version(body: DownloadRequest):
         )
 
     builds = builds_data.get("builds", []) if isinstance(builds_data, dict) else []
-    successful = [b for b in builds if b.get("channel") == "default" and b.get("downloads", {}).get("application")]
-    if not successful:
+    # PaperMC channels: STABLE (preferred) > BETA > ALPHA > default (legacy)
+    _channel_priority = {"STABLE": 0, "default": 1, "BETA": 2, "ALPHA": 3}
+    candidates = [
+        b for b in builds
+        if b.get("channel") in _channel_priority and b.get("downloads", {}).get("application")
+    ]
+    if not candidates:
         raise HTTPException(status_code=400, detail=f"No successful builds found for version '{version}'")
 
-    latest = successful[-1]
+    # Pick the newest build with the highest priority channel
+    candidates.sort(key=lambda b: (_channel_priority.get(b.get("channel"), 99), -b.get("build", 0)))
+    latest = candidates[0]
     build_num = latest["build"]
     app_download = latest["downloads"]["application"]
     jar_name = app_download["name"]
@@ -233,12 +258,24 @@ async def switch_version(body: SwitchRequest):
     servers_dir = _get_servers_dir()
     source_dir = servers_dir / version
     source_jar = source_dir / "server.jar"
+    legacy_jar = _get_server_mc_dir() / "server.jar"
 
     if not source_jar.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Version '{version}' is not installed. Download it first.",
-        )
+        # Fallback: if the legacy jar matches the requested version, it's valid
+        svc = _get_service()
+        try:
+            cfg = svc.read_config()
+            cfg_version = cfg.get("mc_version", "")
+        except Exception:
+            cfg_version = ""
+        if version == cfg_version and legacy_jar.exists():
+            # The legacy jar IS the requested version — nothing to copy
+            source_jar = legacy_jar
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Version '{version}' is not installed. Download it first.",
+            )
 
     target_jar = _get_active_jar_path()
     server_mc_dir = _get_server_mc_dir()
@@ -263,13 +300,16 @@ async def switch_version(body: SwitchRequest):
             except Exception as e:
                 log.warning("Could not backup existing jar: %s", e)
 
-    # Copy new jar into place
-    try:
-        shutil.copy2(source_jar, target_jar)
-        log.info("Switched active server.jar to %s", target_jar)
-    except Exception as e:
-        log.exception("Failed to copy jar")
-        raise HTTPException(status_code=500, detail=f"Failed to activate version: {e}")
+    # Copy new jar into place (skip if source and target are the same file)
+    if source_jar.resolve() != target_jar.resolve():
+        try:
+            shutil.copy2(source_jar, target_jar)
+            log.info("Switched active server.jar to %s", target_jar)
+        except Exception as e:
+            log.exception("Failed to copy jar")
+            raise HTTPException(status_code=500, detail=f"Failed to activate version: {e}")
+    else:
+        log.info("Version %s is already active at %s", version, target_jar)
 
     # Update config
     try:

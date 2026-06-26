@@ -70,6 +70,8 @@ async def list_versions():
 
     data = _fetch_json(PAPER_API)
     raw_versions: list[str] = data.get("versions", []) if isinstance(data, dict) else []
+    # Reverse so newest versions appear first
+    raw_versions = list(reversed(raw_versions))
 
     versions: list[VersionInfo] = []
     for v in raw_versions:
