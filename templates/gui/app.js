@@ -2358,7 +2358,7 @@ document.getElementById('wizard-next').addEventListener('click', wizardNext);
 
 const SECTION_ORDER = [
   'tiktok','rcon','server_host','control_method',
-  'mc_version','java','minecraft_server_api',
+  'java','minecraft_server_api',
   'console','overlay','theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
@@ -2368,7 +2368,7 @@ const SECTION_ORDER = [
 
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method'],
-  'Minecraft': ['mc_version','java','minecraft_server_api'],
+  'Minecraft': ['java','minecraft_server_api'],
   'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
   'Chat & Commands': ['comment_commands','random_triggers']
 };
@@ -2393,7 +2393,6 @@ const SECTION_META = {
   port_policy: { title: 'Port Policy', desc: 'Controls what happens when a required port is already in use. Can auto-resolve to the next free port.', category: 'System' },
   api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'System' },
   plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' },
-  mc_version: { title: 'Minecraft Version', desc: 'Select the PaperMC server version. 1.21.11 is the only SAFE version. Other versions are untested.', category: 'Minecraft' }
 };
 
 const HELP_TEXT = {
@@ -2458,7 +2457,6 @@ const HELP_TEXT = {
   'port_policy.auto_resolve': 'When enabled, automatically find the next free port if the default port is already in use. When disabled, logs an error and exits.',
   'port_policy.session_only': 'When enabled, resolved ports are used only for the current session. When disabled, resolved ports are saved permanently to the config.',
   'port_policy.max_offset': 'How many ports to try before giving up. -1 means unlimited.',
-  'mc_version': 'The Minecraft server version to use. 1.21.11 is the only SAFE version. Other versions are untested and may break functionality. Requires Advanced Settings to change.',
   'api_key': 'Optional API key for authentication. When set, all non-localhost requests must include the X-API-Key header. Leave empty to disable authentication.',
   'plugin_sandbox.enabled': 'Enable sandboxing to restrict plugin subprocess resources.',
   'plugin_sandbox.max_memory_mb': 'Maximum RAM per plugin process in megabytes.',
@@ -2532,7 +2530,6 @@ const FIELD_META = {
   'plugin_sandbox.max_files': { basic: false, type: 'number', min: 1 },
   'plugin_sandbox.max_processes': { basic: false, type: 'number', min: 1 },
   'plugin_sandbox.priority_class': { basic: false, type: 'select', options: ['below_normal', 'idle'] },
-  'mc_version': { basic: false, type: 'text' }
 };
 
 function getMeta(path) {
@@ -2562,21 +2559,11 @@ class ConfigEditor {
     this.activeSection = null;
     this.originalTypes = {}; // track original types for commands_config etc.
     this._advancedMode = localStorage.getItem('config_advanced_mode') === 'true';
-    // Version editor state
-    this._versionOptionsCache = null;
-    this._safeVersions = null;
-    this._versionChangePending = null;
-    this._versionWarningAttached = false;
   }
 
   open(config) {
     this.original = JSON.parse(JSON.stringify(config));
     this.data = JSON.parse(JSON.stringify(config));
-    // Ensure mc_version has a default
-    if (!this.data.mc_version) {
-      this.data.mc_version = '1.21.11';
-      this.original.mc_version = '1.21.11';
-    }
     this.unknownKeys = {};
     this.originalUnknownKeys = {};
     this.errors.clear();
@@ -2599,8 +2586,6 @@ class ConfigEditor {
     this._updateSaveButton();
     this._updateAdvancedUI();
     this._attachInputListeners();
-    // Start fetching version options in background
-    this._initVersionCache();
   }
 
   isDirty() {
@@ -2833,12 +2818,6 @@ class ConfigEditor {
       body = this.buildThemeEditor(key, value);
     } else if (key === 'overlay') {
       body = this.buildOverlayEditor(key, value);
-    } else if (key === 'mc_version') {
-      if (this._advancedMode) {
-        body = this.buildVersionEditor(value);
-      } else {
-        body = this._buildLockedField(key, key, getHelp(key));
-      }
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       body = this.buildObjectFields(key, value);
     } else if (Array.isArray(value)) {
@@ -3251,119 +3230,6 @@ class ConfigEditor {
   buildOverlayEditor(path, overlay) {
     const fields = this.buildObjectFields(path, overlay);
     return fields;
-  }
-
-  /* ─── Version Editor ─── */
-
-  buildVersionEditor(value) {
-    const safeSet = this._safeVersions || new Set(['1.21.11']);
-    const current = value || '1.21.11';
-    const isCurrentSafe = safeSet.has(current);
-    let html = '';
-
-    if (!isCurrentSafe) {
-      html += `<div style="padding:0.5rem 0.75rem;margin-bottom:0.75rem;background:rgba(220,38,38,0.1);border:1px solid var(--danger);border-radius:4px;color:var(--danger);font-size:0.85rem;">
-        <strong>Warning:</strong> Version ${escapeHtml(current)} is untested and may break functionality.
-      </div>`;
-    }
-
-    html += `<div class="editor-field">
-      <div class="field-label">PaperMC Server Version</div>
-      <div class="field-widget">
-        <select data-path="mc_version" data-type="text" onchange="editor._onVersionChange(this)" style="width:100%;padding:0.5rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.9rem;">
-          ${(this._versionOptionsCache || [{version: '1.21.11', safe: true}]).map(v => {
-            const isSafe = (this._safeVersions || new Set(['1.21.11'])).has(v.version);
-            const label = v.version + (isSafe ? ' (SAFE)' : ' (untested)');
-            const selected = v.version === current ? ' selected' : '';
-            return `<option value="${escapeHtml(v.version)}"${selected}>${escapeHtml(label)}</option>`;
-          }).join('')}
-        </select>
-        <p class="field-desc">The Minecraft server jar version. SAFE = tested and confirmed working (1.21.11). Other versions may cause issues.</p>
-        <p class="field-desc" style="margin-top:0.25rem;">Safe versions: ${Array.from(safeSet).join(', ')}</p>
-      </div>
-    </div>`;
-
-    // Attach version dialog handlers (once)
-    this._attachVersionWarningHandlers();
-
-    return html;
-  }
-
-  _attachVersionWarningHandlers() {
-    if (this._versionWarningAttached) return;
-    this._versionWarningAttached = true;
-
-    const cancelBtn = document.getElementById('version-warning-cancel');
-    const okBtn = document.getElementById('version-warning-ok');
-    const checkbox = document.getElementById('version-warning-checkbox');
-
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => this._dismissVersionWarning());
-    }
-    if (checkbox) {
-      checkbox.addEventListener('change', () => {
-        if (okBtn) okBtn.disabled = !checkbox.checked;
-      });
-    }
-    if (okBtn) {
-      okBtn.addEventListener('click', () => this._confirmVersionWarning());
-    }
-  }
-
-  _initVersionCache() {
-    if (this._versionOptionsCache) return;
-    fetchJSON('/versions').then(resp => {
-      this._versionOptionsCache = resp.versions || [];
-      this._safeVersions = new Set(resp.safe_versions || ['1.21.11']);
-      // Re-render if the editor is currently open
-      const editorEl = document.getElementById('config-editor');
-      if (editorEl && !editorEl.classList.contains('hidden')) {
-        this.render();
-      }
-    }).catch(() => {
-      this._versionOptionsCache = [{ version: '1.21.11', safe: true }];
-      this._safeVersions = new Set(['1.21.11']);
-    });
-  }
-
-  _onVersionChange(selectEl) {
-    const newVersion = selectEl.value;
-    const safeSet = this._safeVersions || new Set(['1.21.11']);
-    if (!safeSet.has(newVersion)) {
-      this._versionChangePending = selectEl;
-      const dlg = document.getElementById('version-warning-dialog');
-      const checkbox = document.getElementById('version-warning-checkbox');
-      const okBtn = document.getElementById('version-warning-ok');
-      if (dlg && checkbox && okBtn) {
-        checkbox.checked = false;
-        okBtn.disabled = true;
-        dlg.classList.remove('hidden');
-      }
-    } else {
-      this.collect();
-      this._updateSaveButton();
-    }
-  }
-
-  _dismissVersionWarning() {
-    const dlg = document.getElementById('version-warning-dialog');
-    if (dlg) dlg.classList.add('hidden');
-    if (this._versionChangePending) {
-      const orig = this.data.mc_version || '1.21.11';
-      this._versionChangePending.value = orig;
-      this._versionChangePending = null;
-    }
-  }
-
-  _confirmVersionWarning() {
-    const dlg = document.getElementById('version-warning-dialog');
-    if (dlg) dlg.classList.add('hidden');
-    this._versionChangePending = null;
-    this.collect();
-    this._updateSaveButton();
-    if (typeof this.render === 'function') {
-      try { this.render(); } catch (e) {}
-    }
   }
 
   buildPrimitiveArray(path, arr) {
