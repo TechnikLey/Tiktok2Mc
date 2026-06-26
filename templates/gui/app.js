@@ -115,6 +115,9 @@ document.getElementById('btn-server-switch')?.addEventListener('click', serverMa
 document.getElementById('btn-server-add-custom')?.addEventListener('click', serverManagerAddCustom);
 document.getElementById('btn-server-remove')?.addEventListener('click', serverManagerRemoveVersion);
 document.getElementById('btn-server-refresh')?.addEventListener('click', serverManagerRefreshList);
+document.getElementById('btn-server-start')?.addEventListener('click', serverManagerStart);
+document.getElementById('btn-server-stop')?.addEventListener('click', serverManagerStop);
+document.getElementById('btn-server-restart')?.addEventListener('click', serverManagerRestart);
 
 /* ─── Server Manager Modal Wiring ─── */
 document.getElementById('server-download-cancel')?.addEventListener('click', closeServerDownloadModal);
@@ -772,6 +775,131 @@ function serverManagerRemoveVersion() {
 
 function serverManagerRefreshList() {
   loadServerManager();
+}
+
+/* ─── Server Lifecycle Controls ─── */
+let _serverLifecycleInterval = null;
+
+function startServerLifecyclePolling() {
+  stopServerLifecyclePolling();
+  updateServerLifecycleStatus();
+  _serverLifecycleInterval = setInterval(updateServerLifecycleStatus, 5000);
+}
+
+function stopServerLifecyclePolling() {
+  if (_serverLifecycleInterval) {
+    clearInterval(_serverLifecycleInterval);
+    _serverLifecycleInterval = null;
+  }
+}
+
+async function updateServerLifecycleStatus() {
+  const statusEl = document.getElementById('server-controls-status');
+  const uptimeEl = document.getElementById('server-controls-uptime');
+  const startBtn = document.getElementById('btn-server-start');
+  const stopBtn = document.getElementById('btn-server-stop');
+  const restartBtn = document.getElementById('btn-server-restart');
+  if (!statusEl) return;
+
+  try {
+    const data = await fetchJSON('/server/status');
+    const state = data.state || 'unknown';
+    const alive = data.alive || false;
+    const uptime = data.uptime || null;
+
+    statusEl.className = 'server-controls-status';
+    const dot = statusEl.querySelector('.server-controls-dot') || document.createElement('span');
+    const label = statusEl.querySelector('.server-controls-label') || document.createElement('span');
+
+    dot.className = 'server-controls-dot';
+    label.className = 'server-controls-label';
+
+    if (state === 'running') {
+      dot.classList.add('server-controls-dot--running');
+      label.textContent = 'Running';
+      if (uptimeEl) {
+        const mins = Math.floor(uptime / 60);
+        const secs = uptime % 60;
+        uptimeEl.textContent = `(uptime: ${mins}m ${secs}s)`;
+      }
+    } else if (state === 'starting') {
+      dot.classList.add('server-controls-dot--starting');
+      label.textContent = 'Starting...';
+    } else if (state === 'stopping') {
+      dot.classList.add('server-controls-dot--stopping');
+      label.textContent = 'Stopping...';
+    } else if (state === 'failed') {
+      dot.classList.add('server-controls-dot--failed');
+      label.textContent = 'Failed';
+    } else if (state === 'stopped') {
+      dot.classList.add('server-controls-dot--stopped');
+      label.textContent = 'Stopped';
+    } else {
+      dot.classList.add('server-controls-dot--unknown');
+      label.textContent = 'Unknown';
+    }
+
+    if (startBtn) startBtn.disabled = (state === 'running' || state === 'starting');
+    if (stopBtn) stopBtn.disabled = (state !== 'running');
+    if (restartBtn) restartBtn.disabled = (state !== 'running');
+  } catch (e) {
+    log('Server lifecycle status poll failed: ' + e.message, 'err');
+  }
+}
+
+async function serverManagerStart() {
+  const confirmed = await showConfirmDialog(
+    'Start Minecraft Server?',
+    'This will start the Minecraft server process. It may take a moment to become ready.',
+    'Start',
+    'btn--success'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await postJSON('/server/start');
+    showToast(res.message || 'Server started', 'success');
+    await updateServerLifecycleStatus();
+    loadServerManager();
+  } catch (e) {
+    showToast('Start failed: ' + e.message, 'error');
+  }
+}
+
+async function serverManagerStop() {
+  const confirmed = await showConfirmDialog(
+    'Stop Minecraft Server?',
+    'This will stop the Minecraft server process. Players will be disconnected.',
+    'Stop',
+    'btn-danger',
+    'text-danger'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await postJSON('/server/stop');
+    showToast(res.message || 'Server stopped', 'success');
+    await updateServerLifecycleStatus();
+    loadServerManager();
+  } catch (e) {
+    showToast('Stop failed: ' + e.message, 'error');
+  }
+}
+
+async function serverManagerRestart() {
+  const confirmed = await showConfirmDialog(
+    'Restart Minecraft Server?',
+    'This will restart the Minecraft server process. Players will be temporarily disconnected.',
+    'Restart',
+    'btn-primary'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await postJSON('/server/restart');
+    showToast(res.message || 'Server restarting', 'success');
+    await updateServerLifecycleStatus();
+    loadServerManager();
+  } catch (e) {
+    showToast('Restart failed: ' + e.message, 'error');
+  }
 }
 
 /* ─── Server Manager: Download Modal ─── */
@@ -5746,6 +5874,9 @@ function switchView(viewId) {
   }
   if (viewId === 'servers') {
     loadServerManager();
+    startServerLifecyclePolling();
+  } else {
+    stopServerLifecyclePolling();
   }
   if (viewId === 'log') {
     crashReports.load();

@@ -104,9 +104,15 @@ def _get_active_version() -> str | None:
 
 
 def _get_server_status() -> str:
-    # Placeholder: in future this could check if the Minecraft process is running
-    # For now we return 'stopped' and let the lifecycle supervisor track it
-    return "stopped"
+    try:
+        from core.lifecycle import get_supervisor
+        supervisor = get_supervisor()
+        proc = supervisor.get("Minecraft Server")
+        if proc is None:
+            return "unknown"
+        return proc.state.value
+    except Exception:
+        return "stopped"
 
 
 # ── Models ──────────────────────────────────────────────────────────

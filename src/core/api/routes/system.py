@@ -2,22 +2,14 @@
 
 import asyncio
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-import core.paths
 from core.lifecycle import get_supervisor, SupervisorState
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["System"])
-
-
-def _runtime_dir() -> Path:
-    d = core.paths.get_root_dir() / "core" / "runtime"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
 
 
 @router.post("/restart")
@@ -42,23 +34,6 @@ async def restart_system():
         return {"status": "restart_requested"}
     except Exception as e:
         log.exception("Failed to request restart")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/server/restart")
-async def restart_server():
-    """Request a restart of the Minecraft Server process.
-
-    The supervisor (start.py) watches for the ``restart_server`` runtime
-    signal and restarts only the ``Minecraft Server`` child process.
-    """
-    try:
-        signal_file = _runtime_dir() / "restart_server"
-        signal_file.write_text("restart", encoding="utf-8")
-        log.info("Minecraft Server restart requested via API")
-        return {"status": "server_restart_requested"}
-    except Exception as e:
-        log.exception("Failed to request Minecraft Server restart")
         raise HTTPException(status_code=500, detail=str(e))
 
 
