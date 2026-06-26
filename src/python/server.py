@@ -206,6 +206,7 @@ WEBSERVERPORT = 29188
 APIPORT = 29187
 MINECRAFTSERVERAPI_ENABLED = True
 SERVER_HOST = "127.0.0.1"
+MC_VERSION = "1.21.11"
 
 try:
     if CONFIG_FILE.exists():
@@ -220,6 +221,7 @@ try:
                        cfg.get("minecraft_server_api", {}).get("api_port", 29187)))
         MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+        MC_VERSION = cfg.get("mc_version", "1.21.11")
     else:
         log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
 except Exception as e:
@@ -371,11 +373,12 @@ if RCON_ENABLED and not RCON_PASSWORD:
 
 # === Start Minecraft server ===
 log.info("\n--- Minecraft Server ---")
-log.info(f"RAM:   {Xms} -> {Xmx}")
-log.info(f"Java:  {JAVA_EXE}")
-log.info(f"Path:  {SERVER_DIR}")
-log.info(f"Port:  {MC_PORT}")
-log.info("------------------------\n")
+log.info(f"RAM:     {Xms} -> {Xmx}")
+log.info(f"Java:    {JAVA_EXE}")
+log.info(f"Version: {MC_VERSION}")
+log.info(f"Path:    {SERVER_DIR}")
+log.info(f"Port:    {MC_PORT}")
+log.info("--------------------------\n")
 
 try:
     proc = subprocess.run(

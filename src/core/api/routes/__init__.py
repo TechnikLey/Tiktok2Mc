@@ -15,6 +15,7 @@ from .overlay import router as overlay_router
 from .hooks import router as hooks_router
 from .event_commands import router as event_commands_router
 from .rcon import router as rcon_router
+from .versions import router as versions_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -32,3 +33,4 @@ api_router.include_router(plugin_overlay_router)
 api_router.include_router(hooks_router)
 api_router.include_router(event_commands_router)
 api_router.include_router(rcon_router)
+api_router.include_router(versions_router)

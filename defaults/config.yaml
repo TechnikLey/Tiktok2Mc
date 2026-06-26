@@ -122,6 +122,15 @@ shutdown:
   enabled: true
   delay_seconds: 30
 
+# ---------------------------------------------------------------------------
+#  MINECRAFT VERSION
+# ---------------------------------------------------------------------------
+# The Minecraft server version to use (PaperMC build).
+# SAFE versions: 1.21.11 (tested & confirmed working).
+# Other versions are UNTESTED and may break functionality.
+# Managed by the Web GUI (Advanced Settings). Do not edit manually.
+mc_version: "1.21.11"
+
 # ===========================================================================
 #  MINECRAFT SERVER (JAVA)
 # ===========================================================================

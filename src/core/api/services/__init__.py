@@ -32,6 +32,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "update": dict,
     "overlay": dict,
     "plugin_sandbox": dict,
+    "mc_version": str,
 }
 
 

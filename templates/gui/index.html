@@ -556,6 +556,32 @@
       </div>
     </div>
 
+    <!-- Version Warning Dialog -->
+    <div id="version-warning-dialog" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:520px;">
+        <h3 style="color:var(--danger);margin-top:0;">Unsafe Version Selected</h3>
+        <div style="color:var(--text-muted);margin-bottom:1rem;">
+          <p><strong>This version is not tested and may cause issues.</strong></p>
+          <p style="margin-top:0.5rem;">Switching to an untested Minecraft version may:</p>
+          <ul style="margin:0.5rem 0;padding-left:1.25rem;">
+            <li>Break plugin compatibility (including MinecraftServerAPI)</li>
+            <li>Cause server crashes or startup failures</li>
+            <li>Break functionality with TikTok event triggers</li>
+            <li>Corrupt existing world saves (downgrades are never safe)</li>
+          </ul>
+          <p style="font-size:0.85rem;margin-top:0.5rem;">The only SAFE version is <strong>1.21.11</strong>. Only proceed if you understand these risks.</p>
+        </div>
+        <label style="display:flex;align-items:center;gap:0.5rem;padding:0.75rem;background:var(--input-bg);border-radius:4px;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
+          <input type="checkbox" id="version-warning-checkbox">
+          <span>I understand the risks and want to proceed</span>
+        </label>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="version-warning-cancel">Cancel</button>
+          <button class="btn btn--danger" id="version-warning-ok" disabled>Change Version Anyway</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Advanced Settings Confirmation Dialog -->
     <div id="advanced-confirm-dialog" class="wizard-overlay hidden modal-z-250">
       <div class="modal-card" style="max-width:500px;">
