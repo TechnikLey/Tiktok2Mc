@@ -176,11 +176,11 @@ CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resol
 # Priority:
 # 1. servers/<mc_version>/server.jar  (version manager download)
 # 2. server/mc/server.jar             (legacy / switched active jar)
-MC_VERSION = "26.1.2"
+MC_VERSION = "1.21.11"
 try:
     if CONFIG_FILE.exists():
         cfg = load_yaml(CONFIG_FILE)
-        MC_VERSION = cfg.get("mc_version", "26.1.2")
+        MC_VERSION = cfg.get("mc_version", "1.21.11")
 except Exception:
     pass
 
@@ -231,7 +231,7 @@ WEBSERVERPORT = 29188
 APIPORT = 29187
 MINECRAFTSERVERAPI_ENABLED = True
 SERVER_HOST = "127.0.0.1"
-MC_VERSION = "26.1.2"
+MC_VERSION = "1.21.11"
 
 try:
     if CONFIG_FILE.exists():
@@ -246,7 +246,7 @@ try:
                        cfg.get("minecraft_server_api", {}).get("api_port", 29187)))
         MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-        MC_VERSION = cfg.get("mc_version", "26.1.2")
+        MC_VERSION = cfg.get("mc_version", "1.21.11")
     else:
         log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
 except Exception as e:

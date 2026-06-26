@@ -18,7 +18,20 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["Servers"])
 
 PAPER_API = "https://api.papermc.io/v2/projects/paper"
-SAFE_VERSIONS = {"26.1.2"}
+SAFE_VERSIONS = {"1.21.11"}
+
+_MIN_SUPPORTED_MAJOR = 1
+_MIN_SUPPORTED_MINOR = 13
+
+
+def _is_supported_version(version: str) -> bool:
+    parts = version.split(".")
+    try:
+        major = int(parts[0])
+        minor = int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        return False
+    return major > _MIN_SUPPORTED_MAJOR or (major == _MIN_SUPPORTED_MAJOR and minor >= _MIN_SUPPORTED_MINOR)
 
 _service: ApiService | None = None
 
@@ -105,7 +118,7 @@ def _list_installed_versions() -> list[dict[str, Any]]:
     # Also recognise the legacy jar at server/mc/server.jar
     legacy_jar = _get_server_mc_dir() / "server.jar"
     if legacy_jar.exists():
-        cfg_ver = _get_active_version() or "26.1.2"
+        cfg_ver = _get_active_version() or "1.21.11"
         if cfg_ver not in seen:
             meta = _read_meta(_get_server_mc_dir())
             versions.append({
@@ -198,7 +211,7 @@ class RemoveResponse(BaseModel):
 @router.get("/servers", response_model=ServersListResponse)
 async def list_servers():
     installed = _list_installed_versions()
-    active_version = _get_active_version() or "26.1.2"
+    active_version = _get_active_version() or "1.21.11"
 
     for v in installed:
         v["active"] = v["version"] == active_version
@@ -226,6 +239,11 @@ async def download_version(body: DownloadRequest):
     version = body.version.strip()
     if not version:
         raise HTTPException(status_code=400, detail="Version cannot be empty")
+    if not _is_supported_version(version):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Version '{version}' is not supported. Minimum supported version is {_MIN_SUPPORTED_MAJOR}.{_MIN_SUPPORTED_MINOR}+.",
+        )
 
     # Verify version exists on PaperMC
     try:
@@ -285,6 +303,11 @@ async def switch_version(body: SwitchRequest):
     version = body.version.strip()
     if not version:
         raise HTTPException(status_code=400, detail="Version cannot be empty")
+    if not _is_supported_version(version):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Version '{version}' is not supported. Minimum supported version is {_MIN_SUPPORTED_MAJOR}.{_MIN_SUPPORTED_MINOR}+.",
+        )
 
     servers_dir = _get_servers_dir()
     source_dir = servers_dir / version

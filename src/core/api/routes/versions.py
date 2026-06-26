@@ -16,7 +16,20 @@ router = APIRouter(tags=["Versions"])
 
 PAPER_API = "https://api.papermc.io/v2/projects/paper"
 
-SAFE_VERSIONS = {"26.1.2"}
+SAFE_VERSIONS = {"1.21.11"}
+
+_MIN_SUPPORTED_MAJOR = 1
+_MIN_SUPPORTED_MINOR = 13
+
+
+def _is_supported_version(version: str) -> bool:
+    parts = version.split(".")
+    try:
+        major = int(parts[0])
+        minor = int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        return False
+    return major > _MIN_SUPPORTED_MAJOR or (major == _MIN_SUPPORTED_MAJOR and minor >= _MIN_SUPPORTED_MINOR)
 
 _service: ApiService | None = None
 
@@ -66,15 +79,16 @@ class SetVersionResponse(BaseModel):
 async def list_versions():
     svc = _get_service()
     cfg = svc.read_config()
-    current_version = cfg.get("mc_version", "26.1.2")
+    current_version = cfg.get("mc_version", "1.21.11")
 
     data = _fetch_json(PAPER_API)
     raw_versions: list[str] = data.get("versions", []) if isinstance(data, dict) else []
-    # Reverse so newest versions appear first
-    raw_versions = list(reversed(raw_versions))
+    # Filter to supported versions (1.13+) and reverse so newest appear first
+    supported = [v for v in raw_versions if _is_supported_version(v)]
+    supported.reverse()
 
     versions: list[VersionInfo] = []
-    for v in raw_versions:
+    for v in supported:
         versions.append(VersionInfo(
             version=v,
             safe=v in SAFE_VERSIONS,
@@ -95,6 +109,12 @@ async def set_version(body: SetVersionRequest):
     requested = body.version.strip()
     if not requested:
         raise HTTPException(status_code=400, detail="Version cannot be empty")
+
+    if not _is_supported_version(requested):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Version '{requested}' is not supported. Minimum supported version is {_MIN_SUPPORTED_MAJOR}.{_MIN_SUPPORTED_MINOR}+.",
+        )
 
     data = _fetch_json(PAPER_API)
     raw_versions: list[str] = data.get("versions", []) if isinstance(data, dict) else []
