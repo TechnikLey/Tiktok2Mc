@@ -586,7 +586,7 @@ def main():
             cprint("Building GUI installer...", Color.CYAN)
             import subprocess as _sp
             nsis_script = SCRIPT_DIR / "installer" / "install.nsi"
-            installer_out = SCRIPT_DIR / "build" / f"TikTok2MC-{TOOL_VERSION}-Setup.exe"
+            installer_out = SCRIPT_DIR / "build" / "TikTok2MC-Setup.exe"
             if nsis_script.exists():
                 # Find makensis: PATH first, then common install locations
                 makensis_cmd = "makensis"
@@ -629,8 +629,8 @@ def main():
             linux_template = SCRIPT_DIR / "installer" / "install_linux.sh"
             if linux_template.exists():
                 import tarfile
-                installer_out = SCRIPT_DIR / "build" / f"TikTok2Mc-{TOOL_VERSION}-Linux-Setup.sh"
-                tar_path = SCRIPT_DIR / "build" / f"TikTok2Mc-{TOOL_VERSION}-Linux.tar.gz"
+                installer_out = SCRIPT_DIR / "build" / "TikTok2Mc-Linux-Setup.sh"
+                tar_path = SCRIPT_DIR / "build" / "TikTok2Mc-Linux.tar.gz"
 
                 # Pack release/ into a tar.gz
                 with tarfile.open(tar_path, "w:gz") as tf:

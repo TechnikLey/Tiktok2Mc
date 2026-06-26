@@ -21,11 +21,11 @@ RequestExecutionLevel admin
 !include "nsDialogs.nsh"
 
 ; Installer properties
-Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
+Name "${PRODUCT_NAME}"
 !ifdef OUT_FILE
   OutFile "${OUT_FILE}"
 !else
-  OutFile "..\build\TikTok2MC-${PRODUCT_VERSION}-Setup.exe"
+  OutFile "..\build\TikTok2MC-Setup.exe"
 !endif
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_UNINSTALL_KEY}" "InstallDir"
@@ -60,7 +60,16 @@ Page custom StartupPageCreate StartupPageLeave
 
 ; ---------- Language Selection on Startup ----------
 Function .onInit
-  !insertmacro MUI_LANGDLL_DISPLAY
+  ; In silent mode NSIS defaults to the first declared language (English).
+  ; Otherwise show the language dialog with English pre-selected instead of
+  ; auto-detecting the OS language.
+  ${Unless} ${Silent}
+    LangDLL::LangDialog "Installer Language" "Please select a language." AC ${MUI_LANGDLL_LANGUAGES_CP} "English"
+    Pop $LANGUAGE
+    ${If} $LANGUAGE == "cancel"
+      Abort
+    ${EndIf}
+  ${EndUnless}
 FunctionEnd
 
 ; ---------- Variables ----------
@@ -118,18 +127,21 @@ Function InstallTypeCreate
 
   ; Radio buttons MUST be created consecutively (no other controls between them)
   ; so Windows groups them correctly for automatic mutual exclusion.
-  ${NSD_CreateRadioButton} 0 22 100% 16u "$(INSTALLTYPE_BASIC)"
+  ; All coordinates use dialog units (u) so positions scale with the dialog
+  ; font and keep a consistent 4 DLU gap between controls at every DPI.
+  ${NSD_CreateRadioButton} 0 24u 100% 16u "$(INSTALLTYPE_BASIC)"
   Pop $hBasicRadio
 
-  ${NSD_CreateRadioButton} 0 74 100% 16u "$(INSTALLTYPE_ADVANCED)"
+  ${NSD_CreateRadioButton} 0 80u 100% 16u "$(INSTALLTYPE_ADVANCED)"
   Pop $hAdvancedRadio
 
   ; Description labels are created AFTER all radio buttons so they do not
-  ; break the radio button tab-order grouping.
-  ${NSD_CreateLabel} 0 40 100% 32u "$(INSTALLTYPE_BASIC_DESC)"
+  ; break the radio button tab-order grouping.  Each description sits 4 DLU
+  ; below its radio button, with enough height to hold a wrapped line.
+  ${NSD_CreateLabel} 0 44u 100% 32u "$(INSTALLTYPE_BASIC_DESC)"
   Pop $0
 
-  ${NSD_CreateLabel} 0 92 100% 32u "$(INSTALLTYPE_ADVANCED_DESC)"
+  ${NSD_CreateLabel} 0 100u 100% 32u "$(INSTALLTYPE_ADVANCED_DESC)"
   Pop $0
 
   ; Default: Basic
@@ -177,6 +189,8 @@ Function AdvancedComponentsCreate
   nsDialogs::Create 1018
   Pop $0
 
+  ; Vertical coordinates are in dialog units (u) so the layout scales with
+  ; the dialog font and keeps a consistent 4 DLU gap between checkboxes.
   ${NSD_CreateCheckBox} 0 0 100% 20u "$(COMP_PLUGINS)"
   Pop $hPluginCheck
   ${If} $AdvancedComponents & 1
@@ -185,7 +199,7 @@ Function AdvancedComponentsCreate
     ${NSD_Uncheck} $hPluginCheck
   ${EndIf}
 
-  ${NSD_CreateCheckBox} 0 24 100% 20u "$(COMP_MC)"
+  ${NSD_CreateCheckBox} 0 24u 100% 20u "$(COMP_MC)"
   Pop $hMCCheck
   ${If} $AdvancedComponents & 2
     ${NSD_Check} $hMCCheck
@@ -193,7 +207,7 @@ Function AdvancedComponentsCreate
     ${NSD_Uncheck} $hMCCheck
   ${EndIf}
 
-  ${NSD_CreateCheckBox} 0 48 100% 20u "$(COMP_DOCS)"
+  ${NSD_CreateCheckBox} 0 48u 100% 20u "$(COMP_DOCS)"
   Pop $hDocsCheck
   ${If} $AdvancedComponents & 4
     ${NSD_Check} $hDocsCheck
@@ -256,17 +270,19 @@ Function GuiModeCreate
   Pop $0
 
   ; Radio buttons first (consecutive for auto-grouping)
-  ${NSD_CreateRadioButton} 0 20 100% 16u "$(GUI_GUI)"
+  ; All vertical coordinates use dialog units (u) so the layout scales with
+  ; the dialog font and keeps a consistent 4 DLU gap between controls.
+  ${NSD_CreateRadioButton} 0 4u 100% 16u "$(GUI_GUI)"
   Pop $hGuiModeGui
 
-  ${NSD_CreateRadioButton} 0 64 100% 16u "$(GUI_START)"
+  ${NSD_CreateRadioButton} 0 52u 100% 16u "$(GUI_START)"
   Pop $hGuiModeStart
 
   ; Description labels after radio buttons
-  ${NSD_CreateLabel} 0 38 100% 24u "$(GUI_GUI_DESC)"
+  ${NSD_CreateLabel} 0 24u 100% 24u "$(GUI_GUI_DESC)"
   Pop $0
 
-  ${NSD_CreateLabel} 0 82 100% 24u "$(GUI_START_DESC)"
+  ${NSD_CreateLabel} 0 72u 100% 24u "$(GUI_START_DESC)"
   Pop $0
 
   ; Default: GUI Mode (true)
@@ -312,19 +328,21 @@ Function JavaPortCreate
   nsDialogs::Create 1018
   Pop $0
 
+  ; All vertical coordinates use dialog units (u) so labels and input
+  ; fields scale with the dialog font and keep a consistent 4 DLU gap.
   ${NSD_CreateLabel} 0 0 100% 20u "$(JAVA_PATH_LABEL)"
   Pop $0
 
-  ${NSD_CreateText} 0 24 100% 16u "$JavaPath"
+  ${NSD_CreateText} 0 24u 100% 16u "$JavaPath"
   Pop $hJavaPathText
 
-  ${NSD_CreateLabel} 0 52 100% 20u "$(JAVA_PORT_LABEL)"
+  ${NSD_CreateLabel} 0 44u 100% 20u "$(JAVA_PORT_LABEL)"
   Pop $0
 
   ${If} $ApiPort == ""
     StrCpy $ApiPort "29185"
   ${EndIf}
-  ${NSD_CreateNumber} 0 76 30% 16u "$ApiPort"
+  ${NSD_CreateNumber} 0 68u 30% 16u "$ApiPort"
   Pop $hApiPortText
 
   nsDialogs::Show

@@ -38,7 +38,7 @@ DEFAULT_REDIRECT_URI = "http://localhost:8888/callback"
 def _print_banner():
     print("=" * 60)
     print("  Spotify OAuth Setup Helper")
-    print("  TikTok2MC v1.0.0")
+    print("  TikTok2MC")
     print("=" * 60)
     print()
 

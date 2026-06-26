@@ -152,7 +152,7 @@ class TestBuildPyInstallerIntegration:
         nsis_cmd = [
             "makensis",
             "-DPRODUCT_VERSION=1.0.0",
-            f"-DOUT_FILE=build/TikTok2MC-1.0.0-Setup.exe",
+            "-DOUT_FILE=build/TikTok2MC-Setup.exe",
             str(NSIS_SCRIPT),
         ]
         assert nsis_cmd[0] == "makensis"
@@ -175,11 +175,10 @@ class TestBuildPyInstallerIntegration:
 
         assert any("makensis not found" in msg for msg, _ in captured)
 
-    def test_installer_output_path_respects_tool_version(self):
-        """Verify the installer output filename uses the tool version."""
-        from core.version import TOOL_VERSION
-        expected = f"TikTok2MC-{TOOL_VERSION}-Setup.exe"
-        assert "v" in expected or expected.replace(".", "").replace("-", "").isalnum()
+    def test_installer_output_path_is_versionless(self):
+        """Verify the installer output filename does not include the tool version."""
+        expected = "TikTok2MC-Setup.exe"
+        assert expected == "TikTok2MC-Setup.exe"
 
 
 class TestInstallerPrerequisites:
