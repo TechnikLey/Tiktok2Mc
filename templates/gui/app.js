@@ -42,6 +42,9 @@ let _uptimeIntervalId = null;
 let _lastTiktokEventTime = 0;
 let _tiktokStatusIntervalId = null;
 
+/* ─── Server Manager Placeholder Data ─── */
+let _serverManagerCache = null;
+
 function _stopDashboardPolling() {
   if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
   if (_statusIntervalId) { clearInterval(_statusIntervalId); _statusIntervalId = null; }
@@ -106,6 +109,26 @@ document.getElementById('btn-shutdown-cancel').addEventListener('click', () => {
   }
   document.getElementById('shutdown-overlay').classList.add('hidden');
 });
+
+/* ─── Server Manager Button Wiring ─── */
+document.getElementById('btn-server-switch')?.addEventListener('click', serverManagerSwitchVersion);
+document.getElementById('btn-server-add-custom')?.addEventListener('click', serverManagerAddCustom);
+document.getElementById('btn-server-remove')?.addEventListener('click', serverManagerRemoveVersion);
+document.getElementById('btn-server-refresh')?.addEventListener('click', serverManagerRefreshList);
+
+/* ─── Server Manager Modal Wiring ─── */
+document.getElementById('server-download-cancel')?.addEventListener('click', closeServerDownloadModal);
+document.getElementById('server-download-confirm')?.addEventListener('click', confirmServerDownload);
+document.getElementById('server-download-version')?.addEventListener('change', () => {
+  const btn = document.getElementById('server-download-confirm');
+  const sel = document.getElementById('server-download-version');
+  if (btn && sel) btn.disabled = !sel.value;
+});
+
+document.getElementById('server-custom-cancel')?.addEventListener('click', closeServerCustomModal);
+document.getElementById('server-custom-confirm')?.addEventListener('click', confirmServerCustom);
+document.getElementById('server-custom-name')?.addEventListener('input', validateServerCustomForm);
+document.getElementById('server-custom-file')?.addEventListener('change', validateServerCustomForm);
 
 /* ─── Dialogs ─── */
 function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-primary', messageClass = '') {
@@ -594,6 +617,265 @@ async function loadPlugins() {
     populatePluginSubnav();
   } catch (e) {
     log('Plugins load failed: ' + e.message, 'err');
+  }
+}
+
+/* ─── Server Manager ─── */
+async function loadServerManager() {
+  try {
+    const data = await fetchJSON('/servers');
+    _serverManagerCache = data;
+    renderServerManager();
+  } catch (e) {
+    log('Server Manager load failed: ' + e.message, 'err');
+    const versionsList = document.getElementById('server-versions-list');
+    if (versionsList) versionsList.innerHTML = '<p class="text-muted">Failed to load server data.</p>';
+  }
+}
+
+function renderServerManager() {
+  const activeCard = document.getElementById('server-active-card');
+  const versionsList = document.getElementById('server-versions-list');
+  if (!activeCard || !versionsList) return;
+
+  if (!_serverManagerCache) {
+    activeCard.innerHTML = '<div class="server-active-placeholder text-muted">Loading server info...</div>';
+    versionsList.innerHTML = '<p class="text-muted">Loading versions...</p>';
+    return;
+  }
+
+  const active = _serverManagerCache.active || {};
+  const statusColor = active.status === 'running' ? 'var(--color-success)' : 'var(--color-text-muted)';
+  activeCard.innerHTML = `
+    <div class="server-active-header">
+      <div class="server-active-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
+      </div>
+      <div>
+        <div style="font-weight:var(--weight-semibold);color:var(--color-text);">${escapeHtml(active.name || 'Default Server')}</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-muted);">
+          ${active.status === 'running'
+            ? '<span class="server-active-indicator">Running</span>'
+            : 'Stopped'}
+        </div>
+      </div>
+    </div>
+    <dl class="server-active-meta">
+      <dt>Version</dt>
+      <dd>${escapeHtml(active.version || '—')}</dd>
+      <dt>Path</dt>
+      <dd>${escapeHtml(active.path || '—')}</dd>
+      <dt>Jar File</dt>
+      <dd>${escapeHtml(active.jarName || 'server.jar')}${active.jarExists ? '' : ' <span style="color:var(--danger)">(missing)</span>'}</dd>
+      <dt>Status</dt>
+      <dd style="color:${statusColor};font-weight:var(--weight-medium);">${escapeHtml(active.status || 'stopped')}</dd>
+    </dl>
+  `;
+
+  const versions = _serverManagerCache.installed || [];
+  if (!versions.length) {
+    versionsList.innerHTML = '<p class="text-muted">No server versions installed yet. Use <strong>Download</strong> or <strong>Add Custom</strong> to install a version.</p>';
+    return;
+  }
+
+  let html = '<table class="server-versions-table"><thead><tr><th>Version</th><th>Status</th><th>Type</th><th>Path</th><th>Active</th><th>Actions</th></tr></thead><tbody>';
+  for (const v of versions) {
+    const badgeClass = v.type === 'safe' ? 'server-status-badge--safe'
+                     : v.type === 'custom' ? 'server-status-badge--custom'
+                     : 'server-status-badge--unsafe';
+    const badgeLabel = v.type === 'safe' ? 'SAFE'
+                     : v.type === 'custom' ? 'CUSTOM'
+                     : 'UNSAFE';
+    const activeLabel = v.active
+      ? '<span class="server-active-indicator">Active</span>'
+      : '<span class="text-muted">—</span>';
+    const size = v.size ? `(${(v.size / 1024 / 1024).toFixed(1)} MB)` : '';
+    const switchBtn = v.active
+      ? '<button class="btn btn--sm btn--secondary" disabled>Active</button>'
+      : `<button class="btn btn--sm btn--primary" onclick="serverManagerPromptSwitch('${escapeHtml(v.version)}')">Switch</button>`;
+    const removeBtn = v.active
+      ? '<button class="btn btn--sm btn--danger" disabled title="Cannot remove active version">Remove</button>'
+      : `<button class="btn btn--sm btn--danger" onclick="serverManagerPromptRemove('${escapeHtml(v.version)}')">Remove</button>`;
+    html += `<tr>
+      <td data-label="Version"><strong>${escapeHtml(v.version)}</strong></td>
+      <td data-label="Status"><span class="server-status-badge ${badgeClass}">${badgeLabel}</span></td>
+      <td data-label="Type">${escapeHtml(v.type)}</td>
+      <td data-label="Path"><code style="font-size:0.85rem;">${escapeHtml(v.path)}</code> ${size}</td>
+      <td data-label="Active">${activeLabel}</td>
+      <td data-label="Actions">${switchBtn} ${removeBtn}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  versionsList.innerHTML = html;
+}
+
+async function serverManagerPromptSwitch(version) {
+  const isSafe = _serverManagerCache?.installed?.find(v => v.version === version)?.type === 'safe';
+  if (!isSafe) {
+    const confirmed = await showConfirmDialog(
+      'Switch to Untested Version?',
+      `Version ${version} is not marked as SAFE. It may break plugins, corrupt worlds, or cause crashes. Are you sure you want to switch?`,
+      'Switch Anyway',
+      'btn-danger',
+      'text-danger'
+    );
+    if (!confirmed) return;
+  } else {
+    const confirmed = await showConfirmDialog(
+      'Switch Version?',
+      `Switch active server to ${version}? The server will use this version on next start.`,
+      'Switch',
+      'btn-primary'
+    );
+    if (!confirmed) return;
+  }
+  try {
+    const res = await postJSON('/servers/switch', { version });
+    showToast(res.message || `Switched to ${version}`, 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Switch failed: ' + e.message, 'error');
+  }
+}
+
+async function serverManagerPromptRemove(version) {
+  const confirmed = await showConfirmDialog(
+    'Remove Version?',
+    `Delete version ${version} and its server.jar? This cannot be undone.`,
+    'Remove',
+    'btn-danger',
+    'text-danger'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await fetch(API + '/servers/' + encodeURIComponent(version), { method: 'DELETE' });
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const data = await res.json();
+    showToast(data.message || `Removed ${version}`, 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Remove failed: ' + e.message, 'error');
+  }
+}
+
+function serverManagerSwitchVersion() {
+  openServerDownloadModal();
+}
+
+function serverManagerAddCustom() {
+  openServerCustomModal();
+}
+
+function serverManagerRemoveVersion() {
+  showToast('Select a version from the table and click its Remove button.', 'info');
+}
+
+function serverManagerRefreshList() {
+  loadServerManager();
+}
+
+/* ─── Server Manager: Download Modal ─── */
+let _serverDownloadVersions = [];
+
+async function openServerDownloadModal() {
+  const modal = document.getElementById('server-download-modal');
+  const select = document.getElementById('server-download-version');
+  const confirmBtn = document.getElementById('server-download-confirm');
+  const errorEl = document.getElementById('server-download-error');
+  if (!modal || !select) return;
+
+  select.innerHTML = '<option value="">Loading versions...</option>';
+  confirmBtn.disabled = true;
+  errorEl.classList.add('hidden');
+  modal.classList.remove('hidden');
+
+  try {
+    const data = await fetchJSON('/versions');
+    _serverDownloadVersions = data.versions || [];
+    const safeSet = new Set(data.safe_versions || ['1.21.11']);
+    select.innerHTML = _serverDownloadVersions.map(v => {
+      const label = v.version + (safeSet.has(v.version) ? ' (SAFE)' : ' (untested)');
+      return `<option value="${escapeHtml(v.version)}">${escapeHtml(label)}</option>`;
+    }).join('');
+    confirmBtn.disabled = false;
+  } catch (e) {
+    select.innerHTML = '<option value="">Failed to load versions</option>';
+    errorEl.textContent = 'Could not fetch PaperMC versions: ' + e.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+function closeServerDownloadModal() {
+  document.getElementById('server-download-modal')?.classList.add('hidden');
+}
+
+async function confirmServerDownload() {
+  const select = document.getElementById('server-download-version');
+  const version = select?.value;
+  if (!version) return;
+  closeServerDownloadModal();
+  showToast(`Downloading PaperMC ${version}...`, 'info');
+  try {
+    const res = await postJSON('/servers/download', { version });
+    showToast(res.message || `Downloaded ${version}`, 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Download failed: ' + e.message, 'error');
+  }
+}
+
+/* ─── Server Manager: Custom Jar Modal ─── */
+function openServerCustomModal() {
+  const modal = document.getElementById('server-custom-modal');
+  const nameInput = document.getElementById('server-custom-name');
+  const fileInput = document.getElementById('server-custom-file');
+  const confirmBtn = document.getElementById('server-custom-confirm');
+  const errorEl = document.getElementById('server-custom-error');
+  if (!modal) return;
+
+  if (nameInput) nameInput.value = '';
+  if (fileInput) fileInput.value = '';
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (errorEl) errorEl.classList.add('hidden');
+  modal.classList.remove('hidden');
+}
+
+function closeServerCustomModal() {
+  document.getElementById('server-custom-modal')?.classList.add('hidden');
+}
+
+function validateServerCustomForm() {
+  const name = document.getElementById('server-custom-name')?.value?.trim();
+  const file = document.getElementById('server-custom-file')?.files?.[0];
+  const confirmBtn = document.getElementById('server-custom-confirm');
+  if (confirmBtn) confirmBtn.disabled = !(name && file && file.name.endsWith('.jar'));
+}
+
+async function confirmServerCustom() {
+  const nameInput = document.getElementById('server-custom-name');
+  const fileInput = document.getElementById('server-custom-file');
+  const name = nameInput?.value?.trim();
+  const file = fileInput?.files?.[0];
+  if (!name || !file) return;
+
+  closeServerCustomModal();
+  showToast(`Importing custom jar as '${name}'...`, 'info');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('name', name);
+
+  try {
+    const res = await fetch(API + '/servers/custom', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const data = await res.json();
+    showToast(data.message || `Imported ${name}`, 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Import failed: ' + e.message, 'error');
   }
 }
 
@@ -5462,6 +5744,9 @@ function switchView(viewId) {
   if (viewId === 'overlays') {
     renderOverlayUrls();
   }
+  if (viewId === 'servers') {
+    loadServerManager();
+  }
   if (viewId === 'log') {
     crashReports.load();
   }
@@ -5659,6 +5944,7 @@ async function init() {
   await loadConfig();
   await loadPlugins();
   await loadHooks();
+  await loadServerManager();
   await reactionEditor.load();
   updateRestartBanner();
   connectLogStream();

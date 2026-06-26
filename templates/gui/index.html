@@ -62,6 +62,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm7.5-5.18l-1.41 1.41L12 15.59l3.5-3.5-1.41-1.41L12 12.82l-2.09-2.09-1.41 1.41L11.5 12.82zM7.5 14h4v1.5h-4V14z" fill="currentColor"/></svg>
                     <span class="nav-label">Console</span>
                 </a>
+                <a class="nav-item" data-view="servers" onclick="switchView('servers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
+                    <span class="nav-label">Server Manager</span>
+                </a>
                 <a class="nav-item" data-view="triggers" onclick="switchView('triggers')">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
                     <span class="nav-label">Event Tester</span>
@@ -289,6 +293,42 @@
                         <span class="text-muted">No update information available.</span>
                     </div>
                     <div id="updates-detail" class="hidden"></div>
+                </section>
+            </div>
+
+            <!-- ─── Server Manager ─── -->
+            <div class="view" id="view-servers">
+                <div class="view-header">
+                    <h2>Server Manager</h2>
+                </div>
+
+                <!-- Active Server -->
+                <section class="view-section">
+                    <h3>Active Server</h3>
+                    <div class="server-active-card" id="server-active-card">
+                        <div class="server-active-placeholder text-muted">
+                            Loading server info...
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Installed Versions -->
+                <section class="view-section">
+                    <h3>Installed Versions</h3>
+                    <div id="server-versions-list">
+                        <p class="text-muted">Loading versions...</p>
+                    </div>
+                </section>
+
+                <!-- Actions -->
+                <section class="view-section">
+                    <h3>Actions</h3>
+                    <div class="server-actions">
+                        <button class="btn btn--primary" id="btn-server-switch" title="Switch to a different installed version">Switch Version</button>
+                        <button class="btn btn--secondary" id="btn-server-add-custom" title="Import a custom server.jar">Add Custom server.jar</button>
+                        <button class="btn btn--secondary" id="btn-server-remove" title="Remove an installed version">Remove Version</button>
+                        <button class="btn btn--secondary" id="btn-server-refresh" title="Refresh the version list">Refresh List</button>
+                    </div>
                 </section>
             </div>
 
@@ -682,6 +722,49 @@
         <div class="modal-actions">
           <button class="btn btn--secondary" id="advanced-confirm-cancel">Cancel</button>
           <button class="btn btn--danger" id="advanced-confirm-ok" disabled>Unlock Advanced</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Download Version Modal -->
+    <div id="server-download-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;">Download PaperMC Version</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;">Select a version to download from PaperMC. The jar will be saved to <code>servers/&lt;version&gt;/server.jar</code>.</p>
+        <div class="form-group">
+          <label>Version</label>
+          <select id="server-download-version" class="form-select" style="width:100%;">
+            <option value="">Loading versions...</option>
+          </select>
+          <p class="field-desc" style="margin-top:0.25rem;">SAFE versions are tested. Others are untested.</p>
+        </div>
+        <div id="server-download-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="server-download-cancel">Cancel</button>
+          <button class="btn btn--primary" id="server-download-confirm" disabled>Download</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Upload Custom Jar Modal -->
+    <div id="server-custom-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;">Add Custom server.jar</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;">Import a custom Minecraft server jar. It will be tagged as CUSTOM and saved to <code>servers/&lt;name&gt;/server.jar</code>.</p>
+        <div class="form-group">
+          <label>Version Name</label>
+          <input type="text" id="server-custom-name" class="form-input" placeholder="e.g. my-custom-server">
+          <p class="field-desc">A unique identifier for this server version.</p>
+        </div>
+        <div class="form-group">
+          <label>server.jar File</label>
+          <input type="file" id="server-custom-file" class="form-input" accept=".jar">
+          <p class="field-desc">Only .jar files are accepted.</p>
+        </div>
+        <div id="server-custom-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="server-custom-cancel">Cancel</button>
+          <button class="btn btn--primary" id="server-custom-confirm" disabled>Import</button>
         </div>
       </div>
     </div>

@@ -167,11 +167,35 @@ def _find_java(root_dir: Path, config_path: Path | None = None) -> Path | None:
 ROOT_DIR = get_root_dir()
 SERVER_DIR = (ROOT_DIR / "server" / "mc").resolve()
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
-SERVER_JAR = (SERVER_DIR / "server.jar").resolve()
 SERVER_PROPERTIES = (SERVER_DIR / "server.properties").resolve()
 IGNORE_RCON_FILE = (ROOT_DIR / "config" / ".ignore_rcon_warning").resolve()
 PLUGINS_DIR = (SERVER_DIR / "plugins").resolve()
 CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resolve()
+
+# === Determine server.jar path (version-aware) ===
+# Priority:
+# 1. servers/<mc_version>/server.jar  (version manager download)
+# 2. server/mc/server.jar             (legacy / switched active jar)
+MC_VERSION = "1.21.11"
+try:
+    if CONFIG_FILE.exists():
+        cfg = load_yaml(CONFIG_FILE)
+        MC_VERSION = cfg.get("mc_version", "1.21.11")
+except Exception:
+    pass
+
+_versioned_jar = (ROOT_DIR / "servers" / MC_VERSION / "server.jar").resolve()
+_legacy_jar = (SERVER_DIR / "server.jar").resolve()
+
+if _versioned_jar.exists():
+    SERVER_JAR = _versioned_jar
+    log.info("Using version-managed jar: %s", SERVER_JAR)
+elif _legacy_jar.exists():
+    SERVER_JAR = _legacy_jar
+    log.info("Using legacy jar: %s", SERVER_JAR)
+else:
+    SERVER_JAR = _legacy_jar
+    log.warning("No server.jar found at expected paths. Expected one of: %s, %s", _versioned_jar, _legacy_jar)
 
 # === Java detection ===
 JAVA_EXE = _find_java(ROOT_DIR, CONFIG_FILE)
