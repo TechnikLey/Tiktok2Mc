@@ -59,3 +59,13 @@ def get_plugins_dir() -> Path:
     if rel_dir.is_dir():
         return rel_dir
     return dev_dir
+
+
+def get_versions_dir() -> Path:
+    """Return the resolved versions directory (template repository)."""
+    return (get_root_dir() / "versions").resolve()
+
+
+def get_servers_dir() -> Path:
+    """Return the resolved server instances directory (server/<instance>/)."""
+    return (get_root_dir() / "server").resolve()
