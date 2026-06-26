@@ -60,16 +60,7 @@ Page custom StartupPageCreate StartupPageLeave
 
 ; ---------- Language Selection on Startup ----------
 Function .onInit
-  ; In silent mode NSIS defaults to the first declared language (English).
-  ; Otherwise show the language dialog with English pre-selected instead of
-  ; auto-detecting the OS language.
-  ${Unless} ${Silent}
-    LangDLL::LangDialog "Installer Language" "Please select a language." AC ${MUI_LANGDLL_LANGUAGES_CP} "English"
-    Pop $LANGUAGE
-    ${If} $LANGUAGE == "cancel"
-      Abort
-    ${EndIf}
-  ${EndUnless}
+  !insertmacro MUI_LANGDLL_DISPLAY
 FunctionEnd
 
 ; ---------- Variables ----------
