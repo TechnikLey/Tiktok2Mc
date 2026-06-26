@@ -341,3 +341,42 @@ class RawActionsUpdateRequest(BaseModel):
     content: str
 
 
+# ── Trigger (Event Tester) models ───────────────────────────────────
+
+
+class TriggerTypesResponse(BaseModel):
+    types: list[str]
+
+
+class TriggerExecuteRequest(BaseModel):
+    trigger: str
+    user: str = "System"
+
+
+class TriggerCommentRequest(BaseModel):
+    user: str = "TestUser"
+    text: str
+    moderator: bool = False
+    superfan: bool = False
+    fanclub: bool = False
+
+
+class TriggerResponse(BaseModel):
+    status: str
+    message: str = ""
+    trigger: str = ""
+    user: str = ""
+
+
+class TriggerHistoryEntry(BaseModel):
+    timestamp: float
+    kind: str
+    payload: dict[str, Any]
+    status: str
+    message: str = ""
+
+
+class TriggerHistoryResponse(BaseModel):
+    history: list[TriggerHistoryEntry]
+
+

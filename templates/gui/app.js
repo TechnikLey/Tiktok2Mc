@@ -5363,6 +5363,158 @@ function _updateThemeLabel(theme) {
   if (label) label.textContent = theme === 'dark' ? 'Light' : 'Dark';
 }
 
+/* ─── Event Tester ─── */
+class EventTester {
+  constructor() {
+    this._cooldown = false;
+    this._history = [];
+    this._statusEl = document.getElementById('trigger-tester-status');
+    this._errorEl = document.getElementById('trigger-error');
+    this._historyEl = document.getElementById('trigger-history');
+  }
+
+  onTypeChange() {
+    const type = document.getElementById('trigger-type').value;
+    const customGroup = document.getElementById('custom-trigger-group');
+    const commentFields = document.getElementById('comment-fields');
+    if (customGroup) customGroup.style.display = type === 'custom' ? 'block' : 'none';
+    if (commentFields) commentFields.style.display = type === 'comment' ? 'flex' : 'none';
+  }
+
+  _setStatus(state, text) {
+    if (!this._statusEl) return;
+    this._statusEl.textContent = text;
+    this._statusEl.className = 'console-status ' + state;
+  }
+
+  _showError(msg) {
+    if (!this._errorEl) return;
+    this._errorEl.textContent = msg;
+    this._errorEl.classList.remove('hidden');
+    setTimeout(() => this._errorEl.classList.add('hidden'), 5000);
+  }
+
+  async sendTrigger() {
+    if (this._cooldown) {
+      this._showError('Please wait before triggering again.');
+      return;
+    }
+
+    const typeSelect = document.getElementById('trigger-type');
+    const type = typeSelect ? typeSelect.value : 'follow';
+    let triggerName = type;
+    if (type === 'custom') {
+      const customInput = document.getElementById('trigger-custom-name');
+      triggerName = customInput ? customInput.value.trim() : '';
+      if (!triggerName) {
+        this._showError('Please enter a custom trigger name.');
+        return;
+      }
+    }
+
+    const userInput = document.getElementById('trigger-user');
+    const user = userInput ? (userInput.value.trim() || 'TestUser') : 'TestUser';
+
+    const confirmed = await showConfirmDialog(
+      'Confirm Test Trigger',
+      `Send TEST ${type === 'comment' ? 'comment' : 'trigger'} "${triggerName}" as user "${user}"?`,
+      'Send',
+      'btn-danger',
+      'text-danger'
+    );
+    if (!confirmed) return;
+
+    this._cooldown = true;
+    this._setStatus('running', 'Sending...');
+
+    try {
+      let result;
+      if (type === 'comment') {
+        const text = document.getElementById('comment-text').value.trim();
+        if (!text) {
+          this._showError('Comment text is required.');
+          this._setStatus('error', 'Error');
+          this._cooldown = false;
+          return;
+        }
+        const moderator = document.getElementById('comment-mod').checked;
+        const superfan = document.getElementById('comment-sf').checked;
+        const fanclub = document.getElementById('comment-fc').checked;
+        result = await postJSON('/triggers/comment', {
+          user, text, moderator, superfan, fanclub
+        });
+      } else {
+        result = await postJSON('/triggers/execute', {
+          trigger: triggerName, user
+        });
+      }
+
+      if (result.status === 'ok' || result.status === 'success') {
+        this._setStatus('success', 'Sent');
+        showToast('Test event sent successfully.', 'success');
+        log(`[TEST] ${type}: ${triggerName} (${user})`, 'info');
+      } else {
+        this._setStatus('error', 'Failed');
+        this._showError(result.message || 'Trigger failed.');
+        log(`[TEST ERROR] ${type}: ${result.message}`, 'error');
+      }
+      this._addHistory(type, triggerName, user, result.status, result.message || '');
+    } catch (e) {
+      this._setStatus('error', 'Failed');
+      this._showError(e.message);
+      log(`[TEST ERROR] ${e.message}`, 'error');
+      this._addHistory(type, triggerName, user, 'error', e.message);
+    } finally {
+      setTimeout(() => {
+        this._cooldown = false;
+        this._setStatus('offline', 'Ready');
+      }, 1500);
+    }
+  }
+
+  _addHistory(kind, trigger, user, status, message) {
+    const entry = {
+      time: new Date().toLocaleTimeString(),
+      kind,
+      trigger,
+      user,
+      status,
+      message
+    };
+    this._history.unshift(entry);
+    if (this._history.length > 50) this._history.pop();
+    this._renderHistory();
+  }
+
+  _renderHistory() {
+    if (!this._historyEl) return;
+    if (!this._history.length) {
+      this._historyEl.innerHTML = '<p class="text-muted">No events triggered yet this session.</p>';
+      return;
+    }
+    this._historyEl.innerHTML = this._history.map(h => {
+      const kindClass = h.kind === 'comment' ? 'kind-comment' : 'kind-trigger';
+      const badgeClass = h.status === 'ok' || h.status === 'success' ? 'badge-success' : 'badge-error';
+      const label = h.kind === 'comment' ? 'COMMENT' : 'TRIGGER';
+      const detail = h.kind === 'comment' ? `${h.trigger}` : `${h.trigger} → ${h.user}`;
+      return `<div class="trigger-history-entry">
+        <span class="trigger-history-time">${escapeHtml(h.time)}</span>
+        <span class="trigger-history-kind ${kindClass}">${label}</span>
+        <span class="trigger-history-detail">${escapeHtml(detail)}</span>
+        <span class="trigger-history-badge ${badgeClass}">${escapeHtml(h.status)}</span>
+        ${h.message ? `<span class="trigger-history-message" title="${escapeHtml(h.message)}">${escapeHtml(h.message)}</span>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  clearHistory() {
+    this._history = [];
+    this._renderHistory();
+  }
+}
+
+const eventTester = new EventTester();
+
 /* ─── Init ─── */
 async function init() {
   _initTheme();

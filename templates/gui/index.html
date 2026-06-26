@@ -62,6 +62,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm7.5-5.18l-1.41 1.41L12 15.59l3.5-3.5-1.41-1.41L12 12.82l-2.09-2.09-1.41 1.41L11.5 12.82zM7.5 14h4v1.5h-4V14z" fill="currentColor"/></svg>
                     <span class="nav-label">Console</span>
                 </a>
+                <a class="nav-item" data-view="triggers" onclick="switchView('triggers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
+                    <span class="nav-label">Event Tester</span>
+                </a>
                 <a class="nav-item" data-view="updates" onclick="switchView('updates')">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>
                     <span class="nav-label">Updates</span>
@@ -271,6 +275,74 @@
                         <span class="text-muted">No update information available.</span>
                     </div>
                     <div id="updates-detail" class="hidden"></div>
+                </section>
+            </div>
+
+            <!-- ─── Event Tester ─── -->
+            <div class="view" id="view-triggers">
+                <div class="view-header">
+                    <h2>Event Tester</h2>
+                    <div class="console-toolbar">
+                        <span id="trigger-tester-status" class="console-status offline">Ready</span>
+                    </div>
+                </div>
+
+                <section class="view-section">
+                    <div class="warning-box">
+                        <strong>TEST MODE</strong> — Events fired here are simulated and behave exactly like real TikTok events. Use with care on a live server.
+                    </div>
+                </section>
+
+                <section class="view-section">
+                    <h3>Trigger Simulator</h3>
+                    <div class="trigger-form">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Event Type</label>
+                                <select id="trigger-type" class="form-select" onchange="eventTester.onTypeChange()">
+                                    <option value="follow">Follow</option>
+                                    <option value="like">Like</option>
+                                    <option value="join">Join</option>
+                                    <option value="share">Share</option>
+                                    <option value="comment">Comment</option>
+                                    <option value="gift">Gift</option>
+                                    <option value="tiktok">Toggle TikTok Connection</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="custom-trigger-group" style="flex:1;display:none;">
+                                <label>Custom Trigger Name</label>
+                                <input type="text" id="trigger-custom-name" class="form-input" placeholder="e.g. my_action">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>User</label>
+                                <input type="text" id="trigger-user" class="form-input" value="TestUser">
+                            </div>
+                        </div>
+                        <div class="form-row" id="comment-fields" style="display:none;">
+                            <div class="form-group" style="flex:2">
+                                <label>Comment Text</label>
+                                <input type="text" id="comment-text" class="form-input" placeholder="Enter comment text...">
+                            </div>
+                            <div class="form-group checkbox-group" style="flex:1;align-items:flex-end;padding-bottom:0.5rem;">
+                                <label><input type="checkbox" id="comment-mod"> Moderator</label>
+                                <label><input type="checkbox" id="comment-sf"> Superfan</label>
+                                <label><input type="checkbox" id="comment-fc"> Fanclub</label>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn--primary" id="btn-trigger-send" onclick="eventTester.sendTrigger()">Send Trigger</button>
+                            <button class="btn btn--secondary" onclick="eventTester.clearHistory()">Clear History</button>
+                        </div>
+                        <div id="trigger-error" class="modal-error hidden"></div>
+                    </div>
+                </section>
+
+                <section class="view-section">
+                    <h3>Session History</h3>
+                    <div id="trigger-history" class="trigger-history">
+                        <p class="text-muted">No events triggered yet this session.</p>
+                    </div>
                 </section>
             </div>
         </main>
