@@ -1,5 +1,0 @@
-event_commands:
-  test:
-    - target: timer
-      command: pause
-      args: not_a_dict

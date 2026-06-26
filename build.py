@@ -470,7 +470,6 @@ def main():
         sync_folder("docs", OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [
-            ("static/css/style.css",                "core/static/css/style.css"),
             ("defaults/config.yaml",                "config/config.yaml"),
             ("defaults/gifts.json",                 "core/gifts.json"),
             ("LICENSE",                             "LICENSE"),

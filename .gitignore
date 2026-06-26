@@ -16,6 +16,7 @@ core/runtime/plugin_stop_test-plugin
 core/runtime/shutdown
 templates/gui/node_modules/
 data/.enc_key
+data/event_commands.yaml
 data/backups/
 node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json
 tmp/gui.lock
