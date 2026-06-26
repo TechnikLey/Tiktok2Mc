@@ -56,8 +56,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         log.warning("Could not read RCON config — console will auto-configure on first request")
 
-    # Start console log capture
-    server_dir = get_root_dir() / "server" / "mc"
+    # Start console log capture for the default instance
+    server_dir = get_root_dir() / "server" / "default"
     cap = init_console_capture(server_dir)
     await cap.start()
 

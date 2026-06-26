@@ -102,6 +102,20 @@ class TestApiService:
         with pytest.raises(ValueError, match="must be dict"):
             svc.write_config({"java": "not_a_dict"}, backup=False)
 
+    def test_write_config_replace_keys_removes_nested_keys(self, svc):
+        cfg = svc.read_config()
+        cfg["instances"] = {"a": {"name": "A"}, "b": {"name": "B"}}
+        svc.write_config(cfg, backup=False, replace_keys=["instances"])
+
+        # Now remove instance "b" and write again
+        cfg = svc.read_config()
+        cfg["instances"] = {"a": {"name": "A"}}
+        svc.write_config(cfg, backup=False, replace_keys=["instances"])
+
+        reread = svc.read_config()
+        assert "a" in reread["instances"]
+        assert "b" not in reread["instances"]
+
     def test_get_uptime(self, svc):
         uptime = svc.get_uptime()
         assert isinstance(uptime, float)

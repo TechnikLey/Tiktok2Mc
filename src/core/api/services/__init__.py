@@ -138,7 +138,7 @@ class ApiService:
         return data
 
     def write_config(
-        self, data: dict[str, Any], backup: bool = True
+        self, data: dict[str, Any], backup: bool = True, replace_keys: list[str] | None = None
     ) -> None:
         """Validate and write a config dict back to the YAML file atomically.
 
@@ -147,6 +147,11 @@ class ApiService:
 
         If *backup* is ``True`` the previous file is copied to a versioned
         backup (``config.yaml.v1.bak``, ``config.yaml.v2.bak``, …).
+
+        *replace_keys* allows callers to specify top-level keys whose nested
+        dicts should be fully replaced rather than merged.  This ensures
+        deleted sub-keys are removed on disk (``deep_update_rt`` preserves
+        old keys by default to keep YAML comments).
         """
         data["config_version"] = EXPECTED_CONFIG_VERSION
 
@@ -154,6 +159,17 @@ class ApiService:
         existing = load_yaml(self.config_path) if self.config_path.exists() else CommentedMap()
         if not isinstance(existing, CommentedMap):
             existing = CommentedMap(existing) if isinstance(existing, dict) else CommentedMap()
+
+        # For keys marked as replace, remove nested keys in existing that are not in data
+        if replace_keys:
+            for key in replace_keys:
+                if key in data and key in existing:
+                    old_val = existing[key]
+                    new_val = data[key]
+                    if isinstance(old_val, (CommentedMap, dict)) and isinstance(new_val, dict):
+                        for old_nested_key in list(old_val.keys()):
+                            if old_nested_key not in new_val:
+                                del old_val[old_nested_key]
 
         deep_update_rt(existing, data)
         _validate_config_schema(existing)

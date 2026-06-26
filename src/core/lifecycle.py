@@ -57,6 +57,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Awaitable
 from typing import Any, Callable
 
 from core.paths import get_base_dir, get_root_dir
@@ -129,6 +130,10 @@ class ManagedProcess:
     post_spawn: Callable[[subprocess.Popen], None] | None = None
     # If False, the supervisor knows about the process but will not start it.
     enabled: bool = True
+    # Optional async readiness check (returns True when fully online).
+    readiness_check: Callable[[], Awaitable[bool]] | None = None
+    # Maximum seconds to wait for readiness before marking FAILED.
+    readiness_timeout: float = 120.0
     # Runtime state
     state: ProcessState = field(default=ProcessState.STOPPED)
     proc: subprocess.Popen | None = field(default=None, repr=False)
@@ -318,6 +323,8 @@ class ProcessSupervisor:
         env: dict[str, str] | None = None,
         post_spawn: Callable[[subprocess.Popen], None] | None = None,
         enabled: bool = True,
+        readiness_check: Callable[[], Awaitable[bool]] | None = None,
+        readiness_timeout: float = 120.0,
     ) -> ManagedProcess:
         """Register a process to be managed.
 
@@ -337,6 +344,8 @@ class ProcessSupervisor:
                 env=env,
                 post_spawn=post_spawn,
                 enabled=enabled,
+                readiness_check=readiness_check,
+                readiness_timeout=readiness_timeout,
             )
             self._processes[name] = proc
             return proc
@@ -385,6 +394,25 @@ class ProcessSupervisor:
 
         try:
             await self._do_start(proc)
+
+            # Optional readiness probe
+            if proc.readiness_check is not None:
+                ready = False
+                deadline = time.time() + proc.readiness_timeout
+                log.info("[SUPERVISOR] %s waiting for readiness (timeout %.0fs)...", name, proc.readiness_timeout)
+                while time.time() < deadline:
+                    try:
+                        if await proc.readiness_check():
+                            ready = True
+                            break
+                    except Exception:
+                        pass
+                    await asyncio.sleep(1.0)
+                if not ready:
+                    log.error("[SUPERVISOR] %s failed readiness check within %.0fs", name, proc.readiness_timeout)
+                    proc.state = ProcessState.FAILED
+                    return False
+
             proc.state = ProcessState.RUNNING
             proc.start_time = time.time()
             log.info("[SUPERVISOR] %s started (PID %s)", name, proc.proc.pid if proc.proc else "?")

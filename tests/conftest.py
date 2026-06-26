@@ -198,10 +198,23 @@ def _patch_paths(project_dir):
                 setattr(mod, name, _new_funcs[name])
 
     # Reset singletons so they recreate with the new paths on next access.
-    core.api.registry._registry = None
-    core.backup._backup_manager = None
-    core.overlay._manager = None
-    core.overlay_utils._manager = None
+    try:
+        import core.api.registry
+        core.api.registry._registry = None
+    except Exception:
+        pass
+    try:
+        core.backup._backup_manager = None
+    except Exception:
+        pass
+    try:
+        core.overlay._manager = None
+    except Exception:
+        pass
+    try:
+        core.overlay_utils._manager = None
+    except Exception:
+        pass
 
     # Reset cached service instances in API route modules so that
     # ApiService, ActionsService, etc. are recreated with patched paths.

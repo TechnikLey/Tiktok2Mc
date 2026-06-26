@@ -2,7 +2,9 @@ import asyncio
 import logging
 import json
 import os
+import platform
 import shutil
+import subprocess
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
@@ -13,7 +15,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 from core.api.services import ApiService
-from core.paths import get_root_dir
+from core.paths import get_root_dir, get_versions_dir, get_servers_dir
 
 log = logging.getLogger(__name__)
 
@@ -63,16 +65,37 @@ def _get_service() -> ApiService:
     return _service
 
 
-def _get_servers_dir() -> Path:
-    return (get_root_dir() / "servers").resolve()
+def _get_versions_dir() -> Path:
+    return get_versions_dir()
 
 
-def _get_server_mc_dir() -> Path:
-    return (get_root_dir() / "server" / "mc").resolve()
+def _get_instance_dir(instance_id: str) -> Path:
+    return (get_servers_dir() / instance_id).resolve()
 
 
-def _get_active_jar_path() -> Path:
-    return _get_server_mc_dir() / "server.jar"
+def _ensure_versions_dir() -> Path:
+    d = _get_versions_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _ensure_instance_dir(instance_id: str) -> Path:
+    d = _get_instance_dir(instance_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _resolve_version_jar(version: str) -> Path | None:
+    """Return the path to server.jar for an installed *version*.
+
+    Only checks the canonical template repository:
+    versions/<version>/server.jar
+    """
+    versions_dir = _get_versions_dir()
+    jar = versions_dir / version / "server.jar"
+    if jar.exists():
+        return jar
+    return None
 
 
 def _fetch_json(url: str, timeout: int = 30) -> dict | list:
@@ -83,12 +106,6 @@ def _fetch_json(url: str, timeout: int = 30) -> dict | list:
     except Exception as e:
         log.warning("Failed to fetch %s: %s", url, e)
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}")
-
-
-def _ensure_servers_dir() -> Path:
-    d = _get_servers_dir()
-    d.mkdir(parents=True, exist_ok=True)
-    return d
 
 
 def _read_meta(version_dir: Path) -> dict[str, Any]:
@@ -110,22 +127,20 @@ def _write_meta(version_dir: Path, meta: dict[str, Any]) -> None:
 
 
 def _list_installed_versions() -> list[dict[str, Any]]:
-    servers_dir = _get_servers_dir()
+    versions_dir = _get_versions_dir()
     versions = []
-    seen = set()
 
     def _resolve_type(name: str, meta: dict) -> str:
         if meta.get("origin") == "custom":
             return "custom"
         return "safe" if name in SAFE_VERSIONS else "unsafe"
 
-    # Scan version-managed directories: servers/<version>/server.jar
-    if servers_dir.exists():
-        for subdir in sorted(servers_dir.iterdir()):
+    # Scan version template directories: versions/<version>/server.jar
+    if versions_dir.exists():
+        for subdir in sorted(versions_dir.iterdir()):
             if subdir.is_dir() and subdir.name.startswith(".") is False:
                 jar = subdir / "server.jar"
                 if jar.exists():
-                    seen.add(subdir.name)
                     meta = _read_meta(subdir)
                     versions.append({
                         "version": subdir.name,
@@ -134,20 +149,6 @@ def _list_installed_versions() -> list[dict[str, Any]]:
                         "hasJar": True,
                         "size": jar.stat().st_size,
                     })
-
-    # Also recognise the legacy jar at server/mc/server.jar
-    legacy_jar = _get_server_mc_dir() / "server.jar"
-    if legacy_jar.exists():
-        cfg_ver = _get_active_version() or "1.21.11"
-        if cfg_ver not in seen:
-            meta = _read_meta(_get_server_mc_dir())
-            versions.append({
-                "version": cfg_ver,
-                "path": str(_get_server_mc_dir().relative_to(get_root_dir())),
-                "type": _resolve_type(cfg_ver, meta),
-                "hasJar": True,
-                "size": legacy_jar.stat().st_size,
-            })
 
     return versions
 
@@ -208,7 +209,7 @@ def _save_instances(instances: dict[str, dict[str, Any]]) -> None:
     svc = ApiService()
     cfg = svc.read_config()
     cfg[INSTANCE_CONFIG_KEY] = instances
-    svc.write_config(cfg, backup=True)
+    svc.write_config(cfg, backup=True, replace_keys=[INSTANCE_CONFIG_KEY])
 
 
 def _get_instance(instance_id: str) -> dict[str, Any] | None:
@@ -325,7 +326,7 @@ async def list_servers():
             auto_start=inst_data.get("auto_start", False),
             java_args=inst_data.get("java_args", ""),
             status=_get_server_status(inst_id),
-            path=str(_get_server_mc_dir().relative_to(get_root_dir())),
+            path=str(_get_instance_dir(inst_id).relative_to(get_root_dir())),
         ))
 
     return ServersListResponse(
@@ -352,11 +353,74 @@ def _new_instance_id(name: str, existing: dict) -> str:
 
 @router.post("/servers/instances")
 async def create_instance(body: CreateInstanceRequest):
+    log.info(
+        "CREATE_INSTANCE request: name='%s' version='%s' port=%d java_args='%s'",
+        body.name, body.version, body.port, body.java_args,
+    )
     instances = _load_instances()
+
+    # Validate name uniqueness
+    existing_names = {data.get("name", "").strip().lower() for data in instances.values()}
+    if body.name.strip().lower() in existing_names:
+        raise HTTPException(status_code=409, detail=f"A server instance named '{body.name}' already exists.")
+
+    # Validate port uniqueness
+    existing_ports = {data.get("port", 25565) for data in instances.values()}
+    if body.port in existing_ports:
+        conflicting = [iid for iid, data in instances.items() if data.get("port", 25565) == body.port]
+        raise HTTPException(
+            status_code=409,
+            detail=f"Port {body.port} is already in use by instance(s): {', '.join(conflicting)}.",
+        )
+
+    # Validate version is installed
+    version = body.version.strip()
+    if not version:
+        raise HTTPException(status_code=400, detail="Version is required.")
+
+    source_jar = _resolve_version_jar(version)
+    if source_jar is None:
+        checked_path = str(_get_versions_dir() / version / "server.jar")
+        log.warning(
+            "Version '%s' not found. Checked: %s",
+            version,
+            checked_path,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Version '{version}' is not installed. Download it first.",
+        )
+
     inst_id = _new_instance_id(body.name, instances)
+
+    # Create instance directory and copy server.jar
+    instance_dir = _ensure_instance_dir(inst_id)
+    target_jar = instance_dir / "server.jar"
+    try:
+        shutil.copy2(source_jar, target_jar)
+        log.info("Copied %s -> %s for instance '%s'", source_jar, target_jar, inst_id)
+    except Exception as e:
+        log.exception("Failed to copy server.jar for instance '%s'", inst_id)
+        raise HTTPException(status_code=500, detail=f"Failed to copy server.jar: {e}")
+
+    # Write server.properties with instance port
+    props_file = instance_dir / "server.properties"
+    try:
+        _set_server_property(props_file, "server-port", str(body.port))
+        _set_server_property(props_file, "enable-rcon", "true")
+    except Exception as e:
+        log.warning("Failed to write server.properties for instance '%s': %s", inst_id, e)
+
+    # Accept EULA
+    eula_file = instance_dir / "eula.txt"
+    try:
+        eula_file.write_text("eula=true\n", encoding="utf-8")
+    except Exception as e:
+        log.warning("Failed to write eula.txt for instance '%s': %s", inst_id, e)
+
     instances[inst_id] = {
         "name": body.name,
-        "version": body.version,
+        "version": version,
         "port": body.port,
         "enabled": True,
         "auto_start": False,
@@ -364,6 +428,25 @@ async def create_instance(body: CreateInstanceRequest):
     }
     _save_instances(instances)
     return {"status": "ok", "id": inst_id, "message": f"Server instance '{body.name}' created"}
+
+
+def _set_server_property(file_path: Path, key: str, value: str) -> None:
+    """Set or append a property in a properties file."""
+    try:
+        if not file_path.exists():
+            file_path.write_text("", encoding="utf-8")
+        lines = file_path.read_text("utf-8").splitlines()
+        found = False
+        for i, line in enumerate(lines):
+            if line.startswith(f"{key}="):
+                lines[i] = f"{key}={value}"
+                found = True
+                break
+        if not found:
+            lines.append(f"{key}={value}")
+        file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except Exception as e:
+        log.warning("Failed to set property %s: %s", key, e)
 
 
 @router.get("/servers/instances")
@@ -430,9 +513,49 @@ async def delete_instance(instance_id: str):
     instances = _load_instances()
     if instance_id not in instances:
         raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+
+    # Remove from configuration first
     del instances[instance_id]
     _save_instances(instances)
+
+    # Delete instance directory
+    instance_dir = _get_instance_dir(instance_id)
+    if instance_dir.exists():
+        try:
+            shutil.rmtree(instance_dir)
+            log.info("Deleted instance directory: %s", instance_dir)
+        except Exception as e:
+            log.warning("Failed to delete instance directory %s: %s", instance_dir, e)
+
     return {"status": "ok", "message": f"Server instance '{instance_id}' deleted"}
+
+
+@router.post("/servers/instances/{instance_id}/open")
+async def open_instance_folder(instance_id: str):
+    instances = _load_instances()
+    if instance_id not in instances:
+        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+    target_path = _get_instance_dir(instance_id)
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail=f"Directory does not exist: {target_path}")
+
+    # Open the folder in the OS file explorer
+    opened = False
+    system = platform.system()
+    try:
+        if system == "Windows":
+            os.startfile(str(target_path))
+            opened = True
+        elif system == "Darwin":
+            subprocess.Popen(["open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            opened = True
+        else:
+            subprocess.Popen(["xdg-open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            opened = True
+    except Exception as e:
+        log.warning("Failed to open folder %s: %s", target_path, e)
+
+    return {"path": str(target_path), "opened": opened}
 
 
 @router.put("/servers/instances/{instance_id}/version")
@@ -460,8 +583,8 @@ async def download_version(body: DownloadRequest):
         )
 
     # Check if version is already installed (duplicate download guard)
-    servers_dir = _ensure_servers_dir()
-    target_dir = servers_dir / version
+    versions_dir = _ensure_versions_dir()
+    target_dir = versions_dir / version
     target_jar = target_dir / "server.jar"
     already_installed = target_jar.exists()
 
@@ -495,11 +618,15 @@ async def download_version(body: DownloadRequest):
     if not candidates:
         raise HTTPException(status_code=400, detail=f"No successful builds found for version '{version}'")
 
-    candidates.sort(key=lambda b: (_channel_priority.get(b.get("channel"), 99), -b.get("build", 0)))
-    latest = candidates[0]
-    build_num = latest["build"]
-    download_obj = latest["downloads"]["server:default"]
-    download_url = download_obj["url"]
+    candidates.sort(key=lambda b: (_channel_priority.get(b.get("channel"), 99), -b.get("id", 0)))
+    try:
+        latest = candidates[0]
+        build_num = latest["id"]
+        download_obj = latest["downloads"]["server:default"]
+        download_url = download_obj["url"]
+    except (KeyError, TypeError) as e:
+        log.exception("Unexpected PaperMC API format for version %s", version)
+        raise HTTPException(status_code=502, detail=f"Unexpected API response from PaperMC for version '{version}': {e}")
 
     if not download_url:
         raise HTTPException(status_code=502, detail=f"PaperMC did not return a download URL for version '{version}' build {build_num}")
@@ -567,31 +694,18 @@ async def switch_version(body: SwitchRequest):
             detail=f"Version '{version}' is not supported. Minimum supported version is {_MIN_SUPPORTED_MAJOR}.{_MIN_SUPPORTED_MINOR}+.",
         )
 
-    servers_dir = _get_servers_dir()
-    source_dir = servers_dir / version
-    source_jar = source_dir / "server.jar"
-    legacy_jar = _get_server_mc_dir() / "server.jar"
+    # Find the source jar
+    source_jar = _resolve_version_jar(version)
+    if source_jar is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version '{version}' is not installed. Download it first.",
+        )
 
-    if not source_jar.exists():
-        # Fallback: if the legacy jar matches the requested version, it's valid
-        svc = _get_service()
-        try:
-            cfg = svc.read_config()
-            cfg_version = cfg.get("mc_version", "")
-        except Exception:
-            cfg_version = ""
-        if version == cfg_version and legacy_jar.exists():
-            # The legacy jar IS the requested version — nothing to copy
-            source_jar = legacy_jar
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Version '{version}' is not installed. Download it first.",
-            )
-
-    target_jar = _get_active_jar_path()
-    server_mc_dir = _get_server_mc_dir()
-    server_mc_dir.mkdir(parents=True, exist_ok=True)
+    default_instance_dir = _get_instance_dir("default")
+    legacy_jar = default_instance_dir / "server.jar"
+    target_jar = legacy_jar
+    default_instance_dir.mkdir(parents=True, exist_ok=True)
 
     # Backup existing jar if it exists and isn't from the same version
     svc = _get_service()
@@ -602,7 +716,7 @@ async def switch_version(body: SwitchRequest):
         current_version = ""
 
     if target_jar.exists() and current_version and current_version != version:
-        backup_dir = servers_dir / current_version
+        backup_dir = _get_versions_dir() / current_version
         backup_dir.mkdir(parents=True, exist_ok=True)
         backup_jar = backup_dir / "server.jar"
         if not backup_jar.exists():
@@ -676,8 +790,8 @@ async def upload_custom_jar(
     if not version_name:
         raise HTTPException(status_code=400, detail="Invalid version name")
 
-    servers_dir = _ensure_servers_dir()
-    target_dir = servers_dir / version_name
+    versions_dir = _ensure_versions_dir()
+    target_dir = versions_dir / version_name
     target_dir.mkdir(parents=True, exist_ok=True)
     target_jar = target_dir / "server.jar"
 
@@ -703,25 +817,11 @@ async def upload_custom_jar(
 
 @router.delete("/servers/{version}", response_model=RemoveResponse)
 async def remove_version(version: str):
-    servers_dir = _get_servers_dir()
-    target_dir = servers_dir / version
+    versions_dir = _get_versions_dir()
+    target_dir = versions_dir / version
 
     if not target_dir.exists() or not target_dir.is_dir():
         raise HTTPException(status_code=404, detail=f"Version '{version}' not found")
-
-    # Prevent removing the currently active version's source if it's the only copy
-    svc = _get_service()
-    try:
-        cfg = svc.read_config()
-        active_version = cfg.get("mc_version", "")
-    except Exception:
-        active_version = ""
-
-    if version == active_version:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot remove the currently active version '{version}'. Switch to another version first.",
-        )
 
     try:
         shutil.rmtree(target_dir)

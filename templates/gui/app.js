@@ -5335,7 +5335,7 @@ function connectLogStream() {
       if (type === 'log') {
         liveLog.add(payload.msg || payload.message || '', payload.level || 'info', payload.source || '');
       } else if (type === 'server.console') {
-        if (payload.line && consoleTerminal._connected) {
+        if (payload.line) {
           consoleTerminal._print(payload.line, 'server');
         }
       } else if (type === 'server.restarting') {

@@ -461,10 +461,17 @@ def _register_builtin_processes() -> None:
         )
 
     if SERVER_EXE_PATH.exists():
+        server_default_dir = (ROOT_DIR / "server" / "default").resolve()
+        server_default_dir.mkdir(parents=True, exist_ok=True)
+        default_port = cfg.get("java", {}).get("port", 25565)
+        from core.minecraft_readiness import make_minecraft_readiness_check
         supervisor.register(
             "Minecraft Server",
-            [str(SERVER_EXE_PATH)],
+            [str(SERVER_EXE_PATH), "--instance-dir", str(server_default_dir), "--port", str(default_port)],
+            cwd=server_default_dir,
             hidden=get_visibility(2),
+            readiness_check=make_minecraft_readiness_check(server_default_dir),
+            readiness_timeout=120.0,
         )
 
     if GUI_EXE_PATH.exists() and GUI_ENABLED and not _gui_already_running():
