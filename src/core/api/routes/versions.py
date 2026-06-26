@@ -1,20 +1,17 @@
 import logging
 import urllib.request
 import json
-import os
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from core.api.services import ApiService
-from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Versions"])
 
-PAPER_API = "https://api.papermc.io/v2/projects/paper"
+PAPER_API = "https://fill.papermc.io/v3/projects/paper"
 
 SAFE_VERSIONS = {"1.21.11"}
 
@@ -22,7 +19,13 @@ _MIN_SUPPORTED_MAJOR = 1
 _MIN_SUPPORTED_MINOR = 13
 
 
+def _is_stable_version(version: str) -> bool:
+    return "-" not in version
+
+
 def _is_supported_version(version: str) -> bool:
+    if not _is_stable_version(version):
+        return False
     parts = version.split(".")
     try:
         major = int(parts[0])
@@ -30,6 +33,18 @@ def _is_supported_version(version: str) -> bool:
     except (ValueError, IndexError):
         return False
     return major > _MIN_SUPPORTED_MAJOR or (major == _MIN_SUPPORTED_MAJOR and minor >= _MIN_SUPPORTED_MINOR)
+
+
+def _flatten_versions(nested: dict) -> list[str]:
+    result = []
+    for group, versions in nested.items():
+        if isinstance(versions, list):
+            result.extend(versions)
+    return result
+
+
+def _semver_sort_key(v: str) -> tuple[int, ...]:
+    return tuple(int(p) if p.isdigit() else 0 for p in v.split("."))
 
 _service: ApiService | None = None
 
@@ -82,10 +97,9 @@ async def list_versions():
     current_version = cfg.get("mc_version", "1.21.11")
 
     data = _fetch_json(PAPER_API)
-    raw_versions: list[str] = data.get("versions", []) if isinstance(data, dict) else []
-    # Filter to supported versions (1.13+) and reverse so newest appear first
+    raw_versions = _flatten_versions(data.get("versions", {})) if isinstance(data, dict) else []
     supported = [v for v in raw_versions if _is_supported_version(v)]
-    supported.reverse()
+    supported.sort(key=_semver_sort_key, reverse=True)
 
     versions: list[VersionInfo] = []
     for v in supported:
@@ -117,7 +131,7 @@ async def set_version(body: SetVersionRequest):
         )
 
     data = _fetch_json(PAPER_API)
-    raw_versions: list[str] = data.get("versions", []) if isinstance(data, dict) else []
+    raw_versions = _flatten_versions(data.get("versions", {})) if isinstance(data, dict) else []
     if requested not in raw_versions:
         raise HTTPException(
             status_code=400,

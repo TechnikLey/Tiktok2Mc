@@ -110,13 +110,7 @@ document.getElementById('btn-shutdown-cancel').addEventListener('click', () => {
   document.getElementById('shutdown-overlay').classList.add('hidden');
 });
 
-/* ─── Server Manager Button Wiring ─── */
-document.getElementById('btn-server-switch')?.addEventListener('click', serverManagerSwitchVersion);
-document.getElementById('btn-server-add-custom')?.addEventListener('click', serverManagerAddCustom);
-document.getElementById('btn-server-refresh')?.addEventListener('click', serverManagerRefreshList);
-document.getElementById('btn-server-start')?.addEventListener('click', serverManagerStart);
-document.getElementById('btn-server-stop')?.addEventListener('click', serverManagerStop);
-document.getElementById('btn-server-restart')?.addEventListener('click', serverManagerRestart);
+/* ─── Server Manager — lifecycle polling is started/stopped in view switch code ─── */
 
 /* ─── Server Manager Modal Wiring ─── */
 document.getElementById('server-download-cancel')?.addEventListener('click', closeServerDownloadModal);
@@ -623,161 +617,12 @@ async function loadPlugins() {
 }
 
 /* ─── Server Manager ─── */
-async function loadServerManager() {
-  try {
-    const data = await fetchJSON('/servers');
-    _serverManagerCache = data;
-    renderServerManager();
-  } catch (e) {
-    log('Server Manager load failed: ' + e.message, 'err');
-    const versionsList = document.getElementById('server-versions-list');
-    if (versionsList) versionsList.innerHTML = '<p class="text-muted">Failed to load server data.</p>';
-  }
-}
-
-function renderServerManager() {
-  const activeCard = document.getElementById('server-active-card');
-  const versionsList = document.getElementById('server-versions-list');
-  if (!activeCard || !versionsList) return;
-
-  if (!_serverManagerCache) {
-    activeCard.innerHTML = '<div class="server-active-placeholder text-muted">Loading server info...</div>';
-    versionsList.innerHTML = '<p class="text-muted">Loading versions...</p>';
-    return;
-  }
-
-  const active = _serverManagerCache.active || {};
-  const statusColor = active.status === 'running' ? 'var(--color-success)' : 'var(--color-text-muted)';
-  activeCard.innerHTML = `
-    <div class="server-active-header">
-      <div class="server-active-icon">
-        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
-      </div>
-      <div>
-        <div style="font-weight:var(--weight-semibold);color:var(--color-text);">${escapeHtml(active.name || 'Default Server')}</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-muted);">
-          ${active.status === 'running'
-            ? '<span class="server-active-indicator">Running</span>'
-            : 'Stopped'}
-        </div>
-      </div>
-    </div>
-    <dl class="server-active-meta">
-      <dt>Version</dt>
-      <dd>${escapeHtml(active.version || '—')}</dd>
-      <dt>Path</dt>
-      <dd>${escapeHtml(active.path || '—')}</dd>
-      <dt>Jar File</dt>
-      <dd>${escapeHtml(active.jarName || 'server.jar')}${active.jarExists ? '' : ' <span style="color:var(--danger)">(missing)</span>'}</dd>
-      <dt>Status</dt>
-      <dd style="color:${statusColor};font-weight:var(--weight-medium);">${escapeHtml(active.status || 'stopped')}</dd>
-    </dl>
-  `;
-
-  const versions = _serverManagerCache.installed || [];
-  if (!versions.length) {
-    versionsList.innerHTML = '<p class="text-muted">No server versions installed yet. Use <strong>Download</strong> or <strong>Add Custom</strong> to install a version.</p>';
-    return;
-  }
-
-  let html = '<table class="server-versions-table"><thead><tr><th>Version</th><th>Status</th><th>Path</th><th>Active</th><th>Actions</th></tr></thead><tbody>';
-  for (const v of versions) {
-    const badgeClass = v.type === 'safe' ? 'server-status-badge--safe'
-                     : v.type === 'custom' ? 'server-status-badge--custom'
-                     : 'server-status-badge--unsafe';
-    const badgeLabel = v.type === 'safe' ? 'SAFE'
-                     : v.type === 'custom' ? 'CUSTOM'
-                     : 'UNSAFE';
-    const activeLabel = v.active
-      ? '<span class="server-active-indicator">Active</span>'
-      : '<span class="text-muted">—</span>';
-    const size = v.size ? `(${(v.size / 1024 / 1024).toFixed(1)} MB)` : '';
-    const switchBtn = v.active
-      ? '<button class="btn btn--sm btn--secondary" disabled>Active</button>'
-      : `<button class="btn btn--sm btn--primary" onclick="serverManagerPromptSwitch('${escapeHtml(v.version)}')">Switch</button>`;
-    const removeBtn = v.active
-      ? '<button class="btn btn--sm btn--danger" disabled title="Cannot remove active version">Remove</button>'
-      : `<button class="btn btn--sm btn--danger" onclick="serverManagerPromptRemove('${escapeHtml(v.version)}')">Remove</button>`;
-    html += `<tr>
-      <td data-label="Version"><strong>${escapeHtml(v.version)}</strong></td>
-      <td data-label="Status"><span class="server-status-badge ${badgeClass}">${badgeLabel}</span></td>
-      <td data-label="Path"><code style="font-size:0.85rem;">${escapeHtml(v.path)}</code> ${size}</td>
-      <td data-label="Active">${activeLabel}</td>
-      <td data-label="Actions">${switchBtn} ${removeBtn}</td>
-    </tr>`;
-  }
-  html += '</tbody></table>';
-  versionsList.innerHTML = html;
-}
-
-async function serverManagerPromptSwitch(version) {
-  const isSafe = _serverManagerCache?.installed?.find(v => v.version === version)?.type === 'safe';
-  if (!isSafe) {
-    const confirmed = await showConfirmDialog(
-      'Switch to Untested Version?',
-      `Version ${version} is not marked as SAFE. It may break plugins, corrupt worlds, or cause crashes. Are you sure you want to switch?`,
-      'Switch Anyway',
-      'btn-danger',
-      'text-danger'
-    );
-    if (!confirmed) return;
-  } else {
-    const confirmed = await showConfirmDialog(
-      'Switch Version?',
-      `Switch active server to ${version}? The server will use this version on next start.`,
-      'Switch',
-      'btn-primary'
-    );
-    if (!confirmed) return;
-  }
-  try {
-    const res = await postJSON('/servers/switch', { version });
-    showToast(res.message || `Switched to ${version}`, 'success');
-    await loadServerManager();
-  } catch (e) {
-    showToast('Switch failed: ' + e.message, 'error');
-  }
-}
-
-async function serverManagerPromptRemove(version) {
-  const confirmed = await showConfirmDialog(
-    'Remove Version?',
-    `Delete version ${version} and its server.jar? This cannot be undone.`,
-    'Remove',
-    'btn-danger',
-    'text-danger'
-  );
-  if (!confirmed) return;
-  try {
-    const res = await fetch(API + '/servers/' + encodeURIComponent(version), { method: 'DELETE' });
-    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
-    const data = await res.json();
-    showToast(data.message || `Removed ${version}`, 'success');
-    await loadServerManager();
-  } catch (e) {
-    showToast('Remove failed: ' + e.message, 'error');
-  }
-}
-
-function serverManagerSwitchVersion() {
-  openServerDownloadModal();
-}
-
-function serverManagerAddCustom() {
-  openServerCustomModal();
-}
-
-function serverManagerRefreshList() {
-  loadServerManager();
-}
-
-/* ─── Server Lifecycle Controls ─── */
 let _serverLifecycleInterval = null;
 
 function startServerLifecyclePolling() {
   stopServerLifecyclePolling();
-  updateServerLifecycleStatus();
-  _serverLifecycleInterval = setInterval(updateServerLifecycleStatus, 5000);
+  updateServerLifecycleUI();
+  _serverLifecycleInterval = setInterval(updateServerLifecycleUI, 5000);
 }
 
 function stopServerLifecyclePolling() {
@@ -787,112 +632,245 @@ function stopServerLifecyclePolling() {
   }
 }
 
-async function updateServerLifecycleStatus() {
-  const statusEl = document.getElementById('server-controls-status');
-  const uptimeEl = document.getElementById('server-controls-uptime');
-  const startBtn = document.getElementById('btn-server-start');
-  const stopBtn = document.getElementById('btn-server-stop');
-  const restartBtn = document.getElementById('btn-server-restart');
-  if (!statusEl) return;
-
+async function loadServerManager() {
   try {
-    const data = await fetchJSON('/server/status');
-    const state = data.state || 'unknown';
-    const alive = data.alive || false;
-    const uptime = data.uptime || null;
+    const data = await fetchJSON('/servers');
+    _serverManagerCache = data;
+    renderServerManager();
+  } catch (e) {
+    log('Server Manager load failed: ' + e.message, 'err');
+    ['server-instances', 'server-versions-list'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<p class="text-muted">Failed to load server data.</p>';
+    });
+  }
+}
 
-    statusEl.className = 'server-controls-status';
-    const dot = statusEl.querySelector('.server-controls-dot') || document.createElement('span');
-    const label = statusEl.querySelector('.server-controls-label') || document.createElement('span');
+function renderServerManager() {
+  const instancesEl = document.getElementById('server-instances');
+  const versionsList = document.getElementById('server-versions-list');
+  if (!instancesEl || !versionsList) return;
 
-    dot.className = 'server-controls-dot';
-    label.className = 'server-controls-label';
+  if (!_serverManagerCache) {
+    instancesEl.innerHTML = '<div class="text-muted server-loading">Loading server instances...</div>';
+    versionsList.innerHTML = '<p class="text-muted">Loading versions...</p>';
+    return;
+  }
 
-    if (state === 'running') {
-      dot.classList.add('server-controls-dot--running');
-      label.textContent = 'Running';
-      if (uptimeEl) {
-        const mins = Math.floor(uptime / 60);
-        const secs = uptime % 60;
-        uptimeEl.textContent = `(uptime: ${mins}m ${secs}s)`;
+  const instances = _serverManagerCache.instances || [];
+  if (!instances.length) {
+    instancesEl.innerHTML = '<div class="text-muted server-loading">No server instances configured. Add one to get started.</div>';
+  } else {
+    instancesEl.innerHTML = instances.map(inst => renderServerCard(inst)).join('');
+  }
+
+  renderVersionLibrary(versionsList);
+}
+
+function renderServerCard(inst) {
+  const state = inst.status || 'stopped';
+  const stateLabel = state.charAt(0).toUpperCase() + state.slice(1);
+  const dotClass = 'server-status-dot--' + state;
+  const instId = escapeHtml(inst.id);
+  return `<div class="server-card" data-instance-id="${instId}">
+    <div class="server-card-top">
+      <div class="server-card-title">
+        <span class="server-status-dot ${dotClass}"></span>
+        <strong class="server-card-name">${escapeHtml(inst.name)}</strong>
+        <span class="server-card-version-badge">
+          ${escapeHtml(inst.version)}
+          <span class="server-status-badge ${_versionBadgeClass(inst.version)}">${_versionBadgeLabel(inst.version)}</span>
+        </span>
+      </div>
+      <div class="server-card-actions-top">
+        <button class="btn btn--sm btn--success server-action-btn" onclick="serverCardAction('${instId}', 'start')" title="Start" ${state === 'running' ? 'disabled' : ''}>
+          <svg width="14" height="14" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+        </button>
+        <button class="btn btn--sm btn--danger server-action-btn" onclick="serverCardAction('${instId}', 'stop')" title="Stop" ${state !== 'running' ? 'disabled' : ''}>
+          <svg width="14" height="14" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" fill="currentColor"/></svg>
+        </button>
+        <button class="btn btn--sm btn--secondary server-action-btn" onclick="serverCardAction('${instId}', 'restart')" title="Restart">
+          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4C7.58 4 4.01 7.58 4.01 12S7.58 20 12 20c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="server-card-body">
+      <div class="server-card-meta">
+        <div class="server-card-meta-item">
+          <span class="server-card-label">Status</span>
+          <span class="server-card-value server-state-text server-state-text--${state}">${stateLabel}</span>
+        </div>
+        <div class="server-card-meta-item">
+          <span class="server-card-label">Uptime</span>
+          <span class="server-card-value server-uptime" data-instance="${instId}">—</span>
+        </div>
+        <div class="server-card-meta-item">
+          <span class="server-card-label">Port</span>
+          <span class="server-card-value code">${inst.port || '25565'}</span>
+        </div>
+        <div class="server-card-meta-item">
+          <span class="server-card-label">Path</span>
+          <span class="server-card-value code">${escapeHtml(inst.path || '—')}</span>
+        </div>
+      </div>
+    </div>
+    <div class="server-card-footer">
+      <button class="btn btn--sm btn--secondary" onclick="openServerDownloadModal()">Switch Version</button>
+      <button class="btn btn--sm btn--secondary" onclick="showToast('Folder: ' + '${escapeHtml(inst.path || '')}', 'info')">Open Folder</button>
+    </div>
+  </div>`;
+}
+
+function renderVersionLibrary(versionsList) {
+  const versions = _serverManagerCache.installed || [];
+  const countEl = document.getElementById('version-count');
+  if (countEl) countEl.textContent = versions.length + ' version' + (versions.length !== 1 ? 's' : '');
+
+  if (!versions.length) {
+    versionsList.innerHTML = '<p class="text-muted">No versions installed yet. Use <strong>Download</strong> or <strong>Add Custom</strong> to install one.</p>';
+    return;
+  }
+
+  let html = '<div class="version-cards">';
+  for (const v of versions) {
+    const badgeClass = 'server-status-badge--' + (v.type === 'safe' ? 'safe' : v.type === 'custom' ? 'custom' : 'unsafe');
+    const badgeLabel = v.type.toUpperCase();
+    const activeClass = v.active ? ' version-card--active' : '';
+    const sizeStr = v.size ? ' (' + (v.size / 1024 / 1024).toFixed(1) + ' MB)' : '';
+    const switchBtn = v.active
+      ? '<span class="text-muted" style="font-size:var(--text-xs);font-weight:var(--weight-medium);">Currently active</span>'
+      : '<button class="btn btn--sm btn--primary" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">Use</button>';
+    const removeBtn = v.active ? '' : '<button class="btn btn--sm btn--danger-ghost" onclick="serverManagerPromptRemove(\'' + escapeHtml(v.version) + '\')" title="Remove">Remove</button>';
+
+    html += '<div class="version-card' + activeClass + '">' +
+      '<div class="version-card-info">' +
+        '<div class="version-card-version">' +
+          '<strong>' + escapeHtml(v.version) + '</strong>' +
+          '<span class="server-status-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+        '</div>' +
+        '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code> ' + sizeStr + '</div>' +
+      '</div>' +
+      '<div class="version-card-actions">' + switchBtn + removeBtn + '</div>' +
+    '</div>';
+  }
+  html += '</div>';
+  versionsList.innerHTML = html;
+}
+
+function _versionBadgeClass(version) {
+  if (!_serverManagerCache) return 'server-status-badge--unsafe';
+  const found = (_serverManagerCache.installed || []).find(v => v.version === version);
+  if (!found) return 'server-status-badge--unsafe';
+  return found.type === 'safe' ? 'server-status-badge--safe'
+       : found.type === 'custom' ? 'server-status-badge--custom'
+       : 'server-status-badge--unsafe';
+}
+
+function _versionBadgeLabel(version) {
+  if (!_serverManagerCache) return 'UNSAFE';
+  const found = (_serverManagerCache.installed || []).find(v => v.version === version);
+  if (!found) return 'UNSAFE';
+  return found.type.toUpperCase();
+}
+
+async function serverManagerPromptSwitch(version) {
+  const isSafe = (_serverManagerCache?.installed || []).find(v => v.version === version)?.type === 'safe';
+  if (!isSafe) {
+    const confirmed = await showConfirmDialog(
+      'Switch to Untested Version?',
+      'Version ' + version + ' is not marked as SAFE. It may break plugins, corrupt worlds, or cause crashes. Are you sure you want to switch?',
+      'Switch Anyway',
+      'btn-danger',
+      'text-danger'
+    );
+    if (!confirmed) return;
+  } else {
+    const confirmed = await showConfirmDialog('Switch Version?', 'Switch active server to ' + version + '?', 'Switch', 'btn-primary');
+    if (!confirmed) return;
+  }
+  try {
+    const res = await postJSON('/servers/switch', { version });
+    showToast(res.message || 'Switched to ' + version, 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Switch failed: ' + e.message, 'error');
+  }
+}
+
+async function serverManagerPromptRemove(version) {
+  const confirmed = await showConfirmDialog('Remove Version?', 'Delete version ' + version + ' and its server.jar? This cannot be undone.', 'Remove', 'btn-danger', 'text-danger');
+  if (!confirmed) return;
+  try {
+    const res = await fetch(API + '/servers/' + encodeURIComponent(version), { method: 'DELETE' });
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    const data = await res.json();
+    showToast(data.message || 'Removed ' + version, 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Remove failed: ' + e.message, 'error');
+  }
+}
+
+/* ─── Server Lifecycle UI Updates ─── */
+
+async function updateServerLifecycleUI() {
+  try {
+    const cards = document.querySelectorAll('[data-instance-id]');
+    for (const card of cards) {
+      const instId = card.getAttribute('data-instance-id');
+      let data;
+      try {
+        data = await fetchJSON('/server/' + instId + '/status');
+      } catch (e) {
+        continue;
       }
-    } else if (state === 'starting') {
-      dot.classList.add('server-controls-dot--starting');
-      label.textContent = 'Starting...';
-    } else if (state === 'stopping') {
-      dot.classList.add('server-controls-dot--stopping');
-      label.textContent = 'Stopping...';
-    } else if (state === 'failed') {
-      dot.classList.add('server-controls-dot--failed');
-      label.textContent = 'Failed';
-    } else if (state === 'stopped') {
-      dot.classList.add('server-controls-dot--stopped');
-      label.textContent = 'Stopped';
-    } else {
-      dot.classList.add('server-controls-dot--unknown');
-      label.textContent = 'Unknown';
+      const state = data.state || 'unknown';
+      const uptime = data.uptime;
+
+      const dot = card.querySelector('.server-status-dot');
+      if (dot) dot.className = 'server-status-dot server-status-dot--' + state;
+
+      const stateText = card.querySelector('.server-state-text');
+      if (stateText) {
+        stateText.textContent = state.charAt(0).toUpperCase() + state.slice(1);
+        stateText.className = 'server-card-value server-state-text server-state-text--' + state;
+      }
+
+      const uptimeEl = card.querySelector('.server-uptime');
+      if (uptimeEl) uptimeEl.textContent = uptime ? formatUptime(uptime) : '—';
+
+      const startBtn = card.querySelector('.btn--success');
+      const stopBtn = card.querySelector('.btn--danger');
+      if (startBtn) startBtn.disabled = state === 'running';
+      if (stopBtn) stopBtn.disabled = state !== 'running';
     }
-
-    if (startBtn) startBtn.disabled = (state === 'running' || state === 'starting');
-    if (stopBtn) stopBtn.disabled = (state !== 'running');
-    if (restartBtn) restartBtn.disabled = (state !== 'running');
   } catch (e) {
-    log('Server lifecycle status poll failed: ' + e.message, 'err');
+    log('Server status poll failed: ' + e.message, 'err');
   }
 }
 
-async function serverManagerStart() {
-  const confirmed = await showConfirmDialog(
-    'Start Minecraft Server?',
-    'This will start the Minecraft server process. It may take a moment to become ready.',
-    'Start',
-    'btn--success'
-  );
-  if (!confirmed) return;
-  try {
-    const res = await postJSON('/server/start');
-    showToast(res.message || 'Server started', 'success');
-    await updateServerLifecycleStatus();
-    loadServerManager();
-  } catch (e) {
-    showToast('Start failed: ' + e.message, 'error');
-  }
+function formatUptime(seconds) {
+  if (!seconds || seconds < 0) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+  if (m > 0) return m + 'm ' + s + 's';
+  return s + 's';
 }
 
-async function serverManagerStop() {
-  const confirmed = await showConfirmDialog(
-    'Stop Minecraft Server?',
-    'This will stop the Minecraft server process. Players will be disconnected.',
-    'Stop',
-    'btn-danger',
-    'text-danger'
-  );
-  if (!confirmed) return;
-  try {
-    const res = await postJSON('/server/stop');
-    showToast(res.message || 'Server stopped', 'success');
-    await updateServerLifecycleStatus();
-    loadServerManager();
-  } catch (e) {
-    showToast('Stop failed: ' + e.message, 'error');
+async function serverCardAction(instanceId, action) {
+  if (action === 'restart') {
+    const confirmed = await showConfirmDialog('Restart ' + instanceId + '?', 'This will kick all players on this server. Are you sure?', 'Restart', 'btn-danger', 'text-danger');
+    if (!confirmed) return;
   }
-}
-
-async function serverManagerRestart() {
-  const confirmed = await showConfirmDialog(
-    'Restart Minecraft Server?',
-    'This will restart the Minecraft server process. Players will be temporarily disconnected.',
-    'Restart',
-    'btn-primary'
-  );
-  if (!confirmed) return;
+  const endpoint = '/server/' + instanceId + '/' + action;
   try {
-    const res = await postJSON('/server/restart');
-    showToast(res.message || 'Server restarting', 'success');
-    await updateServerLifecycleStatus();
+    const res = await postJSON(endpoint);
+    showToast(res.message || 'Server ' + action + 'ing', 'info');
     loadServerManager();
   } catch (e) {
-    showToast('Restart failed: ' + e.message, 'error');
+    showToast('Failed to ' + action + ' server: ' + e.message, 'error');
   }
 }
 
@@ -936,10 +914,17 @@ async function confirmServerDownload() {
   const version = select?.value;
   if (!version) return;
   closeServerDownloadModal();
-  showToast(`Downloading PaperMC ${version}...`, 'info');
+  showToast('Downloading PaperMC ' + version + '...', 'info');
   try {
     const res = await postJSON('/servers/download', { version });
-    showToast(res.message || `Downloaded ${version}`, 'success');
+    if (res.status === 'already_installed') {
+      showToast(
+        'Version ' + version + ' is already installed. Use "Switch Version" to activate it.',
+        'info'
+      );
+    } else {
+      showToast(res.message || 'Downloaded ' + version, 'success');
+    }
     await loadServerManager();
   } catch (e) {
     showToast('Download failed: ' + e.message, 'error');

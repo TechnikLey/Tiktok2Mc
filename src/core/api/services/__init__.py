@@ -14,30 +14,32 @@ from core.version import EXPECTED_CONFIG_VERSION
 log = logging.getLogger(__name__)
 
 _CONFIG_SCHEMA: dict[str, type] = {
-    "config_version": str,
-    "auto_update_config": bool,
-    "show_sudo_warning": bool,
-    "server_host": str,
+    "api": dict,
     "api_key": str,
-    "control_method": str,
-    "port_policy": dict,
-    "shutdown": dict,
-    "java": dict,
-    "rcon": dict,
-    "tiktok": dict,
+    "auto_update_config": bool,
     "comment_commands": dict,
+    "config_advanced": bool,
+    "config_version": str,
     "console": dict,
-    "minecraft_server_api": dict,
+    "control_method": str,
     "gui": dict,
-    "update": dict,
+    "java": dict,
+    "mc_version": str,
+    "minecraft_server_api": dict,
     "overlay": dict,
     "plugin_sandbox": dict,
-    "mc_version": str,
+    "port_policy": dict,
+    "rcon": dict,
+    "server_host": str,
+    "shutdown": dict,
+    "show_sudo_warning": bool,
+    "tiktok": dict,
+    "update": dict,
 }
 
 
 def _validate_config_schema(data: Any, path: str = "") -> None:
-    """Validate *data* against the frozen v1.0 config schema.
+    """Validate *data* against the config schema.
 
     Raises ``ValueError`` on the first violation.
     ``config_version`` must be a recognised semantic version.
