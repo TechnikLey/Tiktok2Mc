@@ -2527,6 +2527,63 @@ input[type="color"] {
 #trigger-tester-status.success { background: rgba(34, 197, 94, 0.15); color: var(--color-success); }
 #trigger-tester-status.error { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
 
+/* ─── TikTok Connection Toggle ─── */
+.tiktok-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.tiktok-state-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  min-width: 60px;
+  text-align: center;
+}
+.tiktok-state-on { background: var(--color-success-subtle); color: var(--color-success); }
+.tiktok-state-off { background: var(--color-danger-subtle); color: var(--color-danger); }
+
+/* ─── Gift Selector ─── */
+.gift-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.gift-selector select {
+  min-height: 120px;
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+}
+.gift-selector select option {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.gift-selector select option:last-child {
+  border-bottom: none;
+}
+.gift-selector select option:checked {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+.gift-selector select option:disabled {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ─── System kind badge ─── */
+.kind-system { background: var(--color-warning-subtle); color: var(--color-warning); }
+
 /* ─── Server Manager ─── */
 
 /* Server status dot */

@@ -24,6 +24,12 @@ class TestTriggerService:
         assert "follow" in types
         assert "comment" in types
 
+    def test_tiktok_is_not_an_event_type(self):
+        svc = TriggerService()
+        types = svc.get_event_types()
+        assert "tiktok" not in types
+        assert "gift" in types
+
     def test_history_initially_empty(self):
         svc = TriggerService()
         assert svc.get_history() == []
@@ -90,6 +96,40 @@ class TestTriggerService:
         assert result["status"] == "error"
         assert len(svc.get_history()) == 1
         assert svc.get_history()[0]["status"] == "error"
+
+    @patch("core.api.services.trigger_service.urllib.request.urlopen")
+    def test_execute_trigger_with_gift_id(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({"status": "ok", "trigger": "12345", "user": "TestUser"}).encode()
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        svc = TriggerService()
+        svc._webhook_port = 29188
+        result = svc.execute_trigger("gift", "TestUser", gift_id="12345")
+
+        assert result["status"] == "ok"
+        assert len(svc.get_history()) == 1
+        # The payload should contain the gift_id as the trigger value
+        assert svc.get_history()[0]["payload"]["trigger"] == "12345"
+
+    @patch("core.api.services.trigger_service.urllib.request.urlopen")
+    def test_toggle_tiktok_connection(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(
+            {"status": "ok", "message": "TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT=True"}
+        ).encode()
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        svc = TriggerService()
+        svc._webhook_port = 29188
+        result = svc.toggle_tiktok_connection()
+
+        assert result["status"] == "ok"
+        assert result["connected"] is False
+        assert len(svc.get_history()) == 1
+        assert svc.get_history()[0]["kind"] == "system"
 
     def test_dispatch_via_executable_not_found(self):
         svc = TriggerService()

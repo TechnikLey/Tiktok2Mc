@@ -339,6 +339,22 @@
                     </div>
                 </section>
 
+                <!-- TikTok Connection Control -->
+                <section class="view-section">
+                    <h3>System Controls</h3>
+                    <div class="trigger-form">
+                        <div class="form-row" style="align-items:center;">
+                            <div class="form-group" style="flex:1;margin-bottom:0;">
+                                <label>TikTok Connection</label>
+                                <div class="tiktok-toggle-row">
+                                    <span id="tiktok-connection-state" class="tiktok-state-label">Unknown</span>
+                                    <button class="btn btn--secondary" id="btn-tiktok-toggle" onclick="eventTester.toggleTiktok()">Toggle Connection</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="view-section">
                     <h3>Trigger Simulator</h3>
                     <div class="trigger-form">
@@ -352,13 +368,21 @@
                                     <option value="share">Share</option>
                                     <option value="comment">Comment</option>
                                     <option value="gift">Gift</option>
-                                    <option value="tiktok">Toggle TikTok Connection</option>
                                     <option value="custom">Custom</option>
                                 </select>
                             </div>
                             <div class="form-group" id="custom-trigger-group" style="flex:1;display:none;">
                                 <label>Custom Trigger Name</label>
                                 <input type="text" id="trigger-custom-name" class="form-input" placeholder="e.g. my_action">
+                            </div>
+                            <div class="form-group" id="gift-trigger-group" style="flex:2;display:none;">
+                                <label>Select Gift</label>
+                                <div class="gift-selector">
+                                    <input type="text" id="gift-search" class="form-input" placeholder="Search gifts..." oninput="eventTester.onGiftSearch(this.value)">
+                                    <select id="gift-select" class="form-select" size="5">
+                                        <option value="" disabled>Loading gifts...</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group" style="flex:1">
                                 <label>User</label>

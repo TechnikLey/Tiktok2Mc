@@ -5766,14 +5766,121 @@ class EventTester {
     this._statusEl = document.getElementById('trigger-tester-status');
     this._errorEl = document.getElementById('trigger-error');
     this._historyEl = document.getElementById('trigger-history');
+    this._gifts = [];
+    this._selectedGift = null;
+    this._tiktokConnected = false;
+    this._giftSelectLoaded = false;
   }
 
   onTypeChange() {
     const type = document.getElementById('trigger-type').value;
     const customGroup = document.getElementById('custom-trigger-group');
+    const giftGroup = document.getElementById('gift-trigger-group');
     const commentFields = document.getElementById('comment-fields');
     if (customGroup) customGroup.style.display = type === 'custom' ? 'block' : 'none';
+    if (giftGroup) giftGroup.style.display = type === 'gift' ? 'block' : 'none';
     if (commentFields) commentFields.style.display = type === 'comment' ? 'flex' : 'none';
+
+    if (type === 'gift' && !this._giftSelectLoaded) {
+      this._loadGifts();
+    }
+  }
+
+  async _loadGifts() {
+    try {
+      const data = await fetchJSON('/gifts');
+      this._gifts = data.gifts || [];
+      this._giftSelectLoaded = true;
+      this._renderGiftSelect(this._gifts);
+    } catch (e) {
+      showToast('Failed to load gifts: ' + e.message, 'error');
+      this._gifts = [];
+    }
+  }
+
+  _renderGiftSelect(gifts) {
+    const select = document.getElementById('gift-select');
+    if (!select) return;
+    if (!gifts.length) {
+      select.innerHTML = '<option value="" disabled>No gifts available</option>';
+      return;
+    }
+    let html = '<option value="" disabled selected>Choose a gift...</option>';
+    for (const g of gifts) {
+      html += `<option value="${g.id}" data-name="${escapeHtml(g.name)}">${escapeHtml(g.name)} (ID: ${g.id})</option>`;
+    }
+    select.innerHTML = html;
+    select.onchange = () => {
+      const opt = select.options[select.selectedIndex];
+      this._selectedGift = opt ? { id: opt.value, name: opt.dataset.name || '' } : null;
+    };
+  }
+
+  onGiftSearch(query) {
+    const q = (query || '').toLowerCase().trim();
+    const filtered = q
+      ? this._gifts.filter(g => (g.name || '').toLowerCase().includes(q) || String(g.id).includes(q))
+      : this._gifts;
+    this._renderGiftSelect(filtered);
+  }
+
+  async toggleTiktok() {
+    if (this._cooldown) {
+      this._showError('Please wait before toggling again.');
+      return;
+    }
+    const confirmed = await showConfirmDialog(
+      'Toggle TikTok Connection',
+      'Toggle the TikTok live-stream connection?',
+      'Toggle',
+      'btn-danger'
+    );
+    if (!confirmed) return;
+
+    this._cooldown = true;
+    this._setStatus('running', 'Toggling...');
+    try {
+      const result = await postJSON('/triggers/tiktok-connection', {});
+      if (result.status === 'ok' || result.status === 'success') {
+        this._tiktokConnected = result.connected;
+        this._updateTiktokStateUI();
+        this._setStatus('success', 'Toggled');
+        showToast(`TikTok connection is now ${result.connected ? 'ON' : 'OFF'}.`, 'success');
+        log(`[TEST] TikTok connection toggled: ${result.connected ? 'ON' : 'OFF'}`, 'info');
+      } else {
+        this._setStatus('error', 'Failed');
+        this._showError(result.message || 'Toggle failed.');
+        log(`[TEST ERROR] TikTok toggle: ${result.message}`, 'error');
+      }
+      this._addHistory('system', 'tiktok-toggle', 'System', result.status, result.message || '');
+    } catch (e) {
+      this._setStatus('error', 'Failed');
+      this._showError(e.message);
+      log(`[TEST ERROR] ${e.message}`, 'error');
+      this._addHistory('system', 'tiktok-toggle', 'System', 'error', e.message);
+    } finally {
+      setTimeout(() => {
+        this._cooldown = false;
+        this._setStatus('offline', 'Ready');
+      }, 1500);
+    }
+  }
+
+  _updateTiktokStateUI() {
+    const label = document.getElementById('tiktok-connection-state');
+    const btn = document.getElementById('btn-tiktok-toggle');
+    if (!label || !btn) return;
+    if (this._tiktokConnected) {
+      label.textContent = 'ON';
+      label.className = 'tiktok-state-label tiktok-state-on';
+      btn.textContent = 'Disconnect';
+      btn.className = 'btn btn--danger';
+    } else {
+      label.textContent = 'OFF';
+      label.className = 'tiktok-state-label tiktok-state-off';
+      btn.textContent = 'Connect';
+      btn.className = 'btn btn--primary';
+    }
   }
 
   _setStatus(state, text) {
@@ -5798,6 +5905,8 @@ class EventTester {
     const typeSelect = document.getElementById('trigger-type');
     const type = typeSelect ? typeSelect.value : 'follow';
     let triggerName = type;
+    let giftId = null;
+
     if (type === 'custom') {
       const customInput = document.getElementById('trigger-custom-name');
       triggerName = customInput ? customInput.value.trim() : '';
@@ -5805,6 +5914,13 @@ class EventTester {
         this._showError('Please enter a custom trigger name.');
         return;
       }
+    } else if (type === 'gift') {
+      if (!this._selectedGift || !this._selectedGift.id) {
+        this._showError('Please select a gift.');
+        return;
+      }
+      giftId = String(this._selectedGift.id);
+      triggerName = this._selectedGift.name || giftId;
     }
 
     const userInput = document.getElementById('trigger-user');
@@ -5839,9 +5955,9 @@ class EventTester {
           user, text, moderator, superfan, fanclub
         });
       } else {
-        result = await postJSON('/triggers/execute', {
-          trigger: triggerName, user
-        });
+        const payload = { trigger: triggerName, user };
+        if (giftId) payload.gift_id = giftId;
+        result = await postJSON('/triggers/execute', payload);
       }
 
       if (result.status === 'ok' || result.status === 'success') {
@@ -5888,9 +6004,11 @@ class EventTester {
       return;
     }
     this._historyEl.innerHTML = this._history.map(h => {
-      const kindClass = h.kind === 'comment' ? 'kind-comment' : 'kind-trigger';
+      const kindClass = h.kind === 'comment' ? 'kind-comment' : (h.kind === 'system' ? 'kind-system' : 'kind-trigger');
       const badgeClass = h.status === 'ok' || h.status === 'success' ? 'badge-success' : 'badge-error';
-      const label = h.kind === 'comment' ? 'COMMENT' : 'TRIGGER';
+      let label = 'TRIGGER';
+      if (h.kind === 'comment') label = 'COMMENT';
+      else if (h.kind === 'system') label = 'SYSTEM';
       const detail = h.kind === 'comment' ? `${h.trigger}` : `${h.trigger} → ${h.user}`;
       return `<div class="trigger-history-entry">
         <span class="trigger-history-time">${escapeHtml(h.time)}</span>

@@ -15,6 +15,7 @@ from core.api.models import (
     TriggerHistoryResponse,
     TriggerResponse,
     TriggerTypesResponse,
+    TiktokToggleResponse,
 )
 from core.api.services.trigger_service import get_trigger_service
 
@@ -45,6 +46,7 @@ async def execute_trigger(body: TriggerExecuteRequest):
         result = get_trigger_service().execute_trigger(
             trigger=body.trigger,
             user=body.user,
+            gift_id=body.gift_id,
         )
         return TriggerResponse(
             status=result.get("status", "error"),
@@ -56,6 +58,27 @@ async def execute_trigger(body: TriggerExecuteRequest):
         raise
     except Exception as exc:
         log.exception("Trigger execution failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/triggers/tiktok-connection", response_model=TiktokToggleResponse)
+async def toggle_tiktok_connection():
+    """Toggle the TikTok live-stream connection on/off.
+
+    This is a system control operation, not an event simulation.
+    It directly toggles the bridge's ``disable_tiktok_connect`` flag.
+    """
+    try:
+        result = get_trigger_service().toggle_tiktok_connection()
+        return TiktokToggleResponse(
+            status=result.get("status", "error"),
+            message=result.get("message", ""),
+            connected=result.get("connected", False),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("TikTok toggle failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
 

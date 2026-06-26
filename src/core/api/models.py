@@ -351,6 +351,8 @@ class TriggerTypesResponse(BaseModel):
 class TriggerExecuteRequest(BaseModel):
     trigger: str
     user: str = "System"
+    gift_id: str | None = None
+    gift_name: str | None = None
 
 
 class TriggerCommentRequest(BaseModel):
@@ -366,6 +368,12 @@ class TriggerResponse(BaseModel):
     message: str = ""
     trigger: str = ""
     user: str = ""
+
+
+class TiktokToggleResponse(BaseModel):
+    status: str
+    message: str = ""
+    connected: bool = False
 
 
 class TriggerHistoryEntry(BaseModel):

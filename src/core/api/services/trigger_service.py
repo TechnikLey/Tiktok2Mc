@@ -51,6 +51,8 @@ class TriggerService:
     DEBOUNCE_SECONDS = 1.5
 
     # Predefined trigger types known to be valid in most configs
+    # Note: "tiktok" is intentionally excluded — it is a system control,
+    # not an event category, and has its own dedicated API endpoint.
     DEFAULT_EVENT_TYPES = [
         "follow",
         "like",
@@ -58,7 +60,6 @@ class TriggerService:
         "share",
         "comment",
         "gift",
-        "tiktok",
     ]
 
     def __init__(self) -> None:
@@ -148,14 +149,23 @@ class TriggerService:
             return False, f"Please wait {remaining}s before triggering again."
         return True, ""
 
-    def execute_trigger(self, trigger: str, user: str = "System") -> dict[str, Any]:
-        """Send a trigger event."""
+    def execute_trigger(
+        self, trigger: str, user: str = "System", gift_id: str | None = None
+    ) -> dict[str, Any]:
+        """Send a trigger event.
+
+        When *gift_id* is provided the trigger value is set to the gift ID
+        so that the bridge can match it against ``ctx.valid_functions``.
+        """
         ok, msg = self.can_execute()
         if not ok:
             return {"status": "error", "message": msg}
 
         self._last_execution = time.time()
-        payload = {"trigger": trigger, "user": user}
+        # If a gift_id is given, use it as the trigger value so the bridge
+        # resolves it against valid_functions by ID (and falls back to name).
+        trigger_value = gift_id if gift_id is not None else trigger
+        payload = {"trigger": trigger_value, "user": user}
         record = TriggerRecord(
             timestamp=self._last_execution,
             kind="trigger",
@@ -168,6 +178,49 @@ class TriggerService:
         record.status = result.get("status", "error")
         record.message = result.get("message", "")
         return result
+
+    def toggle_tiktok_connection(self) -> dict[str, Any]:
+        """Toggle the TikTok live-stream connection on/off.
+
+        This is a system control operation, not an event simulation.
+        It calls the same bridge endpoint used by the external trigger tool
+        but is exposed as a dedicated API so the GUI can separate connection
+        state from event testing.
+        """
+        ok, msg = self.can_execute()
+        if not ok:
+            return {"status": "error", "message": msg}
+
+        self._last_execution = time.time()
+        payload = {"trigger": "tiktok", "user": "System"}
+        record = TriggerRecord(
+            timestamp=self._last_execution,
+            kind="system",
+            payload=payload,
+            status="running",
+        )
+        self._history.append(record)
+
+        result = self._dispatch(payload, mode="trigger")
+        record.status = result.get("status", "error")
+        record.message = result.get("message", "")
+
+        # The bridge returns a message like "TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT=True"
+        # Parse the boolean out so the GUI can show an ON/OFF state.
+        connected = True
+        message = result.get("message", "")
+        if "DISABLE_TIKTOK_CONNECT=True" in message:
+            connected = False
+        elif "DISABLE_TIKTOK_CONNECT=False" in message:
+            connected = True
+        elif "disabled" in message.lower() or "now true" in message.lower():
+            connected = False
+
+        return {
+            "status": result.get("status", "error"),
+            "message": message,
+            "connected": connected,
+        }
 
     def send_comment(
         self,
