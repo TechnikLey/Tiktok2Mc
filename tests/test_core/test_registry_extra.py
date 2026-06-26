@@ -18,6 +18,10 @@ class TestPluginRegistryBackup:
     def test_save_creates_backup(self, project_dir):
         from core.api.registry import PluginRegistry
 
+        # Pre-seed the registry file so that __init__ triggers a startup backup.
+        reg_file = project_dir / "api_plugin_registry.json"
+        reg_file.write_text("[]", encoding="utf-8")
+
         registry = PluginRegistry(project_dir)
         from core.api.models import PluginRegistration
 
@@ -76,6 +80,10 @@ class TestPluginRegistryBackupNumbering:
     def test_backup_numbers_increment(self, project_dir):
         from core.api.registry import PluginRegistry
         from core.api.models import PluginRegistration
+
+        # Pre-seed the registry file so that __init__ triggers a startup backup.
+        reg_file = project_dir / "api_plugin_registry.json"
+        reg_file.write_text("[]", encoding="utf-8")
 
         registry = PluginRegistry(project_dir)
         p = PluginRegistration(name="p", path="/p")
