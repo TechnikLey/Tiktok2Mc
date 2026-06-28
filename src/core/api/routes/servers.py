@@ -250,6 +250,7 @@ class InstanceInfo(BaseModel):
 class ServersListResponse(BaseModel):
     instances: list[InstanceInfo]
     installed: list[ServerVersionInfo]
+    safe_versions: list[str]
 
 
 class DownloadRequest(BaseModel):
@@ -332,6 +333,7 @@ async def list_servers():
     return ServersListResponse(
         instances=instances,
         installed=[ServerVersionInfo(**v) for v in installed],
+        safe_versions=list(sorted(SAFE_VERSIONS)),
     )
 
 

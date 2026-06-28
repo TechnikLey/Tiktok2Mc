@@ -98,7 +98,7 @@ def main():
             OUT_DIR / "core" / "static" / "css",
             OUT_DIR / "server" / "java",
             OUT_DIR / "server" / "default",
-            OUT_DIR / "version" / "1.21.11",
+            OUT_DIR / "versions" / "1.21.11",
             OUT_DIR / "config",
             OUT_DIR / "data",
             OUT_DIR / "test",
@@ -481,7 +481,7 @@ def main():
             ("tools/MinecraftServerAPI-1.21.x.jar", "server/default/plugins/MinecraftServerAPI-1.21.x.jar"),
             ("tools/DelayedTNT.jar",                "server/default/plugins/DelayedTNT.jar"),
             ("tools/server.jar",                    "server/default/server.jar"),
-            ("tools/server.jar",                    "version/1.21.11/server.jar"),
+            ("tools/server.jar",                    "versions/1.21.11/server.jar"),
             ("tools/mca.vsix",                      "core/assets/mca.vsix"),
             ("AIPrompt.md",                         "AIPrompt.md"),
         ]

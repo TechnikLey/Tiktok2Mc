@@ -44,6 +44,7 @@ let _tiktokStatusIntervalId = null;
 
 /* ─── Server Manager Placeholder Data ─── */
 let _serverManagerCache = null;
+let _serverActionInProgress = false;
 
 function _stopDashboardPolling() {
   if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
@@ -119,6 +120,12 @@ document.getElementById('server-download-version')?.addEventListener('change', (
   const btn = document.getElementById('server-download-confirm');
   const sel = document.getElementById('server-download-version');
   if (btn && sel) btn.disabled = !sel.value;
+});
+
+document.getElementById('server-switch-cancel')?.addEventListener('click', closeServerSwitchModal);
+document.getElementById('server-switch-download')?.addEventListener('click', () => {
+  closeServerSwitchModal();
+  openServerDownloadModal();
 });
 
 document.getElementById('server-custom-cancel')?.addEventListener('click', closeServerCustomModal);
@@ -715,7 +722,7 @@ function renderServerCard(inst) {
       </div>
     </div>
     <div class="server-card-footer">
-      <button class="btn btn--sm btn--secondary" onclick="openServerDownloadModal()">Switch Version</button>
+      <button class="btn btn--sm btn--secondary" onclick="openServerSwitchModal()">Switch Version</button>
       <button class="btn btn--sm btn--secondary" onclick="showToast('Folder: ' + '${escapeHtml(inst.path || '')}', 'info')">Open Folder</button>
     </div>
   </div>`;
@@ -737,9 +744,7 @@ function renderVersionLibrary(versionsList) {
     const badgeLabel = v.type.toUpperCase();
     const activeClass = v.active ? ' version-card--active' : '';
     const sizeStr = v.size ? ' (' + (v.size / 1024 / 1024).toFixed(1) + ' MB)' : '';
-    const switchBtn = v.active
-      ? '<span class="text-muted" style="font-size:var(--text-xs);font-weight:var(--weight-medium);">Currently active</span>'
-      : '<button class="btn btn--sm btn--primary" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">Use</button>';
+    const switchBtn = '';
     const removeBtn = v.active ? '' : '<button class="btn btn--sm btn--danger-ghost" onclick="serverManagerPromptRemove(\'' + escapeHtml(v.version) + '\')" title="Remove">Remove</button>';
 
     html += '<div class="version-card' + activeClass + '">' +
@@ -760,7 +765,10 @@ function renderVersionLibrary(versionsList) {
 function _versionBadgeClass(version) {
   if (!_serverManagerCache) return 'server-status-badge--unsafe';
   const found = (_serverManagerCache.installed || []).find(v => v.version === version);
-  if (!found) return 'server-status-badge--unsafe';
+  if (!found) {
+    if ((_serverManagerCache.safe_versions || []).includes(version)) return 'server-status-badge--safe';
+    return 'server-status-badge--unsafe';
+  }
   return found.type === 'safe' ? 'server-status-badge--safe'
        : found.type === 'custom' ? 'server-status-badge--custom'
        : 'server-status-badge--unsafe';
@@ -769,12 +777,17 @@ function _versionBadgeClass(version) {
 function _versionBadgeLabel(version) {
   if (!_serverManagerCache) return 'UNSAFE';
   const found = (_serverManagerCache.installed || []).find(v => v.version === version);
-  if (!found) return 'UNSAFE';
+  if (!found) {
+    if ((_serverManagerCache.safe_versions || []).includes(version)) return 'SAFE';
+    return 'UNSAFE';
+  }
   return found.type.toUpperCase();
 }
 
 async function serverManagerPromptSwitch(version) {
-  const isSafe = (_serverManagerCache?.installed || []).find(v => v.version === version)?.type === 'safe';
+  const installed = _serverManagerCache?.installed || [];
+  const found = installed.find(v => v.version === version);
+  const isSafe = found ? found.type === 'safe' : (_serverManagerCache?.safe_versions || []).includes(version);
   if (!isSafe) {
     const confirmed = await showConfirmDialog(
       'Switch to Untested Version?',
@@ -789,6 +802,7 @@ async function serverManagerPromptSwitch(version) {
     if (!confirmed) return;
   }
   try {
+    closeServerSwitchModal();
     const res = await postJSON('/servers/switch', { version });
     showToast(res.message || 'Switched to ' + version, 'success');
     await loadServerManager();
@@ -850,17 +864,21 @@ async function updateServerLifecycleUI() {
 }
 
 async function serverCardAction(instanceId, action) {
-  if (action === 'restart') {
-    const confirmed = await showConfirmDialog('Restart ' + instanceId + '?', 'This will kick all players on this server. Are you sure?', 'Restart', 'btn-danger', 'text-danger');
-    if (!confirmed) return;
-  }
-  const endpoint = '/server/' + instanceId + '/' + action;
+  if (_serverActionInProgress) return;
+  _serverActionInProgress = true;
   try {
+    if (action === 'restart') {
+      const confirmed = await showConfirmDialog('Restart ' + instanceId + '?', 'This will kick all players on this server. Are you sure?', 'Restart', 'btn-danger', 'text-danger');
+      if (!confirmed) return;
+    }
+    const endpoint = '/server/' + instanceId + '/' + action;
     const res = await postJSON(endpoint);
     showToast(res.message || 'Server ' + action + 'ing', 'info');
     loadServerManager();
   } catch (e) {
     showToast('Failed to ' + action + ' server: ' + e.message, 'error');
+  } finally {
+    _serverActionInProgress = false;
   }
 }
 
@@ -897,6 +915,47 @@ async function openServerDownloadModal() {
 
 function closeServerDownloadModal() {
   document.getElementById('server-download-modal')?.classList.add('hidden');
+}
+
+/* ─── Server Manager: Switch Version Modal ─── */
+
+function openServerSwitchModal() {
+  const modal = document.getElementById('server-switch-modal');
+  const list = document.getElementById('server-switch-list');
+  if (!modal || !list) return;
+
+  const installed = _serverManagerCache?.installed || [];
+  const safeVersions = _serverManagerCache?.safe_versions || [];
+
+  if (!installed.length) {
+    list.innerHTML = '<p class="text-muted">No versions installed. <a href="#" onclick="closeServerSwitchModal();openServerDownloadModal();return false;">Download one first</a>.</p>';
+  } else {
+    let html = '';
+    for (const v of installed) {
+      const badgeClass = 'server-status-badge--' + (v.type === 'safe' ? 'safe' : v.type === 'custom' ? 'custom' : 'unsafe');
+      const badgeLabel = v.type.toUpperCase();
+      const activeClass = v.active ? ' version-card--active' : '';
+      html += '<div class="version-card' + activeClass + '" style="cursor:pointer;" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">' +
+        '<div class="version-card-info">' +
+          '<div class="version-card-version">' +
+            '<strong>' + escapeHtml(v.version) + '</strong>' +
+            '<span class="server-status-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+          '</div>' +
+          '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code></div>' +
+        '</div>' +
+        '<div class="version-card-actions">' +
+          (v.active ? '<span class="text-muted" style="font-size:var(--text-xs);font-weight:var(--weight-medium);">Currently active</span>' : '<span class="text-muted" style="font-size:var(--text-xs);">Click to switch</span>') +
+        '</div>' +
+      '</div>';
+    }
+    list.innerHTML = html;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeServerSwitchModal() {
+  document.getElementById('server-switch-modal')?.classList.add('hidden');
 }
 
 async function confirmServerDownload() {
