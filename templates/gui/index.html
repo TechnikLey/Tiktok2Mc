@@ -258,6 +258,9 @@
                     <h2>Minecraft Console</h2>
                     <div class="console-toolbar">
                         <span id="console-status" class="console-status offline">Disconnected</span>
+                        <select id="console-instance-selector" class="form-select" style="width:auto;min-width:140px;font-size:var(--text-sm);padding:0.25rem 0.5rem;" onchange="consoleTerminal.switchInstance(this.value)">
+                          <option value="">Select server...</option>
+                        </select>
                         <button class="btn btn--sm btn--secondary" id="btn-console-connect" onclick="consoleTerminal.toggleConnection()">Connect</button>
                         <button class="btn btn--sm btn--secondary" id="btn-console-clear" onclick="consoleTerminal.clear()">Clear</button>
                     </div>
@@ -301,9 +304,10 @@
                 <div class="view-header">
                     <h2>Server Manager</h2>
                     <div class="header-actions">
+                        <button class="btn btn--primary btn--sm" onclick="openServerCreateModal()" title="Create a new server instance">+ Create Server</button>
                         <button class="btn btn--secondary btn--sm" onclick="openServerDownloadModal()" title="Download PaperMC version">Download Version</button>
                         <button class="btn btn--secondary btn--sm" onclick="openServerCustomModal()" title="Import custom server.jar">Add Custom Version</button>
-                        <button class="btn btn--primary btn--sm" onclick="loadServerManager()" title="Refresh">Refresh</button>
+                        <button class="btn btn--secondary btn--sm" onclick="loadServerManager()" title="Refresh">Refresh</button>
                     </div>
                 </div>
 
@@ -712,6 +716,36 @@
         <div class="modal-actions">
           <button class="btn btn--secondary" id="advanced-confirm-cancel">Cancel</button>
           <button class="btn btn--danger" id="advanced-confirm-ok" disabled>Unlock Advanced</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Create Server Modal -->
+    <div id="server-create-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;">Create New Server</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;">Create a new Minecraft server instance with a separate directory and port.</p>
+        <div class="form-group">
+          <label>Server Name</label>
+          <input type="text" id="server-create-name" class="form-input" placeholder="e.g. Survival World" autocomplete="off">
+          <p class="field-desc">A friendly name for this server instance.</p>
+        </div>
+        <div class="form-group">
+          <label>Version</label>
+          <select id="server-create-version" class="form-select" style="width:100%;">
+            <option value="">Loading installed versions...</option>
+          </select>
+          <p class="field-desc">Select an installed Minecraft version.</p>
+        </div>
+        <div class="form-group">
+          <label>Port</label>
+          <input type="number" id="server-create-port" class="form-input" value="25565" min="1024" max="65535">
+          <p class="field-desc">The port players connect to (1024-65535).</p>
+        </div>
+        <div id="server-create-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="server-create-cancel">Cancel</button>
+          <button class="btn btn--primary" id="server-create-confirm" disabled>Create Server</button>
         </div>
       </div>
     </div>

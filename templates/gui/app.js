@@ -114,6 +114,11 @@ document.getElementById('btn-shutdown-cancel').addEventListener('click', () => {
 /* ─── Server Manager — lifecycle polling is started/stopped in view switch code ─── */
 
 /* ─── Server Manager Modal Wiring ─── */
+document.getElementById('server-create-cancel')?.addEventListener('click', closeServerCreateModal);
+document.getElementById('server-create-confirm')?.addEventListener('click', confirmServerCreate);
+document.getElementById('server-create-name')?.addEventListener('input', validateServerCreateForm);
+document.getElementById('server-create-version')?.addEventListener('change', validateServerCreateForm);
+
 document.getElementById('server-download-cancel')?.addEventListener('click', closeServerDownloadModal);
 document.getElementById('server-download-confirm')?.addEventListener('click', confirmServerDownload);
 document.getElementById('server-download-version')?.addEventListener('change', () => {
@@ -644,6 +649,7 @@ async function loadServerManager() {
     const data = await fetchJSON('/servers');
     _serverManagerCache = data;
     renderServerManager();
+    refreshConsoleInstanceSelector();
   } catch (e) {
     log('Server Manager load failed: ' + e.message, 'err');
     ['server-instances', 'server-versions-list'].forEach(id => {
@@ -858,6 +864,7 @@ async function updateServerLifecycleUI() {
       if (startBtn) startBtn.disabled = state === 'running';
       if (stopBtn) stopBtn.disabled = state !== 'running';
     }
+    refreshConsoleInstanceSelector();
   } catch (e) {
     log('Server status poll failed: ' + e.message, 'err');
   }
@@ -880,6 +887,60 @@ async function serverCardAction(instanceId, action) {
   } finally {
     _serverActionInProgress = false;
   }
+}
+
+/* ─── Server Manager: Create Server Modal ─── */
+
+async function openServerCreateModal() {
+  const modal = document.getElementById('server-create-modal');
+  const nameInput = document.getElementById('server-create-name');
+  const versionSelect = document.getElementById('server-create-version');
+  const portInput = document.getElementById('server-create-port');
+  const confirmBtn = document.getElementById('server-create-confirm');
+  const errorEl = document.getElementById('server-create-error');
+  if (!modal) return;
+
+  nameInput.value = '';
+  portInput.value = '25565';
+  errorEl.classList.add('hidden');
+  confirmBtn.disabled = true;
+
+  const installed = _serverManagerCache?.installed || [];
+  if (!installed.length) {
+    versionSelect.innerHTML = '<option value="">No installed versions — download one first</option>';
+  } else {
+    versionSelect.innerHTML = installed.map(v =>
+      `<option value="${escapeHtml(v.version)}">${escapeHtml(v.version)} (${v.type.toUpperCase()})</option>`
+    ).join('');
+  }
+  confirmBtn.disabled = !nameInput.value.trim() || !versionSelect.value;
+  modal.classList.remove('hidden');
+}
+
+function closeServerCreateModal() {
+  document.getElementById('server-create-modal')?.classList.add('hidden');
+}
+
+async function confirmServerCreate() {
+  const name = document.getElementById('server-create-name')?.value.trim();
+  const version = document.getElementById('server-create-version')?.value;
+  const port = parseInt(document.getElementById('server-create-port')?.value, 10);
+  if (!name || !version || isNaN(port)) return;
+  closeServerCreateModal();
+  try {
+    const res = await postJSON('/servers/instances', { name, version, port });
+    showToast(res.message || 'Server created', 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Failed to create server: ' + e.message, 'error');
+  }
+}
+
+function validateServerCreateForm() {
+  const name = document.getElementById('server-create-name')?.value.trim();
+  const version = document.getElementById('server-create-version')?.value;
+  const confirmBtn = document.getElementById('server-create-confirm');
+  if (confirmBtn) confirmBtn.disabled = !name || !version;
 }
 
 /* ─── Server Manager: Download Modal ─── */
@@ -5384,7 +5445,7 @@ function connectLogStream() {
       if (type === 'log') {
         liveLog.add(payload.msg || payload.message || '', payload.level || 'info', payload.source || '');
       } else if (type === 'server.console') {
-        if (payload.line) {
+        if (payload.line && (!_consoleInstanceId || payload.instance_id === _consoleInstanceId)) {
           consoleTerminal._print(payload.line, 'server');
         }
       } else if (type === 'server.restarting') {
@@ -5545,10 +5606,41 @@ function parseMinecraftColors(text) {
   return html;
 }
 
+let _consoleInstanceId = '';
+let _consoleLastRefresh = 0;
+
+function refreshConsoleInstanceSelector() {
+  const sel = document.getElementById('console-instance-selector');
+  if (!sel) return;
+  const now = Date.now();
+  if (now - _consoleLastRefresh < 2000) return;
+  _consoleLastRefresh = now;
+  const instances = _serverManagerCache?.instances || [];
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select server...</option>' +
+    instances.map(inst =>
+      `<option value="${escapeHtml(inst.id)}" ${inst.id === current ? 'selected' : ''}>${escapeHtml(inst.name)} (${escapeHtml(inst.version)})</option>`
+    ).join('');
+  if (!current && instances.length === 1) {
+    sel.value = instances[0].id;
+    _consoleInstanceId = instances[0].id;
+  }
+}
+
 const consoleTerminal = {
   _history: [],
   _historyIdx: -1,
   _connected: false,
+
+  switchInstance(instanceId) {
+    _consoleInstanceId = instanceId || '';
+    if (this._connected) {
+      this.disconnect();
+    }
+    const output = document.getElementById('console-output');
+    output.innerHTML = '';
+    this._print('Switched to ' + (instanceId ? 'server: ' + instanceId : 'all servers') + '. Click Connect for RCON.', 'system');
+  },
 
   async toggleConnection() {
     if (this._connected) {
