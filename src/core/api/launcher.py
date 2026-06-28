@@ -33,8 +33,12 @@ from core.models import AppConfig
 
 log = logging.getLogger(__name__)
 
-_API_BASE = os.environ.get("API_BASE_URL", "http://127.0.0.1:29185/api/v1")
 _TIMEOUT = 5
+
+
+def _get_api_base() -> str:
+    """Return the API base URL, checking the environment on every call."""
+    return os.environ.get("API_BASE_URL", "http://127.0.0.1:29185/api/v1")
 _PLUGINS_DIR_NAME = "plugins"
 
 
@@ -76,7 +80,7 @@ class PluginLauncher:
         api_base_url: str | None = None,
         plugins_dir: Path | None = None,
     ) -> None:
-        self._api_base = (api_base_url or _API_BASE).rstrip("/")
+        self._api_base = (api_base_url or _get_api_base()).rstrip("/")
         self._plugins_dir: Path | None = plugins_dir
         self.source: str = "empty"
         self.plugin_count: int = 0

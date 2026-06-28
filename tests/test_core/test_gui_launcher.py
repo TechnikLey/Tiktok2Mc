@@ -16,8 +16,13 @@ _src = Path(__file__).resolve().parent.parent.parent / "src"
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-# Mock webview before importing gui.py
+# Mock webview and logging before importing gui.py to prevent file I/O
 sys.modules["webview"] = MagicMock()
+sys.modules["core.logger"] = MagicMock()
+sys.modules["core.logger"].initialize_logging = MagicMock(return_value=MagicMock())
+sys.modules["core.logger"].install_global_exception_hook = MagicMock()
+sys.modules["core.logger"].start_heartbeat = MagicMock(return_value=MagicMock())
+sys.modules["core.logger"].handle_unhandled_exception = MagicMock()
 
 from python.gui import (
     LauncherAPI,

@@ -109,6 +109,9 @@ class TestPluginLauncher:
     def test_env_var_overrides_base_url(self, monkeypatch, empty_plugins_dir):
         import os
         monkeypatch.setitem(os.environ, "API_BASE_URL", "http://127.0.0.1:1/api/v1")
+        import importlib
+        import core.api.launcher as launcher_mod
+        importlib.reload(launcher_mod)
         from core.api.launcher import PluginLauncher
 
         launcher = PluginLauncher(plugins_dir=empty_plugins_dir)
