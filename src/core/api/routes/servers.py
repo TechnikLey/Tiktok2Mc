@@ -312,7 +312,7 @@ async def list_servers():
     raw_instances = _load_instances()
     instances: list[InstanceInfo] = []
     for inst_id, inst_data in raw_instances.items():
-        version = inst_data.get("version", active_version)
+        version = inst_data.get("version", "1.21.11")
         instances.append(InstanceInfo(
             id=inst_id,
             name=inst_data.get("name", inst_id),
