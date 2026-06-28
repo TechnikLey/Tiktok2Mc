@@ -358,7 +358,10 @@ describe('togglePluginNav / populatePluginSubnav', () => {
       { name: 'spotify', display_name: 'Spotify' },
       { name: 'timer', display_name: 'Timer' },
     ];
-    document.body.innerHTML += '<div id="plugin-subnav"></div>';
+    // Ensure plugin-subnav exists (already in HTML) without recreating entire body DOM
+    if (!document.getElementById('plugin-subnav')) {
+      document.body.insertAdjacentHTML('beforeend', '<div id="plugin-subnav"></div>');
+    }
     document.querySelector('.nav-item[data-view="plugins"]')?.classList.remove('expanded');
   });
 
@@ -425,8 +428,8 @@ describe('wizard rendering', () => {
     expect(content.innerHTML).toContain('RCON Password');
   });
 
-  it('renders step 2 (review)', () => {
-    wizardStep = 2;
+  it('renders step 3 (review)', () => {
+    wizardStep = 3;
     wizardData.tiktok_user = 'testuser';
     wizardData.rcon_password = 'secret123';
     renderWizardStep();
@@ -548,6 +551,7 @@ describe('connectLogStream', () => {
     view.innerHTML = '';
     const msgEvent = { data: JSON.stringify({ type: 'log', data: { msg: 'hello', level: 'info' } }) };
     _sseSource.onmessage(msgEvent);
+    expect(view.lastChild).toBeTruthy();
     expect(view.lastChild.textContent).toContain('hello');
   });
 });

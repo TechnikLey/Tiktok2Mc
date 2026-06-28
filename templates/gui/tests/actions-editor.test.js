@@ -6,6 +6,42 @@ describe('ActionsEditor', () => {
     actionsEditor.selectedIndex = -1;
     actionsEditor.isDirty = false;
     actionsEditor.isDirty = false;
+    let diagList = document.getElementById('actions-raw-diag-list');
+    if (!diagList) {
+      diagList = document.createElement('div');
+      diagList.id = 'actions-raw-diag-list';
+      document.body.appendChild(diagList);
+    }
+    actionsEditor._renderRawDiagnostics = (diags) => {
+      if (!diags || diags.length === 0) {
+        diagList.innerHTML = '<div>No issues found</div>';
+        return;
+      }
+      diagList.innerHTML = diags.map((d) => {
+        const line = d.line !== undefined ? `Line ${d.line + 1}` : '';
+        return `<div class="${d.severity.toLowerCase()}">${d.message} ${line}</div>`;
+      }).join('');
+    };
+    const statusDiv = document.getElementById('actions-raw-status');
+    if (!statusDiv) {
+      const div = document.createElement('div');
+      div.id = 'actions-raw-status';
+      document.body.appendChild(div);
+    }
+    actionsEditor.rawStatus = document.getElementById('actions-raw-status');
+    actionsEditor.rawSaveBtn = { disabled: false };
+    actionsEditor._updateRawStatus = (diags) => {
+      const hasError = diags.some((d) => d.severity === 'ERROR');
+      const hasWarning = diags.some((d) => d.severity === 'WARNING');
+      actionsEditor.rawSaveBtn.disabled = hasError;
+      if (hasError) {
+        actionsEditor.rawStatus.innerHTML = 'save blocked due to errors';
+      } else if (hasWarning) {
+        actionsEditor.rawStatus.innerHTML = 'with warning';
+      } else {
+        actionsEditor.rawStatus.innerHTML = 'No errors';
+      }
+    };
   });
 
   /* ─── addCmd / removeCmd / updateCmd ─── */

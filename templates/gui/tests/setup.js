@@ -62,16 +62,20 @@ function toGlobalScope(code) {
         depth -= (line.match(/}/g) || []).length;
         continue;
       }
-      // async function name(...)  ->  window.name = async function name(...)
+      // async function name(...)  ->  keep as-is for hoisting, + window.name = name
       if (/^async\s+function\s+(\w+)/.test(line)) {
-        result.push(line.replace(/^(async\s+function\s+)(\w+)/, 'window.$2 = $1$2'));
+        result.push(line);
+        const m = line.match(/^async\s+function\s+(\w+)/);
+        result.push(`window.${m[1]} = ${m[1]};`);
         depth += (line.match(/{/g) || []).length;
         depth -= (line.match(/}/g) || []).length;
         continue;
       }
-      // function name(...)  ->  window.name = function name(...)
+      // function name(...)  ->  keep as-is for hoisting, + window.name = name
       if (/^function\s+(\w+)/.test(line)) {
-        result.push(line.replace(/^function\s+(\w+)/, 'window.$1 = function $1'));
+        result.push(line);
+        const m = line.match(/^function\s+(\w+)/);
+        result.push(`window.${m[1]} = ${m[1]};`);
         depth += (line.match(/{/g) || []).length;
         depth -= (line.match(/}/g) || []).length;
         continue;

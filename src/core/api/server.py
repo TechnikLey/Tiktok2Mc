@@ -17,7 +17,6 @@ from .plugin_watcher import get_plugin_watcher
 from .plugin_overlay import command_queue
 from .dashboard_publisher import get_dashboard_publisher
 from .services.rcon import get_rcon_service
-from .services.console_capture import init_console_capture, get_console_capture
 from .services import ApiService
 from core.paths import get_root_dir
 from core.overlay import set_event_loop
@@ -56,11 +55,6 @@ async def lifespan(app: FastAPI):
     except Exception:
         log.warning("Could not read RCON config — console will auto-configure on first request")
 
-    # Start console log capture for the default instance
-    server_dir = get_root_dir() / "server" / "default"
-    cap = init_console_capture(server_dir)
-    await cap.start()
-
     await event_bus.publish("server.started", {"version": API_VERSION})
     try:
         yield
@@ -68,7 +62,6 @@ async def lifespan(app: FastAPI):
         # Expected when the supervisor cancels the API server task during shutdown.
         pass
     finally:
-        await cap.stop()
         await get_rcon_service().disconnect()
         await get_dashboard_publisher().stop()
         await get_event_command_mapper().stop()

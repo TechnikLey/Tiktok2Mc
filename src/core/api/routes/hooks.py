@@ -21,35 +21,53 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["Hooks"])
 
 
-# ── Helpers ───────────────────────────────────────────────────────────
+# ── Hook cache ────────────────────────────────────────────────────────
+# Avoid redundant filesystem scans on every hook listing.
+
+_hook_cache: dict[str, tuple[Path, "HookManifest"]] | None = None
 
 
-def _find_hook_dir(hook_name: str) -> Path | None:
-    """Find a hook's directory by scanning all hook sources."""
+def _build_hook_cache() -> dict[str, tuple[Path, "HookManifest"]]:
+    """Scan all hook directories once and return {name: (path, manifest)}."""
+    cache: dict[str, tuple[Path, "HookManifest"]] = {}
     for parent_dir in discover_hooks_dirs():
         for child in sorted(parent_dir.iterdir()):
             if not child.is_dir():
                 continue
             manifest = load_hook_manifest(child)
-            if manifest and manifest.name == hook_name:
-                return child
-    return None
+            if manifest and manifest.name:
+                cache[manifest.name] = (child, manifest)
+    return cache
+
+
+def _invalidate_hook_cache() -> None:
+    global _hook_cache
+    _hook_cache = None
+
+
+def _get_hook_cache() -> dict[str, tuple[Path, "HookManifest"]]:
+    global _hook_cache
+    if _hook_cache is None:
+        _hook_cache = _build_hook_cache()
+    return _hook_cache
+
+
+def _find_hook_dir(hook_name: str) -> Path | None:
+    entry = _get_hook_cache().get(hook_name)
+    return entry[0] if entry else None
 
 
 def _serialize_hook(reg: HookRegistration) -> dict:
     """Convert a HookRegistration to a JSON-safe dict."""
     d = reg.to_dict()
-    # Add extra info from disk
-    hook_dir = _find_hook_dir(reg.name)
-    if hook_dir:
+    entry = _get_hook_cache().get(reg.name)
+    if entry:
+        hook_dir, manifest = entry
         d["path"] = str(hook_dir)
-        manifest = load_hook_manifest(hook_dir)
-        if manifest:
+        if manifest.config_schema:
             d["config_schema"] = manifest.config_schema
-    # If registry has an error but disk loaded fine, clear it
-    if d.get("error") and hook_dir:
-        manifest = load_hook_manifest(hook_dir)
-        if manifest:
+        # If registry has an error but disk loaded fine, clear it
+        if d.get("error"):
             d["error"] = ""
     return d
 
@@ -100,6 +118,7 @@ async def discover_hooks():
     active_names = {info["name"] for info in discovered}
     cleaned = registry.clean_stale(active_names)
 
+    _invalidate_hook_cache()
     hooks = [_serialize_hook(h) for h in registry.list()]
     return {
         "total": len(hooks),
@@ -136,6 +155,7 @@ async def enable_hook(name: str):
     if hook.enabled:
         return {"status": "already_enabled", "name": name}
     registry.set_enabled(name, True)
+    _invalidate_hook_cache()
     return {"status": "enabled", "name": name}
 
 
@@ -149,6 +169,7 @@ async def disable_hook(name: str):
     if not hook.enabled:
         return {"status": "already_disabled", "name": name}
     registry.set_enabled(name, False)
+    _invalidate_hook_cache()
     return {"status": "disabled", "name": name}
 
 

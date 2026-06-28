@@ -195,13 +195,15 @@ async def server_instance_restart(instance_id: str):
     if proc is None:
         raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' is not registered")
 
-    try:
-        await supervisor.stop(pname)
-        await supervisor.start(pname)
-        return {"status": "restarted", "message": f"Server '{instance_id}' restarted"}
-    except Exception as e:
-        log.exception("Failed to restart server '%s'", instance_id)
-        raise HTTPException(status_code=500, detail=f"Failed to restart: {e}")
+    async def _bg_restart():
+        try:
+            await supervisor.stop(pname)
+            await supervisor.start(pname)
+        except Exception:
+            log.exception("Background restart failed for '%s'", instance_id)
+
+    asyncio.create_task(_bg_restart())
+    return {"status": "restart_requested", "message": f"Server '{instance_id}' restart initiated"}
 
 
 # ── Legacy default-server endpoints (backward compat) ──────────────

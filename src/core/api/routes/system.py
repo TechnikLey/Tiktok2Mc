@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 
 from fastapi import APIRouter, HTTPException
 
@@ -40,14 +41,17 @@ async def restart_system():
 @router.post("/shutdown/now")
 async def shutdown_now():
     """Trigger immediate shutdown of the entire application."""
-    import sys
-    import threading
+    log.info("Shutdown requested via API – shutting down supervisor then exiting")
 
-    log.info("Shutdown requested via API – calling sys.exit")
+    async def _delayed_exit():
+        await asyncio.sleep(0.3)
+        try:
+            supervisor = get_supervisor()
+            await supervisor.shutdown()
+        except Exception:
+            log.exception("Supervisor shutdown failed, exiting directly")
+        finally:
+            os._exit(0)
 
-    def _exit():
-        sys.exit(0)
-
-    # Give the HTTP response a moment to leave the wire, then exit.
-    threading.Timer(0.3, _exit).start()
+    asyncio.create_task(_delayed_exit())
     return {"status": "shutdown_requested"}
