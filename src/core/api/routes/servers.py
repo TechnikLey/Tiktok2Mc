@@ -232,7 +232,6 @@ class ServerVersionInfo(BaseModel):
     type: str  # safe | unsafe | custom
     hasJar: bool
     size: int | None = None
-    active: bool = False
 
 
 class InstanceInfo(BaseModel):
@@ -309,10 +308,6 @@ class UpdateInstanceRequest(BaseModel):
 @router.get("/servers", response_model=ServersListResponse)
 async def list_servers():
     installed = _list_installed_versions()
-    active_version = _get_active_version() or "1.21.11"
-
-    for v in installed:
-        v["active"] = v["version"] == active_version
 
     raw_instances = _load_instances()
     instances: list[InstanceInfo] = []

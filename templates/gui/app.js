@@ -729,7 +729,8 @@ function renderServerCard(inst) {
     </div>
     <div class="server-card-footer">
       <button class="btn btn--sm btn--secondary" onclick="openServerSwitchModal()">Switch Version</button>
-      <button class="btn btn--sm btn--secondary" onclick="showToast('Folder: ' + '${escapeHtml(inst.path || '')}', 'info')">Open Folder</button>
+      <button class="btn btn--sm btn--secondary" onclick="openServerFolder('${instId}')">Open Folder</button>
+      ${instId !== 'default' ? '<button class="btn btn--sm btn--danger-ghost" onclick="deleteServerInstance(\'' + instId + '\')" title="Delete server">Delete</button>' : ''}
     </div>
   </div>`;
 }
@@ -748,12 +749,8 @@ function renderVersionLibrary(versionsList) {
   for (const v of versions) {
     const badgeClass = 'server-status-badge--' + (v.type === 'safe' ? 'safe' : v.type === 'custom' ? 'custom' : 'unsafe');
     const badgeLabel = v.type.toUpperCase();
-    const activeClass = v.active ? ' version-card--active' : '';
     const sizeStr = v.size ? ' (' + (v.size / 1024 / 1024).toFixed(1) + ' MB)' : '';
-    const switchBtn = '';
-    const removeBtn = v.active ? '' : '<button class="btn btn--sm btn--danger-ghost" onclick="serverManagerPromptRemove(\'' + escapeHtml(v.version) + '\')" title="Remove">Remove</button>';
-
-    html += '<div class="version-card' + activeClass + '">' +
+    html += '<div class="version-card">' +
       '<div class="version-card-info">' +
         '<div class="version-card-version">' +
           '<strong>' + escapeHtml(v.version) + '</strong>' +
@@ -761,7 +758,9 @@ function renderVersionLibrary(versionsList) {
         '</div>' +
         '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code> ' + sizeStr + '</div>' +
       '</div>' +
-      '<div class="version-card-actions">' + switchBtn + removeBtn + '</div>' +
+      '<div class="version-card-actions">' +
+        '<button class="btn btn--sm btn--danger-ghost" onclick="serverManagerPromptRemove(\'' + escapeHtml(v.version) + '\')" title="Remove version">Remove</button>' +
+      '</div>' +
     '</div>';
   }
   html += '</div>';
@@ -889,6 +888,37 @@ async function serverCardAction(instanceId, action) {
   }
 }
 
+/* ─── Server Manager: Instance Actions ─── */
+
+async function openServerFolder(instanceId) {
+  try {
+    const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to open folder');
+    if (!data.opened) showToast('Folder path: ' + data.path, 'info');
+  } catch (e) {
+    showToast('Open folder failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteServerInstance(instanceId) {
+  const inst = (_serverManagerCache?.instances || []).find(i => i.id === instanceId);
+  const name = inst ? inst.name : instanceId;
+  const confirmed = await showConfirmDialog('Delete Server?', 'Delete server "' + name + '" and all its files? This cannot be undone.', 'Delete', 'btn-danger', 'text-danger');
+  if (!confirmed) return;
+  try {
+    const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId), { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.detail || 'Failed to delete');
+    }
+    showToast('Server "' + name + '" deleted', 'success');
+    await loadServerManager();
+  } catch (e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
 /* ─── Server Manager: Create Server Modal ─── */
 
 async function openServerCreateModal() {
@@ -995,8 +1025,7 @@ function openServerSwitchModal() {
     for (const v of installed) {
       const badgeClass = 'server-status-badge--' + (v.type === 'safe' ? 'safe' : v.type === 'custom' ? 'custom' : 'unsafe');
       const badgeLabel = v.type.toUpperCase();
-      const activeClass = v.active ? ' version-card--active' : '';
-      html += '<div class="version-card' + activeClass + '" style="cursor:pointer;" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">' +
+      html += '<div class="version-card" style="cursor:pointer;" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">' +
         '<div class="version-card-info">' +
           '<div class="version-card-version">' +
             '<strong>' + escapeHtml(v.version) + '</strong>' +
@@ -1005,7 +1034,7 @@ function openServerSwitchModal() {
           '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code></div>' +
         '</div>' +
         '<div class="version-card-actions">' +
-          (v.active ? '<span class="text-muted" style="font-size:var(--text-xs);font-weight:var(--weight-medium);">Currently active</span>' : '<span class="text-muted" style="font-size:var(--text-xs);">Click to switch</span>') +
+          '<span class="text-muted" style="font-size:var(--text-xs);">Click to switch</span>' +
         '</div>' +
       '</div>';
     }
