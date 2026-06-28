@@ -622,7 +622,6 @@ async function loadPlugins() {
     currentPlugins = data.plugins || [];
     renderPluginManager();
     renderOverlayUrls();
-    populatePluginSubnav();
   } catch (e) {
     log('Plugins load failed: ' + e.message, 'err');
   }
@@ -1188,42 +1187,12 @@ function renderPluginManager() {
   tableDiv.innerHTML = html;
 }
 
-/* ─── Plugin View & Sub-nav ─── */
-let _pluginNavExpanded = false;
-
-function togglePluginNav() {
-  // Plugin sub-nav only works in full sidebar mode
-  if (_sidebarMode === 1) {
-    switchView('plugins');
-    return;
-  }
-  _pluginNavExpanded = !_pluginNavExpanded;
-  document.querySelector('.nav-item[data-view="plugins"]').classList.toggle('expanded', _pluginNavExpanded);
-  document.getElementById('plugin-subnav').classList.toggle('expanded', _pluginNavExpanded);
-  switchView('plugins');
-}
-
-function populatePluginSubnav() {
-  const container = document.getElementById('plugin-subnav');
-  if (!container) return;
-  container.innerHTML = currentPlugins.map(p =>
-    `<div class="nav-subitem" data-plugin="${p.name}" onclick="openInlinePluginConfig('${p.name}', '${escapeHtml(p.display_name || p.name)}')">${escapeHtml(p.display_name || p.name)}</div>`
-  ).join('');
-}
+/* ─── Plugin View ─── */
 
 function openInlinePluginConfig(pluginName, displayName) {
-  // Close any other editors first
   _hideAllEditors();
-  // Deactivate other nav items
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
-  // Update sub-nav active state
-  document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
-  const sub = document.querySelector(`.nav-subitem[data-plugin="${pluginName}"]`);
-  if (sub) sub.classList.add('active');
-  // Expand plugin nav
-  if (!_pluginNavExpanded) togglePluginNav();
-  // Open config inline
   pluginEditor.openInline(pluginName, displayName);
 }
 
@@ -1323,7 +1292,6 @@ async function loadHooks() {
     const data = await fetchJSON('/hooks');
     currentHooks = data.hooks || [];
     renderHookManager();
-    populateHookSubnav();
   } catch (e) {
     log('Hooks load failed: ' + e.message, 'err');
   }
@@ -1404,35 +1372,10 @@ async function promptDisableHook(name, displayName) {
 
 /* ─── Hook Nav ─── */
 
-let _hookNavExpanded = false;
-
-function toggleHookNav() {
-  if (_sidebarMode === 1) {
-    switchView('hooks');
-    return;
-  }
-  _hookNavExpanded = !_hookNavExpanded;
-  document.querySelector('.nav-item[data-view="hooks"]').classList.toggle('expanded', _hookNavExpanded);
-  document.getElementById('hook-subnav').classList.toggle('expanded', _hookNavExpanded);
-  switchView('hooks');
-}
-
-function populateHookSubnav() {
-  const container = document.getElementById('hook-subnav');
-  if (!container) return;
-  container.innerHTML = currentHooks.map(h =>
-    `<div class="nav-subitem" data-hook="${h.name}" onclick="openInlineHookConfig('${h.name}', '${escapeHtml(h.display_name || h.name)}')">${escapeHtml(h.display_name || h.name)}</div>`
-  ).join('');
-}
-
 function openInlineHookConfig(hookName, displayName) {
   _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.querySelector('.nav-item[data-view="hooks"]')?.classList.add('active');
-  document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
-  const sub = document.querySelector(`.nav-subitem[data-hook="${hookName}"]`);
-  if (sub) sub.classList.add('active');
-  if (!_hookNavExpanded) toggleHookNav();
   hookEditor.openInline(hookName, displayName);
 }
 
@@ -1560,7 +1503,6 @@ class HookConfigEditor {
     document.getElementById('hooks-config-section').classList.add('hidden');
     document.getElementById('hook-list-section').classList.remove('hidden');
     document.getElementById('hook-review-modal').classList.add('hidden');
-    document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
     document.querySelector('.nav-item[data-view="hooks"]')?.classList.add('active');
   }
 
@@ -3874,9 +3816,6 @@ class PluginConfigEditor {
     document.getElementById('plugins-config-section').classList.add('hidden');
     document.getElementById('plugin-list-section').classList.remove('hidden');
     document.getElementById('plugin-review-modal').classList.add('hidden');
-    // Deactivate sub-nav items
-    document.querySelectorAll('.nav-subitem').forEach(el => el.classList.remove('active'));
-    // Reactivate the plugins nav item
     document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
   }
 
@@ -5861,7 +5800,6 @@ function switchView(viewId) {
     document.getElementById('plugin-list-section')?.classList.remove('hidden');
     pluginEditor._detachInputListeners();
     document.getElementById('plugin-review-modal')?.classList.add('hidden');
-    document.querySelectorAll('.nav-subitem[data-plugin]').forEach(el => el.classList.remove('active'));
   }
   // Close inline hook config if open
   const hookInline = document.getElementById('hooks-config-section');
@@ -5870,7 +5808,6 @@ function switchView(viewId) {
     document.getElementById('hook-list-section')?.classList.remove('hidden');
     hookEditor._detachInputListeners();
     document.getElementById('hook-review-modal')?.classList.add('hidden');
-    document.querySelectorAll('.nav-subitem[data-hook]').forEach(el => el.classList.remove('active'));
   }
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
@@ -5878,11 +5815,9 @@ function switchView(viewId) {
   document.getElementById('view-' + viewId)?.classList.add('active');
   if (viewId === 'plugins') {
     renderPluginManager();
-    populatePluginSubnav();
   }
   if (viewId === 'hooks') {
     renderHookManager();
-    populateHookSubnav();
   }
   if (viewId === 'overlays') {
     renderOverlayUrls();

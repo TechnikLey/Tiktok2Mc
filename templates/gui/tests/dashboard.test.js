@@ -351,33 +351,7 @@ describe('showWizard / hideWizard', () => {
   });
 });
 
-/* ─── togglePluginNav / populatePluginSubnav ─── */
-describe('togglePluginNav / populatePluginSubnav', () => {
-  beforeEach(() => {
-    currentPlugins = [
-      { name: 'spotify', display_name: 'Spotify' },
-      { name: 'timer', display_name: 'Timer' },
-    ];
-    // Ensure plugin-subnav exists (already in HTML) without recreating entire body DOM
-    if (!document.getElementById('plugin-subnav')) {
-      document.body.insertAdjacentHTML('beforeend', '<div id="plugin-subnav"></div>');
-    }
-    document.querySelector('.nav-item[data-view="plugins"]')?.classList.remove('expanded');
-  });
 
-  it('populates plugin sub-nav', () => {
-    populatePluginSubnav();
-    const items = document.querySelectorAll('.nav-subitem');
-    expect(items.length).toBe(2);
-    expect(items[0].textContent).toBe('Spotify');
-  });
-
-  it('toggles plugin nav expansion', () => {
-    togglePluginNav();
-    expect(document.querySelector('.nav-item[data-view="plugins"]').classList.contains('expanded')).toBe(true);
-    expect(document.getElementById('plugin-subnav').classList.contains('expanded')).toBe(true);
-  });
-});
 
 /* ─── updateRestartBanner ─── */
 describe('updateRestartBanner', () => {
