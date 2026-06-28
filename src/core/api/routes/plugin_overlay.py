@@ -71,8 +71,13 @@ async def plugin_event_stream(name: str):
                     yield f"data: {json.dumps(msg['data'])}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
+                except (ConnectionResetError, ConnectionAbortedError, OSError) as exc:
+                    log.debug("Plugin SSE client disconnected abruptly: %s", exc)
+                    break
         except asyncio.CancelledError:
             pass
+        except (ConnectionResetError, ConnectionAbortedError, OSError) as exc:
+            log.debug("Plugin SSE transport closed: %s", exc)
         finally:
             event_bus.unsubscribe(q)
 

@@ -38,8 +38,13 @@ async def logs_stream():
                     yield f"data: {json.dumps(msg)}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
+                except (ConnectionResetError, ConnectionAbortedError, OSError) as exc:
+                    log.debug("SSE log client disconnected abruptly: %s", exc)
+                    break
         except asyncio.CancelledError:
             pass
+        except (ConnectionResetError, ConnectionAbortedError, OSError) as exc:
+            log.debug("SSE log transport closed: %s", exc)
         finally:
             event_bus.unsubscribe(q)
 

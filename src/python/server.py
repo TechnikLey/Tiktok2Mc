@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import subprocess
 import sys
 import shutil
@@ -164,18 +165,29 @@ def _find_java(root_dir: Path, config_path: Path | None = None) -> Path | None:
     return None
 
 
+# === Parse arguments (instance-based only) ===
+_parser = argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--instance-dir", type=str, default=None, help="Path to the server instance directory")
+_parser.add_argument("--port", type=str, default=None, help="Override the server port")
+_args, _ = _parser.parse_known_args()
+
 ROOT_DIR = get_root_dir()
-SERVER_DIR = (ROOT_DIR / "server" / "mc").resolve()
 CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
-SERVER_PROPERTIES = (SERVER_DIR / "server.properties").resolve()
+
+if _args.instance_dir:
+    INSTANCE_DIR = Path(_args.instance_dir).resolve()
+else:
+    INSTANCE_DIR = (ROOT_DIR / "server" / "default").resolve()
+INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
+
+SERVER_PROPERTIES = (INSTANCE_DIR / "server.properties").resolve()
 IGNORE_RCON_FILE = (ROOT_DIR / "config" / ".ignore_rcon_warning").resolve()
-PLUGINS_DIR = (SERVER_DIR / "plugins").resolve()
+PLUGINS_DIR = (INSTANCE_DIR / "plugins").resolve()
 CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resolve()
 
-# === Determine server.jar path (version-aware) ===
-# Priority:
-# 1. servers/<mc_version>/server.jar  (version manager download)
-# 2. server/mc/server.jar             (legacy / switched active jar)
+# === Determine server.jar path (instance-based ONLY) ===
+# NO version-based paths. NO legacy paths. NO fallback paths.
+SERVER_JAR = (INSTANCE_DIR / "server.jar").resolve()
 MC_VERSION = "1.21.11"
 try:
     if CONFIG_FILE.exists():
@@ -184,18 +196,13 @@ try:
 except Exception:
     pass
 
-_versioned_jar = (ROOT_DIR / "servers" / MC_VERSION / "server.jar").resolve()
-_legacy_jar = (SERVER_DIR / "server.jar").resolve()
+if not SERVER_JAR.exists():
+    log.error("server.jar not found at %s", SERVER_JAR)
+    log.error("Place a valid Minecraft server.jar in the instance directory and restart.")
+    _wait_or_skip()
+    sys.exit(1)
 
-if _versioned_jar.exists():
-    SERVER_JAR = _versioned_jar
-    log.info("Using version-managed jar: %s", SERVER_JAR)
-elif _legacy_jar.exists():
-    SERVER_JAR = _legacy_jar
-    log.info("Using legacy jar: %s", SERVER_JAR)
-else:
-    SERVER_JAR = _legacy_jar
-    log.warning("No server.jar found at expected paths. Expected one of: %s, %s", _versioned_jar, _legacy_jar)
+log.info("Using instance jar: %s", SERVER_JAR)
 
 # === Java detection ===
 JAVA_EXE = _find_java(ROOT_DIR, CONFIG_FILE)
@@ -251,6 +258,14 @@ try:
         log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
 except Exception as e:
     log.warning("Failed to load config: %s — using defaults.", e)
+
+# === Port override from CLI ===
+if _args.port:
+    try:
+        MC_PORT = int(_args.port)
+        log.info("Port overridden by CLI: %d", MC_PORT)
+    except ValueError:
+        log.warning("Invalid --port value '%s' — using config default.", _args.port)
 
 # === Ensure MinecraftServerAPI config is in sync ===
 if CONFIGSERVERAPI_FILE.exists():
@@ -310,13 +325,6 @@ RCON_ENABLED = RCON.get("enabled", False)
 RCON_PASSWORD = RCON.get("password", "")
 RCON_PORT = RCON.get("port", 25575)
 
-# === Pre-flight checks ===
-if not SERVER_JAR.exists():
-    log.warning("server.jar not found at %s", SERVER_JAR)
-    log.warning("Place a valid Minecraft server.jar in that directory and restart.")
-    _wait_or_skip()
-    sys.exit(1)
-
 # === RCON disabled warning (only in interactive mode) ===
 if not RCON_ENABLED and not IGNORE_RCON_FILE.exists() and _is_interactive():
     log.info("\nWARNING: RCON is disabled!")
@@ -350,7 +358,7 @@ elif not RCON_ENABLED and not _is_interactive():
     log.info("RCON is disabled — continuing (non-interactive mode).")
 
 # === Accept EULA ===
-EULA_FILE = SERVER_DIR / "eula.txt"
+EULA_FILE = INSTANCE_DIR / "eula.txt"
 if not EULA_FILE.exists():
     try:
         with EULA_FILE.open("w", encoding="utf-8") as f:
@@ -401,7 +409,7 @@ log.info("\n--- Minecraft Server ---")
 log.info(f"RAM:     {Xms} -> {Xmx}")
 log.info(f"Java:    {JAVA_EXE}")
 log.info(f"Version: {MC_VERSION}")
-log.info(f"Path:    {SERVER_DIR}")
+log.info(f"Path:    {INSTANCE_DIR}")
 log.info(f"Port:    {MC_PORT}")
 log.info("--------------------------\n")
 
@@ -409,7 +417,7 @@ heartbeat = start_heartbeat(log, interval=60.0)
 try:
     proc = subprocess.run(
         [str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"],
-        cwd=str(SERVER_DIR),
+        cwd=str(INSTANCE_DIR),
     )
     if proc.returncode != 0:
         log.warning("Minecraft server exited with code %s", proc.returncode)
