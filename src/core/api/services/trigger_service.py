@@ -75,17 +75,15 @@ class TriggerService:
     # ------------------------------------------------------------------
 
     def _discover_executable(self) -> None:
-        """Locate ``text_trigger.exe`` / ``test_trigger.exe`` / ``send_trigger.py``."""
+        """Locate ``test_trigger.exe`` / ``test_trigger.bin``."""
         root = get_root_dir()
         base = get_base_dir()
         is_windows = sys.platform == "win32"
         suffix = ".exe" if is_windows else ".bin"
 
         candidates: list[Path] = [
-            root / f"text_trigger{suffix}",
             root / f"test_trigger{suffix}",
             base.parent / "test" / f"test_trigger{suffix}",
-            root / "tests" / "send_trigger.py",
             root / "test" / f"test_trigger{suffix}",
         ]
 
@@ -364,6 +362,8 @@ class TriggerService:
                     return {"status": "ok", "message": stdout}
             return {"status": "ok", "message": "Triggered via external tool."}
         except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
             return {"status": "error", "message": "Trigger executable timed out."}
         except Exception as exc:
             raise RuntimeError(str(exc)) from exc
