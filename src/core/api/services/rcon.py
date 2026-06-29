@@ -37,10 +37,15 @@ class RconService:
                 pass
             self._conn = None
         try:
-            conn = await asyncio.to_thread(
-                lambda: MCRcon(self._host, self._password, port=self._port)
+            conn = await asyncio.wait_for(
+                asyncio.to_thread(
+                    lambda: MCRcon(self._host, self._password, port=self._port)
+                ),
+                timeout=5.0,
             )
-            await asyncio.to_thread(conn.connect)
+            await asyncio.wait_for(
+                asyncio.to_thread(conn.connect), timeout=5.0
+            )
             self._conn = conn
             self._connected = True
             log.info("[RCON] Connected to %s:%s", self._host, self._port)

@@ -5655,8 +5655,10 @@ const consoleTerminal = {
     const status = document.getElementById('console-status');
     btn.disabled = true;
     btn.textContent = 'Connecting...';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const res = await fetch(API + '/rcon/connect', { method: 'POST' });
+      const res = await fetch(API + '/rcon/connect', { method: 'POST', signal: controller.signal });
       if (!res.ok) throw new Error((await res.json()).detail || 'Connection failed');
       this._connected = true;
       status.textContent = 'Connected';
@@ -5666,11 +5668,16 @@ const consoleTerminal = {
       input.focus();
       this._print('Connected to RCON. Type a command and press Enter.', 'system');
     } catch (e) {
-      this._print('Connection failed: ' + e.message, 'error');
+      if (e.name === 'AbortError') {
+        this._print('Connection timed out after 10 seconds.', 'error');
+      } else {
+        this._print('Connection failed: ' + e.message, 'error');
+      }
       btn.textContent = 'Connect';
       status.textContent = 'Disconnected';
       status.className = 'console-status offline';
     } finally {
+      clearTimeout(timeoutId);
       btn.disabled = false;
     }
   },
@@ -5996,6 +6003,7 @@ class EventTester {
     } catch (e) {
       this._setStatus('error', 'Failed');
       this._showError(e.message);
+      showToast('Toggle failed: ' + e.message, 'error');
       log(`[TEST ERROR] ${e.message}`, 'error');
       this._addHistory('system', 'tiktok-toggle', 'System', 'error', e.message);
     } finally {
@@ -6107,12 +6115,14 @@ class EventTester {
       } else {
         this._setStatus('error', 'Failed');
         this._showError(result.message || 'Trigger failed.');
+        showToast('Trigger failed: ' + (result.message || 'Unknown'), 'error');
         log(`[TEST ERROR] ${type}: ${result.message}`, 'error');
       }
       this._addHistory(type, triggerName, user, result.status, result.message || '');
     } catch (e) {
       this._setStatus('error', 'Failed');
       this._showError(e.message);
+      showToast('Trigger failed: ' + e.message, 'error');
       log(`[TEST ERROR] ${e.message}`, 'error');
       this._addHistory(type, triggerName, user, 'error', e.message);
     } finally {
