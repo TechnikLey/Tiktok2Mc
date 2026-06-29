@@ -118,6 +118,8 @@ document.getElementById('server-create-cancel')?.addEventListener('click', close
 document.getElementById('server-create-confirm')?.addEventListener('click', confirmServerCreate);
 document.getElementById('server-create-name')?.addEventListener('input', validateServerCreateForm);
 document.getElementById('server-create-version')?.addEventListener('change', validateServerCreateForm);
+document.getElementById('server-create-port')?.addEventListener('input', validateServerCreateForm);
+document.getElementById('server-create-port')?.addEventListener('change', validateServerCreateForm);
 
 document.getElementById('server-download-cancel')?.addEventListener('click', closeServerDownloadModal);
 document.getElementById('server-download-confirm')?.addEventListener('click', confirmServerDownload);
