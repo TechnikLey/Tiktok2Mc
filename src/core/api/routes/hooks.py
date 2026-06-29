@@ -77,13 +77,40 @@ def _serialize_hook(reg: HookRegistration) -> dict:
 
 @router.get("/hooks")
 async def list_hooks():
-    """List all registered hooks with their status."""
+    """List all registered hooks with their status.
+
+    If the registry is empty, auto-discovers hooks from the filesystem
+    so they appear immediately without waiting for the bridge process.
+    """
     registry = get_hook_registry()
-    hooks = [_serialize_hook(h) for h in registry.list()]
+    hooks = registry.list()
+    if not hooks:
+        from core.hook_loader import _discover_hook_dirs
+        discovered = _discover_hook_dirs()
+        hook_infos = []
+        for info in discovered:
+            hook_infos.append({
+                "name": info["name"],
+                "version": info["version"],
+                "display_name": info["display_name"],
+                "description": info["description"],
+                "author": info["author"],
+                "capabilities": info["capabilities"],
+                "plugin": info["plugin"],
+                "update_url": info["update_url"],
+                "source": info["source"],
+            })
+        registry.sync_from_discovery(hook_infos)
+        active_names = {info["name"] for info in discovered}
+        registry.clean_stale(active_names)
+        _invalidate_hook_cache()
+        hooks = registry.list()
+        log.info("[HOOK] Auto-discovered %d hook(s) on first list request", len(hooks))
+    serialized = [_serialize_hook(h) for h in hooks]
     return {
-        "total": len(hooks),
-        "enabled": sum(1 for h in hooks if h["enabled"]),
-        "hooks": hooks,
+        "total": len(serialized),
+        "enabled": sum(1 for h in serialized if h["enabled"]),
+        "hooks": serialized,
     }
 
 

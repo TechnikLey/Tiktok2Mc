@@ -28,6 +28,45 @@ DEFAULT_PORT = 29185
 _LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
+def _discover_hooks_at_startup() -> None:
+    """Auto-discover hooks from filesystem and populate the hook registry.
+
+    Mirrors what PluginWatcher does for plugins — ensures hooks appear
+    in the GUI immediately without waiting for the bridge process.
+    """
+    try:
+        from core.hook_loader import _discover_hook_dirs
+        from core.hook_registry import get_hook_registry
+
+        discovered = _discover_hook_dirs()
+        hook_infos = []
+        for info in discovered:
+            hook_infos.append({
+                "name": info["name"],
+                "version": info["version"],
+                "display_name": info["display_name"],
+                "description": info["description"],
+                "author": info["author"],
+                "capabilities": info["capabilities"],
+                "plugin": info["plugin"],
+                "update_url": info["update_url"],
+                "source": info["source"],
+            })
+        registry = get_hook_registry()
+        new_count = registry.sync_from_discovery(hook_infos)
+        active_names = {info["name"] for info in discovered}
+        cleaned = registry.clean_stale(active_names)
+        if new_count or cleaned:
+            log.info(
+                "[HOOK] Auto-discovered: %d new, %d removed at startup",
+                new_count, cleaned,
+            )
+        else:
+            log.info("[HOOK] Auto-discovered %d hook(s) at startup", len(discovered))
+    except Exception as exc:
+        log.warning("[HOOK] Auto-discovery at startup failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from core.event_command_mapper import get_event_command_mapper
@@ -40,6 +79,7 @@ async def lifespan(app: FastAPI):
     set_event_loop(asyncio.get_running_loop())
     command_queue.set_loop(asyncio.get_running_loop())
     get_plugin_watcher().start()
+    _discover_hooks_at_startup()
     await get_health_monitor().start()
     get_event_command_mapper().start()
     get_dashboard_publisher().start()

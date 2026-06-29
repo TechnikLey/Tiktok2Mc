@@ -5,10 +5,12 @@ All endpoints are prefixed with ``/api/v1`` by the central router.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
 
+from core.api.eventbus import event_bus
 from core.api.models import (
     TriggerCommentRequest,
     TriggerExecuteRequest,
@@ -41,6 +43,9 @@ async def execute_trigger(body: TriggerExecuteRequest):
 
     The trigger flows through the same pipeline as a real TikTok event so
     that test behaviour is indistinguishable from production behaviour.
+
+    Additionally, the trigger is published to the EventBus so that any
+    configured event reactions (event_commands.yaml) are also fired.
     """
     try:
         result = get_trigger_service().execute_trigger(
@@ -48,6 +53,21 @@ async def execute_trigger(body: TriggerExecuteRequest):
             user=body.user,
             gift_id=body.gift_id,
         )
+
+        # Also publish to EventBus so reactions fire
+        event_type = body.trigger
+        if body.gift_id:
+            event_type = "gift"
+        event_data = {
+            "user": body.user,
+            "gift_id": body.gift_id,
+            "test": True,
+            "source": "trigger_tester",
+        }
+        asyncio.ensure_future(
+            event_bus.publish(f"tiktok.{event_type}", event_data)
+        )
+
         return TriggerResponse(
             status=result.get("status", "error"),
             message=result.get("message", ""),
@@ -70,6 +90,12 @@ async def toggle_tiktok_connection():
     """
     try:
         result = get_trigger_service().toggle_tiktok_connection()
+        asyncio.ensure_future(
+            event_bus.publish("system.tiktok_toggle", {
+                "connected": result.get("connected", False),
+                "source": "trigger_tester",
+            })
+        )
         return TiktokToggleResponse(
             status=result.get("status", "error"),
             message=result.get("message", ""),
@@ -88,6 +114,9 @@ async def send_test_comment(body: TriggerCommentRequest):
 
     The comment flows through the same pipeline as a real TikTok comment so
     that test behaviour is indistinguishable from production behaviour.
+
+    Additionally, the comment is published to the EventBus so that any
+    configured event reactions (event_commands.yaml) are also fired.
     """
     try:
         result = get_trigger_service().send_comment(
@@ -96,6 +125,17 @@ async def send_test_comment(body: TriggerCommentRequest):
             moderator=body.moderator,
             superfan=body.superfan,
             fanclub=body.fanclub,
+        )
+        asyncio.ensure_future(
+            event_bus.publish("tiktok.comment", {
+                "user": body.user,
+                "text": body.text,
+                "moderator": body.moderator,
+                "superfan": body.superfan,
+                "fanclub": body.fanclub,
+                "test": True,
+                "source": "trigger_tester",
+            })
         )
         return TriggerResponse(
             status=result.get("status", "error"),

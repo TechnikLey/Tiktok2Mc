@@ -1352,6 +1352,16 @@ async function loadHooks() {
   }
 }
 
+async function refreshHooks() {
+  try {
+    await postJSON('/hooks/discover', {});
+    await loadHooks();
+    showToast('Hooks refreshed.', 'success');
+  } catch (e) {
+    showToast('Failed to refresh hooks: ' + e.message, 'error');
+  }
+}
+
 function renderHookManager() {
   const tableDiv = document.getElementById('hook-manager-table');
   if (!tableDiv) return;
@@ -4899,8 +4909,18 @@ class ReactionEditor {
     const action = this.data[event]?.[idx];
     if (!action) return;
     try {
-      await postJSON('/events', { type: event, data: { test: true } });
-      showToast(`Test event sent for "${event}". Check if the plugin reacted.`, 'info');
+      // Publish to EventBus so the event-command mapper dispatches the reaction
+      await postJSON('/events', { type: event, data: { test: true, source: 'reaction_test' } });
+      // Also attempt to send via trigger service if it's a known TikTok event type
+      const knownTiktokEvents = ['follow', 'like', 'join', 'share', 'comment', 'gift'];
+      const tiktokPrefix = event.startsWith('tiktok.') ? event.slice(7) : '';
+      if (knownTiktokEvents.includes(tiktokPrefix)) {
+        await postJSON('/triggers/execute', {
+          trigger: tiktokPrefix,
+          user: 'TestUser',
+        }).catch(() => {}); // fire-and-forget, bridge may not be running
+      }
+      showToast(`Test event "${event}" sent via EventBus.${tiktokPrefix ? ' Also sent to bridge.' : ''}`, 'info');
     } catch (e) {
       showToast('Test failed: ' + e.message, 'error');
     }
@@ -5965,14 +5985,18 @@ class EventTester {
       select.innerHTML = '<option value="" disabled>No gifts available</option>';
       return;
     }
-    let html = '<option value="" disabled selected>Choose a gift...</option>';
+    const selectedId = this._selectedGift ? String(this._selectedGift.id) : '';
+    let html = '<option value="" disabled' + (selectedId === '' ? ' selected' : '') + '>Choose a gift...</option>';
     for (const g of gifts) {
-      html += `<option value="${g.id}" data-name="${escapeHtml(g.name)}">${escapeHtml(g.name)} (ID: ${g.id})</option>`;
+      const sel = String(g.id) === selectedId ? ' selected' : '';
+      html += `<option value="${g.id}" data-name="${escapeHtml(g.name)}"${sel}>${escapeHtml(g.name)} (ID: ${g.id})</option>`;
     }
     select.innerHTML = html;
     select.onchange = () => {
       const opt = select.options[select.selectedIndex];
-      this._selectedGift = opt ? { id: opt.value, name: opt.dataset.name || '' } : null;
+      if (opt && opt.value) {
+        this._selectedGift = { id: opt.value, name: opt.dataset.name || '' };
+      }
     };
   }
 
@@ -6197,6 +6221,8 @@ async function init() {
   await loadStatus();
   await loadConfig();
   await loadPlugins();
+  // One-time hook discovery at startup, then periodic refresh is just the list
+  await postJSON('/hooks/discover', {}).catch(() => {});
   await loadHooks();
   await loadServerManager();
   await reactionEditor.load();

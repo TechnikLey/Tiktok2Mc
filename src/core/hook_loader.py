@@ -133,11 +133,11 @@ def _discover_hook_dirs() -> list[dict]:
                         "_manifest": None,
                         "_error": error,
                     })
-                    log.warning("[HOOK] Hook '%s' has errors: %s", fallback_name, error)
+                    log.debug("[HOOK] Hook '%s' has errors: %s", fallback_name, error)
                 continue
 
             if manifest.name in seen_names:
-                log.warning(
+                log.debug(
                     "[HOOK] Duplicate hook name '%s' in %s — skipping",
                     manifest.name, child,
                 )
@@ -158,7 +158,7 @@ def _discover_hook_dirs() -> list[dict]:
                 "source_type": source_type,
                 "_manifest": manifest,
             })
-            log.info(
+            log.debug(
                 "[HOOK] Discovered hook '%s' v%s in %s",
                 manifest.name, version, child,
             )

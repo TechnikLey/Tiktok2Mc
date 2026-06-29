@@ -303,9 +303,19 @@ class TriggerService:
             except Exception:
                 return {"status": "error", "message": f"HTTP {exc.code}: {exc.reason}"}
         except urllib.error.URLError as exc:
+            msg = (
+                f"Cannot reach bridge at {url}. "
+                f"The TikTok bridge (main.py) may not be running yet. "
+                f"Error: {exc.reason}"
+            )
+            return {"status": "error", "message": msg}
+        except ConnectionResetError as exc:
             return {
                 "status": "error",
-                "message": f"Cannot reach bridge webhook at {url}. Is the bot running? ({exc.reason})",
+                "message": (
+                    f"Bridge at {url} refused the connection. "
+                    f"The TikTok bridge may still be starting up or is not running."
+                ),
             }
         except Exception as exc:
             log.exception("HTTP dispatch failed")
