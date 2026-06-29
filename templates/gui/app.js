@@ -535,6 +535,7 @@ function formatUptime(seconds) {
 }
 
 let _uptimeData = { baseSeconds: 0, lastFetch: 0 };
+let _serverUptimeData = {};
 
 function _updateUptimeDisplay() {
   const el = document.getElementById('uptime-value');
@@ -543,6 +544,26 @@ function _updateUptimeDisplay() {
   const elapsed = (now - _uptimeData.lastFetch) / 1000;
   const total = _uptimeData.baseSeconds + elapsed;
   el.textContent = formatUptime(total);
+}
+
+function _updateServerUptimeDisplay() {
+  const now = Date.now();
+  for (const instId in _serverUptimeData) {
+    const d = _serverUptimeData[instId];
+    const card = document.querySelector('[data-instance-id="' + instId + '"]');
+    if (!card) continue;
+    const stateText = card.querySelector('.server-state-text');
+    if (stateText && stateText.textContent.toLowerCase() !== 'running') {
+      delete _serverUptimeData[instId];
+      const uptimeEl = card.querySelector('.server-uptime');
+      if (uptimeEl) uptimeEl.textContent = '—';
+      continue;
+    }
+    const elapsed = (now - d.lastFetch) / 1000;
+    const total = d.baseSeconds + elapsed;
+    const uptimeEl = card.querySelector('.server-uptime');
+    if (uptimeEl) uptimeEl.textContent = formatUptime(total);
+  }
 }
 
 async function loadStatus() {
@@ -695,13 +716,13 @@ function renderServerCard(inst) {
         </span>
       </div>
       <div class="server-card-actions-top">
-        <button class="btn btn--sm btn--success server-action-btn" onclick="serverCardAction('${instId}', 'start')" title="Start" ${state === 'running' ? 'disabled' : ''}>
+        <button class="btn btn--sm btn--success server-action-btn" onclick="serverCardAction('${instId}', 'start')" title="Start" ${state === 'running' || state === 'starting' || state === 'stopping' ? 'disabled' : ''}>
           <svg width="14" height="14" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
         </button>
         <button class="btn btn--sm btn--danger server-action-btn" onclick="serverCardAction('${instId}', 'stop')" title="Stop" ${state !== 'running' ? 'disabled' : ''}>
           <svg width="14" height="14" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" fill="currentColor"/></svg>
         </button>
-        <button class="btn btn--sm btn--secondary server-action-btn" onclick="serverCardAction('${instId}', 'restart')" title="Restart">
+        <button class="btn btn--sm btn--secondary server-action-btn" onclick="serverCardAction('${instId}', 'restart')" title="Restart" ${state !== 'running' ? 'disabled' : ''}>
           <svg width="14" height="14" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4C7.58 4 4.01 7.58 4.01 12S7.58 20 12 20c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>
         </button>
       </div>
@@ -855,12 +876,24 @@ async function updateServerLifecycleUI() {
       }
 
       const uptimeEl = card.querySelector('.server-uptime');
-      if (uptimeEl) uptimeEl.textContent = uptime ? formatUptime(uptime) : '—';
+      if (uptimeEl) {
+        if (uptime !== null && uptime !== undefined) {
+          _serverUptimeData[instId] = { baseSeconds: uptime, lastFetch: Date.now() };
+          uptimeEl.textContent = formatUptime(uptime);
+        } else {
+          delete _serverUptimeData[instId];
+          uptimeEl.textContent = '—';
+        }
+      }
 
+      const isTransitional = state === 'starting' || state === 'stopping';
+      const actionDisabled = isTransitional || _serverActionInProgress;
       const startBtn = card.querySelector('.btn--success');
       const stopBtn = card.querySelector('.btn--danger');
-      if (startBtn) startBtn.disabled = state === 'running';
-      if (stopBtn) stopBtn.disabled = state !== 'running';
+      const restartBtn = card.querySelectorAll('.btn--secondary')[0];
+      if (startBtn) startBtn.disabled = state === 'running' || actionDisabled;
+      if (stopBtn) stopBtn.disabled = state !== 'running' || actionDisabled;
+      if (restartBtn) restartBtn.disabled = state !== 'running' || actionDisabled;
     }
     refreshConsoleInstanceSelector();
   } catch (e) {
@@ -870,12 +903,13 @@ async function updateServerLifecycleUI() {
 
 async function serverCardAction(instanceId, action) {
   if (_serverActionInProgress) return;
+  if (action === 'restart') {
+    const confirmed = await showConfirmDialog('Restart ' + instanceId + '?', 'This will kick all players on this server. Are you sure?', 'Restart', 'btn-danger', 'text-danger');
+    if (!confirmed) return;
+  }
   _serverActionInProgress = true;
+  document.querySelectorAll('.server-card-actions-top .server-action-btn').forEach(btn => { btn.disabled = true; });
   try {
-    if (action === 'restart') {
-      const confirmed = await showConfirmDialog('Restart ' + instanceId + '?', 'This will kick all players on this server. Are you sure?', 'Restart', 'btn-danger', 'text-danger');
-      if (!confirmed) return;
-    }
     const endpoint = '/server/' + instanceId + '/' + action;
     const res = await postJSON(endpoint);
     showToast(res.message || 'Server ' + action + 'ing', 'info');
@@ -884,6 +918,7 @@ async function serverCardAction(instanceId, action) {
     showToast('Failed to ' + action + ' server: ' + e.message, 'error');
   } finally {
     _serverActionInProgress = false;
+    updateServerLifecycleUI();
   }
 }
 
@@ -966,10 +1001,28 @@ async function confirmServerCreate() {
 }
 
 function validateServerCreateForm() {
-  const name = document.getElementById('server-create-name')?.value.trim();
-  const version = document.getElementById('server-create-version')?.value;
+  const nameInput = document.getElementById('server-create-name');
+  const versionSelect = document.getElementById('server-create-version');
+  const portInput = document.getElementById('server-create-port');
   const confirmBtn = document.getElementById('server-create-confirm');
-  if (confirmBtn) confirmBtn.disabled = !name || !version;
+  const errorEl = document.getElementById('server-create-error');
+  const name = nameInput?.value.trim();
+  const version = versionSelect?.value;
+  const port = parseInt(portInput?.value, 10);
+  const instances = (_serverManagerCache?.instances || []);
+
+  let error = '';
+  if (name && instances.some(i => i.name.toLowerCase() === name.toLowerCase())) {
+    error = 'A server with this name already exists.';
+  } else if (!isNaN(port) && instances.some(i => i.port === port)) {
+    error = 'Port ' + port + ' is already in use by another server.';
+  }
+
+  if (errorEl) {
+    errorEl.textContent = error;
+    errorEl.classList.toggle('hidden', !error);
+  }
+  if (confirmBtn) confirmBtn.disabled = !name || !version || !!error;
 }
 
 /* ─── Server Manager: Download Modal ─── */
@@ -6158,6 +6211,9 @@ async function init() {
     const activeView = document.querySelector('.view.active');
     if (activeView && activeView.id === 'view-status') {
       _updateUptimeDisplay();
+    }
+    if (activeView && (activeView.id === 'view-status' || activeView.id === 'view-servers')) {
+      _updateServerUptimeDisplay();
     }
     _updateTiktokStatusDisplay();
   }, 1000);
