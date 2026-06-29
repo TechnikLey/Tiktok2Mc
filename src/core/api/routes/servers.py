@@ -85,6 +85,47 @@ def _ensure_instance_dir(instance_id: str) -> Path:
     return d
 
 
+def _sync_datapack_to_instance(instance_id: str) -> Path | None:
+    """Copy the StreamingTool datapack from the central store to *instance_id*.
+
+    Creates the instance's ``world/datapacks/`` directory if needed and copies
+    the full datapack folder and zip from ``server/datapack/``.
+    Returns the instance's datapack root path, or ``None`` on failure.
+    """
+    dp_dir = get_servers_dir() / "datapack"
+    if not dp_dir.exists():
+        log.warning("[DATAPACK] Datapack source not found at %s — nothing to sync", dp_dir)
+        return None
+
+    instance_dp = get_servers_dir() / instance_id / "world" / "datapacks"
+    instance_dp.mkdir(parents=True, exist_ok=True)
+
+    dp_name = "StreamingTool"
+    src_dir = dp_dir / dp_name
+    dst_dir = instance_dp / dp_name
+    src_zip = dp_dir / f"{dp_name}.zip"
+    dst_zip = instance_dp / f"{dp_name}.zip"
+
+    try:
+        # Remove old datapack in instance
+        if dst_dir.exists():
+            shutil.rmtree(dst_dir)
+        if dst_zip.exists():
+            dst_zip.unlink()
+
+        # Copy fresh datapack
+        if src_dir.exists():
+            shutil.copytree(src_dir, dst_dir)
+        if src_zip.exists():
+            shutil.copy2(src_zip, dst_zip)
+
+        log.info("[DATAPACK] Synced '%s' datapack to instance '%s'", dp_name, instance_id)
+        return instance_dp
+    except Exception as exc:
+        log.warning("[DATAPACK] Failed to sync datapack to instance '%s': %s", instance_id, exc)
+        return None
+
+
 def _resolve_version_jar(version: str) -> Path | None:
     """Return the path to server.jar for an installed *version*.
 
@@ -414,6 +455,9 @@ async def create_instance(body: CreateInstanceRequest):
         eula_file.write_text("eula=true\n", encoding="utf-8")
     except Exception as e:
         log.warning("Failed to write eula.txt for instance '%s': %s", inst_id, e)
+
+    # Sync datapack from default server to the new instance
+    _sync_datapack_to_instance(inst_id)
 
     instances[inst_id] = {
         "name": body.name,

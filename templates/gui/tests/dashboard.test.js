@@ -402,8 +402,8 @@ describe('wizard rendering', () => {
     expect(content.innerHTML).toContain('RCON Password');
   });
 
-  it('renders step 3 (review)', () => {
-    wizardStep = 3;
+  it('renders step 2 (review)', () => {
+    wizardStep = 2;
     wizardData.tiktok_user = 'testuser';
     wizardData.rcon_password = 'secret123';
     renderWizardStep();

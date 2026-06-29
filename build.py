@@ -104,7 +104,7 @@ def main():
             OUT_DIR / "test",
             OUT_DIR / "logs",
             OUT_DIR / "server" / "default" / "plugins" / "MinecraftServerAPI",
-            OUT_DIR / "server" / "default" / "world" / "datapacks" / "StreamingTool" / "data" / "streamingtool" / "function",
+            OUT_DIR / "server" / "datapack" / "StreamingTool" / "data" / "streamingtool" / "function",
             OUT_DIR / "server" / "default" / "plugins" / "DelayedTNT",
             OUT_DIR / "hooks",
             OUT_DIR / "docs",

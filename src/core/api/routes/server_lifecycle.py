@@ -145,6 +145,13 @@ async def server_instance_start(instance_id: str):
     if proc.state == ProcessState.RUNNING:
         return {"status": "already_running", "message": f"Server '{instance_id}' is already running"}
 
+    # Sync datapack from default server before starting
+    try:
+        from core.api.routes.servers import _sync_datapack_to_instance
+        _sync_datapack_to_instance(instance_id)
+    except Exception:
+        log.warning("[DATAPACK] Failed to sync datapack for '%s' — server will use whatever is on disk", instance_id)
+
     try:
         success = await supervisor.start(pname)
         if success:

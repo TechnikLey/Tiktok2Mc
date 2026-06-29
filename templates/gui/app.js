@@ -2210,11 +2210,15 @@ function isFirstRun(cfg) {
 function showWizard() {
   document.getElementById('wizard').classList.remove('hidden');
   document.getElementById('dashboard').classList.add('hidden');
-  wizardStep = 0;
+  const tiktokUser = (currentConfig.tiktok || {}).user || '';
+  const rconPassword = (currentConfig.rcon || {}).password || '';
+  const tiktokOk = tiktokUser && tiktokUser !== 'your_tiktok_username';
+  const rconOk = !!rconPassword;
+  // Skip already-configured steps
+  wizardStep = tiktokOk ? 1 : 0;
   wizardData = {
-    tiktok_user: (currentConfig.tiktok || {}).user || '',
-    rcon_password: (currentConfig.rcon || {}).password || '',
-    advanced: currentConfig.config_advanced || false
+    tiktok_user: tiktokUser,
+    rcon_password: rconPassword,
   };
   renderWizardStep();
 }
@@ -2258,12 +2262,14 @@ function renderWizardStep() {
   const content = document.getElementById('wizard-content');
   const backBtn = document.getElementById('wizard-back');
   const nextBtn = document.getElementById('wizard-next');
-  steps.innerHTML = [0, 1, 2, 3].map(i => `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`).join('');
+  // Only 2 configurable steps + review: tiktok, rcon, review
+  const totalSteps = 3;
+  steps.innerHTML = [0, 1, 2].map(i => `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`).join('');
   backBtn.disabled = wizardStep === 0;
   backBtn.style.visibility = wizardStep === 0 ? 'hidden' : 'visible';
-  nextBtn.textContent = wizardStep === 3 ? 'Save' : 'Next';
+  nextBtn.textContent = wizardStep === 2 ? 'Save' : 'Next';
   if (wizardStep === 0) {
-    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Welcome! Let's get your stream connected. Enter your TikTok username below.</p>
+    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Enter your TikTok username below.</p>
       <div class="form-group"><label>TikTok Username (without @)</label>
       <input type="text" id="w-tiktok-user" value="${escapeHtml(wizardData.tiktok_user)}" placeholder="your_tiktok_username">
       <div class="inline-error" id="err-tiktok-user">Please enter a valid TikTok username.</div>
@@ -2277,19 +2283,11 @@ function renderWizardStep() {
       <div class="strength-label" id="strength-label">Enter a password to see strength</div>
       <div class="hint">Choose any password you prefer. Strength meter is for guidance only.</div></div>`;
     setTimeout(updatePasswordMeter, 0);
-  } else if (wizardStep === 2) {
-    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Enable advanced settings to access more configuration options. These can break functionality if misconfigured.</p>
-      <div class="form-group" style="display:flex;align-items:center;gap:1rem;">
-        <input type="checkbox" class="toggle" id="w-advanced-enabled" ${wizardData.advanced ? 'checked' : ''}>
-        <label for="w-advanced-enabled" style="margin:0;cursor:pointer;">Enable Advanced Features</label>
-      </div>
-      <p class="muted" style="font-size:0.85rem;margin-top:1rem;color:var(--color-danger);font-weight:600;">Warning: Advanced settings can break functionality if misconfigured. Only enable if you understand the risks.</p>`;
   } else {
     content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Review your settings before saving.</p>
       <div style="background:var(--input-bg);padding:1rem;border-radius:8px;margin-bottom:1rem;">
       <div class="field-row"><span>TikTok User</span><span>${escapeHtml(wizardData.tiktok_user || '—')}</span></div>
-      <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '********' : 'Not set'}</span></div>
-      <div class="field-row"><span>Advanced Features</span><span>${wizardData.advanced ? 'Enabled' : 'Disabled'}</span></div></div>
+      <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '********' : 'Not set'}</span></div></div>
       <p class="muted" style="font-size:0.85rem;margin:0;">Plugins are disabled by default. You can enable them later from the dashboard.</p>`;
   }
 }
@@ -2347,53 +2345,12 @@ async function wizardNext() {
       return;
     }
     wizardData.rcon_password = pass;
-  } else if (wizardStep === 2) {
-    const adv = document.getElementById('w-advanced-enabled')?.checked || false;
-    if (adv && !wizardData.advanced) {
-      const confirmed = await _confirmAdvancedInWizard();
-      if (!confirmed) return;
-    }
-    wizardData.advanced = adv;
   }
-  if (wizardStep === 3) { await wizardSave(); return; }
+  if (wizardStep === 2) { await wizardSave(); return; }
   wizardStep++;
   renderWizardStep();
 }
 
-function _confirmAdvancedInWizard() {
-  return new Promise((resolve) => {
-    const dlg = document.getElementById('advanced-confirm-dialog');
-    const input = document.getElementById('advanced-confirm-input');
-    let okBtn = document.getElementById('advanced-confirm-ok');
-    let cancelBtn = document.getElementById('advanced-confirm-cancel');
-    if (!dlg || !input || !okBtn || !cancelBtn) { resolve(false); return; }
-    input.value = '';
-    dlg.classList.remove('hidden');
-    okBtn.disabled = true;
-
-    const onInput = () => { okBtn.disabled = input.value.trim() !== 'I understand the risks'; };
-    input.addEventListener('input', onInput);
-
-    const cleanup = () => {
-      dlg.classList.add('hidden');
-      input.removeEventListener('input', onInput);
-      const newOk = okBtn.cloneNode(true);
-      const newCancel = cancelBtn.cloneNode(true);
-      okBtn.parentNode.replaceChild(newOk, okBtn);
-      cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-    };
-
-    const handleOk = () => {
-      if (input.value.trim() !== 'I understand the risks') return;
-      cleanup();
-      resolve(true);
-    };
-    const handleCancel = () => { cleanup(); resolve(false); };
-
-    okBtn.addEventListener('click', handleOk);
-    cancelBtn.addEventListener('click', handleCancel);
-  });
-}
 async function wizardSave() {
   const nextBtn = document.getElementById('wizard-next');
   nextBtn.disabled = true;
@@ -2406,7 +2363,6 @@ async function wizardSave() {
     if (!cfg.rcon) cfg.rcon = {};
     cfg.rcon.password = wizardData.rcon_password;
     cfg.rcon.enabled = true;
-    cfg.config_advanced = wizardData.advanced || false;
     await putJSON('/config', { config: cfg, backup: true });
     await postJSON('/reload', {});
     if (cfg.rcon && cfg.rcon.password) {

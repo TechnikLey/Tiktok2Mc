@@ -339,7 +339,8 @@ def _apply_config(config: dict) -> None:
             "trigger_comment_event": trigger_comment,
         })
 
-    ctx.datapack_root = (BASE_DIR / ".." / "server" / "mc" / "world" / "datapacks").resolve()
+    ctx.datapack_root = (BASE_DIR / ".." / "server" / "datapack").resolve()
+    ctx.datapack_root.mkdir(parents=True, exist_ok=True)
 
 
 def load_config():
@@ -371,8 +372,10 @@ def generate_datapack():
     """
     log.info(f"\n[BUILD] Generating datapack in: {ctx.datapack_root}")
 
-    if not ctx.datapack_root.exists() or not ctx.datapack_root.is_dir():
-        log.error(f"[BUILD] Datapack root does not exist or is not a directory: {ctx.datapack_root}")
+    try:
+        ctx.datapack_root.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        log.error(f"[BUILD] Cannot create datapack root directory {ctx.datapack_root}: {e}")
         return
 
     full_dp_path = ctx.datapack_root / ctx.datapack_name
