@@ -11,9 +11,9 @@
 ## 🔴 REQUIRED — Release Blockers
 
 ### 1. Documentation Rewrite (DO LAST — after all code changes frozen)
-- `GUIDE.md` is stale: missing event bus routing, hook system, declarative plugin subscriptions, Event Reactions, Live Dashboard, GUI-first entry point, Setup Wizard, Port Scanner, Backup System, API Key auth, installer docs
-- `README.md` should mention API server access, actions editor, Event Reactions, GUI-first, installers
-- `CHANGELOG.md` v1.0.0 section missing 12+ recent changes (UI redesign, Event Reactions, Live Dashboard, build fixes); test count needs updating
+- `GUIDE.md` is stale: missing event bus routing, hook system, Trigger Simulator, declarative plugin subscriptions, Event Reactions, Live Dashboard, GUI-first entry point, Setup Wizard, Port Scanner, Backup System, API Key auth, installer docs, Server Manager (Create Server, Console Instance Selector, lifecycle)
+- `README.md` should mention API server access, actions editor, Event Reactions, GUI-first, installers, Server Manager
+- `CHANGELOG.md` v1.0.0 section missing 12+ recent changes (UI redesign, Event Reactions, Live Dashboard, Server Manager, Trigger Simulator, hook system, build fixes); test count needs updating
 - `ROADMAP.md` very stale — lists completed features as missing, test counts are wrong (claims 378, actual far higher); should be rewritten or removed
 - `AIPrompt.md` references stale file paths (`~/core/gifts.json` → `~/defaults/gifts.json`, `~/config/config.yaml` path ambiguous)
 - `docs/dev-book-en/` and `docs/dev-book-de/` reference old plugin system architecture (self-registration, legacy registry) — needs audit
@@ -28,6 +28,10 @@
 | `src/core/api/server.py` | 97 | MEDIUM | FastAPI app factory, CORS, static mounts |
 | `build.py` | 422 | MEDIUM | Build system, no tests |
 | `src/core/api/services/actions.py` | 421 | LOW | ActionsService line-parser coverage incomplete |
+| `src/core/api/routes/server_lifecycle.py` | 191 | MEDIUM | Server lifecycle API (start/stop/restart/status) has limited test coverage |
+| `src/core/api/services/rcon.py` | 82 | LOW | RCON connection handling, no direct unit tests |
+| `src/core/api/services/trigger_service.py` | 323 | LOW | 12 tests cover core paths but subprocess dispatch edge cases untested |
+| `src/core/api/routes/triggers.py` | 137 | LOW | Trigger API endpoints, no direct route tests |
 
 ### SSE/WS Test Limitations
 - SSE stream **receive** tests cannot use TestClient (httpx blocking limitation)
@@ -45,15 +49,15 @@
 | `build.py` | ~615 | MEDIUM | 0 tests — build system, cross-platform caching, installer generation |
 
 ### GUI Frontend Coverage
-- Vitest + JSDOM tests exist (6 test files) but no **integration tests** with real API backend
-- No Playwright/Cypress E2E tests for GUI workflows (config save, plugin toggle, actions edit)
+- Vitest + JSDOM tests exist (6 test files) but all 446 tests currently fail when run from build directory (`build/release/core/templates/gui/tests/` vs `templates/gui/tests/` path mismatch)
+- No Playwright/Cypress E2E tests for GUI workflows (config save, plugin toggle, actions edit, server console)
 
 ---
 
 ## 🟠 IMPORTANT — Plugin Coupling & Unfinished Work
 
 ### GUI
-- Integrated Minecraft server console (RCON terminal)
+- **Integrated Minecraft server console (RCON terminal)** — console instance selector, connection timeout, and lifecycle UX added. Remaining: output rendering polish, command input history, multi-tab support.
 
 ### Testing
 - Frontend/GUI integration tests (Playwright or similar)
@@ -103,4 +107,4 @@
 
 ---
 
-*Last updated: 2026-06-02 — Cleaned: removed completed sections (Plugin Cross-Coupling, Security, Architecture, Stability & Logging, Overlay Preview), removed stale "Plugin Implementation Tests" section and TECHNICAL DEBT row, removed "Completed Since Last Update" and "Next Steps" sections.*
+*Last updated: 2026-06-29 — Added new test coverage gaps (server lifecycle, rcon, trigger service), updated GUI frontend coverage status, updated doc rewrite scope (Server Manager, Trigger Simulator), refined RCON console status.*

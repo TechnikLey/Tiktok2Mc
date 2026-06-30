@@ -8,6 +8,46 @@
 
 ## v1.0.0-dev (Current Development)
 
+### Server Manager Overhaul
+- **Create Server UI** — new `+ Create Server` button in Server Manager header with modal (name/version/port fields). Backend `create_instance` validates port/name conflicts.
+- **Console Instance Selector** — dropdown to pick which Minecraft server instance to watch. SSE events filtered by `instance_id`. RCON auto-disconnects on switch. Auto-selects single server if only one exists.
+- **Server Lifecycle UX** — disable buttons during transitions (start/stop/restart), validate create form on every input/change event, live uptime display, `_serverActionInProgress` guard prevents double actions.
+- **Restored Server Manager features** — Open Folder button (calls `POST /servers/instances/{id}/open`), Delete button for non-default instances, Version Library now shows only installed versions without active/current indicator. Removed `active` flag from `ServerVersionInfo`.
+- **Server validation fixes** — `active_version` undefined crash in `list_servers` (HTTP 500) fixed; `safe_versions` fallback for 1.21.11 display.
+- **Instance-based server paths** — all server directories now instance-aware.
+- **Sidebar simplified** — removed dropdown menus for Plugins and Hooks from GUI sidebar.
+- **Datapack source-of-truth** — moved to `server/datapack/`; Setup Wizard skips already-configured steps.
+
+### Hook System & Trigger Simulator
+- **Trigger Simulator (Event Tester) API** — new `GET/POST /api/v1/triggers/*` endpoints (`/types`, `/execute`, `/tiktok-connection`, `/comment`, `/history`). GUI test trigger card for simulating follow/like/gift/share/join/comment events through the full pipeline (EventBus, reactions).
+- **Hook management enhancements** — hook caching (avoids redundant FS scans), auto-discovery on first list request, clean-stale mechanism for removed hook directories.
+- **Hook auto-discovery at startup** — `_discover_hooks_at_startup()` called in server lifespan so hooks appear in GUI immediately without waiting for bridge process.
+- **Test trigger GUI fix** — corrected executable paths (`text_trigger.exe` → `test_trigger.exe`) and orphaned subprocess cleanup on timeout.
+
+### RCON Console
+- **Connection timeout** — RCON connect and MCRcon constructor wrapped in `asyncio.wait_for(..., timeout=5.0)` to prevent indefinite hangs.
+- **RCON pre-configuration** — server startup reads RCON settings from `config.yaml` and pre-configures `RconService` so console works on first request.
+
+### Infrastructure
+- **CancelledErrorMiddleware** — suppresses `asyncio.CancelledError` spam on client disconnect, returns proper HTTP 499 status.
+- **Gift images static mount** — `/gifts-pictures` mounted from `core/assets/gifts_picture/`.
+- **GUI dashboard static mount** — `/gui` mounted from `templates/gui/`.
+
+### Test & Build Hardening
+- **Test isolation violations fixed** — `document.body.innerHTML +=` destroying DOM references causing `connectLogStream` test failures; test setup isolation improved.
+- **TestServerLifecycle** — added server-related test coverage for launcher and lifecycle.
+- **Build.py fix** — `version/` → `versions/` path correction.
+
+### Fixed Bugs
+- `active_version` undefined in `list_servers` causing HTTP 500
+- SSE `ConnectionResetError` not handled gracefully
+- Server paths not instance-aware (multi-server conflict)
+- Test isolation violations (DOM references, `document.body.innerHTML +=`)
+- `1.21.11` showing as unsafe version (via `safe_versions` fallback)
+- Orphaned subprocesses on trigger dispatch timeout
+- Sidebar dropdown for Plugins/Hooks removed (was confusing with new Hook system)
+- Wizard skipping configured steps (datapack path)
+
 ### Plugin Decoupling & Architecture
 - **Declarative Event Routing** — `main.py` no longer hardcodes plugin names. Events are published to EventBus; `_event_bridge_worker()` reads `event_subscriptions` from every `plugin.json` and routes automatically. Third-party plugins receive events the same way as official ones.
 - **Removed ChannelPoints Plugin** — `src/plugins/channelpoints/` deleted entirely (281 lines). The main system no longer manages economy/points.
@@ -176,7 +216,7 @@
 - Integrated into registry, plugin config, config.yaml, and actions.mca
 
 ### Testing
-- **608 Python tests + 228 GUI frontend tests = 836 total**
+- **852 Python tests + 228 GUI frontend tests = 1080 total**
 - GUI frontend (Vitest + JSDOM): 228 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
 - CI workflow `test.yml` on push/PR to `main`
 - BackupManager: 30 standalone tests
@@ -237,4 +277,4 @@
 
 ---
 
-*Last updated: 2026-06-02*
+*Last updated: 2026-06-29*
