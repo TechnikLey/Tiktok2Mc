@@ -820,7 +820,11 @@ async def _runtime_validation_loop() -> None:
         _health_mon.record_heartbeat("supervisor")
         _health_mon.record_heartbeat("api_server")
 
-        monitored_components = [f"process.{p.name}" for p in supervisor.list_processes()]
+        # Only monitor running processes — disabled/stopped ones don't report heartbeats
+        monitored_components = [
+            f"process.{p.name}" for p in supervisor.list_processes()
+            if p.state == ProcessState.RUNNING
+        ]
         monitored_components.extend(["supervisor", "api_server"])
 
         suite = validate_runtime(
