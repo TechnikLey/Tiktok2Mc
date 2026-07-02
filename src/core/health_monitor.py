@@ -51,7 +51,7 @@ class HealthState(str, enum.Enum):
 
 _VALID_TRANSITIONS: dict[HealthState, set[HealthState]] = {
     HealthState.UNKNOWN:    {HealthState.STARTING},
-    HealthState.STARTING:   {HealthState.RUNNING, HealthState.FAILED, HealthState.DEGRADED, HealthState.STOPPED},
+    HealthState.STARTING:   {HealthState.RUNNING, HealthState.FAILED, HealthState.DEGRADED, HealthState.STOPPING, HealthState.STOPPED},
     HealthState.RUNNING:    {HealthState.DEGRADED, HealthState.FAILED, HealthState.STOPPING, HealthState.RECOVERING},
     HealthState.DEGRADED:   {HealthState.RUNNING, HealthState.FAILED, HealthState.STOPPING, HealthState.RECOVERING},
     HealthState.RECOVERING: {HealthState.RUNNING, HealthState.DEGRADED, HealthState.FAILED, HealthState.STOPPING},

@@ -775,13 +775,17 @@ async def _plugin_health_check_loop() -> None:
             continue
 
         for proc in supervisor.list_processes():
-            if proc.name in _BUILTIN_NAMES or proc.shell:
+            if proc.shell:
                 continue
             if proc.state != ProcessState.RUNNING or proc.proc is None:
                 continue
             if proc.proc.poll() is None:
                 # Process is alive — record heartbeat
                 _health_mon.record_heartbeat(f"process.{proc.name}")
+                continue
+
+            if proc.name in _BUILTIN_NAMES:
+                # Built-in processes are handled by dedicated workers
                 continue
 
             log.warning("Plugin '%s' process died (exit code %d) — updating registry", proc.name, proc.proc.returncode)
@@ -811,6 +815,10 @@ async def _runtime_validation_loop() -> None:
         await asyncio.sleep(_RUNTIME_VALIDATION_INTERVAL)
         if supervisor.state != SupervisorState.RUNNING:
             continue
+
+        # Record heartbeats for supervisor and api_server (they can't report their own)
+        _health_mon.record_heartbeat("supervisor")
+        _health_mon.record_heartbeat("api_server")
 
         monitored_components = [f"process.{p.name}" for p in supervisor.list_processes()]
         monitored_components.extend(["supervisor", "api_server"])
