@@ -20,9 +20,11 @@ from .triggers import router as triggers_router
 from .logs import router as logs_router
 from .servers import router as servers_router
 from .server_lifecycle import router as server_lifecycle_router
+from .diagnostics import router as diagnostics_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
+api_router.include_router(diagnostics_router)
 api_router.include_router(config_router)
 api_router.include_router(plugins_router)
 api_router.include_router(plugin_config_router)

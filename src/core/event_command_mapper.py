@@ -29,6 +29,7 @@ from typing import Any
 
 from core.paths import get_root_dir
 from core.yaml_utils import load_yaml, save_yaml
+from core.health_monitor import get_health_monitor, HealthState
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ class EventCommandMapper:
         self._running = False
         self._history: deque[dict[str, Any]] = deque(maxlen=MAX_HISTORY)
         self._dispatch_counts: dict[str, int] = {}
+        self._health = get_health_monitor()
+        self._health.register("event_command_mapper", HealthState.UNKNOWN)
 
     # ------------------------------------------------------------------
     #  Config helpers
@@ -147,6 +150,11 @@ class EventCommandMapper:
                     "[ECM] Failed to dispatch %s → %s/%s: %s",
                     event_type, target, command, exc,
                 )
+                try:
+                    self._health.record_error("event_command_mapper", f"Dispatch failed: {event_type} -> {target}/{command}: {exc}")
+                    self._health.set_state("event_command_mapper", HealthState.DEGRADED)
+                except Exception:
+                    pass
 
     # ------------------------------------------------------------------
     #  Background loop
@@ -185,6 +193,7 @@ class EventCommandMapper:
         self._ensure_config_file()
         self._running = True
         self._task = asyncio.create_task(self._loop())
+        self._health.set_state("event_command_mapper", HealthState.RUNNING)
 
     async def stop(self) -> None:
         """Stop the background mapper task gracefully."""
@@ -198,6 +207,7 @@ class EventCommandMapper:
             except asyncio.CancelledError:
                 pass
             self._task = None
+        self._health.set_state("event_command_mapper", HealthState.STOPPED)
 
 
 # Module-level singleton

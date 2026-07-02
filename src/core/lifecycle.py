@@ -61,6 +61,7 @@ from collections.abc import Awaitable
 from typing import Any, Callable
 
 from core.paths import get_base_dir, get_root_dir
+from core.health_monitor import get_health_monitor, HealthState
 
 log = logging.getLogger(__name__)
 
@@ -149,6 +150,25 @@ class ManagedProcess:
 
 def _sanitize_session_name(name: str) -> str:
     return name.replace(" ", "-").replace("/", "-").lower()
+
+
+def _update_process_health(proc_name: str, state: ProcessState) -> None:
+    """Update the health monitor for a managed process."""
+    try:
+        hm = get_health_monitor()
+        hstate = {
+            ProcessState.STOPPED: HealthState.STOPPED,
+            ProcessState.STARTING: HealthState.STARTING,
+            ProcessState.RUNNING: HealthState.RUNNING,
+            ProcessState.STOPPING: HealthState.STOPPING,
+            ProcessState.FAILED: HealthState.FAILED,
+        }.get(state)
+        if hstate:
+            hm.set_state(f"process.{proc_name}", hstate)
+            if state == ProcessState.RUNNING:
+                hm.record_heartbeat(f"process.{proc_name}")
+    except Exception:
+        pass
 
 
 def _build_display_env_tmux() -> list[str]:
@@ -255,6 +275,10 @@ class ProcessSupervisor:
         self._runtime_dir = (get_root_dir() / "core" / "runtime").resolve()
         self._runtime_dir.mkdir(parents=True, exist_ok=True)
         self.shutdown_delay = 30.0
+        # Register with health monitor
+        _health = get_health_monitor()
+        _health.register("supervisor", HealthState.UNKNOWN)
+        _health.register("api_server", HealthState.UNKNOWN)
 
     # ------------------------------------------------------------------
     # State helpers
@@ -272,6 +296,22 @@ class ProcessSupervisor:
             self._state = value
         if old != value:
             log.info("[SUPERVISOR] State: %s -> %s", old.value, value.value)
+            # Notify health monitor
+            try:
+                _health = get_health_monitor()
+                _state_map = {
+                    SupervisorState.IDLE: HealthState.UNKNOWN,
+                    SupervisorState.STARTING: HealthState.STARTING,
+                    SupervisorState.RUNNING: HealthState.RUNNING,
+                    SupervisorState.COUNTDOWN: HealthState.RUNNING,
+                    SupervisorState.RESTARTING: HealthState.RECOVERING,
+                    SupervisorState.SHUTTING_DOWN: HealthState.STOPPING,
+                    SupervisorState.COMPLETE: HealthState.STOPPED,
+                }
+                hs = _state_map.get(value, HealthState.UNKNOWN)
+                _health.set_state("supervisor", hs)
+            except Exception as exc:
+                log.debug("[SUPERVISOR] Health monitor update failed: %s", exc)
             for listener in self._state_listeners:
                 try:
                     listener(value)
@@ -348,7 +388,13 @@ class ProcessSupervisor:
                 readiness_timeout=readiness_timeout,
             )
             self._processes[name] = proc
-            return proc
+        # Register with health monitor
+        try:
+            _health = get_health_monitor()
+            _health.register(f"process.{name}", HealthState.STOPPED)
+        except Exception:
+            pass
+        return proc
 
     def unregister(self, name: str) -> bool:
         """Remove a registered process.  Stops it first if running."""
@@ -391,6 +437,7 @@ class ProcessSupervisor:
                 log.info("[SUPERVISOR] %s is already %s", name, proc.state.value)
                 return True
             proc.state = ProcessState.STARTING
+        _update_process_health(name, ProcessState.STARTING)
 
         try:
             await self._do_start(proc)
@@ -411,23 +458,28 @@ class ProcessSupervisor:
                 if not ready:
                     log.error("[SUPERVISOR] %s failed readiness check within %.0fs", name, proc.readiness_timeout)
                     proc.state = ProcessState.FAILED
+                    _update_process_health(name, ProcessState.FAILED)
                     return False
 
             proc.state = ProcessState.RUNNING
             proc.start_time = time.time()
+            _update_process_health(name, ProcessState.RUNNING)
             log.info("[SUPERVISOR] %s started (PID %s)", name, proc.proc.pid if proc.proc else "?")
             return True
         except _ProcessStartupError as exc:
             if exc.intentional:
                 log.warning("[SUPERVISOR] %s", exc)
                 proc.state = ProcessState.STOPPED
+                _update_process_health(name, ProcessState.STOPPED)
             else:
                 log.exception("[SUPERVISOR] Failed to start %s: %s", name, exc)
                 proc.state = ProcessState.FAILED
+                _update_process_health(name, ProcessState.FAILED)
             return False
         except Exception as exc:
             log.exception("[SUPERVISOR] Failed to start %s: %s", name, exc)
             proc.state = ProcessState.FAILED
+            _update_process_health(name, ProcessState.FAILED)
             return False
 
     async def _do_start(self, proc: ManagedProcess) -> None:
@@ -572,10 +624,12 @@ class ProcessSupervisor:
                 if proc.state == ProcessState.STOPPED:
                     return True
             proc.state = ProcessState.STOPPING
+        _update_process_health(name, ProcessState.STOPPING)
 
         try:
             await self._do_stop(proc, graceful_timeout=graceful_timeout, force_timeout=force_timeout)
             proc.state = ProcessState.STOPPED
+            _update_process_health(name, ProcessState.STOPPED)
             proc.proc = None
             proc.session_name = None
             log.info("[SUPERVISOR] %s stopped", name)
@@ -583,6 +637,7 @@ class ProcessSupervisor:
         except Exception as exc:
             log.exception("[SUPERVISOR] Failed to stop %s: %s", name, exc)
             proc.state = ProcessState.FAILED
+            _update_process_health(name, ProcessState.FAILED)
             return False
 
     async def _do_stop(

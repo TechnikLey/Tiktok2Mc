@@ -78,11 +78,24 @@ from core.port_scanner import (
 )
 from core.api.launcher import PluginLauncher
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
+from core.health_monitor import get_health_monitor, HealthState, HealthMonitor
+from core.crash_manager import CrashManager
+from core.error_codes import LIFECYCLE_0001, CORE_0001
+from core.diagnostics import generate_diagnostics_report, generate_diagnostics_markdown
+from core.validation_framework import run_startup_validation, validate_runtime, validate_shutdown, ValidationSuite
 
 log = initialize_logging(__name__)
 
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
+
+# Global crash manager and health monitor
+crash_mgr = CrashManager("start")
+_health_mon = get_health_monitor()
+
+# Runtime validation configuration
+_RUNTIME_VALIDATION_INTERVAL = 30.0
+_RUNTIME_HEARTBEAT_TIMEOUT = 120.0
 
 # -----------------------------
 # Base directory / config
@@ -767,11 +780,15 @@ async def _plugin_health_check_loop() -> None:
             if proc.state != ProcessState.RUNNING or proc.proc is None:
                 continue
             if proc.proc.poll() is None:
+                # Process is alive — record heartbeat
+                _health_mon.record_heartbeat(f"process.{proc.name}")
                 continue
 
             log.warning("Plugin '%s' process died (exit code %d) — updating registry", proc.name, proc.proc.returncode)
             proc.state = ProcessState.FAILED
             proc.restart_count += 1
+            _health_mon.set_state(f"process.{proc.name}", HealthState.FAILED)
+            _health_mon.record_error(f"process.{proc.name}", f"Process died with exit code {proc.proc.returncode}")
 
             try:
                 await _mark_plugin_dead(proc.name)
@@ -788,23 +805,92 @@ async def _plugin_health_check_loop() -> None:
                     log.warning("Failed to write restart signal for '%s': %s", proc.name, exc)
 
 
+async def _runtime_validation_loop() -> None:
+    """Periodic runtime validation of all registered components."""
+    while True:
+        await asyncio.sleep(_RUNTIME_VALIDATION_INTERVAL)
+        if supervisor.state != SupervisorState.RUNNING:
+            continue
+
+        monitored_components = [f"process.{p.name}" for p in supervisor.list_processes()]
+        monitored_components.extend(["supervisor", "api_server"])
+
+        suite = validate_runtime(
+            health_monitor=_health_mon,
+            components=monitored_components,
+            heartbeat_timeout=_RUNTIME_HEARTBEAT_TIMEOUT,
+        )
+
+        critical = suite.critical_failures()
+        if critical:
+            for fail in critical:
+                log.warning("[RUNTIME-VALIDATION] %s", fail.format())
+
+
+# -----------------------------
+# Diagnostics command
+# -----------------------------
+def _log_diagnostics_report() -> None:
+    """Generate and log a diagnostics report."""
+    report = generate_diagnostics_report(crash_mgr)
+    log.info("[DIAGNOSTICS] Health: %d/%d running, %d degraded, %d failed",
+             report["health"]["running"], report["health"]["total_components"],
+             report["health"]["degraded"], report["health"]["failed"])
+    if report["health"]["failed_components"]:
+        log.warning("[DIAGNOSTICS] Failed components: %s", ", ".join(report["health"]["failed_components"]))
+    if report["health"]["degraded_components"]:
+        log.warning("[DIAGNOSTICS] Degraded components: %s", ", ".join(report["health"]["degraded_components"]))
+
+
 # -----------------------------
 # Main
 # -----------------------------
 async def main() -> None:
     """Run the supervisor event loop."""
     supervisor._loop = asyncio.get_running_loop()
+
+    # Install asyncio exception handler via crash manager
+    crash_mgr.install_asyncio(supervisor._loop)
+
+    # Register core components with health monitor
+    _health_mon.register("startup", HealthState.STARTING)
+
     supervisor.state = SupervisorState.STARTING
     supervisor.shutdown_delay = float(SHUTDOWN_DELAY_SECONDS)
 
+    # Run startup validation
+    startup_suite = run_startup_validation(
+        config_path=CONFIG_FILE,
+        required_dirs=[
+            (ROOT_DIR / "config", "config", False),
+            (ROOT_DIR / "logs", "logs", True),
+            (ROOT_DIR / "data", "data", True),
+            (ROOT_DIR / "core" / "runtime", "runtime", True),
+        ],
+    )
+    critical_failures = startup_suite.critical_failures()
+    if critical_failures:
+        for fail in critical_failures:
+            log.error("[STARTUP-VALIDATION] %s", fail.format())
+        log.error("[STARTUP-VALIDATION] %d critical failure(s) — aborting", len(critical_failures))
+        _health_mon.set_state("startup", HealthState.FAILED)
+        input("Press Enter to exit...")
+        sys.exit(1)
+    _health_mon.set_state("startup", HealthState.RUNNING)
+
     await start_api_server()
+    _health_mon.set_state("api_server", HealthState.RUNNING)
 
     # Discover plugins now that the API is available.
     try:
         plugin_registry: list[AppConfig] = await asyncio.to_thread(_launcher.get_plugins)
         _register_plugins(plugin_registry)
     except Exception as exc:
-        log.warning("Plugin discovery failed: %s", exc)
+        crash_mgr.report_error(
+            LIFECYCLE_0001,
+            detail=f"Plugin discovery failed: {exc}",
+            context_info={"phase": "startup"},
+        )
 
     if ALLOW_CLOSE:
         log.info("\nStarting programs... (start script visible)")
@@ -826,9 +912,13 @@ async def main() -> None:
     supervisor.state = SupervisorState.RUNNING
     log.info("\nAll programs have been started.")
 
+    # Log initial diagnostics
+    _log_diagnostics_report()
+
     # Background tasks.
     watcher = asyncio.create_task(check_and_run(), name="signal-watcher")
     health = asyncio.create_task(_plugin_health_check_loop(), name="plugin-health")
+    runtime_val = asyncio.create_task(_runtime_validation_loop(), name="runtime-validation")
     cmd_task = asyncio.create_task(command_loop(), name="command-loop")
 
     # Wait for shutdown to complete.
@@ -836,7 +926,7 @@ async def main() -> None:
     await supervisor._shutdown_complete_event.wait()
 
     # Cancel background tasks.
-    for task in (watcher, health, cmd_task):
+    for task in (watcher, health, runtime_val, cmd_task):
         if not task.done():
             task.cancel()
             try:
@@ -844,21 +934,44 @@ async def main() -> None:
             except asyncio.CancelledError:
                 pass
 
+    # Run shutdown validation
+    shutdown_suite = validate_shutdown(timeout=5.0)
+    if not shutdown_suite.all_passed():
+        for fail in shutdown_suite.failures():
+            log.warning("[SHUTDOWN-VALIDATION] %s", fail.format())
+
     # Stop the API server if still running.
     await supervisor.stop_api_server(timeout=5.0)
+
+    # Log final diagnostics
+    _log_diagnostics_report()
 
     log.info("Shutdown complete.")
 
 
 if __name__ == "__main__":
+    crash_mgr.install()
     install_global_exception_hook("start")
     heartbeat = start_heartbeat(log, interval=60.0)
+
+    # Register the start process itself
+    _health_mon.register("start_process", HealthState.STARTING)
+
     try:
         asyncio.run(main())
+        _health_mon.set_state("start_process", HealthState.STOPPED)
     except KeyboardInterrupt:
         log.info("\nInterrupted by user.")
+        _health_mon.set_state("start_process", HealthState.STOPPED)
     except Exception:
-        handle_unhandled_exception("start")
+        crash_mgr.report_exception(
+            CORE_0001,
+            exc=sys.exc_info()[1],
+            exc_type=sys.exc_info()[0],
+            exc_tb=sys.exc_info()[2],
+            context_info={"source": "start.main"},
+        )
+        _health_mon.set_state("start_process", HealthState.FAILED)
         sys.exit(1)
     finally:
         heartbeat.stop()

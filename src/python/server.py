@@ -15,6 +15,9 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from core.yaml_utils import load_yaml
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
+from core.health_monitor import get_health_monitor, HealthState
+from core.crash_manager import get_crash_manager
+from core.error_codes import MC_0002, MC_0003
 
 log = initialize_logging(__name__)
 install_global_exception_hook("server")
@@ -414,26 +417,38 @@ log.info(f"Port:    {MC_PORT}")
 log.info("--------------------------\n")
 
 heartbeat = start_heartbeat(log, interval=60.0)
+crash_mgr = get_crash_manager()
+health = get_health_monitor()
+health.register("mc_server", HealthState.STARTING)
 try:
+    health.set_state("mc_server", HealthState.RUNNING)
     proc = subprocess.run(
         [str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"],
         cwd=str(INSTANCE_DIR),
     )
     if proc.returncode != 0:
         log.warning("Minecraft server exited with code %s", proc.returncode)
+        crash_mgr.report_error(MC_0003, detail=f"Exit code: {proc.returncode}")
+        health.set_state("mc_server", HealthState.FAILED)
         sys.exit(proc.returncode)
 except FileNotFoundError:
     log.error("Java executable not found: %s", JAVA_EXE)
+    crash_mgr.report_error(MC_0002, detail=str(JAVA_EXE))
+    health.set_state("mc_server", HealthState.FAILED)
     _wait_or_skip()
     sys.exit(1)
 except KeyboardInterrupt:
     log.info("\nServer was stopped manually.")
+    health.set_state("mc_server", HealthState.STOPPED)
 except Exception as e:
     log.error("Failed to start Minecraft server: %s", e)
+    crash_mgr.report_exception(MC_0003, exc=e, context_info={"detail": str(e)})
     handle_unhandled_exception("server")
+    health.set_state("mc_server", HealthState.FAILED)
     _wait_or_skip()
     sys.exit(1)
 finally:
+    health.set_state("mc_server", HealthState.STOPPED)
     heartbeat.stop()
 
 log.info("\nServer stopped.")

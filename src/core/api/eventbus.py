@@ -5,6 +5,9 @@ import logging
 from collections import defaultdict
 from typing import Any
 
+from core.error_codes import CORE_0006
+from core.health_monitor import get_health_monitor, HealthState
+
 log = logging.getLogger(__name__)
 
 ALL_EVENTS = "*"
@@ -74,6 +77,10 @@ class EventBus:
                 q.put_nowait(msg)
             except asyncio.QueueFull:
                 log.warning("Event queue full, dropping %s event", event_type)
+                try:
+                    get_health_monitor().record_error("eventbus", f"{CORE_0006.code}: Queue full, dropping {event_type}")
+                except Exception:
+                    pass
 
 
 # Module-level singleton — import and use directly.

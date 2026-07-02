@@ -28,6 +28,8 @@ from core.paths import get_base_dir
 from core.utils import load_config, normalize_config_version
 from core.api.server import DEFAULT_PORT
 from core.checksum import compute_sha256, fetch_checksum, verify_checksum
+from core.crash_manager import get_crash_manager
+from core.error_codes import UPDATE_0001, UPDATE_0002, UPDATE_0003
 
 import logging
 from core.logger import initialize_logging, install_global_exception_hook, handle_unhandled_exception
@@ -591,11 +593,13 @@ def run_update():
 
 if __name__ == "__main__":
     install_global_exception_hook("update")
+    crash_mgr = get_crash_manager()
     try:
         _init()
         run_update()
     except KeyboardInterrupt:
         log.info("Update interrupted by user.")
-    except Exception:
+    except Exception as exc:
+        crash_mgr.report_exception(UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"})
         handle_unhandled_exception("update")
         sys.exit(1)

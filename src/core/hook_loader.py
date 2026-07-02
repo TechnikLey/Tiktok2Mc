@@ -17,6 +17,8 @@ from core.hook_manifest import (
 )
 from core.hook_registry import get_hook_registry, HookRegistration
 from core.plugin_config import load_plugin_config, save_plugin_config
+from core.crash_manager import get_crash_manager
+from core.error_codes import HOOK_0001, HOOK_0002, HOOK_0003, HOOK_0004, HOOK_0005, HOOK_0007
 
 log = logging.getLogger(__name__)
 
@@ -223,6 +225,7 @@ def _load_single_hook(
     main_py = hook_dir / "main.py"
     if not main_py.exists():
         log.warning("[HOOK] %s: no main.py found — skipping", hook_dir)
+        get_crash_manager().report_error(HOOK_0002, detail=f"{manifest.name}: {main_py}")
         return False
 
     disallowed = _check_imports(main_py)
@@ -232,6 +235,7 @@ def _load_single_hook(
                 "[HOOK] %s uses disallowed import: '%s' — hook skipped.",
                 manifest.name, name,
             )
+            get_crash_manager().report_error(HOOK_0003, detail=f"{manifest.name}: {name}")
         return False
 
     module_name = f"hooks.{manifest.name}"
@@ -243,6 +247,7 @@ def _load_single_hook(
         spec = importlib.util.spec_from_file_location(module_name, main_py)
         if spec is None or spec.loader is None:
             log.warning("[HOOK] Could not create spec for: %s", manifest.name)
+            get_crash_manager().report_error(HOOK_0004, detail=f"{manifest.name}: spec creation failed")
             return False
 
         module = importlib.util.module_from_spec(spec)
@@ -250,9 +255,11 @@ def _load_single_hook(
         spec.loader.exec_module(module)
     except SyntaxError as e:
         log.warning("[HOOK] Syntax error in %s: %s", manifest.name, e)
+        get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
         return False
     except Exception as e:
         log.warning("[HOOK] Failed to load %s: %s", manifest.name, e)
+        get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
         return False
 
     if hasattr(module, "register") and callable(module.register):
@@ -262,9 +269,11 @@ def _load_single_hook(
             return True
         except Exception as e:
             log.warning("[HOOK] register() failed in %s: %s", manifest.name, e)
+            get_crash_manager().report_exception(HOOK_0005, exc=e, context_info={"hook": manifest.name})
             return False
     else:
         log.error("[HOOK] %s/main.py has no register() function — skipped.", hook_dir)
+        get_crash_manager().report_error(HOOK_0007, detail=manifest.name)
         return False
 
 

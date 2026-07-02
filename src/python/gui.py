@@ -26,6 +26,8 @@ if _src not in sys.path:
 from core.paths import get_base_dir, get_root_dir
 from core.api.server import DEFAULT_PORT
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
+from core.health_monitor import get_health_monitor, HealthState
+from core.crash_manager import get_crash_manager
 
 log = initialize_logging(__name__)
 
@@ -339,7 +341,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
                         break
                 except Exception as exc:
                     log.debug("Poll error: %s", exc)
-        t = threading.Thread(target=_poll_api, daemon=True)
+        t = get_crash_manager().supervised_thread(target=_poll_api, name="gui-api-poll", daemon=True)
         t.start()
 
     def _on_closing():
@@ -353,12 +355,18 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
 if __name__ == "__main__":
     install_global_exception_hook("gui")
     heartbeat = start_heartbeat(log, interval=60.0)
+    health = get_health_monitor()
+    health.register("gui", HealthState.STARTING)
     try:
+        health.set_state("gui", HealthState.RUNNING)
         main()
     except KeyboardInterrupt:
         log.info("GUI interrupted by user.")
+        health.set_state("gui", HealthState.STOPPED)
     except Exception:
         handle_unhandled_exception("gui")
+        health.set_state("gui", HealthState.FAILED)
         sys.exit(1)
     finally:
+        health.set_state("gui", HealthState.STOPPED)
         heartbeat.stop()

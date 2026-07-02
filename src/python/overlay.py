@@ -24,6 +24,8 @@ from core.paths import get_base_dir
 from core.api.server import DEFAULT_PORT
 from core.yaml_utils import load_yaml
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
+from core.health_monitor import get_health_monitor, HealthState
+from core.crash_manager import get_crash_manager
 
 log = initialize_logging(__name__)
 
@@ -122,12 +124,19 @@ def main() -> None:
 if __name__ == "__main__":
     install_global_exception_hook("overlay")
     heartbeat = start_heartbeat(log, interval=60.0)
+    crash_mgr = get_crash_manager()
+    health = get_health_monitor()
+    health.register("overlay", HealthState.STARTING)
     try:
+        health.set_state("overlay", HealthState.RUNNING)
         main()
     except KeyboardInterrupt:
         log.info("Overlay interrupted by user.")
+        health.set_state("overlay", HealthState.STOPPED)
     except Exception:
         handle_unhandled_exception("overlay")
+        health.set_state("overlay", HealthState.FAILED)
         sys.exit(1)
     finally:
+        health.set_state("overlay", HealthState.STOPPED)
         heartbeat.stop()

@@ -1,24 +1,24 @@
 """Centralized backup manager — single source of truth for all backups.
-
-All backups are stored under ``data/backups/``, organized by category::
-
-    data/backups/
-    ├── config/                 # Main config.yaml backups
-    ├── plugin_registry/        # api_plugin_registry.json backups
-    ├── migration/              # Pre-migration safety snapshots
-    └── plugins/
-        └── <plugin_name>/      # Per-plugin config.yaml backups
-
-Features
---------
-* **Content deduplication** — SHA-256 hash comparison skips identical backups.
-* **Time coalescing** — skips backup if one was created within the last 60 s.
-* **Retention enforcement** — keeps only the *N* newest backups per category
-  (default: 10, configurable).
-* **Timestamp-based naming** — lexicographically sortable, human-readable
-  filenames (``config.v20260529_143021_123456.yaml.bak``).
-"""
-
+ 
+ All backups are stored under ``data/backups/``, organized by category::
+ 
+     data/backups/
+     ├── config/                 # Main config.yaml backups
+     ├── plugin_registry/        # api_plugin_registry.json backups
+     ├── migration/              # Pre-migration safety snapshots
+     └── plugins/
+         └── <plugin_name>/      # Per-plugin config.yaml backups
+ 
+ Features
+ --------
+ * **Content deduplication** — SHA-256 hash comparison skips identical backups.
+ * **Time coalescing** — skips backup if one was created within the last 60 s.
+ * **Retention enforcement** — keeps only the *N* newest backups per category
+   (default: 10, configurable).
+ * **Timestamp-based naming** — lexicographically sortable, human-readable
+   filenames (``config.v20260529_143021_123456.yaml.bak``).
+ """
+ 
 from __future__ import annotations
 
 import hashlib
@@ -27,6 +27,9 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
+
+from core.error_codes import BACKUP_0001, BACKUP_0002
+from core.crash_manager import get_crash_manager
 
 log = logging.getLogger(__name__)
 

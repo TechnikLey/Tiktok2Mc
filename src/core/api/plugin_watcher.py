@@ -14,6 +14,7 @@ from typing import Set
 
 from core.api.registry import get_registry
 from core.api.models import PluginRegistration
+from core.health_monitor import get_health_monitor, HealthState
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class PluginWatcher:
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._known: Set[str] = set()
+        self._health = get_health_monitor()
+        self._health.register("plugin_watcher", HealthState.STARTING)
 
     def _resolve_plugins_dir(self) -> Path | None:
         if self._plugins_dir is not None:
@@ -84,6 +87,7 @@ class PluginWatcher:
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+        self._health.set_state("plugin_watcher", HealthState.RUNNING)
         log.info("Plugin watcher started (poll interval: %ss)", _POLL_INTERVAL)
 
     def stop(self) -> None:
@@ -91,6 +95,7 @@ class PluginWatcher:
         if self._thread is not None:
             self._thread.join(timeout=5)
             self._thread = None
+        self._health.set_state("plugin_watcher", HealthState.STOPPED)
         log.info("Plugin watcher stopped")
 
     def _run(self) -> None:

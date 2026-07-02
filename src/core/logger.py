@@ -7,6 +7,7 @@ Provides:
 - Periodic heartbeat logging for long-running processes
 - Non-blocking / asynchronous file logging via QueueHandler
 - Recurrence pattern tracking for frequent crashes
+- Integration with ``CrashManager`` and ``HealthMonitor``
 
 Usage:
     from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat
@@ -41,6 +42,10 @@ try:
     _PSUTIL_AVAILABLE = True
 except ImportError:
     _PSUTIL_AVAILABLE = False
+
+# Lazy imports for integration — imported inside functions to avoid cycles
+_CRASH_MANAGER: Any = None
+_CRASH_MANAGER_LOCK = threading.Lock()
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -250,6 +255,15 @@ class Heartbeat:
                 parts.append(f"memory_percent={mem['percent']}%")
 
             self.logger.info(" | ".join(parts))
+
+            # Report heartbeat to health monitor
+            try:
+                from core.health_monitor import get_health_monitor
+                hm = get_health_monitor()
+                hm.record_heartbeat("process." + (self.logger.name or "unknown"))
+            except Exception:
+                pass
+
         except Exception as exc:
             self.logger.debug("Heartbeat error: %s", exc)
 

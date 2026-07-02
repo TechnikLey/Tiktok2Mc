@@ -36,6 +36,7 @@ from typing import Any
 from core import parse_args, get_base_dir
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
+from core.health_monitor import get_health_monitor, HealthState
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +102,14 @@ class BasePlugin:
 
         # Command dispatch table — subclasses register handlers here
         self._handlers: dict[str, Any] = {}
+
+        # Register with health monitor
+        try:
+            hm = get_health_monitor()
+            hm.register(f"plugin.{self.PLUGIN_NAME}", HealthState.STARTING)
+            self._health = hm
+        except Exception:
+            self._health = None
 
     # -- properties --------------------------------------------------------
 
@@ -217,6 +226,8 @@ class BasePlugin:
                         handler(args)
                     except Exception as e:
                         log.exception("[%s] Handler '%s' failed: %s", self.PLUGIN_NAME, cmd, e)
+                        if self._health:
+                            self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"handler '{cmd}' failed: {e}")
                 else:
                     # Fall through to subclass ``on_command`` override
                     self.on_command(cmd, args)
@@ -238,6 +249,8 @@ class BasePlugin:
                 self.on_tick()
             except Exception as e:
                 log.exception("[%s] Tick failed: %s", self.PLUGIN_NAME, e)
+                if self._health:
+                    self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"on_tick failed: {e}")
             heartbeat_counter += 1
             if heartbeat_counter >= self._HEARTBEAT_INTERVAL:
                 heartbeat_counter = 0
@@ -248,6 +261,9 @@ class BasePlugin:
                     )
                 except Exception:
                     pass
+                # Report heartbeat to health monitor
+                if self._health:
+                    self._health.record_heartbeat(f"plugin.{self.PLUGIN_NAME}")
             time.sleep(1)
 
     # -- subclass hooks -----------------------------------------------------
@@ -287,6 +303,10 @@ class BasePlugin:
 
     def run(self) -> None:
         """Main entry point: register overlay, start threads, open window."""
+        if self._health:
+            self._health.set_state(f"plugin.{self.PLUGIN_NAME}", HealthState.RUNNING)
+            self._health.record_heartbeat(f"plugin.{self.PLUGIN_NAME}")
+
         html = self.get_overlay_html()
         self.register_overlay(html)
 

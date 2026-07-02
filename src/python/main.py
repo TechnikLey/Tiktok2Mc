@@ -39,6 +39,9 @@ from core.api.eventbus import event_bus
 from core.api.plugin_overlay import command_queue
 from core.plugin_config import discover_plugins_dir, load_plugin_manifest
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
+from core.health_monitor import get_health_monitor, HealthState
+from core.crash_manager import get_crash_manager
+from core.error_codes import TIKTOK_0001, TIKTOK_0002, TIKTOK_0003, TIKTOK_0004, TIKTOK_0005, MC_0004, MC_0005, MC_0006, MC_0007, HOOK_0006
 
 log = initialize_logging(__name__)
 
@@ -564,6 +567,7 @@ async def rcon_worker():
         except Exception as e:
             log.info(f"[RCON OFFLINE] {e}")
             ctx.rcon_connection = None
+            get_crash_manager().report_exception(MC_0004, exc=e, context_info={"source": "rcon_worker"})
             await asyncio.sleep(5)
             retry_key = repr((commands, source_user))
             retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
@@ -573,8 +577,10 @@ async def rcon_worker():
                     await ctx.rcon_queue.put((commands, source_user))
                 except Exception as e:
                     log.info(f"RCON Queue Error: {e}")
+                    get_crash_manager().report_exception(MC_0005, exc=e, context_info={"retries": retries})
             else:
                 log.info(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
+                get_crash_manager().report_error(MC_0006, detail=f"After {retries} attempts: {commands}")
                 ctx.rcon_queue_retries.pop(retry_key, None)
             await asyncio.sleep(wait_time)
             continue
@@ -606,6 +612,7 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
                     HOOK_ACTIONS[action](source_user, action, {})
                 except Exception as e:
                     log.warning(f"[HOOK] Error in action '{action}': {e}")
+                    get_crash_manager().report_exception(HOOK_0006, exc=e, context_info={"action": action, "trigger": trigger_name})
             elif action:
                 log.warning(f"[HOOK] Unknown script action: '{action}'") 
 
@@ -673,10 +680,12 @@ async def trigger_worker():
                 await execute_global_command(trigger, source_user, chain_depth)
             except Exception as e:
                 log.info(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
+                get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"trigger": trigger, "user": str(source_user)})
             finally:
                 ctx.trigger_queue.task_done()
         except Exception as e_outer:
             log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
+            get_crash_manager().report_exception(TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"})
             await asyncio.sleep(0.1)  
 
 
@@ -697,6 +706,7 @@ def _publish_event(event_type: str, event_data: dict) -> None:
         urllib.request.urlopen(req, timeout=3)
     except Exception as exc:
         log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
+        get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type, "target": "eventbus_api"})
 
 
 @app.route('/webhook', methods=['POST'])
@@ -749,6 +759,7 @@ def _publish_event(event_type: str, event_data: dict) -> None:
         urllib.request.urlopen(req, timeout=3)
     except Exception as exc:
         log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
+        get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type, "target": "eventbus_api_webhook"})
 
 
 def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) -> None:
@@ -793,6 +804,7 @@ def _dispatch_comment_http(cmd_url, username, cmd_text):
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:
         log.info(f"[COMMENT CMD] HTTP dispatch failed: {e}")
+        get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"source": "_dispatch_comment_http", "url": cmd_url})
 
 
 def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
@@ -817,9 +829,12 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
     """Publish a TikTok event to the EventBus for plugins to consume."""
     if ctx.main_loop is not None:
         data = {"type": event_type, "user": user, **extra}
-        asyncio.run_coroutine_threadsafe(
-            event_bus.publish(f"tiktok.{event_type}", data), ctx.main_loop
-        )
+        try:
+            asyncio.run_coroutine_threadsafe(
+                event_bus.publish(f"tiktok.{event_type}", data), ctx.main_loop
+            )
+        except Exception as exc:
+            get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type})
 
 
 def _load_event_subscriptions() -> dict[str, list[str]]:
@@ -910,6 +925,7 @@ async def _event_bridge_worker():
 
         except Exception as e:
             log.info(f"[EVENT-BRIDGE] Error handling event: {e}")
+            get_crash_manager().report_exception(TIKTOK_0004, exc=e, context_info={"source": "_event_bridge_worker"})
         finally:
             q.task_done()
 
@@ -1282,8 +1298,9 @@ def create_client(user):
                 except asyncio.QueueFull:
                     log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
 
-        except Exception:
+        except Exception as exc:
             log.exception("ERROR IN ON_GIFT EVENT")
+            get_crash_manager().report_exception(TIKTOK_0003, exc=exc, context_info={"source": "on_gift"})
 
     # =========================
     # FOLLOW events
@@ -1319,6 +1336,7 @@ def create_client(user):
                 ctx._last_like_event = now
         except Exception as e:
             log.info(f"[EVENT ERROR] Error in like handling: {e}")
+            get_crash_manager().report_exception(TIKTOK_0003, exc=e, context_info={"source": "on_like"})
 
     # ========================
     # Join events
@@ -1578,9 +1596,12 @@ async def run_bot():
     """Main async loop: initializes config, builds the datapack,
     starts all workers, and connects to TikTok Live."""
     ctx.main_loop = asyncio.get_running_loop()
+    health = get_health_monitor()
+    health.set_state("tiktok_bridge", HealthState.RUNNING)
     
     if not load_config():
         log.info("Error in load_config")
+        health.set_state("tiktok_bridge", HealthState.FAILED)
         sys.exit(1)
 
     # TikTok username check: warn if still default, but do not block startup.
@@ -1631,11 +1652,16 @@ async def run_bot():
 
     threading.Thread(target=run_signal_server, daemon=True).start()
 
-    asyncio.create_task(trigger_worker())
-    asyncio.create_task(rcon_worker())
-    asyncio.create_task(_event_bridge_worker())
-    asyncio.create_task(gift_revenue_counter())
-    asyncio.create_task(_reload_signal_watcher())
+    crash_mgr = get_crash_manager()
+    for name, coro in [
+        ("trigger_worker", trigger_worker()),
+        ("rcon_worker", rcon_worker()),
+        ("_event_bridge_worker", _event_bridge_worker()),
+        ("gift_revenue_counter", gift_revenue_counter()),
+        ("_reload_signal_watcher", _reload_signal_watcher()),
+    ]:
+        task = asyncio.create_task(coro, name=name)
+        crash_mgr.observe_task(task, component="tiktok_bridge")
 
     while True:
         with ctx.tiktok_lock:
@@ -1666,9 +1692,11 @@ async def run_bot():
             if "DEVICE_BLOCKED" in error_str or bool(_RE_ERR_CODE_200.search(error_str)):
                 log.info("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 log.info("[TIP] Wait 15 minutes or restart your router.")
+                get_crash_manager().report_exception(TIKTOK_0001, exc=e, context_info={"block_reason": "DEVICE_BLOCKED"})
                 await asyncio.sleep(900)
             else:
                 log.info(f"[..] Reconnect in {ctx.reconnect_delay}s...")
+                get_crash_manager().report_exception(TIKTOK_0002, exc=e, context_info={"reconnect_delay": ctx.reconnect_delay})
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
@@ -1681,14 +1709,21 @@ async def run_bot():
 if __name__ == "__main__":
     install_global_exception_hook("main")
     heartbeat = start_heartbeat(log, interval=60.0)
+    crash_mgr = get_crash_manager()
+    health = get_health_monitor()
+    health.register("tiktok_bridge", HealthState.STARTING)
     try:
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(run_bot())
+        health.set_state("tiktok_bridge", HealthState.STOPPED)
     except KeyboardInterrupt:
         log.info("\n[STOP] Script stopped manually.")
+        health.set_state("tiktok_bridge", HealthState.STOPPED)
     except Exception:
         handle_unhandled_exception("main")
+        health.set_state("tiktok_bridge", HealthState.FAILED)
         sys.exit(1)
     finally:
+        health.set_state("tiktok_bridge", HealthState.STOPPED)
         heartbeat.stop()
