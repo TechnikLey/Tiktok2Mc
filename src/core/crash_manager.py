@@ -225,6 +225,7 @@ class CrashManager:
         context_info: Optional[dict[str, Any]] = None,
     ) -> ErrorInstance:
         """Report a non-exception error with a structured error code."""
+        self._crash_count += 1
         instance = error_code.with_context(
             module=self.module_name,
             detail=detail,

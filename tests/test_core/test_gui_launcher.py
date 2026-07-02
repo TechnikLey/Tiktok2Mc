@@ -18,6 +18,7 @@ if str(_src) not in sys.path:
 
 # Mock webview and logging before importing gui.py to prevent file I/O
 sys.modules["webview"] = MagicMock()
+_core_logger_original = sys.modules.get("core.logger")
 sys.modules["core.logger"] = MagicMock()
 sys.modules["core.logger"].initialize_logging = MagicMock(return_value=MagicMock())
 sys.modules["core.logger"].install_global_exception_hook = MagicMock()
@@ -30,6 +31,15 @@ from python.gui import (
     IS_WINDOWS,
     START_EXE,
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _restore_core_logger():
+    yield
+    if _core_logger_original is not None:
+        sys.modules["core.logger"] = _core_logger_original
+    else:
+        sys.modules.pop("core.logger", None)
 
 
 class TestApiReady:

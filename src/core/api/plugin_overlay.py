@@ -85,8 +85,9 @@ class CommandQueue:
         Returns immediately if commands are already pending.
         Raises ``asyncio.TimeoutError`` if *timeout* elapses.
         """
-        event: asyncio.Event
         with self._lock:
+            if plugin_name in self._queues and self._queues[plugin_name]:
+                return
             if plugin_name not in self._events:
                 self._events[plugin_name] = asyncio.Event()
             event = self._events[plugin_name]
