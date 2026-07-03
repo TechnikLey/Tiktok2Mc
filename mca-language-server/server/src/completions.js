@@ -1,15 +1,11 @@
 // Completion provider for MCA files.
 //
-// Provides context-aware completions:
-//   - Trigger names (event triggers, gift IDs, custom names)
-//   - Command prefixes (/, !, $, &, >>)
-//   - Known script names
-//   - Placeholders ({user}, {comment})
-//   - Multiplier syntax
-//   - Snippets for common patterns
+// Provides context-aware completions derived from the shared mca-spec.json
+// (generated from the Python implementation).
 
 const {
-  COMMAND_PREFIXES, KNOWN_EVENT_TRIGGERS, PLACEHOLDERS, SNIPPETS,
+  getEventTriggers, getEventTriggerDocs, getCommandPrefixes,
+  getPlaceholders, getRules, NAMED_OVERLAY_RE,
 } = require('./language');
 
 const CompletionItemKind = {
@@ -18,9 +14,20 @@ const CompletionItemKind = {
   Value: 13,
   Function: 2,
   Constant: 9,
-  Class: 5,
-  Property: 10,
   Operator: 20,
+};
+
+// Priority scores for sorting completions (higher = more relevant)
+const PRIORITY = {
+  EXACT_MATCH: 100,
+  PREFIX_MATCH: 80,
+  CONTEXT_TRIGGER: 70,
+  CONTEXT_COMMAND: 60,
+  CONTEXT_SCRIPT: 55,
+  CONTEXT_PLACEHOLDER: 50,
+  CONTEXT_MULTIPLIER: 45,
+  SNIPPET: 30,
+  GENERIC: 10,
 };
 
 /**
@@ -28,60 +35,59 @@ const CompletionItemKind = {
  */
 function getContext(line, character) {
   const before = line.slice(0, character);
-  
-  // Check if we're before the colon (trigger name area)
-  const colonIdx = line.indexOf(':');
-  
-  // Check if we're in a comment
+
   const hashIdx = line.indexOf('#');
   if (hashIdx >= 0 && hashIdx < character && !before.includes(':')) {
     return { type: 'comment' };
   }
 
+  const colonIdx = line.indexOf(':');
+
   if (colonIdx < 0 || character <= colonIdx + 1) {
-    // Before or at the colon -- trigger name area
-    const triggerPart = colonIdx >= 0 ? line.slice(0, colonIdx) : line.slice(0, character);
-    const afterColon = colonIdx >= 0 ? line.slice(colonIdx + 1, character) : '';
-    return { type: 'trigger', triggerPart, afterColon };
+    return { type: 'trigger', triggerPart: colonIdx >= 0 ? line.slice(0, colonIdx) : '' };
   }
 
-  // After colon -- command area
   const afterColon = line.slice(colonIdx + 1, character);
-  const cmdPart = line.slice(colonIdx + 1);
-
-  // Check if just after a semicolon (new command)
   const lastSemi = afterColon.lastIndexOf(';');
-  const currentCmd = lastSemi >= 0 ? afterColon.slice(lastSemi + 1).trim() : afterColon.trim();
+  const currentCmd = lastSemi >= 0 ? afterColon.slice(lastSemi + 1) : afterColon;
 
-  // Check if we're at the end of a command (multiplier area)
   const atEnd = character >= line.length || /^\s*$/.test(line.slice(character));
 
-  // Detect if cursor is right after a prefix character
-  if (currentCmd === '' && (afterColon.endsWith('/') || afterColon.endsWith('!') || 
-      afterColon.endsWith('$') || afterColon.endsWith('&') || afterColon.endsWith('>'))) {
-    const prefixChar = currentCmd === '' ? afterColon.trimEnd().slice(-1) : '';
-    if (prefixChar === '>') {
-      return { type: 'overlay_body', cmdPart: currentCmd };
+  // If cursor is right after $, suggest scripts
+  if (currentCmd.trim() === '$') {
+    return { type: 'script_name', cmdPart: '' };
+  }
+
+  // If cursor is right after @, suggest overlay names
+  if (currentCmd.trim() === '@') {
+    return { type: 'overlay_name', cmdPart: '' };
+  }
+
+  // If cursor is at end after space, suggest multiplier
+  if (atEnd && /\s$/.test(afterColon) && currentCmd.trim().length > 0) {
+    const lastChar = currentCmd.trimEnd().slice(-1);
+    if (lastChar === 'x') {
+      return { type: 'multiplier_value', cmdPart: currentCmd.trim() };
     }
-    return { type: 'command_body', prefix: prefixChar, cmdPart: currentCmd };
+    return { type: 'multiplier', cmdPart: currentCmd.trim() };
   }
 
-  // Detect multiplier context (end of command, space before)
-  if (atEnd && currentCmd.length > 0 && /\s$/.test(afterColon)) {
-    return { type: 'multiplier', cmdPart: currentCmd };
+  // Middle of command — detect prefix for ranking
+  const trimmed = currentCmd.trim();
+  if (trimmed.startsWith('$')) {
+    return { type: 'script_body', cmdPart: trimmed };
+  }
+  if (trimmed.startsWith('@')) {
+    return { type: 'overlay_body', cmdPart: trimmed };
+  }
+  if (trimmed === '' || trimmed.length === 0) {
+    return { type: 'command_start', cmdPart: '' };
+  }
+  if (trimmed.includes('{')) {
+    return { type: 'placeholder', cmdPart: trimmed };
   }
 
-  // In the middle of a command
-  if (currentCmd.length > 0) {
-    // Check for { placeholder
-    if (currentCmd.endsWith('{')) {
-      return { type: 'placeholder', cmdPart: currentCmd };
-    }
-    return { type: 'command_body', cmdPart: currentCmd };
-  }
-
-  // Start of command area
-  return { type: 'command_start', cmdPart: '' };
+  return { type: 'command_body', cmdPart: trimmed };
 }
 
 function provideCompletions(document, position) {
@@ -91,24 +97,31 @@ function provideCompletions(document, position) {
   const character = position.character;
 
   const completions = [];
-  
+
   try {
     const ctx = getContext(line, character);
 
     if (ctx.type === 'trigger') {
-      // -- Trigger name completions ---------------------------------------
-      // Event triggers
-      for (const t of KNOWN_EVENT_TRIGGERS) {
+      // -- Trigger name completions (ranked: event triggers first) ----
+      const eventTriggers = getEventTriggers();
+      const eventDocs = getEventTriggerDocs();
+      const docMap = {};
+      for (const d of eventDocs) docMap[d.name] = d.doc;
+
+      for (const t of eventTriggers) {
+        const priority = line.length <= 1 ? PRIORITY.EXACT_MATCH : PRIORITY.CONTEXT_TRIGGER;
         completions.push({
-          label: t.name,
+          label: t,
           kind: CompletionItemKind.Keyword,
           detail: 'Event trigger',
-          documentation: t.doc,
-          insertText: `${t.name}:`,
+          documentation: docMap[t] || '',
+          insertText: `${t}:`,
+          data: { priority },
+          sortText: String(100000 - priority).padStart(6, '0'),
         });
       }
 
-      // Add common gift ID examples (from defaults/actions.mca)
+      // Gift ID examples
       const giftExamples = [
         { id: '5655', name: 'Rose' },
         { id: '16111', name: 'Mamma Mia' },
@@ -122,122 +135,171 @@ function provideCompletions(document, position) {
           label: g.id,
           kind: CompletionItemKind.Value,
           detail: `Gift: ${g.name}`,
-          documentation: `Gift ID for ${g.name}`,
           insertText: `${g.id}:`,
+          data: { priority: PRIORITY.GENERIC },
+          sortText: String(100000 - PRIORITY.GENERIC).padStart(6, '0'),
         });
       }
 
-      // Quoted trigger suggestion
+      // Quoted trigger
       completions.push({
         label: "'quoted trigger'",
         kind: CompletionItemKind.Snippet,
         detail: 'Trigger with spaces',
-        documentation: 'Use single quotes for trigger names containing spaces.',
         insertText: "'${1:trigger name}':",
+        insertTextFormat: 2,
+        data: { priority: PRIORITY.SNIPPET },
+        sortText: String(100000 - PRIORITY.SNIPPET).padStart(6, '0'),
       });
 
       // Snippets
-      for (const s of SNIPPETS) {
+      const snippets = [
+        { label: 'Basic trigger', insert: '${1:name}:${2:/cmd}', doc: 'Basic trigger with a Minecraft command' },
+        { label: 'Overlay', insert: '${1:name}:>>${2:Title}|${3:Subtitle}|${4:3}', doc: 'Trigger with overlay text' },
+        { label: 'Chain commands', insert: '${1:name}:${2:/cmd1} ; ${3:/cmd2}', doc: 'Multiple semicolon-chained commands' },
+        { label: 'Shell command', insert: '${1:name}:&${2:curl ...}', doc: 'Host shell command' },
+        { label: 'Script action', insert: '${1:name}:\\$${2:random}', doc: 'Hook script invocation' },
+        { label: 'Disabled trigger', insert: '##${1:name}:${2:/cmd}', doc: 'Disabled trigger (## prefix)' },
+        { label: 'Multiplier', insert: '${1:name}:${2:/cmd} x${3:5}', doc: 'Repeat command N times' },
+        { label: 'Named overlay', insert: '${1:name}:@${2:screen}>>${3:Title}|${4:3}', doc: 'Overlay to named screen' },
+      ];
+      for (const s of snippets) {
         completions.push({
           label: s.label,
           kind: CompletionItemKind.Snippet,
           detail: 'Snippet',
           documentation: s.doc,
-          insertText: s.insertText,
-          insertTextFormat: 2, // SnippetTextFormat
+          insertText: s.insert,
+          insertTextFormat: 2,
+          data: { priority: PRIORITY.SNIPPET },
+          sortText: String(100000 - PRIORITY.SNIPPET).padStart(6, '0'),
         });
       }
-    } else if (ctx.type === 'command_start' || ctx.type === 'command_body') {
-      // -- Command prefix completions -------------------------------------
-      for (const [prefix, info] of Object.entries(COMMAND_PREFIXES)) {
+    } else if (ctx.type === 'command_start') {
+      // -- Command prefix completions (highest priority at command start) --
+      const prefixes = getCommandPrefixes();
+      for (const [prefix, info] of Object.entries(prefixes)) {
         completions.push({
           label: prefix,
           kind: CompletionItemKind.Operator,
           detail: info.label,
-          documentation: info.doc,
+          documentation: info.doc || '',
           insertText: prefix,
+          data: { priority: PRIORITY.EXACT_MATCH },
+          sortText: String(100000 - PRIORITY.EXACT_MATCH).padStart(6, '0'),
         });
       }
-
-      // Script names (known scripts from the Python hook system)
+    } else if (ctx.type === 'script_name' || ctx.type === 'script_body') {
+      // -- Script names (highest priority after $) -----------------------
       completions.push({
         label: '$random',
         kind: CompletionItemKind.Function,
         detail: 'Built-in script: random trigger',
-        documentation: 'Executes the commands of a randomly selected trigger from the file. Configured via random/config.yaml.',
+        documentation: 'Executes the commands of a randomly selected trigger. Configured via random/config.yaml.',
         insertText: '$random',
+        data: { priority: PRIORITY.CONTEXT_SCRIPT },
+        sortText: String(100000 - PRIORITY.CONTEXT_SCRIPT).padStart(6, '0'),
       });
-
-      // Named overlay prefix
+    } else if (ctx.type === 'overlay_name') {
+      // -- Overlay name suggestions (after @) --------------------------
       completions.push({
-        label: '@name>>',
+        label: 'screenName>>',
         kind: CompletionItemKind.Operator,
-        detail: 'Named overlay',
-        documentation: 'Send overlay text to a specific named overlay screen.',
-        insertText: '@${1:screenName}>>',
+        detail: 'Named overlay target',
+        documentation: 'Replace screenName with your overlay screen identifier.',
+        insertText: '${1:screenName}>>',
         insertTextFormat: 2,
+        data: { priority: PRIORITY.EXACT_MATCH },
+        sortText: String(100000 - PRIORITY.EXACT_MATCH).padStart(6, '0'),
       });
-
-      // Placeholders
-      for (const p of PLACEHOLDERS) {
-        completions.push({
-          label: p.name,
-          kind: CompletionItemKind.Constant,
-          detail: 'Placeholder',
-          documentation: p.doc,
-          insertText: p.name,
-        });
-      }
-    } else if (ctx.type === 'overlay_body') {
-      // -- Overlay body hints --------------------------------------------
-      completions.push({
-        label: 'Title|Subtitle|Duration',
-        kind: CompletionItemKind.Snippet,
-        detail: 'Overlay format',
-        documentation: '>>Title|Subtitle|Duration\n- Title: Main text (large)\n- Subtitle: Subtext (small, optional)\n- Duration: seconds (optional, default: 3)',
-        insertText: '${1:Title}|${2:Subtitle}|${3:3}',
-        insertTextFormat: 2,
-      });
-
-      for (const p of PLACEHOLDERS) {
-        completions.push({
-          label: p.name,
-          kind: CompletionItemKind.Constant,
-          detail: 'Placeholder',
-          documentation: p.doc,
-          insertText: p.name,
-        });
-      }
     } else if (ctx.type === 'multiplier') {
-      // -- Multiplier completions ----------------------------------------
-      for (const n of [2, 3, 5, 10, 25, 50, 100]) {
+      // -- Multiplier suggestions (ranked by common values) --------------
+      const multValues = [
+        { n: 2, doc: 'Repeat 2 times' },
+        { n: 3, doc: 'Repeat 3 times' },
+        { n: 5, doc: 'Repeat 5 times' },
+        { n: 10, doc: 'Repeat 10 times' },
+        { n: 25, doc: 'Repeat 25 times' },
+        { n: 50, doc: 'Repeat 50 times' },
+        { n: 100, doc: '⚠️ High — may cause lag. Add # ignore-lag to suppress warning.' },
+      ];
+      for (const m of multValues) {
         completions.push({
-          label: `x${n}`,
+          label: `x${m.n}`,
           kind: CompletionItemKind.Value,
-          detail: `Repeat ${n} times`,
-          documentation: n > 50 ? 'High multiplier — may cause lag. Add # ignore-lag to suppress warning.' : '',
-          insertText: `x${n}`,
+          detail: `${m.n}× repeat`,
+          documentation: m.doc,
+          insertText: `x${m.n}`,
+          data: { priority: PRIORITY.CONTEXT_MULTIPLIER },
+          sortText: String(100000 - PRIORITY.CONTEXT_MULTIPLIER + (100 - m.n)).padStart(6, '0'),
+        });
+      }
+    } else if (ctx.type === 'multiplier_value') {
+      // After typing "x", suggest just the number
+      const multValues = [2, 3, 5, 10, 25, 50, 100];
+      for (const n of multValues) {
+        completions.push({
+          label: String(n),
+          kind: CompletionItemKind.Value,
+          detail: `${n}× repeat`,
+          insertText: String(n),
+          data: { priority: PRIORITY.CONTEXT_MULTIPLIER },
+          sortText: String(100000 - PRIORITY.CONTEXT_MULTIPLIER + (100 - n)).padStart(6, '0'),
         });
       }
     } else if (ctx.type === 'placeholder') {
-      // -- Placeholder completions ---------------------------------------
-      for (const p of PLACEHOLDERS) {
+      // -- Placeholder completions (only valid in context) --------------
+      const placeholders = getPlaceholders();
+      for (const p of placeholders) {
         completions.push({
           label: p.name,
           kind: CompletionItemKind.Constant,
           detail: 'Placeholder',
-          documentation: p.doc,
+          documentation: p.doc || '',
           insertText: p.name,
+          data: { priority: PRIORITY.CONTEXT_PLACEHOLDER },
+          sortText: String(100000 - PRIORITY.CONTEXT_PLACEHOLDER).padStart(6, '0'),
+        });
+      }
+    } else if (ctx.type === 'command_body' || ctx.type === 'overlay_body') {
+      // -- Inside a command body, suggest placeholders with medium priority
+      const placeholders = getPlaceholders();
+      for (const p of placeholders) {
+        completions.push({
+          label: p.name,
+          kind: CompletionItemKind.Constant,
+          detail: 'Placeholder',
+          documentation: p.doc || '',
+          insertText: p.name,
+          data: { priority: PRIORITY.CONTEXT_PLACEHOLDER },
+          sortText: String(100000 - PRIORITY.CONTEXT_PLACEHOLDER).padStart(6, '0'),
+        });
+      }
+
+      // Overlay body template
+      if (ctx.type === 'overlay_body') {
+        completions.push({
+          label: 'Title|Subtitle|Duration',
+          kind: CompletionItemKind.Snippet,
+          detail: 'Overlay format',
+          documentation: '>>Title|Subtitle|Duration\nTitle: required\nSubtitle: optional\nDuration: seconds (default 3)',
+          insertText: '${1:Title}|${2:Subtitle}|${3:3}',
+          insertTextFormat: 2,
+          data: { priority: PRIORITY.SNIPPET },
+          sortText: String(100000 - PRIORITY.SNIPPET).padStart(6, '0'),
         });
       }
     }
   } catch (err) {
-    // Fallback: return basic completions even on error
-    for (const prefix of Object.keys(COMMAND_PREFIXES)) {
+    // Fallback: return basic prefix completions
+    const prefixes = getCommandPrefixes();
+    for (const prefix of Object.keys(prefixes)) {
       completions.push({
         label: prefix,
         kind: CompletionItemKind.Operator,
         insertText: prefix,
+        data: { priority: 0 },
+        sortText: '999999',
       });
     }
   }
@@ -246,7 +308,6 @@ function provideCompletions(document, position) {
 }
 
 function resolveCompletion(item) {
-  // Enrich item if needed
   return item;
 }
 

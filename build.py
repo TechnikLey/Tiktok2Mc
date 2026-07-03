@@ -6,6 +6,7 @@
 import sys
 import os
 import hashlib
+import json
 import shutil
 import subprocess
 import uuid
@@ -49,8 +50,286 @@ if _src not in sys.path:
 
 from core.version import TOOL_VERSION, UPDATER_VERSION
 
+# ── MCA spec sources and paths
+MCA_SPEC_SOURCES = [
+    "src/core/validator.py",
+    "src/core/api/services/actions.py",
+    "tools/generate_mca_spec.py",
+]
+MCA_SPEC_OUTPUT = "mca-language-server/mca-spec.json"
+MCA_EXTENSION_DIR = "mca-language-server"
+MCA_SERVER_TEST_DIR = "mca-language-server/server/test"
+
+
+def _spec_source_hashes() -> dict[str, str]:
+    """Return {relative_path: sha256} for all files that feed into the MCA spec."""
+    hashes = {}
+    for rel in MCA_SPEC_SOURCES:
+        p = Path(__file__).resolve().parent / rel
+        if p.exists():
+            hashes[rel] = _sha256_file(p)
+        else:
+            hashes[rel] = ""
+    return hashes
+
+
+def _sha256_file(filepath: Path) -> str:
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _generate_mca_spec(force: bool = False) -> bool:
+    """Generate MCA language spec JSON from Python sources.
+    
+    Returns True if the spec was generated (or was already current).
+    Raises RuntimeError on failure.
+    """
+    script = Path(__file__).resolve().parent / "tools" / "generate_mca_spec.py"
+    if not script.exists():
+        raise RuntimeError(f"MCA spec generator not found: {script}")
+
+    # Incremental: check if any source file has changed
+    if not force:
+        cache = Path(__file__).resolve().parent / "build" / "cache" / "mca_spec_hashes.json"
+        current_hashes = _spec_source_hashes()
+        if cache.exists():
+            try:
+                cached = json.loads(cache.read_text(encoding="utf-8"))
+                if cached.get("hashes") == current_hashes:
+                    output = Path(__file__).resolve().parent / MCA_SPEC_OUTPUT
+                    if output.exists():
+                        cprint("MCA spec up to date (no source changes).", Color.GRAY)
+                        return True
+            except Exception:
+                pass
+
+    cprint("Generating MCA language specification...", Color.CYAN)
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"MCA spec generation failed:\n{result.stderr.strip()}"
+        )
+    for line in result.stdout.strip().split("\n"):
+        cprint(f"  {line}", Color.GRAY)
+
+    # Persist hash cache for incremental builds
+    cache = Path(__file__).resolve().parent / "build" / "cache" / "mca_spec_hashes.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(
+        json.dumps({"hashes": _spec_source_hashes()}, indent=2),
+        encoding="utf-8",
+    )
+    return True
+
+
+def _validate_mca_spec() -> None:
+    """Validate that the generated mca-spec.json is correct.
+    
+    Raises RuntimeError if validation fails.
+    """
+    spec_path = Path(__file__).resolve().parent / MCA_SPEC_OUTPUT
+    if not spec_path.exists():
+        raise RuntimeError(f"MCA spec not found: {spec_path}")
+
+    try:
+        data = json.loads(spec_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"MCA spec is not valid JSON: {e}")
+
+    required = ["version", "event_triggers", "command_prefixes", "diagnostic_codes",
+                 "placeholders", "patterns", "validation_rules"]
+    missing = [k for k in required if k not in data]
+    if missing:
+        raise RuntimeError(f"MCA spec missing required fields: {', '.join(missing)}")
+
+    if not isinstance(data.get("event_triggers"), list) or len(data["event_triggers"]) == 0:
+        raise RuntimeError("MCA spec: event_triggers must be a non-empty list")
+
+    if not isinstance(data.get("command_prefixes"), dict) or len(data["command_prefixes"]) == 0:
+        raise RuntimeError("MCA spec: command_prefixes must be a non-empty dict")
+
+    if not isinstance(data.get("diagnostic_codes"), list) or len(data["diagnostic_codes"]) == 0:
+        raise RuntimeError("MCA spec: diagnostic_codes must be a non-empty list")
+
+    cprint("MCA specification valid.", Color.GRAY)
+
+
+def _run_mca_tests() -> None:
+    """Run the MCA language server test suite.
+    
+    Raises RuntimeError if any test fails.
+    """
+    test_runner = Path(__file__).resolve().parent / MCA_SERVER_TEST_DIR / "run.js"
+    if not test_runner.exists():
+        raise RuntimeError(f"MCA test runner not found: {test_runner}")
+
+    cprint("Running MCA language server tests...", Color.CYAN)
+    result = subprocess.run(
+        ["node", str(test_runner)],
+        capture_output=True, text=True, timeout=60,
+    )
+    # Print test output regardless of pass/fail
+    for line in result.stdout.strip().split("\n"):
+        cprint(f"  {line}", Color.GRAY if "PASS" in line else (
+            Color.RED if "FAIL" in line else Color.GRAY))
+
+    if result.returncode != 0 or "FAIL" in result.stdout:
+        raise RuntimeError("MCA language server tests FAILED.")
+    cprint("All MCA language server tests passed.", Color.GREEN)
+
+
+def _find_vsce() -> str:
+    """Locate the vsce CLI tool path."""
+    npm_dir = Path(os.environ.get("APPDATA", "")) / "npm"
+
+    # Check for vsce.cmd (Windows) or vsce (Unix)
+    for name in ["vsce.cmd", "vsce"]:
+        p = npm_dir / name
+        if p.exists():
+            return str(p)
+
+    # Check via npx
+    for npx_name in ["npx.cmd", "npx"]:
+        npx_path = shutil.which(npx_name)
+        if npx_path:
+            return f"{npx_path} --yes @vscode/vsce"
+
+    raise RuntimeError(
+        "vsce not found. Install it: npm install -g @vscode/vsce"
+    )
+
+
+def _package_vsix(extension_dir: Path) -> Path:
+    """Package the VSIX extension.
+    
+    Returns the path to the generated .vsix file.
+    Raises RuntimeError on failure.
+    """
+    vsce_cmd = _find_vsce()
+    cprint("Packaging VSIX...", Color.CYAN)
+
+    # vsce outputs the vsix to the current directory
+    result = subprocess.run(
+        vsce_cmd.split() + ["package", "--allow-missing-repository"],
+        capture_output=True, text=True, timeout=120,
+        cwd=str(extension_dir),
+    )
+    for line in result.stdout.strip().split("\n"):
+        cprint(f"  {line}", Color.GRAY)
+
+    # Parse the output to find the generated .vsix path
+    vsix_name = None
+    for line in result.stdout.split("\n"):
+        line = line.strip()
+        if line.endswith(".vsix"):
+            vsix_name = line
+            break
+
+    if not vsix_name:
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"VSIX packaging failed:\n{result.stderr.strip()}"
+            )
+        # Fallback: guess the filename from package name + version
+        pkg = json.loads((extension_dir / "package.json").read_text(encoding="utf-8"))
+        vsix_name = f"{pkg['name']}-{pkg['version']}.vsix"
+
+    vsix_path = extension_dir / vsix_name
+    if not vsix_path.exists():
+        raise RuntimeError(f"VSIX not found at expected path: {vsix_path}")
+
+    return vsix_path
+
+
+def _verify_vsix(path: Path) -> None:
+    """Verify the generated VSIX package exists and is valid."""
+    if not path.exists():
+        raise RuntimeError(f"VSIX package not found: {path}")
+
+    size = path.stat().st_size
+    if size == 0:
+        raise RuntimeError(f"VSIX package is empty: {path}")
+
+    cprint(f"  Size: {size / 1024:.1f} KB", Color.GRAY)
+
+
+def _build_vsix_pipeline(start_time: float) -> None:
+    """Full VSIX build pipeline."""
+    mca_dir = Path(__file__).resolve().parent / MCA_EXTENSION_DIR
+
+    # ── Step 1: Validate Python sources ──
+    cprint("\n[1/6] Validating Python sources...", Color.CYAN)
+    for rel in MCA_SPEC_SOURCES[:2]:  # only the Python implementation files
+        src = Path(__file__).resolve().parent / rel
+        if src.exists():
+            try:
+                compile(src.read_text(encoding="utf-8"), str(src), "exec")
+            except SyntaxError as e:
+                raise RuntimeError(f"Syntax error in {rel}: {e}")
+    cprint("      Python sources OK", Color.GREEN)
+
+    # ── Step 2: Generate MCA spec (forced) ──
+    cprint("[2/6] Generating MCA language specification...", Color.CYAN)
+    _generate_mca_spec(force=True)
+    cprint("      Specification generated", Color.GREEN)
+
+    # ── Step 3: Validate generated spec ──
+    cprint("[3/6] Validating generated specification...", Color.CYAN)
+    _validate_mca_spec()
+    cprint("      Specification valid", Color.GREEN)
+
+    # ── Step 4: Run extension tests ──
+    cprint("[4/6] Running language server tests...", Color.CYAN)
+    _run_mca_tests()
+
+    # ── Step 5: Package VSIX ──
+    cprint("[5/6] Packaging extension...", Color.CYAN)
+    vsix_path = _package_vsix(mca_dir)
+    cprint("      Extension packaged", Color.GREEN)
+
+    # ── Step 6: Verify package ──
+    cprint("[6/6] Verifying package...", Color.CYAN)
+    _verify_vsix(vsix_path)
+    cprint("      Package verified", Color.GREEN)
+
+    # ── Report ──
+    elapsed = time.time() - start_time
+    mins, secs = divmod(elapsed, 60)
+    cprint(f"\n{'=' * 50}", Color.GREEN)
+    cprint(f"VSIX build completed in {int(mins):02d}:{secs:06.3f}", Color.GREEN)
+    cprint(f"Output: {vsix_path}", Color.GREEN)
+    cprint(f"{'=' * 50}", Color.GREEN)
+
+
 def main():
     start = time.time()
+
+    BUILD_VSIX = "--vsix" in sys.argv
+
+    if BUILD_VSIX:
+        try:
+            _build_vsix_pipeline(start)
+            return
+        except Exception as e:
+            elapsed = time.time() - start
+            mins, secs = divmod(elapsed, 60)
+            cprint(f"\n{'=' * 50}", Color.RED)
+            cprint(f"VSIX build FAILED in {int(mins):02d}:{secs:06.3f}", Color.RED)
+            cprint(f"{'=' * 50}", Color.RED)
+            cprint(f"\nError: {e}", Color.RED)
+            sys.exit(1)
+
+    # Regenerate MCA language spec before main build (incremental)
+    try:
+        _generate_mca_spec(force=False)
+    except RuntimeError as e:
+        cprint(f"Warning: {e}", Color.YELLOW)
 
     try:
         # ----- Configuration -----

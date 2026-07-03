@@ -1,6 +1,10 @@
 // Hover provider — returns rich markdown documentation for tokens under the cursor.
+// Documentation is derived from the shared mca-spec.json.
 
-const { COMMAND_PREFIXES, KNOWN_EVENT_TRIGGERS, PLACEHOLDERS, NAMED_OVERLAY_RE } = require('./language');
+const {
+  getCommandPrefixes, getEventTriggerDocs, getPlaceholders,
+  getRules, NAMED_OVERLAY_RE,
+} = require('./language');
 const { parseLine } = require('./parser');
 
 function provideHover(document, position) {
@@ -19,13 +23,20 @@ function provideHover(document, position) {
     const tEnd = tStart + result.trigger.length;
     if (character >= tStart && character <= tEnd) {
       const trigger = result.trigger;
-      const eventTrigger = KNOWN_EVENT_TRIGGERS.find(t => t.name === trigger);
+      const docs = getEventTriggerDocs();
+      const found = docs.find(d => d.name === trigger);
 
-      if (eventTrigger) {
+      if (found) {
         return {
           contents: {
             kind: 'markdown',
-            value: `**\`${trigger}\`** — Event Trigger\n\n${eventTrigger.doc}\n\n_Trigger names are case-sensitive._`,
+            value: [
+              `**\`${trigger}\`** — Event Trigger`,
+              '',
+              found.doc || '',
+              '',
+              '_Trigger names are case-sensitive._',
+            ].join('\n'),
           },
         };
       }
@@ -34,7 +45,7 @@ function provideHover(document, position) {
         return {
           contents: {
             kind: 'markdown',
-            value: `**\`${trigger}\`** — Gift ID\n\nNumeric gift ID trigger. Fires when this specific gift is sent.\n\nSee TikTok Live gift IDs for known values.`,
+            value: `**\`${trigger}\`** — Gift ID\n\nNumeric gift ID trigger. Fires when this specific TikTok gift is sent.\n\nAllowed characters: \`A-Z\`, \`a-z\`, \`0-9\`, \`_\`.`,
           },
         };
       }
@@ -42,7 +53,7 @@ function provideHover(document, position) {
       return {
         contents: {
           kind: 'markdown',
-          value: `**\`${trigger}\`** — Custom Trigger\n\nUser-defined trigger name.\n\nAllowed characters: \`A-Z\`, \`a-z\`, \`0-9\`, \`_\`. Use single quotes for spaces.`,
+          value: `**\`${trigger}\`** — Custom Trigger\n\nUser-defined trigger name.\n\nAllowed characters: \`A-Z\`, \`a-z\`, \`0-9\`, \`_\`. Use single quotes for names with spaces.`,
         },
       };
     }
@@ -58,13 +69,14 @@ function provideHover(document, position) {
     }
 
     // -- Hover over command prefixes -------------------------------------
-    for (const [prefix, info] of Object.entries(COMMAND_PREFIXES)) {
+    const prefixes = getCommandPrefixes();
+    for (const [prefix, info] of Object.entries(prefixes)) {
       const idx = rawLine.indexOf(prefix, result.colonIndex);
       if (idx >= 0 && character >= idx && character < idx + prefix.length) {
         return {
           contents: {
             kind: 'markdown',
-            value: `**\`${prefix}\`** — ${info.label}\n\n${info.doc}`,
+            value: `**\`${prefix}\`** — ${info.label}\n\n${info.doc || ''}`,
           },
         };
       }
@@ -87,13 +99,14 @@ function provideHover(document, position) {
     }
 
     // -- Hover over placeholders -----------------------------------------
-    for (const p of PLACEHOLDERS) {
+    const placeholders = getPlaceholders();
+    for (const p of placeholders) {
       const idx = rawLine.indexOf(p.name);
       if (idx >= 0 && character >= idx && character < idx + p.name.length) {
         return {
           contents: {
             kind: 'markdown',
-            value: `**\`${p.name}\`** — Placeholder\n\n${p.doc}`,
+            value: `**\`${p.name}\`** — Placeholder\n\n${p.doc || ''}`,
           },
         };
       }
@@ -105,8 +118,12 @@ function provideHover(document, position) {
       const idx = rawLine.lastIndexOf(`x${multMatch[1]}`);
       if (character >= idx && character < idx + multMatch[0].trim().length) {
         const amount = parseInt(multMatch[1], 10);
+        const rules = getRules() || {};
+        const threshold = rules.high_multi_threshold || 50;
         let warning = '';
-        if (amount > 50) warning = '\n\n⚠️ High multiplier — this may cause lag. Add `# ignore-lag` to suppress the warning.';
+        if (amount > threshold) {
+          warning = '\n\n⚠️ High multiplier — this may cause lag. Add `# ignore-lag` to suppress the warning.';
+        }
         return {
           contents: {
             kind: 'markdown',

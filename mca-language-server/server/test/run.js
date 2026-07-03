@@ -3,6 +3,7 @@
 
 console.log('=== MCA Language Server Tests ===\n');
 
+require('./test_spec');
 require('./test_parser');
 require('./test_validator');
 require('./test_completions');

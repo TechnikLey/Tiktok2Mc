@@ -1,9 +1,6 @@
 // MCA line parser.  Mirrors the logic in
 // src/core/validator.py (validate_text) and
 // src/core/api/services/actions.py (ActionsService.parse).
-//
-// Each parseLine() call returns a structured object describing one line,
-// or null for comment-only / empty lines.
 
 const { NAMED_OVERLAY_RE, TRIGGER_NAME_RE, QUOTED_TRIGGER_RE, MULTIPLIER_RE, VALID_PREFIX_CHARS } = require('./language');
 
@@ -18,18 +15,21 @@ function parseLine(rawLine, lineNumber) {
   // -- Detect disabled trigger (##) and full-line comment (#) ----------
   let isDisabled = false;
   let codeLine; // the line we will actually parse
+  let effectiveRaw; // the raw_line as modified by ## stripping (for offset computation)
 
   {
     const stripped = trimmed.trimStart();
     if (stripped.startsWith('##')) {
       isDisabled = true;
-      // Reconstruct: preserve leading whitespace, strip ##
       const lead = trimmed.slice(0, trimmed.length - trimmed.trimStart().length);
       codeLine = lead + stripped.slice(2);
+      // Reconstruct effective raw line: same as Python: lead + content_after_##
+      effectiveRaw = codeLine;
     } else if (stripped.startsWith('#')) {
-      return null; // full-line comment
+      return null;
     } else {
       codeLine = trimmed;
+      effectiveRaw = rawLine;
     }
   }
 
@@ -74,7 +74,8 @@ function parseLine(rawLine, lineNumber) {
     let cmdStartGlobal;
 
     if (trimmedCmd) {
-      const found = rawLine.indexOf(trimmedCmd, cmdGlobalOffset);
+      // Search in effectiveRaw (may have ## stripped, matching Python behavior)
+      const found = effectiveRaw.indexOf(trimmedCmd, cmdGlobalOffset);
       cmdStartGlobal = found >= 0 ? found : cmdGlobalOffset;
     } else {
       cmdStartGlobal = cmdGlobalOffset;
@@ -93,7 +94,8 @@ function parseLine(rawLine, lineNumber) {
 
   return {
     lineNumber,
-    rawLine,
+    rawLine,          // original raw line
+    effectiveRaw,     // raw line after ## stripping (for offset lookups, matches Python behavior)
     isDisabled,
     commentText,
     baseOffset: offset,

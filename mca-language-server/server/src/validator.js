@@ -4,8 +4,9 @@
 // format (severity, range, message, code, source).
 
 const {
-  COMMAND_PREFIXES, NAMED_OVERLAY_RE, TRIGGER_NAME_RE,
-  QUOTED_TRIGGER_RE, MULTIPLIER_RE, VALID_PREFIX_CHARS,
+  getCommandPrefixes, getPlaceholders, getRules, getPatterns,
+  NAMED_OVERLAY_RE, MULTIPLIER_RE, TRIGGER_NAME_RE,
+  QUOTED_TRIGGER_RE, VALID_PREFIX_CHARS,
 } = require('./language');
 const { parseLine } = require('./parser');
 
@@ -33,13 +34,15 @@ function validateDocument(text) {
   const diagnostics = [];
   const lines = text.split('\n');
   const seenTriggers = new Set();
+  const rules = getRules() || {};
+  const highMultiThreshold = rules.high_multi_threshold || 50;
 
   for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
     try {
       const rawLine = lines[lineNumber];
       const result = parseLine(rawLine, lineNumber);
 
-      if (!result) continue; // comment / empty line
+      if (!result) continue;
 
       if (result.isError) {
         diagnostics.push(diag(
@@ -63,7 +66,6 @@ function validateDocument(text) {
           ));
         }
       } else {
-        // No content after colon
         diagnostics.push(diag(
           ln, result.colonIndex, result.colonIndex + 1,
           'No content after \':\' (no commands).',
@@ -161,8 +163,6 @@ function validateDocument(text) {
       seenTriggers.add(result.trigger);
 
       // -- 7. Command validation ----------------------------------------
-      const cmdStr = result.lineWithoutComment.slice(result.colonRelIndex + 1);
-
       for (let ci = 0; ci < result.commands.length; ci++) {
         const cmd = result.commands[ci];
 
@@ -177,11 +177,9 @@ function validateDocument(text) {
 
         const t = cmd.text;
 
-        // Detect prefix
         const isOverlay = t.startsWith('>>') || NAMED_OVERLAY_RE.test(t);
 
         if (isOverlay) {
-          // {comment} placeholder check
           if (t.includes('{comment}') && result.trigger.toLowerCase() !== 'comment') {
             const phPos = cmd.startChar + t.indexOf('{comment}');
             diagnostics.push(diag(ln, phPos, phPos + '{comment}'.length,
@@ -189,7 +187,6 @@ function validateDocument(text) {
               DiagnosticSeverity.Error, 'comment_placeholder_wrong_trigger'));
           }
 
-          // Multiplier on overlay
           const multOv = t.match(MULTIPLIER_RE);
           if (multOv) {
             const token = `x${multOv[1]}`;
@@ -201,7 +198,6 @@ function validateDocument(text) {
         } else {
           const firstChar = t[0];
           if (firstChar === '@') {
-            // Could be named overlay but didn't match -- check
             if (!NAMED_OVERLAY_RE.test(t)) {
               diagnostics.push(diag(ln, cmd.startChar, cmd.endChar,
                 'Invalid overlay prefix — expected @name>>.',
@@ -221,13 +217,12 @@ function validateDocument(text) {
           const xToken = `x${amount}`;
           const xPos = cmd.startChar + t.lastIndexOf(xToken);
 
-          if (amount > 50 && !result.rawLine.includes('# ignore-lag')) {
+          if (amount > highMultiThreshold && !(result.effectiveRaw || result.rawLine).includes('# ignore-lag')) {
             diagnostics.push(diag(ln, xPos, xPos + xToken.length,
               `Performance warning: x${amount} is very high.`,
               DiagnosticSeverity.Warning, 'high_multi'));
           }
         } else {
-          // Check for invalid multiplier (x followed by non-numeric)
           const badMult = t.match(/\s+x([^\s]+)\s*$/);
           if (badMult && !/^\d+$/.test(badMult[1])) {
             const token = `x${badMult[1]}`;
@@ -239,7 +234,6 @@ function validateDocument(text) {
         }
       }
     } catch (err) {
-      // Robustness: never crash the language server
       diagnostics.push(diag(
         lineNumber, 0, Math.max(1, lines[lineNumber].length),
         `Internal error: ${err.message}`,

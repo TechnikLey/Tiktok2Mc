@@ -70,11 +70,11 @@ test('provides multiplier completions at end of command', () => {
   assert.ok(labels.includes('x10'));
 });
 
-test('provides named overlay completion', () => {
-  const doc = makeDoc('test: ');
+test('provides named overlay completion after @', () => {
+  const doc = makeDoc('test:@');
   const results = provideCompletions(doc, { line: 0, character: 6 });
   const labels = results.map(r => r.label);
-  assert.ok(labels.includes('@name>>'));
+  assert.ok(labels.some(l => l.includes('screenName')));
 });
 
 test('resolveCompletion returns item unchanged', () => {

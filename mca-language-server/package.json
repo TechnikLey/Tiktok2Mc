@@ -53,7 +53,11 @@
   },
   "scripts": {
     "vscode:prepublish": "echo 'No compile needed for JS'",
-    "postinstall": "cd client && npm install && cd ../server && npm install"
+    "postinstall": "cd client && npm install && cd ../server && npm install",
+    "test": "node server/test/run.js",
+    "benchmark": "node server/test/benchmark.js",
+    "generate-spec": "python ../tools/generate_mca_spec.py",
+    "diff-test": "python ../tools/diff_test_mca.py --count 500"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",

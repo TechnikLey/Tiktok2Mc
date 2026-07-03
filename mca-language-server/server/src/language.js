@@ -1,90 +1,117 @@
-// Language definition for MCA (derived from src/core/validator.py and
-// src/core/api/services/actions.py in the Python codebase).
+// Language definitions for MCA.
 //
-// Keep this file in sync when the Python implementation changes.
+// This file is generated from mca-spec.json (which is itself generated from
+// the Python implementation: src/core/validator.py and
+// src/core/api/services/actions.py).
+//
+// DO NOT edit language rules here directly — update the Python source,
+// regenerate the spec, then re-read:  python tools/generate_mca_spec.py
+//
+// If the spec file cannot be loaded, fallback values are used so the
+// extension remains functional.
 
-const COMMAND_PREFIXES = {
-  '/': { type: 'vanilla', label: 'Vanilla Minecraft', doc: 'Minecraft command executed via datapack .mcfunction' },
-  '!': { type: 'rcon', label: 'RCON', doc: 'Command sent directly via RCON connection' },
-  '$': { type: 'script', label: 'Script', doc: 'Hook script action registered via HOOK_ACTIONS' },
-  '&': { type: 'shell', label: 'Shell', doc: 'Host shell command executed via subprocess' },
+const fs = require('fs');
+const path = require('path');
+
+// ── Load spec ───────────────────────────────────────────────────────────
+let spec = null;
+const specPaths = [
+  path.join(__dirname, '..', '..', 'mca-spec.json'),    // development layout
+  path.join(__dirname, '..', 'mca-spec.json'),           // alternate layout
+];
+
+for (const p of specPaths) {
+  try {
+    if (fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, 'utf-8');
+      spec = JSON.parse(raw);
+      break;
+    }
+  } catch (e) {
+    // silently continue to fallback
+  }
+}
+
+// ── Fallback constants (used only when spec loading fails) ──────────────
+
+const FALLBACK_EVENT_TRIGGERS = ['follow', 'join', 'comment', 'likes', 'like_2', 'share'];
+
+const FALLBACK_PREFIXES = {
+  '/': { type: 'vanilla', label: 'Vanilla Minecraft', doc: 'Minecraft command via datapack' },
+  '!': { type: 'rcon', label: 'RCON', doc: 'Command sent directly via RCON' },
+  '$': { type: 'script', label: 'Script', doc: 'Hook script action' },
+  '&': { type: 'shell', label: 'Shell', doc: 'Host shell command' },
   '>>': { type: 'overlay', label: 'Overlay', doc: 'Overlay text: >>Title|Subtitle|Duration' },
 };
 
-const NAMED_OVERLAY_RE = /^@(\w+)>>/;
-
-const KNOWN_EVENT_TRIGGERS = [
-  { name: 'follow', doc: 'Fires when someone follows the stream' },
-  { name: 'join', doc: 'Fires when someone joins the stream' },
-  { name: 'comment', doc: 'Fires when someone sends a chat comment ({comment} is available)' },
-  { name: 'likes', doc: 'Fires every N likes (configurable in config.yaml)' },
-  { name: 'like_2', doc: 'Fires at a bigger milestone (default: 100_000 likes)' },
-  { name: 'share', doc: 'Fires when someone shares the stream' },
+const FALLBACK_PLACEHOLDERS = [
+  { name: '{user}', triggers: ['all'], doc: 'Replaced with the triggering user\'s display name' },
+  { name: '{comment}', triggers: ['comment'], doc: 'Replaced with comment text (only on "comment" trigger)' },
 ];
 
-const VALID_PREFIX_CHARS = ['/', '!', '$', '&'];
+const FALLBACK_RULES = {
+  high_multi_threshold: 50,
+  valid_prefix_chars: ['/', '!', '$', '&'],
+};
 
+// ── Accessors ───────────────────────────────────────────────────────────
+
+function getEventTriggers() {
+  if (spec && spec.event_triggers) return spec.event_triggers;
+  return FALLBACK_EVENT_TRIGGERS;
+}
+
+function getEventTriggerDocs() {
+  if (spec && spec.event_trigger_docs) return spec.event_trigger_docs;
+  return FALLBACK_EVENT_TRIGGERS.map(name => ({ name, doc: '' }));
+}
+
+function getCommandPrefixes() {
+  if (spec && spec.command_prefixes) return spec.command_prefixes;
+  return FALLBACK_PREFIXES;
+}
+
+function getPlaceholders() {
+  if (spec && spec.placeholders) return spec.placeholders;
+  return FALLBACK_PLACEHOLDERS;
+}
+
+function getRules() {
+  if (spec && spec.validation_rules) return spec.validation_rules;
+  return FALLBACK_RULES;
+}
+
+function getPatterns() {
+  if (spec && spec.patterns) return spec.patterns;
+  return {};
+}
+
+function getSpec() {
+  return spec;
+}
+
+// ── Compiled regex patterns (from spec or fallback) ─────────────────────
+
+const NAMED_OVERLAY_RE = /^@(\w+)>>/;
+const MULTIPLIER_RE = /\s+x(\d+)\s*$/;
+const INVALID_MULTIPLIER_RE = /\s+x([^\s]+)\s*$/;
 const TRIGGER_NAME_RE = /^[A-Za-z0-9_]+$/;
 const QUOTED_TRIGGER_RE = /^'[A-Za-z0-9_ ]+'$/;
-
-const MULTIPLIER_RE = /\s+x(\d+)\s*$/;
-
-const PLACEHOLDERS = [
-  { name: '{user}', doc: 'Replaced with the triggering user\'s display name', triggers: ['all'] },
-  { name: '{comment}', doc: 'Replaced with comment text (only works on the "comment" trigger)', triggers: ['comment'] },
-];
-
-const SNIPPETS = [
-  {
-    label: 'Trigger with vanilla command',
-    insertText: '${1:trigger_name}:${2:/command}',
-    doc: 'Basic trigger with a Minecraft command',
-  },
-  {
-    label: 'Trigger with overlay',
-    insertText: '${1:trigger_name}:>>${2:Title}|${3:Subtitle}|${4:3}',
-    doc: 'Trigger that sends text to the overlay',
-  },
-  {
-    label: 'Trigger with multiple commands',
-    insertText: '${1:trigger_name}:${2:/command1} ; ${3:/command2}',
-    doc: 'Chain multiple commands with semicolons',
-  },
-  {
-    label: 'Trigger with shell command',
-    insertText: '${1:trigger_name}:&${2:curl http://localhost:29191/add}',
-    doc: 'Trigger that runs a shell command on the host',
-  },
-  {
-    label: 'Trigger with script action',
-    insertText: '${1:trigger_name}:$${2:random}',
-    doc: 'Trigger that invokes a hook script',
-  },
-  {
-    label: 'Disabled trigger',
-    insertText: '##${1:trigger_name}:${2:/command}',
-    doc: 'Disabled trigger (prefixed with ##)',
-  },
-  {
-    label: 'Command with multiplier',
-    insertText: '${1:trigger_name}:${2:/command} x${3:5}',
-    doc: 'Repeat a command N times with xN multiplier',
-  },
-  {
-    label: 'Named overlay',
-    insertText: '${1:trigger_name}:@${2:screenName}>>${3:Title}|${4:Subtitle}|${5:3}',
-    doc: 'Overlay text sent to a specific named overlay screen',
-  },
-];
+const VALID_PREFIX_CHARS = getRules().valid_prefix_chars || FALLBACK_RULES.valid_prefix_chars;
 
 module.exports = {
-  COMMAND_PREFIXES,
+  getEventTriggers,
+  getEventTriggerDocs,
+  getCommandPrefixes,
+  getPlaceholders,
+  getRules,
+  getPatterns,
+  getSpec,
+  // Exposed regex constants for direct use in other modules
   NAMED_OVERLAY_RE,
-  KNOWN_EVENT_TRIGGERS,
-  VALID_PREFIX_CHARS,
+  MULTIPLIER_RE,
+  INVALID_MULTIPLIER_RE,
   TRIGGER_NAME_RE,
   QUOTED_TRIGGER_RE,
-  MULTIPLIER_RE,
-  PLACEHOLDERS,
-  SNIPPETS,
+  VALID_PREFIX_CHARS,
 };
