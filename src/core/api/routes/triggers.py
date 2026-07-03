@@ -1,6 +1,10 @@
 """API routes for the Event Tester (trigger simulator).
 
 All endpoints are prefixed with ``/api/v1`` by the central router.
+
+These routes are thin: they collect input from the request, delegate
+to ``TriggerService`` (which wraps the shared ``TriggerEngine``), and
+return structured responses.  No trigger execution logic lives here.
 """
 
 from __future__ import annotations
@@ -28,7 +32,6 @@ router = APIRouter(tags=["Triggers"])
 
 @router.get("/triggers/types", response_model=TriggerTypesResponse)
 async def list_trigger_types():
-    """Return the predefined trigger/event types available for testing."""
     try:
         types = get_trigger_service().get_event_types()
         return TriggerTypesResponse(types=types)
@@ -39,14 +42,6 @@ async def list_trigger_types():
 
 @router.post("/triggers/execute", response_model=TriggerResponse)
 async def execute_trigger(body: TriggerExecuteRequest):
-    """Execute a simulated trigger event.
-
-    The trigger flows through the same pipeline as a real TikTok event so
-    that test behaviour is indistinguishable from production behaviour.
-
-    Additionally, the trigger is published to the EventBus so that any
-    configured event reactions (event_commands.yaml) are also fired.
-    """
     try:
         result = get_trigger_service().execute_trigger(
             trigger=body.trigger,
@@ -54,18 +49,19 @@ async def execute_trigger(body: TriggerExecuteRequest):
             gift_id=body.gift_id,
         )
 
-        # Also publish to EventBus so reactions fire
         event_type = body.trigger
         if body.gift_id:
             event_type = "gift"
-        event_data = {
-            "user": body.user,
-            "gift_id": body.gift_id,
-            "test": True,
-            "source": "trigger_tester",
-        }
         asyncio.ensure_future(
-            event_bus.publish(f"tiktok.{event_type}", event_data)
+            event_bus.publish(
+                f"tiktok.{event_type}",
+                {
+                    "user": body.user,
+                    "gift_id": body.gift_id,
+                    "test": True,
+                    "source": "trigger_tester",
+                },
+            )
         )
 
         return TriggerResponse(
@@ -83,18 +79,16 @@ async def execute_trigger(body: TriggerExecuteRequest):
 
 @router.post("/triggers/tiktok-connection", response_model=TiktokToggleResponse)
 async def toggle_tiktok_connection():
-    """Toggle the TikTok live-stream connection on/off.
-
-    This is a system control operation, not an event simulation.
-    It directly toggles the bridge's ``disable_tiktok_connect`` flag.
-    """
     try:
         result = get_trigger_service().toggle_tiktok_connection()
         asyncio.ensure_future(
-            event_bus.publish("system.tiktok_toggle", {
-                "connected": result.get("connected", False),
-                "source": "trigger_tester",
-            })
+            event_bus.publish(
+                "system.tiktok_toggle",
+                {
+                    "connected": result.get("connected", False),
+                    "source": "trigger_tester",
+                },
+            )
         )
         return TiktokToggleResponse(
             status=result.get("status", "error"),
@@ -110,14 +104,6 @@ async def toggle_tiktok_connection():
 
 @router.post("/triggers/comment", response_model=TriggerResponse)
 async def send_test_comment(body: TriggerCommentRequest):
-    """Execute a simulated comment event.
-
-    The comment flows through the same pipeline as a real TikTok comment so
-    that test behaviour is indistinguishable from production behaviour.
-
-    Additionally, the comment is published to the EventBus so that any
-    configured event reactions (event_commands.yaml) are also fired.
-    """
     try:
         result = get_trigger_service().send_comment(
             user=body.user,
@@ -127,15 +113,18 @@ async def send_test_comment(body: TriggerCommentRequest):
             fanclub=body.fanclub,
         )
         asyncio.ensure_future(
-            event_bus.publish("tiktok.comment", {
-                "user": body.user,
-                "text": body.text,
-                "moderator": body.moderator,
-                "superfan": body.superfan,
-                "fanclub": body.fanclub,
-                "test": True,
-                "source": "trigger_tester",
-            })
+            event_bus.publish(
+                "tiktok.comment",
+                {
+                    "user": body.user,
+                    "text": body.text,
+                    "moderator": body.moderator,
+                    "superfan": body.superfan,
+                    "fanclub": body.fanclub,
+                    "test": True,
+                    "source": "trigger_tester",
+                },
+            )
         )
         return TriggerResponse(
             status=result.get("status", "error"),
@@ -152,7 +141,6 @@ async def send_test_comment(body: TriggerCommentRequest):
 
 @router.get("/triggers/history", response_model=TriggerHistoryResponse)
 async def get_trigger_history():
-    """Return the in-memory session history of triggered events."""
     try:
         entries = get_trigger_service().get_history()
         return TriggerHistoryResponse(history=entries)

@@ -382,6 +382,7 @@ class TriggerHistoryEntry(BaseModel):
     payload: dict[str, Any]
     status: str
     message: str = ""
+    success: bool = True
 
 
 class TriggerHistoryResponse(BaseModel):

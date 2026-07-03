@@ -79,7 +79,7 @@ def main():
             {"name": "server",         "src": "src/python/server.py",         "dest": "core"},
             {"name": "overlay",        "src": "src/python/overlay.py",        "dest": "core"},
             {"name": "start",          "src": "src/python/start.py",          "dest": ""},
-            {"name": "test_trigger",   "src": "tests/send_trigger.py",        "dest": "test"},
+            {"name": "test_trigger",   "src": "src/python/send_trigger.py",    "dest": "test"},
         ]
 
         # ----- Preparation & Directory Structure -----

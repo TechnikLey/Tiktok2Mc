@@ -1,14 +1,16 @@
+"""Tests for TriggerService (API-layer wrapper around TriggerEngine)."""
+
+from __future__ import annotations
+
 import json
-import sys
 import time
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
-
 from core.api.services.trigger_service import TriggerService, get_trigger_service
+from core.trigger_engine import TriggerEngine
+from core.trigger_engine.models import ExecutionStatus, TriggerResult
 
 
 class TestTriggerService:
@@ -47,95 +49,193 @@ class TestTriggerService:
         ok, msg = svc.can_execute()
         assert ok is True
 
-    @patch("core.api.services.trigger_service.urllib.request.urlopen")
-    def test_execute_trigger_http_success(self, mock_urlopen):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps({"status": "ok", "trigger": "follow", "user": "TestUser"}).encode()
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
-
+    def test_debounce_message_on_block(self):
         svc = TriggerService()
-        svc._webhook_port = 29188
+        svc._last_execution = time.time()
+        ok, msg = svc.can_execute()
+        assert "wait" in msg.lower()
+        assert "s before" in msg.lower()
+
+    def test_execute_trigger_records_history(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="follow",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "follow", "user": "TestUser"},
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10  # bypass debounce
+
         result = svc.execute_trigger("follow", "TestUser")
 
-        assert result["status"] == "ok"
+        assert result["status"] == "success"
         assert len(svc.get_history()) == 1
-        assert svc.get_history()[0]["kind"] == "trigger"
-
-    @patch("core.api.services.trigger_service.urllib.request.urlopen")
-    def test_send_comment_http_success(self, mock_urlopen):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps({"status": "ok"}).encode()
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
-
-        svc = TriggerService()
-        svc._webhook_port = 29188
-        result = svc.send_comment("TestUser", "hello", moderator=True)
-
-        assert result["status"] == "ok"
-        assert len(svc.get_history()) == 1
-        assert svc.get_history()[0]["kind"] == "comment"
-
-    @patch("core.api.services.trigger_service.urllib.request.urlopen")
-    def test_execute_trigger_http_error(self, mock_urlopen):
-        from urllib.error import HTTPError
-
-        mock_urlopen.side_effect = HTTPError(
-            url="http://127.0.0.1:29188/custom_trigger",
-            code=400,
-            msg="Bad Request",
-            hdrs={},
-            fp=None,
+        assert svc.get_history()[0]["kind"] == "follow"
+        assert svc.get_history()[0]["success"] is True
+        mock_engine.execute_trigger.assert_called_once_with(
+            trigger_name="follow", user="TestUser", gift_id=None
         )
 
-        svc = TriggerService()
-        svc._webhook_port = 29188
-        result = svc.execute_trigger("unknown", "System")
+    def test_execute_trigger_error_result(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=False,
+            trigger_name="bad",
+            status=ExecutionStatus.ERROR,
+            execution_time_ms=5.0,
+            payload={"trigger": "bad", "user": "System"},
+            error_code="TRIGGER_NOT_FOUND",
+            error_message="Trigger 'bad' does not exist",
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+
+        result = svc.execute_trigger("bad")
 
         assert result["status"] == "error"
+        assert "does not exist" in result["message"]
+
+    def test_send_comment_records_history(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_comment.return_value = TriggerResult(
+            success=True,
+            trigger_name="comment",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"user": "TestUser", "text": "hello"},
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+
+        result = svc.send_comment("TestUser", "hello", moderator=True)
+
+        assert result["status"] == "success"
         assert len(svc.get_history()) == 1
-        assert svc.get_history()[0]["status"] == "error"
+        assert svc.get_history()[0]["kind"] == "comment"
+        mock_engine.execute_comment.assert_called_once_with(
+            user="TestUser", text="hello", moderator=True, superfan=False, fanclub=False
+        )
 
-    @patch("core.api.services.trigger_service.urllib.request.urlopen")
-    def test_execute_trigger_with_gift_id(self, mock_urlopen):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps({"status": "ok", "trigger": "12345", "user": "TestUser"}).encode()
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+    def test_execute_trigger_debounce_blocks(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time()  # recently executed
 
-        svc = TriggerService()
-        svc._webhook_port = 29188
-        result = svc.execute_trigger("gift", "TestUser", gift_id="12345")
+        result = svc.execute_trigger("follow")
 
-        assert result["status"] == "ok"
-        assert len(svc.get_history()) == 1
-        # The payload should contain the gift_id as the trigger value
-        assert svc.get_history()[0]["payload"]["trigger"] == "12345"
+        assert result["status"] == "error"
+        assert "wait" in result["message"]
+        mock_engine.execute_trigger.assert_not_called()
 
-    @patch("core.api.services.trigger_service.urllib.request.urlopen")
-    def test_toggle_tiktok_connection(self, mock_urlopen):
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps(
-            {"status": "ok", "message": "TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT=True"}
-        ).encode()
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+    def test_execute_trigger_with_gift_id(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="5655",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "5655", "user": "TestUser"},
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
 
-        svc = TriggerService()
-        svc._webhook_port = 29188
+        result = svc.execute_trigger("gift", "TestUser", gift_id="5655")
+
+        assert result["status"] == "success"
+        mock_engine.execute_trigger.assert_called_once_with(
+            trigger_name="gift", user="TestUser", gift_id="5655"
+        )
+
+    def test_toggle_tiktok_connection(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="tiktok",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "tiktok", "user": "System"},
+            error_message="TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT=True",
+            bridge_response={
+                "status": "ok",
+                "message": "TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT=True",
+            },
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+
         result = svc.toggle_tiktok_connection()
 
-        assert result["status"] == "ok"
+        assert result["status"] == "success"
         assert result["connected"] is False
         assert len(svc.get_history()) == 1
-        assert svc.get_history()[0]["kind"] == "system"
 
-    def test_dispatch_via_executable_not_found(self):
+    def test_toggle_tiktok_connection_connected_state(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="tiktok",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "tiktok", "user": "System"},
+            error_message="TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT=False",
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+
+        result = svc.toggle_tiktok_connection()
+
+        assert result["status"] == "success"
+        assert result["connected"] is True
+
+    def test_get_trigger_definitions(self):
         svc = TriggerService()
-        svc._executable_path = None
-        with patch.object(svc, "_dispatch_via_http") as mock_http:
-            mock_http.return_value = {"status": "ok"}
-            result = svc._dispatch({"trigger": "follow"}, "trigger")
-            mock_http.assert_called_once()
-            assert result["status"] == "ok"
+        defs = svc.get_trigger_definitions()
+        assert len(defs) >= 6
+        names = [d["name"] for d in defs]
+        assert "follow" in names
+        assert "comment" in names
+        assert "gift" in names
+
+    def test_history_contains_trigger_fields(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="follow",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "follow", "user": "Alice"},
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+        svc.execute_trigger("follow", "Alice")
+        entry = svc.get_history()[0]
+        assert "timestamp" in entry
+        assert "kind" in entry
+        assert "payload" in entry
+        assert "status" in entry
+        assert "message" in entry
+        assert "success" in entry
+
+    def test_multiple_executions_in_history(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        def side_effect(trigger_name, user="System", gift_id=None, gift_name=None):
+            return TriggerResult(
+                success=True,
+                trigger_name=trigger_name,
+                status=ExecutionStatus.SUCCESS,
+                execution_time_ms=5.0,
+                payload={"trigger": trigger_name, "user": user},
+            )
+        mock_engine.execute_trigger.side_effect = side_effect
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+
+        svc.execute_trigger("follow", "A")
+        svc._last_execution = time.time() - 5
+        svc.execute_trigger("follow", "B")
+
+        assert len(svc.get_history()) == 2
+        assert svc.get_history()[0]["payload"]["user"] == "B"
+        assert svc.get_history()[1]["payload"]["user"] == "A"
