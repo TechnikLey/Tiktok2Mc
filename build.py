@@ -324,7 +324,7 @@ def _build_vsix_pipeline(start_time: float) -> None:
 
 def cmd_app(args):
     start = time.time()
-    BUILD_INSTALLER = args.installer
+    BUILD_INSTALLER = getattr(args, 'installer', False)
 
     IS_WINDOWS = sys.platform == "win32"
     SUFFIX = ".exe" if IS_WINDOWS else ".bin"
