@@ -1,0 +1,67 @@
+{
+  "name": "mca-language",
+  "displayName": "MCA Language",
+  "description": "Language server, syntax highlighting, IntelliSense, and diagnostics for MCA trigger/action definition files (.mca)",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./client/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "mca",
+        "aliases": [
+          "MCA"
+        ],
+        "extensions": [
+          ".mca"
+        ],
+        "configuration": "./mca-language-server/language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mca",
+        "scopeName": "source.mca",
+        "path": "./syntaxes/mca.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "mca-icons",
+        "label": "MCA File Icons",
+        "path": "./mca-language-server/icons/mca-icon-theme.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "mca.ignoreLag",
+        "title": "Ignore Performance Warning",
+        "category": "MCA"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "mca",
+        "path": "./snippets/mca.code-snippets"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "echo 'No compile needed for JS'",
+    "postinstall": "cd client && npm install && cd ../server && npm install"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "vscode": "^1.1.37"
+  }
+}

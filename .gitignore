@@ -21,5 +21,13 @@ data/backups/
 node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json
 tmp/gui.lock
 server/
+!mca-language-server/server/
 logs/
+
+# VS Code extension build artifacts
+*.vsix
+.vscode-test/
+mca-language-server/node_modules/
+mca-language-server/out/
+mca-language-server/dist/
 

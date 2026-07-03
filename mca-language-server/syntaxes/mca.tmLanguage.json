@@ -1,0 +1,225 @@
+{
+  "scopeName": "source.mca",
+  "name": "MCA Actions Language",
+  "patterns": [
+    {
+      "comment": "Disabled trigger (##) — dimmed/comment style",
+      "begin": "^(\\s*)(##)",
+      "beginCaptures": {
+        "2": { "name": "punctuation.definition.comment.mca" }
+      },
+      "end": "$",
+      "patterns": [
+        { "include": "#disabled_trigger_line" }
+      ]
+    },
+    { "include": "#full_line_comment" },
+    { "include": "#trigger_line" }
+  ],
+  "repository": {
+    "full_line_comment": {
+      "comment": "Full-line comment starting with # (not ##)",
+      "match": "^\\s*#.*$",
+      "name": "comment.line.number-sign.mca"
+    },
+
+    "disabled_trigger_line": {
+      "comment": "The content of a ## disabled trigger (parsed as trigger:command)",
+      "patterns": [
+        {
+          "comment": "Inline comment",
+          "begin": "(#)",
+          "beginCaptures": {
+            "1": { "name": "comment.line.number-sign.mca" }
+          },
+          "end": "$"
+        },
+        { "include": "#trigger_colon" },
+        { "include": "#trigger_name" },
+        { "include": "#command_area" }
+      ]
+    },
+
+    "trigger_line": {
+      "comment": "Active trigger line with colon separator",
+      "patterns": [
+        {
+          "comment": "Inline comment anywhere on the line",
+          "begin": "(?<!#)(#)",
+          "beginCaptures": {
+            "1": { "name": "comment.line.number-sign.mca" }
+          },
+          "end": "$"
+        },
+        { "include": "#trigger_colon" },
+        { "include": "#trigger_name" },
+        { "include": "#command_area" }
+      ]
+    },
+
+    "trigger_colon": {
+      "comment": "The colon separator after the trigger name",
+      "match": "(?<=^\\s*'?[A-Za-z0-9_ ]+'?):",
+      "name": "punctuation.separator.mca"
+    },
+
+    "trigger_name": {
+      "comment": "Trigger name (quoted or unquoted) at line start",
+      "patterns": [
+        {
+          "comment": "Quoted trigger name with spaces",
+          "match": "^\\s*('[A-Za-z0-9_ ]+')(?=:)",
+          "name": "entity.name.tag.mca"
+        },
+        {
+          "comment": "Numeric trigger (gift ID)",
+          "match": "^\\s*(\\d+)(?=:)",
+          "name": "constant.numeric.mca"
+        },
+        {
+          "comment": "Alphanumeric trigger name",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)(?=:)",
+          "name": "entity.name.tag.mca"
+        }
+      ]
+    },
+
+    "command_area": {
+      "comment": "Everything after the colon — commands separated by semicolons",
+      "patterns": [
+        { "include": "#semicolon" },
+        { "include": "#named_overlay" },
+        { "include": "#overlay" },
+        { "include": "#vanilla_command" },
+        { "include": "#rcon_command" },
+        { "include": "#script_command" },
+        { "include": "#shell_command" },
+        { "include": "#placeholder" },
+        { "include": "#multiplier" },
+        { "include": "#numbers" },
+        { "include": "#trailing_junk" }
+      ]
+    },
+
+    "named_overlay": {
+      "comment": "Named overlay: @name>>body",
+      "begin": "(?<=[:;])\\s*(@[A-Za-z0-9_]+)(>>)",
+      "beginCaptures": {
+        "1": { "name": "entity.name.type.mca" },
+        "2": { "name": "keyword.operator.mca" }
+      },
+      "end": "(?=;|#|$)",
+      "patterns": [
+        { "include": "#placeholder" },
+        { "include": "#overlay_pipe" },
+        { "include": "#numbers" }
+      ]
+    },
+
+    "overlay": {
+      "comment": "Overlay text: >>body",
+      "begin": "(?<=[:;])\\s*(>>)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.mca" }
+      },
+      "end": "(?=;|#|$)",
+      "patterns": [
+        { "include": "#placeholder" },
+        { "include": "#overlay_pipe" },
+        { "include": "#numbers" }
+      ]
+    },
+
+    "overlay_pipe": {
+      "comment": "Pipe separator in overlay body (Title|Subtitle|Duration)",
+      "match": "\\|",
+      "name": "punctuation.separator.mca"
+    },
+
+    "vanilla_command": {
+      "comment": "Vanilla Minecraft command: /command",
+      "begin": "(?<=[:;\\s])(/)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.mca" }
+      },
+      "end": "(?=;|#|$|\\s+x\\d+\\s*$)",
+      "patterns": [
+        { "include": "#placeholder" },
+        { "include": "#numbers" }
+      ]
+    },
+
+    "rcon_command": {
+      "comment": "RCON command: !command",
+      "begin": "(?<=[:;\\s])(!)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.mca" }
+      },
+      "end": "(?=;|#|$)",
+      "patterns": [
+        { "include": "#placeholder" },
+        { "include": "#numbers" }
+      ]
+    },
+
+    "script_command": {
+      "comment": "Script command: $scriptname",
+      "begin": "(?<=[:;\\s])(\\$)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.mca" }
+      },
+      "end": "(?=;|#|$)",
+      "patterns": [
+        { "include": "#numbers" }
+      ]
+    },
+
+    "shell_command": {
+      "comment": "Shell command: &command",
+      "begin": "(?<=[:;\\s])(&)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.mca" }
+      },
+      "end": "(?=;|#|$)",
+      "patterns": [
+        { "include": "#numbers" }
+      ]
+    },
+
+    "placeholder": {
+      "comment": "{user} and {comment} placeholders",
+      "match": "\\{(user|comment)\\}",
+      "name": "constant.character.escape.mca"
+    },
+
+    "multiplier": {
+      "comment": "Command multiplier xN (at end of command)",
+      "match": "\\s+(x\\d+)\\s*$",
+      "captures": {
+        "1": { "name": "constant.numeric.mca" }
+      }
+    },
+
+    "semicolon": {
+      "comment": "Command separator semicolon",
+      "match": ";",
+      "name": "punctuation.separator.mca"
+    },
+
+    "trailing_junk": {
+      "comment": "Trailing junk (e.g. extra colons) marked as error",
+      "match": ":+(?=;|#|$)",
+      "name": "invalid.illegal.mca"
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Numeric literals and multipliers",
+          "match": "\\b\\d+(\\.\\d+)?\\b",
+          "name": "constant.numeric.mca"
+        }
+      ]
+    }
+  }
+}

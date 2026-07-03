@@ -1,0 +1,10 @@
+{
+  "iconDefinitions": {
+    "mca-file": {
+      "iconPath": "./file.png"
+    }
+  },
+  "fileExtensions": {
+    "mca": "mca-file"
+  }
+}

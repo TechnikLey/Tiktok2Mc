@@ -1,0 +1,12 @@
+.vscode/**
+.vscode-test/**
+node_modules/.bin/**
+node_modules/*/.github/**
+node_modules/*/test/**
+node_modules/*/tests/**
+node_modules/*/docs/**
+.gitignore
+**/*.ts
+**/*.map
+server/test/
+snippets/
