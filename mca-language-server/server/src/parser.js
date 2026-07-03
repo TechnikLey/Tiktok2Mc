@@ -2,7 +2,7 @@
 // src/core/validator.py (validate_text) and
 // src/core/api/services/actions.py (ActionsService.parse).
 
-const { NAMED_OVERLAY_RE, TRIGGER_NAME_RE, QUOTED_TRIGGER_RE, MULTIPLIER_RE, VALID_PREFIX_CHARS } = require('./language');
+const { NAMED_OVERLAY_RE, TRIGGER_NAME_RE, QUOTED_TRIGGER_RE, MULTIPLIER_RE } = require('./language');
 
 /**
  * @param {string} rawLine  One line of an .mca file (including trailing newline).

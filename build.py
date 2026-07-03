@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 # ==========================================
 # build.py - TikTok-MC-Gift (Parallel & Cross-Platform)
+#
+# Usage:
+#   python build.py <command> [options]
+#
+# Commands:
+#   app              Build application (PyInstaller)
+#   vsix             Build VS Code extension (.vsix)
+#   spec             Generate MCA language specification
+#   test             Run tests (MCA / Python)
+#   all              Run spec + app + vsix
+#   ci               CI pipeline (validate + test + spec + app)
+#   clean            Clean build artifacts
 # ==========================================
 
 import sys
@@ -13,6 +25,7 @@ import uuid
 import time
 import fnmatch
 import ast
+import argparse
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
@@ -307,60 +320,38 @@ def _build_vsix_pipeline(start_time: float) -> None:
     cprint(f"{'=' * 50}", Color.GREEN)
 
 
-def main():
+# ── Command handlers ─────────────────────────────────────────────────────────
+
+def cmd_app(args):
     start = time.time()
+    BUILD_INSTALLER = args.installer
 
-    BUILD_VSIX = "--vsix" in sys.argv
+    IS_WINDOWS = sys.platform == "win32"
+    SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
-    if BUILD_VSIX:
-        try:
-            _build_vsix_pipeline(start)
-            return
-        except Exception as e:
-            elapsed = time.time() - start
-            mins, secs = divmod(elapsed, 60)
-            cprint(f"\n{'=' * 50}", Color.RED)
-            cprint(f"VSIX build FAILED in {int(mins):02d}:{secs:06.3f}", Color.RED)
-            cprint(f"{'=' * 50}", Color.RED)
-            cprint(f"\nError: {e}", Color.RED)
-            sys.exit(1)
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    os.chdir(SCRIPT_DIR)
 
-    # Regenerate MCA language spec before main build (incremental)
+    OUT_DIR = SCRIPT_DIR / "build" / "release"
+    CACHE_DIR = SCRIPT_DIR / "build" / "cache"
+    EXE_CACHE_DIR = CACHE_DIR / "exes"
+    HASH_CACHE_DIR = CACHE_DIR / "hashes"
+    PARALLEL_TEMP_DIR = SCRIPT_DIR / "build" / "temp_parallel"
+
+    MAX_THREADS = min(16, (os.cpu_count() or 4))
+    MAX_COPY_THREADS = min(32, (os.cpu_count() or 4) * 4)
+
+    CORE_EXECUTABLES = [
+        {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
+        {"name": "gui",            "src": "src/python/gui.py",            "dest": "core", "windowed": True},
+        {"name": "update",         "src": "src/python/update.py",         "dest": ""},
+        {"name": "server",         "src": "src/python/server.py",         "dest": "core"},
+        {"name": "overlay",        "src": "src/python/overlay.py",        "dest": "core"},
+        {"name": "start",          "src": "src/python/start.py",          "dest": ""},
+        {"name": "test_trigger",   "src": "src/python/send_trigger.py",    "dest": "test"},
+    ]
+
     try:
-        _generate_mca_spec(force=False)
-    except RuntimeError as e:
-        cprint(f"Warning: {e}", Color.YELLOW)
-
-    try:
-        # ----- Configuration -----
-        MAX_THREADS = min(16, (os.cpu_count() or 4))
-        MAX_COPY_THREADS = min(32, (os.cpu_count() or 4) * 4)
-        BUILD_INSTALLER = "--installer" in sys.argv
-
-        IS_WINDOWS = sys.platform == "win32"
-        SUFFIX = ".exe" if IS_WINDOWS else ".bin"
-
-        SCRIPT_DIR = Path(__file__).resolve().parent
-        os.chdir(SCRIPT_DIR)
-
-        OUT_DIR = SCRIPT_DIR / "build" / "release"
-        CACHE_DIR = SCRIPT_DIR / "build" / "cache"
-        EXE_CACHE_DIR = CACHE_DIR / "exes"
-        HASH_CACHE_DIR = CACHE_DIR / "hashes"
-        PARALLEL_TEMP_DIR = SCRIPT_DIR / "build" / "temp_parallel"
-
-        # Definition of main files
-        # windowed=True means no console window on Windows (--noconsole in PyInstaller)
-        CORE_EXECUTABLES = [
-            {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
-            {"name": "gui",            "src": "src/python/gui.py",            "dest": "core", "windowed": True},
-            {"name": "update",         "src": "src/python/update.py",         "dest": ""},
-            {"name": "server",         "src": "src/python/server.py",         "dest": "core"},
-            {"name": "overlay",        "src": "src/python/overlay.py",        "dest": "core"},
-            {"name": "start",          "src": "src/python/start.py",          "dest": ""},
-            {"name": "test_trigger",   "src": "src/python/send_trigger.py",    "dest": "test"},
-        ]
-
         # ----- Preparation & Directory Structure -----
         cprint("Preparing build environment...", Color.CYAN)
 
@@ -392,7 +383,6 @@ def main():
         for d in REQUIRED_DIRS:
             d.mkdir(parents=True, exist_ok=True)
 
-        # Clean up stale temp dirs from previous interrupted runs
         if PARALLEL_TEMP_DIR.exists():
             shutil.rmtree(PARALLEL_TEMP_DIR, ignore_errors=True)
         PARALLEL_TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -401,7 +391,6 @@ def main():
         cprint("Collecting all files to compile...", Color.CYAN)
         all_build_tasks = []
 
-        # Add main EXEs
         for item in CORE_EXECUTABLES:
             suffix = item.get("suffix", SUFFIX)
             task = {
@@ -413,33 +402,25 @@ def main():
                 task["windowed"] = True
             all_build_tasks.append(task)
 
-        # Find and add plugins
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
-        # Collect plugin hook dirs to copy raw later (not compiled to .exe)
         plugin_hook_dirs: list[Path] = []
         if src_plugins_root.exists():
             for py_file in src_plugins_root.rglob("*.py"):
-                # Skip __pycache__ directories
                 if "__pycache__" in str(py_file):
                     continue
-                # Skip test plugins (dev-only, not for user release)
                 if "test" == py_file.parent.name and py_file.parent.parent.name == "plugins":
                     continue
-                # Skip plugin hooks (these are imported in-process, not exec'd)
                 if "hooks" in py_file.parent.parts:
                     plugin_hook_dirs.append(py_file.parent)
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
-                # Plugin executables keep their original stem name (e.g. main.exe)
-                # so that start.py can find them at plugins/<name>/main.exe
                 all_build_tasks.append({
                     "name": f"{py_file.stem}{SUFFIX}",
                     "src": str(py_file),
                     "dest": dest,
                 })
 
-                # Also copy extra files if present in the same plugin folder
                 for extra_file in ["plugin.json", "version.txt", "README.md", "config.yaml"]:
                     extra_path = py_file.parent / extra_file
                     if extra_path.exists():
@@ -461,10 +442,6 @@ def main():
             return h.hexdigest()
 
         def _resolve_module(module: str, src_root: Path) -> str | None:
-            """Resolve a dotted module name to a relative path under *src_root*.
-            
-            Returns a relative path (to SCRIPT_DIR) or None if external.
-            """
             rel = module.replace(".", "/")
             for candidate in [f"{rel}.py", f"{rel}/__init__.py"]:
                 path = src_root / candidate
@@ -473,7 +450,6 @@ def main():
             return None
 
         def _parent_inits(module: str) -> list[str]:
-            """Return ``__init__.py`` paths for each parent package of *module*."""
             result: list[str] = []
             parts = module.replace(".", "/").split("/")
             for i in range(1, len(parts)):
@@ -483,14 +459,7 @@ def main():
             return result
 
         def _try_resolve_local(module: str, src_root: Path, source_path: Path) -> list[str]:
-            """Resolve *module* to local file paths under *src_root*.
-            
-            Handles relative and absolute imports.  Returns relative paths
-            (to SCRIPT_DIR), including parent ``__init__.py`` files.
-            """
             resolved: list[str] = []
-
-            # --- Relative imports ---
             if module.startswith("."):
                 parts = module.split(".")
                 dots = len(parts[0])
@@ -517,8 +486,6 @@ def main():
                     if init.exists():
                         resolved.append(str(init.relative_to(SCRIPT_DIR)))
                 return resolved
-
-            # --- Absolute imports ---
             path = _resolve_module(module, src_root)
             if path:
                 resolved.append(path)
@@ -526,19 +493,11 @@ def main():
             return resolved
 
         def resolve_transitive_imports(source_path: Path) -> set[str]:
-            """Walk the static import graph of *source_path* and return all files
-            under ``src/`` that are reachable, as relative paths to *SCRIPT_DIR*.
-            
-            Only ``core.*`` and local ``src/`` imports are followed — stdlib and
-            third-party modules are ignored.
-            """
             src_root = SCRIPT_DIR / "src"
             if not src_root.exists():
                 return set()
-
             visited: set[str] = set()
             queue: list[Path] = [source_path.resolve()]
-
             while queue:
                 path = queue.pop()
                 try:
@@ -548,13 +507,11 @@ def main():
                 if rel in visited:
                     continue
                 visited.add(rel)
-
                 try:
                     with open(path, "rb") as f:
                         tree = ast.parse(f.read())
                 except SyntaxError:
                     continue
-
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Import):
                         for alias in node.names:
@@ -572,13 +529,10 @@ def main():
                             for r in _try_resolve_local(mod, src_root, path):
                                 if r not in visited:
                                     queue.append(SCRIPT_DIR / r)
-
             return visited
 
         def build_one(item):
             full_src = Path(item["src"]).resolve()
-
-            # Unique name for cache/hash
             safe_name = str(full_src.relative_to(SCRIPT_DIR)).replace(os.sep, "_")
             hash_file = HASH_CACHE_DIR / f"{safe_name}.sha256"
             dep_hash_file = HASH_CACHE_DIR / f"{safe_name}.dep_sha256"
@@ -587,16 +541,13 @@ def main():
             current_hash = sha256_file(full_src)
             need_build = True
 
-            # Hash the transitive dependency tree (no broad core_tree_hash)
             deps = resolve_transitive_imports(full_src)
-
-            # Include build.py itself so flag changes force a full rebuild
             build_py = SCRIPT_DIR / "build.py"
 
             dep_hasher = hashlib.sha256()
             dep_hasher.update(current_hash.encode())
             for dep in sorted(deps):
-                dep_hasher.update(dep.encode())  # path string catches added/removed deps
+                dep_hasher.update(dep.encode())
                 dep_path = SCRIPT_DIR / dep
                 if dep_path.exists():
                     dep_hasher.update(sha256_file(dep_path).encode())
@@ -642,11 +593,7 @@ def main():
 
                 try:
                     with open(log_file, "w", encoding="utf-8") as lf:
-                        proc = subprocess.Popen(
-                            cmd,
-                            stdout=lf,
-                            stderr=subprocess.STDOUT,
-                        )
+                        proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT)
                         try:
                             return_code = proc.wait(timeout=600)
                         except subprocess.TimeoutExpired:
@@ -678,7 +625,6 @@ def main():
                         cprint(log_file.read_text(errors="replace"), Color.RED)
                     return False
 
-                # Cleanup temp for this thread
                 for p in (t_dist, t_work, t_spec):
                     shutil.rmtree(p, ignore_errors=True)
                 if log_file.exists():
@@ -701,7 +647,6 @@ def main():
                 except Exception as exc:
                     cprint(f"FAILED: {task['name']} - {exc}", Color.RED)
                     failed = True
-
             if failed:
                 raise RuntimeError("One or more build tasks failed.")
 
@@ -718,12 +663,10 @@ def main():
             def is_excluded(path):
                 rel = path.relative_to(src)
                 for pattern in exclude:
-                    # kompletter Ordner (rekursiv)
                     if pattern.endswith("/**"):
                         base = Path(pattern[:-3])
                         if base in rel.parents or rel == base:
                             return True
-                    # einfache Glob-Patterns (*.md etc.)
                     elif fnmatch.fnmatch(str(rel), pattern):
                         return True
                 return False
@@ -743,7 +686,6 @@ def main():
         sync_folder("templates",          OUT_DIR / "core" / "templates")
         sync_folder("tools/Java",      OUT_DIR / "server" / "java")
         sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
-        # Copy plugin hooks as raw .py (not compiled to .exe — imported in-process)
         for hook_src_dir in set(plugin_hook_dirs):
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)
@@ -772,7 +714,6 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_path, target)
 
-        # Generate config.default.yaml from config.yaml with template header
         config_src = OUT_DIR / "config" / "config.yaml"
         config_default = OUT_DIR / "config" / "config.default.yaml"
         if config_src.exists():
@@ -868,7 +809,6 @@ def main():
             nsis_script = SCRIPT_DIR / "installer" / "install.nsi"
             installer_out = SCRIPT_DIR / "build" / "TikTok2MC-Setup.exe"
             if nsis_script.exists():
-                # Find makensis: PATH first, then common install locations
                 makensis_cmd = "makensis"
                 try:
                     _sp.run(["makensis", "/VERSION"], check=False, capture_output=True)
@@ -895,7 +835,6 @@ def main():
                             check=True, capture_output=True,
                         )
                         cprint(f"Installer created: {installer_out}", Color.GREEN)
-                        # Also copy installer into the release folder so it ships with the portable ZIP
                         installer_in_release = OUT_DIR / installer_out.name
                         shutil.copy2(installer_out, installer_in_release)
                         cprint(f"Installer copied to release: {installer_in_release}", Color.GREEN)
@@ -912,24 +851,20 @@ def main():
                 installer_out = SCRIPT_DIR / "build" / "TikTok2Mc-Linux-Setup.sh"
                 tar_path = SCRIPT_DIR / "build" / "TikTok2Mc-Linux.tar.gz"
 
-                # Pack release/ into a tar.gz
                 with tarfile.open(tar_path, "w:gz") as tf:
                     for entry in OUT_DIR.rglob("*"):
                         if entry.is_file():
                             tf.add(entry, arcname=entry.relative_to(OUT_DIR))
 
-                # Build self-extracting script: header + archive
                 with open(installer_out, "wb") as outf:
                     outf.write(linux_template.read_bytes())
                     outf.write(b"\n__ARCHIVE_BELOW__\n")
                     with open(tar_path, "rb") as tgf:
                         outf.write(tgf.read())
 
-                # Make executable
                 os.chmod(installer_out, 0o755)
                 cprint(f"Linux installer created: {installer_out}", Color.GREEN)
 
-                # Copy into release folder as well
                 installer_in_release = OUT_DIR / installer_out.name
                 shutil.copy2(installer_out, installer_in_release)
                 cprint(f"Installer copied to release: {installer_in_release}", Color.GREEN)
@@ -953,6 +888,108 @@ def main():
         cprint(str(e), Color.RED)
         cprint(f"======================================", Color.RED)
         sys.exit(1)
+
+
+def cmd_vsix(_args):
+    start = time.time()
+    try:
+        _build_vsix_pipeline(start)
+    except Exception as e:
+        elapsed = time.time() - start
+        mins, secs = divmod(elapsed, 60)
+        cprint(f"\n{'=' * 50}", Color.RED)
+        cprint(f"VSIX build FAILED in {int(mins):02d}:{secs:06.3f}", Color.RED)
+        cprint(f"{'=' * 50}", Color.RED)
+        cprint(f"\nError: {e}", Color.RED)
+        sys.exit(1)
+
+
+def cmd_spec(_args):
+    _generate_mca_spec(force=True)
+    _validate_mca_spec()
+
+
+def cmd_test(_args):
+    _run_mca_tests()
+
+
+def cmd_all(args):
+    cprint("=== Building all ===", Color.CYAN)
+    cmd_spec(args)
+    cmd_app(args)
+    cmd_vsix(args)
+
+
+def cmd_ci(args):
+    cprint("=== CI pipeline ===", Color.CYAN)
+    cmd_spec(args)
+    cmd_test(args)
+    cmd_app(args)
+
+
+def cmd_clean(_args):
+    script_dir = Path(__file__).resolve().parent
+    try:
+        build_dir = script_dir / "build"
+        if build_dir.exists():
+            shutil.rmtree(build_dir)
+            cprint(f"Removed: {build_dir}", Color.GREEN)
+
+        for f in ["upload.py"]:
+            p = script_dir / f
+            if p.exists():
+                p.unlink()
+                cprint(f"Removed: {p}", Color.GREEN)
+
+        for cache_dir in sorted(script_dir.rglob("__pycache__")):
+            shutil.rmtree(cache_dir, ignore_errors=True)
+
+        cprint("Clean complete.", Color.GREEN)
+    except Exception as e:
+        cprint(f"Clean failed: {e}", Color.RED)
+        sys.exit(1)
+
+
+# ── Entry point ──────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="TikTok-MC-Gift build system",
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    sub.add_parser("spec", help="Generate MCA language specification")
+    sub.add_parser("vsix", help="Build VS Code extension (.vsix)")
+    sub.add_parser("test", help="Run MCA language server tests")
+
+    p_app = sub.add_parser("app", help="Build application via PyInstaller")
+    p_app.add_argument("--installer", action="store_true",
+                       help="Also build GUI installer (NSIS on Windows, shell on Linux)")
+
+    sub.add_parser("all", help="Run spec + app + vsix")
+    sub.add_parser("ci", help="CI pipeline: spec + test + app")
+    sub.add_parser("clean", help="Clean build artifacts")
+
+    parsed = parser.parse_args()
+
+    if parsed.command == "app":
+        cmd_app(parsed)
+    elif parsed.command == "vsix":
+        cmd_vsix(parsed)
+    elif parsed.command == "spec":
+        cmd_spec(parsed)
+    elif parsed.command == "test":
+        cmd_test(parsed)
+    elif parsed.command == "all":
+        cmd_all(parsed)
+    elif parsed.command == "ci":
+        cmd_ci(parsed)
+    elif parsed.command == "clean":
+        cmd_clean(parsed)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

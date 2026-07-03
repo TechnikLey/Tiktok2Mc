@@ -20,6 +20,7 @@ __all__ = [
     "print_diagnostics",
     "validate_text",
     "validate_file",
+    "COMMAND_PREFIX_CHARS",
 ]
 
 
@@ -45,6 +46,45 @@ _RE_TRAILING_SEMICOLON = re.compile(r";\s*$")
 _RE_OVERLAY_PREFIX = re.compile(r"@(\w+)>>")
 _RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
 _RE_INVALID_MULTIPLIER = re.compile(r"\s+x([^\s]+)\s*$")
+
+# -- Thresholds for validation -----------------------------------------------
+
+HIGH_MULTI_THRESHOLD: int = 50
+
+# Single-character command prefixes (the "first char" after the trigger colon).
+# These are the standard Minecraft-mode prefixes; overlay (>>, @name>>) is
+# handled as a separate branch in prefix validation.
+COMMAND_PREFIX_CHARS: tuple[str, ...] = ("/", "!", "$", "&")
+
+# -- Diagnostic code registry (single source of truth for all diagnostic codes)
+
+class DiagnosticCodeInfo:
+    """Metadata for a single diagnostic code."""
+    __slots__ = ("severity", "message")
+
+    def __init__(self, severity: str, message: str) -> None:
+        self.severity = severity
+        self.message = message
+
+DIAGNOSTIC_CODES: dict[str, DiagnosticCodeInfo] = {
+    "missing_colon": DiagnosticCodeInfo("ERROR", "Missing colon: each line must define a trigger."),
+    "space_after_colon": DiagnosticCodeInfo("WARNING", "Space after colon is unusual (expected 'trigger:command' without space)."),
+    "no_content_after_colon": DiagnosticCodeInfo("ERROR", "No content after ':' (no commands)."),
+    "trailing_colons": DiagnosticCodeInfo("ERROR", "Trailing colon at end of command."),
+    "trailing_semicolon": DiagnosticCodeInfo("INFO", "Unnecessary semicolon at end of line."),
+    "unmatched_close_square": DiagnosticCodeInfo("ERROR", "Unmatched closing square bracket ']'."),
+    "unbalanced_square": DiagnosticCodeInfo("ERROR", "Unbalanced opening square bracket '[' (check selectors!)."),
+    "unmatched_close_curly": DiagnosticCodeInfo("ERROR", "Unmatched closing curly bracket '}'."),
+    "unbalanced_curly": DiagnosticCodeInfo("ERROR", "Unbalanced opening curly bracket '{' (check NBT data!)."),
+    "invalid_trigger_name": DiagnosticCodeInfo("ERROR", "Invalid trigger name (allowed: A-Z, a-z, 0-9, _)."),
+    "duplicate_trigger": DiagnosticCodeInfo("ERROR", "Duplicate trigger defined multiple times."),
+    "empty_command_block": DiagnosticCodeInfo("WARNING", "Empty command block (double semicolon?)."),
+    "invalid_prefix": DiagnosticCodeInfo("ERROR", "Each command must start with '/', '$', '!', '&' or '>>'."),
+    "comment_placeholder_wrong_trigger": DiagnosticCodeInfo("ERROR", "'{comment}' is only valid on the 'comment' trigger."),
+    "overlay_multiplier": DiagnosticCodeInfo("ERROR", "Multiplier is not allowed on overlay commands (>> or @name>>)."),
+    "high_multi": DiagnosticCodeInfo("WARNING", "Performance warning: multiplier is very high (add # ignore-lag)."),
+    "invalid_multiplier": DiagnosticCodeInfo("ERROR", "Invalid multiplier (use xNumber)."),
+}
 
 
 # -- Helpers ------------------------------------------------------------------
@@ -401,7 +441,7 @@ def validate_text(text: str) -> List[Diagnostic]:
                         "overlay_multiplier",
                     ))
 
-            elif cmd_trim[0] not in ("/", "$", "!", "&"):
+            elif cmd_trim[0] not in COMMAND_PREFIX_CHARS:
                 diagnostics.append(_make_diag(
                     line_number,
                     cmd_start_global,
@@ -416,7 +456,7 @@ def validate_text(text: str) -> List[Diagnostic]:
             mm = _RE_MULTIPLIER.search(cmd_trim)
             if mm:
                 amount = int(mm.group(1))
-                if amount > 50 and "# ignore-lag" not in raw_line:
+                if amount > HIGH_MULTI_THRESHOLD and "# ignore-lag" not in raw_line:
                     x_token = f"x{amount}"
                     token_pos = cmd_start_global + cmd_trim.rfind(x_token)
                     diagnostics.append(_make_diag(

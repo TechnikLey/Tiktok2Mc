@@ -56,8 +56,14 @@ test('spec has placeholders', () => {
 test('spec has validation_rules', () => {
   const rules = lang.getRules();
   assert.ok(rules.high_multi_threshold > 0);
-  assert.ok(Array.isArray(rules.valid_prefix_chars));
-  assert.ok(rules.valid_prefix_chars.includes('/'));
+});
+
+test('spec has command_start_patterns', () => {
+  const patterns = lang.getCommandStartPatterns();
+  assert.ok(Array.isArray(patterns.single_char));
+  assert.ok(patterns.single_char.includes('/'));
+  assert.ok(Array.isArray(patterns.multi_char));
+  assert.ok(typeof patterns.description === 'string');
 });
 
 test('spec has diagnostic_codes', () => {
