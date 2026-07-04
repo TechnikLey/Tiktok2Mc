@@ -73,7 +73,6 @@ if __name__ == "__main__":
   "min_api_version": "1.0.0",
   "capabilities": [],
   "depends_on": [],
-  "auto_enable": false,
   "config_schema": {
     "version": 1,
     "fields": []

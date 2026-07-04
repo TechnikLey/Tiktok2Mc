@@ -99,19 +99,6 @@ class TestPluginRegistrationFromManifest:
         assert reg.enabled is True
         assert reg.level == 3
 
-    def test_from_manifest_preserves_auto_enable(self):
-        from core.api.models import PluginManifest, PluginRegistration
-
-        manifest = PluginManifest(
-            name="auto-on",
-            version="1.0.0",
-            entry_point="p.py",
-            display_name="Auto On",
-            auto_enable=True,
-        )
-        reg = PluginRegistration.from_manifest(manifest)
-        assert reg.auto_enable is True
-
 
 class TestManifestDiscovery:
     def test_discover_single_manifest(self, tmp_path):

@@ -15,7 +15,6 @@
     "timer:events"
   ],
   "depends_on": [],
-  "auto_enable": false,
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {
     "version": 1,

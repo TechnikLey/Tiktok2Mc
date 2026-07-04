@@ -227,7 +227,7 @@ class PluginLauncher:
             registration = PluginRegistration.from_manifest(
                 manifest,
                 path=str(entry_path),
-                enabled=manifest.auto_enable,
+                enabled=False,
             )
             self._register(registration)
 

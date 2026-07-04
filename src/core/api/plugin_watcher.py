@@ -127,7 +127,7 @@ class PluginWatcher:
                         entry_point=manifest_path_part,
                         display_name=raw.get("display_name", name),
                         version=raw.get("version", "0.0.0"),
-                        enabled=raw.get("auto_enable", False),
+                        enabled=False,
                         description=raw.get("description", ""),
                         update_url=raw.get("update_url", ""),
                     )

@@ -59,7 +59,7 @@ class PluginRegistry:
 
         Preserves the existing ``enabled`` and ``registered_at`` state
         when a plugin is already registered — the launcher must NOT
-        override runtime state with ``auto_enable`` from the manifest.
+        override runtime state.
         """
         now = time.time()
         data.registered_at = data.registered_at or now

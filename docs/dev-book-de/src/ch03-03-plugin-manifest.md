@@ -16,7 +16,6 @@ Die `plugin.json` ist das Herzstück jedes Plugins. Sie beschreibt das Plugin vo
   "min_api_version": "1.0.0",
   "capabilities": ["mein-plugin:feature"],
   "depends_on": [],
-  "auto_enable": false,
   "update_url": "https://api.github.com/.../releases/latest",
   "comment_handler": {
     "prefix": "$",
@@ -48,7 +47,6 @@ Die `plugin.json` ist das Herzstück jedes Plugins. Sie beschreibt das Plugin vo
 | `homepage` | Projekt-Website oder Repository |
 | `capabilities` | Liste von Fähigkeiten für EventBus-Routing |
 | `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen |
-| `auto_enable` | Bei `true` wird das Plugin automatisch aktiviert |
 | `update_url` | GitHub-API-URL für automatische Updates |
 | `comment_handler` | Chat-Command-Konfiguration für TikTok-Kommentare |
 | `config_schema` | Schema für die Konfigurationsoberfläche |

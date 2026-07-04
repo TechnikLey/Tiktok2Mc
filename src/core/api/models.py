@@ -92,8 +92,6 @@ class PluginManifest(BaseModel):
     )
     update_url: str = Field(
         "", description="URL for checking plugin updates (GitHub Releases API or direct)")
-    auto_enable: bool = Field(
-        False, description="Suggested default enabled state (GUI hint)")
     ics: bool = Field(True, description="Interface Control System flag")
     level: int = Field(4, ge=1, le=4, description="Default visibility level")
     config_schema: Optional[PluginConfigSchemaModel] = Field(
@@ -140,8 +138,6 @@ class PluginRegistration(BaseModel):
         default_factory=list,
         description="Plugins that must be running first",
     )
-    auto_enable: bool = Field(
-        False, description="Suggested default enabled state")
     update_url: str = Field(
         "", description="URL for checking plugin updates")
     author: str = Field("", description="Plugin author or maintainer")
@@ -187,7 +183,6 @@ class PluginRegisterRequest(BaseModel):
     description: str = ""
     capabilities: list[str] = Field(default_factory=list)
     depends_on: list[str] = Field(default_factory=list)
-    auto_enable: bool = False
     update_url: str = ""
     author: str = ""
     homepage: str = ""
@@ -211,7 +206,6 @@ class PluginUpdateRequest(BaseModel):
     display_name: Optional[str] = None
     capabilities: Optional[list[str]] = None
     depends_on: Optional[list[str]] = None
-    auto_enable: Optional[bool] = None
     update_url: Optional[str] = None
     author: Optional[str] = None
     homepage: Optional[str] = None

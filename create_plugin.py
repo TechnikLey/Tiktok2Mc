@@ -63,7 +63,6 @@ PLUGIN_JSON_TEMPLATE = '''\
   "min_api_version": "1.0.0",
   "capabilities": [],
   "depends_on": [],
-  "auto_enable": false,
   "update_url": "{update_url}",
   "config_schema": {{
     "version": 1,
