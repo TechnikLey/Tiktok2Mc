@@ -18,23 +18,4 @@
 - `AIPrompt.md` references stale file paths (`~/core/gifts.json` → `~/defaults/gifts.json`, `~/config/config.yaml` path ambiguous)
 - `docs/dev-book-en/` and `docs/dev-book-de/` reference old plugin system architecture (self-registration, legacy registry) — needs audit
 
----
-
-## ⚪ TECHNICAL DEBT — Discovered During Analysis
-
-### Priority: High
-| Item | Reason | Est. Complexity |
-|------|--------|----------------|
-| `config.yaml` inline comments may reference old port values or removed sections | Template was updated piecemeal; spot-check needed for stale references | Low |
-
----
-
-## 🛠️ REFACTOR OPPORTUNITIES
-
-| Opportunity | Benefit | Risk | Est. Complexity |
-|-------------|---------|------|----------------|
-| Standardize error responses across all API routes | `plugin_overlay.py` returns HTML for OAuth errors (browser redirect — intentional); rest uses `HTTPException` consistently | Low | Small |
-
----
-
-*Last updated: 2026-07-04 — Refactor: config.yaml schema validation in `validation_framework.py` (statt `services/__init__.py`); error responses standardisiert (plugin_config.py, actions.py); python/overlay.py als nicht-tot erkannt und entfernt.*
+*Last updated: 2026-07-04 — Refactor items und config.yaml-Kommentarprüfung abgeschlossen; nur noch 🔴 Documentation Rewrite offen.*
