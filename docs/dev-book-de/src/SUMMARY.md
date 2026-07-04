@@ -1,53 +1,51 @@
-[Einführung](./Introduction.md)
-[Grundkonzepte & Begriffe](./ch00-00-Fundamentals-and-Concepts.md)
-[Lokale Entwicklung einrichten](./ch00-01-Setting-Up-Local-Development.md)
+[Einführung](./introduction.md)
 
-- [Wie das System zusammenarbeitet](./ch01-00-How-the-System-Works-Together.md)
-  - [Daten von TikTok empfangen](./ch01-01-Receiving-Data-from-TikTok.md)
-  - [Events verarbeiten](./ch01-02-Processing-Events.md)
-  - [Daten an Minecraft senden](./ch01-03-Sending-Data-to-Minecraft.md)
+# Erste Schritte
 
-- [Eigenes Plugin erstellen](./ch02-00-Create-your-own-plugin.md)
-  - [Plugin-Struktur & Setup](./ch02-01-plugin-structure-and-setup.md)
-  - [Events empfangen: Webhook-System](./ch02-02-webhook-events-and-minecraft-integration.md)
-  - [Konfiguration & Datenspeicherung](./ch02-03-configuration-and-data-storage.md)
-  - [GUI mit Flask + pywebview](./ch02-04-gui-with-pywebview.md)
-  - [Interne-Plugin Kommunikation](./ch02-05-inter-plugin-communication.md)
-  - [Error Handling & Best Practices](./ch02-06-error-handling-and-best-practices.md)
+- [Erste Schritte](./ch01-00-getting-started.md)
 
-- [Von Event zum Minecraft-Befehl](./ch03-00-Mapping-Events-to-Minecraft.md)
-  - [Die actions.mca Datei](./ch03-01-The-actions.mca-File.md)
-  - [Syntax & Befehle](./ch03-02-Structure.md)
-  - [Design-Entscheidungen](./ch03-03-Design-Decisions.md)
-  - [Parser-Logik](./ch03-04-Parser-Logic.md)
-  - [$random & Meta-Befehle](./ch03-05-Function-of-the-$random-Command.md)
-  - [Eigene $ Befehle](./ch03-06-Creating-Your-Own-$-Command.md)
-  - [RCON & seine Grenzen](./ch03-07-Rcon-and-Its-Limitations.md)
-  - [mcfunction Batch-Optimierung](./ch03-08-The-Use-of-mcfunction-Files.md)
+# Grundlagen
 
-- [Modulare Architektur](./ch04-00-System-Modules-and-Integration.md)
-  - [Control Methods: DCS vs ICS](./ch04-01-Control-Method.md)
-  - [Die PLUGIN_REGISTRY](./ch04-02-The-PLUGIN_REGISTRY.md)
-  - [GUI-Architektur mit Flask](./ch04-03-GUI-Architecture.md)
-  - [Inter-Modul-Kommunikation (DCS)](./ch04-04-Communication-and-DCS.md)
-  - [Module in Streaming-Software](./ch04-05-Integrating-Plugins-into-Streaming-Software.md)
+- [Grundkonzepte](./ch02-00-core-concepts.md)
 
-- [Python in diesem Projekt](./ch05-00-Python-in-This-Project.md)
-  - [Die main.py Datei](./ch05-01-The-main.py-File.md)
-  - [Importe](./ch05-02-Imports.md)
-  - [TikTok-Client & Event-Handler](./ch05-03-TikTok-Client-and-Event-Handler.md)
-  - [Event-System verstehen](./ch05-04-Understanding-the-Event-System.md)
-  - [Gift-Events](./ch05-05-Gift-Events.md)
-  - [Follow-Events](./ch05-06-Follow-Events.md)
-  - [Like-Events](./ch05-07-Like-Events.md)
-  - [Threading & Queues](./ch05-08-Threading-and-Queues.md)
+# Plugin-Entwicklung
 
-- [Debugging & Troubleshooting](./ch06-00-Debugging-and-Troubleshooting.md)
+- [Plugin-Entwicklung](./ch03-00-plugins.md)
+  - [Dein erstes Plugin](./ch03-01-your-first-plugin.md)
+  - [Plugin-Struktur](./ch03-02-plugin-structure.md)
+  - [Plugin-Manifest](./ch03-03-plugin-manifest.md)
+  - [Konfiguration](./ch03-04-configuration.md)
+  - [Plugin-API](./ch03-05-plugin-api.md)
+  - [Events & Subscriptions](./ch03-06-events-and-subscriptions.md)
+  - [Plugin-übergreifende Kommunikation](./ch03-07-cross-plugin-communication.md)
+  - [Overlays & Zustand](./ch03-08-overlays-and-state.md)
+  - [Fortgeschrittene Features](./ch03-09-advanced-features.md)
+  - [Best Practices](./ch03-10-best-practices.md)
 
-- [Anhang](./attachment.md)
-  - [Glossar](./glossary.md)
-  - [Core-Module der Infrastruktur](./core-modules.md)
-  - [Projektstruktur](./project-structure.md)
-  - [Konfiguration (config.yaml)](./config.md)
-  - [Update-Prozess](./update.md)
-  - [Plugin erstellen ohne Python](./create-a-plugin-without-Python.md)
+# Hook-Entwicklung
+
+- [Hook-Entwicklung](./ch04-00-hooks.md)
+  - [Dein erster Hook](./ch04-01-your-first-hook.md)
+  - [Hook-Struktur](./ch04-02-hook-structure.md)
+  - [Hook-Manifest](./ch04-03-hook-manifest.md)
+  - [Hook-API](./ch04-04-hook-api.md)
+  - [Konfiguration](./ch04-05-configuration.md)
+  - [Import-Beschränkungen](./ch04-06-import-restrictions.md)
+  - [Plugin-gebündelte Hooks](./ch04-07-plugin-bundled-hooks.md)
+  - [Fortgeschrittene Features](./ch04-08-advanced-features.md)
+  - [Best Practices](./ch04-09-best-practices.md)
+
+# Aktionen & Minecraft
+
+- [Aktionen & Minecraft](./ch05-00-actions-and-minecraft.md)
+  - [Actions.mca Überblick](./ch05-01-actions-mca-overview.md)
+  - [Event-Command-Mapper](./ch05-02-event-command-mapper.md)
+  - [RCON & Minecraft-Kommunikation](./ch05-03-rcon-and-minecraft.md)
+  - [Overlay-System](./ch05-04-overlay-system.md)
+
+# Anhang
+
+- [Glossar](./glossary.md)
+- [Konfigurationsreferenz](./config-reference.md)
+- [Fehlerbehebung](./troubleshooting.md)
+- [FAQ](./faq.md)
