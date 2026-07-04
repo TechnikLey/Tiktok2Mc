@@ -25,7 +25,7 @@ test('provides trigger name completions before colon', () => {
   const labels = results.map(r => r.label);
   assert.ok(labels.includes('follow'));
   assert.ok(labels.includes('comment'));
-  assert.ok(labels.includes('likes'));
+  assert.ok(!labels.includes('likes'));
 });
 
 test('provides trigger name completions at trigger area', () => {

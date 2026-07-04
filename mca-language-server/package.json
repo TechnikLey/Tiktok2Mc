@@ -44,12 +44,7 @@
         "category": "MCA"
       }
     ],
-    "snippets": [
-      {
-        "language": "mca",
-        "path": "./snippets/mca.code-snippets"
-      }
-    ]
+    "snippets": []
   },
   "scripts": {
     "vscode:prepublish": "echo 'No compile needed for JS'",

@@ -9,4 +9,3 @@ node_modules/*/docs/**
 **/*.ts
 **/*.map
 server/test/
-snippets/

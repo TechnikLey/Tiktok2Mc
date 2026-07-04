@@ -43,7 +43,7 @@ function getContext(line, character) {
 
   const colonIdx = line.indexOf(':');
 
-  if (colonIdx < 0 || character <= colonIdx + 1) {
+  if (colonIdx < 0 || character <= colonIdx) {
     return { type: 'trigger', triggerPart: colonIdx >= 0 ? line.slice(0, colonIdx) : '' };
   }
 
@@ -103,7 +103,7 @@ function provideCompletions(document, position) {
 
     if (ctx.type === 'trigger') {
       // -- Trigger name completions (ranked: event triggers first) ----
-      const eventTriggers = getEventTriggers();
+      const eventTriggers = getEventTriggers().filter(t => t !== 'likes' && t !== 'like_2');
       const eventDocs = getEventTriggerDocs();
       const docMap = {};
       for (const d of eventDocs) docMap[d.name] = d.doc;
@@ -121,26 +121,6 @@ function provideCompletions(document, position) {
         });
       }
 
-      // Gift ID examples
-      const giftExamples = [
-        { id: '5655', name: 'Rose' },
-        { id: '16111', name: 'Mamma Mia' },
-        { id: '8913', name: 'Rosa' },
-        { id: '6267', name: 'Corgi' },
-        { id: '7168', name: 'Money Gun' },
-        { id: '16071', name: 'Flower Show' },
-      ];
-      for (const g of giftExamples) {
-        completions.push({
-          label: g.id,
-          kind: CompletionItemKind.Value,
-          detail: `Gift: ${g.name}`,
-          insertText: `${g.id}:`,
-          data: { priority: PRIORITY.GENERIC },
-          sortText: String(100000 - PRIORITY.GENERIC).padStart(6, '0'),
-        });
-      }
-
       // Quoted trigger
       completions.push({
         label: "'quoted trigger'",
@@ -151,30 +131,6 @@ function provideCompletions(document, position) {
         data: { priority: PRIORITY.SNIPPET },
         sortText: String(100000 - PRIORITY.SNIPPET).padStart(6, '0'),
       });
-
-      // Snippets
-      const snippets = [
-        { label: 'Basic trigger', insert: '${1:name}:${2:/cmd}', doc: 'Basic trigger with a Minecraft command' },
-        { label: 'Overlay', insert: '${1:name}:>>${2:Title}|${3:Subtitle}|${4:3}', doc: 'Trigger with overlay text' },
-        { label: 'Chain commands', insert: '${1:name}:${2:/cmd1} ; ${3:/cmd2}', doc: 'Multiple semicolon-chained commands' },
-        { label: 'Shell command', insert: '${1:name}:&${2:curl ...}', doc: 'Host shell command' },
-        { label: 'Script action', insert: '${1:name}:\\$${2:random}', doc: 'Hook script invocation' },
-        { label: 'Disabled trigger', insert: '##${1:name}:${2:/cmd}', doc: 'Disabled trigger (## prefix)' },
-        { label: 'Multiplier', insert: '${1:name}:${2:/cmd} x${3:5}', doc: 'Repeat command N times' },
-        { label: 'Named overlay', insert: '${1:name}:@${2:screen}>>${3:Title}|${4:3}', doc: 'Overlay to named screen' },
-      ];
-      for (const s of snippets) {
-        completions.push({
-          label: s.label,
-          kind: CompletionItemKind.Snippet,
-          detail: 'Snippet',
-          documentation: s.doc,
-          insertText: s.insert,
-          insertTextFormat: 2,
-          data: { priority: PRIORITY.SNIPPET },
-          sortText: String(100000 - PRIORITY.SNIPPET).padStart(6, '0'),
-        });
-      }
     } else if (ctx.type === 'command_start') {
       // -- Command prefix completions (highest priority at command start) --
       const prefixes = getCommandPrefixes();
