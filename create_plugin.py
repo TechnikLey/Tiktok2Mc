@@ -60,10 +60,6 @@ PLUGIN_JSON_TEMPLATE = '''\
   "description": "",
   "author": "",
   "homepage": "",
-  "ports": {{
-    "declared": [],
-    "protocol": "tcp"
-  }},
   "min_api_version": "1.0.0",
   "capabilities": [],
   "depends_on": [],

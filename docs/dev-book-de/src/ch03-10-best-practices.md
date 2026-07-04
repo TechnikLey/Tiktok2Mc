@@ -5,7 +5,6 @@ Dieses Kapitel fasst bewährte Verfahren und häufige Fehler zusammen, die dir b
 ## Plugin-Struktur
 
 - **Eindeutige Plugin-Namen**: Verwende Kebab-Case (`mein-plugin`) und stelle sicher, dass der Name in `plugin.json` und `PLUGIN_NAME` übereinstimmen.
-- **Eindeutige Ports**: Jedes Plugin braucht einen eigenen Port. Vermeide Konflikte mit den Built-in-Plugins (Bereich `29189`–`29194`).
 - **Vollständiges Manifest**: Gib immer `min_api_version`, `author` und `description` an.
 
 ## Konfiguration
@@ -38,7 +37,7 @@ Dieses Kapitel fasst bewährte Verfahren und häufige Fehler zusammen, die dir b
 | Fehler | Ursache | Lösung |
 |---|---|---|
 | Plugin wird nicht erkannt | `plugin.json` fehlt oder ist ungültig | Prüfe das Manifest auf Gültigkeit |
-| Plugin startet nicht | Port-Konflikt | Wähle einen anderen Port |
+| Plugin startet nicht | Abhängigkeit nicht erfüllt oder Import-Fehler | Prüfe `depends_on` und die Logs |
 | Events kommen nicht an | Falsche Event-Subscriptions | Prüfe `event_subscriptions` im Manifest |
 | `get_overlay_html()` fehlt | Methode nicht überschrieben | Implementiere `get_overlay_html()` |
 | `PLUGIN_NAME` falsch | Stimmt nicht mit `plugin.json` überein | Korrigiere den Namen |

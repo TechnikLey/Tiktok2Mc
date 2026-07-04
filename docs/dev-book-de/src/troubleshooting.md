@@ -18,9 +18,8 @@ Dieses Kapitel hilft dir bei häufigen Problemen während der Plugin- und Hook-E
 
 **Mögliche Ursachen**:
 
-1. **Port-Konflikt** – Ein anderes Plugin verwendet denselben Port. Wähle einen anderen `DEFAULT_PORT`.
-2. **Abhängigkeit nicht erfüllt** – Ein in `depends_on` aufgeführtes Plugin ist nicht aktiviert.
-3. **Import-Fehler** – Prüfe die Logs auf Import-Fehler.
+1. **Abhängigkeit nicht erfüllt** – Ein in `depends_on` aufgeführtes Plugin ist nicht aktiviert.
+2. **Import-Fehler** – Prüfe die Logs auf Import-Fehler.
 
 ## Hook wird nicht geladen
 

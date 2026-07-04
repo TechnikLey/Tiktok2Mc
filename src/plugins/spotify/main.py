@@ -288,7 +288,6 @@ def _format_track(data):
 
 class SpotifyControlPlugin(BasePlugin):
     PLUGIN_NAME = "spotify-control"
-    DEFAULT_PORT = 29194
 
     def __init__(self):
         super().__init__()

@@ -16,10 +16,6 @@ Jeder Hook hat seine eigene Datei `main.py` und sein eigenes Verzeichnis. Eine e
 
 ## Entwicklung
 
-### Wie finde ich einen freien Port für mein Plugin?
-
-Die Built-in-Plugins verwenden Ports `29189`–`29194`. Wähle einen Port außerhalb dieses Bereichs, z. B. `29200` oder höher.
-
 ### Mein Plugin wird nicht in der Liste angezeigt. Was tun?
 
 Prüfe, ob die `plugin.json` existiert und gültig ist. Der `entry_point` muss korrekt sein. Starte das System neu, damit der Plugin-Watcher erneut scannt.

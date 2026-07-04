@@ -41,7 +41,6 @@ class DeathManager:
 
 class DeathCounterPlugin(BasePlugin):
     PLUGIN_NAME = "death-counter"
-    DEFAULT_PORT = 29190
 
     def __init__(self):
         super().__init__()

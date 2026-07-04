@@ -38,7 +38,6 @@ log = logging.getLogger(__name__)
 
 class HalloPlugin(BasePlugin):
     PLUGIN_NAME = "hallo"
-    DEFAULT_PORT = 29195
 
     def __init__(self):
         super().__init__()

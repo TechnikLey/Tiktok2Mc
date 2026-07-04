@@ -32,7 +32,3 @@ src/plugins/<name>/
 - Der Plugin-Name in `plugin.json` (Feld `name`) verwendet **Kebab-Case**: `mein-plugin`
 - Der Verzeichnisname sollte dem Plugin-Namen entsprechen (ohne Bindestriche, z. B. `meinplugin`)
 - Der `entry_point` in `plugin.json` zeigt auf die `main.py` relativ zum Projektstamm
-
-## Port-Konvention
-
-Jedes Plugin benötigt einen eigenen HTTP-Port für die Kommunikation. Die Standard-Ports der Built-in-Plugins liegen im Bereich `29189`–`29194`. Wähle für eigene Plugins einen freien Port außerhalb dieses Bereichs.

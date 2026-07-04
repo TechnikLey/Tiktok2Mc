@@ -62,7 +62,6 @@ class WinManager:
 
 class WinCounterPlugin(BasePlugin):
     PLUGIN_NAME = "win-counter"
-    DEFAULT_PORT = 29191
 
     def __init__(self):
         super().__init__()

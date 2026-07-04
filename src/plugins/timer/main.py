@@ -23,7 +23,6 @@ log = logging.getLogger(__name__)
 
 class TimerPlugin(BasePlugin):
     PLUGIN_NAME = "timer"
-    DEFAULT_PORT = 29189
 
     def __init__(self):
         super().__init__()

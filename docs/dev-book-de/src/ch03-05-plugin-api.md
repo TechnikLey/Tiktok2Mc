@@ -11,17 +11,15 @@ from core.base_plugin import BasePlugin
 
 class MeinPlugin(BasePlugin):
     PLUGIN_NAME = "mein-plugin"
-    DEFAULT_PORT = 29195
 ```
 
 Die Basisklasse übernimmt die gesamte Lebenszyklus-Verwaltung, Konfigurationsladung und API-Kommunikation.
 
 ## Plugin-Identität
 
-Zwei Klassenattribute sind für jedes Plugin erforderlich:
+Ein Klassenattribut ist für jedes Plugin erforderlich:
 
 - **`PLUGIN_NAME`** – Muss exakt mit dem `name`-Feld in der `plugin.json` übereinstimmen.
-- **`DEFAULT_PORT`** – Ein eindeutiger Port für die HTTP-Kommunikation.
 
 ## Konfiguration
 

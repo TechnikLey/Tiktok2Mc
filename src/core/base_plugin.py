@@ -6,7 +6,6 @@ Usage
 
     class MyPlugin(BasePlugin):
         PLUGIN_NAME = "my-plugin"
-        DEFAULT_PORT = 29190
 
         def on_command(self, command: str, args: dict):
             if command == "start":
@@ -73,7 +72,6 @@ class BasePlugin:
     """
 
     PLUGIN_NAME: str = ""
-    DEFAULT_PORT: int = 29190
 
     def __init__(self):
         if not self.PLUGIN_NAME:
@@ -89,7 +87,6 @@ class BasePlugin:
         self._window_state = self._load_window_state()
 
         self._cfg = load_plugin_config(self._plugin_dir)
-        self._port = self._cfg.get("port", self.DEFAULT_PORT)
         self._server_host = _SERVER_HOST
 
         self._theme = load_plugin_theme(self._cfg, self.PLUGIN_NAME)
