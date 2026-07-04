@@ -1,87 +1,102 @@
 # Grundkonzepte
 
-Dieses Kapitel vermittelt die grundlegenden Konzepte, die du für die Entwicklung von Plugins und Hooks benötigst. Es beschreibt die Architektur auf hoher Ebene und erklärt, wie die einzelnen Komponenten zusammenarbeiten.
+Dieses Kapitel erklärt die Architektur und die wichtigsten Komponenten, die du als Entwickler kennen musst.
 
-## Systemübersicht
-
-TikTok2Mc verbindet TikTok-Live-Events mit Minecraft. Die Daten durchlaufen dabei mehrere Stationen:
+## Systemarchitektur
 
 ```
-TikTok Live → Bridge-Prozess → EventBus → Plugins / Hooks → Minecraft (RCON)
+┌─────────────────────────────────────────────────────────┐
+│                    Supervisor (start.py)                  │
+│  Startet und überwacht alle Komponenten                  │
+└─────────────────────────────────────────────────────────┘
+         │                   │                   │
+         ▼                   ▼                   ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  API-Server      │  │  Bridge (main.py)│  │  Minecraft      │
+│  (FastAPI)       │  │  TikTok-Client   │  │  Server         │
+│  Port 29185      │  │  EventBus        │  │  (RCON)         │
+│                  │  │  Hook-Loader     │  │                 │
+│  Plugin-Watcher  │  │  RCON-Worker     │  │                 │
+│  CommandQueue    │  │  Event-Bridge    │  │                 │
+│  Event-Command-  │  │  Trigger-Worker  │  │                 │
+│  Mapper          │  │                  │  │                 │
+└────────┬─────────┘  └────────┬─────────┘  └────────┬────────┘
+         │                     │                      │
+         │   HTTP (POST/GET)   │   asyncio.Queue      │   RCON
+         ▼                     ▼                      ▼
+┌──────────────────────────────────────────────────────────┐
+│  Plugins (Subprozesse)                                    │
+│  python src/plugins/*/main.py                             │
+│  Kommunizieren per HTTP mit API-Server                    │
+└──────────────────────────────────────────────────────────┘
 ```
 
-1. **TikTok Live**: Eingehende Events (Gifts, Follows, Likes, Comments, Shares, Joins) werden vom TikTokLive-Client empfangen.
-2. **Bridge-Prozess** (`src/python/main.py`): Der zentrale Hauptprozess des Systems. Er startet den API-Server, verwaltet die TikTok-Verbindung, lädt Hooks, empfängt TikTok-Events und leitet sie in den EventBus weiter. Der Bridge-Prozess läuft durchgehend und koordiniert alle Komponenten.
-3. **EventBus**: Ein zentrales Publish/Subscribe-System, das Ereignisse an alle interessierten Komponenten (Plugins, Hooks, Event-Command-Mapper) verteilt.
-4. **Plugins & Hooks**: Diese Komponenten reagieren auf Ereignisse und führen Aktionen aus. Plugins laufen als separate Prozesse, Hooks laufen direkt im Bridge-Prozess.
-5. **Minecraft**: Über RCON (Remote Console) werden Befehle an den Minecraft-Server gesendet.
+### Supervisor (`src/python/start.py`)
 
-## API-Server
+Der Supervisor ist der Lebenszyklus-Manager. Er startet API-Server, Bridge-Prozess, Minecraft-Server und GUI, überwacht ihre Gesundheit und startet sie bei Bedarf neu.
 
-Der API-Server ist ein HTTP-Server, der unter `http://127.0.0.1:29185/api/v1/` läuft und die gesamte Kommunikation zwischen Plugins, Hooks und dem Hauptsystem vermittelt. Er wird vom Bridge-Prozess gestartet und bietet:
+### API-Server (`src/core/api/server.py`)
 
-- **Plugin-Registrierung**: Plugins melden sich über `POST /api/v1/plugins/register` an
-- **EventBus-Zugriff**: Komponenten können Events über `POST /api/v1/events` veröffentlichen
-- **Overlay-Auslieferung**: Overlay-HTML und SSE-Updates werden über den API-Server bereitgestellt
+Zentraler HTTP-Server (FastAPI) auf Port 29185. Stellt bereit:
 
-Ein Plugin kommuniziert **ausschließlich** über den API-Server mit dem Rest des Systems – es gibt keine direkte Verbindung zwischen Plugins oder zum Bridge-Prozess.
+- **Plugin-Registrierung und -Verwaltung** — `PluginWatcher` scannt `src/plugins/` und registriert Plugins
+- **CommandQueue** — Speichert eingehende Befehle pro Plugin (Long-Polling über `?wait=1`)
+- **Event-Command-Mapper** — Leitet EventBus-Ereignisse an Plugin-Commands weiter
+- **Overlay-Auslieferung** — HTML und SSE-Updates für OBS/Browser
+- **Plugin-Signale** — Signal-Dateien in `core/runtime/` steuern Plugin-Start/Stopp
+
+### Bridge-Prozess (`src/python/main.py`)
+
+Der TikTok→Minecraft-Bridge-Prozess. Enthält:
+
+- **TikTokLive-Client** — Empfängt Live-Events (Gift, Follow, Like, Comment, Join, Share)
+- **EventBus** — In-Memory Publish/Subscribe (asyncio.Queue-basiert, max. 2000 Events pro Queue)
+- **Event-Bridge Worker** — Leitet TikTok-Events an Plugins mit passenden `event_subscriptions` weiter
+- **Trigger-Worker** — Verarbeitet die `actions.mca` und führt Aktionen aus
+- **RCON-Worker** — Sendet Minecraft-Befehle an den Server (mit Wiederholungslogik)
+- **Hook-Loader** — Lädt und initialisiert Hooks aus `src/hooks/`
+
+## Zwei Wege der Event-Zustellung
+
+```
+TikTok-Event
+    │
+    ├──→ EventBus (Bridge-Prozess)
+    │       │
+    │       ├──→ Event-Bridge Worker → CommandQueue → Plugin-Polling
+    │       │      (Filtert nach event_subscriptions)
+    │       │
+    │       ├──→ Event-Command-Mapper → CommandQueue → Plugin-Polling
+    │       │      (Abbildung via event_commands.yaml)
+    │       │
+    │       └──→ Trigger-Worker → execute_global_command()
+    │              (Führt actions.mca aus: RCON, Scripts, Overlays, Shell)
+    │
+    └──→ TikTok-Client Callback → Trigger-Queue (direkt für actions.mca-Triggernamen)
+```
 
 ## Plugins vs. Hooks
 
-TikTok2Mc bietet zwei Erweiterungsmechanismen, die für unterschiedliche Anwendungsfälle optimiert sind:
-
-### Plugins
-
-- **Separater Prozess**: Jedes Plugin läuft in einem eigenen Subprozess.
-- **API-Kommunikation**: Plugins kommunizieren über HTTP mit dem zentralen API-Server.
-- **Sandboxing**: Plugins können über Betriebssystem-Ressourcenlimits isoliert werden.
-- **GUI-Unterstützung**: Plugins können eigene Overlay-Fenster mit pywebview erstellen.
-- **Zustandsverwaltung**: Plugins haben einen eigenen Zustand und können Overlay-HTML registrieren.
-- **Geeignet für**: Komplexe Erweiterungen mit GUI, eigenem Zustand oder speziellen Ressourcenanforderungen.
-
-### Hooks
-
-- **Im Prozess**: Hooks laufen direkt im Bridge-Prozess, ohne eigenen Subprozess.
-- **Direkte Funktionen**: Hooks registrieren Handler-Funktionen für `$`-Befehle in der `actions.mca`.
-- **Leichtgewichtig**: Kein Overhead durch Prozessverwaltung oder HTTP-Kommunikation.
-- **Import-Beschränkungen**: Hooks haben eingeschränkte Importmöglichkeiten (Sicherheit).
-- **Geeignet für**: Einfache, reaktive Erweiterungen, die auf TikTok-Events mit Minecraft-Befehlen reagieren.
-
-### Wann Plugin, wann Hook?
-
 | Kriterium | Plugin | Hook |
-|---|---|---|
-| Komplexität | Hoch | Niedrig |
-| GUI benötigt | Ja | Nein |
-| Eigenständiger Zustand | Ja | Nein |
-| Ressourcenintensiv | Ja | Nein |
-| Einfache Reaktion auf Events | Möglich | Optimal |
+|-----------|--------|------|
+| Ausführung | Eigener Subprozess (python .../main.py) | Im Bridge-Prozess (direkter Aufruf) |
+| Kommunikation | HTTP (POST/GET zum API-Server) | Funktionsaufruf (über HookAPI) |
+| GUI | pywebview-Fenster oder OBS-Overlay | Keine GUI |
+| Zustand | Eigener State (per `push_state()`) | Kein Zustand |
+| Latenz | ~1s (Polling-Intervall) | Millisekunden |
+| Komplexität | Vollständige Klasse mit Threads | Einfache Funktion |
+| Anwendungsfall | Komplexe Logik, GUI, Timer | Einfache `$`-Befehle für Minecraft |
 
-## Events & Trigger
+## Kommunikationswege
 
-### Events
-
-Events sind die grundlegende Nachrichteneinheit im System. Sie werden über den EventBus verteilt:
-
-- **TikTok-Events**: `tiktok.gift`, `tiktok.follow`, `tiktok.like`, `tiktok.join`, `tiktok.comment`, `tiktok.share`
-- **Plugin-Events**: Von Plugins ausgelöst, z. B. `timer.zero`, `death.milestone`
-- **Minecraft-Events**: `minecraft.player_death` (über Webhook)
-- **System-Events**: `server.started`, `server.stopping`
-
-### Trigger
-
-Trigger sind die Einträge in der `actions.mca`, die TikTok-Ereignisse auf Aktionen abbilden. Ein Trigger kann sein:
-
-- Ein Event-Name: `follow`, `like`, `join`, `comment`, `share`
-- Eine Gift-ID: `5655` (für eine Rose)
-- Ein Eigenname: Ein benutzerdefinierter Name für die Trigger-Verkettung
-
-Jeder Trigger kann mehrere Aktionen auslösen: Vanilla-Befehle, RCON-Befehle, Hook-`$`-Befehle, Overlay-Text oder Shell-Befehle.
-
-## Event-Command-Mapper
-
-Der Event-Command-Mapper ist ein zentraler Bestandteil, der EventBus-Ereignisse auf Plugin-Befehle abbildet. Er liest die Datei `event_commands.yaml` und leitet Befehle an die entsprechenden Plugins weiter. Dies ermöglicht lose Kopplung zwischen Komponenten – Plugins müssen nichts voneinander wissen.
+```
+Plugin A ──send_command("B", "start", {})──→ API-Server ──→ Plugin B (CommandQueue)
+Plugin A ──api_post("/events", ...)─────────→ EventBus ──→ Event-Command-Mapper ──→ Plugin B
+Plugin A ──api_post("/events", ...)─────────→ EventBus ──→ Event-Bridge ──→ Plugin B
+Hook ──────api.rcon_enqueue([...])──────────→ RCON-Queue ──→ Minecraft-Server
+Hook ──────api.enqueue_trigger("name", user)→ Trigger-Queue ──→ execute_global_command()
+```
 
 ## Nächstes Kapitel
 
-Im nächsten Kapitel beginnst du mit der [Plugin-Entwicklung](./ch03-00-plugins.md) und erstellst dein erstes Plugin.
+Ab jetzt geht es in die Praxis. Im [nächsten Kapitel](./ch03-00-plugins.md) entwickelst du dein erstes vollständiges Plugin.

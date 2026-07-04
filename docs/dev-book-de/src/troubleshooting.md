@@ -28,7 +28,7 @@ Dieses Kapitel hilft dir bei häufigen Problemen während der Plugin- und Hook-E
 **Mögliche Ursachen**:
 
 1. **register()-Funktion fehlt** – Jeder Hook benötigt `def register(api):` auf oberster Ebene.
-2. **Import nicht erlaubt** – Verwende nur erlaubte Module (siehe [Import-Beschränkungen](./ch04-06-import-restrictions.md)).
+2. **Import nicht erlaubt** – Verwende nur erlaubte Module (siehe [Import-Beschränkungen](./ch04-05-import-restrictions.md)).
 3. **Action-Name falsch** – Der Name in `api.register_action()` muss mit dem `$`-Befehl in der `actions.mca` übereinstimmen.
 
 ## Events kommen nicht an

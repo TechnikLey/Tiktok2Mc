@@ -7,11 +7,19 @@ In diesem Kapitel lernst du, wie du Hooks erstellst, konfigurierst und in das Sy
 ## Aufbau des Kapitels
 
 1. [Dein erster Hook](./ch04-01-your-first-hook.md) – Erstelle in wenigen Minuten deinen ersten Hook
-2. [Hook-Struktur](./ch04-02-hook-structure.md) – Verzeichnisstruktur und Dateien
-3. [Hook-Manifest](./ch04-03-hook-manifest.md) – Die `hook.json` im Detail
-4. [Hook-API](./ch04-04-hook-api.md)
-5. [Konfiguration](./ch04-05-configuration.md)
-6. [Import-Beschränkungen](./ch04-06-import-restrictions.md) – Gültige Imports und Einschränkungen
-7. [Plugin-gebündelte Hooks](./ch04-07-plugin-bundled-hooks.md) – Hooks im Bundle mit einem Plugin
-8. [Fortgeschrittene Features](./ch04-08-advanced-features.md) – Trigger-Verkettung und komplexe Muster
-9. [Best Practices](./ch04-09-best-practices.md) – Bewährte Verfahren und häufige Fehler
+2. [Hook-Struktur & Manifest](./ch04-02-hook-structure-and-manifest.md) – Verzeichnisstruktur und hook.json
+3. [Hook-API-Referenz](./ch04-03-hook-api.md) – Alle verfügbaren Hook-API-Methoden
+4. [Konfiguration](./ch04-04-hook-configuration.md) – Per-Hook-Konfiguration
+5. [Import-Beschränkungen](./ch04-05-import-restrictions.md) – Gültige Imports und Einschränkungen
+6. [Plugin-gebündelte Hooks](./ch04-06-plugin-bundled-hooks.md) – Hooks im Bundle mit einem Plugin
+
+## Wann ein Hook, wann ein Plugin?
+
+| Aspekt | Hook | Plugin |
+|--------|------|--------|
+| Ausführungsort | Läuft **direkt im Bridge-Prozess** | Eigener Subprozess |
+| Kommunikation | **Direkter Funktionsaufruf** | HTTP-API (`send_command`) |
+| Latenz | Millisekunden | Höher (Polling-Intervall 1s) |
+| Komplexität | Einfach, eine Funktion | Vollständige Klasse mit Threads |
+| Anwendungsfall | Einfache `$`-Befehle | Komplexe Logik, GUI, Zustand |
+| Lebenszyklus | Wird beim Start geladen | Wird als Subprozess gestartet/gestoppt |

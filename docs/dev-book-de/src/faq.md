@@ -26,13 +26,13 @@ Prüfe, ob die `register()`-Funktion existiert und ob alle Importe erlaubt sind.
 
 ### Kann ich externe Bibliotheken in Hooks verwenden?
 
-Nein. Hooks dürfen nur die erlaubten Module importieren (siehe [Import-Beschränkungen](./ch04-06-import-restrictions.md)). Wenn du externe Bibliotheken benötigst, erstelle ein Plugin.
+Nein. Hooks dürfen nur die erlaubten Module importieren (siehe [Import-Beschränkungen](./ch04-05-import-restrictions.md)). Wenn du externe Bibliotheken benötigst, erstelle ein Plugin.
 
 ## Events
 
 ### Wie empfange ich TikTok-Events in meinem Plugin?
 
-Deklariere `event_subscriptions` in der `plugin.json` und registriere einen Handler für `"tiktok_event"`. Siehe [Events & Subscriptions](./ch03-06-events-and-subscriptions.md).
+Deklariere `event_subscriptions` in der `plugin.json` und registriere einen Handler für `"tiktok_event"`. Siehe [Events & Subscriptions](./ch03-05-events-and-subscriptions.md).
 
 ### Wie sende ich ein Event von meinem Plugin?
 
@@ -46,11 +46,11 @@ Der Event-Command-Mapper leitet Events aus dem EventBus an Plugins weiter, basie
 
 ### Wie sende ich Minecraft-Befehle aus einem Hook?
 
-Verwende `api.rcon_enqueue([...])`. Siehe [Hook-API](./ch04-04-hook-api.md).
+Verwende `api.rcon_enqueue([...])`. Siehe [Hook-API](./ch04-03-hook-api.md).
 
 ### Wie sende ich Minecraft-Befehle aus einem Plugin?
 
-Plugins kommunizieren indirekt über den [Event-Command-Mapper](./ch05-02-event-command-mapper.md) oder über `send_command()` an spezialisierte Komponenten. Siehe [Plugin-übergreifende Kommunikation](./ch03-07-cross-plugin-communication.md).
+Plugins kommunizieren indirekt über den [Event-Command-Mapper](./ch05-02-event-command-mapper.md) oder über `send_command()` an spezialisierte Komponenten. Siehe [Plugin-übergreifende Kommunikation](./ch03-06-cross-plugin-communication.md).
 
 ### Kann ich Befehle von Minecraft-Server-Plugins (Bukkit/Paper) senden?
 

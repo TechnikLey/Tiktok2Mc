@@ -4,7 +4,7 @@ Dieses Kapitel beschreibt die wichtigsten Konfigurationsmöglichkeiten des Syste
 
 ## Globale Konfiguration (`config.yaml`)
 
-Die globale `config.yaml` im Projektstamm enthält systemweite Einstellungen:
+Die globale `config/config.yaml` enthält systemweite Einstellungen:
 
 ```yaml
 # RCON-Verbindung zum Minecraft-Server

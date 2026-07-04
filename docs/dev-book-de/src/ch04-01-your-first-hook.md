@@ -104,7 +104,7 @@ execute_global_command("follow", user)
 
 ## Hook testen
 
-1. **Starte TikTok2Mc**: `python run.py`
+1. **Starte TikTok2Mc**: `python start.py`
    Der Bridge-Prozess lädt automatisch alle Hooks aus `src/hooks/`. In der Konsolenausgabe siehst du:
    ```
    [HOOK] Registered action: superjump
@@ -149,4 +149,4 @@ Setze in der `hook.json` das Feld `"enabled"` im `config_schema` auf `false` ode
 
 ## Nächste Schritte
 
-Im nächsten Kapitel lernst du die [Hook-Struktur](./ch04-02-hook-structure.md) im Detail kennen.
+Im nächsten Kapitel lernst du die [Hook-Struktur & Manifest](./ch04-02-hook-structure-and-manifest.md) im Detail kennen.
