@@ -179,18 +179,28 @@ def _run_python_tests() -> None:
     Raises RuntimeError if any test fails.
     """
     cprint("Running Python test suite...", Color.CYAN)
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/", "-x", "-q", "--timeout=60"],
-        capture_output=True, text=True, timeout=300,
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "pytest", "tests/", "-x", "--timeout=60"],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
     )
-    for line in result.stdout.strip().split("\n"):
-        if "PASS" in line or "passed" in line:
-            cprint(f"  {line}", Color.GRAY)
-        elif "FAIL" in line or "failed" in line:
-            cprint(f"  {line}", Color.RED)
-
-    if result.returncode != 0:
-        raise RuntimeError("Python tests FAILED.")
+    stdout_lines: list[str] = []
+    for line in proc.stdout or []:
+        stdout_lines.append(line)
+        stripped = line.rstrip("\n")
+        if not stripped:
+            continue
+        if "FAILED" in stripped or "FAIL" in stripped and "PASS" not in stripped:
+            cprint(stripped, Color.RED)
+        elif "warning" in stripped.lower() or "Warning" in stripped:
+            cprint(stripped, Color.YELLOW)
+        elif "error" in stripped.lower():
+            cprint(stripped, Color.RED)
+        elif stripped.startswith("tests/"):
+            cprint(stripped, Color.GRAY)
+    proc.wait(timeout=300)
+    if proc.returncode != 0:
+        raise RuntimeError("Python tests FAILED (exit code %d)." % proc.returncode)
     cprint("All Python tests passed.", Color.GREEN)
 
 
