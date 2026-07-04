@@ -85,9 +85,13 @@ if __name__ == "__main__":
 Starte das System und aktiviere das Plugin:
 
 1. Starte TikTok2Mc: `python run.py`
-2. Das Plugin wird automatisch vom System erkannt.
-3. Aktiviere es über die API oder warte, bis der Plugin-Watcher es registriert hat.
-4. Sende einen Test-Trigger (siehe [Fehlerbehebung](./troubleshooting.md) im Anhang).
+2. Das Plugin wird automatisch vom Plugin-Watcher erkannt und beim API-Server registriert.
+3. Aktiviere das Plugin über die API: `curl -X PUT http://127.0.0.1:29185/api/v1/plugins/hallo/enable`
+4. Sende einen Test-Event, um zu prüfen, ob das Plugin reagiert:
+   ```bash
+   python tests/send_trigger.py --event tiktok.follow --user TestUser
+   ```
+5. Prüfe die Konsolenausgabe: Es sollte `TestUser folgt jetzt!` erscheinen.
 
 ## Nächste Schritte
 

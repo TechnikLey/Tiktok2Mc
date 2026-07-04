@@ -11,10 +11,20 @@ TikTok Live → Bridge-Prozess → EventBus → Plugins / Hooks → Minecraft (R
 ```
 
 1. **TikTok Live**: Eingehende Events (Gifts, Follows, Likes, Comments, Shares, Joins) werden vom TikTokLive-Client empfangen.
-2. **Bridge-Prozess**: Der Bridge-Prozess (`src/python/main.py`) empfängt die TikTok-Events und leitet sie in die Ereigniswarteschlange und den EventBus weiter.
-3. **EventBus**: Ein zentrales Publish/Subscribe-System, das Ereignisse an alle interessierten Komponenten verteilt.
-4. **Plugins & Hooks**: Diese Komponenten reagieren auf die Ereignisse und führen Aktionen aus.
+2. **Bridge-Prozess** (`src/python/main.py`): Der zentrale Hauptprozess des Systems. Er startet den API-Server, verwaltet die TikTok-Verbindung, lädt Hooks, empfängt TikTok-Events und leitet sie in den EventBus weiter. Der Bridge-Prozess läuft durchgehend und koordiniert alle Komponenten.
+3. **EventBus**: Ein zentrales Publish/Subscribe-System, das Ereignisse an alle interessierten Komponenten (Plugins, Hooks, Event-Command-Mapper) verteilt.
+4. **Plugins & Hooks**: Diese Komponenten reagieren auf Ereignisse und führen Aktionen aus. Plugins laufen als separate Prozesse, Hooks laufen direkt im Bridge-Prozess.
 5. **Minecraft**: Über RCON (Remote Console) werden Befehle an den Minecraft-Server gesendet.
+
+## API-Server
+
+Der API-Server ist ein HTTP-Server, der unter `http://127.0.0.1:29185/api/v1/` läuft und die gesamte Kommunikation zwischen Plugins, Hooks und dem Hauptsystem vermittelt. Er wird vom Bridge-Prozess gestartet und bietet:
+
+- **Plugin-Registrierung**: Plugins melden sich über `POST /api/v1/plugins/register` an
+- **EventBus-Zugriff**: Komponenten können Events über `POST /api/v1/events` veröffentlichen
+- **Overlay-Auslieferung**: Overlay-HTML und SSE-Updates werden über den API-Server bereitgestellt
+
+Ein Plugin kommuniziert **ausschließlich** über den API-Server mit dem Rest des Systems – es gibt keine direkte Verbindung zwischen Plugins oder zum Bridge-Prozess.
 
 ## Plugins vs. Hooks
 

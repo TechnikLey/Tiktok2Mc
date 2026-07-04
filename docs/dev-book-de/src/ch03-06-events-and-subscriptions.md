@@ -4,7 +4,7 @@ Plugins können auf Ereignisse aus dem gesamten System reagieren. Es gibt zwei M
 
 ## Event-Bridge
 
-Die Event-Bridge ist der primäre Weg für Plugins, TikTok-Events zu empfangen. Sie verteilt eingehende Events von TikTok automatisch an alle Plugins, die die entsprechenden Events abonniert haben.
+Die Event-Bridge ist eine Komponente im Bridge-Prozess, die TikTok-Events an Plugins verteilt. Sie empfängt Events aus dem TikTokLive-Client, filtert sie anhand der `event_subscriptions` aus der `plugin.json` jedes Plugins und leitet sie per HTTP an die entsprechenden Plugins weiter. Die Event-Bridge ist der primäre Weg für Plugins, TikTok-Events zu empfangen.
 
 ### Events abonnieren
 

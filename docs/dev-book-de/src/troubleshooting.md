@@ -56,8 +56,14 @@ Dieses Kapitel hilft dir bei häufigen Problemen während der Plugin- und Hook-E
 Du kannst Trigger ohne TikTok-Verbindung testen:
 
 ```bash
-python tests/send_trigger.py
+# Einen einzelnen Follow-Event senden
+python tests/send_trigger.py --event tiktok.follow --user TestUser
+
+# Alle verfügbaren Optionen anzeigen
+python tests/send_trigger.py --help
 ```
+
+Das Skript sendet einen simulierten TikTok-Event über die API an den EventBus. Dein Plugin muss aktiviert sein und die entsprechende `event_subscription` deklarieren.
 
 Oder über die Trigger-Tester-Oberfläche in der GUI.
 

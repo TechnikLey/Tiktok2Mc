@@ -6,16 +6,18 @@ RCON (Remote Console) ist das Protokoll, über das das System mit dem Minecraft-
 
 ### In Plugins
 
-Plugins kommunizieren indirekt mit Minecraft. Sie senden Befehle über das Event-System oder den Event-Command-Mapper:
+Plugins haben keinen direkten RCON-Zugriff. Sie senden Minecraft-Befehle indirekt über den Event-Command-Mapper. Ein spezialisierter Dienst empfängt das Event und führt den RCON-Befehl aus:
 
 ```python
-# Ein Plugin kann über den Event-Command-Mapper
-# Minecraft-bezogene Befehle an spezialisierte Komponenten senden.
+# Ein Plugin veröffentlicht ein Event, das der Event-Command-Mapper
+# an einen Minecraft-Befehl-Dienst weiterleitet.
 self.api_post("/events", {
     "type": "minecraft.befehl",
     "data": {"befehl": "say Hallo"}
 })
 ```
+
+Konfiguriere dazu in der `event_commands.yaml` einen Eintrag, der dieses Event auf einen RCON-Befehl abbildet (siehe [Event-Command-Mapper](./ch05-02-event-command-mapper.md) für Details).
 
 ### In Hooks
 
