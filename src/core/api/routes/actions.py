@@ -3,7 +3,6 @@ import logging
 import re
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
 
 from core.api.models import (
     ActionsResponse,
@@ -86,12 +85,9 @@ async def update_actions_raw(body: RawActionsUpdateRequest):
         diagnostics = _get_service().validate(body.content)
         errors = [d for d in diagnostics if d.get("severity") == Severity.ERROR.value]
         if errors:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=422,
-                content={
-                    "detail": "Cannot save — syntax errors detected.",
-                    "diagnostics": diagnostics,
-                },
+                detail=f"Cannot save — syntax errors detected: {diagnostics[0]['message']}",
             )
         _get_service().write_raw(body.content, backup=True)
         diagnostics = _get_service().validate(body.content)

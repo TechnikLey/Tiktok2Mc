@@ -93,14 +93,14 @@ class TestUpdatePluginConfig:
         resp = client.put("/api/v1/plugins/test-plugin/config", json=payload)
         assert resp.status_code == 422
         detail = resp.json()["detail"]
-        assert "errors" in detail
+        assert "Validation failed" in detail
 
     def test_put_out_of_range_422(self, client, fake_plugins_dir):
         payload = {"enabled": True, "port": 100}
         resp = client.put("/api/v1/plugins/test-plugin/config", json=payload)
         assert resp.status_code == 422
         detail = resp.json()["detail"]
-        assert any("1024" in e for e in detail["errors"])
+        assert "1024" in detail
 
     def test_put_unknown_plugin_404(self, client, fake_plugins_dir):
         resp = client.put(

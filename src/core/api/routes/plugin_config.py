@@ -55,7 +55,7 @@ async def update_plugin_config(name: str, body: dict[str, Any]):
         if errors:
             raise HTTPException(
                 status_code=422,
-                detail={"message": "Validation failed", "errors": errors},
+                detail=f"Validation failed: {errors}",
             )
 
     backup = body.pop("_backup", True)

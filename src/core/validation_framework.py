@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from core.utils import normalize_config_version
+from core.version import EXPECTED_CONFIG_VERSION
 from core.error_codes import (
     CORE_0004,
     CONFIG_0001,
@@ -479,3 +481,73 @@ def validate_runtime(
                 ))
 
     return suite
+
+
+# ==============================================================================
+# Config schema validation
+# ==============================================================================
+
+_CONFIG_SCHEMA: dict[str, type] = {
+    "api": dict,
+    "api_key": str,
+    "auto_update_config": bool,
+    "comment_commands": dict,
+    "config_advanced": bool,
+    "config_version": str,
+    "console": dict,
+    "control_method": str,
+    "gui": dict,
+    "java": dict,
+    "mc_version": str,
+    "minecraft_server_api": dict,
+    "overlay": dict,
+    "plugin_sandbox": dict,
+    "port_policy": dict,
+    "rcon": dict,
+    "server_host": str,
+    "shutdown": dict,
+    "show_sudo_warning": bool,
+    "tiktok": dict,
+    "update": dict,
+}
+
+
+def validate_config_schema(data: Any, path: str = "") -> None:
+    """Validate *data* against the config schema.
+
+    Raises ``ValueError`` on the first violation.
+    ``config_version`` must be a recognised semantic version.
+    """
+    if not isinstance(data, dict):
+        raise ValueError(f"Config must be a dict, got {type(data).__name__}")
+
+    for key, expected_type in _CONFIG_SCHEMA.items():
+        full_key = f"{path}.{key}" if path else key
+        if key not in data:
+            continue
+        value = data[key]
+        if not isinstance(value, expected_type):
+            raise ValueError(
+                f"{full_key!r} must be {expected_type.__name__}, "
+                f"got {type(value).__name__}"
+            )
+
+    raw_ver = data.get("config_version", "")
+    try:
+        norm_ver = normalize_config_version(raw_ver)
+    except ValueError as e:
+        raise ValueError(
+            f"config_version is not a recognised version format: {e}"
+        )
+
+    major = int(norm_ver.split(".")[0])
+    if major < 1:
+        log.info(
+            "Config version %s is legacy — will be normalised to %s on write",
+            norm_ver, EXPECTED_CONFIG_VERSION,
+        )
+
+    known = set(_CONFIG_SCHEMA)
+    unknown = set(data) - known
+    if unknown:
+        log.warning("Unknown config keys (possible typo): %s", sorted(unknown))

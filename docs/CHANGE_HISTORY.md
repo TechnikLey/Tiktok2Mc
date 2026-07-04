@@ -159,6 +159,64 @@
 - **End-to-end update validation** (`tests/test_core/test_update_integration.py`) — version boundary upgrade, signal lifecycle, restart flow, rollback, platform paths. 24 tests.
 - **Spotify test migration** — `test_spotify_setup.py` updated for plugin-local config path.
 
+### Error Handling & Diagnostics Framework
+- **Structured error code system** (`src/core/error_codes.py`, 1333 lines) — every error receives a stable, documented error code with subsystem prefixes (CORE, PLUGIN, API, CONFIG, LIFECYCLE, MC, TIKTOK, HOOK, DIAG, etc.). `list_all_codes()`, `get_error_code()` lookup API.
+- **CrashManager** (`src/core/crash_manager.py`) — centralized crash capture for main thread, worker threads, asyncio tasks, futures, and plugin crashes. Every crash assigned an error code, logged with structured context, preserves stack traces, notifies health monitor.
+- **HealthMonitor** (`src/core/health_monitor.py`) — health state machine with 8 states (UNKNOWN → STARTING → RUNNING → DEGRADED → FAILED → RECOVERING → STOPPING → STOPPED) and valid transition enforcement. Every major subsystem exposes a health state.
+- **Diagnostics report** (`src/core/diagnostics.py`) — comprehensive runtime snapshot including component states, recent errors, crash history, queue/thread/async task statistics.
+- **ValidationFramework** (`src/core/validation_framework.py`) — structured validation for startup, shutdown, runtime, and operation timeouts; every step produces a clear result with error code.
+- **Diagnostics API routes** — `GET /api/v1/diagnostics` and `GET /api/v1/health` endpoints for runtime introspection.
+- **Integration** — EventBus, base_plugin, lifecycle, hook_loader, plugin_watcher, backup, logger, overlay, update, and start.py all wired into health monitoring and crash reporting.
+
+### Trigger Engine Redesign
+- **Shared `trigger_engine/` module** — extracted from `trigger_service.py` into dedicated package (`models.py`, `engine.py`, `dispatcher.py`, `validator.py`)
+- **TriggerEngine** — orchestrates trigger execution with timeout, payload validation, and dispatch
+- **PayloadValidator** — validates trigger payloads against expected schemas per trigger type
+- **BridgeDispatcher** — handles subprocess dispatch to the TikTok bridge executable with proper cleanup and orphan prevention
+- **Trigger models** — `TriggerType` enum (FOLLOW, LIKE, JOIN, SHARE, COMMENT, GIFT, CUSTOM), `ExecutionStatus`, `TriggerResult`, `TriggerDefinition`, `EngineConfig`
+- **Standalone CLI tool** — `src/python/send_trigger.py` replaces `tests/send_trigger.py` as a proper utility; `test_send_trigger_cli.py` covers CLI parsing and execution paths
+- **Tests** — 435+ tests in `test_trigger_engine.py`, `test_trigger_service.py` expanded to 244 lines
+
+### MCA Language Server (VS Code Extension)
+- **Complete language server redesign** — new VS Code extension (`mca-language-server/`) with IntelliSense (completions, hover, go-to-definition), diagnostics (validator with error codes), syntax highlighting (TextMate grammar), symbol navigation (document symbols, outline), and code snippets
+- **VSIX build integration** — `build.py` gains `--build-vsix` flag; generates, validates, and differential-tests the VSIX package as part of the build pipeline
+- **Spec-driven build system** — `src/core/mca_spec.py` as single source of truth; `tools/generate_mca_spec.py` exports Python runtime definitions (command prefixes, diagnostic codes, trigger types, overlay syntax) to `mca-spec.json`
+- **Differential testing** — `tools/diff_test_mca.py` validates spec output consistency across builds; catches regressions in language definition exports
+- **MCA definition migration** — language definitions migrated from ad-hoc JavaScript to spec-driven; `src/core/validator.py` enhanced with exportable constants for spec generation
+- **9 test suites** — parser, validator, completions, hover, spec, benchmark across ~1000 lines of JS tests
+- **Removed `defaults/shell_actions.txt`** — was empty and fully superseded by actions.mca
+
+### Test Expansion
+- **1197 total tests green** (Python + GUI) — 17 new test suites added, test ordering fixed, production bugs resolved
+- **New test suites:**
+  - `test_crash_manager.py`, `test_diagnostics.py`, `test_error_codes.py`
+  - `test_health_monitor.py`, `test_validation_framework.py`
+  - `test_hook_api.py`, `test_hook_manifest.py`, `test_hook_registry.py`
+  - `test_console_capture.py`, `test_core_models.py`
+  - `test_dashboard_publisher.py`, `test_gui_launcher.py`
+  - `test_minecraft_readiness.py`, `test_plugin_discovery.py`
+  - `test_plugin_health_monitor.py`, `test_plugin_overlay_stores.py`
+  - `test_rcon_service.py`
+
+### Heartbeat & Process Lifecycle Fixes
+- **Heartbeat monitoring scoped** — only running processes are monitored for heartbeats; disabled/stopped processes are skipped to avoid false degradation
+- **STARTING→STOPPING transition allowed** — health monitor permits transition from STARTING to STOPPING; heartbeats recorded for all supervised processes including those still in STARTING state
+
+### Build System Improvements
+- **`test --all` flag** — `build.py test --all` runs the complete test suite (Python + GUI) in a single command
+- **Live pytest output** — `test --all` streams pytest output in real time instead of silent capture, improving CI debugging
+- **`--installer` default fix** — set to `False` when `cmd_app` invoked from composed commands to prevent accidental installer builds during routine operations
+- **Better default actions.mca comments** — improved inline documentation in `defaults/actions.mca`
+
+### MCA Language Server Fixes
+- **Simplified completions** — removed redundant `dollarPrefixes`, `customPrefixes`, and snippet logic from `completions.js`; completion items are now derived directly from the MCA spec
+- **Removed inline snippets** — `snippets/mca.code-snippets` deleted (57 lines); snippets are no longer needed as completions provide equivalent functionality
+- **Cleaned up packaging** — removed `.vscodeignore`, simplified `package.json` scripts and metadata
+
+### Refactoring
+- **Config schema validation extracted** — `_CONFIG_SCHEMA` and `validate_config_schema()` moved from `services/__init__.py` into `validation_framework.py` for reusability and testability
+- **Error responses standardised** — `plugin_config.py` changed from dict to string `detail`; `actions.py` replaced `JSONResponse` with `HTTPException` for consistency across API routes (`plugin_overlay.py` OAuth HTML responses kept as browser-facing endpoints by design)
+
 ---
 
 ## Pre-v1.0.0 Milestones
@@ -216,7 +274,7 @@
 - Integrated into registry, plugin config, config.yaml, and actions.mca
 
 ### Testing
-- **852 Python tests + 228 GUI frontend tests = 1080 total**
+- **969 Python tests + 228 GUI frontend tests = 1197 total**
 - GUI frontend (Vitest + JSDOM): 228 tests across helpers, config-editor, plugin-config-editor, actions-editor, dashboard
 - CI workflow `test.yml` on push/PR to `main`
 - BackupManager: 30 standalone tests
@@ -277,4 +335,4 @@
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-07-04 — Added MCA Language Server Fixes section; added Refactoring section (config schema validation extraction, error response standardisation).*
