@@ -173,6 +173,27 @@ def _validate_mca_spec() -> None:
     cprint("MCA specification valid.", Color.GRAY)
 
 
+def _run_python_tests() -> None:
+    """Run the full Python test suite via pytest.
+    
+    Raises RuntimeError if any test fails.
+    """
+    cprint("Running Python test suite...", Color.CYAN)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/", "-x", "-q", "--timeout=60"],
+        capture_output=True, text=True, timeout=300,
+    )
+    for line in result.stdout.strip().split("\n"):
+        if "PASS" in line or "passed" in line:
+            cprint(f"  {line}", Color.GRAY)
+        elif "FAIL" in line or "failed" in line:
+            cprint(f"  {line}", Color.RED)
+
+    if result.returncode != 0:
+        raise RuntimeError("Python tests FAILED.")
+    cprint("All Python tests passed.", Color.GREEN)
+
+
 def _run_mca_tests() -> None:
     """Run the MCA language server test suite.
     
@@ -909,8 +930,12 @@ def cmd_spec(_args):
     _validate_mca_spec()
 
 
-def cmd_test(_args):
-    _run_mca_tests()
+def cmd_test(args):
+    if getattr(args, 'all', False):
+        _run_python_tests()
+        _run_mca_tests()
+    else:
+        _run_mca_tests()
 
 
 def cmd_all(args):
@@ -960,7 +985,9 @@ def main():
 
     sub.add_parser("spec", help="Generate MCA language specification")
     sub.add_parser("vsix", help="Build VS Code extension (.vsix)")
-    sub.add_parser("test", help="Run MCA language server tests")
+    p_test = sub.add_parser("test", help="Run tests")
+    p_test.add_argument("--all", action="store_true",
+                        help="Run all tests (Python + MCA)")
 
     p_app = sub.add_parser("app", help="Build application via PyInstaller")
     p_app.add_argument("--installer", action="store_true",
