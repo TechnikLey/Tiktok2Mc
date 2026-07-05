@@ -1,30 +1,55 @@
-# See defaults/gifts.json for all gift IDs and names.
-# Semicolon (;) chains multiple commands: runs /give first, then the >> overlay.
-# & runs a shell command on your PC (e.g. URL call, custom script).
+# ─── Syntax Quick Reference ───────────────────────────────────────────────────
+# <trigger>:<command1> ; <command2>        →  chain multiple with ;
+# >>Title|Subtitle|Seconds                 →  overlay text (on-screen)
+# /command                                 →  Minecraft vanilla (datapack)
+# !command                                 →  RCON (direct to server)
+# $name                                    →  hook script (Python)
+# &command                                 →  shell command (PC, e.g. webhook)
+# @slot>>Title                             →  overlay in named slot
+# x<number>                                →  multiplier (run command N times)
+# {user}                                   →  placeholder: viewer name
+# {comment}                                →  placeholder: comment text (comment trigger only)
+# ## <trigger>:...                         →  disabled (kept as template)
+# Gift ID format:  <position><id>          →  e.g. 1<id> = slot 1, 8<id> = slot 8
+# All gift IDs and names: defaults/gifts.json
+# ─── Event Examples ────────────────────────────────────────────────────────────
+
+# 1. Follow: golden apple + overlay (; chains both)
 follow:/give @a minecraft:golden_apple 7 ; >>New Follower!|{user} is now following!|5
-# Caution: avoid expensive or spammy commands here (they may lag the stream).
-#join:>>Welcome!|{user} joined the stream!
-# Caution: avoid expensive or spammy commands here (they may lag the stream).
-#comment:>>{user} wrote:|{comment}
-# "likes" fires every N likes (default: 100, configurable in config.yaml).
-likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x2
-# "like_2" fires at a larger milestone (default: 100,000 likes).
-# Semicolon (;) chains both commands: /clear runs first, then /kill.
+
+# 2. Likes (every 100): creeper spawn with x3 multiplier
+likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x3
+
+# 3. Like mega (default: 100k): clear inventory + kill all
 like_2:/clear @a * ; /kill @a
-# ─── Rose (Gift ID: 655) ──────────────────────────────────────────────────
-# Parameters: !tnt <Amount> <Delay> <Fuse> <Player>
-5655:!tnt 2 0.1 2 Notch
-# ─── Mamma Mia (Gift ID: 6111) ─────────────────────────────────────────────
-16111:/give @a minecraft:diamond
-# ─── Rosa (Gift ID: 913) ──────────────────────────────────────────────────
+
+# 4. Comment: display chat message in overlay ({comment} works here only)
+comment:>>{user} wrote:|{comment}
+
+# 5. Share: fireworks for everyone (simple /give)
+share:/give @a minecraft:firework_rocket 3
+
+# ─── Gift Examples ─────────────────────────────────────────────────────────────
+
+# 6. Rosa (ID 913): summon 3 evokers (multiplier x3 on the command)
 8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
-# ─── Corgi (Gift ID: 267) ─────────────────────────────────────────────────
-# Same syntax as above: !tnt <Amount> <Delay> <Fuse> <Player>
-6267:!tnt 600 0.1 2 Notch
-# ─── Money Gun (Gift ID: 168) ──────────────────────────────────────────────
-7168:/execute at @a run summon minecraft:wither ~ ~ ~ x50
-# ─── Flower Show (Gift ID: 6071) ───────────────────────────────────────────
-# $random picks a random active trigger (defaults: likes, like_2, follow, join, comment).
-16071:$random
-'Tom the Tomato':$random
+
+# 7. Mamma Mia (ID 16111): diamonds + overlay (chained)
+16111:/give @a minecraft:diamond ; >>Mamma Mia!|{user} sent Mamma Mia!|4
+
+# 8. Tom the Tomato (ID 16379): random trigger ($random)
 16379:$random
+
+# ─── Advanced Examples ─────────────────────────────────────────────────────────
+
+# 9. Quoted trigger name (needed when the name contains spaces)
+'Tom the Tomato':/give @a minecraft:potato 1
+
+# 10. Shell command: Discord webhook on follow (PC-side)
+#follow:&curl -X POST -H "Content-Type: application/json" -d "{\"content\":\"{user} just followed!\"}" https://discord.com/api/webhooks/YOUR_WEBHOOK
+
+# 11. Disabled with ## – kept as template, won't fire
+##like_2:/kill @a
+
+# 12. Disabled gift with TNT parameters (requires TNT plugin)
+##5655:!tnt 2 0.1 2 Notch
