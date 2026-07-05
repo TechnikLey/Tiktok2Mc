@@ -21,7 +21,7 @@ In der `plugin.json`:
 }
 ```
 
-Wildcard `"tiktok.*"` abonniert alle TikTok-Events.
+Wildcard `"tiktok.*"` abonniert alle TikTok-Events. Du kannst auch Events anderer Plugins abonnieren, z. B. `"timer.zero"` oder `"death-counter.milestone"`. Eigene Events haben den Namespace `plugin-name.ereignis` (siehe unten).
 
 ### Handler registrieren
 
@@ -175,6 +175,29 @@ Namenskonvention: `plugin-name.ereignis` (Namespace mit Punkt).
 | Reihenfolge | Events eines Typs werden in Reihenfolge des Eintreffens verarbeitet |
 | Zustellung | At-Most-Once nach Verarbeitung durch den Handler. Bei Netzwerkfehlern kann ein Event erneut angefragt werden. |
 | Timeout | Polling-Timeout: 30s Server-Seite, 35s Client-Seite |
+
+## Kommentar-Handler (`comment_handler`)
+
+Plugins können auf TikTok-Kommentare mit einem bestimmten Prefix reagieren. Die Deklaration erfolgt in der `plugin.json`:
+
+```json
+{
+  "comment_handler": {
+    "prefix": "$",
+    "enabled": true
+  }
+}
+```
+
+| Feld | Beschreibung |
+|------|--------------|
+| `prefix` | Zeichen, das einen Command markiert (z. B. `$` für `$song`). Standard: `"$"`. |
+| `enabled` | Ob der Handler aktiv ist. Standard: `true`. |
+
+Wenn ein TikTok-Kommentar mit dem Prefix beginnt (z. B. `$song`), leitet das System den Command an das Plugin weiter. Das Plugin empfängt den Event über `event_subscriptions: ["tiktok.comment"]` und kann den Prefix parsen.
+
+> [!NOTE]
+> Ohne `comment_handler`-Deklaration wird der Prefix nicht registriert. Das Plugin kann Kommentare zwar über `tiktok.comment` empfangen, aber das System erkennt den Command nicht als zu diesem Plugin gehörig.
 
 ## Häufige Fehler
 

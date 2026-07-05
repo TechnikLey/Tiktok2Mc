@@ -275,7 +275,6 @@ class TestManifestRegistrationViaAPI:
                 "version": "1.0.0",
                 "entry_point": "src/plugins/timer/main.py",
                 "display_name": "Timer",
-                "ports": {"declared": [29189]},
                 "capabilities": ["timer:schedule"],
             }),
             encoding="utf-8",

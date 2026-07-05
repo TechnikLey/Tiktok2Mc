@@ -33,13 +33,18 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 |------|--------------|
 | `description` | Kurzbeschreibung (1-2 Sätze) |
 | `author` | Entwickler-Name |
+| `homepage` | Projekt-URL (z. B. GitHub-Repository) |
 | `min_api_version` | Mindestversion der Plugin-API (aktuell `1.0.0`, siehe `src/core/version.py`). Bei Inkompatibilität wird das Plugin nicht gestartet. |
-| `event_subscriptions` | Liste von TikTok-Event-Typen, die das Plugin empfangen will. **Ohne dieses Feld keine TikTok-Events.** |
-| `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen |
+| `max_api_version` | Höchste unterstützte API-Version. Fehlt das Feld oder ist es `null`, gibt es keine Obergrenze. |
+| `event_subscriptions` | Liste von Event-Typen, die das Plugin über den EventBus empfangen will. Unterstützt Wildcards wie `"tiktok.*"`. **Ohne dieses Feld werden keine Events zugestellt.** |
+| `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen. Sind Abhängigkeiten nicht aktiv, wird das Plugin nicht gestartet (Fehler `PLUGIN-0005`). |
 | `capabilities` | Liste von Fähigkeiten, die das Plugin bereitstellt. Wird vom System zur Discovery verwendet, z. B. `["timer:countdown"]`. Andere Plugins können per API nach Plugins mit bestimmten Capabilities suchen. |
 | `config_schema` | Schema für die Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |
 | `comment_handler` | Objekt mit `prefix` (String) und `enabled` (Boolean). Deklariert, dass das Plugin auf TikTok-Kommentare mit einem bestimmten Prefix reagiert (z. B. `"$"`). Siehe [Events empfangen](./ch03-05-events-and-subscriptions.md). |
-| `update_url` | GitHub-API-URL für Auto-Updates |
+| `update_url` | URL für Auto-Updates, z. B. `"https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"`. Bei leerem String keine Update-Prüfung. |
+
+> [!NOTE]
+> Die internen Felder `ics` (Boolean, Standard `true`) und `level` (Integer 1–4, Standard `4`) werden automatisch gesetzt. In der Regel musst du sie nicht in der `plugin.json` angeben.
 
 ### Vollständiges Beispiel
 
@@ -51,10 +56,12 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
   "display_name": "Mein Plugin",
   "description": "Reagiert auf Follows und Gifts",
   "author": "Dein Name",
+  "homepage": "https://github.com/DeinName/Tiktok2Mc",
   "min_api_version": "1.0.0",
   "event_subscriptions": ["tiktok.follow", "tiktok.gift"],
   "capabilities": ["mein-plugin:counter"],
   "depends_on": [],
+  "update_url": "https://api.github.com/repos/DeinName/Tiktok2Mc/releases/latest",
   "config_schema": {
     "version": 1,
     "fields": [
@@ -62,6 +69,7 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
         "key": "schwellwert",
         "type": "integer",
         "default": 10,
+        "min": 1,
         "label": "Schwellwert",
         "category": "Events"
       }

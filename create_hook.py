@@ -78,10 +78,10 @@ enabled: true
 
 def get_valid_hook_name():
     while True:
-        name = input("Please enter hook name (only a-z and 0-9): ").strip()
+        name = input("Please enter hook name (a-z, 0-9, hyphens, underscores): ").strip()
 
-        if not re.match(r'^[a-z0-9]+$', name):
-            log.info("\033[91mInvalid name! Only a-z and 0-9 allowed.\033[0m")
+        if not re.match(r'^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$|^[a-z0-9]$', name):
+            log.info("\033[91mInvalid name! Only a-z, 0-9, hyphens, and underscores allowed (must start/end with letter/digit).\033[0m")
         else:
             return name
 

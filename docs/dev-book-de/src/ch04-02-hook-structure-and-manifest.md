@@ -15,7 +15,7 @@ src/hooks/<name>/
 
 | Feld | Typ | Beschreibung | Beispiel |
 |------|-----|--------------|----------|
-| `name` | String | Eindeutiger Hook-Name (Kleinbuchstaben, Ziffern) | `"sprung"` |
+| `name` | String | Eindeutiger Hook-Name (Kleinbuchstaben, Ziffern, Bindestriche, Unterstriche) | `"sprung"` |
 | `version` | String | Semantische Version | `"1.0.0"` |
 | `display_name` | String | Anzeigename | `"Supersprung"` |
 
@@ -26,9 +26,11 @@ src/hooks/<name>/
 | `description` | String | Kurzbeschreibung |
 | `author` | String | Entwickler-Name |
 | `min_api_version` | String | Mindest-Hook-API-Version (aktuell `1.0.0`, siehe `src/core/version.py`) |
-| `config_schema` | Objekt | Schema für die Hook-Konfiguration |
+| `capabilities` | Array | Liste von Fähigkeiten, z. B. `["hook:random"]` |
+| `depends_on` | Array | Liste von Plugin-Namen, die aktiviert sein müssen |
 | `plugin` | String | Bei Plugin-gebündelten Hooks: der Plugin-Name |
-| `update_url` | String | URL für Auto-Updates |
+| `config_schema` | Objekt | Schema für die Hook-Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |
+| `update_url` | String | URL für Auto-Updates, z. B. `"https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"` |
 
 ### Vollständiges Beispiel
 
@@ -40,7 +42,7 @@ src/hooks/<name>/
   "description": "Gibt allen Spieler Sprung-Boost",
   "author": "Dein Name",
   "min_api_version": "1.0.0",
-  "enabled": true,
+  "capabilities": ["hook:jump"],
   "config_schema": {
     "version": 1,
     "fields": [
@@ -48,6 +50,8 @@ src/hooks/<name>/
         "key": "dauer",
         "type": "integer",
         "default": 10,
+        "min": 1,
+        "max": 300,
         "label": "Effektdauer (Sekunden)"
       }
     ]
@@ -67,7 +71,7 @@ def register(api: HookAPI):
         dauer = api.get_hook_config("sprung").get("dauer", 10)
         api.rcon_enqueue([f"effect give @a minecraft:jump_boost {dauer} 5 true"])
 
-    api.register_action("superjump", handler)
+    api.register_action("sprung", handler)
 ```
 
 ### Wichtige Regeln

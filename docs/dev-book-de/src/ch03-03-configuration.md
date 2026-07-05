@@ -31,6 +31,7 @@ Definiere in der `plugin.json` unter `config_schema`, welche Felder dein Plugin 
         "key": "schwellwert",
         "type": "integer",
         "default": 10,
+        "min": 1,
         "label": "Schwellwert",
         "help": "Bei diesem Wert wird ein Event ausgelöst",
         "category": "Events"
@@ -41,6 +42,15 @@ Definiere in der `plugin.json` unter `config_schema`, welche Felder dein Plugin 
         "default": "#000000",
         "label": "Hintergrundfarbe",
         "category": "Theme"
+      },
+      {
+        "key": "api_key",
+        "type": "string",
+        "default": "",
+        "secret": true,
+        "label": "API-Key",
+        "help": "Wird in der GUI maskiert",
+        "category": "Authentifizierung"
       },
       {
         "key": "modus",
@@ -69,22 +79,31 @@ Definiere in der `plugin.json` unter `config_schema`, welche Felder dein Plugin 
 |-----|--------------|
 | `boolean` | Wahr/Falsch |
 | `integer` | Ganze Zahl (optional mit `min`, `max`) |
+| `number` | Fließkommazahl (optional mit `min`, `max`) |
 | `string` | Text (optional mit `pattern`-Regex) |
 | `color` | Hex-Farbe, z. B. `#ff4444` |
-| `select` | Auswahl aus `options`-Liste |
-| `array` | Liste von Elementen (mit `item_schema`) |
+| `select` | Auswahl aus `options`-Liste. Das Feld `options` ist ein Pflichtfeld für diesen Typ. |
+| `array` | Liste von Elementen (mit `item_schema`). Das Feld `item_schema` definiert Typ und Validierung der enthaltenen Elemente. |
+| `object` | Verschachteltes Objekt (mit `item_schema` für die Felddefinitionen) |
 
 ### Feldeigenschaften
 
-| Eigenschaft | Beschreibung |
-|-------------|--------------|
-| `key` | Schlüssel in der Config (Punkte für Verschachtelung: `theme.background`) |
-| `type` | Datentyp |
-| `default` | Standardwert |
-| `label` | Anzeigename |
-| `help` | Hilfetext |
-| `category` | Kategorie für GUI-Gruppierung |
-| `advanced` | Bei `true` in erweiterter Ansicht verstecken |
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `key` | String | Schlüssel in der Config (Punkte für Verschachtelung: `theme.background`) |
+| `type` | String | Datentyp (siehe unterstützte Typen oben) |
+| `default` | Any | Standardwert, wenn das Feld in der Config fehlt |
+| `label` | String | Anzeigename in der GUI |
+| `help` | String | Hilfetext / Tooltip |
+| `category` | String | Kategorie für GUI-Gruppierung (Standard: `"General"`) |
+| `advanced` | Boolean | Bei `true` in der erweiterten Ansicht verstecken (Standard: `false`) |
+| `required` | Boolean | Bei `true` muss das Feld gesetzt sein (Standard: `false`) |
+| `secret` | Boolean | Bei `true` wird der Wert in der GUI maskiert (z. B. für API-Keys, Standard: `false`) |
+| `min` | Integer | Minimalwert (nur für `integer`) |
+| `max` | Integer | Maximalwert (nur für `integer`) |
+| `options` | Array | Erlaubte Werte (nur für `select`) |
+| `item_schema` | Objekt | Schema für Array-Elemente (nur für `array`). Unterstützt `type`, `min`, `max` und `options`. |
+| `widget` | String | GUI-Widget-Hinweis, z. B. `"textarea"` oder `"color"` |
 
 ## Zugriff im Code
 

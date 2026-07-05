@@ -6,10 +6,6 @@
   "description": "Internal development and testing plugin.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
-  "ports": {
-    "declared": [],
-    "protocol": "tcp"
-  },
   "min_api_version": "1.0.0",
   "capabilities": [],
   "depends_on": [],
