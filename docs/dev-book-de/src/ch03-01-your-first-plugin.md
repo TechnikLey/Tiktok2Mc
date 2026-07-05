@@ -6,7 +6,7 @@ Der Code aus dem [Quickstart](./ch01-00-getting-started.md) wird hier erweitert.
 
 ## Das vollständige Beispiel
 
-Ersetze `src/plugins/meinplugin/main.py`:
+Ersetze `src/plugins/mein-plugin/main.py`:
 
 ```python
 import logging
@@ -15,7 +15,7 @@ from core.base_plugin import BasePlugin
 log = logging.getLogger(__name__)
 
 class MeinPlugin(BasePlugin):
-    PLUGIN_NAME = "meinplugin"
+    PLUGIN_NAME = "mein-plugin"
 
     def __init__(self):
         super().__init__()
@@ -43,7 +43,7 @@ class MeinPlugin(BasePlugin):
 
             if self._zaehler >= self._schwellwert:
                 self.api_post("/events", {
-                    "type": "meinplugin.milestone",
+                    "type": "mein-plugin.milestone",
                     "data": {"count": self._zaehler}
                 })
 
@@ -72,14 +72,14 @@ class MeinPlugin(BasePlugin):
 <body>
     <div class="count" id="counter">0</div>
     <script>
-        new EventSource("/api/v1/plugins/meinplugin/stream");
+        new EventSource("/api/v1/plugins/mein-plugin/stream");
         es.onmessage = (e) => {{
             const d = JSON.parse(e.data);
             document.getElementById("counter").innerText = d.count;
         }};
         es.onerror = () => {{
             es.close();
-            setTimeout(() => {{ new EventSource("/api/v1/plugins/meinplugin/stream"); }}, 2000);
+            setTimeout(() => {{ new EventSource("/api/v1/plugins/mein-plugin/stream"); }}, 2000);
         }};
     </script>
 </body>
@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
 ### 1. Plugin-Identität
 
-`PLUGIN_NAME = "meinplugin"` identifiziert das Plugin eindeutig. Der Wert muss mit dem `name`-Feld in der `plugin.json` übereinstimmen.
+`PLUGIN_NAME = "mein-plugin"` identifiziert das Plugin eindeutig. Der Wert muss mit dem `name`-Feld in der `plugin.json` übereinstimmen.
 
 ### 2. Handler registrieren
 
@@ -123,7 +123,7 @@ self.push_state()
 
 ```python
 self.api_post("/events", {
-    "type": "meinplugin.milestone",
+    "type": "mein-plugin.milestone",
     "data": {"count": self._zaehler}
 })
 ```

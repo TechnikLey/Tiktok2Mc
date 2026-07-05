@@ -128,13 +128,13 @@ rcon_host = glob_cfg.get("rcon", {}).get("host", "localhost")
 
 | Code | Bedeutung |
 |------|-----------|
-| `HOOK_0001` | Hook-Verzeichnis nicht gefunden |
-| `HOOK_0002` | `hook.json` fehlt oder ungültig |
-| `HOOK_0003` | `main.py` fehlt |
-| `HOOK_0004` | `name` oder `version` fehlt im Manifest |
-| `HOOK_0005` | Disallowed import gefunden |
-| `HOOK_0006` | Unerwarteter Fehler beim Laden |
-| `HOOK_0007` | `register()`-Funktion fehlt |
+| `HOOK-0001` | Hook-Verzeichnis nicht gefunden |
+| `HOOK-0002` | `hook.json` fehlt oder ungültig |
+| `HOOK-0003` | `main.py` fehlt |
+| `HOOK-0004` | `name` oder `version` fehlt im Manifest |
+| `HOOK-0005` | Disallowed import gefunden |
+| `HOOK-0006` | Unerwarteter Fehler beim Laden |
+| `HOOK-0007` | `register()`-Funktion fehlt |
 
 ## Nächstes Kapitel
 

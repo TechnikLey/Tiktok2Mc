@@ -35,12 +35,18 @@ Muss überschrieben werden. Gibt den HTML-String für das Overlay zurück. Wird 
 | `self.state = {...}` | Ersetzt den gesamten State (thread-safe). |
 | `self.push_state()` | Sendet den aktuellen State per `POST /plugins/{name}/state` an den API-Server → SSE → Browser. |
 
-**Wichtig**: `self._state["key"] = val` umgeht den Lock. Verwende stattdessen ein separates Instanz-Attribut und schreibe bei Bedarf in `self._state` oder setze den State komplett:
+**Thread-Safety**: `self.state` (Property) ist thread-safe und sollte für Lese- und Schreibzugriffe aus parallelen Threads verwendet werden. Der direkte Zugriff auf `self._state["key"] = val` ist unter CPython durch die GIL für einzelne Zuweisungen atomar, aber nicht für zusammengesetzte Operationen:
 
 ```python
-# OK
-self._state["count"] = self._zaehler
+# Empfohlen: thread-safe über die Property
+state = self.state
+state["count"] = self._zaehler
+self.state = state
 self.push_state()
+
+# Auch OK (einzelne Zuweisung, atomar unter GIL):
+self._state["count"] = self._zaehler
+self.push_state()  # liest über thread-safes self.state
 ```
 
 ## Overlay
@@ -58,6 +64,9 @@ self.push_state()
 | `self.send_command(target, command, args)` | Sendet Befehl an ein anderes Plugin per `POST /plugins/{target}/command`. Gibt `True`/`False` zurück. |
 | `self.api_post(path, data)` | Sendet HTTP-POST an `http://127.0.0.1:29185/api/v1/{path}`. Gibt `True`/`False` zurück. |
 | `self.api_get(path, timeout=5)` | Sendet HTTP-GET. Gibt das JSON-Objekt oder `None` bei Fehlern zurück. |
+
+> [!NOTE]
+> Die API-Basis-URL kann über die Umgebungsvariable `API_BASE_URL` überschrieben werden (z. B. für abweichende Host/Port-Konfiguration). Standard: `http://127.0.0.1:29185/api/v1`.
 
 ```python
 # Befehl an Timer-Plugin senden
@@ -103,16 +112,20 @@ Wird einmal aufgerufen, kehrt nicht zurück (blockiert bis zum Plugin-Ende). Fü
 
 ### `on_tick()`
 
-Wird einmal pro Sekunde vom Tick-Thread aufgerufen:
+Wird einmal pro Sekunde vom Tick-Thread aufgerufen. Überschreibe sie für periodische Aufgaben (z. B. Timer-Countdown). Das Attribut `self._running` ist von `BasePlugin` vordefiniert; weitere Attribute müssen im `__init__` initialisiert werden:
 
 ```python
+def __init__(self):
+    super().__init__()
+    self._remaining = 60  # Initialisierung vor on_tick()
+
 def on_tick(self):
     if self._running and self._remaining > 0:
         self._remaining -= 1
         self.push_state()
 ```
 
-**Threading-Hinweis**: `on_tick()` läuft im Tick-Thread. Handler laufen im Polling-Thread. `self._state` und `self.state` sind thread-safe.
+**Threading-Hinweis**: `on_tick()` läuft im Tick-Thread. Handler laufen im Polling-Thread. `self._state` (direkter Zugriff) und `self.state` (Property) sind unter CPython für einzelne Zuweisungen sicher (GIL garantiert atomare dict-Operationen).
 
 ## Verzeichnisse
 
@@ -145,8 +158,11 @@ theme_file = self._plugin_dir / "theme.json"
 4. python main.py → if __name__ → MeinPlugin().run()
 5. run() registriert Overlay, startet Threads
 6. Polling-Thread empfängt Befehle → Handler wird aufgerufen
-7. Benutzer deaktiviert → Signal-Datei → Supervisor beendet Prozess
+7. Benutzer deaktiviert → Signal-Datei → Supervisor beendet Prozess (SIGTERM)
 ```
+
+> [!NOTE]
+> Der Supervisor beendet den Plugin-Prozess per `SIGTERM`. Hintergrund-Threads sind als `daemon=True` gestartet und werden automatisch beendet. Für eigene Betriebsmittel (Dateien, Netzwerkverbindungen) kann `atexit`-Handler registriert werden.
 
 ## Nächstes Kapitel
 

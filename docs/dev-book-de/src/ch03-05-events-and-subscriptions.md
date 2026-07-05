@@ -64,7 +64,9 @@ Die Event-Bridge liefert standardisierte Dictionaries:
 {
     "event_type": "tiktok.comment",
     "user": "kommentator",
-    "data": {}
+    "data": {
+        "comment": "Hallo zusammen!"
+    }
 }
 
 # tiktok.like

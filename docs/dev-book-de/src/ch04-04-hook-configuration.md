@@ -45,6 +45,9 @@ Unterstützte Feldtypen: `boolean`, `integer`, `string`, `color`, `select`
 
 Fehlt die `config.yaml`, wird sie beim ersten Start automatisch aus dem Schema generiert (mit Default-Werten). Fehlende oder ungültige Felder werden repariert ("Healing").
 
+> [!NOTE]
+> Das Feld `enabled` wird automatisch vom System verwaltet, auch wenn es nicht im Schema definiert ist. Setze `enabled: false` in der `config.yaml`, um den Hook zu deaktivieren.
+
 ## Zugriff im Hook
 
 ```python

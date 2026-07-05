@@ -62,7 +62,7 @@ self._state["count"] = self._zaehler
 self.push_state()
 ```
 
-`push_state()` sendet `POST /api/v1/plugins/{name}/state` an den API-Server. Der Server speichert den Zustand im `PluginStateStore` und leitet ihn per SSE an alle verbundenen Clients weiter.
+`push_state()` sendet `POST /api/v1/plugins/{name}/state` an den API-Server. Der Server speichert den Zustand im `PluginStateStore` und leitet ihn per SSE (`GET /api/v1/plugins/{name}/stream` — der SSE-Endpunkt) an alle verbundenen Clients weiter.
 
 ### SSE-Code im HTML
 

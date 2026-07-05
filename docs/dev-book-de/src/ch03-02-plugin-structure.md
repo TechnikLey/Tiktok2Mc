@@ -24,7 +24,7 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 |------|--------------|----------|
 | `name` | Eindeutiger Name (Kleinbuchstaben, Ziffern, Bindestriche). Regex: `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` | `"mein-plugin"` |
 | `version` | Semantische Version | `"1.0.0"` |
-| `entry_point` | Pfad zur `main.py` relativ zum Projektstamm | `"src/plugins/meinplugin/main.py"` |
+| `entry_point` | Pfad zur `main.py` relativ zum Projektstamm | `"src/plugins/mein-plugin/main.py"` |
 | `display_name` | Anzeigename für die GUI | `"Mein Plugin"` |
 
 ### Wichtige optionale Felder
@@ -33,12 +33,12 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 |------|--------------|
 | `description` | Kurzbeschreibung (1-2 Sätze) |
 | `author` | Entwickler-Name |
-| `min_api_version` | Mindestversion der Plugin-API. Bei Inkompatibilität wird das Plugin nicht gestartet. |
+| `min_api_version` | Mindestversion der Plugin-API (aktuell `1.0.0`, siehe `src/core/version.py`). Bei Inkompatibilität wird das Plugin nicht gestartet. |
 | `event_subscriptions` | Liste von TikTok-Event-Typen, die das Plugin empfangen will. **Ohne dieses Feld keine TikTok-Events.** |
 | `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen |
-| `capabilities` | Freie Schlagwörter für das System, z. B. `["timer:countdown"]` |
+| `capabilities` | Liste von Fähigkeiten, die das Plugin bereitstellt. Wird vom System zur Discovery verwendet, z. B. `["timer:countdown"]`. Andere Plugins können per API nach Plugins mit bestimmten Capabilities suchen. |
 | `config_schema` | Schema für die Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |
-| `comment_handler` | Deklaration, dass das Plugin auf TikTok-Kommentare reagiert |
+| `comment_handler` | Objekt mit `prefix` (String) und `enabled` (Boolean). Deklariert, dass das Plugin auf TikTok-Kommentare mit einem bestimmten Prefix reagiert (z. B. `"$"`). Siehe [Events empfangen](./ch03-05-events-and-subscriptions.md). |
 | `update_url` | GitHub-API-URL für Auto-Updates |
 
 ### Vollständiges Beispiel
@@ -47,7 +47,7 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 {
   "name": "mein-plugin",
   "version": "1.0.0",
-  "entry_point": "src/plugins/meinplugin/main.py",
+  "entry_point": "src/plugins/mein-plugin/main.py",
   "display_name": "Mein Plugin",
   "description": "Reagiert auf Follows und Gifts",
   "author": "Dein Name",
@@ -72,7 +72,7 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 
 ## main.py — Der Einstiegspunkt
 
-Das System startet den Subprozess mit: `python src/plugins/<name>/main.py`
+Das System startet den Subprozess mit: `python src/plugins/<plugin-dir>/main.py`
 
 Die Datei muss enthalten:
 
@@ -100,10 +100,10 @@ if __name__ == "__main__":
 
 | Element | Konvention | Beispiel |
 |---------|------------|----------|
-| `name` in `plugin.json` | Kebab-Case | `mein-plugin` |
-| Verzeichnisname | Nur Kleinbuchstaben, Ziffern (keine Bindestriche) | `meinplugin` |
+| `name` in `plugin.json` | Kebab-Case (Kleinbuchstaben, Ziffern, Bindestriche) | `mein-plugin` |
+| Verzeichnisname | Identisch mit `name` | `mein-plugin` |
 | `PLUGIN_NAME` in Python | Exakt wie `name` in plugin.json | `"mein-plugin"` |
-| `entry_point` | Relativer Pfad | `src/plugins/meinplugin/main.py` |
+| `entry_point` | Relativer Pfad | `src/plugins/mein-plugin/main.py` |
 
 **Konsequenz bei Abweichung**: Das Plugin wird zwar registriert, der Subprozess startet nicht korrekt.
 
@@ -114,6 +114,17 @@ if __name__ == "__main__":
 3. **Registrierung**: Daten werden im API-Server in der `PluginRegistry` gespeichert (`data/api_plugin_registry.json`)
 4. **Aktivierung**: Erst beim Enable (per API oder GUI) wird der Subprozess gestartet
 5. **Signal-Datei**: Der API-Server schreibt `core/runtime/plugin_start_<name>`. Der Supervisor startet daraufhin den Prozess.
+
+## version.txt
+
+Das Scaffolding-Skript erzeugt eine `version.txt` im YAML-Format:
+
+```
+version: v1.0.0
+update_url: https://api.github.com/repos/...
+```
+
+Wird vom System für Update-Prüfungen verwendet.
 
 ## Nächstes Kapitel
 

@@ -14,12 +14,12 @@ In 5 Minuten erstellst du dein erstes Plugin und siehst, wie es im System lebt.
 python create_plugin.py
 ```
 
-Das Skript fragt nach einem Namen (nur a-z, 0-9). Beispiel: `meinplugin`
+Das Skript fragt nach einem Namen (a-z, 0-9, Bindestriche). Beispiel: `mein-plugin`
 
-Nach der Erstellung liegt das Plugin unter `src/plugins/meinplugin/`:
+Nach der Erstellung liegt das Plugin unter `src/plugins/mein-plugin/`:
 
 ```
-src/plugins/meinplugin/
+src/plugins/mein-plugin/
 ├── plugin.json         # Manifest
 ├── main.py             # Einstiegspunkt
 ├── config.yaml         # Konfiguration
@@ -29,7 +29,7 @@ src/plugins/meinplugin/
 
 ## 2. Plugin-Code schreiben
 
-Ersetze den Inhalt von `src/plugins/meinplugin/main.py`:
+Ersetze den Inhalt von `src/plugins/mein-plugin/main.py`:
 
 ```python
 import logging
@@ -38,7 +38,7 @@ from core.base_plugin import BasePlugin
 log = logging.getLogger(__name__)
 
 class MeinPlugin(BasePlugin):
-    PLUGIN_NAME = "meinplugin"
+    PLUGIN_NAME = "mein-plugin"
 
     def __init__(self):
         super().__init__()
@@ -61,11 +61,11 @@ if __name__ == "__main__":
 
 ## 3. Event-Abonnement eintragen
 
-Füge in `src/plugins/meinplugin/plugin.json` das Feld `event_subscriptions` hinzu:
+Füge in `src/plugins/mein-plugin/plugin.json` das Feld `event_subscriptions` hinzu:
 
 ```json
 {
-  "name": "meinplugin",
+  "name": "mein-plugin",
   "event_subscriptions": ["tiktok.follow", "tiktok.gift"]
 }
 ```
@@ -83,10 +83,10 @@ Startet den API-Server unter `http://127.0.0.1:29185`. Der Plugin-Watcher regist
 ## 5. Plugin aktivieren
 
 ```bash
-curl -X PUT http://127.0.0.1:29185/api/v1/plugins/meinplugin/enable
+curl -X PUT http://127.0.0.1:29185/api/v1/plugins/mein-plugin/enable
 ```
 
-Der Supervisor startet daraufhin den Subprozess: `python src/plugins/meinplugin/main.py`
+Der Supervisor startet daraufhin den Subprozess: `python src/plugins/mein-plugin/main.py`
 
 Bestätigung in der Konsole: Das Plugin loggt, dass es gestartet ist.
 
@@ -101,7 +101,7 @@ In der Konsole sollte erscheinen: `TestUser folgt jetzt!`
 ## 7. Plugin deaktivieren
 
 ```bash
-curl -X PUT http://127.0.0.1:29185/api/v1/plugins/meinplugin/disable
+curl -X PUT http://127.0.0.1:29185/api/v1/plugins/mein-plugin/disable
 ```
 
 Das System beendet den Subprozess.

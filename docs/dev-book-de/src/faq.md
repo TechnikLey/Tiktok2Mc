@@ -4,7 +4,7 @@
 
 ### Kann ich ein Plugin in einer anderen Sprache als Python schreiben?
 
-Ja, Plugins können in jeder Sprache geschrieben werden, solange sie als eigenständiger Prozess laufen und die HTTP-API des Systems ansprechen können. Der Aufwand ist jedoch deutlich höher, da du die gesamte Kommunikation selbst implementieren musst.
+Ja, Plugins können in jeder Sprache geschrieben werden, solange sie als eigenständiger Prozess laufen und die HTTP-API des Systems ansprechen können. Der Aufwand ist jedoch deutlich höher, da du die gesamte Kommunikation selbst implementieren musst. Diese Dokumentation beschreibt nur die Python-API über `BasePlugin` — für andere Sprachen musst du die HTTP-Endpunkte aus dem Quellcode ermitteln.
 
 ### Was ist der Unterschied zwischen einem Plugin und einem Hook?
 

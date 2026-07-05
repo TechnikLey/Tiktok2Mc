@@ -26,7 +26,7 @@ Die Funktion gibt `True` bei Erfolg zurück, sonst `False`.
 
 ## Overlay in Plugins
 
-Plugins können vollständige HTML-Overlays bereitstellen:
+Plugins können vollständige HTML-Overlays bereitstellen. Eine detaillierte Anleitung findest du in [Overlays & Zustand](./ch03-07-overlays-and-state.md).
 
 ```python
 def get_overlay_html(self) -> str:

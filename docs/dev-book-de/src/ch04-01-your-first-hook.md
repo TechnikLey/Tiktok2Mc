@@ -47,7 +47,7 @@ def register(api: HookAPI):
 
 ### Was passiert hier Zeile für Zeile?
 
-**`def register(api: HookAPI)`**: Jeder Hook **muss** eine Funktion namens `register` auf oberster Ebene definieren. Der Hook-Loader ruft diese Funktion genau einmal beim Start auf und übergibt ihr ein `HookAPI`-Objekt. Ohne diese Funktion wird der Hook nicht geladen (Fehler `HOOK_0007`).
+**`def register(api: HookAPI)`**: Jeder Hook **muss** eine Funktion namens `register` auf oberster Ebene definieren. Der Hook-Loader ruft diese Funktion genau einmal beim Start auf und übergibt ihr ein `HookAPI`-Objekt. Ohne diese Funktion wird der Hook nicht geladen (Fehler `HOOK-0007`).
 
 **`api.register_action("superjump", superjump)`**: Registriert die Handler-Funktion unter dem Namen `"superjump"` im globalen `HOOK_ACTIONS`-Dictionary. Wenn später ein `$superjump`-Befehl in der `actions.mca` ausgelöst wird, sucht das System in diesem Dictionary nach dem Namen und ruft die zugehörige Funktion auf.
 
@@ -124,7 +124,7 @@ execute_global_command("follow", user)
 
 ## Hook deaktivieren
 
-Setze in der `hook.json` das Feld `"enabled"` im `config_schema` auf `false` oder entferne die `hook.json`-Datei. Hooks, die nicht geladen werden sollen, können auch aus dem Verzeichnis `src/hooks/` entfernt werden.
+Setze in der `config.yaml` des Hooks `enabled: false` oder deaktiviere den Hook über die GUI. Das System lädt deaktivierte Hooks nicht. Hooks können auch aus dem Verzeichnis `src/hooks/` entfernt werden.
 
 ## Unterschied zum Plugin
 

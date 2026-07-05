@@ -25,10 +25,9 @@ src/hooks/<name>/
 |------|-----|--------------|
 | `description` | String | Kurzbeschreibung |
 | `author` | String | Entwickler-Name |
-| `min_api_version` | String | Mindest-Hook-API-Version |
+| `min_api_version` | String | Mindest-Hook-API-Version (aktuell `1.0.0`, siehe `src/core/version.py`) |
 | `config_schema` | Objekt | Schema für die Hook-Konfiguration |
 | `plugin` | String | Bei Plugin-gebündelten Hooks: der Plugin-Name |
-| `enabled` | Boolean | Ob der Hook beim Start geladen wird (Default: `true`) |
 | `update_url` | String | URL für Auto-Updates |
 
 ### Vollständiges Beispiel
@@ -74,7 +73,7 @@ def register(api: HookAPI):
 ### Wichtige Regeln
 
 - Die Funktion **muss** `register` heißen (Groß-/Kleinschreibung beachten)
-- Ohne `register` wird der Hook nicht geladen (Fehler: `HOOK_0007`)
+- Ohne `register` wird der Hook nicht geladen (Fehler: `HOOK-0007`)
 - Erster `register_action`-Aufruf gewinnt — doppelte Namen überschreiben nicht
 - Die Handler-Funktion muss drei Parameter akzeptieren: `(user, trigger, context)`
 
@@ -89,8 +88,8 @@ def register(api: HookAPI):
 ## Hooks aktivieren/deaktivieren
 
 - **Über `config.yaml`**: Setze `enabled: false` im Hook-Verzeichnis
-- **Über `hook.json`**: Setze `"enabled": false` im Manifest
 - **Über die GUI**: Der API-Server steuert `data/hook_registry.json`
+- **Über die API**: `PUT /api/v1/hooks/<name>/enable` bzw. `.../disable`
 
 ## Nächstes Kapitel
 

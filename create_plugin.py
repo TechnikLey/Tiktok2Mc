@@ -83,10 +83,10 @@ PLUGIN_JSON_TEMPLATE = '''\
 
 def get_valid_plugin_name():
     while True:
-        name = input("Please enter module name (only a-z and 0-9): ").strip()
+        name = input("Please enter module name (a-z, 0-9, hyphens): ").strip()
 
-        if not re.match(r'^[a-z0-9]+$', name):
-            log.info("\033[91mInvalid name! Only a-z and 0-9 allowed.\033[0m")
+        if not re.match(r'^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$', name):
+            log.info("\033[91mInvalid name! Only a-z, 0-9, and hyphens allowed (must start/end with letter/digit).\033[0m")
         elif (PLUGINS_DIR / name).exists():
             log.info("\033[91mFolder already exists! Please choose another name.\033[0m")
         else:

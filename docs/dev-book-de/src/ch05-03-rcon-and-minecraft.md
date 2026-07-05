@@ -51,6 +51,6 @@ rcon:
 
 ## Einschränkungen
 
-- RCON hat eine begrenzte Befehllänge (ca. 1400 Zeichen).
+- RCON hat eine begrenzte Befehllänge (maximal 1463 Byte pro Befehl inkl. Protokoll-Overhead).
 - Sehr viele Befehle hintereinander können zu Verzögerungen führen.
 - Der Minecraft-Server muss RCON aktiviert haben (siehe `server.properties`).
