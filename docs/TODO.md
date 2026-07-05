@@ -13,18 +13,21 @@
 ### 1. Documentation Rewrite (DO LAST — after all code changes frozen)
 
 #### `GUIDE.md` — Lücken nach Rewrite
-Wurde als User-facing-Dokumentation umgeschrieben (`d862c87`), deckt aber folgende Themen noch nicht ab:
-- Event Bus Routing (internes Pub/Sub)
-- Hook System (wie Hooks funktionieren, erstellen)
-- Trigger Engine / Trigger Simulator
-- Deklarative Plugin-Subscriptions (`event_subscriptions` in `plugin.json`)
-- API-Key-Auth
-- Installer-Dokumentation (Windows NSIS, Linux Shell)
-- Server Manager (Create Server, Console Instance Selector, Lifecycle)
-- MCA Language Server (VS Code Extension)
-- Error Codes / Diagnostics / Health Monitoring
-- Setup Wizard (GUI-Ersteinrichtung)
-- Port Scanner (Detailfunktionsweise)
+Wurde als User-facing-Dokumentation umgeschrieben (`d862c87`). Folgende Themen wurden ergänzt:
+- ✅ API-Key-Auth
+- ✅ Installer-Dokumentation (Windows NSIS, Linux Shell)
+- ✅ Server Manager (Create Server, Console Instance Selector, Lifecycle)
+- ✅ Error Codes / Diagnostics / Health Monitoring
+- ✅ Setup Wizard (GUI-Ersteinrichtung)
+- ✅ Overlay Preview & Live Theme Editor (Dashboard)
+
+Folgende Themen wurden bewusst NICHT in GUIDE.md aufgenommen (da sie Developer/Internal-Only sind):
+- ❌ Event Bus Routing (internes Pub/Sub)
+- ❌ Hook System (wie Hooks funktionieren, erstellen)
+- ❌ Trigger Engine / Trigger Simulator (Test-Tool bereits in FAQ erwähnt)
+- ❌ Deklarative Plugin-Subscriptions (`event_subscriptions` in `plugin.json`)
+- ❌ MCA Language Server (VS Code Extension — Developer-Tool)
+- ❌ Port Scanner (Detailfunktionsweise — interne Logik, im Guide bereits als "automatische Portsuche" erwähnt)
 
 #### `README.md` — GUI-Features fehlen
 Erwähnt weder API Server Access, Actions Editor, Event Reactions, GUI-first-Ansatz, Installer noch Server Manager.
@@ -57,7 +60,4 @@ Beide wurden vollständig neu geschrieben (DE: Phase 3 Rewrite `8dfb042`, EN: 1:
 - P1: `comment_handler`-Feld in `plugin.json` dokumentieren
 - P1: Error-Code-Format vereinheitlichen (underscore vs. hyphen)
 
-### 4. GUI: Overlay Preview & Live Theme Editor
-- Feature ist implementiert, fehlende Punkte prüfen (ggf. Issues in `CHANGE_HISTORY.md` ergänzen)
-
-*Last updated: 2026-07-05 — Umfassendes Review aller Dokumente; dev-books als erledigt markiert; Lücken in GUIDE.md konkretisiert; neue Secondary-Items ergänzt.*
+*Last updated: 2026-07-05 — GUIDE.md aktualisiert: Installation, Setup Wizard, Server Manager, API-Key-Auth, Error Codes/Diagnostics, Overlay Preview/Live Theme Editor hinzugefügt; TODOs für GUIDE.md-Lücken aktualisiert*

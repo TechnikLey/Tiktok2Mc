@@ -8,16 +8,47 @@ If you are setting the tool up for the first time, start with the [Quick Start](
 
 ## Table of Contents
 
+- [Installation](#installation)
 - [Configuration](#configuration)
+- [Setup Wizard](#setup-wizard)
 - [Actions and Triggers](#actions-and-triggers)
 - [Event-Command Mapper](#event-command-mapper)
 - [Comment Commands](#comment-commands)
 - [Plugins](#plugins)
 - [Overlays](#overlays)
 - [The Dashboard](#the-dashboard)
+- [Server Manager](#server-manager)
 - [Updating the Tool](#updating-the-tool)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
+
+---
+
+## Installation
+
+### Windows
+
+Download `TikTok2MC-Setup.exe` from the [Releases page](https://github.com/TechnikLey/Tiktok2Mc/releases) and run it. The installer guides you through setup:
+
+- **Basic** — quick install with default settings
+- **Advanced** — choose which components to install (Plugins, Minecraft Server, Documentation), set GUI mode, Java path, and port
+
+The installer creates desktop and Start Menu shortcuts. Use Windows Add/Remove Programs to uninstall.
+
+### Linux
+
+Download `TikTok2Mc-Linux-Setup.sh` from the Releases page. Open a terminal, navigate to the download folder, and run:
+
+```bash
+chmod +x TikTok2Mc-Linux-Setup.sh
+sudo ./TikTok2Mc-Linux-Setup.sh
+```
+
+The installer places the tool in `/opt/TikTok2Mc` and creates a `tiktok2mc` command and a desktop entry.
+
+### Portable version
+
+A portable ZIP (Windows) or tar.gz (Linux) is also available. Extract it anywhere and run the tool directly.
 
 ---
 
@@ -41,6 +72,7 @@ All main settings are in `config/config.yaml`. Open this file with any text edit
 - **Comment commands** — under `comment_commands`. Let viewers send commands via TikTok chat.
 - **Follow tracking** — under `tiktok.follow_tracking`. Prevents viewers from repeatedly triggering the follow action. Choose `all_time` (never repeats) or `per_stream` (resets each stream).
 - **Auto-update config** — under `auto_update_config`. When enabled, new configuration options from updates are merged into your existing config automatically. Your settings are preserved.
+- **API key** — under `api_key`. Optional. If you expose the Dashboard to the internet (not recommended for most users), set an API key here to require authentication. Requests from the same computer (localhost) are always allowed without a key. When set, external requests must include the `X-API-Key` header.
 
 ### Plugin-specific config files
 
@@ -49,6 +81,18 @@ Each plugin (Timer, Death Counter, Win Counter, Spotify Control) has its own `co
 > **Tip:** The Dashboard (web interface) provides a visual editor for all settings. You don't need to edit files by hand unless you prefer to.
 
 [IMAGE: Screenshot of the Dashboard configuration editor showing the section navigation and search bar]
+
+---
+
+## Setup Wizard
+
+The first time you start the tool (or if your TikTok username and RCON password are still set to defaults), a **Setup Wizard** opens automatically in the Dashboard. It walks you through three steps:
+
+1. **TikTok Username** — enter your username (without the `@` symbol)
+2. **RCON Password** — create a secure password (the wizard shows a strength meter)
+3. **Review & Save** — check your settings and save
+
+After saving, the wizard asks if you want to restart now or later. You can also reopen the Setup Wizard at any time from the Dashboard.
 
 ---
 
@@ -415,9 +459,11 @@ The Dashboard is a web interface available at `http://127.0.0.1:29185/` that let
 ### What you can do in the Dashboard
 
 - **Edit Actions** — visual table of event triggers with inline command editing. Add events by type (follow, join, comment, likes, share) or use the gift picker with search. Switch to the Raw tab for direct text editing with live validation.
-- **Edit Configuration** — form-based editor with section navigation (Connection, Minecraft, Streaming & Overlays, Chat & Commands, Integrations, Appearance, System). Search filters across all settings. Validation prevents invalid values.
+- **Edit Configuration** — form-based editor with section navigation (Connection, Minecraft, Streaming & Overlays, Chat & Commands, Integrations, Appearance, System). Search filters across all settings. Validation prevents invalid values. Overlay theme colors can be previewed live before saving.
 - **Plugin Configuration** — each plugin has its own settings page with form fields, category sidebar, and search.
 - **Event Commands** — visually edit the Event-Command Mapper.
+- **Server Manager** — create and manage Minecraft server instances (see below).
+- **Live Theme Editor** — adjust overlay colors and preview changes in real time without saving.
 - **Check for Updates** — click "Check for Updates" in the Updates card.
 - **API Documentation** — visit `http://127.0.0.1:29185/docs` for interactive API reference.
 
@@ -426,6 +472,35 @@ The Dashboard is a web interface available at `http://127.0.0.1:29185/` that let
 The Configuration Editor shows a diff view before saving changes, so you can review what will be modified.
 
 [IMAGE: The Dashboard main page showing the overview with cards for Actions, Configuration, Updates]
+
+---
+
+## Server Manager
+
+The Server Manager (in the Dashboard) lets you create and manage multiple Minecraft server instances from one place.
+
+### Server instances
+
+Each server instance has its own:
+- **Name** — a label to identify it
+- **Version** — which PaperMC version it runs
+- **Status** — shown with a color-coded indicator (running, stopped, etc.)
+- **Port** — the server port
+- **Save folder** — worlds, configs, and mods
+
+A **default** instance is always present. You can create additional instances for different game modes, maps, or testing.
+
+### What you can do
+
+- **Start, stop, or restart** any instance with one click
+- **Switch versions** — change the PaperMC version per instance
+- **Create new instances** — set a name, port, and version
+- **Delete instances** — non-default instances can be removed
+- **Open folder** — access the server files directly
+
+### Console access
+
+A drop-down selector lets you switch between instances to view each server's console output in real time.
 
 ---
 
@@ -494,6 +569,18 @@ The updater creates a backup in `data/backups/migration/` before migrating. If s
 - **Network exposure warning** — Only appears if `server_host` is set to `0.0.0.0`. For most users, `127.0.0.1` is correct and safe.
 
 These are just warnings. The tool will still run.
+
+### Error codes in logs
+
+If you see a code like `[HOOK-0005]` or `[API-0012]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the `docs/dev-book-de/src/error-codes.md` file.
+
+### Health and diagnostics
+
+The Dashboard has a **Live Plugin Health** card that shows the status of all components with color-coded indicators. For a full system report, visit:
+
+- `http://127.0.0.1:29185/api/v1/health` — basic health check
+- `http://127.0.0.1:29185/api/v1/health/extended` — detailed health info
+- `http://127.0.0.1:29185/api/v1/diagnostics` — full diagnostics report (threads, crash history, component states)
 
 ---
 
