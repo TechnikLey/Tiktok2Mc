@@ -1,0 +1,21 @@
+# ==========================================
+# example_plugin – Lokale Konfiguration
+# ==========================================
+# Dieses YAML wird AUTOMATISCH von BasePlugin
+# geladen. Alle Werte hier überschreiben die
+# defaults aus plugin.json → config_schema.
+
+# Startwert des Zählers
+initial_count: 0
+# Schrittweite für +/- Befehle
+step_size: 1
+# Automatisches Hochzählen (pro Sekunde)
+auto_tick: false
+# Maximalwert (0 = unbegrenzt)
+max_count: 9999
+
+# Theme-Farben (optional – überschreibt Built-in)
+theme:
+  background: "#000000"
+  text: "#00ff88"
+  accent: "#00cc66"

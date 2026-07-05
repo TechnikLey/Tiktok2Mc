@@ -439,7 +439,7 @@ def cmd_app(args):
             for py_file in src_plugins_root.rglob("*.py"):
                 if "__pycache__" in str(py_file):
                     continue
-                if "test" == py_file.parent.name and py_file.parent.parent.name == "plugins":
+                if py_file.parent.name in ("test", "example_plugin") and py_file.parent.parent.name == "plugins":
                     continue
                 if "hooks" in py_file.parent.parts:
                     plugin_hook_dirs.append(py_file.parent)

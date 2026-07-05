@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 # ==========================================
 # create_plugin.py - Plugin Scaffolding (Cross-Platform)
+#
+# Generates a modern BasePlugin-based plugin skeleton with:
+#   - main.py (BasePlugin subclass)
+#   - plugin.json (manifest with config_schema)
+#   - config.yaml (local configuration overrides)
+#   - version.txt (version + update URL)
+#   - README.md (documentation)
 # ==========================================
 
 import sys
@@ -20,35 +27,66 @@ from core.version import TOOL_VERSION as VERSION
 PLUGINS_DIR = Path("src/plugins")
 
 CONFIG_YAML_TEMPLATE = '''\
-# ==========================================
 # Plugin configuration
-# ==========================================
-# This is the local configuration file for this plugin.
-# All plugin-specific settings live here.
+# All values here override the defaults defined in plugin.json → config_schema.
 
 enabled: true
 '''
 
 MAIN_PY_TEMPLATE = '''\
 import logging
-import sys
-import os
-from pathlib import Path
-from core import parse_args, get_base_file
-from core.plugin_config import load_plugin_config
+from core.base_plugin import BasePlugin
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
 
-PLUGIN_DIR = Path(__file__).resolve().parent
-MAIN_FILE = get_base_file()
-args = parse_args()
 
-cfg = load_plugin_config(PLUGIN_DIR)
+class {class_name}(BasePlugin):
+    PLUGIN_NAME = "{name}"
 
-gui_hidden = args.gui_hidden
+    def __init__(self):
+        super().__init__()
+        cfg = self.config
+        # Read config values here:
+        # self._some_setting = cfg.get("some_setting", "default")
+        self.register_handler("example", self._on_example)
 
-# Your plugin code goes here...
+    def _on_example(self, args: dict):
+        log.info("[%s] Example command received: %s", self.PLUGIN_NAME, args)
+
+    def on_tick(self):
+        pass
+
+    def get_overlay_html(self) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+{self.theme_style}
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    body {{
+        background: transparent;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        overflow: hidden;
+        width: 100vw; height: 100vh;
+        display: flex; justify-content: center; align-items: center;
+        color: var(--text);
+        font-size: 5vh;
+    }}
+</style>
+</head>
+<body>
+    <div>Hello from {display_name}!</div>
+    <script>
+        const es = new EventSource('/api/v1/plugins/{name}/stream');
+        es.onmessage = e => {{ /* handle live updates */ }};
+    </script>
+</body>
+</html>"""
+
+
+if __name__ == "__main__":
+    {class_name}().run()
 '''
 
 PLUGIN_JSON_TEMPLATE = '''\
@@ -60,6 +98,10 @@ PLUGIN_JSON_TEMPLATE = '''\
   "description": "",
   "author": "",
   "homepage": "",
+  "ports": {{
+    "declared": [],
+    "protocol": "tcp"
+  }},
   "min_api_version": "1.0.0",
   "capabilities": [],
   "depends_on": [],
@@ -113,12 +155,22 @@ def main():
     plugin_path.mkdir(parents=True, exist_ok=True)
     log.info(f"Folder '{plugin_name}' created.")
 
-    # Create main.py
-    (plugin_path / "main.py").write_text(MAIN_PY_TEMPLATE, encoding="utf-8")
-    log.info("File 'main.py' created.")
+    # Derive class name from plugin name (kebab-case → PascalCase)
+    class_name = "".join(part.capitalize() for part in plugin_name.replace("-", "_").split("_"))
+
+    display_name = plugin_name.replace("-", " ").replace("_", " ").title()
 
     # Ask for update URL
     update_url = get_update_url()
+
+    # Create main.py (BasePlugin-based)
+    main_py = MAIN_PY_TEMPLATE.format(
+        name=plugin_name,
+        class_name=class_name,
+        display_name=display_name,
+    )
+    (plugin_path / "main.py").write_text(main_py, encoding="utf-8")
+    log.info("File 'main.py' created (BasePlugin subclass).")
 
     # Create version.txt
     version_content = f"version: {VERSION}\nupdate_url: {update_url}\n"
@@ -135,14 +187,13 @@ def main():
     log.info("File 'config.yaml' created.")
 
     # Create plugin.json with embedded schema
-    display_name = plugin_name.replace("-", " ").replace("_", " ").title()
     plugin_json = PLUGIN_JSON_TEMPLATE.format(
         name=plugin_name,
         display_name=display_name,
         update_url=update_url,
     )
     (plugin_path / "plugin.json").write_text(plugin_json, encoding="utf-8")
-    log.info("File 'plugin.json' created (with config_schema).")
+    log.info("File 'plugin.json' created (with config_schema and ports).")
 
     input("\nPress Enter to exit...")
 

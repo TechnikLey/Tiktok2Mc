@@ -1,0 +1,84 @@
+{
+  "name": "example_plugin",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/example_plugin/main.py",
+  "display_name": "Example Plugin",
+  "description": "Referenz-Plugin – demonstriert alle Features des BasePlugin-Systems. Dient als Lernvorlage und wird nicht ins Release gebaut.",
+  "author": "Tiktok2Mc",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "ports": {
+    "declared": [],
+    "protocol": "tcp"
+  },
+  "min_api_version": "1.0.0",
+  "capabilities": [],
+  "depends_on": [],
+  "update_url": "",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "initial_count",
+        "type": "number",
+        "default": 0,
+        "label": "Startwert",
+        "help": "Der Wert, auf den der Zähler beim Start gesetzt wird.",
+        "category": "General"
+      },
+      {
+        "key": "step_size",
+        "type": "number",
+        "default": 1,
+        "label": "Schrittweite",
+        "help": "Um wie viel der Zähler pro Inkrement/Dekrement springt.",
+        "category": "General"
+      },
+      {
+        "key": "auto_tick",
+        "type": "boolean",
+        "default": false,
+        "label": "Auto-Tick",
+        "help": "Wenn aktiviert, zählt der Zähler automatisch jede Sekunde hoch.",
+        "category": "Behavior"
+      },
+      {
+        "key": "max_count",
+        "type": "number",
+        "default": 9999,
+        "label": "Maximalwert",
+        "help": "Obergrenze des Zählers (0 = unbegrenzt).",
+        "category": "Limits"
+      },
+      {
+        "key": "theme",
+        "type": "group",
+        "label": "Farben (Theme)",
+        "help": "Überschreibt die Standard-Designfarben des Plugins.",
+        "category": "Appearance",
+        "fields": [
+          {
+            "key": "background",
+            "type": "color",
+            "default": "#000000",
+            "label": "Hintergrund",
+            "help": "Hintergrundfarbe des Overlays."
+          },
+          {
+            "key": "text",
+            "type": "color",
+            "default": "#00ff88",
+            "label": "Textfarbe",
+            "help": "Hauptfarbe für den Zähler-Text."
+          },
+          {
+            "key": "accent",
+            "type": "color",
+            "default": "#00cc66",
+            "label": "Akzent",
+            "help": "Farbe für Akzente (z. B. Labels)."
+          }
+        ]
+      }
+    ]
+  }
+}
