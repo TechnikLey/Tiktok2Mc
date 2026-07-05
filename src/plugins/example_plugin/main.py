@@ -43,7 +43,7 @@ class ExamplePlugin(BasePlugin):
 
     # ---- Required: unique plugin ID -------------------------------
     # BasePlugin raises RuntimeError at __init__ if this is empty.
-    PLUGIN_NAME = "example_plugin"
+    PLUGIN_NAME = "example-plugin"
 
     # ---- Constructor ----------------------------------------------
     # super().__init__() automatically:
@@ -411,11 +411,11 @@ class ExamplePlugin(BasePlugin):
 
         /**
          * Connect to the EventSource stream.
-         * The API endpoint /api/v1/plugins/example_plugin/stream
+         * The API endpoint /api/v1/plugins/{self.PLUGIN_NAME}/stream
          * is provided automatically by the core API server when
          * the plugin calls push_state().
          */
-        const evtSource = new EventSource('/api/v1/plugins/example_plugin/stream');
+         const evtSource = new EventSource('/api/v1/plugins/{self.PLUGIN_NAME}/stream');
 
         evtSource.onmessage = function(e) {{
             try {{
@@ -438,7 +438,7 @@ class ExamplePlugin(BasePlugin):
         window.addEventListener('resize', () => {{
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {{
-                fetch('/api/v1/plugins/example_plugin/command', {{
+                fetch('/api/v1/plugins/{self.PLUGIN_NAME}/command', {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
                     body: JSON.stringify({{

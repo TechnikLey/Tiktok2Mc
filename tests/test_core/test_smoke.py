@@ -17,6 +17,10 @@ EXPECTED_PLUGINS: dict[str, dict[str, object]] = {
         "dir": "deathcounter",
         "display_name": "Death Counter",
     },
+    "example-plugin": {
+        "dir": "example_plugin",
+        "display_name": "Example Plugin",
+    },
     "spotify-control": {
         "dir": "spotify",
         "display_name": "Spotify Control",

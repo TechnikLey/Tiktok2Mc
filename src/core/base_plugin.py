@@ -21,6 +21,7 @@ Usage
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import os
@@ -79,7 +80,10 @@ class BasePlugin:
 
         self._args = parse_args()
         self._base_dir = get_base_dir()
-        self._plugin_dir = Path(__file__).resolve().parent
+        try:
+            self._plugin_dir = Path(inspect.getfile(self.__class__)).resolve().parent
+        except (TypeError, OSError):
+            self._plugin_dir = Path(__file__).resolve().parent
         self._data_dir = (self._base_dir.parent / "data").resolve()
         self._data_dir.mkdir(parents=True, exist_ok=True)
 

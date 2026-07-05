@@ -1,5 +1,5 @@
 {
-  "name": "example_plugin",
+  "name": "example-plugin",
   "version": "1.0.0",
   "entry_point": "src/plugins/example_plugin/main.py",
   "display_name": "Example Plugin",
