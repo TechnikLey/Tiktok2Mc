@@ -253,8 +253,8 @@ body {
 }
 .theme-toggle:hover { background: var(--color-border); color: var(--color-text); }
 .theme-toggle svg { display: none; }
-[data-theme="light"] .theme-toggle .theme-icon-light { display: inline-block; }
-[data-theme="dark"] .theme-toggle .theme-icon-dark { display: inline-block; }
+[data-theme="light"] .theme-toggle .theme-icon-dark { display: inline-block; }
+[data-theme="dark"] .theme-toggle .theme-icon-light { display: inline-block; }
 #status-pill {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
