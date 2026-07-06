@@ -10,8 +10,9 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 - **Chat commands** — Let viewers type commands in chat to control the game or your Spotify playback.
 - **Stream overlays** — Show death counts, win counters, timers, and Spotify info on your stream.
 - **Auto-updates** — The tool checks for updates on startup and installs them automatically.
+- **Web Dashboard** — A browser interface at `http://127.0.0.1:29185` for managing actions, configuration, plugins, server instances, and event reactions visually. No file editing required.
 
-Everything is controlled through simple text files. No programming required.
+Everything is controlled either through the Dashboard or via simple text files. No programming required.
 
 ## What you need
 
@@ -135,6 +136,7 @@ Open Minecraft Java Edition, go to **Multiplayer > Add Server**, and enter `loca
 | `config/config.yaml` | Main settings file. This is where you turn features on and off. |
 | `data/actions.mca` | Your action rules. What happens when someone follows, sends a gift, etc. |
 | `docs/GUIDE.md` | Complete user guide with examples, troubleshooting, and plugin setup. |
+| `http://127.0.0.1:29185` | Web Dashboard — visual editor for actions, config, plugins, and server management. |
 | `docs/CHANGELOG.md` | Release history — what changed in each version. |
 
 ## Getting help
