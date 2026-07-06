@@ -190,23 +190,34 @@ def _cleanup_processes():
     """Terminate any spawned processes on GUI exit."""
     global _full_system_proc
     if _full_system_proc is None or _full_system_proc.poll() is not None:
+        log.debug("Cleanup: no managed process to stop, skipping.")
         return
 
-    # Try graceful shutdown first.
-    try:
-        req = urllib.request.Request(
-            f"{API_URL}/api/v1/shutdown/now",
-            method="POST",
-            headers={"Content-Type": "application/json"},
-            data=b"{}",
-        )
-        urllib.request.urlopen(req, timeout=3.0)
-        for _ in range(20):
-            if _full_system_proc.poll() is not None:
-                return
-            time.sleep(0.25)
-    except Exception:
-        pass
+    log.info("Cleanup: managed process (PID %s) still running, attempting graceful shutdown.", _full_system_proc.pid)
+
+    # Only send shutdown request if the API is actually reachable.
+    # If the API is already down, skip the request and force-kill directly.
+    api_was_running = _api_ready(timeout=1.0)
+    if api_was_running:
+        try:
+            req = urllib.request.Request(
+                f"{API_URL}/api/v1/shutdown/now",
+                method="POST",
+                headers={"Content-Type": "application/json"},
+                data=b"{}",
+            )
+            urllib.request.urlopen(req, timeout=3.0)
+            log.info("Cleanup: shutdown request sent, waiting for process to exit.")
+            for _ in range(20):
+                if _full_system_proc.poll() is not None:
+                    log.info("Cleanup: process exited cleanly.")
+                    return
+                time.sleep(0.25)
+            log.warning("Cleanup: process did not exit within 5s after API shutdown request.")
+        except Exception as exc:
+            log.warning("Cleanup: API shutdown request failed: %s", exc)
+    else:
+        log.info("Cleanup: API not reachable, skipping shutdown request.")
 
     # Force kill if still running.
     try:
@@ -219,8 +230,9 @@ def _cleanup_processes():
             )
         else:
             _full_system_proc.terminate()
-    except Exception:
-        pass
+        log.info("Cleanup: process force-killed.")
+    except Exception as exc:
+        log.warning("Cleanup: force-kill failed: %s", exc)
 
 
 atexit.register(_cleanup_processes)
@@ -330,14 +342,25 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
     )
 
     if is_launcher:
+        import threading as _threading
+        _nav_lock = _threading.Lock()
+
         def _poll_api():
             while True:
                 time.sleep(2.0)
                 try:
                     if _api_ready(timeout=1.0):
-                        if _window is not None and hasattr(_window, "load_url"):
-                            _window.load_url(GUI_URL)
-                            log.info("API came online — switched to dashboard.")
+                        with _nav_lock:
+                            if _window is not None and hasattr(_window, "load_url"):
+                                # Short extra wait so JS-based navigation in the launcher can
+                                # fire first if it also detected the API.
+                                time.sleep(0.5)
+                                if _window is not None and hasattr(_window, "load_url"):
+                                    try:
+                                        _window.load_url(GUI_URL)
+                                        log.info("API came online — switched to dashboard.")
+                                    except Exception as nav_err:
+                                        log.warning("Navigation to dashboard failed: %s", nav_err)
                         break
                 except Exception as exc:
                     log.debug("Poll error: %s", exc)

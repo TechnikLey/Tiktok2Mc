@@ -2445,7 +2445,7 @@ document.getElementById('wizard-next').addEventListener('click', wizardNext);
 
 const SECTION_ORDER = [
   'tiktok','rcon','server_host','control_method',
-  'java','minecraft_server_api',
+  'api','java','mc_version','minecraft_server_api',
   'console','overlay','theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
@@ -2454,8 +2454,8 @@ const SECTION_ORDER = [
 ];
 
 const CATEGORIES = {
-  'Connection': ['tiktok','rcon','server_host','control_method'],
-  'Minecraft': ['java','minecraft_server_api'],
+  'Connection': ['tiktok','rcon','server_host','control_method','api'],
+  'Minecraft': ['java','mc_version','minecraft_server_api'],
   'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
   'Chat & Commands': ['comment_commands','random_triggers']
 };
@@ -2463,7 +2463,9 @@ const CATEGORIES = {
 const SECTION_META = {
   tiktok: { title: 'TikTok Live', desc: 'Connect the tool to your TikTok live stream. Set your username and connection behavior.', category: 'Connection' },
   rcon: { title: 'Remote Console (RCON)', desc: 'RCON allows the tool to send commands to your Minecraft server. Keep this enabled.', category: 'Connection' },
+  api: { title: 'API Server', desc: 'Configuration for the central API server that powers the dashboard and internal communication.', category: 'Connection' },
   java: { title: 'Minecraft Server', desc: 'Controls how much RAM the Minecraft server uses and which port it runs on.', category: 'Minecraft' },
+  mc_version: { title: 'Minecraft Version', desc: 'The Minecraft version the server runs on. Used for version-aware features.', category: 'Minecraft' },
   comment_commands: { title: 'Chat Commands', desc: 'Let viewers send commands via TikTok chat. You can create multiple groups with different prefixes, roles, and rules.', category: 'Chat & Commands' },
   random_triggers: { title: 'Random Trigger Filter', desc: 'Controls which triggers can be selected by the $random action in data/actions.mca.', category: 'Chat & Commands' },
   console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
