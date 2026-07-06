@@ -1215,7 +1215,10 @@ def handle_custom_trigger():
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
-    app.run(host=ctx.server_host, port=ctx.mcserver_api_port, threaded=True, debug=False, use_reloader=False)
+    try:
+        app.run(host=ctx.server_host, port=ctx.mcserver_api_port, threaded=True, debug=False, use_reloader=False)
+    except Exception as exc:
+        log.error("Bridge webhook server failed to start on %s:%s: %s", ctx.server_host, ctx.mcserver_api_port, exc)
 
 # ==========================================
 # HTTP command executor

@@ -12,13 +12,43 @@ source of truth for trigger execution, validation, and dispatch.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
+import core.paths
 from core.trigger_engine import EngineConfig, TriggerEngine
 from core.trigger_engine.models import TriggerResult
+from core.yaml_utils import load_yaml
 
 log = logging.getLogger(__name__)
+
+
+def _resolve_bridge_port() -> int:
+    """Determine the bridge webhook port from env, config, or default.
+
+    Priority:
+    1. Environment variable ``RESOLVED_PORT_WEBHOOK_PORT`` (set by port scanner)
+    2. Config key ``minecraft_server_api.web_server_port``
+    3. Default ``29188``
+    """
+    env_port = os.environ.get("RESOLVED_PORT_WEBHOOK_PORT")
+    if env_port is not None:
+        try:
+            return int(env_port)
+        except (ValueError, TypeError):
+            pass
+
+    try:
+        config_path = core.paths.get_config_file()
+        if config_path.exists():
+            cfg = load_yaml(config_path)
+            port = cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)
+            return int(port)
+    except Exception:
+        pass
+
+    return 29188
 
 
 class TriggerService:
@@ -34,7 +64,11 @@ class TriggerService:
     DEBOUNCE_SECONDS = 1.5
 
     def __init__(self, engine: TriggerEngine | None = None) -> None:
-        self._engine = engine or TriggerEngine()
+        if engine is None:
+            bridge_port = _resolve_bridge_port()
+            config = EngineConfig(bridge_port=bridge_port)
+            engine = TriggerEngine(config=config)
+        self._engine = engine
         self._history: list[TriggerResult] = []
         self._last_execution: float = 0.0
 
