@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!WARNING]
 > **Breaking changes.** v1.0.0 is a clean break from v0.x. Configuration files, plugins, and data from versions 0.x are not compatible. This is intentional — v1.0.0 is the first stable release built on a new foundation.
 
+> [!IMPORTANT]
+> **The new GUI is the centerpiece of v1.0.0.** You can now manage servers, plugins, events, overlays, reactions, and settings entirely through the graphical interface — no more editing config files by hand.
+
 ### Added
 
 - **Server Manager** — create, start, stop, and restart Minecraft servers directly from the GUI. Switch between multiple server instances, see live uptime, and open server folders with one click.
@@ -29,10 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **GUI redesigned** — the interface has a fresh new look with improved layout and navigation.
 - **Config editor improvements** — the Save button now only lights up when you've made changes, and you'll be warned if you try to close with unsaved work.
 - **Timer, Win Counter, Death Counter** — these plugins no longer depend on each other. You can use any combination without one forcing settings on another.
-- **Single GUI instance** — launching the GUI a second time now brings the existing window to the front instead of opening a duplicate.
 - **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
 
 ### Removed
@@ -40,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ChannelPoints plugin** (economy and points system)
 - **LikeGoal plugin** (like goal overlay)
 - **`shell_actions.txt`** — replaced by the `&` prefix in `actions.mca`
-- **Sidebar dropdowns** for Plugins and Hooks — navigation has been streamlined
 
 ### Fixed
 
