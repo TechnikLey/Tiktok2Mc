@@ -80,7 +80,7 @@ def on_greeting(user, trigger, context):
 
 ## get_hook_config(name)
 
-Returns the configuration of a specific hook as a dict.
+Returns the configuration of a specific hook as a dict. The `name` parameter is the hook name (identical to the directory name and the `name` field in `hook.json`).
 
 ```python
 config = api.get_hook_config("jump")
@@ -103,7 +103,7 @@ api.send_overlay_text("Gift", "Diamond", 3, "gift-overlay")
 - **subtitle**: Subtitle (optional)
 - **duration**: Display duration in seconds (default: 3)
 - **overlay_name**: Overlay channel (default: `"default"`)
-- Returns `True` on success, `False` on error
+- Returns `True` on success, `False` on error (e.g., when the API server is unreachable or the overlay is disabled)
 
 ## log(msg)
 

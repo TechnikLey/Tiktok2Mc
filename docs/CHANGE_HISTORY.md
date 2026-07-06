@@ -198,6 +198,44 @@
   - `test_plugin_health_monitor.py`, `test_plugin_overlay_stores.py`
   - `test_rcon_service.py`
 
+### Documentation Rewrite
+- **GUIDE.md als User-facing-Dokumentation umgeschrieben** (`d862c87`) — folgende Themen ergänzt:
+  - API-Key-Auth
+  - Installer-Dokumentation (Windows NSIS, Linux Shell)
+  - Server Manager (Create Server, Console Instance Selector, Lifecycle)
+  - Error Codes / Diagnostics / Health Monitoring
+  - Setup Wizard (GUI-Ersteinrichtung)
+  - Overlay Preview & Live Theme Editor (Dashboard)
+- **Dev-Books (`docs/dev-book-en/`, `docs/dev-book-de/`)** vollständig neu geschrieben (DE: Phase 3 Rewrite `8dfb042`, EN: 1:1-Übersetzung `a08fb03`):
+  - Alte Architektur-Verweise (Self-Registration, Legacy Registry) bereinigt
+  - **Alle P1–P9 Probleme aus `documentation_clarity_review.md` behoben**:
+    - P1: Naming-Konvention vereinheitlicht (Kebab-Case)
+    - P2: `comment_handler`-Feld mit `prefix`/`enabled` dokumentiert
+    - P3: Error-Code-Format auf `SUBSYSTEM-NNNN` (Hyphen) vereinheitlicht
+    - P4: Thread-Safety-Klarstellung (`self.state` vs `self._state`) mit Faustregel
+    - P5: Hook `enabled`-Feld: Tutorial korrigiert (config.yaml statt config_schema)
+    - P6: Overlay-Duplikate in ch05-04 entfernt, Cross-Reference zu ch03-07
+    - P7: API-Endpunkt-Referenz-Tabelle in Plugin-API-Kapitel eingefügt
+    - P8: Aktuelle API-Version `1.0.0` dokumentiert
+    - P9: `src/core/` vs `src/python/`-Verzeichnisstruktur in Grundkonzepten erklärt
+- **Alle Minor Issues M1–M15 aus `documentation_clarity_review.md` behoben** (DE+EN):
+  - M1: `on_tick()`-Beispiel: Initialisierung von `self._remaining` war bereits vorhanden ✅
+  - M2: Hook-Deaktivierung: Formulierung entschärft (Deaktivieren via config.yaml empfohlen, Löschen nur bei dauerhafter Entfernung)
+  - M3: Event-Bridge vs ECM: Warum zwei Wege? — Erklärung ergänzt
+  - M4: `get_hook_config(name)`: Parameter `name` als Hook-Name (Verzeichnis + hook.json) dokumentiert
+  - M5: Headless Plugin: Minimales `get_overlay_html()`-Return-Beispiel ergänzt
+  - M6: Shutdown/Cleanup: `atexit`-Beispiel für Betriebsmittel ergänzt
+  - M7: `capabilities`: Bereits ausreichend dokumentiert (Discovery + API-Suche) ✅
+  - M8: `tiktok.like` delta/total: Inline-Kommentare erklären die Felder
+  - M9: `api_post()`/`api_get()`: `API_BASE_URL`-Env-Var war bereits dokumentiert ✅
+  - M10: Glossary: Bridge-Prozess-Eintrag um PYTHONPATH-Erklärung ergänzt
+  - M11: `push_state()` vs SSE: Unterschied war bereits erklärt ✅
+  - M12: Wildcard: Explizit erwähnt, dass Wildcards für jeden Namespace funktionieren
+  - M13: `send_overlay_text()` False: Fehlerursachen dokumentiert
+  - M14: `version.txt`-Format: War bereits gezeigt ✅
+  - M15: RCON-Längenlimit: "ca. 1400" → "maximal 1463 Byte" ✅
+- **TODO.md bereinigt** — alle Items entfernt (P1–P9 + M1–M15), nur noch CHANGELOG.md offen
+
 ### Heartbeat & Process Lifecycle Fixes
 - **Heartbeat monitoring scoped** — only running processes are monitored for heartbeats; disabled/stopped processes are skipped to avoid false degradation
 - **STARTING→STOPPING transition allowed** — health monitor permits transition from STARTING to STOPPING; heartbeats recorded for all supervised processes including those still in STARTING state
@@ -335,4 +373,4 @@
 
 ---
 
-*Last updated: 2026-07-04 — Added MCA Language Server Fixes section; added Refactoring section (config schema validation extraction, error response standardisation).*
+*Last updated: 2026-07-05 — Documentation Rewrite: Dev-Books alle P1–P9 + M1–M15 behoben, TODO.md bereinigt, nur CHANGELOG.md offen.*

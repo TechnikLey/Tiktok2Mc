@@ -124,7 +124,7 @@ execute_global_command("follow", user)
 
 ## Hook deaktivieren
 
-Setze in der `config.yaml` des Hooks `enabled: false` oder deaktiviere den Hook über die GUI. Das System lädt deaktivierte Hooks nicht. Hooks können auch aus dem Verzeichnis `src/hooks/` entfernt werden.
+Setze in der `config.yaml` des Hooks `enabled: false` oder deaktiviere den Hook über die GUI. Das System lädt deaktivierte Hooks nicht. Die `config.yaml`-Methode ist der empfohlene Weg — das Entfernen aus `src/hooks/` ist nur nötig, wenn der Hook dauerhaft gelöscht werden soll.
 
 ## Unterschied zum Plugin
 

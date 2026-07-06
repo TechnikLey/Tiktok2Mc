@@ -39,23 +39,9 @@ Das HTML-Overlay wird über eine URL als Browser-Quelle in OBS eingebunden:
 http://127.0.0.1:29185/api/v1/plugins/<plugin-name>/overlay
 ```
 
-## Echtzeit-Updates
+## Echtzeit-Updates per SSE
 
-Plugins können ihren Zustand per Server-Sent Events (SSE) aktualisieren:
-
-```python
-self.push_state()
-```
-
-Das Overlay-HTML verbindet sich mit dem SSE-Endpunkt:
-
-```javascript
-const es = new EventSource("/api/v1/plugins/mein-plugin/stream");
-es.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    document.getElementById("counter").innerText = data.count;
-};
-```
+Plugins können ihren Zustand per `push_state()` aktualisieren. Details zu SSE, EventSource und Zustandsverwaltung findest du in [Overlays & Zustand](./ch03-07-overlays-and-state.md).
 
 ## Overlay in der actions.mca
 

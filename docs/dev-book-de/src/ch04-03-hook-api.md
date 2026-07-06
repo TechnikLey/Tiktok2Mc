@@ -80,7 +80,7 @@ def on_begruessung(user, trigger, context):
 
 ## get_hook_config(name)
 
-Gibt die Konfiguration eines bestimmten Hooks als Dict zurück.
+Gibt die Konfiguration eines bestimmten Hooks als Dict zurück. Der Parameter `name` ist der Hook-Name (identisch mit dem Verzeichnisnamen und dem `name`-Feld in der `hook.json`).
 
 ```python
 config = api.get_hook_config("sprung")
@@ -103,7 +103,7 @@ api.send_overlay_text("Gift", "Diamant", 3, "gift-overlay")
 - **subtitle**: Untertitel (optional)
 - **duration**: Anzeigedauer in Sekunden (Default: 3)
 - **overlay_name**: Overlay-Kanal (Default: `"default"`)
-- Gibt `True` bei Erfolg, `False` bei Fehler zurück
+- Gibt `True` bei Erfolg, `False` bei Fehler zurück (z. B. wenn der API-Server nicht erreicht werden kann oder das Overlay deaktiviert ist)
 
 ## log(msg)
 

@@ -124,7 +124,7 @@ execute_global_command("follow", user)
 
 ## Disable Hook
 
-Set `enabled: false` in the hook's `config.yaml` or disable the hook via the GUI. The system does not load disabled hooks. Hooks can also be removed from the `src/hooks/` directory.
+Set `enabled: false` in the hook's `config.yaml` or disable the hook via the GUI. The system does not load disabled hooks. The `config.yaml` method is the recommended approach — removing from `src/hooks/` is only necessary if the hook should be permanently deleted.
 
 ## Difference from Plugin
 

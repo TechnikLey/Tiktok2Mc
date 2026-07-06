@@ -19,7 +19,7 @@ Must match exactly the `name` field in the `plugin.json`. Used for API endpoints
 
 ### `get_overlay_html() -> str`
 
-Must be overridden. Returns the HTML string for the overlay. Called once by `run()` on startup.
+Must be overridden. Returns the HTML string for the overlay. Called once by `run()` on startup. For plugins without an overlay, a minimal return is sufficient: `return "<html><body></body></html>"` or `return ""`.
 
 ## Configuration
 
@@ -48,6 +48,8 @@ self.push_state()
 self._state["count"] = self._counter
 self.push_state()  # reads via thread-safe self.state
 ```
+
+> **Rule of thumb**: Use `self.state =` for compound operations (e.g., increment, updating multiple fields at once). `self._state[key] = val` is only safe for single, atomic assignments.
 
 ## Overlay
 
@@ -162,7 +164,36 @@ theme_file = self._plugin_dir / "theme.json"
 ```
 
 > [!NOTE]
-> The supervisor terminates the plugin process via `SIGTERM`. Background threads are started as `daemon=True` and are terminated automatically. For own resources (files, network connections), `atexit` handlers can be registered.
+> The supervisor terminates the plugin process via `SIGTERM`. Background threads are started as `daemon=True` and are terminated automatically. For own resources (files, network connections), register `atexit` handlers:
+> ```python
+> import atexit
+> def cleanup():
+>     self._file.close()
+> atexit.register(cleanup)
+> ```
+
+## REST API Endpoints (for Non-Python Plugins)
+
+Plugins in other languages communicate directly via HTTP with the API server (`http://127.0.0.1:29185/api/v1/`):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/plugins` | List all registered plugins |
+| `POST` | `/plugins/{name}/command` | Send a command to a plugin |
+| `GET` | `/plugins/{name}/commands?wait=1` | Poll for pending commands (long-polling) |
+| `POST` | `/plugins/{name}/state` | Update plugin state (for SSE) |
+| `GET` | `/plugins/{name}/stream` | SSE stream for state updates |
+| `POST` | `/plugins/{name}/overlay-html` | Set overlay HTML |
+| `GET` | `/plugins/{name}/overlay` | Retrieve overlay HTML |
+| `GET` | `/plugins/{name}/config` | Read plugin configuration |
+| `PUT` | `/plugins/{name}/config` | Write plugin configuration |
+| `POST` | `/events` | Publish a custom event on the EventBus |
+| `GET` | `/health` | API server health status |
+| `GET` | `/diagnostics` | Full diagnostic report |
+
+**Authentication**: If `api_key` is set in the global `config.yaml`, every request must include the `X-API-Key: <key>` header (only applies to requests from outside localhost).
+
+**Base URL**: Default `http://127.0.0.1:29185/api/v1/`, overridable via the `API_BASE_URL` environment variable.
 
 ## Next Chapter
 

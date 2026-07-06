@@ -11,7 +11,7 @@ Zentraler HTTP-Server (Port 29185), der die Kommunikation zwischen Plugins, Hook
 ## B
 
 **Bridge-Prozess**
-Der Hauptprozess (`src/python/main.py`), der die TikTok-Verbindung verwaltet, Events empfängt und an das System weiterleitet.
+Der Hauptprozess (`src/python/main.py`), der die TikTok-Verbindung verwaltet, Events empfängt und an das System weiterleitet. Importiert Module aus `src/core/` — beide Verzeichnisse teilen denselben PYTHONPATH, daher funktioniert `from core.*` im Bridge-Prozess.
 
 ## C
 

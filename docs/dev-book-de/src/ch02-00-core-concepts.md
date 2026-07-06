@@ -56,6 +56,19 @@ Der TikTok→Minecraft-Bridge-Prozess. Enthält:
 - **RCON-Worker** — Sendet Minecraft-Befehle an den Server (mit Wiederholungslogik)
 - **Hook-Loader** — Lädt und initialisiert Hooks aus `src/hooks/`
 
+## Projektverzeichnis: `src/core/` vs. `src/python/`
+
+Das Projekt hat zwei Python-Quellverzeichnisse mit unterschiedlichen Rollen:
+
+| Verzeichnis | Rolle | Python-Paket |
+|-------------|-------|-------------|
+| `src/core/` | **API-Server, Infrastruktur, geteilte Module** (`BasePlugin`, `EventBus`, `config`, `backup`, `health`, `error_codes`, usw.) | Wird via `PYTHONPATH` oder `pip install -e .` als Paket `core` importierbar |
+| `src/python/` | **Startpunkte und Subprozesse** (`start.py` = Supervisor, `main.py` = Bridge, `send_trigger.py`, `spotify_setup.py`, usw.) | Kein eigenes Paket — importiert `core.*` aus dem Schwesterverzeichnis |
+
+**Warum zwei Verzeichnisse?** `src/core/` enthält die gemeinsame Logik, die von allen Komponenten genutzt wird — inklusive Plugins (`from core.base_plugin import BasePlugin`). `src/python/` enthält ausführbare Einstiegspunkte, die als separate Prozesse laufen (Supervisor, Bridge). Beide teilen sich denselben `PYTHONPATH`, daher funktioniert `from core.*` in beiden Verzeichnissen.
+
+**Für Plugin-Entwickler relevant**: Dein Plugin lebt in `src/plugins/<name>/`, importiert aber `BasePlugin` aus `src/core/`. Der Subprozess (`python src/plugins/<name>/main.py`) findet `core` über den `PYTHONPATH`, der vom Supervisor gesetzt wird.
+
 ## Zwei Wege der Event-Zustellung
 
 ```

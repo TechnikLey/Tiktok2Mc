@@ -9,6 +9,8 @@ Events sind der zentrale Kommunikationsweg. Dieses Kapitel zeigt, wie dein Plugi
 | **Event-Bridge** | TikTok-Events (Gift, Follow, Like, Comment, Join, Share) | `event_subscriptions` in `plugin.json` | `"tiktok_event"` |
 | **Event-Command-Mapper** | Alle EventBus-Ereignisse (TikTok, Plugins, System) | `event_commands.yaml` | Beliebig, definiert in der YAML |
 
+**Warum zwei Wege?** Die Event-Bridge ist der schnelle Einstieg für TikTok — Plugins erhalten TikTok-Events ohne zusätzliche Konfiguration, indem sie `event_subscriptions` setzen. Der Event-Command-Mapper (ECM) ist das flexible Werkzeug für lose Kopplung: Ein Event kann mehrere Plugins ansprechen, und Plugins müssen sich nicht kennen. In der Praxis nutzt ein TikTok-Plugin meist die Bridge; der ECM verbindet Plugins untereinander (z. B. Timer → WinCounter).
+
 ## Weg 1: Event-Bridge (TikTok-Events)
 
 ### Abonnement deklarieren
@@ -21,7 +23,7 @@ In der `plugin.json`:
 }
 ```
 
-Wildcard `"tiktok.*"` abonniert alle TikTok-Events. Du kannst auch Events anderer Plugins abonnieren, z. B. `"timer.zero"` oder `"death-counter.milestone"`. Eigene Events haben den Namespace `plugin-name.ereignis` (siehe unten).
+Wildcard `"tiktok.*"` abonniert alle TikTok-Events. Wildcards funktionieren für jeden Namespace, z. B. `"timer.*"` oder `"*.milestone"`. Du kannst auch einzelne Events anderer Plugins abonnieren, z. B. `"timer.zero"` oder `"death-counter.milestone"`. Eigene Events haben den Namespace `plugin-name.ereignis` (siehe unten).
 
 ### Handler registrieren
 
@@ -74,8 +76,8 @@ Die Event-Bridge liefert standardisierte Dictionaries:
     "event_type": "tiktok.like",
     "user": "fan",
     "data": {
-        "delta": 3,
-        "total": 150
+        "delta": 3,    # Like-Inkrement seit letztem Event
+        "total": 150   # Gesamtanzahl Likes (Session)
     }
 }
 

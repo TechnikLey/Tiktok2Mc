@@ -19,7 +19,7 @@ Muss exakt mit dem `name`-Feld in der `plugin.json` übereinstimmen. Wird für A
 
 ### `get_overlay_html() -> str`
 
-Muss überschrieben werden. Gibt den HTML-String für das Overlay zurück. Wird von `run()` beim Start einmal aufgerufen.
+Muss überschrieben werden. Gibt den HTML-String für das Overlay zurück. Wird von `run()` beim Start einmal aufgerufen. Für Plugins ohne Overlay reicht eine minimale Rückgabe: `return "<html><body></body></html>"` oder `return ""`.
 
 ## Konfiguration
 
@@ -48,6 +48,8 @@ self.push_state()
 self._state["count"] = self._zaehler
 self.push_state()  # liest über thread-safes self.state
 ```
+
+> **Faustregel**: `self.state =` für zusammengesetzte Operationen (z. B. Inkrement, mehrere Felder gleichzeitig). `self._state[key] = val` ist nur für einzelne, atomare Zuweisungen geeignet.
 
 ## Overlay
 
@@ -162,7 +164,36 @@ theme_file = self._plugin_dir / "theme.json"
 ```
 
 > [!NOTE]
-> Der Supervisor beendet den Plugin-Prozess per `SIGTERM`. Hintergrund-Threads sind als `daemon=True` gestartet und werden automatisch beendet. Für eigene Betriebsmittel (Dateien, Netzwerkverbindungen) kann `atexit`-Handler registriert werden.
+> Der Supervisor beendet den Plugin-Prozess per `SIGTERM`. Hintergrund-Threads sind als `daemon=True` gestartet und werden automatisch beendet. Für eigene Betriebsmittel (Dateien, Netzwerkverbindungen) `atexit`-Handler registrieren:
+> ```python
+> import atexit
+> def cleanup():
+>     self._file.close()
+> atexit.register(cleanup)
+> ```
+
+## REST-API-Endpunkte (für Nicht-Python-Plugins)
+
+Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`http://127.0.0.1:29185/api/v1/`):
+
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| `GET` | `/plugins` | Alle registrierten Plugins auflisten |
+| `POST` | `/plugins/{name}/command` | Befehl an ein Plugin senden |
+| `GET` | `/plugins/{name}/commands?wait=1` | Befehle vom System abholen (Long-Polling) |
+| `POST` | `/plugins/{name}/state` | Plugin-Zustand aktualisieren (für SSE) |
+| `GET` | `/plugins/{name}/stream` | SSE-Stream für Zustands-Updates |
+| `POST` | `/plugins/{name}/overlay-html` | Overlay-HTML setzen |
+| `GET` | `/plugins/{name}/overlay` | Overlay-HTML abrufen |
+| `GET` | `/plugins/{name}/config` | Plugin-Konfiguration lesen |
+| `PUT` | `/plugins/{name}/config` | Plugin-Konfiguration schreiben |
+| `POST` | `/events` | Eigenes Event auf dem EventBus veröffentlichen |
+| `GET` | `/health` | Health-Status des API-Servers |
+| `GET` | `/diagnostics` | Diagnose-Report (alle Komponenten) |
+
+**Authentifizierung**: Wenn `api_key` in der globalen `config.yaml` gesetzt ist, muss jeder Request den Header `X-API-Key: <key>` enthalten (gilt nur für Requests von außerhalb localhost).
+
+**Basis-URL**: Standard `http://127.0.0.1:29185/api/v1/`, überschreibbar über die Umgebungsvariable `API_BASE_URL`.
 
 ## Nächstes Kapitel
 

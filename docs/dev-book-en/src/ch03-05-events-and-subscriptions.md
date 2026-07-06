@@ -9,6 +9,8 @@ Events are the central communication path. This chapter shows how your plugin re
 | **Event Bridge** | TikTok events (Gift, Follow, Like, Comment, Join, Share) | `event_subscriptions` in `plugin.json` | `"tiktok_event"` |
 | **Event-Command-Mapper** | All EventBus events (TikTok, Plugins, System) | `event_commands.yaml` | Any, defined in the YAML |
 
+**Why two paths?** The Event Bridge is the quick start for TikTok — plugins receive TikTok events without additional setup by setting `event_subscriptions`. The Event-Command-Mapper (ECM) is the flexible tool for loose coupling: one event can trigger multiple plugins, and plugins don't need to know about each other. In practice, a TikTok plugin usually uses the Bridge; the ECM connects plugins together (e.g., Timer → WinCounter).
+
 ## Path 1: Event Bridge (TikTok Events)
 
 ### Declare Subscription
@@ -21,7 +23,7 @@ In the `plugin.json`:
 }
 ```
 
-Wildcard `"tiktok.*"` subscribes to all TikTok events. You can also subscribe to events from other plugins, e.g., `"timer.zero"` or `"death-counter.milestone"`. Your own events use the namespace `plugin-name.event` (see below).
+Wildcard `"tiktok.*"` subscribes to all TikTok events. Wildcards work for any namespace, e.g., `"timer.*"` or `"*.milestone"`. You can also subscribe to individual events from other plugins, e.g., `"timer.zero"` or `"death-counter.milestone"`. Your own events use the namespace `plugin-name.event` (see below).
 
 ### Register Handler
 
@@ -74,8 +76,8 @@ The Event Bridge delivers standardized dictionaries:
     "event_type": "tiktok.like",
     "user": "fan",
     "data": {
-        "delta": 3,
-        "total": 150
+        "delta": 3,    # Like increment since last event
+        "total": 150   # Total likes (session)
     }
 }
 
