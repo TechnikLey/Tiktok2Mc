@@ -5942,25 +5942,46 @@ class EventTester {
   }
 
   _renderGiftSelect(gifts) {
-    const select = document.getElementById('gift-select');
-    if (!select) return;
+    const container = document.getElementById('gift-select');
+    if (!container) return;
     if (!gifts.length) {
-      select.innerHTML = '<option value="" disabled>No gifts available</option>';
+      container.innerHTML = '<div class="gift-empty">No gifts match your search.</div>';
       return;
     }
     const selectedId = this._selectedGift ? String(this._selectedGift.id) : '';
-    let html = '<option value="" disabled' + (selectedId === '' ? ' selected' : '') + '>Choose a gift...</option>';
-    for (const g of gifts) {
-      const sel = String(g.id) === selectedId ? ' selected' : '';
-      html += `<option value="${g.id}" data-name="${escapeHtml(g.name)}"${sel}>${escapeHtml(g.name)} (ID: ${g.id})</option>`;
-    }
-    select.innerHTML = html;
-    select.onchange = () => {
-      const opt = select.options[select.selectedIndex];
-      if (opt && opt.value) {
-        this._selectedGift = { id: opt.value, name: opt.dataset.name || '' };
-      }
+    container.innerHTML = gifts.map(g => {
+      const imgPath = g.image_url || '';
+      const selected = String(g.id) === selectedId ? ' gift-item-selected' : '';
+      return `<div class="gift-item${selected}" data-gift-id="${g.id}" data-gift-name="${escapeHtml(g.name)}">
+        <img src="${imgPath}" alt="${escapeHtml(g.name)}" class="gift-item-img" loading="lazy" onerror="this.style.display='none'">
+        <div class="gift-item-info">
+          <div class="gift-item-name">${escapeHtml(g.name)}</div>
+          <div class="gift-item-meta">ID: ${g.id} &middot; ${g.coins} coins</div>
+        </div>
+      </div>`;
+    }).join('');
+    container._clickHandler = (e) => {
+      const item = e.target.closest('.gift-item');
+      if (!item) return;
+      const id = parseInt(item.dataset.giftId);
+      const name = item.dataset.giftName || '';
+      this._selectGift(id, name);
     };
+    container.removeEventListener('click', container._boundClick);
+    container._boundClick = container._clickHandler.bind(this);
+    container.addEventListener('click', container._boundClick);
+  }
+
+  _selectGift(id, name) {
+    this._selectedGift = { id: id, name: name };
+    const hid = document.getElementById('gift-selected-id');
+    if (hid) hid.value = id;
+    const container = document.getElementById('gift-select');
+    if (container) {
+      container.querySelectorAll('.gift-item').forEach(el => {
+        el.classList.toggle('gift-item-selected', parseInt(el.dataset.giftId) === id);
+      });
+    }
   }
 
   onGiftSearch(query) {

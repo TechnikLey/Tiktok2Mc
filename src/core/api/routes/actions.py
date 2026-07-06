@@ -27,15 +27,33 @@ def _get_service() -> ActionsService:
     return _service
 
 
-_IMAGE_RE = re.compile(r"[^a-zA-Z0-9 ]")
+def _normalize_name(name: str) -> str:
+    name = name.lower().strip()
+    name = name.replace("_", " ")
+    name = re.sub(r"[^a-z0-9\s]", " ", name)
+    name = re.sub(r"\s+", " ", name)
+    return name.strip()
 
 
-def _gift_image_path(gift: dict, index: int) -> str:
-    idx = index + 1
-    name = gift.get("name", "")
-    safe = _IMAGE_RE.sub("", name).strip()
-    safe = re.sub(r"\s+", "_", safe)
-    return f"/gifts-pictures/{str(idx).zfill(3)}_{safe}.png"
+def _build_gift_image_map() -> dict[str, str]:
+    root = core.paths.get_root_dir()
+    pics_dir = root / "assets" / "gifts_picture"
+    if not pics_dir.exists():
+        pics_dir = root / "core" / "assets" / "gifts_picture"
+    if not pics_dir.exists():
+        return {}
+    mapping = {}
+    for f in pics_dir.iterdir():
+        if f.suffix.lower() != ".png":
+            continue
+        stem = f.stem
+        us_pos = stem.find("_")
+        if us_pos == -1:
+            continue
+        name_part = stem[us_pos + 1:]
+        normalized = _normalize_name(name_part)
+        mapping[normalized] = f"/gifts-pictures/{f.name}"
+    return mapping
 
 
 @router.get("/actions", response_model=ActionsResponse)
@@ -135,8 +153,10 @@ def _load_gifts() -> list[dict]:
 async def get_gifts():
     try:
         gifts = _load_gifts()
-        for i, g in enumerate(gifts):
-            g["image_url"] = _gift_image_path(g, i)
+        image_map = _build_gift_image_map()
+        for g in gifts:
+            normalized = _normalize_name(g.get("name", ""))
+            g["image_url"] = image_map.get(normalized, "")
         gifts.sort(key=lambda g: (g.get("coins", 0), g.get("name", "")))
         return {"gifts": gifts}
     except Exception as e:

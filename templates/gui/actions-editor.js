@@ -471,7 +471,7 @@ class ActionsEditor {
     this.addGiftList.innerHTML = filtered.map(g => {
       const imgPath = g.image_url || '';
       const selected = this.selectedGiftId === g.id ? ' gift-item-selected' : '';
-      return `<div class="gift-item${selected}" data-gift-id="${g.id}" onclick="actionsEditor._selectGift(${g.id})">
+      return `<div class="gift-item${selected}" data-gift-id="${g.id}">
         <img src="${imgPath}" alt="${escapeHtml(g.name)}" class="gift-item-img" loading="lazy" onerror="this.style.display='none'">
         <div class="gift-item-info">
           <div class="gift-item-name">${escapeHtml(g.name)}</div>
@@ -479,12 +479,19 @@ class ActionsEditor {
         </div>
       </div>`;
     }).join('');
+
+    this.addGiftList.removeEventListener('click', this._boundGiftClick);
+    this._boundGiftClick = (e) => {
+      const item = e.target.closest('.gift-item');
+      if (!item) return;
+      this._selectGift(parseInt(item.dataset.giftId));
+    };
+    this.addGiftList.addEventListener('click', this._boundGiftClick);
   }
 
   _selectGift(id) {
     this.selectedGiftId = id;
     this.addGiftConfirm.disabled = false;
-    // Update visual selection
     this.addGiftList.querySelectorAll('.gift-item').forEach(el => {
       el.classList.toggle('gift-item-selected', parseInt(el.dataset.giftId) === id);
     });

@@ -378,11 +378,10 @@
                             </div>
                             <div class="form-group" id="gift-trigger-group" style="flex:2;display:none;">
                                 <label>Select Gift</label>
-                                <div class="gift-selector">
-                                    <input type="text" id="gift-search" class="form-input" placeholder="Search gifts..." oninput="eventTester.onGiftSearch(this.value)">
-                                    <select id="gift-select" class="form-select" size="5">
-                                        <option value="" disabled>Loading gifts...</option>
-                                    </select>
+                                <div class="gift-picker">
+                                    <input type="text" id="gift-search" class="form-input" placeholder="Search gifts by name or ID..." oninput="eventTester.onGiftSearch(this.value)">
+                                    <div id="gift-select" class="gift-list" style="max-height:200px;"></div>
+                                    <input type="hidden" id="gift-selected-id" value="">
                                 </div>
                             </div>
                             <div class="form-group" style="flex:1">
