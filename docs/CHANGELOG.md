@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [!IMPORTANT]
 > **The new GUI is the centerpiece of v1.0.0.** You can now manage servers, plugins, events, overlays, reactions, and settings entirely through the graphical interface — no more editing config files by hand.
 >
-> This changelog only lists the most important user-facing changes. A massive amount of work happened under the hood — the full detail can be found in `docs/CHANGE_HISTORY.md`.
+> This changelog only lists the most important user-facing changes. A massive amount of work happened under the hood.
 
 ### Added
 

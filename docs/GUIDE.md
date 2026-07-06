@@ -2,6 +2,12 @@
 
 This guide explains how to use TikTok2Mc. No programming knowledge is required.
 
+You can configure and control **everything** in TikTok2Mc in one of three ways — choose whichever suits you best:
+
+- **Dashboard (GUI)** — Use the web interface at `http://127.0.0.1:29185/`. No file editing needed.
+- **Configuration Files** — Edit `config.yaml` and other files directly with any text editor.
+- **Mixed** — Use both. Changes from the GUI and files are synchronized automatically.
+
 If you are setting the tool up for the first time, start with the [Quick Start](../README.md#quick-start) in the README.
 
 ---
@@ -78,9 +84,11 @@ All main settings are in `config/config.yaml`. Open this file with any text edit
 
 Each plugin (Timer, Death Counter, Win Counter, Spotify Control) has its own `config.yaml` inside its plugin directory (e.g., `plugins/timer/config.yaml`). You can edit these files to change plugin-specific behavior like colors, timers, and milestones.
 
-> **Tip:** The Dashboard (web interface) provides a visual editor for all settings. You don't need to edit files by hand unless you prefer to.
+> [!TIP]
+> The Dashboard (web interface) provides a visual editor for all settings. You don't need to edit files by hand unless you prefer to.
 
-[IMAGE: Screenshot of the Dashboard configuration editor showing the section navigation and search bar]
+> [!IMPORTANT]
+> IMAGE: Screenshot of the Dashboard configuration editor showing the section navigation and search bar
 
 ---
 
@@ -93,6 +101,9 @@ The first time you start the tool (or if your TikTok username and RCON password 
 3. **Review & Save** — check your settings and save
 
 After saving, the wizard asks if you want to restart now or later. You can also reopen the Setup Wizard at any time from the Dashboard.
+
+> [!IMPORTANT]
+> IMAGE: Screenshot of the Setup Wizard showing the three-step process (TikTok username, RCON password, Review & Save)
 
 ---
 
@@ -217,6 +228,9 @@ Lines starting with `#` are ignored. Use this to temporarily disable an action:
 
 A full list of gift IDs and names is available in `defaults/gifts.json`. The Dashboard also includes a gift picker with search.
 
+> [!IMPORTANT]
+> IMAGE: Screenshot of the Actions editor in the Dashboard showing the table of triggers with inline command editing and the gift picker
+
 ---
 
 ## Event-Command Mapper
@@ -272,6 +286,9 @@ event_commands:
 | death-counter | `player_death` |
 
 The Event-Command Mapper can also be edited visually in the Dashboard.
+
+> [!IMPORTANT]
+> IMAGE: Screenshot of the Event-Command Mapper editor in the Dashboard showing event types and target actions
 
 ---
 
@@ -330,6 +347,9 @@ Each group has a `trigger_comment_event` setting (default: `true`). When set to 
 
 > For full details, read the inline comments in `config.yaml` under `comment_commands`.
 
+> [!IMPORTANT]
+> IMAGE: Screenshot of the Comment Commands configuration in the Dashboard showing groups, prefixes, roles, and cooldowns
+
 ---
 
 ## Plugins
@@ -352,7 +372,8 @@ Plugins are optional features you can turn on or off.
 | **Win Counter** | Tracks wins and losses | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
 | **Spotify Control** | Viewers control your Spotify via chat | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
 
-> **Note:** Everything starts disabled. Only turn on what you actually need.
+> [!NOTE]
+> Everything starts disabled. Only turn on what you actually need.
 
 ### Timer
 
@@ -404,6 +425,9 @@ The overlay shows the current track with album art.
 
 > You also need to enable the `$` comment command group in `config.yaml` under `comment_commands` for chat commands to work.
 
+> [!IMPORTANT]
+> IMAGE: Screenshot of a plugin settings page in the Dashboard (e.g., Timer or Spotify Control) showing form fields and live preview
+
 ---
 
 ## Overlays
@@ -448,7 +472,8 @@ The core overlay supports two display modes (set in `config.yaml` under `overlay
 For chroma key (green screen) support, add `&chroma=true` to the overlay URL:
 `http://127.0.0.1:29185/api/v1/overlay?overlay=default&chroma=true`
 
-[IMAGE: OBS Studio showing the Browser Source setup dialog with an overlay URL filled in]
+> [!IMPORTANT]
+> IMAGE: OBS Studio showing the Browser Source setup dialog with an overlay URL filled in
 
 ---
 
@@ -471,7 +496,8 @@ The Dashboard is a web interface available at `http://127.0.0.1:29185/` that let
 
 The Configuration Editor shows a diff view before saving changes, so you can review what will be modified.
 
-[IMAGE: The Dashboard main page showing the overview with cards for Actions, Configuration, Updates]
+> [!IMPORTANT]
+> IMAGE: The Dashboard main page showing the overview with cards for Actions, Configuration, Updates
 
 ---
 
@@ -501,6 +527,9 @@ A **default** instance is always present. You can create additional instances fo
 ### Console access
 
 A drop-down selector lets you switch between instances to view each server's console output in real time.
+
+> [!IMPORTANT]
+> IMAGE: Screenshot of the Server Manager in the Dashboard showing the list of server instances with status indicators and control buttons
 
 ---
 
