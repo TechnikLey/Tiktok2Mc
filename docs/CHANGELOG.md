@@ -14,59 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Central API server** — FastAPI-based backend running on `127.0.0.1:29185`. Manages plugins, configuration, events, and updates through a unified REST interface at `/api/v1`. Interactive documentation available at `/docs`.
-- **Manifest-driven plugin system** — each plugin declares its identity via `plugin.json` (name, version, entry point, ports, capabilities). The launcher discovers plugins from manifests instead of scanning executables.
-- **Plugin discovery endpoint** — `GET /api/v1/plugins/discover` scans the filesystem for plugin manifests and merges registry state. Read-only, no side effects.
-- **Plugin enable/disable endpoints** — `POST /api/v1/plugins/{name}/enable` and `/disable` for simple, idempotent plugin state management.
-- **Plugin update checker** — `GET /api/v1/plugins/updates` checks all registered plugins for newer versions via their `update_url` field. Supports GitHub Releases API and direct version URLs.
-- **Tool update check** — `GET /api/v1/updates/check` queries the main GitHub repository for newer tool releases and compares with the current version.
-- **Event bus** — real-time event system with Server-Sent Events (`GET /api/v1/events/stream`) and WebSocket (`/api/v1/ws`) endpoints. Components can inject events via `POST /api/v1/events`.
-- **Configuration API** — `GET /api/v1/config` and `PUT /api/v1/config` for reading and updating the main configuration with automatic schema validation and versioned backups.
-- **Update coordination signals** — `GET/PUT/DELETE /api/v1/updater/signal` for in-memory kill signaling between the updater and the main process. Dual signaling (file + API) for backward compatibility with compiled `update.exe`.
-- **Security warnings** — non-blocking log warnings when the default RCON password (`ABC1234`) is still set or when `server_host` is bound to `0.0.0.0`.
-- **Config schema validation** — the API validates configuration structure on read and write, warns about unknown top-level keys, and normalizes `config_version` to semantic versioning format.
-- **Automated test suite** — 475 tests (460 passed, 4 skipped, 11 known fixture-isolation failures) covering API endpoints, plugin system, configuration, update checker, manifest validation, event bus, actions validator (44), hook system, YAML round-trip, overlay utils, smoke tests, BackupManager (30), bridge core (38), and update lifecycle (24). CI workflow runs on every push and pull request.
-- **Plugin manifest validation** — Pydantic model enforces kebab-case names, semver versions, valid entry points, and port declarations.
-- **Single version source of truth** — `core/version.py` centralizes all version constants. Build, upload, plugin scaffolding, and API version all import from this file.
-- **Plugin health monitoring** — watchdog thread periodically pings plugin health endpoints, auto-restarts crashed plugins, and updates registry state on failure.
-- **Registry/filesystem sync** — filesystem watcher auto-syncs plugin registry when directories appear or disappear.
+- **Server Manager** — create, start, stop, and restart Minecraft servers directly from the GUI. Switch between multiple server instances, see live uptime, and open server folders with one click.
+- **Live Dashboard** — a new main screen showing the health status of all your plugins, recent activity, and live event feed at a glance.
+- **Event Reactions** — a visual, step-by-step wizard to set up what happens when viewers follow, like, gift, share, join, or comment. No more editing raw config files for common reaction setups.
+- **Overlay Preview & Theme Editor** — edit overlay colors and see the result instantly. Test how overlay messages will look before they appear on stream.
+- **Event Tester** — simulate any viewer event (follow, like, gift, etc.) to test if your reactions work correctly, without needing a real TikTok stream.
+- **Windows Installer** — one-click setup wizard with desktop shortcuts and start menu entry. Uninstall supported.
+- **Spotify Login Helper** — a guided tool that opens your browser, connects to Spotify, and saves the authentication — no more manual token handling.
+- **API Key Protection** — optional password protection for anyone accessing the tool over your network.
+- **VS Code Extension for .mca Files** — syntax highlighting, error checking, and auto-complete when editing action files in VS Code.
+- **Automatic Backups** — your configuration files are now automatically backed up before changes, so you can recover if something goes wrong.
+- **Port Conflict Detection** — if the required network ports are already in use, the tool now detects this and resolves it automatically.
+- **Security warnings** — you'll see a console warning if you're still using the default RCON password or if the tool is exposed to your whole network.
 
 ### Changed
 
-- **Plugin architecture** — plugins no longer self-register. Registration is handled centrally by `PluginLauncher` reading `plugin.json` manifests. All plugin `main.py` files updated to remove self-registration code.
-- **Plugin decoupling** — Timer, Win Counter, and Death Counter now run fully standalone. Cross-plugin dependencies (`auto_win`, `pause_on_death`, `decrement_on_death`) default to `false`.
-- **Configuration versioning** — `config_version` now uses semantic versioning (`1.0`) instead of integer versions. Automatic normalization on read, upgrade on write.
-- **All plugins start disabled** — opt-in model. Nothing runs unless explicitly enabled in configuration or via the API.
-- **CORS policy** — restricted from `["*"]` to localhost origins by default. Open CORS available via `create_app(cors_origins=["*"])` for development.
-- **Update signaling** — dual mechanism: compiled `update.exe` uses file-based signaling (`update_signal.tmp`), Python source uses both file and API signaling.
-- **Test suite grown from 285 to 475 tests** — added tests for actions validator (44), hook system, YAML round-trip, overlay utils, plugin smoke tests, BackupManager (30), bridge core (38), and update lifecycle (24).
+- **GUI redesigned** — the interface has a fresh new look with improved layout and navigation.
+- **Config editor improvements** — the Save button now only lights up when you've made changes, and you'll be warned if you try to close with unsaved work.
+- **Timer, Win Counter, Death Counter** — these plugins no longer depend on each other. You can use any combination without one forcing settings on another.
+- **Single GUI instance** — launching the GUI a second time now brings the existing window to the front instead of opening a duplicate.
+- **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
 
 ### Removed
 
-- **Legacy file-based plugin registry** — `python/registry.py` deleted. Plugin registration now goes through the central API only.
-- **Legacy GUI module** — `python/gui.py` removed (post-v1.0.0 GUI is a separate project).
-- **Legacy plugin updater** — `python/plugin_updater.py` removed (replaced by `PluginUpdateChecker` in the API).
-- **Self-registration from plugins** — all `register_plugin()` calls removed from plugin `main.py` files.
-- **Dead code** — `ErrorResponse`, `WSMessage`, `ImportLegacyResponse`, `validate_config_dict`, `read_plugin_registry()` removed.
-- **`--register-only` CLI flag** — no longer needed with manifest-driven discovery.
+- **ChannelPoints plugin** (economy and points system)
+- **LikeGoal plugin** (like goal overlay)
+- **`shell_actions.txt`** — replaced by the `&` prefix in `actions.mca`
+- **Sidebar dropdowns** for Plugins and Hooks — navigation has been streamlined
 
 ### Fixed
 
-- **Route ordering** — `/plugins/updates` and `/plugins/discover` now defined before `/plugins/{name}` to prevent path parameter capture.
-- **Circular imports** — `API_VERSION` moved to `models.py` to break import cycles between server and routes.
-- **`get_root_dir()` path resolution** — now works correctly regardless of executable nesting depth.
-- **Config write validation** — `write_config()` now validates schema before persisting, preventing corrupt configurations.
-- **Config version normalization** — handles legacy integer versions, string numbers, `v`-prefixed versions, and malformed input gracefully.
-- **GUI bugs** — overlay URLs on dashboard, dismiss button on restart-pending banner, SSE log stream connected, ShutdownNow race condition resolved.
-- **Shutdown cancel race** — cancel signal now checked directly in countdown loop (1s) instead of file watcher (5s).
-- **Restart sleep race** — replaced `time.sleep(3)` with polling loop (`_wait_for_processes_stopped`, `_wait_for_process_started`) in `start.py`; configurable 0.5s interval, 10s timeout.
-- **Auto-restart after update** — update now spawns a new process and exits automatically instead of prompting for manual relaunch.
-
-### Security
-
-- **RCON default password warning** — log-level warning when `ABC1234` is still configured.
-- **Network exposure warning** — log-level warning when `server_host: 0.0.0.0` exposes all services to the network.
-- **CORS restricted to localhost** — default CORS policy only allows requests from `127.0.0.1` and `localhost`.
+Due to a full system rewrite, many legacy issues from previous versions were inherently resolved. No specific bug list is carried forward.
 
 ---
 
