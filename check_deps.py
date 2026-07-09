@@ -237,6 +237,68 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
         return False
 
 
+def _install_node_nodesource():
+    """Install node 22 LTS via NodeSource on Linux. Returns True on success."""
+    if sys.platform == "win32":
+        return False
+
+    # Detect distro
+    try:
+        with open("/etc/os-release") as f:
+            os_release = f.read()
+    except FileNotFoundError:
+        return False
+
+    if "Debian" in os_release or "Ubuntu" in os_release or "Linux Mint" in os_release:
+        distro = "debian"
+    elif "Fedora" in os_release:
+        distro = "fedora"
+    elif "Arch" in os_release or "Manjaro" in os_release:
+        distro = "arch"
+    else:
+        return False
+
+    cprint("  Adding NodeSource repository for node 22 LTS...", C.YELLOW)
+
+    if distro == "debian":
+        cmds = [
+            ["sudo", "apt-get", "install", "-y", "ca-certificates", "curl", "gnupg"],
+            ["sudo", "mkdir", "-p", "/etc/apt/keyrings"],
+            ["bash", "-c", 'curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg'],
+            ["bash", "-c", 'echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list'],
+            ["sudo", "apt-get", "update"],
+            ["sudo", "apt-get", "install", "-y", "nodejs"],
+        ]
+    elif distro == "fedora":
+        cmds = [
+            ["sudo", "dnf", "install", "-y", "curl"],
+            ["bash", "-c", 'curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -'],
+            ["sudo", "dnf", "install", "-y", "nodejs"],
+        ]
+    elif distro == "arch":
+        # Arch has up-to-date node in official repos
+        cmds = [
+            ["sudo", "pacman", "-Sy", "--noconfirm", "nodejs", "npm"],
+        ]
+    else:
+        return False
+
+    for cmd in cmds:
+        result = subprocess.run(cmd, text=True, timeout=120)
+        if result.returncode != 0:
+            cprint(f"  ! NodeSource setup failed at: {' '.join(cmd[:3])}...", C.RED)
+            return False
+
+    # Verify
+    ver = _get_version("node")
+    if ver and ver[0] >= 20:
+        cprint(f"  + node {ver[0]}.{ver[1]} installed via NodeSource", C.GREEN)
+        return True
+    else:
+        cprint("  ! NodeSource install completed but node version still too old", C.RED)
+        return False
+
+
 def check_system_tool(name, check_func, pkg_names, category, optional, platform_filter):
     """Check if a system tool is available. Returns (available, version_info)."""
     if platform_filter and sys.platform != platform_filter:
@@ -303,6 +365,11 @@ def main():
                 continue
             if not available and not optional:
                 if auto_install and pm_name:
+                    # Special handling: outdated node -> use NodeSource
+                    if name == "node" and version_info and "need >=" in version_info:
+                        if _install_node_nodesource():
+                            installed_count += 1
+                            continue
                     if install_system_tool(name, pkg_names, pm_name, pm_prefix):
                         installed_count += 1
                     else:
