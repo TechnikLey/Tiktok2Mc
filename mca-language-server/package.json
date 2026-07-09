@@ -48,7 +48,6 @@
   },
   "scripts": {
     "vscode:prepublish": "echo 'No compile needed for JS'",
-    "postinstall": "cd client && npm install 2>/dev/null; cd ../server && npm install 2>/dev/null; true",
     "test": "node server/test/run.js",
     "benchmark": "node server/test/benchmark.js",
     "generate-spec": "python ../tools/generate_mca_spec.py",
