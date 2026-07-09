@@ -187,7 +187,7 @@ SYSTEM_TOOLS = [
     ("qt6-webengine", _check_qt6_webengine,
                                  {"apt":"libqt6webengine6 qt6-wayland", "dnf":"qt6-qtwebengine qt6-qtwayland",
                                   "pacman":"qt6-webengine qt6-wayland", "zypper":"qt6-webengine"},
-                                 "gui",             True, "linux"),
+                                 "gui",             False, "linux"),
 ]
 
 
