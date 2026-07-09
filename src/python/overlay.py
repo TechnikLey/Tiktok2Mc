@@ -27,7 +27,8 @@ if sys.platform == "linux":
         os.environ["LD_LIBRARY_PATH"] = f"{_new_ld}:{_ld}" if _ld else _new_ld
         if getattr(sys, "frozen", False) and "_LD_FIXED" not in os.environ:
             os.environ["_LD_FIXED"] = "1"
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            # Re-exec without PyInstaller arguments that argparse doesn't understand
+            os.execv(sys.executable, [sys.executable])
 
 import argparse
 import logging
