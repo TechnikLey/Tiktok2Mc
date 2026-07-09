@@ -144,8 +144,11 @@ except Exception as e:
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
-        log.error("This script must be run as root on Linux to start the tool.")
-        _input_confirm_exit("Press Enter to exit...")
+        if sys.stdin.isatty():
+            log.error("This script must be run as root on Linux to start the tool.")
+            _input_confirm_exit("Press Enter to exit...")
+        else:
+            log.warning("Not running as root. Continuing anyway (no TTY). Some features may fail.")
 
 # -----------------------------
 # Plugin sandbox

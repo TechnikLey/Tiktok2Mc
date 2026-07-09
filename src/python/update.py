@@ -89,9 +89,12 @@ def _init():
         sys.exit(1)
     if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
         if os.geteuid() != 0:
-            log.error("This script must be run as root on Linux to perform updates.")
-            wait_for_key()
-            sys.exit(1)
+            if sys.stdin.isatty():
+                log.error("This script must be run as root on Linux to perform updates.")
+                wait_for_key()
+                sys.exit(1)
+            else:
+                log.warning("Not running as root (no TTY). Continuing anyway — updates may fail.")
     CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
     HEADERS_API = {
@@ -375,7 +378,10 @@ def run_update():
         if "beta" in online_tag.lower():
             if AUTO_MODE:
                 sys.exit(5)  # skip beta in auto mode
-            choice = input(f"[!] Beta version {online_tag} available. Install? (y/N): ").lower()
+            try:
+                choice = input(f"[!] Beta version {online_tag} available. Install? (y/N): ").lower()
+            except EOFError:
+                choice = "n"
             if choice != 'y': sys.exit(5)
 
         # Download & extract

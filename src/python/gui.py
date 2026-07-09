@@ -345,14 +345,20 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         import webview
     except ImportError as exc:
         log.error("pywebview is required for the GUI: %s", exc)
-        input("Press Enter to exit...")
+        try:
+            input("Press Enter to exit...")
+        except EOFError:
+            pass
         sys.exit(1)
     except Exception as exc:
         hint = _linux_install_hint()
         log.error("GUI backend failed to load: %s", exc)
         if hint:
             log.error("Install Qt6: %s", hint)
-        input("Press Enter to exit...")
+        try:
+            input("Press Enter to exit...")
+        except EOFError:
+            pass
         sys.exit(1)
 
     launcher_api = LauncherAPI()

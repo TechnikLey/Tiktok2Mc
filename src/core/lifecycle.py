@@ -543,7 +543,7 @@ class ProcessSupervisor:
             log_dir = get_root_dir() / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"{_sanitize_session_name(proc.name)}.log"
-            kwargs = {"cwd": cwd, "env": env}
+            kwargs = {"cwd": cwd, "env": env, "stdin": subprocess.DEVNULL}
             with open(log_file, "w", encoding="utf-8") as lf:
                 proc.proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, **kwargs)
 
