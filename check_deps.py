@@ -243,14 +243,25 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
         cprint(f"  ! No package mapping for {pm_name} — install {name} manually", C.YELLOW)
         return False
 
-    cprint(f"  Installing {name} ({pkg}) via {pm_name}...", C.YELLOW)
+    cprint(f"  Installing {name} via {pm_name}...", C.YELLOW)
     cmd = pm_prefix + pkg.split()
-    result = subprocess.run(cmd, text=True, timeout=120)
+    cprint(f"  > {' '.join(cmd)}", C.GRAY)
+    try:
+        result = subprocess.run(cmd, text=True, timeout=120)
+    except FileNotFoundError:
+        cprint(f"  ! Package manager '{pm_name}' not found — install {name} manually", C.RED)
+        return False
+    except subprocess.TimeoutExpired:
+        cprint(f"  ! Installation timed out for {name}", C.RED)
+        return False
     if result.returncode == 0:
         cprint(f"  + {name} installed", C.GREEN)
         return True
     else:
+        stderr = result.stderr.strip()[:300] if result.stderr else ""
         cprint(f"  ! Failed to install {name} (exit code {result.returncode})", C.RED)
+        if stderr:
+            cprint(f"    {stderr}", C.RED)
         return False
 
 
@@ -328,7 +339,7 @@ def check_system_tool(name, check_func, pkg_names, category, optional, platform_
     if available:
         status = C.GREEN + "OK" + C.RESET
     elif optional:
-        status = C.GRAY + "skip" + C.RESET
+        status = C.GRAY + "skip (optional)" + C.RESET
     else:
         status = C.RED + "MISSING" + C.RESET
     suffix = f"  {C.YELLOW}({version_info}){C.RESET}" if version_info else ""
@@ -359,6 +370,9 @@ def main():
         os.system("")
 
     header("TikTok2Mc Dependency Checker")
+    cprint(f"  Script: {Path(__file__).resolve()}", C.GRAY)
+    cprint(f"  Python: {sys.executable}", C.GRAY)
+    cprint(f"  Platform: {sys.platform}", C.GRAY)
     if auto_install:
         cprint("  Mode: --install (auto-install everything)\n", C.CYAN)
 
