@@ -147,6 +147,19 @@ def _check_npm():
 def _check_binutils():
     return shutil.which("ld") is not None, None
 
+def _check_qt6_webengine():
+    """Check if Qt6 WebEngine is available (Linux only)."""
+    if sys.platform != "linux":
+        return True, None
+    for p in [
+        Path("/usr/lib/x86_64-linux-gnu/libQt6WebEngineCore.so.6"),
+        Path("/usr/lib/libQt6WebEngineCore.so.6"),
+        Path("/usr/lib64/libQt6WebEngineCore.so.6"),
+    ]:
+        if p.exists():
+            return True, None
+    return False, None
+
 def _check_git():
     return shutil.which("git") is not None, None
 
@@ -171,6 +184,10 @@ SYSTEM_TOOLS = [
                                  "zypper":"java-21-openjdk", "brew":"openjdk@21",
                                  "winget":"Microsoft.OpenJDK.21", "choco":"temurin21", "scoop":"openjdk21"},
                                  "minecraft-server",False, None),
+    ("qt6-webengine", _check_qt6_webengine,
+                                 {"apt":"libqt6webengine6 qt6-wayland", "dnf":"qt6-qtwebengine qt6-qtwayland",
+                                  "pacman":"qt6-webengine qt6-wayland", "zypper":"qt6-webengine"},
+                                 "gui",             True, "linux"),
 ]
 
 
