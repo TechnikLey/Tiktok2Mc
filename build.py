@@ -283,8 +283,11 @@ def _package_vsix(extension_dir: Path) -> Path:
 
     # Ensure npm dependencies are installed
     cprint("Installing npm dependencies...", Color.CYAN)
+    npm_path = shutil.which("npm") or shutil.which("npm.cmd")
+    if not npm_path:
+        raise RuntimeError("npm not found. Install Node.js: https://nodejs.org/")
     npm_result = subprocess.run(
-        ["npm", "install"],
+        [npm_path, "install"],
         capture_output=True, text=True, timeout=120,
         cwd=str(extension_dir),
     )
