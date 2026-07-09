@@ -91,11 +91,12 @@ def _check_java():
     return shutil.which("java") is not None
 
 SYSTEM_TOOLS = [
-    ("node",    _check_node,    "https://nodejs.org/",                        "vsix/mca-tests",  False),
-    ("npm",     _check_npm,     "https://nodejs.org/",                        "vsix",            False),
-    ("binutils",_check_binutils,"sudo apt install binutils",                  "pyinstaller",     False),
-    ("git",     _check_git,     "sudo apt install git",                       "general",         False),
-    ("java",    _check_java,    "sudo apt install openjdk-21-jre-headless",   "minecraft-server",False),
+    # (name, check_func, install_hint, required_for, optional, platform)
+    ("node",    _check_node,    "https://nodejs.org/",                        "vsix/mca-tests",  False, None),
+    ("npm",     _check_npm,     "https://nodejs.org/",                        "vsix",            False, None),
+    ("binutils",_check_binutils,"sudo apt install binutils",                  "pyinstaller",     False, "linux"),
+    ("git",     _check_git,     "sudo apt install git",                       "general",         False, None),
+    ("java",    _check_java,    "sudo apt install openjdk-21-jre-headless",   "minecraft-server",False, None),
 ]
 
 
@@ -142,8 +143,10 @@ def pip_install_requirements(req_path):
         return False
 
 
-def check_system_tool(name, check_func, install_hint, category, optional):
+def check_system_tool(name, check_func, install_hint, category, optional, platform_filter):
     """Check if a system tool is available."""
+    if platform_filter and sys.platform != platform_filter:
+        return None, None
     available = check_func()
     status = C.GREEN + "OK" + C.RESET if available else (C.GRAY + "skip" + C.RESET if optional else C.RED + "MISSING" + C.RESET)
     cprint(f"  [{status}] {name} ({category})")
@@ -177,8 +180,10 @@ def main():
     # ── System tools ──
     if not args.pip_only:
         header("System Tools")
-        for name, check_func, hint, category, optional in SYSTEM_TOOLS:
-            available, _ = check_system_tool(name, check_func, hint, category, optional)
+        for name, check_func, hint, category, optional, platform_filter in SYSTEM_TOOLS:
+            available, _ = check_system_tool(name, check_func, hint, category, optional, platform_filter)
+            if available is None:
+                continue
             if not available and not optional:
                 missing_system.append((name, hint))
             elif not available:
