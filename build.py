@@ -392,6 +392,7 @@ def _build_vsix_pipeline(start_time: float) -> None:
 def cmd_app(args):
     start = time.time()
     BUILD_INSTALLER = getattr(args, 'installer', False)
+    USE_CACHE = getattr(args, 'use_cache', False)
 
     IS_WINDOWS = sys.platform == "win32"
     SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -606,7 +607,6 @@ def cmd_app(args):
             cache_exe = EXE_CACHE_DIR / safe_name.replace(".py", SUFFIX)
 
             current_hash = sha256_file(full_src)
-            need_build = True
 
             deps = resolve_transitive_imports(full_src)
             build_py = SCRIPT_DIR / "build.py"
@@ -624,6 +624,30 @@ def cmd_app(args):
                 dep_hasher.update(sha256_file(build_py).encode())
             combined_hash = dep_hasher.hexdigest()
 
+            target_dir = OUT_DIR if not item["dest"] else OUT_DIR / item["dest"]
+            target_dir.mkdir(parents=True, exist_ok=True)
+            final_path = target_dir / item["name"]
+
+            # --use-cache: only copy from cache, never build
+            if USE_CACHE:
+                if not cache_exe.exists():
+                    cprint(f"  MISSING: {item['name']} — cache entry does not exist", Color.RED)
+                    cache_missing.append(item['name'])
+                    return False
+
+                cached_hash = hash_file.read_text().strip() if hash_file.exists() else ""
+                cached_dep_hash = dep_hash_file.read_text().strip() if dep_hash_file.exists() else ""
+
+                if cached_hash != current_hash or cached_dep_hash != combined_hash:
+                    cprint(f"  OUTDATED: {item['name']} — source changed since last build", Color.YELLOW)
+                    cache_outdated.append(item['name'])
+
+                cprint(f"Cache hit: {item['name']} (use-cache)", Color.GRAY)
+                shutil.copy2(cache_exe, final_path)
+                return True
+
+            # Normal build: check cache first
+            need_build = True
             if (hash_file.exists() and dep_hash_file.exists() and cache_exe.exists()):
                 if (hash_file.read_text().strip() == current_hash and
                     dep_hash_file.read_text().strip() == combined_hash):
@@ -719,6 +743,9 @@ def cmd_app(args):
 
             return True
 
+        cache_missing: list[str] = []
+        cache_outdated: list[str] = []
+
         with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
             futures = {executor.submit(build_one, task): task for task in all_build_tasks}
             failed = False
@@ -732,6 +759,21 @@ def cmd_app(args):
                     failed = True
             if failed:
                 raise RuntimeError("One or more build tasks failed.")
+
+        if USE_CACHE:
+            cprint(f"\n--- Cache Summary ---", Color.CYAN)
+            total = len(all_build_tasks)
+            ok = total - len(cache_missing)
+            cprint(f"  Total: {total}  |  From cache: {ok}  |  Missing: {len(cache_missing)}  |  Outdated: {len(cache_outdated)}", Color.CYAN)
+            if cache_missing:
+                cprint(f"\n  Missing executables (not in cache):", Color.RED)
+                for name in cache_missing:
+                    cprint(f"    - {name}", Color.RED)
+                cprint(f"\n  Run a full build first:  python build.py app", Color.YELLOW)
+            if cache_outdated:
+                cprint(f"\n  Outdated executables (source changed since last build):", Color.YELLOW)
+                for name in cache_outdated:
+                    cprint(f"    - {name}", Color.YELLOW)
 
         # ----- Assets & Resources -----
         cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
@@ -1075,14 +1117,20 @@ def main():
                        help="Also build GUI installer (NSIS on Windows, shell on Linux)")
     p_app.add_argument("--threads", type=int, default=None,
                        help="Number of parallel build threads (default: auto)")
+    p_app.add_argument("--use-cache", action="store_true",
+                       help="Skip building — copy executables from cache (warns on missing/outdated)")
 
     p_all = sub.add_parser("all", help="Run spec + app + vsix")
     p_all.add_argument("--threads", type=int, default=None,
                        help="Number of parallel build threads (default: auto)")
+    p_all.add_argument("--use-cache", action="store_true",
+                       help="Skip building — copy executables from cache (warns on missing/outdated)")
 
     p_ci = sub.add_parser("ci", help="CI pipeline: spec + test + app")
     p_ci.add_argument("--threads", type=int, default=None,
                        help="Number of parallel build threads (default: auto)")
+    p_ci.add_argument("--use-cache", action="store_true",
+                       help="Skip building — copy executables from cache (warns on missing/outdated)")
     sub.add_parser("clean", help="Clean build artifacts")
 
     parsed = parser.parse_args()
