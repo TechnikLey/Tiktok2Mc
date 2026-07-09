@@ -209,6 +209,15 @@ def _run_mca_tests() -> None:
     
     Raises RuntimeError if any test fails.
     """
+    if not shutil.which("node"):
+        raise RuntimeError(
+            "Node.js is not installed or not in PATH.\n"
+            "Install it: https://nodejs.org/ or use your package manager:\n"
+            "  sudo apt install nodejs    # Debian / Ubuntu\n"
+            "  sudo pacman -S nodejs      # Arch\n"
+            "  sudo dnf install nodejs    # Fedora"
+        )
+
     test_runner = Path(__file__).resolve().parent / MCA_SERVER_TEST_DIR / "run.js"
     if not test_runner.exists():
         raise RuntimeError(f"MCA test runner not found: {test_runner}")
@@ -230,16 +239,21 @@ def _run_mca_tests() -> None:
 
 def _find_vsce() -> str:
     """Locate the vsce CLI tool path."""
-    npm_dir = Path(os.environ.get("APPDATA", "")) / "npm"
+    # Check PATH first (works on all platforms)
+    vsce_path = shutil.which("vsce")
+    if vsce_path:
+        return vsce_path
 
-    # Check for vsce.cmd (Windows) or vsce (Unix)
-    for name in ["vsce.cmd", "vsce"]:
-        p = npm_dir / name
-        if p.exists():
-            return str(p)
+    # Windows: check npm global dir
+    if sys.platform == "win32":
+        npm_dir = Path(os.environ.get("APPDATA", "")) / "npm"
+        for name in ["vsce.cmd", "vsce"]:
+            p = npm_dir / name
+            if p.exists():
+                return str(p)
 
-    # Check via npx
-    for npx_name in ["npx.cmd", "npx"]:
+    # Fallback: npx
+    for npx_name in ["npx.cmd", "npx"] if sys.platform == "win32" else ["npx"]:
         npx_path = shutil.which(npx_name)
         if npx_path:
             return f"{npx_path} --yes @vscode/vsce"
