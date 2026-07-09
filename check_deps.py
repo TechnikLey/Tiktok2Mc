@@ -185,7 +185,7 @@ SYSTEM_TOOLS = [
                                  "winget":"Microsoft.OpenJDK.21", "choco":"temurin21", "scoop":"openjdk21"},
                                  "minecraft-server",False, None),
     ("qt6-webengine", _check_qt6_webengine,
-                                 {"apt":"libqt6webengine6 qt6-wayland", "dnf":"qt6-qtwebengine qt6-qtwayland",
+                                 {"apt":"libqt6webenginecore6 qt6-wayland", "dnf":"qt6-qtwebengine qt6-qtwayland",
                                   "pacman":"qt6-webengine qt6-wayland", "zypper":"qt6-webengine"},
                                  "gui",             False, "linux"),
 ]
@@ -244,7 +244,7 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
         return False
 
     cprint(f"  Installing {name} ({pkg}) via {pm_name}...", C.YELLOW)
-    cmd = pm_prefix + [pkg]
+    cmd = pm_prefix + pkg.split()
     result = subprocess.run(cmd, text=True, timeout=120)
     if result.returncode == 0:
         cprint(f"  + {name} installed", C.GREEN)
