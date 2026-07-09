@@ -18,7 +18,17 @@ In 5 Minuten erstellst du dein erstes Plugin und siehst, wie es im System lebt.
 > python check_deps.py --requirements  # Zusätzlich requirements.txt ausführen
 > ```
 >
-> `--install` erkennt den Paketmanager automatisch (apt/dnf/pacman/zypper/brew/winget/choco) und installiert fehlende System-Tools mit.
+> - `--install` erkennt den Paketmanager automatisch (apt/dnf/pacman/zypper/brew/winget/choco) und installiert fehlende System-Tools
+> - Veraltete Tools (z.B. node < 20) werden automatisch auf die richtige Version aktualisiert (via NodeSource auf Linux)
+> - Zeigt installierte Versionen an: `[OK] node (vsix/mca-tests)  (22.17)`
+
+Beim Build können die Abhängigkeiten automatisch geprüft werden:
+
+```bash
+python build.py --check app       # Prüft + installiert Dependencies vor dem Build
+python build.py --check all       # Funktioniert mit jedem Build-Befehl
+python build.py --check ci        #
+```
 
 ### Python-Pakete (requirements.txt)
 
