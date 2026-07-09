@@ -2,15 +2,14 @@
 PyYAML==6.0.3
 pywebview==6.1
 Flask==3.1.3
-flask-cors==6.0.2
 fastapi==0.136.3
 uvicorn==0.48.0
 pydantic==2.13.4
 requests==2.32.5
 python-multipart==0.0.20
+psutil==7.0.0
 
 # === STREAMING & INTEGRATION ===
-aiohttp==3.13.3
 TikTokLive==6.6.5
 mcrcon==0.7.0
 
@@ -26,3 +25,7 @@ cryptography==44.0.2
 PyQt6==6.7.1
 PyQt6-WebEngine==6.7.0
 qtpy==2.4.1
+
+# === TESTING ===
+pytest==8.4.1
+pytest-timeout==2.4.0
