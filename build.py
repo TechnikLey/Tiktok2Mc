@@ -280,6 +280,18 @@ def _package_vsix(extension_dir: Path) -> Path:
     Raises RuntimeError on failure.
     """
     vsce_cmd = _find_vsce()
+
+    # Ensure npm dependencies are installed
+    cprint("Installing npm dependencies...", Color.CYAN)
+    npm_result = subprocess.run(
+        ["npm", "install"],
+        capture_output=True, text=True, timeout=120,
+        cwd=str(extension_dir),
+    )
+    if npm_result.returncode != 0:
+        raise RuntimeError(
+            f"npm install failed in {extension_dir}:\n{npm_result.stderr.strip()}"
+        )
     cprint("Packaging VSIX...", Color.CYAN)
 
     # vsce outputs the vsix to the current directory
