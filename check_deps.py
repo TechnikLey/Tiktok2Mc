@@ -6,10 +6,12 @@
 # installs missing packages automatically.
 #
 # Usage:
-#   python check_deps.py              # Check & install all
+#   python check_deps.py              # Check & install missing Python packages
+#   python check_deps.py --install    # Install EVERYTHING (Python + system tools)
+#   python check_deps.py --check-only # Only check, don't install
 #   python check_deps.py --requirements  # Also pip install from requirements.txt
-#   python check_deps.py --check-only    # Only check, don't install
 #   python check_deps.py --system-only   # Only check system tools
+#   python check_deps.py --pip-only      # Only check/install Python packages
 # ==========================================
 
 import sys
@@ -37,6 +39,35 @@ def header(msg):
     print(f"\n{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}")
     print(f"{C.BOLD}{C.CYAN}  {msg}{C.RESET}")
     print(f"{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}")
+
+# ---- Package manager detection ----
+def _detect_package_manager():
+    """Detect the system package manager. Returns (name, install_cmd_prefix) or None."""
+    if sys.platform == "win32":
+        for name in ["winget", "choco", "scoop"]:
+            if shutil.which(name):
+                if name == "winget":
+                    return name, ["winget", "install", "--accept-package-agreements", "--accept-source-agreements"]
+                elif name == "choco":
+                    return name, ["choco", "install", "-y"]
+                elif name == "scoop":
+                    return name, ["scoop", "install"]
+        return None, None
+
+    # Linux / macOS
+    for name in ["apt", "dnf", "pacman", "zypper", "brew"]:
+        if shutil.which(name):
+            if name == "apt":
+                return name, ["sudo", "apt", "install", "-y"]
+            elif name == "dnf":
+                return name, ["sudo", "dnf", "install", "-y"]
+            elif name == "pacman":
+                return name, ["sudo", "pacman", "-S", "--noconfirm"]
+            elif name == "zypper":
+                return name, ["sudo", "zypper", "install", "-y"]
+            elif name == "brew":
+                return name, ["brew", "install"]
+    return None, None
 
 # ---- Python package definitions ----
 # (import_name, pip_name, required_for, optional)
@@ -74,7 +105,8 @@ PYTHON_PACKAGES = [
     ("pytest_timeout",   "pytest-timeout",  "testing",     True),
 ]
 
-# System tools: (name, check_func, install_hint, required_for)
+# ---- System tools ----
+# (name, check_func, pkg_names, required_for, optional, platform)
 def _check_node():
     return shutil.which("node") is not None
 
@@ -91,12 +123,23 @@ def _check_java():
     return shutil.which("java") is not None
 
 SYSTEM_TOOLS = [
-    # (name, check_func, install_hint, required_for, optional, platform)
-    ("node",    _check_node,    "https://nodejs.org/",                        "vsix/mca-tests",  False, None),
-    ("npm",     _check_npm,     "https://nodejs.org/",                        "vsix",            False, None),
-    ("binutils",_check_binutils,"sudo apt install binutils",                  "pyinstaller",     False, "linux"),
-    ("git",     _check_git,     "sudo apt install git",                       "general",         False, None),
-    ("java",    _check_java,    "sudo apt install openjdk-21-jre-headless",   "minecraft-server",False, None),
+    # (name, check_func, pkg_names, required_for, optional, platform)
+    # pkg_names: dict {pm_name: pkg} for auto-install
+    ("node",    _check_node,    {"apt":"nodejs", "dnf":"nodejs", "pacman":"nodejs", "zypper":"nodejs", "brew":"node",
+                                 "winget":"OpenJS.NodeJS.LTS", "choco":"nodejs-lts", "scoop":"nodejs"},
+                                 "vsix/mca-tests",  False, None),
+    ("npm",     _check_npm,     {"apt":"npm", "dnf":"npm", "pacman":"npm", "zypper":"npm", "brew":"npm",
+                                 "winget":"OpenJS.NodeJS.LTS", "choco":"nodejs-lts", "scoop":"nodejs"},
+                                 "vsix",            False, None),
+    ("binutils",_check_binutils,{"apt":"binutils", "dnf":"binutils", "pacman":"binutils", "zypper":"binutils"},
+                                 "pyinstaller",     False, "linux"),
+    ("git",     _check_git,     {"apt":"git", "dnf":"git", "pacman":"git", "zypper":"git", "brew":"git",
+                                 "winget":"Git.Git", "choco":"git", "scoop":"git"},
+                                 "general",         False, None),
+    ("java",    _check_java,    {"apt":"openjdk-21-jre-headless", "dnf":"java-21-openjdk", "pacman":"jre21-openjdk",
+                                 "zypper":"java-21-openjdk", "brew":"openjdk@21",
+                                 "winget":"Microsoft.OpenJDK.21", "choco":"temurin21", "scoop":"openjdk21"},
+                                 "minecraft-server",False, None),
 ]
 
 
@@ -143,20 +186,40 @@ def pip_install_requirements(req_path):
         return False
 
 
-def check_system_tool(name, check_func, install_hint, category, optional, platform_filter):
+def install_system_tool(name, pkg_names, pm_name, pm_prefix):
+    """Install a system tool via the detected package manager."""
+    pkg = pkg_names.get(pm_name)
+    if not pkg:
+        cprint(f"  ! No package mapping for {pm_name} — install {name} manually", C.YELLOW)
+        return False
+
+    cprint(f"  Installing {name} ({pkg}) via {pm_name}...", C.YELLOW)
+    cmd = pm_prefix + [pkg]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode == 0:
+        cprint(f"  + {name} installed", C.GREEN)
+        return True
+    else:
+        cprint(f"  ! Failed to install {name}: {result.stderr.strip()[:200]}", C.RED)
+        return False
+
+
+def check_system_tool(name, check_func, pkg_names, category, optional, platform_filter):
     """Check if a system tool is available."""
     if platform_filter and sys.platform != platform_filter:
-        return None, None
+        return None
     available = check_func()
     status = C.GREEN + "OK" + C.RESET if available else (C.GRAY + "skip" + C.RESET if optional else C.RED + "MISSING" + C.RESET)
     cprint(f"  [{status}] {name} ({category})")
-    return available, install_hint
+    return available
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Check and install dependencies for TikTok2Mc",
     )
+    parser.add_argument("--install", action="store_true",
+                        help="Install everything: Python packages + system tools")
     parser.add_argument("--requirements", action="store_true",
                         help="Also run pip install -r requirements.txt")
     parser.add_argument("--check-only", action="store_true",
@@ -167,25 +230,42 @@ def main():
                         help="Only check/install Python packages")
     args = parser.parse_args()
 
+    # --install implies everything (overrides check-only)
+    auto_install = args.install
+
     if sys.platform == "win32":
         os.system("")
 
     header("TikTok2Mc Dependency Checker")
+    if auto_install:
+        cprint("  Mode: --install (auto-install everything)\n", C.CYAN)
+
     SCRIPT_DIR = Path(__file__).resolve().parent
     missing_system = []
     missing_python = []
     installed_count = 0
     skipped_count = 0
 
+    # Detect package manager for system tool installation
+    pm_name, pm_prefix = _detect_package_manager()
+    if auto_install and pm_name:
+        cprint(f"  Package manager: {pm_name}\n", C.GRAY)
+
     # ── System tools ──
     if not args.pip_only:
         header("System Tools")
-        for name, check_func, hint, category, optional, platform_filter in SYSTEM_TOOLS:
-            available, _ = check_system_tool(name, check_func, hint, category, optional, platform_filter)
+        for name, check_func, pkg_names, category, optional, platform_filter in SYSTEM_TOOLS:
+            available = check_system_tool(name, check_func, pkg_names, category, optional, platform_filter)
             if available is None:
                 continue
             if not available and not optional:
-                missing_system.append((name, hint))
+                if auto_install and pm_name:
+                    if install_system_tool(name, pkg_names, pm_name, pm_prefix):
+                        installed_count += 1
+                    else:
+                        missing_system.append((name, pkg_names))
+                else:
+                    missing_system.append((name, pkg_names))
             elif not available:
                 skipped_count += 1
 
@@ -236,9 +316,9 @@ def main():
             for p in missing_python:
                 cprint(f"    - {p}", C.RED)
             cprint(f"  {len(missing_system)} system tools missing", C.RED)
-            for name, hint in missing_system:
-                cprint(f"    - {name}: {hint}", C.RED)
-            cprint(f"\n  Run without --check-only to auto-install.", C.YELLOW)
+            for name, _ in missing_system:
+                cprint(f"    - {name}", C.RED)
+            cprint(f"\n  Run with --install to auto-install everything.", C.YELLOW)
             sys.exit(1)
         else:
             cprint("  All dependencies satisfied.", C.GREEN)
@@ -250,13 +330,17 @@ def main():
                 cprint(f"    - {p}", C.RED)
         if missing_system:
             cprint(f"\n  {C.YELLOW}System tools that need manual installation:{C.RESET}")
-            for name, hint in missing_system:
-                cprint(f"    - {name}: {hint}", C.YELLOW)
+            for name, _ in missing_system:
+                hint = next((t[2].get(pm_name, "") for t in SYSTEM_TOOLS if t[0] == name), "")
+                if hint:
+                    cprint(f"    - {name}: {hint}", C.YELLOW)
+                else:
+                    cprint(f"    - {name}", C.YELLOW)
 
         if not missing_python and not missing_system:
             cprint("  Everything is installed.", C.GREEN)
         elif not missing_python and missing_system:
-            cprint("\n  All Python packages OK. Install system tools manually.", C.GREEN)
+            cprint("\n  All Python packages OK. Some system tools need manual installation.", C.YELLOW)
             sys.exit(0)
         else:
             sys.exit(1)

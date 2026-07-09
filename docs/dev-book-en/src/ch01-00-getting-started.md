@@ -12,10 +12,13 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 > Check all dependencies and auto-install missing ones:
 >
 > ```bash
-> python check_deps.py              # Check + install
+> python check_deps.py              # Check + install Python packages
+> python check_deps.py --install    # Install EVERYTHING (Python + system tools)
 > python check_deps.py --check-only # Check only, don't install
 > python check_deps.py --requirements  # Also run requirements.txt
 > ```
+>
+> `--install` detects your package manager (apt/dnf/pacman/zypper/brew/winget/choco) and installs missing system tools automatically.
 
 ### Python Packages (requirements.txt)
 
