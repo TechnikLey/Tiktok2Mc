@@ -1025,10 +1025,31 @@ def cmd_clean(_args):
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 
+def _run_dep_check():
+    """Run check_deps.py --check-only before building. Abort on failure."""
+    check_script = Path(__file__).resolve().parent / "check_deps.py"
+    if not check_script.exists():
+        cprint("check_deps.py not found — skipping dependency check.", Color.YELLOW)
+        return
+
+    cprint("Running dependency check...", Color.CYAN)
+    result = subprocess.run(
+        [sys.executable, str(check_script), "--check-only"],
+        timeout=60,
+    )
+    if result.returncode != 0:
+        cprint("\nBuild aborted: missing dependencies.", Color.RED)
+        cprint("Install them with:  python check_deps.py --install", Color.YELLOW)
+        sys.exit(1)
+    cprint("All dependencies OK.\n", Color.GREEN)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="TikTok-MC-Gift build system",
     )
+    parser.add_argument("--check", action="store_true",
+                        help="Verify all dependencies before building (runs check_deps.py)")
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("spec", help="Generate MCA language specification")
@@ -1053,6 +1074,9 @@ def main():
     sub.add_parser("clean", help="Clean build artifacts")
 
     parsed = parser.parse_args()
+
+    if parsed.check:
+        _run_dep_check()
 
     if parsed.command == "app":
         cmd_app(parsed)
