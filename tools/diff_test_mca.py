@@ -14,6 +14,7 @@ import sys
 import json
 import random
 import subprocess
+import shutil
 import os
 from pathlib import Path
 from typing import Any
@@ -229,6 +230,14 @@ def run_python_validator(text: str) -> list[dict[str, Any]]:
 
 def run_js_validator(text: str) -> list[dict[str, Any]]:
     """Run the JS language server validator via Node.js subprocess."""
+    if not shutil.which("node"):
+        print("Error: Node.js is not installed or not in PATH.", file=sys.stderr)
+        print("Install it: https://nodejs.org/ or use your package manager:", file=sys.stderr)
+        print("  sudo apt install nodejs    # Debian / Ubuntu", file=sys.stderr)
+        print("  sudo pacman -S nodejs      # Arch", file=sys.stderr)
+        print("  sudo dnf install nodejs    # Fedora", file=sys.stderr)
+        return []
+
     js_runner = SCRIPT_DIR.parent / "mca-language-server" / "server" / "test" / "run_validator.js"
 
     # Escape the text for passing as argument

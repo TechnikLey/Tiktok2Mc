@@ -8,6 +8,17 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 - TikTok2Mc cloned: `git clone https://github.com/TechnikLey/Tiktok2Mc.git`
 - Dependencies installed: `pip install -r requirements.txt`
 
+### Build Dependencies (for `python build.py`)
+
+| Tool | Required for | Installation |
+|------|-------------|--------------|
+| **PyInstaller** | `build.py app` | `pip install pyinstaller` |
+| **pytest** | `build.py test` | `pip install pytest pytest-timeout` |
+| **Node.js + npm** | `build.py vsix`, `build.py ci` | https://nodejs.org/ |
+| **@vscode/vsce** | `build.py vsix` | `npm install -g @vscode/vsce` |
+| **binutils** | PyInstaller on Linux | See below |
+| **NSIS** (optional) | Windows installer | https://nsis.sourceforge.io/ |
+
 > [!NOTE]
 > **Linux**: Building with PyInstaller requires `binutils`:
 >
@@ -15,6 +26,14 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 > sudo apt install binutils   # Debian / Ubuntu
 > sudo pacman -S binutils     # Arch
 > sudo dnf install binutils   # Fedora
+> ```
+>
+> MCA tests and VSIX builds also require `nodejs`:
+>
+> ```bash
+> sudo apt install nodejs npm   # Debian / Ubuntu
+> sudo pacman -S nodejs npm     # Arch
+> sudo dnf install nodejs npm   # Fedora
 > ```
 
 ## 1. Create Plugin

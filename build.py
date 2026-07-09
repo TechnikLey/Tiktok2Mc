@@ -178,6 +178,16 @@ def _run_python_tests() -> None:
     
     Raises RuntimeError if any test fails.
     """
+    try:
+        import importlib.util
+        if importlib.util.find_spec("pytest") is None:
+            raise ImportError
+    except ImportError:
+        raise RuntimeError(
+            "pytest is not installed.\n"
+            "Install it: pip install pytest pytest-timeout"
+        )
+
     cprint("Running Python test suite...", Color.CYAN)
     proc = subprocess.Popen(
         [sys.executable, "-m", "pytest", "tests/", "-x", "--timeout=60"],
@@ -612,6 +622,21 @@ def cmd_app(args):
             final_path = target_dir / item["name"]
 
             if need_build:
+                if not shutil.which(sys.executable):
+                    raise RuntimeError(
+                        "Python interpreter not found.\n"
+                        "Ensure Python 3.12+ is installed and in PATH."
+                    )
+                try:
+                    import importlib.util
+                    if importlib.util.find_spec("PyInstaller") is None:
+                        raise ImportError
+                except ImportError:
+                    raise RuntimeError(
+                        "PyInstaller is not installed.\n"
+                        "Install it: pip install pyinstaller"
+                    )
+
                 cprint(f"[Parallel] Compiling: {item['name']}...", Color.YELLOW)
 
                 unique_id = uuid.uuid4().hex[:8]
@@ -855,10 +880,8 @@ def cmd_app(args):
             nsis_script = SCRIPT_DIR / "installer" / "install.nsi"
             installer_out = SCRIPT_DIR / "build" / "TikTok2MC-Setup.exe"
             if nsis_script.exists():
-                makensis_cmd = "makensis"
-                try:
-                    _sp.run(["makensis", "/VERSION"], check=False, capture_output=True)
-                except FileNotFoundError:
+                makensis_cmd = shutil.which("makensis")
+                if not makensis_cmd:
                     for nsis_path in [
                         Path("C:/Program Files (x86)/NSIS/Bin/makensis.exe"),
                         Path("C:/Program Files/NSIS/Bin/makensis.exe"),
@@ -867,9 +890,9 @@ def cmd_app(args):
                         if nsis_path.exists():
                             makensis_cmd = str(nsis_path)
                             break
-                    else:
-                        cprint("makensis not found — install NSIS or restart your terminal", Color.YELLOW)
-                        makensis_cmd = None
+
+                if not makensis_cmd:
+                    cprint("makensis not found — install NSIS or restart your terminal", Color.YELLOW)
 
                 if makensis_cmd:
                     try:
