@@ -8,12 +8,33 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 - TikTok2Mc cloned: `git clone https://github.com/TechnikLey/Tiktok2Mc.git`
 - Dependencies installed: `pip install -r requirements.txt`
 
-### Build Dependencies (for `python build.py`)
+> [!TIP]
+> Check all dependencies and auto-install missing ones:
+>
+> ```bash
+> python check_deps.py              # Check + install
+> python check_deps.py --check-only # Check only, don't install
+> python check_deps.py --requirements  # Also run requirements.txt
+> ```
+
+### Python Packages (requirements.txt)
+
+| Package | Required for |
+|---------|-------------|
+| PyYAML, Flask, fastapi, uvicorn, pydantic | Core |
+| requests, python-multipart, psutil | Core |
+| TikTokLive, mcrcon | Streaming |
+| pyinstaller, packaging, ruamel.yaml | Build |
+| cryptography | Security |
+| PyQt6, PyQt6-WebEngine, qtpy | GUI (pywebview backend) |
+| pytest, pytest-timeout | Tests |
+
+### System Tools
 
 | Tool | Required for | Installation |
 |------|-------------|--------------|
-| **PyInstaller** | `build.py app` | `pip install pyinstaller` |
-| **pytest** | `build.py test` | `pip install pytest pytest-timeout` |
+| **git** | Clone, updates | Usually pre-installed |
+| **java** | Minecraft server | `sudo apt install openjdk-21-jre-headless` |
 | **Node.js + npm** | `build.py vsix`, `build.py ci` | https://nodejs.org/ |
 | **@vscode/vsce** | `build.py vsix` | `npm install -g @vscode/vsce` |
 | **binutils** | PyInstaller on Linux | See below |
