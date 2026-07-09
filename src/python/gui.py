@@ -8,6 +8,27 @@ Supports --gui-hidden for headless mode.
 
 import sys
 import os
+
+# Ensure Qt6 system libraries are findable on Linux (PyInstaller bundles
+# Python code but not system .so files — we need to point to them).
+if sys.platform == "linux":
+    _qt6_lib_paths = [
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/lib64",
+        "/usr/lib",
+        "/usr/local/lib",
+        "/usr/local/lib/x86_64-linux-gnu",
+    ]
+    _ld = os.environ.get("LD_LIBRARY_PATH", "")
+    _qt6_dirs = [p for p in _qt6_lib_paths if os.path.isdir(p)]
+    if _qt6_dirs:
+        _new_ld = ":".join(_qt6_dirs)
+        os.environ["LD_LIBRARY_PATH"] = f"{_new_ld}:{_ld}" if _ld else _new_ld
+        # Re-exec once if frozen so the env takes effect for child imports
+        if getattr(sys, "frozen", False) and "_LD_FIXED" not in os.environ:
+            os.environ["_LD_FIXED"] = "1"
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+
 import argparse
 import logging
 import time
@@ -328,6 +349,12 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         log.error("pywebview is required for the GUI: %s", exc)
         input("Press Enter to exit...")
         sys.exit(1)
+    except Exception as exc:
+        # Catch Qt/GTK backend failures (e.g. missing libQt6WebEngineCore.so.6)
+        log.error("GUI backend failed to load: %s", exc)
+        log.error("On Linux, install Qt6: sudo apt install libqt6webenginecore6 qt6-wayland")
+        input("Press Enter to exit...")
+        sys.exit(1)
 
     launcher_api = LauncherAPI()
 
@@ -372,7 +399,13 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         return True
 
     _window.events.closing += _on_closing
-    webview.start(debug=False)
+    try:
+        webview.start(debug=False)
+    except Exception as exc:
+        log.error("GUI backend error: %s", exc)
+        if "QT" in str(exc) or "GTK" in str(exc) or "pywebview" in str(exc):
+            log.error("Install Qt6 on Linux: sudo apt install libqt6webenginecore6 qt6-wayland")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

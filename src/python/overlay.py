@@ -9,6 +9,26 @@ This replaces the former ``plugins/overlaytxt/main.py`` plugin process.
 
 import sys
 import os
+
+# Ensure Qt6 system libraries are findable on Linux (PyInstaller bundles
+# Python code but not system .so files — we need to point to them).
+if sys.platform == "linux":
+    _qt6_lib_paths = [
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/lib64",
+        "/usr/lib",
+        "/usr/local/lib",
+        "/usr/local/lib/x86_64-linux-gnu",
+    ]
+    _ld = os.environ.get("LD_LIBRARY_PATH", "")
+    _qt6_dirs = [p for p in _qt6_lib_paths if os.path.isdir(p)]
+    if _qt6_dirs:
+        _new_ld = ":".join(_qt6_dirs)
+        os.environ["LD_LIBRARY_PATH"] = f"{_new_ld}:{_ld}" if _ld else _new_ld
+        if getattr(sys, "frozen", False) and "_LD_FIXED" not in os.environ:
+            os.environ["_LD_FIXED"] = "1"
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+
 import argparse
 import logging
 import time
@@ -101,6 +121,10 @@ def main() -> None:
     except ImportError as exc:
         log.error("pywebview not installed: %s", exc)
         sys.exit(1)
+    except Exception as exc:
+        log.error("GUI backend failed to load: %s", exc)
+        log.error("On Linux, install Qt6: sudo apt install libqt6webenginecore6 qt6-wayland")
+        sys.exit(1)
 
     for idx, name in enumerate(overlay_names):
         url = f"{API_URL}/api/v1/overlay?overlay={name}&chroma=1"
@@ -117,7 +141,13 @@ def main() -> None:
         )
 
     log.info("Starting webview event loop for %d overlay window(s)...", len(overlay_names))
-    webview.start()
+    try:
+        webview.start()
+    except Exception as exc:
+        log.error("GUI backend error: %s", exc)
+        if "QT" in str(exc) or "GTK" in str(exc) or "pywebview" in str(exc):
+            log.error("Install Qt6 on Linux: sudo apt install libqt6webenginecore6 qt6-wayland")
+        sys.exit(1)
     log.info("Overlay process exited.")
 
 
