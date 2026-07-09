@@ -10,26 +10,6 @@ This replaces the former ``plugins/overlaytxt/main.py`` plugin process.
 import sys
 import os
 
-# Ensure Qt6 system libraries are findable on Linux (PyInstaller bundles
-# Python code but not system .so files — we need to point to them).
-if sys.platform == "linux":
-    _qt6_lib_paths = [
-        "/usr/lib/x86_64-linux-gnu",
-        "/usr/lib64",
-        "/usr/lib",
-        "/usr/local/lib",
-        "/usr/local/lib/x86_64-linux-gnu",
-    ]
-    _ld = os.environ.get("LD_LIBRARY_PATH", "")
-    _qt6_dirs = [p for p in _qt6_lib_paths if os.path.isdir(p)]
-    if _qt6_dirs:
-        _new_ld = ":".join(_qt6_dirs)
-        os.environ["LD_LIBRARY_PATH"] = f"{_new_ld}:{_ld}" if _ld else _new_ld
-        if getattr(sys, "frozen", False) and "_LD_FIXED" not in os.environ:
-            os.environ["_LD_FIXED"] = "1"
-            # Re-exec without PyInstaller arguments that argparse doesn't understand
-            os.execv(sys.executable, [sys.executable])
-
 import argparse
 import logging
 import time
@@ -52,6 +32,24 @@ log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
 API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
+
+
+def _linux_install_hint() -> str:
+    """Return platform-appropriate Qt6 install instructions for Linux."""
+    if sys.platform != "linux":
+        return ""
+    try:
+        with open("/etc/os-release") as f:
+            os_release = f.read()
+    except FileNotFoundError:
+        return "Install Qt6 system libraries for your distribution."
+    if "Debian" in os_release or "Ubuntu" in os_release:
+        return "sudo apt install libqt6webenginecore6 qt6-wayland"
+    elif "Fedora" in os_release:
+        return "sudo dnf install qt6-qtwebengine qt6-qtwayland"
+    elif "Arch" in os_release or "Manjaro" in os_release:
+        return "sudo pacman -S qt6-webengine qt6-wayland"
+    return "Install Qt6 system libraries for your distribution."
 
 
 def _api_ready(timeout: float = 20.0) -> bool:
@@ -123,8 +121,10 @@ def main() -> None:
         log.error("pywebview not installed: %s", exc)
         sys.exit(1)
     except Exception as exc:
+        hint = _linux_install_hint()
         log.error("GUI backend failed to load: %s", exc)
-        log.error("On Linux, install Qt6: sudo apt install libqt6webenginecore6 qt6-wayland")
+        if hint:
+            log.error("Install Qt6: %s", hint)
         sys.exit(1)
 
     for idx, name in enumerate(overlay_names):
@@ -143,11 +143,15 @@ def main() -> None:
 
     log.info("Starting webview event loop for %d overlay window(s)...", len(overlay_names))
     try:
-        webview.start()
+        if sys.platform == "linux":
+            webview.start(gui='qt')
+        else:
+            webview.start()
     except Exception as exc:
+        hint = _linux_install_hint()
         log.error("GUI backend error: %s", exc)
-        if "QT" in str(exc) or "GTK" in str(exc) or "pywebview" in str(exc):
-            log.error("Install Qt6 on Linux: sudo apt install libqt6webenginecore6 qt6-wayland")
+        if hint:
+            log.error("Install Qt6: %s", hint)
         sys.exit(1)
     log.info("Overlay process exited.")
 

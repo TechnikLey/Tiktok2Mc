@@ -31,6 +31,12 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
+      - name: Install Qt6 system dependencies (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libqt6webenginecore6 qt6-wayland
+
       - name: Install NSIS (Windows only)
         if: matrix.os == 'windows-latest'
         run: choco install nsis
