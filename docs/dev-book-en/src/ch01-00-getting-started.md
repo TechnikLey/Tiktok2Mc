@@ -30,6 +30,25 @@ python build.py --check all       # Works with any build command
 python build.py --check ci        #
 ```
 
+### Build from cache
+
+If a full build has been done before, executables can be reused from the cache:
+
+```bash
+python build.py --use-cache app   # Does NOT build — copies from build/cache/exes/
+python build.py --use-cache all   # Works with app, all, ci
+```
+
+> [!WARNING]
+> `--use-cache` checks hashes against the current source. Missing or outdated files are reported:
+>
+> ```
+> MISSING:  plugin.bin — cache entry does not exist
+> OUTDATED: plugin.bin — source changed since last build
+> ```
+>
+> Missing: run a full build first (`python build.py app`). Outdated: hashes don't match — next full build will rebuild automatically.
+
 ### Python Packages (requirements.txt)
 
 | Package | Required for |

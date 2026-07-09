@@ -30,6 +30,25 @@ python build.py --check all       # Funktioniert mit jedem Build-Befehl
 python build.py --check ci        #
 ```
 
+### Aus dem Cache bauen
+
+Wenn ein voller Build schonmal gelaufen ist, können Executables aus dem Cache wiederverwendet werden:
+
+```bash
+python build.py --use-cache app   # Baut NICHT — kopiert aus build/cache/exes/
+python build.py --use-cache all   # Funktioniert mit app, all, ci
+```
+
+> [!WARNING]
+> `--use-cache` prüft Hashes gegen den aktuellen Source-Code. Fehlende oder veraltete Dateien werden gemeldet:
+>
+> ```
+> MISSING:  plugin.bin — cache entry does not exist
+> OUTDATED: plugin.bin — source changed since last build
+> ```
+>
+> Fehlende Dateien: Erst einen vollen Build starten (`python build.py app`). Veraltete Dateien: Hashes stimmen nicht — beim nächsten vollen Build wird automatisch neu gebaut.
+
 ### Python-Pakete (requirements.txt)
 
 | Paket | Benötigt für |
