@@ -698,6 +698,12 @@ def cmd_app(args):
                     "--log-level", "ERROR",
                     "--hidden-import=_multiprocessing",
                 ]
+                if not IS_WINDOWS:
+                    cmd += [
+                        "--collect-all=PyQt6",
+                        "--collect-binaries=PyQt6",
+                        "--collect-data=PyQt6",
+                    ]
                 if item.get("windowed"):
                     cmd.append("--noconsole")
 
