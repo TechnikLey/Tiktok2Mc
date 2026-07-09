@@ -38,7 +38,7 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 |------|-------------|--------------|
 | **git** | Clone, updates | Usually pre-installed |
 | **java** | Minecraft server | `sudo apt install openjdk-21-jre-headless` |
-| **Node.js + npm** | `build.py vsix`, `build.py ci` | https://nodejs.org/ |
+| **Node.js + npm** | `build.py vsix`, `build.py ci` | https://nodejs.org/ (>= 20) |
 | **@vscode/vsce** | `build.py vsix` | `npm install -g @vscode/vsce` |
 | **binutils** | PyInstaller on Linux | See below |
 | **NSIS** (optional) | Windows installer | https://nsis.sourceforge.io/ |

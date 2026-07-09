@@ -106,21 +106,52 @@ PYTHON_PACKAGES = [
 ]
 
 # ---- System tools ----
-# (name, check_func, pkg_names, required_for, optional, platform)
+# (name, check_func, pkg_names, required_for, optional, platform, min_version)
+
+def _get_version(cmd, flag="--version"):
+    """Get version string from a command. Returns (major, minor) or None."""
+    try:
+        result = subprocess.run([cmd, flag], capture_output=True, text=True, timeout=5)
+        output = (result.stdout + result.stderr).strip()
+        # Extract first digits like "20.19.1" or "v20.19.1"
+        import re
+        m = re.search(r"(\d+)\.(\d+)", output)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    except Exception:
+        pass
+    return None
+
 def _check_node():
-    return shutil.which("node") is not None
+    path = shutil.which("node")
+    if not path:
+        return False, None
+    ver = _get_version("node")
+    if not ver:
+        return True, None
+    if ver[0] < 20:
+        return False, f"{ver[0]}.{ver[1]} (need >= 20)"
+    return True, f"{ver[0]}.{ver[1]}"
 
 def _check_npm():
-    return shutil.which("npm") is not None
+    path = shutil.which("npm")
+    if not path:
+        return False, None
+    ver = _get_version("npm")
+    if not ver:
+        return True, None
+    if ver[0] < 10:
+        return False, f"{ver[0]}.{ver[1]} (need >= 10)"
+    return True, f"{ver[0]}.{ver[1]}"
 
 def _check_binutils():
-    return shutil.which("ld") is not None
+    return shutil.which("ld") is not None, None
 
 def _check_git():
-    return shutil.which("git") is not None
+    return shutil.which("git") is not None, None
 
 def _check_java():
-    return shutil.which("java") is not None
+    return shutil.which("java") is not None, None
 
 SYSTEM_TOOLS = [
     # (name, check_func, pkg_names, required_for, optional, platform)
@@ -207,13 +238,23 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
 
 
 def check_system_tool(name, check_func, pkg_names, category, optional, platform_filter):
-    """Check if a system tool is available."""
+    """Check if a system tool is available. Returns (available, version_info)."""
     if platform_filter and sys.platform != platform_filter:
-        return None
-    available = check_func()
-    status = C.GREEN + "OK" + C.RESET if available else (C.GRAY + "skip" + C.RESET if optional else C.RED + "MISSING" + C.RESET)
-    cprint(f"  [{status}] {name} ({category})")
-    return available
+        return None, None
+    result = check_func()
+    if isinstance(result, tuple):
+        available, version_info = result
+    else:
+        available, version_info = result, None
+    if available:
+        status = C.GREEN + "OK" + C.RESET
+    elif optional:
+        status = C.GRAY + "skip" + C.RESET
+    else:
+        status = C.RED + "MISSING" + C.RESET
+    suffix = f"  {C.YELLOW}({version_info}){C.RESET}" if version_info else ""
+    cprint(f"  [{status}] {name} ({category}){suffix}")
+    return available, version_info
 
 
 def main():
@@ -257,7 +298,7 @@ def main():
     if not args.pip_only:
         header("System Tools")
         for name, check_func, pkg_names, category, optional, platform_filter in SYSTEM_TOOLS:
-            available = check_system_tool(name, check_func, pkg_names, category, optional, platform_filter)
+            available, version_info = check_system_tool(name, check_func, pkg_names, category, optional, platform_filter)
             if available is None:
                 continue
             if not available and not optional:
