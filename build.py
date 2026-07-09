@@ -369,7 +369,7 @@ def cmd_app(args):
     HASH_CACHE_DIR = CACHE_DIR / "hashes"
     PARALLEL_TEMP_DIR = SCRIPT_DIR / "build" / "temp_parallel"
 
-    MAX_THREADS = min(16, (os.cpu_count() or 4))
+    MAX_THREADS = getattr(args, 'threads', None) or min(16, (os.cpu_count() or 4))
     MAX_COPY_THREADS = min(32, (os.cpu_count() or 4) * 4)
 
     CORE_EXECUTABLES = [
@@ -606,12 +606,13 @@ def cmd_app(args):
                 t_spec = PARALLEL_TEMP_DIR / f"spec_{unique_id}"
                 log_file = PARALLEL_TEMP_DIR / f"log_{unique_id}.txt"
 
+                pyinstaller_name = item["name"] if not IS_WINDOWS else item["name"].replace(SUFFIX, "")
                 cmd = [
                     sys.executable, "-m", "PyInstaller",
                     "--onefile",
                     "--path=src",
                     str(full_src),
-                    "--name", item["name"].replace(SUFFIX, ""),
+                    "--name", pyinstaller_name,
                     "--distpath", str(t_dist),
                     "--workpath", str(t_work),
                     "--specpath", str(t_spec),
@@ -643,7 +644,7 @@ def cmd_app(args):
                         cprint(log_file.read_text(errors="replace"), Color.RED)
                     return False
 
-                fresh = t_dist / item["name"]
+                fresh = t_dist / pyinstaller_name
                 if fresh.exists():
                     shutil.copy2(fresh, final_path)
                     shutil.copy2(fresh, cache_exe)
@@ -1002,9 +1003,16 @@ def main():
     p_app = sub.add_parser("app", help="Build application via PyInstaller")
     p_app.add_argument("--installer", action="store_true",
                        help="Also build GUI installer (NSIS on Windows, shell on Linux)")
+    p_app.add_argument("--threads", type=int, default=None,
+                       help="Number of parallel build threads (default: auto)")
 
-    sub.add_parser("all", help="Run spec + app + vsix")
-    sub.add_parser("ci", help="CI pipeline: spec + test + app")
+    p_all = sub.add_parser("all", help="Run spec + app + vsix")
+    p_all.add_argument("--threads", type=int, default=None,
+                       help="Number of parallel build threads (default: auto)")
+
+    p_ci = sub.add_parser("ci", help="CI pipeline: spec + test + app")
+    p_ci.add_argument("--threads", type=int, default=None,
+                       help="Number of parallel build threads (default: auto)")
     sub.add_parser("clean", help="Clean build artifacts")
 
     parsed = parser.parse_args()
