@@ -156,11 +156,12 @@ def install_pip_package(pip_name):
     """Install a pip package. Returns True on success."""
     cprint(f"  Installing {pip_name}...", C.YELLOW)
     result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", pip_name, "--quiet"],
+        [sys.executable, "-m", "pip", "install", pip_name],
         capture_output=True, text=True, timeout=120,
     )
     if result.returncode == 0:
-        cprint(f"  + {pip_name} installed", C.GREEN)
+        last_line = (result.stdout + result.stderr).strip().splitlines()[-1:] or [""]
+        cprint(f"  + {pip_name} installed  {C.GRAY}{last_line[0]}{C.RESET}", C.GREEN)
         return True
     else:
         cprint(f"  ! Failed to install {pip_name}: {result.stderr.strip()[:200]}", C.RED)
@@ -175,11 +176,12 @@ def pip_install_requirements(req_path):
 
     cprint(f"\n  Installing from {req_path.name}...", C.CYAN)
     result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", str(req_path), "--quiet"],
+        [sys.executable, "-m", "pip", "install", "-r", str(req_path)],
         capture_output=True, text=True, timeout=300,
     )
     if result.returncode == 0:
-        cprint("  + All packages from requirements.txt installed", C.GREEN)
+        last_line = (result.stdout + result.stderr).strip().splitlines()[-1:] or [""]
+        cprint(f"  + All packages installed  {C.GRAY}{last_line[0]}{C.RESET}", C.GREEN)
         return True
     else:
         cprint(f"  ! pip install failed:\n{result.stderr.strip()[:500]}", C.RED)
@@ -195,12 +197,12 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
 
     cprint(f"  Installing {name} ({pkg}) via {pm_name}...", C.YELLOW)
     cmd = pm_prefix + [pkg]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    result = subprocess.run(cmd, text=True, timeout=120)
     if result.returncode == 0:
         cprint(f"  + {name} installed", C.GREEN)
         return True
     else:
-        cprint(f"  ! Failed to install {name}: {result.stderr.strip()[:200]}", C.RED)
+        cprint(f"  ! Failed to install {name} (exit code {result.returncode})", C.RED)
         return False
 
 
@@ -336,11 +338,15 @@ def main():
                     cprint(f"    - {name}: {hint}", C.YELLOW)
                 else:
                     cprint(f"    - {name}", C.YELLOW)
+            if not auto_install and pm_name:
+                cprint(f"\n  {C.CYAN}Tipp: Use --install to auto-install system tools via {pm_name}.{C.RESET}")
 
         if not missing_python and not missing_system:
             cprint("  Everything is installed.", C.GREEN)
         elif not missing_python and missing_system:
             cprint("\n  All Python packages OK. Some system tools need manual installation.", C.YELLOW)
+            if not auto_install and pm_name:
+                cprint(f"  {C.CYAN}Tipp: Use --install to auto-install system tools via {pm_name}.{C.RESET}")
             sys.exit(0)
         else:
             sys.exit(1)
