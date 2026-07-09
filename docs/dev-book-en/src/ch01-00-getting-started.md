@@ -8,6 +8,15 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 - TikTok2Mc cloned: `git clone https://github.com/TechnikLey/Tiktok2Mc.git`
 - Dependencies installed: `pip install -r requirements.txt`
 
+> [!NOTE]
+> **Linux**: Building with PyInstaller requires `binutils`:
+>
+> ```bash
+> sudo apt install binutils   # Debian / Ubuntu
+> sudo pacman -S binutils     # Arch
+> sudo dnf install binutils   # Fedora
+> ```
+
 ## 1. Create Plugin
 
 ```bash
