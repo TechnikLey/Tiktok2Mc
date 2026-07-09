@@ -147,7 +147,7 @@ class LauncherAPI:
                 log_file = BASE_DIR / "logs" / "full_system.log"
                 log_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_file, "w", encoding="utf-8") as lf:
-                    _full_system_proc = subprocess.Popen([str(START_EXE)], stdout=lf, stderr=lf)
+                    _full_system_proc = subprocess.Popen([str(START_EXE)], stdout=lf, stderr=lf, stdin=subprocess.DEVNULL)
             log.info("Full system process started (PID %s)", _full_system_proc.pid if _full_system_proc else "?")
             return "started"
         except Exception as e:
@@ -427,5 +427,7 @@ if __name__ == "__main__":
         health.set_state("gui", HealthState.FAILED)
         sys.exit(1)
     finally:
+        if health.get_state("gui") == HealthState.RUNNING:
+            health.set_state("gui", HealthState.STOPPING)
         health.set_state("gui", HealthState.STOPPED)
         heartbeat.stop()

@@ -87,6 +87,25 @@ from core.validation_framework import run_startup_validation, validate_runtime, 
 log = initialize_logging(__name__)
 
 IS_WINDOWS = sys.platform == "win32"
+
+
+def _safe_input(prompt: str = "") -> str:
+    """Wrapper around input() that handles EOFError (no TTY)."""
+    try:
+        return input(prompt)
+    except EOFError:
+        log.warning("No interactive terminal available — treating input as empty/cancel")
+        return ""
+
+
+def _input_confirm_exit(prompt: str = "") -> None:
+    """Call input() and exit; handle EOFError gracefully."""
+    try:
+        input(prompt)
+    except EOFError:
+        pass
+    sys.exit(1)
+
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
 # Global crash manager and health monitor
@@ -121,14 +140,12 @@ try:
     cfg = load_config(CONFIG_FILE)
 except Exception as e:
     log.error("Failed to load config: %s", e)
-    input("Press Enter to exit...")
-    sys.exit(1)
+    _input_confirm_exit("Press Enter to exit...")
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         log.error("This script must be run as root on Linux to start the tool.")
-        input("Press Enter to exit...")
-        sys.exit(1)
+        _input_confirm_exit("Press Enter to exit...")
 
 # -----------------------------
 # Plugin sandbox
@@ -182,62 +199,67 @@ if not IS_WINDOWS:
         SESSION_TOOL = "screen"
     else:
         log.warning("Neither tmux or screen found!")
-        log.info("Without one of these, all processes will share this terminal.")
-        log.info("  [1] Install tmux (recommended)")
-        log.info("  [2] Install screen")
-        log.info("  [3] Continue (all in one terminal)")
-        log.info("  [4] Abort")
 
-        choice = input("Choice [1/2/3/4]: ").strip()
-        tmux_cmd, screen_cmd = _detect_package_manager()
-
-        if choice == "1":
-            if tmux_cmd:
-                log.info("\n=> %s", tmux_cmd)
-                ret = subprocess.run(shlex.split(tmux_cmd)).returncode
-                if ret == 0:
-                    TMUX_PATH = shutil.which("tmux")
-                    if TMUX_PATH:
-                        SESSION_TOOL = "tmux"
-                        log.info("tmux installed successfully.\n")
-                    else:
-                        log.info("[FAIL] tmux was installed but could not be found.")
-                        sys.exit(1)
-                else:
-                    log.info("[FAIL] Installation failed. Please install manually.")
-                    sys.exit(1)
-            else:
-                log.info("[FAIL] No package manager detected. Please install manually:")
-                log.info("         Ubuntu/Debian : sudo apt install tmux")
-                log.info("         Fedora/RHEL   : sudo dnf install tmux")
-                log.info("         Arch Linux    : sudo pacman -S tmux")
-                sys.exit(1)
-        elif choice == "2":
-            if screen_cmd:
-                log.info("\n=> %s", screen_cmd)
-                ret = subprocess.run(shlex.split(screen_cmd)).returncode
-                if ret == 0:
-                    SCREEN_PATH = shutil.which("screen")
-                    if SCREEN_PATH:
-                        SESSION_TOOL = "screen"
-                        log.info("screen installed successfully.\n")
-                    else:
-                        log.info("[FAIL] screen was installed but could not be found.")
-                        sys.exit(1)
-                else:
-                    log.info("[FAIL] Installation failed. Please install manually.")
-                    sys.exit(1)
-            else:
-                log.info("[FAIL] No package manager detected. Please install manually:")
-                log.info("         Ubuntu/Debian : sudo apt install screen")
-                log.info("         Fedora/RHEL   : sudo dnf install screen")
-                log.info("         Arch Linux    : sudo pacman -S screen")
-                sys.exit(1)
-        elif choice == "3":
-            log.info("\n[OK] Continuing without tmux/screen...\n")
+        if not sys.stdin.isatty():
+            log.info("No interactive terminal — continuing without tmux/screen.")
+            SESSION_TOOL = None
         else:
-            log.info("\nAborted.")
-            sys.exit(0)
+            log.info("Without one of these, all processes will share this terminal.")
+            log.info("  [1] Install tmux (recommended)")
+            log.info("  [2] Install screen")
+            log.info("  [3] Continue (all in one terminal)")
+            log.info("  [4] Abort")
+
+            choice = _safe_input("Choice [1/2/3/4]: ").strip()
+            tmux_cmd, screen_cmd = _detect_package_manager()
+
+            if choice == "1":
+                if tmux_cmd:
+                    log.info("\n=> %s", tmux_cmd)
+                    ret = subprocess.run(shlex.split(tmux_cmd)).returncode
+                    if ret == 0:
+                        TMUX_PATH = shutil.which("tmux")
+                        if TMUX_PATH:
+                            SESSION_TOOL = "tmux"
+                            log.info("tmux installed successfully.\n")
+                        else:
+                            log.info("[FAIL] tmux was installed but could not be found.")
+                            sys.exit(1)
+                    else:
+                        log.info("[FAIL] Installation failed. Please install manually.")
+                        sys.exit(1)
+                else:
+                    log.info("[FAIL] No package manager detected. Please install manually:")
+                    log.info("         Ubuntu/Debian : sudo apt install tmux")
+                    log.info("         Fedora/RHEL   : sudo dnf install tmux")
+                    log.info("         Arch Linux    : sudo pacman -S tmux")
+                    sys.exit(1)
+            elif choice == "2":
+                if screen_cmd:
+                    log.info("\n=> %s", screen_cmd)
+                    ret = subprocess.run(shlex.split(screen_cmd)).returncode
+                    if ret == 0:
+                        SCREEN_PATH = shutil.which("screen")
+                        if SCREEN_PATH:
+                            SESSION_TOOL = "screen"
+                            log.info("screen installed successfully.\n")
+                        else:
+                            log.info("[FAIL] screen was installed but could not be found.")
+                            sys.exit(1)
+                    else:
+                        log.info("[FAIL] Installation failed. Please install manually.")
+                        sys.exit(1)
+                else:
+                    log.info("[FAIL] No package manager detected. Please install manually:")
+                    log.info("         Ubuntu/Debian : sudo apt install screen")
+                    log.info("         Fedora/RHEL   : sudo dnf install screen")
+                    log.info("         Arch Linux    : sudo pacman -S screen")
+                    sys.exit(1)
+            elif choice == "3":
+                log.info("\n[OK] Continuing without tmux/screen...\n")
+            else:
+                log.info("\nAborted.")
+                sys.exit(0)
 
 # -----------------------------
 # Port scanner
@@ -251,8 +273,7 @@ if _unresolved:
     for r in _unresolved:
         log.error("Port %d (%s) is already in use.", r.port, r.description)
     log.error("Set port_policy.auto_resolve = true to automatically find a free port.")
-    input("Press Enter to exit...")
-    sys.exit(1)
+    _input_confirm_exit("Press Enter to exit...")
 
 _resolved = build_resolved_map(_results)
 if any(r.in_use for r in _results):
@@ -886,8 +907,7 @@ async def main() -> None:
             log.error("[STARTUP-VALIDATION] %s", fail.format())
         log.error("[STARTUP-VALIDATION] %d critical failure(s) — aborting", len(critical_failures))
         _health_mon.set_state("startup", HealthState.FAILED)
-        input("Press Enter to exit...")
-        sys.exit(1)
+        _input_confirm_exit("Press Enter to exit...")
     _health_mon.set_state("startup", HealthState.RUNNING)
 
     await start_api_server()
