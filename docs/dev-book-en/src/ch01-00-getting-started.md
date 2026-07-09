@@ -22,13 +22,17 @@ In 5 minutes you will create your first plugin and see how it lives in the syste
 > - Outdated tools (e.g. node < 20) are auto-upgraded to the required version (via NodeSource on Linux)
 > - Shows installed versions: `[OK] node (vsix/mca-tests)  (22.17)`
 
-Dependencies can be verified automatically before building:
+Dependencies can be verified **and installed** automatically before building:
 
 ```bash
 python build.py --check app       # Check + install deps before build
 python build.py --check all       # Works with any build command
 python build.py --check ci        #
 ```
+
+> [!TIP]
+> `--check` runs `check_deps.py --install` — installs missing Python packages and system tools automatically.
+> `requirements.txt` is also run by default.
 
 ### Build from cache
 

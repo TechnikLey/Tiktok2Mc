@@ -1083,20 +1083,20 @@ def cmd_clean(_args):
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def _run_dep_check():
-    """Run check_deps.py --check-only before building. Abort on failure."""
+    """Run check_deps.py --install before building. Abort on failure."""
     check_script = Path(__file__).resolve().parent / "check_deps.py"
     if not check_script.exists():
         cprint("check_deps.py not found — skipping dependency check.", Color.YELLOW)
         return
 
-    cprint("Running dependency check...", Color.CYAN)
+    cprint("Running dependency check + install...", Color.CYAN)
     result = subprocess.run(
-        [sys.executable, str(check_script), "--check-only"],
-        timeout=60,
+        [sys.executable, str(check_script), "--install"],
+        timeout=300,
     )
     if result.returncode != 0:
         cprint("\nBuild aborted: missing dependencies.", Color.RED)
-        cprint("Install them with:  python check_deps.py --install", Color.YELLOW)
+        cprint("Install them manually:  python check_deps.py --install", Color.YELLOW)
         sys.exit(1)
     cprint("All dependencies OK.\n", Color.GREEN)
 

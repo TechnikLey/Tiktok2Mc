@@ -326,7 +326,7 @@ def main():
     parser.add_argument("--install", action="store_true",
                         help="Install everything: Python packages + system tools")
     parser.add_argument("--requirements", action="store_true",
-                        help="Also run pip install -r requirements.txt")
+                        help="Force re-run pip install -r requirements.txt (also runs by default)")
     parser.add_argument("--check-only", action="store_true",
                         help="Only check, don't install anything")
     parser.add_argument("--system-only", action="store_true",
@@ -411,8 +411,8 @@ def main():
                     else:
                         skipped_count += 1
 
-    # ── Also run requirements.txt if requested ──
-    if args.requirements and not args.check_only and not args.system_only:
+    # ── Also run requirements.txt by default (unless --system-only or --check-only) ──
+    if not args.check_only and not args.system_only:
         header("requirements.txt")
         req_path = SCRIPT_DIR / "requirements.txt"
         pip_install_requirements(req_path)
