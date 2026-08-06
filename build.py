@@ -337,8 +337,9 @@ def _package_vsix(extension_dir: Path) -> Path:
     cprint("Packaging VSIX...", Color.CYAN)
 
     # vsce outputs the vsix to the current directory
+    # posix=False on Windows keeps backslashes in the tool path intact
     result = subprocess.run(
-        shlex.split(vsce_cmd) + ["package", "--allow-missing-repository"],
+        shlex.split(vsce_cmd, posix=(sys.platform != "win32")) + ["package", "--allow-missing-repository"],
         capture_output=True, text=True, timeout=120,
         cwd=str(extension_dir),
     )

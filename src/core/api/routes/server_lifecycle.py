@@ -8,7 +8,13 @@ from fastapi import APIRouter, HTTPException
 
 from core.lifecycle import get_supervisor, ProcessState
 from core.minecraft_readiness import make_minecraft_readiness_check
-from core.paths import get_base_dir, get_servers_dir
+from core.paths import get_base_dir, get_config_file, get_root_dir, get_servers_dir
+from core.java_utils import (
+    MIN_JAVA_VERSION,
+    detect_java,
+    install_java_linux,
+    install_java_windows,
+)
 
 log = logging.getLogger(__name__)
 
@@ -18,11 +24,68 @@ SERVER_PROCESS_NAME = "Minecraft Server"
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
+# Background Java installation state, polled by the GUI.
+_JAVA_INSTALL = {"installing": False, "message": "", "done": False, "ok": False}
+
 
 def _proc_name(instance_id: str) -> str:
     if instance_id == "default":
         return SERVER_PROCESS_NAME
     return f"{SERVER_PROCESS_NAME}:{instance_id}"
+
+
+def _java_status_payload() -> dict:
+    """Structured Java status for the GUI (detection + install progress)."""
+    status = detect_java(get_root_dir(), get_config_file())
+    return {
+        "ok": status.ok,
+        "path": status.path or None,
+        "version": status.version or None,
+        "source": status.source,
+        "reason": status.reason,
+        "hints": status.hints,
+        "autoInstallable": status.auto_installable,
+        "minJavaVersion": MIN_JAVA_VERSION,
+        "install": dict(_JAVA_INSTALL),
+    }
+
+
+async def _run_java_install() -> None:
+    """Run the platform-appropriate Java installer in the background."""
+    _JAVA_INSTALL.update(installing=True, message="Starting Java installation...", done=False, ok=False)
+    try:
+        if IS_WINDOWS:
+            ok, message = await asyncio.to_thread(install_java_windows, get_root_dir())
+        else:
+            ok, message = await asyncio.to_thread(install_java_linux)
+        _JAVA_INSTALL.update(message=message, done=True, ok=ok)
+        log.info("Java install finished ok=%s: %s", ok, message)
+    except Exception as exc:
+        log.exception("Java installation crashed")
+        _JAVA_INSTALL.update(message=f"Java installation crashed: {exc}", done=True, ok=False)
+    finally:
+        _JAVA_INSTALL["installing"] = False
+
+
+def _require_java() -> None:
+    """Raise a clear HTTP 400 when no usable Java runtime is present.
+
+    This is the pre-flight check: it runs in the API process before any
+    Minecraft server subprocess is spawned, so the GUI receives a precise,
+    actionable error instead of a generic "failed to start".
+    """
+    status = detect_java(get_root_dir(), get_config_file())
+    if status.ok:
+        return
+    reason = status.reason or "No suitable Java runtime was found."
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"Minecraft needs Java {MIN_JAVA_VERSION}+ to start. {reason} "
+            f"Use the 'Install Java' button in the Server Manager, or run one of:\n"
+            + "\n".join(status.hints)
+        ),
+    )
 
 
 def _find_server_exe() -> Path | None:
@@ -85,6 +148,42 @@ def _build_status(proc) -> dict:
     }
 
 
+# ── Java status / install (registered before per-instance routes so that
+# the literal path "/server/java/status" wins over "/server/{id}/status") ──
+
+
+@router.get("/server/java/status")
+async def java_status():
+    return _java_status_payload()
+
+
+@router.post("/server/java/install")
+async def java_install():
+    if _JAVA_INSTALL["installing"]:
+        return {
+            "status": "in_progress",
+            "message": _JAVA_INSTALL["message"] or "Java installation is already in progress...",
+        }
+
+    status = detect_java(get_root_dir(), get_config_file())
+    if status.ok:
+        return {
+            "status": "already_installed",
+            "message": f"Java {status.version} is already available at {status.path}",
+        }
+    if not status.auto_installable:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Automatic installation is not supported on this system. "
+                f"Install Java {MIN_JAVA_VERSION}+ manually:\n" + "\n".join(status.hints)
+            ),
+        )
+
+    asyncio.create_task(_run_java_install())
+    return {"status": "started", "message": "Java installation started..."}
+
+
 # ── Per-instance endpoints ─────────────────────────────────────────
 
 
@@ -97,6 +196,10 @@ async def server_instance_status(instance_id: str):
 
 @router.post("/server/{instance_id}/start")
 async def server_instance_start(instance_id: str):
+    # Pre-flight: fail fast with a clear message when Java is missing/too old,
+    # instead of spawning a subprocess that dies with a cryptic error.
+    _require_java()
+
     supervisor = get_supervisor()
     pname = _proc_name(instance_id)
     proc = supervisor.get(pname)

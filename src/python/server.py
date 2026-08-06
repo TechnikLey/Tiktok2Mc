@@ -2,11 +2,6 @@
 import argparse
 import subprocess
 import sys
-import shutil
-import platform
-import re
-import zipfile
-import urllib.request
 import os
 from pathlib import Path
 from core.paths import get_root_dir
@@ -18,6 +13,7 @@ from core.logger import initialize_logging, install_global_exception_hook, start
 from core.health_monitor import get_health_monitor, HealthState
 from core.crash_manager import get_crash_manager
 from core.error_codes import MC_0002, MC_0003
+from core.java_utils import ensure_java, MIN_JAVA_VERSION
 
 log = initialize_logging(__name__)
 install_global_exception_hook("server")
@@ -42,130 +38,7 @@ def _wait_or_skip(prompt: str = "Press Enter to continue..."):
             pass
 
 
-_MIN_JAVA_VERSION = 17
 
-
-def _java_major_version(java_path: Path) -> int | None:
-    """Return the major Java version reported by ``java -version``, or None."""
-    try:
-        result = subprocess.run(
-            [str(java_path), "-version"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        output = result.stderr or result.stdout
-        # Lines look like: openjdk version "17.0.8"  or  java version "1.8.0_xxx"
-        match = re.search(r'version "([^"]+)"', output)
-        if not match:
-            return None
-        version_str = match.group(1)
-        parts = version_str.split(".")
-        if parts[0] == "1" and len(parts) > 1:
-            return int(parts[1])
-        return int(parts[0])
-    except Exception as exc:
-        log.debug("Could not determine Java version for %s: %s", java_path, exc)
-        return None
-
-
-def _java_is_usable(java_path: Path) -> bool:
-    """Return True if ``java_path`` exists and is new enough for the server."""
-    if not java_path.exists():
-        return False
-    major = _java_major_version(java_path)
-    return major is not None and major >= _MIN_JAVA_VERSION
-
-
-def _find_java(root_dir: Path, config_path: Path | None = None) -> Path | None:
-    # First, check if config specifies a custom Java path
-    if config_path and config_path.exists():
-        try:
-            cfg = load_yaml(config_path)
-            custom_java = cfg.get("java", {}).get("path", "")
-            if custom_java:
-                custom = Path(custom_java)
-                if _java_is_usable(custom):
-                    log.info("Using custom Java path from config: %s", custom)
-                    return custom.resolve()
-                log.warning("Custom Java path from config is not usable: %s", custom)
-        except Exception as e:
-            log.warning("Failed to read custom Java path from config: %s", e)
-
-    bundled = root_dir / "server" / "java" / "bin" / "java.exe"
-    if _java_is_usable(bundled):
-        return bundled.resolve()
-
-    system_java = shutil.which("java")
-    if system_java:
-        system_path = Path(system_java).resolve()
-        if _java_is_usable(system_path):
-            return system_path
-        log.warning(
-            "System Java at %s is too old (need %d+). Looking for a suitable runtime...",
-            system_path, _MIN_JAVA_VERSION,
-        )
-
-    if platform.system() == "Windows":
-        java_dir = root_dir / "server" / "java"
-        java_bin = java_dir / "bin" / "java.exe"
-        if not _java_is_usable(java_bin):
-            log.info("No suitable Java found. Downloading OpenJDK 21 for Windows...")
-            java_dir.mkdir(parents=True, exist_ok=True)
-            jdk_url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip"
-            zip_path = java_dir / "java_download.zip"
-            try:
-                urllib.request.urlretrieve(jdk_url, zip_path)
-                log.info("Download complete. Extracting...")
-                with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                    zip_ref.extractall(java_dir)
-                for sub in java_dir.iterdir():
-                    if sub.is_dir() and (sub / "bin" / "java.exe").exists():
-                        for item in sub.iterdir():
-                            target = java_dir / item.name
-                            if not target.exists():
-                                item.rename(target)
-                        shutil.rmtree(sub)
-                        break
-                zip_path.unlink()
-                log.info("Java extraction complete.")
-            except Exception as e:
-                log.warning(f"Failed to download/extract Java: {e}")
-                if zip_path.exists():
-                    zip_path.unlink()
-        if _java_is_usable(java_bin):
-            return java_bin.resolve()
-    else:
-        log.info("Java not found. Attempting to install via package manager...")
-        install_cmds = {
-            "apt": ["sudo", "apt", "install", "-y", "openjdk-21-jre-headless"],
-            "dnf": ["sudo", "dnf", "install", "-y", "java-21-openjdk-headless"],
-            "pacman": ["sudo", "pacman", "-S", "--noconfirm", "jre-openjdk"],
-            "zypper": ["sudo", "zypper", "install", "-y", "java-21-openjdk-headless"],
-        }
-        for pkg_mgr, cmd in install_cmds.items():
-            if shutil.which(pkg_mgr):
-                log.info(f"Using {pkg_mgr} to install Java...")
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    if result.returncode == 0 and shutil.which("java"):
-                        java_path = Path(shutil.which("java")).resolve()
-                        if _java_is_usable(java_path):
-                            log.info(f"Java installed successfully: {java_path}")
-                            return java_path
-                    else:
-                        log.warning(f"{pkg_mgr} install failed:\n{result.stderr}")
-                except Exception as e:
-                    log.warning(f"Package manager {pkg_mgr} failed: {e}")
-                break
-        log.info("\nJava could not be installed automatically.")
-        log.info(f"Please install Java {_MIN_JAVA_VERSION} or newer manually:")
-        log.info("  Ubuntu/Debian : sudo apt install openjdk-21-jre-headless")
-        log.info("  Fedora/RHEL   : sudo dnf install java-21-openjdk-headless")
-        log.info("  Arch Linux    : sudo pacman -S jre-openjdk")
-        log.info("  openSUSE      : sudo zypper install java-21-openjdk-headless")
-        log.info("  macOS         : brew install openjdk@21")
-    return None
 
 
 # === Parse arguments (instance-based only) ===
@@ -208,10 +81,28 @@ if not SERVER_JAR.exists():
 log.info("Using instance jar: %s", SERVER_JAR)
 
 # === Java detection ===
-JAVA_EXE = _find_java(ROOT_DIR, CONFIG_FILE)
-if JAVA_EXE is None:
+# Try to find a usable runtime and, as a last resort for CLI use, attempt an
+# automatic installation. In the GUI flow the API already ran this check
+# before spawning this process, so we usually only get here when Java exists.
+JAVA_STATUS = ensure_java(ROOT_DIR, CONFIG_FILE)
+if JAVA_STATUS.ok:
+    JAVA_EXE = Path(JAVA_STATUS.path)
+    if JAVA_STATUS.source == "config":
+        log.info("Using custom Java path from config: %s", JAVA_STATUS.path)
+    elif JAVA_STATUS.source == "bundled":
+        log.info("Using bundled Java runtime: %s", JAVA_STATUS.path)
+    else:
+        log.info("Using system Java: %s", JAVA_STATUS.path)
+else:
     log.error("No Java runtime available. Cannot start Minecraft server.")
+    log.error("Reason: %s", JAVA_STATUS.reason)
     log.error("server.jar path: %s", SERVER_JAR)
+    if not JAVA_STATUS.auto_installable:
+        log.info("Please install Java %d or newer manually:", MIN_JAVA_VERSION)
+        for hint in JAVA_STATUS.hints:
+            log.info("  %s", hint)
+    crash_mgr = get_crash_manager()
+    crash_mgr.report_error(MC_0002, detail=JAVA_STATUS.reason)
     _wait_or_skip()
     sys.exit(1)
 

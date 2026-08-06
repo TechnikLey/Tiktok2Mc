@@ -6,9 +6,26 @@ let wizardStep = 0;
 let wizardData = {};
 
 /* ─── API helpers ─── */
+async function _parseErrorDetail(res) {
+  try {
+    const data = await res.json();
+    if (data && data.detail) {
+      return typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+    }
+  } catch (_) { /* not JSON */ }
+  try {
+    const text = await res.text();
+    if (text) return text.slice(0, 500);
+  } catch (_) { /* body already consumed */ }
+  return '';
+}
+async function _throwResError(res) {
+  const detail = await _parseErrorDetail(res);
+  throw new Error(res.status + ' ' + res.statusText + (detail ? ': ' + detail : ''));
+}
 async function fetchJSON(path) {
   const res = await fetch(API + path);
-  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  if (!res.ok) await _throwResError(res);
   return res.json();
 }
 async function postJSON(path, body) {
@@ -17,7 +34,7 @@ async function postJSON(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  if (!res.ok) await _throwResError(res);
   return res.json();
 }
 async function putJSON(path, body) {
@@ -26,7 +43,7 @@ async function putJSON(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  if (!res.ok) await _throwResError(res);
   return res.json();
 }
 
@@ -672,6 +689,7 @@ async function loadServerManager() {
     _serverManagerCache = data;
     renderServerManager();
     refreshConsoleInstanceSelector();
+    loadJavaStatus();
   } catch (e) {
     log('Server Manager load failed: ' + e.message, 'err');
     ['server-instances', 'server-versions-list'].forEach(id => {
@@ -679,6 +697,89 @@ async function loadServerManager() {
       if (el) el.innerHTML = '<p class="text-muted">Failed to load server data.</p>';
     });
   }
+}
+
+/* ─── Java runtime status banner ─── */
+
+async function loadJavaStatus() {
+  try {
+    const data = await fetchJSON('/server/java/status');
+    renderJavaStatusBanner(data);
+  } catch (e) {
+    const el = document.getElementById('java-status-banner');
+    if (el) {
+      el.classList.remove('hidden');
+      el.innerHTML = '<div class="server-card-warning"><strong>Java check failed</strong> — could not query the Java status: ' +
+        escapeHtml(e.message) + '</div>';
+    }
+  }
+}
+
+function renderJavaStatusBanner(data) {
+  const el = document.getElementById('java-status-banner');
+  if (!el) return;
+  if (data && data.ok) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  const reason = (data && data.reason) || 'No Java runtime was found on this system.';
+  const minVer = (data && data.minJavaVersion) || 17;
+  const hints = (data && data.hints) || [];
+  const installMsg = data && data.install && data.install.message ? '<br><em>' + escapeHtml(data.install.message) + '</em>' : '';
+  const hintBlock = hints.length
+    ? '<br><code style="white-space:pre-line;">' + hints.map(escapeHtml).join('\n') + '</code>'
+    : '';
+  const installBtn = (data && data.autoInstallable)
+    ? '<button class="btn btn--sm btn--primary" id="java-install-btn" onclick="installJava()">Install Java</button>'
+    : '';
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="java-banner">' +
+      '<div class="server-card-warning">' +
+        '<strong>Java runtime missing</strong> — ' + escapeHtml(reason) +
+        ' Minecraft needs Java ' + minVer + '+ to run the server.' +
+        installMsg + hintBlock +
+      '</div>' +
+      (installBtn ? '<div class="java-banner-actions">' + installBtn + '</div>' : '') +
+    '</div>';
+}
+
+async function installJava() {
+  const btn = document.getElementById('java-install-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Installing…'; }
+  let lastMsg = '';
+  try {
+    const res = await postJSON('/server/java/install');
+    showToast(res.message || 'Java installation started', 'info');
+  } catch (e) {
+    showToast('Java install failed: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Install Java'; }
+    return;
+  }
+  const iv = setInterval(async () => {
+    try {
+      const data = await fetchJSON('/server/java/status');
+      const inst = data && data.install;
+      if (!inst) { clearInterval(iv); if (btn) { btn.disabled = false; btn.textContent = 'Install Java'; } return; }
+      if (inst.message && inst.message !== lastMsg) {
+        lastMsg = inst.message;
+        showToast(inst.message, 'info');
+      }
+      if (inst.done) {
+        clearInterval(iv);
+        if (data.ok) {
+          showToast('Java is now available' + (data.version ? ' (' + data.version + ')' : '') + '.', 'success');
+        } else {
+          showToast('Java installation failed. See the details above.', 'error');
+        }
+        loadJavaStatus();
+        loadServerManager();
+      }
+    } catch (e) {
+      log('Java install status poll failed: ' + e.message, 'err');
+    }
+  }, 2000);
 }
 
 function renderServerManager() {
