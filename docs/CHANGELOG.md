@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Config editor improvements** — the Save button now only lights up when you've made changes, and you'll be warned if you try to close with unsaved work.
 - **Timer, Win Counter, Death Counter** — these plugins no longer depend on each other. You can use any combination without one forcing settings on another.
 - **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
+- **Smaller Linux installer** — PyQt6 / QtWebEngine is only bundled into binaries that actually use the GUI (gui, overlay, plugins). `server`, `start`, `app`, `update` and `test_trigger` no longer carry a full WebEngine copy, cutting the installer size significantly.
 
 ### Removed
 

@@ -656,6 +656,37 @@ def cmd_app(args):
                                     queue.append(SCRIPT_DIR / r)
             return visited
 
+        def _imports_module(path: Path, module: str) -> bool:
+            """Return True if a source file statically imports ``module``.
+
+            PyQt6 / PyQt6-WebEngine are only bundled into binaries that
+            actually use webview, so ``--collect-all=PyQt6`` stays limited
+            to gui/overlay/plugins instead of inflating every binary.
+            """
+            try:
+                with open(path, "rb") as f:
+                    tree = ast.parse(f.read())
+            except (OSError, SyntaxError):
+                return False
+            prefix = module + "."
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    if any(a.name == module or a.name.startswith(prefix) for a in node.names):
+                        return True
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    if node.module == module or node.module.startswith(prefix):
+                        return True
+            return False
+
+        def _needs_qt(source: Path, deps: set[str]) -> bool:
+            """Whether a binary pulls in webview (directly or via its local deps)."""
+            if _imports_module(source, "webview"):
+                return True
+            for dep in sorted(deps):
+                if _imports_module(SCRIPT_DIR / dep, "webview"):
+                    return True
+            return False
+
         def build_one(item):
             full_src = Path(item["src"]).resolve()
             safe_name = str(full_src.relative_to(SCRIPT_DIR)).replace(os.sep, "_")
@@ -666,6 +697,7 @@ def cmd_app(args):
             current_hash = sha256_file(full_src)
 
             deps = resolve_transitive_imports(full_src)
+            needs_qt = _needs_qt(full_src, deps)
             build_py = SCRIPT_DIR / "build.py"
 
             dep_hasher = hashlib.sha256()
@@ -752,7 +784,7 @@ def cmd_app(args):
                     "--log-level", "ERROR",
                     "--hidden-import=_multiprocessing",
                 ]
-                if not IS_WINDOWS:
+                if not IS_WINDOWS and needs_qt:
                     cmd += [
                         "--collect-all=PyQt6",
                         "--collect-binaries=PyQt6",
