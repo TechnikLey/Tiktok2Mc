@@ -1042,9 +1042,14 @@ def cmd_app(args):
                         if entry.is_file():
                             tf.add(entry, arcname=entry.relative_to(OUT_DIR))
 
+                marker = b"__ARCHIVE_BELOW__"
+                template_data = linux_template.read_bytes().rstrip(b"\r\n")
+                if template_data.endswith(marker):
+                    template_data = template_data[:-len(marker)].rstrip(b"\r\n")
+
                 with open(installer_out, "wb") as outf:
-                    outf.write(linux_template.read_bytes())
-                    outf.write(b"\n__ARCHIVE_BELOW__\n")
+                    outf.write(template_data)
+                    outf.write(b"\n" + marker + b"\n")
                     with open(tar_path, "rb") as tgf:
                         outf.write(tgf.read())
 
