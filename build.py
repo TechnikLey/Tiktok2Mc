@@ -17,6 +17,7 @@
 
 import sys
 import os
+import shlex
 import hashlib
 import json
 import shutil
@@ -299,7 +300,7 @@ def _package_vsix(extension_dir: Path) -> Path:
 
     # vsce outputs the vsix to the current directory
     result = subprocess.run(
-        vsce_cmd.split() + ["package", "--allow-missing-repository"],
+        shlex.split(vsce_cmd) + ["package", "--allow-missing-repository"],
         capture_output=True, text=True, timeout=120,
         cwd=str(extension_dir),
     )
@@ -728,7 +729,7 @@ def cmd_app(args):
                         cprint(log_file.read_text(errors="replace"), Color.RED)
                     return False
 
-                fresh = t_dist / pyinstaller_name
+                fresh = t_dist / (pyinstaller_name + (".exe" if IS_WINDOWS else ""))
                 if fresh.exists():
                     shutil.copy2(fresh, final_path)
                     shutil.copy2(fresh, cache_exe)

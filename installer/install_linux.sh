@@ -136,8 +136,13 @@ trap "rm -rf $TMP_DIR" EXIT
 tail -n +"$ARCHIVE_LINE" "$0" | tar -xz -C "$TMP_DIR"
 
 # --- Install files ---
+PRESERVE_DIR=""
 if [ -d "$INSTALL_DIR" ]; then
     log_warn "Existing installation found at $INSTALL_DIR"
+    # Preserve user data (config + data) across updates
+    PRESERVE_DIR=$(mktemp -d)
+    [ -d "$INSTALL_DIR/config" ] && cp -a "$INSTALL_DIR/config" "$PRESERVE_DIR/config"
+    [ -d "$INSTALL_DIR/data" ] && cp -a "$INSTALL_DIR/data" "$PRESERVE_DIR/data"
     log_info "Backing up old installation to ${INSTALL_DIR}.backup.$(date +%s)"
     mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%s)"
 fi
@@ -145,6 +150,14 @@ fi
 mkdir -p "$INSTALL_DIR"
 cp -r "$TMP_DIR"/* "$INSTALL_DIR/"
 log_ok "Files installed to $INSTALL_DIR"
+
+# --- Restore preserved user config/data ---
+if [ -n "$PRESERVE_DIR" ]; then
+    [ -d "$PRESERVE_DIR/config" ] && cp -a "$PRESERVE_DIR/config" "$INSTALL_DIR/"
+    [ -d "$PRESERVE_DIR/data" ] && cp -a "$PRESERVE_DIR/data" "$INSTALL_DIR/"
+    rm -rf "$PRESERVE_DIR"
+    log_ok "User config and data preserved."
+fi
 
 # --- Remove unselected Advanced components ---
 if [ "$INSTALL_TYPE" = "2" ]; then
@@ -183,7 +196,6 @@ if [ "$GUI_MODE" = "start.bin" ]; then
 Name=TikTok2Mc
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
 Exec=/opt/TikTok2Mc/start.bin
-Icon=/opt/TikTok2Mc/core/assets/icon.png
 Terminal=true
 Type=Application
 Categories=Game;Network;
@@ -194,7 +206,6 @@ else
 Name=TikTok2Mc
 Comment=Connect TikTok Live to Minecraft
 Exec=/opt/TikTok2Mc/core/gui.bin
-Icon=/opt/TikTok2Mc/core/assets/icon.png
 Terminal=false
 Type=Application
 Categories=Game;Network;
@@ -208,7 +219,6 @@ cat > "$FULLSYSTEM_FILE" << 'EOF'
 Name=TikTok2Mc (Full System)
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
 Exec=/opt/TikTok2Mc/start.bin
-Icon=/opt/TikTok2Mc/core/assets/icon.png
 Terminal=true
 Type=Application
 Categories=Game;Network;
@@ -224,7 +234,7 @@ ln -s "$INSTALL_DIR/start.bin" "$BIN_LINK" 2>/dev/null || log_warn "Could not cr
 # --- Autostart (via .desktop autostart) ---
 if [ "$INSTALL_TYPE" = "2" ] && [ "$AUTOSTART_ENABLED" = true ]; then
     AUTOSTART_USER_DIR="$HOME/.config/autostart"
-    if [ -z "$SUDO_USER" ]; then
+    if [ -n "$SUDO_USER" ]; then
         AUTOSTART_USER_DIR=$(eval echo ~${SUDO_USER})/.config/autostart 2>/dev/null || true
     fi
     if [ -n "$AUTOSTART_USER_DIR" ]; then
@@ -238,6 +248,9 @@ Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART_EOF
+        if [ -n "$SUDO_USER" ]; then
+            chown -R "$SUDO_USER:" "$AUTOSTART_USER_DIR" 2>/dev/null || true
+        fi
         log_ok "Autostart entry created for user ${SUDO_USER:-$USER}."
     fi
 fi
@@ -263,11 +276,6 @@ echo "TikTok2Mc has been uninstalled."
 EOF
 chmod +x "$INSTALL_DIR/uninstall.sh"
 log_ok "Uninstaller created: $INSTALL_DIR/uninstall.sh"
-
-# --- Preserve user config ---
-if [ -f "$INSTALL_DIR/config/config.yaml" ]; then
-    log_info "User config will be preserved during updates."
-fi
 
 # --- Done ---
 echo ""

@@ -208,10 +208,11 @@ class PluginLauncher:
             entry_point = manifest.entry_point or ""
             if frozen:
                 # Normalise dev path → release executable path
+                entry_point = entry_point.replace("\\", "/")
                 if entry_point.startswith("src/"):
-                    entry_point = entry_point[4:]
+                    entry_point = entry_point[len("src/"):]
                 if entry_point.endswith(".py"):
-                    entry_point = entry_point[:-3] + suffix
+                    entry_point = entry_point[: -len(".py")] + suffix
 
             entry_path = root / entry_point if entry_point else ""
 
