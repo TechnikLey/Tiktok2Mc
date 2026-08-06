@@ -1,5 +1,5 @@
 from pathlib import Path
-import shutil
+from threading import Lock
 import logging
 from datetime import datetime
 from typing import Any
@@ -14,6 +14,7 @@ from core.validation_framework import validate_config_schema
 
 log = logging.getLogger(__name__)
 
+_config_write_lock = Lock()
 
 class ApiService:
     """Central business logic for the API server.
@@ -104,10 +105,9 @@ class ApiService:
 
         deep_update_rt(existing, data)
         validate_config_schema(existing)
-        save_yaml(self.config_path, existing, backup=backup)
+        with _config_write_lock:
+            save_yaml(self.config_path, existing, backup=backup)
         log.info("Config written: %s", self.config_path)
 
     def get_config_status(self) -> bool:
         return self.config_path.exists()
-
-
