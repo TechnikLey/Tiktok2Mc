@@ -1734,6 +1734,11 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("\n[STOP] Script stopped manually.")
         health.set_state("tiktok_bridge", HealthState.STOPPED)
+    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as exc:
+        # Remote host closed the connection abruptly (e.g. overlay/GUI/browser
+        # disconnect). This is normal network behavior, not a fatal crash.
+        log.warning("[NET] Connection reset by remote host: %s", exc)
+        health.set_state("tiktok_bridge", HealthState.STOPPED)
     except Exception:
         handle_unhandled_exception("main")
         health.set_state("tiktok_bridge", HealthState.FAILED)

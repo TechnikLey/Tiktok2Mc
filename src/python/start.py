@@ -1002,11 +1002,23 @@ if __name__ == "__main__":
     # Register the start process itself
     _health_mon.register("start_process", HealthState.STARTING)
 
+    # Windows: use the selector event loop. The default ProactorEventLoop can
+    # raise ConnectionResetError from its internal _call_connection_lost when a
+    # remote host closes a connection abruptly (CPython gh-79813), which escaped
+    # asyncio.run() and terminated the whole supervisor as a fatal CORE-0001 crash.
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     try:
         asyncio.run(main())
         _health_mon.set_state("start_process", HealthState.STOPPED)
     except KeyboardInterrupt:
         log.info("\nInterrupted by user.")
+        _health_mon.set_state("start_process", HealthState.STOPPED)
+    except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as exc:
+        # A client (overlay, GUI, browser) abruptly closed its connection.
+        # This is normal network behavior and must not crash the supervisor.
+        log.warning("[NET] Connection reset by remote host: %s", exc)
         _health_mon.set_state("start_process", HealthState.STOPPED)
     except Exception:
         crash_mgr.report_exception(
