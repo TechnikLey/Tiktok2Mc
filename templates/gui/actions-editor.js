@@ -339,13 +339,37 @@ class ActionsEditor {
 
   /* ── Trigger mutations ── */
 
-  toggleEnabled(index) {
-    if (this.triggers[index]) {
-      this.triggers[index].enabled = !this.triggers[index].enabled;
-      this.isDirty = true;
-    this._updateSaveButton();
-      this.renderTable();
+  async toggleEnabled(index) {
+    const t = this.triggers[index];
+    if (!t) return;
+
+    // Enabling a trigger that is already enabled elsewhere would create a duplicate
+    if (!t.enabled) {
+      const normalized = (t.name || '').replace(/^'|'$/g, '').toLowerCase();
+      const duplicate = this.triggers.find((other, i) =>
+        i !== index &&
+        other.enabled &&
+        (other.name || '').replace(/^'|'$/g, '').toLowerCase() === normalized
+      );
+      if (duplicate) {
+        showToast(`Trigger "${t.name}" already exists and is enabled.`, 'warning');
+        const deleteDuplicate = await showConfirmDialog(
+          'Duplicate Trigger',
+          `An enabled trigger named "${t.name}" already exists. Delete this duplicate, or leave it disabled?`,
+          'Delete Duplicate',
+          'btn-danger'
+        );
+        if (deleteDuplicate) {
+          this.removeTrigger(index);
+        }
+        return;
+      }
     }
+
+    t.enabled = !t.enabled;
+    this.isDirty = true;
+    this._updateSaveButton();
+    this.renderTable();
   }
 
   updateCmd(ti, ci, field, value) {

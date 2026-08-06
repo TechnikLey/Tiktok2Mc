@@ -95,6 +95,51 @@ describe('ActionsEditor', () => {
       actionsEditor.toggleEnabled(999);
       // no crash
     });
+
+    it('allows enabling when no enabled duplicate exists', async () => {
+      actionsEditor.triggers = [
+        { name: 'like_2', enabled: true, type: 'Event', commands: [] },
+        { name: 'like_3', enabled: false, type: 'Event', commands: [] },
+      ];
+      await actionsEditor.toggleEnabled(1);
+      expect(actionsEditor.triggers[1].enabled).toBe(true);
+    });
+
+    it('blocks enabling a duplicate and deletes it when confirmed', async () => {
+      const origConfirm = showConfirmDialog;
+      const origToast = showToast;
+      showConfirmDialog = async () => true;
+      let toastMsg = null;
+      showToast = (msg) => { toastMsg = msg; };
+      actionsEditor.triggers = [
+        { name: 'like_2', enabled: true, type: 'Event', commands: [] },
+        { name: 'like_2', enabled: false, type: 'Event', commands: [] },
+      ];
+      await actionsEditor.toggleEnabled(1);
+      expect(toastMsg).toContain('already exists');
+      expect(actionsEditor.triggers).toHaveLength(1);
+      expect(actionsEditor.triggers[0].enabled).toBe(true);
+      showConfirmDialog = origConfirm;
+      showToast = origToast;
+    });
+
+    it('keeps the duplicate disabled when cancelled', async () => {
+      const origConfirm = showConfirmDialog;
+      const origToast = showToast;
+      showConfirmDialog = async () => false;
+      let toastMsg = null;
+      showToast = (msg) => { toastMsg = msg; };
+      actionsEditor.triggers = [
+        { name: 'like_2', enabled: true, type: 'Event', commands: [] },
+        { name: 'like_2', enabled: false, type: 'Event', commands: [] },
+      ];
+      await actionsEditor.toggleEnabled(1);
+      expect(toastMsg).toContain('already exists');
+      expect(actionsEditor.triggers).toHaveLength(2);
+      expect(actionsEditor.triggers[1].enabled).toBe(false);
+      showConfirmDialog = origConfirm;
+      showToast = origToast;
+    });
   });
 
   /* ─── removeTrigger ─── */

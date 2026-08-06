@@ -327,9 +327,28 @@ class ActionsService:
         Checks:
         - Script commands must reference registered scripts only
         - Overlay actions must not have invalid data
+        - Duplicate enabled triggers
         """
         registered_scripts = self._get_registered_scripts()
         diagnostics: list[dict[str, Any]] = []
+
+        # Check for duplicate enabled trigger names (case-insensitive)
+        seen: dict[str, int] = {}
+        for ti, trigger in enumerate(triggers):
+            if not trigger.get("enabled", True):
+                continue
+            name = str(trigger.get("name", "")).strip().lower()
+            if not name:
+                continue
+            if name in seen:
+                diagnostics.append({
+                    "line": ti,
+                    "message": f"Duplicate trigger: '{trigger.get('name', '')}' defined multiple times.",
+                    "severity": "ERROR",
+                    "code": "DUPLICATE_TRIGGER"
+                })
+            else:
+                seen[name] = ti
 
         for ti, trigger in enumerate(triggers):
             for ci, cmd in enumerate(trigger.get("commands", [])):

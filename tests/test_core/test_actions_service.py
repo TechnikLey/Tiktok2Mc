@@ -53,7 +53,42 @@ class TestParse:
         assert triggers[0]["commands"][1]["command"] == "echo world"
 
 
-class TestSerialize:
+class TestValidateTriggers:
+    def test_duplicate_enabled_triggers_returns_error(self):
+        svc = ActionsService()
+        triggers = [
+            {"name": "like_2", "enabled": True, "type": "Event", "commands": []},
+            {"name": "like_2", "enabled": True, "type": "Event", "commands": []},
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert any(d["code"] == "DUPLICATE_TRIGGER" for d in diags)
+
+    def test_duplicate_disabled_trigger_allowed(self):
+        svc = ActionsService()
+        triggers = [
+            {"name": "like_2", "enabled": True, "type": "Event", "commands": []},
+            {"name": "like_2", "enabled": False, "type": "Event", "commands": []},
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert not any(d["code"] == "DUPLICATE_TRIGGER" for d in diags)
+
+    def test_case_insensitive_duplicate_detection(self):
+        svc = ActionsService()
+        triggers = [
+            {"name": "like_2", "enabled": True, "type": "Event", "commands": []},
+            {"name": "LIKE_2", "enabled": True, "type": "Event", "commands": []},
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert any(d["code"] == "DUPLICATE_TRIGGER" for d in diags)
+
+    def test_different_names_allowed(self):
+        svc = ActionsService()
+        triggers = [
+            {"name": "like_2", "enabled": True, "type": "Event", "commands": []},
+            {"name": "like_3", "enabled": True, "type": "Event", "commands": []},
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert not any(d["code"] == "DUPLICATE_TRIGGER" for d in diags)
     def test_serializes_shell_command(self):
         svc = ActionsService()
         raw = svc.serialize([{

@@ -427,6 +427,7 @@ textarea.input { resize: vertical; min-height: 100px; }
 .toast--error { border-left-color: var(--color-danger); }
 .toast--success { border-left-color: var(--color-success); }
 .toast--info { border-left-color: var(--color-info); }
+.toast--warning { border-left-color: var(--color-warning); }
 .toast--exit { animation: toast-exit var(--transition-exit) both; }
 
 /* ── Section Header ── */
