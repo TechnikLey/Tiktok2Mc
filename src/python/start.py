@@ -808,9 +808,11 @@ async def _plugin_health_check_loop() -> None:
         for proc in supervisor.list_processes():
             if proc.shell:
                 continue
-            if proc.state != ProcessState.RUNNING or proc.proc is None:
+            if proc.state != ProcessState.RUNNING:
                 continue
-            if proc.proc.poll() is None:
+            # Direct Popen children are polled; tmux/screen children are checked
+            # via session liveness (proc.proc is None there).
+            if await supervisor._process_is_alive(proc):
                 # Process is alive — record heartbeat
                 _health_mon.record_heartbeat(f"process.{proc.name}")
                 continue
@@ -819,11 +821,12 @@ async def _plugin_health_check_loop() -> None:
                 # Built-in processes are handled by dedicated workers
                 continue
 
-            log.warning("Plugin '%s' process died (exit code %d) — updating registry", proc.name, proc.proc.returncode)
+            exit_code = proc.proc.returncode if proc.proc is not None else "?"
+            log.warning("Plugin '%s' process died (exit code %s) — updating registry", proc.name, exit_code)
             proc.state = ProcessState.FAILED
             proc.restart_count += 1
             _health_mon.set_state(f"process.{proc.name}", HealthState.FAILED)
-            _health_mon.record_error(f"process.{proc.name}", f"Process died with exit code {proc.proc.returncode}")
+            _health_mon.record_error(f"process.{proc.name}", f"Process died with exit code {exit_code}")
 
             try:
                 await _mark_plugin_dead(proc.name)
