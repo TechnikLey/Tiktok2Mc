@@ -687,6 +687,204 @@ def cmd_app(args):
                     return True
             return False
 
+        QT_BUNDLE_CACHE = CACHE_DIR / "qt_bundle"
+
+        def _qt_bundle_hash(qt_tasks: list[dict]) -> str:
+            """Combined hash over all Qt entry points, their deps, and build.py."""
+            h = hashlib.sha256()
+            for task in sorted(qt_tasks, key=lambda t: t["name"]):
+                src = Path(task["src"]).resolve()
+                h.update(src.read_bytes())
+                for dep in sorted(resolve_transitive_imports(src)):
+                    h.update(dep.encode())
+                    dep_path = SCRIPT_DIR / dep
+                    if dep_path.exists():
+                        h.update(sha256_file(dep_path).encode())
+            build_py = SCRIPT_DIR / "build.py"
+            if build_py.exists():
+                h.update(sha256_file(build_py).encode())
+            return h.hexdigest()
+
+        def _bundle_exe_name(task: dict) -> str:
+            """Unique PyInstaller EXE name for a task (plugins are all ``main.py``)."""
+            src = Path(task["src"]).resolve()
+            return str(src.relative_to(SCRIPT_DIR)).replace(os.sep, "_").replace(".py", "")
+
+        def _write_qt_spec(spec_path: Path, qt_tasks: list[dict]) -> None:
+            """Write a shared-COLLECT onedir spec so all Qt binaries share one _internal."""
+            lines = [
+                "# -*- mode: python ; coding: utf-8 -*-",
+                "from PyInstaller.utils.hooks import collect_all",
+                "",
+                f"QT_SRC = {str((SCRIPT_DIR / 'src').resolve())!r}",
+                "qt_datas, qt_binaries, qt_hidden = collect_all('PyQt6')",
+                "",
+            ]
+            names: list[str] = []
+            for task in qt_tasks:
+                exe_name = _bundle_exe_name(task)
+                names.append(exe_name)
+                src_file = str((SCRIPT_DIR / task["src"]).resolve())
+                console = not task.get("windowed")
+                lines += [
+                    f"{exe_name}_a = Analysis(",
+                    f"    [{src_file!r}],",
+                    "    pathex=[QT_SRC],",
+                    "    binaries=qt_binaries,",
+                    "    datas=qt_datas,",
+                    "    hiddenimports=['_multiprocessing'] + qt_hidden,",
+                    "    excludes=[],",
+                    "    noarchive=False,",
+                    ")",
+                    f"{exe_name}_pyz = PYZ({exe_name}_a.pure, {exe_name}_a.zipped_data)",
+                    f"{exe_name}_exe = EXE(",
+                    f"    {exe_name}_pyz,",
+                    f"    {exe_name}_a.scripts,",
+                    "    [],",
+                    "    exclude_binaries=True,",
+                    f"    name={exe_name!r},",
+                    f"    console={str(console)},",
+                    "    debug=False,",
+                    "    bootloader_ignore_signals=False,",
+                    "    strip=False,",
+                    "    upx=False,",
+                    "    runtime_tmpdir=None,",
+                    ")",
+                    "",
+                ]
+            collect_args: list[str] = []
+            for name in names:
+                collect_args += [f"{name}_exe", f"{name}_a.binaries", f"{name}_a.zipfiles", f"{name}_a.datas"]
+            lines += ["coll = COLLECT("]
+            lines += [f"    {a}," for a in collect_args]
+            lines += [
+                "    strip=False,",
+                "    upx=False,",
+                "    upx_exclude=[],",
+                "    name='tiktok2mc-qt',",
+                ")",
+                "",
+            ]
+            spec_path.write_text("\n".join(lines), encoding="utf-8")
+
+        def _make_symlink(target: str, link: Path) -> None:
+            if link.is_symlink() or link.exists():
+                try:
+                    link.unlink()
+                except OSError:
+                    pass
+            try:
+                os.symlink(target, link)
+            except OSError as e:
+                cprint(f"WARNING: could not create symlink {link} -> {target}: {e}", Color.YELLOW)
+
+        def _deploy_qt_bundle(cache_dir: Path, qt_tasks: list[dict]) -> None:
+            internal_src = cache_dir / "_internal"
+            internal_dst = OUT_DIR / "core" / "runtime" / "_internal"
+            internal_dst.parent.mkdir(parents=True, exist_ok=True)
+            if internal_dst.exists():
+                shutil.rmtree(internal_dst, ignore_errors=True)
+            shutil.copytree(internal_src, internal_dst, symlinks=True)
+
+            for task in qt_tasks:
+                exe_name = _bundle_exe_name(task)
+                src_exe = cache_dir / exe_name
+                target_dir = OUT_DIR if not task["dest"] else OUT_DIR / task["dest"]
+                target_dir.mkdir(parents=True, exist_ok=True)
+                final_path = target_dir / task["name"]
+                shutil.copy2(src_exe, final_path)
+                os.chmod(final_path, 0o755)
+                cprint(f"Done: {task['name']} (shared runtime)", Color.GREEN)
+
+            # Relative _internal symlink in every directory holding a Qt binary.
+            for task in qt_tasks:
+                if not task["dest"]:
+                    continue
+                depth = len(Path(task["dest"]).parts)
+                rel_up = "/".join([".."] * depth)
+                link_dir = OUT_DIR / task["dest"]
+                link_dir.mkdir(parents=True, exist_ok=True)
+                _make_symlink(f"{rel_up}/core/runtime/_internal", link_dir / "_internal")
+
+        def _build_linux_qt_bundle(qt_tasks: list[dict]) -> bool:
+            """Build all Qt binaries as one onedir bundle sharing a single PyQt6 runtime."""
+            if IS_WINDOWS or not qt_tasks:
+                return True
+
+            bundle_hash = _qt_bundle_hash(qt_tasks)
+            cache_dir = QT_BUNDLE_CACHE / bundle_hash
+            stamp = QT_BUNDLE_CACHE / "current.txt"
+            cached = cache_dir.exists() and stamp.exists() and stamp.read_text().strip() == bundle_hash
+
+            if USE_CACHE:
+                if not cached:
+                    cprint("  MISSING: qt-bundle — cache entry does not exist", Color.RED)
+                    cache_missing.append("qt-bundle")
+                    return False
+                cprint("Cache hit: qt-bundle (use-cache)", Color.GRAY)
+                _deploy_qt_bundle(cache_dir, qt_tasks)
+                return True
+
+            if cached:
+                cprint("Cache hit: qt-bundle", Color.GRAY)
+                _deploy_qt_bundle(cache_dir, qt_tasks)
+                return True
+
+            cprint(f"[Linux] Building shared PyQt6 runtime for {len(qt_tasks)} binaries...", Color.YELLOW)
+            unique_id = uuid.uuid4().hex[:8]
+            t_dist = PARALLEL_TEMP_DIR / f"qtdist_{unique_id}"
+            t_work = PARALLEL_TEMP_DIR / f"qtwork_{unique_id}"
+            t_spec = PARALLEL_TEMP_DIR / f"qtspec_{unique_id}"
+            log_file = PARALLEL_TEMP_DIR / f"qtlog_{unique_id}.txt"
+            for d in (t_dist, t_work, t_spec):
+                d.mkdir(parents=True, exist_ok=True)
+            spec_path = t_spec / "tiktok2mc_qt.spec"
+            _write_qt_spec(spec_path, qt_tasks)
+
+            cmd = [
+                sys.executable, "-m", "PyInstaller",
+                str(spec_path),
+                "--distpath", str(t_dist),
+                "--workpath", str(t_work),
+                "--noconfirm",
+                "--log-level", "ERROR",
+            ]
+            try:
+                with open(log_file, "w", encoding="utf-8") as lf:
+                    proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT)
+                    try:
+                        return_code = proc.wait(timeout=1800)
+                    except subprocess.TimeoutExpired:
+                        _kill_proc_tree(proc.pid)
+                        cprint("TIMEOUT: qt-bundle after 1800s", Color.RED)
+                        if log_file.exists():
+                            cprint(log_file.read_text(errors="replace"), Color.RED)
+                        return False
+            except Exception as e:
+                cprint(f"ERROR running PyInstaller for qt-bundle: {e}", Color.RED)
+                return False
+
+            bundle_root = t_dist / "tiktok2mc-qt"
+            if return_code != 0 or not bundle_root.exists():
+                cprint(f"FAILED: qt-bundle (exit code {return_code})", Color.RED)
+                if log_file.exists():
+                    cprint(log_file.read_text(errors="replace"), Color.RED)
+                return False
+
+            QT_BUNDLE_CACHE.mkdir(parents=True, exist_ok=True)
+            if cache_dir.exists():
+                shutil.rmtree(cache_dir, ignore_errors=True)
+            shutil.move(str(bundle_root), str(cache_dir))
+            stamp.write_text(bundle_hash)
+
+            for p in (t_dist, t_work, t_spec):
+                shutil.rmtree(p, ignore_errors=True)
+            if log_file.exists():
+                log_file.unlink(missing_ok=True)
+
+            _deploy_qt_bundle(cache_dir, qt_tasks)
+            return True
+
         def build_one(item):
             full_src = Path(item["src"]).resolve()
             safe_name = str(full_src.relative_to(SCRIPT_DIR)).replace(os.sep, "_")
@@ -841,8 +1039,27 @@ def cmd_app(args):
         cache_missing: list[str] = []
         cache_outdated: list[str] = []
 
+        # ----- Linux: shared PyQt6 runtime bundle -----
+        # Qt binaries (gui, overlay, plugins) are built together as one onedir
+        # bundle so they share a single PyQt6/QtWebEngine _internal instead of
+        # each embedding a full WebEngine copy. Everything else stays onefile.
+        qt_tasks: list[dict] = []
+        plain_tasks: list[dict] = []
+        if not IS_WINDOWS:
+            for task in all_build_tasks:
+                src = Path(task["src"]).resolve()
+                if _needs_qt(src, resolve_transitive_imports(src)):
+                    qt_tasks.append(task)
+                else:
+                    plain_tasks.append(task)
+            if qt_tasks:
+                if not _build_linux_qt_bundle(qt_tasks):
+                    raise RuntimeError("Linux shared PyQt6 runtime build failed.")
+        else:
+            plain_tasks = list(all_build_tasks)
+
         with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-            futures = {executor.submit(build_one, task): task for task in all_build_tasks}
+            futures = {executor.submit(build_one, task): task for task in plain_tasks}
             failed = False
             for future in as_completed(futures):
                 task = futures[future]
@@ -1071,7 +1288,7 @@ def cmd_app(args):
 
                 with tarfile.open(tar_path, "w:gz") as tf:
                     for entry in OUT_DIR.rglob("*"):
-                        if entry.is_file():
+                        if entry.is_file() or entry.is_symlink():
                             tf.add(entry, arcname=entry.relative_to(OUT_DIR))
 
                 marker = b"__ARCHIVE_BELOW__"
