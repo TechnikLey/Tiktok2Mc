@@ -3,17 +3,21 @@
 # TikTok2Mc — Self-Extracting Linux Installer
 # ============================================================
 # This script extracts the embedded archive and installs
-# TikTok2Mc to /opt/TikTok2Mc.
+# TikTok2Mc to a per-user location (~/.local/share/TikTok2Mc).
+# No root privileges are required, so the Qt GUI runs as a
+# normal user (Qt/Chromium refuses to run as root without sandbox).
 #
 # Usage:
 #   chmod +x TikTok2Mc-<version>-Linux-Setup.sh
-#   sudo ./TikTok2Mc-<version>-Linux-Setup.sh
+#   ./TikTok2Mc-<version>-Linux-Setup.sh
 # ============================================================
 
 set -e
 
-INSTALL_DIR="/opt/TikTok2Mc"
-BIN_LINK="/usr/local/bin/tiktok2mc"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+INSTALL_DIR="$DATA_HOME/TikTok2Mc"
+BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+BIN_LINK="$BIN_HOME/tiktok2mc"
 APP_NAME="TikTok2Mc"
 
 # --- Colors ---
@@ -28,9 +32,11 @@ log_ok()    { echo -e "${GREEN}[OK]${NC}    $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC}  $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# --- Check root ---
-if [ "$EUID" -ne 0 ]; then
-    log_error "This installer must be run as root (use sudo)."
+# --- Refuse to run as root ---
+# TikTok2Mc is installed per-user so the GUI does not run as root.
+if [ "$EUID" -eq 0 ]; then
+    log_error "Do not run this installer with sudo/root."
+    log_error "TikTok2Mc installs per-user under ~/.local/share."
     exit 1
 fi
 
@@ -188,24 +194,26 @@ EOF
     fi
 fi
 
-# --- Create desktop entry (respects GUI mode) ---
-DESKTOP_FILE="/usr/share/applications/tiktok2mc.desktop"
+# --- Create desktop entries (respects GUI mode) ---
+DESKTOP_DIR="$DATA_HOME/applications"
+mkdir -p "$DESKTOP_DIR"
+DESKTOP_FILE="$DESKTOP_DIR/tiktok2mc.desktop"
 if [ "$GUI_MODE" = "start.bin" ]; then
-    cat > "$DESKTOP_FILE" << 'EOF'
+    cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
-Exec=/opt/TikTok2Mc/start.bin
+Exec=$INSTALL_DIR/start.bin
 Terminal=true
 Type=Application
 Categories=Game;Network;
 EOF
 else
-    cat > "$DESKTOP_FILE" << 'EOF'
+    cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc
 Comment=Connect TikTok Live to Minecraft
-Exec=/opt/TikTok2Mc/core/gui.bin
+Exec=$INSTALL_DIR/core/gui.bin
 Terminal=false
 Type=Application
 Categories=Game;Network;
@@ -213,22 +221,23 @@ EOF
 fi
 
 # Also create a "Start Full System" desktop entry (always start.bin)
-FULLSYSTEM_FILE="/usr/share/applications/tiktok2mc-fullsystem.desktop"
-cat > "$FULLSYSTEM_FILE" << 'EOF'
+FULLSYSTEM_FILE="$DESKTOP_DIR/tiktok2mc-fullsystem.desktop"
+cat > "$FULLSYSTEM_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc (Full System)
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
-Exec=/opt/TikTok2Mc/start.bin
+Exec=$INSTALL_DIR/start.bin
 Terminal=true
 Type=Application
 Categories=Game;Network;
 EOF
-log_ok "Desktop entries created."
+log_ok "Desktop entries created in $DESKTOP_DIR."
 
-# --- Terminal command (wrapper that requires sudo and accepts a mode) ---
+# --- Terminal command (per-user, no sudo needed) ---
+mkdir -p "$BIN_HOME"
 cat > "$BIN_LINK" << 'EOF'
 #!/bin/bash
-INSTALL_DIR="/opt/TikTok2Mc"
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/TikTok2Mc"
 
 mode="${1:-}"
 if [ -n "$mode" ]; then
@@ -259,10 +268,7 @@ case "$mode" in
         echo "TikTok2Mc"
         echo "========="
         echo ""
-        echo "This command must be run as root (sudo) because TikTok2Mc"
-        echo "writes to $INSTALL_DIR."
-        echo ""
-        echo "Usage: sudo tiktok2mc <mode>"
+        echo "Usage: tiktok2mc <mode>"
         echo ""
         echo "Modes:"
         echo "  start.bin    Start the complete stack (API, Minecraft, GUI, overlay)"
@@ -272,8 +278,8 @@ case "$mode" in
         echo "  overlay.bin  Start the overlay"
         echo "  update.bin   Run the updater"
         echo ""
-        echo "Example: sudo tiktok2mc start.bin"
-        echo "         sudo tiktok2mc gui.bin"
+        echo "Example: tiktok2mc start.bin"
+        echo "         tiktok2mc gui.bin"
         exit 1
         ;;
 esac
@@ -284,48 +290,42 @@ if [ ! -f "$TARGET" ]; then
     exit 1
 fi
 
-if [ "$(id -u)" -ne 0 ]; then
-    echo "tiktok2mc requires root. Re-running with sudo..."
-    exec sudo "$TARGET" "$@"
-else
-    exec "$TARGET" "$@"
-fi
+exec "$TARGET" "$@"
 EOF
 chmod +x "$BIN_LINK"
-log_ok "Terminal command created: $BIN_LINK (use with sudo, e.g. 'sudo tiktok2mc start.bin')"
+log_ok "Terminal command created: $BIN_LINK (e.g. 'tiktok2mc start.bin')"
+
+case ":$PATH:" in
+    *":$BIN_HOME:"*) : ;;
+    *)
+        log_warn "$BIN_HOME is not on your PATH."
+        log_warn "Add it to your shell profile, e.g.: echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+        ;;
+esac
 
 # --- Autostart (via .desktop autostart) ---
 if [ "$INSTALL_TYPE" = "2" ] && [ "$AUTOSTART_ENABLED" = true ]; then
     AUTOSTART_USER_DIR="$HOME/.config/autostart"
-    if [ -n "$SUDO_USER" ]; then
-        AUTOSTART_USER_DIR=$(eval echo ~${SUDO_USER})/.config/autostart 2>/dev/null || true
-    fi
-    if [ -n "$AUTOSTART_USER_DIR" ]; then
-        mkdir -p "$AUTOSTART_USER_DIR"
-        cat > "$AUTOSTART_USER_DIR/tiktok2mc.desktop" << AUTOSTART_EOF
+    mkdir -p "$AUTOSTART_USER_DIR"
+    cat > "$AUTOSTART_USER_DIR/tiktok2mc.desktop" << AUTOSTART_EOF
 [Desktop Entry]
 Type=Application
 Name=TikTok2Mc
-Exec=/opt/TikTok2Mc/${GUI_MODE}
+Exec=$INSTALL_DIR/${GUI_MODE}
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART_EOF
-        if [ -n "$SUDO_USER" ]; then
-            chown -R "$SUDO_USER:" "$AUTOSTART_USER_DIR" 2>/dev/null || true
-        fi
-        log_ok "Autostart entry created for user ${SUDO_USER:-$USER}."
-    fi
+    log_ok "Autostart entry created for user $USER."
 fi
 
 # --- Uninstall script ---
 cat > "$INSTALL_DIR/uninstall.sh" << 'EOF'
 #!/bin/bash
 set -e
-if [ "$EUID" -ne 0 ]; then
-    echo "[ERROR] Run as root (sudo)"
-    exit 1
-fi
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/TikTok2Mc"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
 echo "Removing TikTok2Mc..."
 read -p "Are you sure you want to uninstall TikTok2Mc? (y/n) [n]: " confirm
 confirm=${confirm:-n}
@@ -333,12 +333,12 @@ if [ "$confirm" != "Y" ] && [ "$confirm" != "y" ]; then
     echo "Uninstall cancelled."
     exit 1
 fi
-rm -rf /opt/TikTok2Mc
-rm -f /usr/share/applications/tiktok2mc.desktop
-rm -f /usr/share/applications/tiktok2mc-fullsystem.desktop
-rm -f /usr/local/bin/tiktok2mc
+rm -rf "$INSTALL_DIR"
+rm -f "$DATA_HOME/applications/tiktok2mc.desktop"
+rm -f "$DATA_HOME/applications/tiktok2mc-fullsystem.desktop"
+rm -f "$BIN_HOME/tiktok2mc"
 echo "Removing user autostart entries..."
-for f in ~/.config/autostart/tiktok2mc*.desktop; do
+for f in "$HOME/.config/autostart"/tiktok2mc*.desktop; do
     [ -f "$f" ] && rm -f "$f"
 done
 echo "TikTok2Mc has been uninstalled."
@@ -351,9 +351,9 @@ echo ""
 echo "=========================================="
 log_ok "Installation complete!"
 echo ""
-echo "  Start:        sudo tiktok2mc start.bin"
-echo "  GUI:          sudo tiktok2mc gui.bin"
-echo "  Uninstall:    sudo $INSTALL_DIR/uninstall.sh"
+echo "  Start:        tiktok2mc start.bin"
+echo "  GUI:          tiktok2mc gui.bin"
+echo "  Uninstall:    $INSTALL_DIR/uninstall.sh"
 echo "=========================================="
 
 exit 0

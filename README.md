@@ -36,7 +36,7 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 **Windows** — Download `TikTok2MC-<version>-Windows-Setup.exe` from [Releases](https://github.com/TechnikLey/Tiktok2Mc/releases) and run the installer. A portable ZIP is also available — extract anywhere and run.
 
-**Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run with `sudo`. Installs to `/opt/TikTok2Mc` with a desktop entry and `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
+**Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it (no `sudo` needed). It installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
 
 > The portable archives include everything needed (including Java). No separate installation required.
 

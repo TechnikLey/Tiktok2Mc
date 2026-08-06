@@ -47,10 +47,10 @@ Download `TikTok2Mc-Linux-Setup.sh` from the Releases page. Open a terminal, nav
 
 ```bash
 chmod +x TikTok2Mc-Linux-Setup.sh
-sudo ./TikTok2Mc-Linux-Setup.sh
+./TikTok2Mc-Linux-Setup.sh
 ```
 
-The installer places the tool in `/opt/TikTok2Mc` and creates a `tiktok2mc` command and a desktop entry.
+The installer places the tool in `~/.local/share/TikTok2Mc` (no root required, so the GUI runs as a normal user) and creates a `tiktok2mc` command and a desktop entry. If `~/.local/bin` is not on your `PATH`, the installer shows you how to add it.
 
 ### Portable version
 

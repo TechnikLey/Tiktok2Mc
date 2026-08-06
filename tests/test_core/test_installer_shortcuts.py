@@ -72,13 +72,30 @@ class TestLinuxInstallerShortcuts:
         assert "gui.bin" in content
         assert "start.bin" in content
 
+    def test_linux_does_not_use_root_opt(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert "/opt/TikTok2Mc" not in content
+        assert "/usr/share/applications" not in content
+        assert "/usr/local/bin" not in content
+
+    def test_linux_installs_per_user(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert 'XDG_DATA_HOME:-$HOME/.local/share' in content
+        assert 'INSTALL_DIR="$DATA_HOME/TikTok2Mc"' in content
+
+    def test_linux_refuses_root(self):
+        content = LINUX_SCRIPT.read_text(encoding="utf-8")
+        assert 'EUID' in content
+        assert "do not run this installer" in content.lower()
+
     def test_linux_desktop_entry_respects_gui_mode(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
         # The desktop entry file is conditionally written
         assert "gui.bin" in content
         assert "start.bin" in content
-        # Both main and full-system entries exist
-        assert "/opt/TikTok2Mc/start.bin" in content
+        # Both main and full-system entries exist, in the per-user location
+        assert "Exec=$INSTALL_DIR/start.bin" in content
+        assert "$DATA_HOME/applications" in content
 
     def test_linux_has_full_system_entry(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
@@ -87,8 +104,8 @@ class TestLinuxInstallerShortcuts:
 
     def test_linux_uninstalls_both_entries(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
-        assert "rm -f /usr/share/applications/tiktok2mc.desktop" in content
-        assert "rm -f /usr/share/applications/tiktok2mc-fullsystem.desktop" in content
+        assert 'rm -f "$DATA_HOME/applications/tiktok2mc.desktop"' in content
+        assert 'rm -f "$DATA_HOME/applications/tiktok2mc-fullsystem.desktop"' in content
 
     def test_linux_has_autostart_config(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
@@ -99,7 +116,7 @@ class TestLinuxInstallerShortcuts:
     def test_linux_uses_gui_mode_for_autostart(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
         # Autostart uses GUI_MODE variable (not separate mode selection)
-        assert 'Exec=/opt/TikTok2Mc/${GUI_MODE}' in content
+        assert 'Exec=$INSTALL_DIR/${GUI_MODE}' in content
 
     def test_linux_has_component_selection(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
