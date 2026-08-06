@@ -2586,7 +2586,7 @@ const SECTION_META = {
   console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
   minecraft_server_api: { title: 'Minecraft Server API', desc: 'Handles communication between the tool and the Minecraft server. Required for player death/respawn detection.', category: 'Minecraft' },
   gui: { title: 'Dashboard', desc: 'The graphical user interface is served by the central API server and shown in a window.', category: 'System' },
-  overlay: { title: 'Overlay Text', desc: 'Built-in overlay subsystem for displaying text messages on stream. Runs as a core component, not a plugin.', category: 'System' },
+  overlay: { title: 'Overlay Text', desc: 'Overlay subsystem for displaying text messages on stream.', category: 'System' },
   theme: { title: 'Overlay Colors', desc: 'Customize colors for overlays. All values are CSS hex codes like #ff0000.', category: 'System' },
   update: { title: 'Auto-Updater', desc: 'Checks for new versions on startup and installs them automatically. Strongly recommended.', category: 'System' },
   shutdown: { title: 'Auto-Shutdown', desc: 'Automatically shuts down the tool after your live stream ends.', category: 'System' },
