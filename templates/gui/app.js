@@ -5992,8 +5992,14 @@ function switchView(viewId) {
 function switchToEditor(viewId, openFn) {
   _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.querySelector(`.nav-item[data-view="${viewId}"]`)?.classList.add('active');
+  const navItem = document.querySelector(`.nav-item[data-view="${viewId}"]`);
+  navItem?.classList.add('active');
   openFn();
+  // Re-assert active class after editor opens to handle race condition
+  // where MutationObserver might clear it before editor overlay is visible
+  setTimeout(() => {
+    navItem?.classList.add('active');
+  }, 0);
 }
 
 /* ─── Theme Toggle ─── */
