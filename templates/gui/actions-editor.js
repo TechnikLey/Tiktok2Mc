@@ -362,6 +362,10 @@ class ActionsEditor {
         if (deleteDuplicate) {
           this.removeTrigger(index);
         }
+        else if (!deleteDuplicate) {
+          this.triggers[index].enabled = false;
+          this.renderTable();
+        }
         return;
       }
     }
