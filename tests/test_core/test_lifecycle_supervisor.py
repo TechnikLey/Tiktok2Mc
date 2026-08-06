@@ -191,6 +191,27 @@ class TestShutdown:
         mock_shutdown.assert_awaited_once()
 
 
+class TestReadinessEarlyExit:
+    class _FakeProc:
+        def __init__(self, exit_code):
+            self._code = exit_code
+
+        def poll(self):
+            return self._code
+
+    async def test_process_alive_direct_proc(self, supervisor):
+        proc = ManagedProcess(name="x", cmd=["true"], proc=self._FakeProc(None))
+        assert await supervisor._process_is_alive(proc) is True
+
+    async def test_process_dead_direct_proc(self, supervisor):
+        proc = ManagedProcess(name="x", cmd=["true"], proc=self._FakeProc(1))
+        assert await supervisor._process_is_alive(proc) is False
+
+    async def test_process_alive_without_proc_or_session(self, supervisor):
+        proc = ManagedProcess(name="x", cmd=["true"])
+        assert await supervisor._process_is_alive(proc) is True
+
+
 class TestWaitForPort:
     @pytest.mark.asyncio
     async def test_wait_for_port_free_returns_immediately(self, supervisor, tmp_path):

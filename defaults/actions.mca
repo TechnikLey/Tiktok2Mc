@@ -49,7 +49,7 @@ share:/give @a minecraft:firework_rocket 3
 #follow:&curl -X POST -H "Content-Type: application/json" -d "{\"content\":\"{user} just followed!\"}" https://discord.com/api/webhooks/YOUR_WEBHOOK
 
 # 11. Disabled with ## – kept as template, won't fire
-##like_2:/kill @a
+##like_3:/kill @a
 
 # 12. Disabled gift with TNT parameters (requires TNT plugin)
 ##5655:!tnt 2 0.1 2 Notch

@@ -421,6 +421,36 @@ class ProcessSupervisor:
     # Starting processes
     # ------------------------------------------------------------------
 
+    async def _process_is_alive(self, proc: ManagedProcess) -> bool:
+        """Return True while the managed process (or its session) is alive.
+
+        Direct Popen children are polled. tmux/screen children are checked via
+        session liveness. Unknown states are conservatively treated as alive.
+        """
+        if proc.proc is not None:
+            return proc.proc.poll() is None
+        if proc.session_name and self._session_tool:
+            try:
+                if self._session_tool == "tmux":
+                    res = await asyncio.to_thread(
+                        subprocess.run,
+                        ["tmux", "has-session", "-t", proc.session_name],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return res.returncode == 0
+                if self._session_tool == "screen":
+                    res = await asyncio.to_thread(
+                        subprocess.run,
+                        ["screen", "-ls", proc.session_name],
+                        capture_output=True,
+                        text=True,
+                    )
+                    return proc.session_name in res.stdout
+            except Exception:
+                return True
+        return True
+
     async def start(self, name: str) -> bool:
         """Start a single registered process."""
         proc = self.get(name)
@@ -445,6 +475,7 @@ class ProcessSupervisor:
             # Optional readiness probe
             if proc.readiness_check is not None:
                 ready = False
+                exited_early = False
                 deadline = time.time() + proc.readiness_timeout
                 log.info("[SUPERVISOR] %s waiting for readiness (timeout %.0fs)...", name, proc.readiness_timeout)
                 while time.time() < deadline:
@@ -454,9 +485,22 @@ class ProcessSupervisor:
                             break
                     except Exception:
                         pass
+                    # If the child already exited (e.g. missing server.jar),
+                    # do not keep polling until the full readiness timeout.
+                    if not await self._process_is_alive(proc):
+                        log.error(
+                            "[SUPERVISOR] %s exited before becoming ready (exit code %s). "
+                            "Its service stays unavailable, but the rest of the "
+                            "application continues to run.",
+                            name,
+                            proc.proc.returncode if proc.proc is not None else "?",
+                        )
+                        exited_early = True
+                        break
                     await asyncio.sleep(1.0)
                 if not ready:
-                    log.error("[SUPERVISOR] %s failed readiness check within %.0fs", name, proc.readiness_timeout)
+                    if not exited_early:
+                        log.error("[SUPERVISOR] %s failed readiness check within %.0fs", name, proc.readiness_timeout)
                     proc.state = ProcessState.FAILED
                     _update_process_health(name, ProcessState.FAILED)
                     return False

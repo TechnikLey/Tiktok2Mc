@@ -152,11 +152,13 @@ def validate_text(text: str) -> List[Diagnostic]:
 
         # ── Comment / disabled-trigger detection ────────────────────
         #
-        #   ##  → disabled trigger (validate content after ##)
+        #   ##  → disabled trigger (kept as a template; it is OFF and
+        #         must NOT count toward duplicate detection)
         #   #   → full-line comment (skip entirely)
         #
         stripped = raw_line.strip()
-        if stripped.startswith("##"):
+        is_disabled = stripped.startswith("##")
+        if is_disabled:
             # Disabled trigger — rewrite raw_line without the ##
             # prefix so the existing validation logic works normally.
             lead = raw_line[: len(raw_line) - len(raw_line.lstrip())]
@@ -360,16 +362,17 @@ def validate_text(text: str) -> List[Diagnostic]:
                 "invalid_trigger_name",
             ))
 
-        if trigger in seen_triggers:
-            diagnostics.append(_make_diag(
-                line_number,
-                trigger_global_start,
-                trigger_global_start + len(trigger),
-                f"Duplicate trigger: '{trigger}' defined multiple times.",
-                Severity.ERROR,
-                "duplicate_trigger",
-            ))
-        seen_triggers.add(trigger)
+        if not is_disabled:
+            if trigger in seen_triggers:
+                diagnostics.append(_make_diag(
+                    line_number,
+                    trigger_global_start,
+                    trigger_global_start + len(trigger),
+                    f"Duplicate trigger: '{trigger}' defined multiple times.",
+                    Severity.ERROR,
+                    "duplicate_trigger",
+                ))
+            seen_triggers.add(trigger)
 
         # ------------------------------------------------------------------
         # G. Command parsing (semicolon-separated)

@@ -766,7 +766,14 @@ async def command_loop() -> None:
                 "\nType 'exit' to stop all programs ('help' for commands): ",
             )
         except EOFError:
-            break
+            # stdin closed (e.g. started headless or without a TTY). This must
+            # NOT shut down the whole application — console commands are just
+            # unavailable, the API and all services keep running.
+            log.info(
+                "Console input unavailable (no TTY); interactive commands are disabled. "
+                "The application continues to run."
+            )
+            return
         cmd = cmd.strip().lower()
         if cmd == "help":
             log.info("\nAvailable commands:")

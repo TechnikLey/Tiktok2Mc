@@ -125,6 +125,39 @@ class TestValidatorTriggerNames:
         assert len(errors) == 1
 
 
+class TestValidatorDisabledTriggers:
+    def test_disabled_duplicate_pair_not_flagged(self):
+        """Two disabled (##) triggers with the same name are OFF and must
+        not count as duplicates."""
+        from core.validator import validate_text
+        diags = validate_text("##dup:/a\n##dup:/b")
+        errors = [d for d in diags if d.code == "duplicate_trigger"]
+        assert len(errors) == 0
+
+    def test_disabled_trigger_does_not_duplicate_active(self):
+        """A disabled (##) trigger sharing a name with an active trigger is
+        OFF and must not be reported as a duplicate."""
+        from core.validator import validate_text
+        diags = validate_text("dup:/a\n##dup:/b")
+        errors = [d for d in diags if d.code == "duplicate_trigger"]
+        assert len(errors) == 0
+
+    def test_active_duplicate_still_flagged(self):
+        """Two active triggers with the same name are still errors."""
+        from core.validator import validate_text
+        diags = validate_text("dup:/a\ndup:/b")
+        errors = [d for d in diags if d.code == "duplicate_trigger"]
+        assert len(errors) == 1
+
+    def test_disabled_trigger_still_syntax_validated(self):
+        """Disabled triggers are kept as templates; their content is still
+        validated for syntax errors."""
+        from core.validator import validate_text
+        diags = validate_text("##nocolonhere")
+        errors = [d for d in diags if d.code == "missing_colon"]
+        assert len(errors) == 1
+
+
 class TestValidatorCommandPrefixes:
     def test_valid_slash(self):
         from core.validator import validate_text

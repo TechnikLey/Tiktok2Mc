@@ -102,6 +102,7 @@ class BotContext:
         # Datapack
         self.datapack_name = "StreamingTool"
         self.namespace = "streamingtool"
+        self.actions_valid = True
         self.start_likes = None
         self.valid_functions = set()
         self.vanilla_functions = set()
@@ -1534,9 +1535,13 @@ async def reload_actions(send_minecraft_reload: bool = False):
         if any(d.severity == Severity.ERROR for d in diags):
             log.error("[RELOAD] actions.mca contains errors; reload aborted")
             print_diagnostics(diags)
+            ctx.actions_valid = False
+            get_health_monitor().set_state("tiktok_bridge", HealthState.DEGRADED)
             return
 
         generate_datapack()
+        ctx.actions_valid = True
+        get_health_monitor().set_state("tiktok_bridge", HealthState.RUNNING)
         if ctx.hook_api is not None:
             ctx.hook_api.update_runtime_state(valid_functions=ctx.valid_functions)
 
@@ -1627,18 +1632,24 @@ async def run_bot():
             log.info("[VALIDATOR] Validation result for actions.mca:")
             print_diagnostics(diags)
         if any(d.severity == Severity.ERROR for d in diags):
-            log.info("[STOP] Errors found. Please fix actions.mca and restart.")
-            if sys.stdin.isatty():
-                try:
-                    input("Press Enter to exit...\n\n\n")
-                except (EOFError, OSError):
-                    pass
-            return
+            n_errors = sum(1 for d in diags if d.severity == Severity.ERROR)
+            log.error(
+                "[ACTIONS] actions.mca contains %d error(s). Datapack generation is skipped, "
+                "but the bridge keeps running so the API stays available. Fix the file and "
+                "trigger a reload (or restart) to apply the actions.",
+                n_errors,
+            )
+            ctx.actions_valid = False
+            health.set_state("tiktok_bridge", HealthState.DEGRADED)
+        else:
+            ctx.actions_valid = True
     except FileNotFoundError as e:
         log.error(f"{e}")
-        return
+        ctx.actions_valid = False
+        health.set_state("tiktok_bridge", HealthState.DEGRADED)
 
-    generate_datapack()
+    if ctx.actions_valid:
+        generate_datapack()
 
     ctx.hook_api = HookAPI(
         ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop,
