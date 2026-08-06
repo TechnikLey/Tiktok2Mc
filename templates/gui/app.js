@@ -703,22 +703,34 @@ function renderServerManager() {
 }
 
 function renderServerCard(inst) {
-  const state = inst.status || 'stopped';
-  const stateLabel = state.charAt(0).toUpperCase() + state.slice(1);
+  const notInstalled = !inst.hasJar;
+  const state = notInstalled ? 'not-installed' : (inst.status || 'stopped');
+  const stateLabel = notInstalled ? 'Not installed' : state.charAt(0).toUpperCase() + state.slice(1);
   const dotClass = 'server-status-dot--' + state;
   const instId = escapeHtml(inst.id);
-  return `<div class="server-card" data-instance-id="${instId}">
+  const versionDisplay = notInstalled ? 'Not installed' : escapeHtml(inst.version);
+  const versionBadge = notInstalled
+    ? '<span class="server-status-badge server-status-badge--missing">MISSING</span>'
+    : `<span class="server-status-badge ${_versionBadgeClass(inst.version)}">${_versionBadgeLabel(inst.version)}</span>`;
+  const notInstalledBanner = notInstalled
+    ? `<div class="server-card-warning">
+         <strong>server.jar missing</strong> — this instance has no server.jar in its folder.
+         Download a version (<strong>Download Version</strong>), add a custom jar (<strong>Add Custom Version</strong>),
+         or <strong>Switch Version</strong> to make it runnable.
+       </div>`
+    : '';
+  return `<div class="server-card" data-instance-id="${instId}" ${notInstalled ? 'data-instance-not-installed="1"' : ''}>
     <div class="server-card-top">
       <div class="server-card-title">
         <span class="server-status-dot ${dotClass}"></span>
         <strong class="server-card-name">${escapeHtml(inst.name)}</strong>
         <span class="server-card-version-badge">
-          ${escapeHtml(inst.version)}
-          <span class="server-status-badge ${_versionBadgeClass(inst.version)}">${_versionBadgeLabel(inst.version)}</span>
+          ${versionDisplay}
+          ${versionBadge}
         </span>
       </div>
       <div class="server-card-actions-top">
-        <button class="btn btn--sm btn--success server-action-btn" onclick="serverCardAction('${instId}', 'start')" title="Start" ${state === 'running' || state === 'starting' || state === 'stopping' ? 'disabled' : ''}>
+        <button class="btn btn--sm btn--success server-action-btn" onclick="serverCardAction('${instId}', 'start')" title="Start" ${state === 'running' || state === 'starting' || state === 'stopping' || notInstalled ? 'disabled' : ''}>
           <svg width="14" height="14" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
         </button>
         <button class="btn btn--sm btn--danger server-action-btn" onclick="serverCardAction('${instId}', 'stop')" title="Stop" ${state !== 'running' ? 'disabled' : ''}>
@@ -729,6 +741,7 @@ function renderServerCard(inst) {
         </button>
       </div>
     </div>
+    ${notInstalledBanner}
     <div class="server-card-body">
       <div class="server-card-meta">
         <div class="server-card-meta-item">
@@ -859,6 +872,7 @@ async function updateServerLifecycleUI() {
     const cards = document.querySelectorAll('[data-instance-id]');
     for (const card of cards) {
       const instId = card.getAttribute('data-instance-id');
+      const cardNotInstalled = card.getAttribute('data-instance-not-installed') === '1';
       let data;
       try {
         data = await fetchJSON('/server/' + instId + '/status');
@@ -869,16 +883,16 @@ async function updateServerLifecycleUI() {
       const uptime = data.uptime;
 
       const dot = card.querySelector('.server-status-dot');
-      if (dot) dot.className = 'server-status-dot server-status-dot--' + state;
+      if (dot && !cardNotInstalled) dot.className = 'server-status-dot server-status-dot--' + state;
 
       const stateText = card.querySelector('.server-state-text');
-      if (stateText) {
+      if (stateText && !cardNotInstalled) {
         stateText.textContent = state.charAt(0).toUpperCase() + state.slice(1);
         stateText.className = 'server-card-value server-state-text server-state-text--' + state;
       }
 
       const uptimeEl = card.querySelector('.server-uptime');
-      if (uptimeEl) {
+      if (uptimeEl && !cardNotInstalled) {
         if (uptime !== null && uptime !== undefined) {
           _serverUptimeData[instId] = { baseSeconds: uptime, lastFetch: Date.now() };
           uptimeEl.textContent = formatUptime(uptime);
@@ -893,7 +907,7 @@ async function updateServerLifecycleUI() {
       const startBtn = card.querySelector('.btn--success');
       const stopBtn = card.querySelector('.btn--danger');
       const restartBtn = card.querySelectorAll('.btn--secondary')[0];
-      if (startBtn) startBtn.disabled = state === 'running' || actionDisabled;
+      if (startBtn) startBtn.disabled = state === 'running' || actionDisabled || cardNotInstalled;
       if (stopBtn) stopBtn.disabled = state !== 'running' || actionDisabled;
       if (restartBtn) restartBtn.disabled = state !== 'running' || actionDisabled;
     }
@@ -5620,7 +5634,7 @@ function refreshConsoleInstanceSelector() {
   const current = sel.value;
   sel.innerHTML = '<option value="">Select server...</option>' +
     instances.map(inst =>
-      `<option value="${escapeHtml(inst.id)}" ${inst.id === current ? 'selected' : ''}>${escapeHtml(inst.name)} (${escapeHtml(inst.version)})</option>`
+      `<option value="${escapeHtml(inst.id)}" ${inst.id === current ? 'selected' : ''}>${escapeHtml(inst.name)} (${inst.hasJar ? escapeHtml(inst.version) : 'Not installed'})</option>`
     ).join('');
   if (!current && instances.length === 1) {
     sel.value = instances[0].id;

@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { validateDocument } = require('../src/validator');
+const { validateDocument, DiagnosticSeverity } = require('../src/validator');
 
 function test(name, fn) {
   try {
@@ -243,9 +243,24 @@ test('disabled trigger ## is validated', () => {
   assert.strictEqual(errors.length, 0); // valid disabled trigger
 });
 
-test('disabled trigger with ## and duplicate', () => {
+test('disabled trigger ## is not counted as duplicate', () => {
   const diags = validateDocument('##dup:/a\ndup:/b');
-  assert.strictEqual(countByCode(diags, 'duplicate_trigger'), 1);
+  assert.strictEqual(countByCode(diags, 'duplicate_trigger'), 0);
+});
+
+test('disabled trigger colliding with active trigger warns', () => {
+  const diags = validateDocument('like_2:/kill @a\n##like_2:/kill @a');
+  assert.strictEqual(countByCode(diags, 'duplicate_trigger'), 0);
+  assert.strictEqual(countByCode(diags, 'duplicate_trigger_disabled'), 1);
+  const warn = findByCode(diags, 'duplicate_trigger_disabled')[0];
+  assert.strictEqual(warn.severity, DiagnosticSeverity.Warning);
+  assert.strictEqual(warn.range.start.line, 1); // warning on the ## line
+});
+
+test('active trigger colliding with earlier disabled trigger warns', () => {
+  const diags = validateDocument('##dup:/a\ndup:/b');
+  assert.strictEqual(countByCode(diags, 'duplicate_trigger'), 0);
+  assert.strictEqual(countByCode(diags, 'duplicate_trigger_disabled'), 1);
 });
 
 // ── Robustness ─────────────────────────────────────────────────────────

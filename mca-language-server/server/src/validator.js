@@ -34,6 +34,7 @@ function validateDocument(text) {
   const diagnostics = [];
   const lines = text.split('\n');
   const seenTriggers = new Set();
+  const seenDisabledTriggers = new Set();
   const rules = getRules() || {};
   const highMultiThreshold = rules.high_multi_threshold || 50;
 
@@ -153,14 +154,31 @@ function validateDocument(text) {
           msg, DiagnosticSeverity.Error, 'invalid_trigger_name'));
       }
 
-      // -- 6. Duplicate trigger (ERROR) ---------------------------------
-      if (seenTriggers.has(result.trigger)) {
-        diagnostics.push(diag(ln, result.triggerGlobalStart,
-          result.triggerGlobalStart + result.trigger.length,
-          `Duplicate trigger: '${result.trigger}' defined multiple times.`,
-          DiagnosticSeverity.Error, 'duplicate_trigger'));
+      // -- 6. Duplicate trigger detection --------------------------------
+      if (result.isDisabled) {
+        // A disabled (##) trigger never counts as a duplicate, but warn if it
+        // collides with an existing active trigger (activating it would break).
+        if (seenTriggers.has(result.trigger)) {
+          diagnostics.push(diag(ln, result.triggerGlobalStart,
+            result.triggerGlobalStart + result.trigger.length,
+            `Disabled trigger '${result.trigger}' is already defined as an active trigger. Activating it would cause a duplicate trigger error.`,
+            DiagnosticSeverity.Warning, 'duplicate_trigger_disabled'));
+        }
+        seenDisabledTriggers.add(result.trigger);
+      } else {
+        if (seenTriggers.has(result.trigger)) {
+          diagnostics.push(diag(ln, result.triggerGlobalStart,
+            result.triggerGlobalStart + result.trigger.length,
+            `Duplicate trigger: '${result.trigger}' defined multiple times.`,
+            DiagnosticSeverity.Error, 'duplicate_trigger'));
+        } else if (seenDisabledTriggers.has(result.trigger)) {
+          diagnostics.push(diag(ln, result.triggerGlobalStart,
+            result.triggerGlobalStart + result.trigger.length,
+            `Trigger '${result.trigger}' is also defined as a disabled trigger (##). Activating the disabled line would cause a duplicate trigger error.`,
+            DiagnosticSeverity.Warning, 'duplicate_trigger_disabled'));
+        }
+        seenTriggers.add(result.trigger);
       }
-      seenTriggers.add(result.trigger);
 
       // -- 7. Command validation ----------------------------------------
       for (let ci = 0; ci < result.commands.length; ci++) {

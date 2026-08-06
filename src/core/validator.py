@@ -78,6 +78,7 @@ DIAGNOSTIC_CODES: dict[str, DiagnosticCodeInfo] = {
     "unbalanced_curly": DiagnosticCodeInfo("ERROR", "Unbalanced opening curly bracket '{' (check NBT data!)."),
     "invalid_trigger_name": DiagnosticCodeInfo("ERROR", "Invalid trigger name (allowed: A-Z, a-z, 0-9, _)."),
     "duplicate_trigger": DiagnosticCodeInfo("ERROR", "Duplicate trigger defined multiple times."),
+    "duplicate_trigger_disabled": DiagnosticCodeInfo("WARNING", "Disabled trigger is already defined as an active trigger; activating it would cause a duplicate trigger error."),
     "empty_command_block": DiagnosticCodeInfo("WARNING", "Empty command block (double semicolon?)."),
     "invalid_prefix": DiagnosticCodeInfo("ERROR", "Each command must start with '/', '$', '!', '&' or '>>'."),
     "comment_placeholder_wrong_trigger": DiagnosticCodeInfo("ERROR", "'{comment}' is only valid on the 'comment' trigger."),
@@ -146,6 +147,7 @@ def validate_text(text: str) -> List[Diagnostic]:
 
     diagnostics: List[Diagnostic] = []
     seen_triggers: Set[str] = set()
+    seen_disabled_triggers: Set[str] = set()
 
     lines = text.splitlines()
     for line_number, raw_line in enumerate(lines):
@@ -362,7 +364,23 @@ def validate_text(text: str) -> List[Diagnostic]:
                 "invalid_trigger_name",
             ))
 
-        if not is_disabled:
+        if is_disabled:
+            # A disabled (##) trigger never counts as a duplicate, but warn if
+            # it collides with an existing active trigger (activating it would
+            # produce a duplicate trigger error).
+            if trigger in seen_triggers:
+                diagnostics.append(_make_diag(
+                    line_number,
+                    trigger_global_start,
+                    trigger_global_start + len(trigger),
+                    f"Disabled trigger '{trigger}' is already defined as an "
+                    "active trigger. Activating it would cause a duplicate "
+                    "trigger error.",
+                    Severity.WARNING,
+                    "duplicate_trigger_disabled",
+                ))
+            seen_disabled_triggers.add(trigger)
+        else:
             if trigger in seen_triggers:
                 diagnostics.append(_make_diag(
                     line_number,
@@ -371,6 +389,17 @@ def validate_text(text: str) -> List[Diagnostic]:
                     f"Duplicate trigger: '{trigger}' defined multiple times.",
                     Severity.ERROR,
                     "duplicate_trigger",
+                ))
+            elif trigger in seen_disabled_triggers:
+                diagnostics.append(_make_diag(
+                    line_number,
+                    trigger_global_start,
+                    trigger_global_start + len(trigger),
+                    f"Trigger '{trigger}' is also defined as a disabled "
+                    "trigger (##). Activating the disabled line would cause a "
+                    "duplicate trigger error.",
+                    Severity.WARNING,
+                    "duplicate_trigger_disabled",
                 ))
             seen_triggers.add(trigger)
 

@@ -112,6 +112,11 @@
       "message": "Duplicate trigger defined multiple times."
     },
     {
+      "code": "duplicate_trigger_disabled",
+      "severity": "WARNING",
+      "message": "Disabled trigger is already defined as an active trigger; activating it would cause a duplicate trigger error."
+    },
+    {
       "code": "empty_command_block",
       "severity": "WARNING",
       "message": "Empty command block (double semicolon?)."

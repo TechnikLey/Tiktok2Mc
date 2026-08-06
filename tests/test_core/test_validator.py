@@ -124,6 +124,30 @@ class TestValidatorTriggerNames:
         errors = [d for d in diags if d.code == "duplicate_trigger"]
         assert len(errors) == 1
 
+    def test_disabled_trigger_not_counted_as_duplicate(self):
+        from core.validator import validate_text
+        diags = validate_text("##dup:/a\ndup:/b")
+        errors = [d for d in diags if d.code == "duplicate_trigger"]
+        assert len(errors) == 0
+
+    def test_disabled_trigger_colliding_with_active_warns(self):
+        from core.validator import validate_text
+        diags = validate_text("like_2:/kill @a\n##like_2:/kill @a")
+        errors = [d for d in diags if d.code == "duplicate_trigger"]
+        assert len(errors) == 0
+        warnings = [d for d in diags if d.code == "duplicate_trigger_disabled"]
+        assert len(warnings) == 1
+        assert warnings[0].severity.name == "WARNING"
+        assert warnings[0].line == 1
+
+    def test_active_trigger_colliding_with_earlier_disabled_warns(self):
+        from core.validator import validate_text
+        diags = validate_text("##dup:/a\ndup:/b")
+        errors = [d for d in diags if d.code == "duplicate_trigger"]
+        assert len(errors) == 0
+        warnings = [d for d in diags if d.code == "duplicate_trigger_disabled"]
+        assert len(warnings) == 1
+
 
 class TestValidatorDisabledTriggers:
     def test_disabled_duplicate_pair_not_flagged(self):

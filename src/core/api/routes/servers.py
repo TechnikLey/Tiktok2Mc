@@ -73,6 +73,11 @@ def _get_instance_dir(instance_id: str) -> Path:
     return (get_servers_dir() / instance_id).resolve()
 
 
+def _instance_has_jar(instance_id: str) -> bool:
+    """Whether the instance directory actually contains a runnable server.jar."""
+    return (_get_instance_dir(instance_id) / "server.jar").is_file()
+
+
 def _ensure_versions_dir() -> Path:
     d = _get_versions_dir()
     d.mkdir(parents=True, exist_ok=True)
@@ -285,6 +290,7 @@ class InstanceInfo(BaseModel):
     java_args: str
     status: str
     path: str
+    hasJar: bool
 
 
 class ServersListResponse(BaseModel):
@@ -364,6 +370,7 @@ async def list_servers():
             java_args=inst_data.get("java_args", ""),
             status=_get_server_status(inst_id),
             path=str(_get_instance_dir(inst_id).relative_to(get_root_dir())),
+            hasJar=_instance_has_jar(inst_id),
         ))
 
     return ServersListResponse(
@@ -504,6 +511,7 @@ async def list_instances():
             "auto_start": data.get("auto_start", False),
             "java_args": data.get("java_args", ""),
             "status": _get_server_status(inst_id),
+            "hasJar": _instance_has_jar(inst_id),
         })
     return {"instances": result}
 
@@ -522,6 +530,7 @@ async def get_instance(instance_id: str):
         "auto_start": data.get("auto_start", False),
         "java_args": data.get("java_args", ""),
         "status": _get_server_status(instance_id),
+        "hasJar": _instance_has_jar(instance_id),
     }
 
 
