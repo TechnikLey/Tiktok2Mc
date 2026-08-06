@@ -26,9 +26,7 @@
 > Existing users can continue using v0.5.0 — it remains
 > stable and supported for day-to-day streaming.
 >
-> **Update:** The previously estimated 1–2 week release window could not be met due to additional development, testing, and stability improvements that were required.
-> 
-> **Estimated release:** The project is now targeted for mid-July, pending successful completion of final testing and polishing.
+> **Update:** Development, testing, and polishing are in their final stage. The first stable v1.0.0 release is planned for August 2026, pending successful completion of the remaining final verification.
 >
 > See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for current progress.
 
