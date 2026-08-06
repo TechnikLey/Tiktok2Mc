@@ -6,7 +6,7 @@
 #   python build.py <command> [options]
 #
 # Commands:
-#   app              Build application (PyInstaller)
+#   app              Build application (PyInstaller); use --only to build select .py files
 #   vsix             Build VS Code extension (.vsix)
 #   spec             Generate MCA language specification
 #   test             Run tests (MCA / Python)
@@ -45,6 +45,44 @@ class Color:
 
 def cprint(msg, color=Color.RESET):
     log.info(f"{color}{msg}{Color.RESET}")
+
+
+def _task_matches(task: dict, token: str) -> bool:
+    """Check whether a build task matches a user-supplied ``--only`` token.
+
+    Tokens may be given as:
+      - task/executable name or its stem   (``server``, ``server.exe``)
+      - the .py source basename            (``server.py``)
+      - a source path relative to the root (``src/python/server.py``)
+    """
+    t = token.strip().replace("\\", "/").lower()
+    if not t:
+        return False
+    src = task["src"].replace("\\", "/").lower()
+    name = task["name"].lower()
+    stem = Path(task["name"]).stem.lower()
+    src_stem = Path(task["src"]).stem.lower()
+    if t == name or t == stem or t == src_stem:
+        return True
+    if t.endswith(".py"):
+        return src == t or src.endswith("/" + t)
+    return src == t + ".py" or src.endswith("/" + t + ".py")
+
+
+def _filter_build_tasks(all_build_tasks: list[dict], tokens: list[str]) -> tuple[list[dict], list[str], list[str]]:
+    """Filter build tasks by ``--only`` tokens.
+
+    Returns ``(kept_tasks, matched_names, unmatched_tokens)``.
+    """
+    clean = [t.strip() for t in tokens if t and t.strip()]
+    keep: list[dict] = []
+    matched_names: set[str] = set()
+    for task in all_build_tasks:
+        if any(_task_matches(task, t) for t in clean):
+            keep.append(task)
+            matched_names.add(task["name"])
+    unmatched = [t for t in clean if not any(_task_matches(task, t) for task in all_build_tasks)]
+    return keep, sorted(matched_names), unmatched
 
 def _kill_proc_tree(pid):
     """Kill a process and all descendants (Windows)."""
@@ -397,6 +435,7 @@ def cmd_app(args):
     start = time.time()
     BUILD_INSTALLER = getattr(args, 'installer', False)
     USE_CACHE = getattr(args, 'use_cache', False)
+    ONLY_FILES = getattr(args, 'only', None)
 
     IS_WINDOWS = sys.platform == "win32"
     SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -427,7 +466,7 @@ def cmd_app(args):
         # ----- Preparation & Directory Structure -----
         cprint("Preparing build environment...", Color.CYAN)
 
-        if OUT_DIR.exists():
+        if OUT_DIR.exists() and not ONLY_FILES:
             shutil.rmtree(OUT_DIR)
 
         REQUIRED_DIRS = [
@@ -499,6 +538,19 @@ def cmd_app(args):
                         target_dir = OUT_DIR / dest
                         target_dir.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(extra_path, target_dir / extra_file)
+
+        if ONLY_FILES:
+            available_names = sorted({t["name"] for t in all_build_tasks})
+            all_build_tasks, matched_names, unmatched = _filter_build_tasks(all_build_tasks, ONLY_FILES)
+            if unmatched:
+                raise RuntimeError(
+                    f"No build task matches: {', '.join(unmatched)}.\n"
+                    f"Available tasks: {', '.join(available_names)}"
+                )
+            cprint(
+                f"Selective build: {len(all_build_tasks)} file(s) -> {', '.join(matched_names)}",
+                Color.CYAN,
+            )
 
         # ----- Execution: Parallel Build -----
         cprint(
@@ -1129,6 +1181,9 @@ def main():
                        help="Number of parallel build threads (default: auto)")
     p_app.add_argument("--use-cache", action="store_true",
                        help="Skip building — copy executables from cache (warns on missing/outdated)")
+    p_app.add_argument("--only", nargs="+", default=None, metavar="FILE",
+                       help="Build only the given .py file(s). Accepts task names (server, overlay, ...), "
+                            "source basenames (server.py) or source paths (src/python/server.py)")
 
     p_all = sub.add_parser("all", help="Run spec + app + vsix")
     p_all.add_argument("--threads", type=int, default=None,
