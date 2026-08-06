@@ -225,11 +225,74 @@ Categories=Game;Network;
 EOF
 log_ok "Desktop entries created."
 
-# --- Symlink (always points to start.bin) ---
-if [ -L "$BIN_LINK" ]; then
-    rm "$BIN_LINK"
+# --- Terminal command (wrapper that requires sudo and accepts a mode) ---
+cat > "$BIN_LINK" << 'EOF'
+#!/bin/bash
+INSTALL_DIR="/opt/TikTok2Mc"
+
+mode="${1:-}"
+if [ -n "$mode" ]; then
+    shift
 fi
-ln -s "$INSTALL_DIR/start.bin" "$BIN_LINK" 2>/dev/null || log_warn "Could not create symlink $BIN_LINK (may need manual setup)"
+
+case "$mode" in
+    start|start.bin)
+        TARGET="$INSTALL_DIR/start.bin"
+        ;;
+    gui|gui.bin)
+        TARGET="$INSTALL_DIR/core/gui.bin"
+        ;;
+    app|app.bin)
+        TARGET="$INSTALL_DIR/core/app.bin"
+        ;;
+    server|server.bin)
+        TARGET="$INSTALL_DIR/core/server.bin"
+        ;;
+    overlay|overlay.bin)
+        TARGET="$INSTALL_DIR/core/overlay.bin"
+        ;;
+    update|update.bin)
+        TARGET="$INSTALL_DIR/update.bin"
+        ;;
+    *)
+        echo ""
+        echo "TikTok2Mc"
+        echo "========="
+        echo ""
+        echo "This command must be run as root (sudo) because TikTok2Mc"
+        echo "writes to $INSTALL_DIR."
+        echo ""
+        echo "Usage: sudo tiktok2mc <mode>"
+        echo ""
+        echo "Modes:"
+        echo "  start.bin    Start the complete stack (API, Minecraft, GUI, overlay)"
+        echo "  gui.bin      Open the graphical user interface"
+        echo "  app.bin      Start the TikTok-to-Minecraft bridge"
+        echo "  server.bin   Start the Minecraft server"
+        echo "  overlay.bin  Start the overlay"
+        echo "  update.bin   Run the updater"
+        echo ""
+        echo "Example: sudo tiktok2mc start.bin"
+        echo "         sudo tiktok2mc gui.bin"
+        exit 1
+        ;;
+esac
+
+if [ ! -f "$TARGET" ]; then
+    echo "[ERROR] Not found: $TARGET" >&2
+    echo "Re-run the installer or check the installation directory." >&2
+    exit 1
+fi
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "tiktok2mc requires root. Re-running with sudo..."
+    exec sudo "$TARGET" "$@"
+else
+    exec "$TARGET" "$@"
+fi
+EOF
+chmod +x "$BIN_LINK"
+log_ok "Terminal command created: $BIN_LINK (use with sudo, e.g. 'sudo tiktok2mc start.bin')"
 
 # --- Autostart (via .desktop autostart) ---
 if [ "$INSTALL_TYPE" = "2" ] && [ "$AUTOSTART_ENABLED" = true ]; then
@@ -264,6 +327,12 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 echo "Removing TikTok2Mc..."
+read -p "Are you sure you want to uninstall TikTok2Mc? (y/n) [n]: " confirm
+confirm=${confirm:-n}
+if [ "$confirm" != "Y" ] && [ "$confirm" != "y" ]; then
+    echo "Uninstall cancelled."
+    exit 1
+fi
 rm -rf /opt/TikTok2Mc
 rm -f /usr/share/applications/tiktok2mc.desktop
 rm -f /usr/share/applications/tiktok2mc-fullsystem.desktop
@@ -282,8 +351,8 @@ echo ""
 echo "=========================================="
 log_ok "Installation complete!"
 echo ""
-echo "  Start:        $INSTALL_DIR/start.bin"
-echo "  Or via terminal: tiktok2mc"
+echo "  Start:        sudo tiktok2mc start.bin"
+echo "  GUI:          sudo tiktok2mc gui.bin"
 echo "  Uninstall:    sudo $INSTALL_DIR/uninstall.sh"
 echo "=========================================="
 
