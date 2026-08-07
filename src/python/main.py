@@ -26,7 +26,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
+from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, DisconnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
 from mcrcon import MCRcon
 from flask import Flask, request
 from core.validator import validate_file, print_diagnostics, Severity
@@ -127,6 +127,7 @@ class BotContext:
         # TikTok state
         self.disable_tiktok_connect = False
         self.tiktok_client = None
+        self.tiktok_live = False
 
         # Event bridge subscriptions (reloaded at runtime)
         self.event_subscriptions = {}
@@ -838,6 +839,40 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
             get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type})
 
 
+def _publish_tiktok_status(connected: bool):
+    """Report the TikTok live connection state to the API EventBus (GUI)."""
+    body = json.dumps({
+        "type": "tiktok.live_status",
+        "data": {"connected": bool(connected), "source": "tiktok_bridge"},
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except Exception as exc:
+        log.info("Failed to publish TikTok live status to EventBus: %s", exc)
+        get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_live_status"})
+
+
+async def _tiktok_status_heartbeat():
+    """Periodically re-report the live state to the API.
+
+    Re-publishes ``tiktok.live_status`` every 30s so the GUI stays accurate
+    even if the API server restarts while the bridge stays connected (the
+    connect/disconnect events are one-shot and would otherwise be missed).
+    """
+    while True:
+        try:
+            _publish_tiktok_status(bool(ctx.tiktok_live))
+        except Exception:
+            pass
+        await asyncio.sleep(30)
+
+
 def _load_event_subscriptions() -> dict[str, list[str]]:
     """Scan all plugin manifests and build event_type → [plugin_names] mapping.
 
@@ -1419,7 +1454,18 @@ def create_client(user):
     def on_live_end(_):
         update_daily_revenue()
         log.info(f"Live ended for @{user}.")
+        ctx.tiktok_live = False
+        _publish_tiktok_status(False)
         ctx.runtime_path_shutdown.touch(exist_ok=True)
+
+    # =========================
+    # Live disconnect events
+    # =========================
+    @client.on(DisconnectEvent)
+    def on_disconnect(_):
+        log.info(f"Live disconnected: @{user}")
+        ctx.tiktok_live = False
+        _publish_tiktok_status(False)
 
     # =========================
     # CONNECT event
@@ -1428,6 +1474,8 @@ def create_client(user):
     def on_connect(_):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
+        ctx.tiktok_live = True
+        _publish_tiktok_status(True)
 
     return client
 
@@ -1673,6 +1721,7 @@ async def run_bot():
         ("_event_bridge_worker", _event_bridge_worker()),
         ("gift_revenue_counter", gift_revenue_counter()),
         ("_reload_signal_watcher", _reload_signal_watcher()),
+        ("_tiktok_status_heartbeat", _tiktok_status_heartbeat()),
     ]:
         task = asyncio.create_task(coro, name=name)
         crash_mgr.observe_task(task, component="tiktok_bridge")
@@ -1714,6 +1763,8 @@ async def run_bot():
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
+            ctx.tiktok_live = False
+            _publish_tiktok_status(False)
             try:
                 client.stop()
             except Exception as e:

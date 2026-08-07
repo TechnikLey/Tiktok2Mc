@@ -48,6 +48,18 @@ class StatusDetail(BaseModel):
     plugins_total: int
     config_loaded: bool
     uptime_seconds: float
+    tiktok_live: Optional[bool] = Field(
+        None, description="Whether the TikTok live connection is currently active (None = unknown)"
+    )
+    tiktok_live_last_update: Optional[float] = Field(
+        None, description="Unix timestamp of the last live-status report from the bridge"
+    )
+    tiktok_live_last_event: Optional[float] = Field(
+        None, description="Unix timestamp of the last genuine TikTok event (test triggers excluded)"
+    )
+    tiktok_live_source: str = Field(
+        "", description="Source of the last live-status report"
+    )
 
 
 # ── Plugin Manifest ──────────────────────────────────────────────────

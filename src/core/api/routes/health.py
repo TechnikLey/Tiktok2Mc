@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from core.api.models import API_VERSION, HealthResponse, StatusDetail
 from core.api.services import ApiService
 from core.api.registry import get_registry
+from core.api.tiktok_live import get_tiktok_live_tracker
 from core.health_monitor import get_health_monitor as get_global_health_monitor
 
 log = logging.getLogger(__name__)
@@ -32,12 +33,17 @@ async def status():
     try:
         plugins = get_registry().list()
         enabled = sum(1 for p in plugins if p.enabled)
+        tracker = get_tiktok_live_tracker().snapshot()
         return StatusDetail(
             server="running",
             plugins_active=enabled,
             plugins_total=len(plugins),
             config_loaded=_get_service().get_config_status(),
             uptime_seconds=_get_service().get_uptime(),
+            tiktok_live=tracker.get("tiktok_live"),
+            tiktok_live_last_update=tracker.get("tiktok_live_last_update"),
+            tiktok_live_last_event=tracker.get("tiktok_live_last_event"),
+            tiktok_live_source=tracker.get("tiktok_live_source", ""),
         )
     except Exception as e:
         log.exception("Failed to get status")

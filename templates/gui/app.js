@@ -57,7 +57,7 @@ let _hooksIntervalId = null;
 let _closePollIntervalId = null;
 let _uptimeIntervalId = null;
 let _lastTiktokEventTime = 0;
-let _tiktokStatusIntervalId = null;
+let _tiktokLiveState = null; // null = unknown, true = live, false = not live
 
 /* ─── Server Manager Placeholder Data ─── */
 let _serverManagerCache = null;
@@ -69,7 +69,6 @@ function _stopDashboardPolling() {
   if (_pluginsIntervalId) { clearInterval(_pluginsIntervalId); _pluginsIntervalId = null; }
   if (_hooksIntervalId) { clearInterval(_hooksIntervalId); _hooksIntervalId = null; }
   if (_uptimeIntervalId) { clearInterval(_uptimeIntervalId); _uptimeIntervalId = null; }
-  if (_tiktokStatusIntervalId) { clearInterval(_tiktokStatusIntervalId); _tiktokStatusIntervalId = null; }
 }
 
 function _closeWindowForShutdown() {
@@ -615,6 +614,11 @@ async function loadStatus() {
           '<span class="status-card__value" id="tiktok-status-value">Checking...</span>' +
         '</div>' +
       '</div>';
+    // Explicit live-state from the API (reported by the bridge). This is
+    // authoritative and survives quiet streams / test triggers.
+    if (typeof data.tiktok_live === 'boolean') {
+      _tiktokLiveState = data.tiktok_live;
+    }
     _updateTiktokStatusDisplay();
   } catch (e) {
     const el = document.getElementById('system-info');
@@ -636,16 +640,25 @@ function _updateTiktokStatusDisplay() {
     return;
   }
   const now = Date.now();
-  const lastEvent = _lastTiktokEventTime;
-  if (lastEvent && (now - lastEvent < 30000)) {
+  const isLive = _tiktokLiveState === true
+    // Fallback only while the state is still unknown (e.g. the API was
+    // restarted): treat recent genuine events as evidence of an active
+    // connection. Never active when an explicit "not live" was received.
+    || (_tiktokLiveState === null && _lastTiktokEventTime && (now - _lastTiktokEventTime < 60000));
+  if (isLive) {
     el.textContent = 'Connected';
     el.className = 'status-card__value success';
     pill.textContent = 'Live';
     pill.className = 'tiktok-status online';
-  } else {
+  } else if (_tiktokLiveState === false) {
     el.textContent = 'Configured';
     el.className = 'status-card__value';
-    pill.textContent = 'Configured';
+    pill.textContent = 'Not Live';
+    pill.className = 'tiktok-status offline';
+  } else {
+    el.textContent = 'Checking...';
+    el.className = 'status-card__value';
+    pill.textContent = 'Checking';
     pill.className = 'tiktok-status connecting';
   }
 }
@@ -5576,9 +5589,17 @@ function connectLogStream() {
         liveLog.add('API server stopping', 'warning', 'server');
       } else if (type.startsWith('plugin.')) {
         liveLog.add(payload.msg || type, payload.level || 'info', payload.plugin || 'plugin');
-      } else if (type.startsWith('tiktok.')) {
-        _lastTiktokEventTime = Date.now();
+      } else if (type === 'tiktok.live_status') {
+        _tiktokLiveState = payload.connected === true;
         _updateTiktokStatusDisplay();
+      } else if (type.startsWith('tiktok.')) {
+        // Test triggers (trigger tester / external simulations) must never
+        // count as proof of an active live connection.
+        const isTestEvent = payload.test === true || payload.source === 'trigger_tester';
+        if (!isTestEvent) {
+          _lastTiktokEventTime = Date.now();
+          _updateTiktokStatusDisplay();
+        }
       } else if (type === 'dashboard.plugin_states') {
         renderLivePluginGrid(payload.plugins || {});
       } else if (type === 'dashboard.ecm_diagnostics') {
@@ -6355,12 +6376,6 @@ async function init() {
     }
     _updateTiktokStatusDisplay();
   }, 1000);
-  _tiktokStatusIntervalId = setInterval(() => {
-    const now = Date.now();
-    if (_lastTiktokEventTime && (now - _lastTiktokEventTime >= 30000)) {
-      _updateTiktokStatusDisplay();
-    }
-  }, 5000);
   if (typeof pywebview !== 'undefined' && pywebview.api) {
     _closePollIntervalId = setInterval(_pollCloseRequest, 200);
   }

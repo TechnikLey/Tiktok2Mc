@@ -529,3 +529,81 @@ describe('connectLogStream', () => {
     expect(view.lastChild.textContent).toContain('hello');
   });
 });
+
+/* ─── TikTok live status ─── */
+describe('TikTok live status', () => {
+  function seedTiktokDom() {
+    currentConfig = { tiktok: { user: 'testuser' } };
+    const info = document.getElementById('system-info');
+    info.innerHTML =
+      '<span class="status-card__value" id="tiktok-status-value">Checking...</span>' +
+      '<span class="tiktok-status" id="tiktok-status-pill">Checking</span>';
+    const pill = document.getElementById('tiktok-status-pill');
+    pill.className = 'tiktok-status connecting';
+    pill.textContent = 'Checking';
+    _tiktokLiveState = null;
+    _lastTiktokEventTime = 0;
+  }
+
+  it('shows Connected when live_status is true', () => {
+    seedTiktokDom();
+    connectLogStream();
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.live_status', data: { connected: true, source: 'tiktok_bridge' } }) });
+    expect(_tiktokLiveState).toBe(true);
+    expect(document.getElementById('tiktok-status-value').textContent).toBe('Connected');
+    expect(document.getElementById('tiktok-status-pill').textContent).toBe('Live');
+  });
+
+  it('shows Configured when live_status is false', () => {
+    seedTiktokDom();
+    connectLogStream();
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.live_status', data: { connected: false } }) });
+    expect(_tiktokLiveState).toBe(false);
+    expect(document.getElementById('tiktok-status-value').textContent).toBe('Configured');
+    expect(document.getElementById('tiktok-status-pill').textContent).toBe('Not Live');
+  });
+
+  it('does not count test triggers as live activity', () => {
+    seedTiktokDom();
+    connectLogStream();
+    const before = _lastTiktokEventTime;
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.gift', data: { test: true, uniqueId: 'x' } }) });
+    expect(_lastTiktokEventTime).toBe(before);
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.comment', data: { source: 'trigger_tester' } }) });
+    expect(_lastTiktokEventTime).toBe(before);
+  });
+
+  it('records genuine events while state is unknown (fallback)', () => {
+    seedTiktokDom();
+    connectLogStream();
+    const before = _lastTiktokEventTime;
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.gift', data: { uniqueId: 'x' } }) });
+    expect(_lastTiktokEventTime).toBeGreaterThan(before);
+    expect(document.getElementById('tiktok-status-value').textContent).toBe('Connected');
+  });
+
+  it('keeps Connected even after a genuine event while explicitly not live', () => {
+    seedTiktokDom();
+    connectLogStream();
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.live_status', data: { connected: true } }) });
+    const before = _lastTiktokEventTime;
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.gift', data: { uniqueId: 'x' } }) });
+    expect(_tiktokLiveState).toBe(true);
+    expect(document.getElementById('tiktok-status-value').textContent).toBe('Connected');
+    expect(_lastTiktokEventTime).toBeGreaterThan(before);
+  });
+
+  it('loadStatus reads tiktok_live from the API', async () => {
+    seedTiktokDom();
+    globalThis.fetch = async () => ({
+      ok: true, status: 200, statusText: 'OK',
+      json: async () => ({
+        server: 'running', plugins_active: 1, plugins_total: 2,
+        config_loaded: true, uptime_seconds: 10, tiktok_live: true, tiktok_live_source: 'tiktok_bridge',
+      }),
+    });
+    await loadStatus();
+    expect(_tiktokLiveState).toBe(true);
+    expect(document.getElementById('tiktok-status-value').textContent).toBe('Connected');
+  });
+});
