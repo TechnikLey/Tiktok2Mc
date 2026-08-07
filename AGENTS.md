@@ -7,7 +7,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 
 ## 2. Architecture
 - **Supervisor** `src/python/start.py` runs the FastAPI control plane in-process (`create_app`, `core/api/server.py`) and spawns: `main.py` (bridge), `gui.py`, plugins, overlay, update. `run.py` = standalone dev API server.
-- **Bridge** `src/python/main.py`: TikTokLive events → `BotContext` queues → RCON `/`, datapack, overlay `>>`, shell `&`, hooks `$`. Publishes to in-process `event_bus` (`api/eventbus.py`).
+- **Bridge** `src/python/main.py`: TikTokLive events → `BotContext` queues → RCON `/`, datapack, overlay `>>`, shell `&`, hooks `$`. Publishes to in-process `event_bus` (`api/eventbus.py`). **Most sensitive file** (events/queues/retries) — minimize changes.
 - **Control plane** `src/core/api/`: thin routes (`routes/`) + logic (`services/`), Pydantic v2 models (`models.py`), plugin registry/launcher/watcher, health monitor, TikTok live tracker, updater.
 - **Plugins** `src/plugins/*`: subprocess, `BasePlugin` long-polls `?wait=1`; manifest `plugin.json`. **Hooks** `src/hooks/*`: in-process, `register(api: HookAPI)`; manifest `hook.json`.
 - **Data flow:** TikTok → bridge → queues → actions/plugins/hooks/RCON. Bridge→API `POST /api/v1/events`; GUI→API REST + SSE (`routes/ws.py`); API→GUI via EventBus.
@@ -23,10 +23,10 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 | `src/core/trigger_engine/` | `TriggerEngine` — **only** place for trigger execution/test logic |
 | `src/plugins/<name>/` | `plugin.json` + `main.py` + `config.yaml`. Scaffold: `python create_plugin.py` |
 | `src/hooks/<name>/` | `hook.json` + `main.py` + `config.yaml`. Scaffold: `python create_hook.py` |
-| `templates/gui/` | Web dashboard (vanilla JS): `app.js`, `actions-editor.js`, `index.html`, `launcher.html`, `style.css`, `design-system.css` |
-| `mca-language-server/` | VSCode extension + JS language server for `.mca` (parity with Python validator) |
+| `templates/gui/` | Web dashboard (vanilla JS): `app.js`, `actions-editor.js`, `index.html`, `launcher.html`, `style.css`, `design-system.css`; tests in `tests/` (vitest) |
+| `mca-language-server/` | VSCode extension + JS language server for `.mca` (parity with Python validator); tests in `server/test/` |
 | `defaults/` | Templates copied to `config/`+`data/` on first run: `config.yaml`, `actions.mca`, `gifts.json`, `event_commands.yaml`, server configs |
-| `tests/` | pytest; `tests/workspace/` is the only writable area (WriteGuard) |
+| `tests/` | pytest: `test_core/`, `test_api/`, `conftest.py` (WriteGuard + heavy-dep mocks), `workspace/` (only writable area) |
 | `docs/dev-book-{en,de}/src/` | mdBook docs — keep both languages in sync |
 | `tools/` | `diff_test_mca.py` (Python↔JS diff), `generate_mca_spec.py` |
 
@@ -59,36 +59,97 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 - **Runtime signals:** `core/runtime/` files (e.g. reload signals) are IPC, not config — don't hardcode content.
 
 ## 7. Testing & Validation
-- **pytest** (`pytest.ini`): asyncio auto-mode; markers `integration`/`unit`/`validator`. `tests/conftest.py` installs a **WriteGuard** — writes outside `tests/workspace/` raise `PermissionError`; never point tests at real `config/`/`data/`.
-- **GUI:** vitest in `templates/gui/` (`npm test`), jsdom.
-- **MCA LSP:** `node server/test/run.js`; parity via `tools/diff_test_mca.py` (Python vs JS) — run after validator/spec changes.
-- **Test style:** one `test_<module>.py` per module in `tests/test_core/` or `tests/test_api/`.
-- **Validation priority:** relevant pytest file → vitest (only if GUI touched) → LSP + diff test (only for `.mca` changes).
+Three layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS LSP + parity diff). CI (`.github/workflows/`) runs pytest + build; static analysis tools are local-only.
 
-## 8. Commands
+### 7.1 Python — pytest, pyright, ruff
+- **pytest** — test framework/runner. Config `pytest.ini`: asyncio auto-mode, markers `integration`/`unit`/`validator`, 40 s timeout. `tests/conftest.py` installs a **WriteGuard** — writes outside `tests/workspace/` raise `PermissionError`; never point tests at real `config/`/`data/`.
+  - Commands: `pytest tests/` · `pytest tests/test_core/test_x.py -m unit` · `pytest tests/test_api/`
+  - When: after any Python change — run the relevant `test_<module>.py`; full suite before merge/PR.
+- **pyright** — static type checker (optional; **not in CI, not in `requirements.txt`, no config file in repo**).
+  - Commands: `pyright` or `pyright <path>`
+  - When: after type-hint-sensitive changes (Pydantic models, API, `trigger_engine`); local check before committing.
+- **ruff** — linter (optional; **not in CI, no config file in repo** — runs on defaults).
+  - Commands: `ruff check .` · `ruff check --fix .` · `ruff format --check .`
+  - When: after Python changes, before committing; keeps style consistent.
+
+### 7.2 GUI — Vitest + jsdom, ESLint
+- **Vitest + jsdom** (`templates/gui/vitest.config.js`, `templates/gui/package.json`): DOM-level tests in `templates/gui/tests/*.test.js` (dashboard, actions-editor, config-editor, plugin-config-editor, server-manager, helpers).
+  - Commands: `cd templates/gui && npm test` (aliases: `test:watch`, `test:ui`)
+  - When: after any change under `templates/gui/`.
+- **ESLint** (`templates/gui/eslint.config.js`, eslint 10): lint for `templates/gui/`.
+  - Command: `cd templates/gui && npx eslint .`
+  - When: after GUI changes, before committing.
+
+### 7.3 MCA Language Server & parity tests
+- **LSP tests** (`mca-language-server/server/test/`: `run.js` + `test_parser.js`, `test_validator.js`, `test_spec.js`, `test_hover.js`, `test_completions.js`; `benchmark.js` = performance benchmark).
+  - Commands: `node mca-language-server/server/test/run.js` (also `npm test` inside `mca-language-server/`)
+  - When: after any change to the JS language server.
+- **Python ↔ JS parity** (`tools/diff_test_mca.py`): generates hundreds of valid/invalid `.mca` snippets, runs Python validator and JS language server, reports every mismatch.
+  - Commands: `python tools/diff_test_mca.py --count 500` (optional `--seed S`); npm script `diff-test` inside `mca-language-server/`
+  - When: after any `.mca` handling change (Python `validator.py`/`services/actions.py`, JS `server/`, spec generation).
+
+### 7.4 Build validation & dev tools
+- `python build.py test` — runs the MCA LSP test suite; `--all` also runs full pytest. `python build.py --check` runs `check_deps.py` first.
+- `python build.py spec` — regenerates `mca-language-server/mca-spec.json` (generated file — never hand-edit).
+- `python check_deps.py` — verifies Python packages + system tools (node/npm); `--install` installs everything, `--system-only` checks tools only.
+- **Utility tools:** `rg` (ripgrep) for fast code search, `fd` for fast file search, `jq` for JSON parsing/inspection (configs, manifests, API output). Not part of `check_deps.py`.
+- **CI:** `test.yml` runs `pytest tests/` (+ a warnings pass) on push/PR to `main`; `build.yml` runs `python build.py --installer` on version tags (Windows + Linux) and creates the GitHub release; `mdbook.yml` builds the docs.
+
+### 7.5 Test style & validation priority
+- One `test_<module>.py` per module in `tests/test_core/` or `tests/test_api/`.
+- **Validation priority:** relevant pytest file → vitest (only if GUI touched) → LSP + diff test (only for `.mca` changes). Static analysis (ruff/pyright/eslint) before larger changes.
+
+## 8. Commands (reference)
 ```bash
-python check_deps.py                  # verify/install dependencies
+# Environment
+python check_deps.py                  # verify deps; --install / --system-only
 pip install -r requirements.txt
+
+# Dev start
 python run.py --reload                # dev: API server only
 python src/python/start.py            # dev: full supervisor
-pytest tests/                         # Python tests
-cd templates/gui && npm test          # GUI JS tests
-node mca-language-server/server/test/run.js  # LSP tests
-python tools/diff_test_mca.py --count 500    # validator parity
-python build.py app|spec|vsix|test|all|ci|clean  # build; --only <name> = single binary
-python create_plugin.py / create_hook.py     # scaffolding
-python src/python/send_trigger.py follow     # manual trigger test
+
+# Tests
+pytest tests/                         # full Python suite
+pytest tests/test_core/test_x.py -m unit
+cd templates/gui && npm test          # GUI tests (vitest, jsdom)
+node mca-language-server/server/test/run.js    # MCA LSP tests
+python tools/diff_test_mca.py --count 500      # Python↔JS parity
+python build.py test                  # MCA tests (--all adds pytest)
+
+# Validation
+ruff check .                          # lint (no repo config; local-only)
+pyright                               # type check (not in CI; local-only)
+cd templates/gui && npx eslint .      # GUI lint
+
+# Build
+python build.py spec                  # regenerate mca-spec.json
+python build.py vsix                  # VSCode extension
+python build.py app --installer --only <name>  # single binary + installer
+python build.py all | ci | clean
+
+# Scaffolding / utility
+python create_plugin.py / create_hook.py      # plugin/hook scaffold
+python src/python/send_trigger.py follow      # manual trigger test
+
+# Search / inspect
+rg <pattern> [<path>]                # fast code search
+fd <pattern> [<path>]                # fast file search
+jq '.key' <file.json>                # JSON parsing/inspection
 ```
 
-## 9. Do / Don't
+## 9. AI Agent Workflow
+Working rules:
 - **Analyze first:** read `src/core/paths.py`, `src/core/version.py`, and the relevant route/service before editing.
-- **Scope:** touch only files the task needs; no drive-by refactors.
-- **Reuse, don't re-implement:** `TriggerEngine` / `services/actions.py` for triggers, `core/validator.py` for validation, `get_x()` singletons, `ApiService`, `BasePlugin`.
+- **Reuse existing systems** instead of re-implementing: `TriggerEngine` / `services/actions.py` for triggers, `core/validator.py` for validation, `get_x()` singletons, `ApiService`, `BasePlugin`.
+- **Prefer small, scoped changes;** no drive-by refactors, touch only files the task needs.
+- **Run tests after changes** (see §7 priority); resolve failures before moving on.
+- **Keep docs and code in sync:** this AGENTS.md, `docs/dev-book-{en,de}/` (both languages), and the `.mca` spec.
 - **Never edit generated files:** `mca-language-server/mca-spec.json` (regenerate: `python build.py spec`), `build/`, `data/backups/`.
-- **Don't confuse root `core/` (runtime) with source `src/core/`.**
-- **Config compat:** don't remove/rename `defaults/config.yaml` keys silently; `EXPECTED_CONFIG_VERSION` bumps need `auto_update_config` migration.
-- **API change checklist:** Pydantic model → route → register in `routes/__init__.py` → tests in `tests/test_api/`.
-- **`.mca` change:** mirror in Python + JS + `mca_spec.py`; verify with `tools/diff_test_mca.py`.
-- **`src/python/main.py` is the most sensitive file** (events/queues/retries) — minimize changes.
-- **After changes:** run the relevant pytest, vitest (GUI), node LSP suites.
+- **No new dependencies without reason** — check `requirements.txt`/`package.json` first.
 - **Ask before** touching live-stream behavior, config migration, or release packaging.
+
+Change checklists:
+- **API change:** Pydantic model (`api/models.py`) → route (`routes/`) → register in `routes/__init__.py` → tests in `tests/test_api/`.
+- **`.mca` change:** mirror in Python + JS + `mca_spec.py`; verify with `tools/diff_test_mca.py`.
+- **Config change:** don't remove/rename `defaults/config.yaml` keys silently; `EXPECTED_CONFIG_VERSION` bumps need `auto_update_config` migration.
