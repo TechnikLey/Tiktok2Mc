@@ -362,7 +362,7 @@ class ActionsEditor {
         if (deleteDuplicate) {
           this.removeTrigger(index);
         }
-        else if (!deleteDuplicate) {
+        else {
           this.triggers[index].enabled = false;
           this.renderTable();
         }

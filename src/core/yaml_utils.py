@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from time import time
 from typing import Any
 
 from ruamel.yaml import YAML
@@ -61,14 +60,7 @@ def save_yaml(path: Path, data: Any, backup: bool = False) -> None:
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         yaml.dump(data, f)
-    for attempt in range(5):
-        try:
-            tmp_path.replace(path)
-            break
-        except PermissionError:
-            if attempt == 4:
-                raise
-            time.sleep(0.1)
+    tmp_path.replace(path)
 
 def deep_update_rt(base: Any, overlay: Any) -> None:
     """Recursively merge *overlay* into *base* in-place.
