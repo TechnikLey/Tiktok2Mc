@@ -2,11 +2,13 @@
 
 This guide explains how to use TikTok2Mc. No programming knowledge is required.
 
-You can configure and control **everything** in TikTok2Mc in one of three ways — choose whichever suits you best:
+The recommended way to configure and control TikTok2Mc is the **Dashboard** (GUI) at `http://127.0.0.1:29185/` (or the desktop application). Everything can be done there — no file editing needed:
 
-- **Dashboard (GUI)** — Use the web interface at `http://127.0.0.1:29185/` or the desktop application. No file editing needed.
-- **Configuration Files** — Edit `config.yaml` and other files directly with any text editor.
+- **Dashboard (GUI)** — The web interface is the primary way to configure and control the tool. It is the only place to enable plugins and to run the setup wizard.
+- **Configuration Files** — `config.yaml` and other files can also be edited directly with any text editor. This is optional and only needed for advanced tweaks.
 - **Mixed** — Use both. Changes from the GUI and files are synchronized automatically.
+
+You cannot open the setup wizard from the Dashboard later; it only appears on first launch (or while the TikTok username and RCON password are still set to defaults). If you miss it, the same settings are available in **Settings → Connection**.
 
 If you are setting the tool up for the first time, start with the [Quick Start](../README.md#quick-start) in the README.
 
@@ -50,7 +52,7 @@ chmod +x TikTok2Mc-Linux-Setup.sh
 ./TikTok2Mc-Linux-Setup.sh
 ```
 
-The installer places the tool in `~/.local/share/TikTok2Mc` (no root required, so the GUI runs as a normal user) and creates a `tiktok2mc` command and a desktop entry. If `~/.local/bin` is not on your `PATH`, the installer shows you how to add it.
+The installer places the tool in `~/.local/share/TikTok2Mc` (no root required for the installation itself) and creates a `tiktok2mc` command and a desktop entry. Note that **running** the tool on Linux requires root privileges (`sudo`) — this is a separate step from the installation. If `~/.local/bin` is not on your `PATH`, the installer shows you how to add it.
 
 ### Portable version
 
@@ -99,7 +101,7 @@ The first time you start the tool (or if your TikTok username and RCON password 
 2. **RCON Password** — create a secure password (the wizard shows a strength meter)
 3. **Review & Save** — check your settings and save
 
-After saving, the wizard asks if you want to restart now or later. You can also reopen the Setup Wizard at any time from the Dashboard.
+Saving immediately applies the settings (a reload and server restart happen behind the scenes). The wizard closes after saving and only appears again while the TikTok username or RCON password are still set to defaults — it cannot be reopened manually. If you skipped it, set the same values later in **Settings → Connection**. There is no "restart now or later" prompt and no separate way to relaunch the wizard.
 
 ---
 
@@ -208,9 +210,9 @@ follow:>>New Follower!|{user} is now following you!|5
 16071:$random
 ```
 
-You can control which triggers are eligible in the Random hook's config file (`hooks/random/config.yaml`). Set `mode: deny-all` to only allow listed triggers, or `mode: allow-only` to exclude listed triggers.
+You can control which triggers are eligible in the Random hook's config file (`hooks/random/config.yaml`). Set `mode: deny-all` to exclude the listed triggers from the random pool, or `mode: allow-only` to only allow the listed triggers.
 
-Triggers containing `$random` are automatically excluded to prevent infinite loops.
+To prevent infinite loops, chained triggers are limited to a depth of 3 — if a chain gets deeper (e.g. `$random` keeps picking a trigger that maps back to `$random`), the offending trigger is permanently banned for the session.
 
 ### Commenting out lines
 
@@ -275,10 +277,10 @@ event_commands:
 
 | Target | Commands |
 |--------|----------|
-| timer | `start`, `pause`, `resume`, `reset`, `add_time`, `set_time` |
-| spotify-control | `play`, `pause`, `next`, `previous`, `volume`, `shuffle`, `repeat`, `save`, `playtrack` |
-| win-counter | `add_win`, `remove_win` |
-| death-counter | `player_death` |
+| timer | `start`, `pause`, `resume`, `reset`, `add_time`, `set_time`, `save_dims` |
+| spotify-control | `play`, `pause`, `next`, `previous`, `volume`, `volume_up`, `volume_down`, `shuffle`, `repeat`, `save`, `playtrack` |
+| win-counter | `add_win`, `remove_win`, `save_dims` |
+| death-counter | `player_death`, `add_death`, `reset`, `save_dims` |
 
 The Event-Command Mapper can also be edited visually in the Dashboard.
 
@@ -347,10 +349,12 @@ Plugins are optional features you can turn on or off.
 
 ### How to enable a plugin
 
-1. Open the main `config/config.yaml` file.
-2. Find the plugin's `enabled: false` setting.
-3. Change it to `enabled: true`.
-4. Some plugins have additional setup (see below).
+1. Open the **Plugins** page in the Dashboard.
+2. Find the plugin you want and toggle it on.
+3. Some plugins have additional setup (see below).
+
+> [!NOTE]
+> Everything starts disabled. Only turn on what you actually need.
 
 ### Available plugins
 
@@ -361,14 +365,11 @@ Plugins are optional features you can turn on or off.
 | **Win Counter** | Tracks wins and losses | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
 | **Spotify Control** | Viewers control your Spotify via chat | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
 
-> [!NOTE]
-> Everything starts disabled. Only turn on what you actually need.
-
 ### Timer
 
 A configurable timer for your stream. Can count down from a set time or count up from zero.
 
-**Settings** (in `plugins/timer/config.yaml` or via the Dashboard):
+**Settings** (in the Dashboard under Plugins → Timer, or in `plugins/timer/config.yaml`):
 - `direction` — `down` (countdown) or `up` (count up)
 - `start_time` — starting time in seconds
 - `auto_start` — start automatically when the tool loads
@@ -388,7 +389,7 @@ The counter updates in real-time on the overlay. You can configure milestones th
 
 Tracks wins and losses. Configure how many wins are needed for each milestone.
 
-**Settings** (in `plugins/win-counter/config.yaml`):
+**Settings** (in the Dashboard under Plugins → Win Counter, or in `plugins/win-counter/config.yaml`):
 - `initial_needed` — wins required for the first milestone
 - `milestone_increment` — additional wins needed for each next milestone
 
@@ -401,8 +402,8 @@ Lets viewers control your Spotify playback through TikTok chat. Viewers can type
 **Setup:**
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app.
 2. Add `http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control` as a Redirect URI.
-3. Copy your Client ID and Client Secret into `plugins/spotify/config.yaml`.
-4. Enable the plugin in the main `config.yaml`: `enabled: true`
+3. Enter your Client ID and Client Secret in the Dashboard (Plugins → Spotify Control → Config), or directly in `plugins/spotify/config.yaml`.
+4. Enable the plugin in the Dashboard (Plugins → toggle Spotify Control on).
 5. On first start, your browser will open for Spotify login.
 
 **Settings:**
@@ -412,7 +413,7 @@ Lets viewers control your Spotify playback through TikTok chat. Viewers can type
 
 The overlay shows the current track with album art.
 
-> You also need to enable the `$` comment command group in `config.yaml` under `comment_commands` for chat commands to work.
+> You also need to enable the `$` comment command group (under `comment_commands` in the Dashboard's Settings, or in `config.yaml`) for chat commands to work.
 
 ---
 
@@ -466,8 +467,8 @@ The Dashboard is a web interface available at `http://127.0.0.1:29185/` that let
 
 ### What you can do in the Dashboard
 
-- **Edit Actions** — visual table of event triggers with inline command editing. Add events by type (follow, join, comment, likes, share) or use the gift picker with search. Switch to the Raw tab for direct text editing with live validation.
-- **Edit Configuration** — form-based editor with section navigation (Connection, Minecraft, Streaming & Overlays, Chat & Commands, Integrations, Appearance, System). Search filters across all settings. Validation prevents invalid values. Overlay theme colors can be previewed live before saving.
+- **Edit Actions** — visual table of event triggers with inline command editing. Add events by type (follow, join, comment, likes, share) or use the gift picker with search. Changes save with validation.
+- **Edit Configuration** — form-based editor with section navigation (Connection, Minecraft, Chat & Commands, System). Search filters across all settings. Validation prevents invalid values. Overlay theme colors can be previewed live before saving.
 - **Plugin Configuration** — each plugin has its own settings page with form fields, category sidebar, and search.
 - **Event Commands** — visually edit the Event-Command Mapper.
 - **Server Manager** — create and manage Minecraft server instances (see below).
@@ -518,7 +519,7 @@ The tool checks for updates automatically on startup (enabled by default). If a 
 - `config/config.yaml` — your settings
 - `data/actions.mca` — your action rules
 - `data/event_commands.yaml` — your event mappings
-- `server/mc/` — your Minecraft world
+- `server/default/` — your Minecraft world
 
 Copy them to a safe location outside the tool folder.
 
@@ -553,11 +554,11 @@ Another program is using one of the ports the tool needs. Common causes:
 ### Minecraft server won't start
 
 - **Windows:** Java is included automatically. If it still fails, try restarting your computer.
-- **Linux:** The tool will detect Java or help you install it. Make sure you run with `sudo`.
+- **Linux:** The tool will detect Java or help you install it. Make sure you run it with `sudo` — the tool requires root privileges on Linux (set `show_sudo_warning: false` to skip this check).
 
 ### Plugin not showing in OBS
 
-- Make sure the plugin is enabled in `config.yaml` (`enabled: true`).
+- Make sure the plugin is enabled (toggle it on in the Dashboard's Plugins page).
 - Check that the URL is correct (see the plugin table above).
 - Make sure the tool is running.
 - The overlay URLs now all go through the main API at port 29185 — do not use the old direct port URLs.
@@ -610,7 +611,7 @@ A: There is no fixed schedule. Updates come out when new features or fixes are r
 
 **Q: Can I use a different Minecraft version?**
 
-A: Yes. Replace the `.jar` file in `server/mc/`. The new server must support RCON and datapacks (most do). The default version is 1.21.11 (PaperMC).
+A: Yes. Use the Server Manager in the Dashboard to switch the version, or replace the `.jar` file in `server/default/`. The new server must support RCON and datapacks (most do). The default version is 1.21.11 (PaperMC).
 
 **Q: Can I use modded servers (Forge, Fabric, Paper)?**
 
@@ -622,7 +623,7 @@ A: No. Only Java Edition supports the features this tool needs.
 
 **Q: Can I run the Minecraft server on a different computer?**
 
-A: Yes. Set the RCON IP and port in `config.yaml` to match your remote server. The tool itself must still run on your streaming PC.
+A: Yes. Set `server_host` (the address the tool connects to for RCON) and `rcon.port` in `config.yaml` to match your remote server, and make sure RCON is enabled there. The tool itself must still run on your streaming PC.
 
 **Q: Can I use the overlays without OBS?**
 

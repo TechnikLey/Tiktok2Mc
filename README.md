@@ -36,19 +36,21 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 **Windows** — Download `TikTok2MC-<version>-Windows-Setup.exe` from [Releases](https://github.com/TechnikLey/Tiktok2Mc/releases) and run the installer. A portable ZIP is also available — extract anywhere and run.
 
-**Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it (no `sudo` needed). It installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
+**Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it. The installer itself needs no `sudo` — it installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
+
+> Running the tool from a terminal on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail. Set `show_sudo_warning: false` in `config.yaml` to skip the check.
 
 > The portable archives include everything needed (including Java). No separate installation required.
 
 ## Quick Start
 
-1. **Configure** — Open `config/config.yaml`. Set your TikTok username (without `@`) and change the RCON password to something secure.
-2. **Enable features** — Each section has an `enabled:` setting (all start disabled). Turn on what you need.
-3. **Define actions** — Edit `data/actions.mca`. Each line is `trigger:command`. Example: `follow:/give @a minecraft:diamond`.
-4. **Launch** — Run `start.exe` (Windows) or `sudo ./start.bin` (Linux).
+1. **Launch** — Run `start.exe` (Windows) or `sudo ./start.bin` (Linux). The Dashboard opens at `http://127.0.0.1:29185`.
+2. **Set up** — On first launch a setup wizard guides you through the required settings: enter your TikTok username (without `@`) and set a secure RCON password. Everything else is managed from the Dashboard.
+3. **Enable features** — Turn on what you need from the Dashboard (Plugins, Comment Commands, etc.).
+4. **Define actions** — Use the Actions page in the Dashboard, or edit `data/actions.mca` directly. Each line is `trigger:command`. Example: `follow:/give @a minecraft:diamond`.
 5. **Connect** — Open Minecraft Java Edition → Multiplayer → Add Server → `localhost:25565`.
 
-> You must be live on TikTok for the tool to connect. The Dashboard is at `http://127.0.0.1:29185`. On first launch a setup wizard will guide you through the required settings.
+> You must be live on TikTok for the tool to connect. The Dashboard is at `http://127.0.0.1:29185` — most settings can also be edited by hand in `config/config.yaml` and `data/actions.mca`.
 
 ## Overlay URLs (OBS Browser Source)
 
