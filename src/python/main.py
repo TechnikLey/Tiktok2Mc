@@ -191,6 +191,51 @@ _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
 # ==========================================
 
 
+def _put_nowait_guarded(queue: asyncio.Queue, item: object, label: str) -> None:
+    """Put an item on a bounded queue, catching ``QueueFull`` in the callback.
+
+    ``call_soon_threadsafe(queue.put_nowait, ...)`` raises ``QueueFull`` inside
+    the loop callback rather than in the calling thread, so a surrounding
+    ``try/except asyncio.QueueFull`` never fires and drops are silently lost.
+    This wrapper performs the put inside the callback so drops are logged.
+    """
+    try:
+        queue.put_nowait(item)
+    except asyncio.QueueFull:
+        log.warning("[QUEUE] %s dropped — queue full", label)
+
+
+def enqueue_threadsafe(
+    item: object,
+    *,
+    queue: asyncio.Queue | None = None,
+    label: str = "event",
+) -> bool:
+    """Schedule a bounded-queue put on the main loop.
+
+    Used from TikTok event threads and the Flask webhook to push items into
+    ``ctx.trigger_queue`` / ``ctx.rcon_queue``.  Returns ``True`` if the put
+    was scheduled (the actual put may still be dropped and logged if the
+    queue fills up in the meantime).
+    """
+    target = queue if queue is not None else ctx.trigger_queue
+    loop = ctx.main_loop
+    if loop is None:
+        log.warning("[QUEUE] %s dropped — main loop not ready", label)
+        return False
+    try:
+        loop.call_soon_threadsafe(_put_nowait_guarded, target, item, label)
+        return True
+    except RuntimeError:
+        log.warning("[QUEUE] %s dropped — main loop not running", label)
+        return False
+
+
+# ==========================================
+# SETUP & HELPER FUNCTIONS
+# ==========================================
+
+
 def _validate_dup_cmd_config():
     """Validate raw YAML for duplicate keys in commands_config sections.
 
@@ -1134,9 +1179,7 @@ def _process_follow(username: str, persist: bool = True):
         except OSError as e:
             log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
     if "follow" in ctx.valid_functions:
-        ctx.main_loop.call_soon_threadsafe(
-            ctx.trigger_queue.put_nowait, ("follow", username)
-        )
+        enqueue_threadsafe(("follow", username), label="follow")
 
 
 def _process_comment_command(
@@ -1298,8 +1341,10 @@ def _process_comment_command(
                 _dispatch_comment_to_plugin(plugin_name, cmd_text, username)
             # 2. Legacy RCON handler
             elif cmd_handler == "rcon":
-                ctx.main_loop.call_soon_threadsafe(
-                    ctx.rcon_queue.put_nowait, ([cmd_text], username)
+                enqueue_threadsafe(
+                    ([cmd_text], username),
+                    queue=ctx.rcon_queue,
+                    label=f"comment_rcon:{prefix}",
                 )
             # 3. Legacy HTTP handler (backward compat)
             elif cmd_handler == "http" and cmd_url:
@@ -1455,15 +1500,14 @@ def handle_custom_trigger():
             return {"status": "error", "message": "Bot event loop not ready yet."}, 503
 
         if sanitized in ctx.valid_functions:
-            try:
-                ctx.main_loop.call_soon_threadsafe(
-                    ctx.trigger_queue.put_nowait, (sanitized, user)
-                )
-            except asyncio.QueueFull:
+            # Best-effort synchronous full-check so the endpoint can still
+            # report overload; the guarded put logs any drop that races in.
+            if ctx.trigger_queue.full():
                 return {
                     "status": "error",
                     "message": "Trigger queue is full. Try again later.",
                 }, 503
+            enqueue_threadsafe((sanitized, user), label=f"custom_trigger:{sanitized}")
             log.info(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
@@ -1600,12 +1644,7 @@ def create_client(user):
                 return
 
             for _ in range(count):
-                try:
-                    ctx.main_loop.call_soon_threadsafe(
-                        ctx.trigger_queue.put_nowait, (target, username)
-                    )
-                except asyncio.QueueFull:
-                    log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
+                enqueue_threadsafe((target, username), label=f"gift:{target}")
 
         except Exception as exc:  # TikTok event handler must not crash the client
             log.exception("ERROR IN ON_GIFT EVENT")
@@ -1661,9 +1700,7 @@ def create_client(user):
         username = get_safe_username(event.user)
         _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
-            ctx.main_loop.call_soon_threadsafe(
-                ctx.trigger_queue.put_nowait, ("join", username)
-            )
+            enqueue_threadsafe(("join", username), label="join")
 
     # =========================
     # COMMENT events
@@ -1732,9 +1769,9 @@ def create_client(user):
         )
 
         if "comment" in ctx.valid_functions and not suppress_comment_trigger:
-            ctx.main_loop.call_soon_threadsafe(
-                ctx.trigger_queue.put_nowait,
+            enqueue_threadsafe(
                 ("comment", {"user": username, "comment": comment_text}),
+                label="comment",
             )
 
     # =========================
@@ -1745,9 +1782,7 @@ def create_client(user):
         username = get_safe_username(event.user)
         _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
-            ctx.main_loop.call_soon_threadsafe(
-                ctx.trigger_queue.put_nowait, ("share", username)
-            )
+            enqueue_threadsafe(("share", username), label="share")
 
     # =========================
     # Live end events

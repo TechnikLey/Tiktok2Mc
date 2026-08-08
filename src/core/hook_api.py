@@ -73,15 +73,36 @@ class HookAPI:
         HOOK_ACTIONS[name] = fn
         log.info(f"[HOOK] Registered action: {name}")
 
+    @staticmethod
+    def _put_nowait_guarded(queue: asyncio.Queue, item: object, label: str) -> None:
+        """Put an item on a bounded queue, catching ``QueueFull`` in the callback.
+
+        ``call_soon_threadsafe(queue.put_nowait, ...)`` raises ``QueueFull``
+        inside the loop callback rather than in the calling thread, so a
+        surrounding ``try/except asyncio.QueueFull`` never fires.  This wrapper
+        performs the put inside the callback so drops are actually logged.
+        """
+        try:
+            queue.put_nowait(item)
+        except asyncio.QueueFull:
+            log.warning("[HOOK] %s dropped — queue full", label)
+
+    def _enqueue_threadsafe(
+        self, queue: asyncio.Queue, item: object, label: str
+    ) -> None:
+        try:
+            self._main_loop.call_soon_threadsafe(
+                self._put_nowait_guarded, queue, item, label
+            )
+        except RuntimeError:
+            log.warning("[HOOK] %s dropped — main loop not running", label)
+
     def rcon_enqueue(self, commands: list[str]) -> None:
         if not commands:
             return
-        try:
-            self._main_loop.call_soon_threadsafe(
-                self._rcon_queue.put_nowait, (commands, "hook")
-            )
-        except asyncio.QueueFull:
-            log.warning("[HOOK] RCON queue full — commands dropped.")
+        self._enqueue_threadsafe(
+            self._rcon_queue, (commands, "hook"), f"rcon:{commands!r}"
+        )
 
     def enqueue_trigger(self, action_name: str, user: str = "hook") -> None:
         if action_name in self._banned_triggers:
@@ -100,12 +121,9 @@ class HookAPI:
                 f"Possible infinite loop."
             )
             return
-        try:
-            self._main_loop.call_soon_threadsafe(
-                self._trigger_queue.put_nowait, (action_name, user, depth)
-            )
-        except asyncio.QueueFull:
-            log.warning(f"[HOOK] Trigger queue full — '{action_name}' dropped.")
+        self._enqueue_threadsafe(
+            self._trigger_queue, (action_name, user, depth), f"trigger:{action_name}"
+        )
 
     def log(self, msg: str) -> None:
         log.info(f"[HOOK] {msg}")
@@ -120,7 +138,12 @@ class HookAPI:
         try:
             from core.overlay_utils import send_overlay_text as _send_overlay
 
-            return _send_overlay(title, subtitle, duration, overlay_name)
+            return _send_overlay(
+                title,
+                subtitle,
+                duration if duration is not None else 3,
+                overlay_name if overlay_name is not None else "default",
+            )
         except (
             Exception
         ) as e:  # hook boundary: overlay failure must never crash trigger dispatch

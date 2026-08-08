@@ -258,6 +258,71 @@ class TestRuntimeReloadWatcher:
         assert not act_signal.exists()
 
 
+# =========================================================================
+# Bounded-queue thread-safe enqueue helpers
+# =========================================================================
+
+
+class TestEnqueueThreadsafe:
+    @pytest.fixture
+    def _sync_loop(self):
+        """Event loop whose call_soon_threadsafe runs the callback inline."""
+        loop = asyncio.new_event_loop()
+        loop.call_soon_threadsafe = lambda cb, *args: cb(*args)  # type: ignore[assignment]
+        yield loop
+        loop.close()
+
+    def test_enqueues_item(self, _sync_loop):
+        from src.python.main import ctx, enqueue_threadsafe
+
+        q = asyncio.Queue()
+        with patch.object(ctx, "main_loop", _sync_loop):
+            assert (
+                enqueue_threadsafe(("follow", "user"), queue=q, label="follow") is True
+            )
+        assert q.get_nowait() == ("follow", "user")
+
+    def test_drops_full_queue_without_raising(self, _sync_loop):
+        from src.python.main import ctx, enqueue_threadsafe
+
+        q = asyncio.Queue(maxsize=1)
+        q.put_nowait(("existing", "hook"))
+        with patch.object(ctx, "main_loop", _sync_loop):
+            assert enqueue_threadsafe(("drop", "user"), queue=q, label="drop") is True
+        assert q.qsize() == 1
+
+    def test_default_queue_is_trigger_queue(self, _sync_loop):
+        from src.python.main import ctx, enqueue_threadsafe
+
+        ctx.trigger_queue = asyncio.Queue()
+        with patch.object(ctx, "main_loop", _sync_loop):
+            assert enqueue_threadsafe(("join", "user"), label="join") is True
+        assert ctx.trigger_queue.get_nowait() == ("join", "user")
+
+    def test_missing_main_loop_returns_false(self):
+        from src.python.main import ctx, enqueue_threadsafe
+
+        q = asyncio.Queue()
+        with patch.object(ctx, "main_loop", None):
+            assert enqueue_threadsafe(("x", "y"), queue=q, label="x") is False
+        assert q.empty()
+
+    def test_running_loop_returns_false(self):
+        from src.python.main import ctx, enqueue_threadsafe
+
+        q = asyncio.Queue()
+        loop = asyncio.new_event_loop()
+
+        def _raise(_cb, *_args):
+            raise RuntimeError("loop closing")
+
+        loop.call_soon_threadsafe = _raise  # type: ignore[assignment]
+        with patch.object(ctx, "main_loop", loop):
+            assert enqueue_threadsafe(("x", "y"), queue=q, label="x") is False
+        loop.close()
+        assert q.empty()
+
+
 class TestUpdateDailyRevenue:
     def test_writes_daily_revenue(self, tmp_path, monkeypatch):
         from src.python.main import ctx, update_daily_revenue
