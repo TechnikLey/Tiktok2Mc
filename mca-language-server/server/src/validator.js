@@ -6,7 +6,7 @@
 const {
   getCommandPrefixes, getPlaceholders, getRules, getPatterns,
   NAMED_OVERLAY_RE, MULTIPLIER_RE, TRIGGER_NAME_RE,
-  QUOTED_TRIGGER_RE, VALID_PREFIX_CHARS,
+  QUOTED_TRIGGER_RE, VALID_PREFIX_CHARS, DYNAMIC_VANILLA_RE,
 } = require('./language');
 const { parseLine } = require('./parser');
 
@@ -225,6 +225,18 @@ function validateDocument(text) {
             diagnostics.push(diag(ln, cmd.startChar, cmd.endChar,
               `Each command must start with '/', '$', '!', '&' or '>>' (found: '${firstChar}').`,
               DiagnosticSeverity.Error, 'invalid_prefix'));
+          }
+        }
+
+        // -- Vanilla {user} without !rc warning (WARNING) -------------------
+        const isVanilla = t.startsWith('/');
+        if (isVanilla) {
+          const hasDynamicVanilla = DYNAMIC_VANILLA_RE.test(t);
+          if (t.includes('{user}') && !hasDynamicVanilla) {
+            const userPos = cmd.startChar + t.indexOf('{user}');
+            diagnostics.push(diag(ln, userPos, userPos + '{user}'.length,
+              'Vanilla command uses {user} but lacks !rc suffix — {user} will NOT be substituted. Add \' !rc\' to send via RCON for dynamic substitution.',
+              DiagnosticSeverity.Warning, 'user_placeholder_needs_rc'));
           }
         }
 

@@ -66,6 +66,7 @@ function specRule(ruleName) {
 const NAMED_OVERLAY_RE = specPattern('overlay_prefix');
 const MULTIPLIER_RE = specPattern('multiplier');
 const INVALID_MULTIPLIER_RE = specPattern('invalid_multiplier');
+const DYNAMIC_VANILLA_RE = specPattern('dynamic_vanilla');
 
 const _unquotedTrigger = specRule('valid_unquoted_trigger');
 const _quotedTrigger = specRule('valid_quoted_trigger');
@@ -130,6 +131,7 @@ module.exports = {
   NAMED_OVERLAY_RE,
   MULTIPLIER_RE,
   INVALID_MULTIPLIER_RE,
+  DYNAMIC_VANILLA_RE,
   TRIGGER_NAME_RE,
   QUOTED_TRIGGER_RE,
   VALID_PREFIX_CHARS,

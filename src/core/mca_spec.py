@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.api.services.actions import EVENT_TRIGGERS, TRIGGER_TYPE_MAP
+from core.api.services.actions import TRIGGER_TYPE_MAP
+from core.mca_parser import EVENT_TRIGGERS
 from core.validator import (
+    _RE_DYNAMIC_VANILLA,
     _RE_INVALID_MULTIPLIER,
     _RE_MULTIPLIER,
     _RE_OVERLAY_PREFIX,
@@ -41,6 +43,7 @@ def export_spec() -> dict[str, Any]:
         "overlay_prefix": _RE_OVERLAY_PREFIX.pattern,
         "multiplier": _RE_MULTIPLIER.pattern,
         "invalid_multiplier": _RE_INVALID_MULTIPLIER.pattern,
+        "dynamic_vanilla": _RE_DYNAMIC_VANILLA.pattern,
     }
 
     validation_rules = {
@@ -123,7 +126,8 @@ _PREFIX_DOCS: dict[str, str] = {
     "/": (
         "Minecraft command executed via datapack .mcfunction files. "
         "The command body (after /) is written to a .mcfunction file "
-        "and invoked via /function namespace:triggername."
+        "and invoked via /function namespace:triggername. "
+        "Add ' !rc' suffix to send via RCON instead, enabling {user} substitution."
     ),
     "!": (
         "RCON-only command sent directly to the Minecraft server "

@@ -59,7 +59,7 @@
     "/": {
       "type": "vanilla",
       "label": "Vanilla Minecraft",
-      "doc": "Minecraft command executed via datapack .mcfunction files. The command body (after /) is written to a .mcfunction file and invoked via /function namespace:triggername."
+      "doc": "Minecraft command executed via datapack .mcfunction files. The command body (after /) is written to a .mcfunction file and invoked via /function namespace:triggername. Add ' !rc' suffix to send via RCON instead, enabling {user} substitution."
     },
     ">>": {
       "type": "overlay",
@@ -84,7 +84,8 @@
     "trailing_semicolon": ";\\s*$",
     "overlay_prefix": "@(\\w+)>>",
     "multiplier": "\\s+x(\\d+)\\s*$",
-    "invalid_multiplier": "\\s+x([^\\s]+)\\s*$"
+    "invalid_multiplier": "\\s+x([^\\s]+)\\s*$",
+    "dynamic_vanilla": "\\s+!rc\\s*$"
   },
   "validation_rules": {
     "high_multi_threshold": 50,
@@ -190,6 +191,11 @@
       "code": "unmatched_close_square",
       "severity": "ERROR",
       "message": "Unmatched closing square bracket ']'."
+    },
+    {
+      "code": "user_placeholder_needs_rc",
+      "severity": "WARNING",
+      "message": "Vanilla command uses {user} but lacks !rc suffix — {user} will NOT be substituted. Add ' !rc' to send via RCON for dynamic substitution."
     }
   ],
   "placeholders": [

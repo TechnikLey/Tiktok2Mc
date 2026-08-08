@@ -29,6 +29,7 @@ _RE_TRAILING_SEMICOLON = re.compile(r";\s*$")
 _RE_OVERLAY_PREFIX = re.compile(r"@(\w+)>>")
 _RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
 _RE_INVALID_MULTIPLIER = re.compile(r"\s+x([^\s]+)\s*$")
+_RE_DYNAMIC_VANILLA = re.compile(r"\s+!rc\s*$")
 
 # -- Thresholds for validation -----------------------------------------------
 
@@ -106,6 +107,10 @@ DIAGNOSTIC_CODES: dict[str, DiagnosticCodeInfo] = {
     ),
     "invalid_multiplier": DiagnosticCodeInfo(
         "ERROR", "Invalid multiplier (use xNumber)."
+    ),
+    "user_placeholder_needs_rc": DiagnosticCodeInfo(
+        "WARNING",
+        "Vanilla command uses {user} but lacks !rc suffix — {user} will NOT be substituted. Add ' !rc' to send via RCON for dynamic substitution.",
     ),
 }
 
@@ -516,6 +521,24 @@ def validate_text(text: str) -> list[Diagnostic]:
                         "invalid_prefix",
                     )
                 )
+
+            # --- Vanilla {user} without !rc warning ---
+            is_vanilla = cmd_trim.startswith("/")
+            if is_vanilla:
+                has_dynamic_vanilla = _RE_DYNAMIC_VANILLA.search(cmd_trim) is not None
+                if "{user}" in cmd_trim and not has_dynamic_vanilla:
+                    # Find position of {user} for the diagnostic
+                    user_pos = cmd_start_global + cmd_trim.find("{user}")
+                    diagnostics.append(
+                        _make_diag(
+                            line_number,
+                            user_pos,
+                            user_pos + len("{user}"),
+                            "Vanilla command uses {user} but lacks !rc suffix — {user} will NOT be substituted. Add ' !rc' to send via RCON for dynamic substitution.",
+                            Severity.WARNING,
+                            "user_placeholder_needs_rc",
+                        )
+                    )
 
             # --- Multiplier validation ---
             mm = _RE_MULTIPLIER.search(cmd_trim)
