@@ -199,8 +199,8 @@ def _patch_paths(project_dir):
     for mod_name, mod in list(sys.modules.items()):
         if mod is None or not hasattr(mod, "__dict__"):
             continue
-        for name in _orig_funcs:
-            if getattr(mod, name, None) is _orig_funcs[name]:
+        for name, orig in _orig_funcs.items():
+            if getattr(mod, name, None) is orig:
                 setattr(mod, name, _new_funcs[name])
 
     # Reset singletons so they recreate with the new paths on next access.
@@ -257,9 +257,9 @@ def _patch_paths(project_dir):
     for mod_name, mod in list(sys.modules.items()):
         if mod is None or not hasattr(mod, "__dict__"):
             continue
-        for name in _orig_funcs:
+        for name, orig in _orig_funcs.items():
             if getattr(mod, name, None) is _new_funcs[name]:
-                setattr(mod, name, _orig_funcs[name])
+                setattr(mod, name, orig)
 
     logger.info("Restored original paths")
 

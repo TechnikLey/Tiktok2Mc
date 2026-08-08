@@ -167,7 +167,7 @@ def _linux_auto_installable() -> bool:
         return True
     if shutil.which("sudo"):
         return True
-    return False
+    return bool(shutil.which("sudo"))
 
 
 def install_hints() -> list[str]:

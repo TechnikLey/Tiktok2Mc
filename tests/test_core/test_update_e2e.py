@@ -234,10 +234,7 @@ class TestUpdateWhitelist:
 
         if file.lower() == f"update{SUFFIX}".lower():
             return False
-        if file.lower() == "config.yaml":
-            return False
-
-        return True
+        return file.lower() != "config.yaml"
 
     def test_whitelisted_root_files_copied(self):
         assert self._should_copy(".", "version.txt") is True

@@ -99,7 +99,7 @@ class TestApiService:
 
     def test_write_config_validates_schema(self, svc):
         # A type-violating update must still fail after merge
-        with pytest.raises(ValueError, match="must be dict"):
+        with pytest.raises(TypeError, match="must be dict"):
             svc.write_config({"java": "not_a_dict"}, backup=False)
 
     def test_write_config_replace_keys_removes_nested_keys(self, svc):

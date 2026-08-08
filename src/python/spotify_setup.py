@@ -87,7 +87,7 @@ def _save_spotify_config(data: dict[str, Any]) -> None:
     cfg_file = _get_config_file()
     # Encrypt sensitive fields before persisting
     for key in ("client_secret", "access_token", "refresh_token"):
-        if key in data and data[key]:
+        if data.get(key):
             data[key] = secure_storage.encrypt(data[key])
     save_yaml(cfg_file, data)
     log.info("Spotify config saved to %s", cfg_file)

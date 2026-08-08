@@ -10,9 +10,15 @@
 #   F                pyflakes (unused imports, redefinitions, undefined names)
 #   I001             import sorting
 #   ISC001           implicit string concatenation
-#   UP006/8/9/17/29/34/35/37/45   type & annotation modernization
+#   UP006/7/8/9/17/24/29/31/34/35/37/41/45   type & annotation modernization
+#   PYI034           `__new__` returns `Self`
 #   RUF100           stale # noqa directives
-#   SIM114           identical if-branches (combine with `or`)
+#   RUF010/15/19/23  explicit conversion flags, next(), key checks, slots order
+#   SIM103/114       return the condition directly, identical branches
+#   C401/408/413     set/dict/list constructor simplification
+#   PIE790/FURB188/PLC0206   pass removal, removeprefix, iterate .items()
+#   TRY004/B008/B017/PLW1509  TypeError, Annotated defaults, no blind asserts
+#   E714             test for object identity uses `is not`
 #   BLE001 / S110    broad-except and try-except-pass policy — enforced
 #                    via per-file-ignores below (error-boundary architecture)
 select = [
@@ -20,28 +26,48 @@ select = [
     "I001",
     "ISC001",
     "UP006",
+    "UP007",
     "UP008",
     "UP009",
     "UP017",
+    "UP024",
     "UP029",
+    "UP031",
     "UP034",
     "UP035",
     "UP037",
+    "UP041",
     "UP045",
+    "PYI034",
     "RUF100",
+    "RUF010",
+    "RUF015",
+    "RUF019",
+    "RUF023",
+    "SIM103",
     "SIM114",
+    "C401",
+    "C408",
+    "C413",
+    "PIE790",
+    "FURB188",
+    "PLC0206",
+    "TRY004",
+    "B008",
+    "B017",
+    "PLW1509",
+    "E714",
     "BLE001",
     "S110",
 ]
 
 # ── Deferred rules (fix findings first, then add to `select`) ─────────
-#   ruff-specific:    RUF010, RUF012, RUF015, RUF019, RUF022, RUF023, RUF059
-#   style/code-smell: SIM102, SIM103, SIM117, ISC004, C401, C408, C413,
-#                     PIE790, FURB188, PERF102, PLR1730, PLW0602, PLC0206
-#   modernization:    UP007, UP024, UP031, UP041, PYI034
-#   datetime/asyncio: DTZ005, ASYNC210, ASYNC220, ASYNC230
-#   refactor:         TRY203, TRY004, TRY401, B008, B017, PLW1509
-#   subprocess:       PLW1510
+#   ruff-specific:    RUF012, RUF022, RUF059
+#   style/code-smell: SIM102, SIM117, ISC004, PERF102, PLR1730, PLW0602
+#   datetime/asyncio: DTZ005, ASYNC220, ASYNC230  (real async refactors:
+#                     console tail-loop, log-file spawn — deferred)
+#   refactor:         TRY203, TRY401
+#   subprocess:       PLW1510  (subprocess.run without explicit check=)
 #   pycodestyle:      E501 (line length) is intentionally not enforced;
 #                     remaining E/W findings (E402, E701, E741, W29x) are
 #                     cleanup candidates for a later step.

@@ -15,6 +15,7 @@ import base64
 import logging
 import os
 from pathlib import Path
+from typing import Self
 
 log = logging.getLogger(__name__)
 
@@ -71,9 +72,9 @@ def _load_or_create_key() -> bytes:
 class SecureStorage:
     """Encrypt and decrypt small strings (e.g. API secrets, tokens)."""
 
-    _instance: SecureStorage | None = None
+    _instance: Self | None = None
 
-    def __new__(cls) -> SecureStorage:
+    def __new__(cls) -> Self:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._init()

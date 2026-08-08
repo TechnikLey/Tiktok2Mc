@@ -58,5 +58,5 @@ class TestConfigFileCorrupt:
         from core.api.services import ApiService
 
         svc = ApiService()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             svc.read_config()

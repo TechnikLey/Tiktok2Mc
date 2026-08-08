@@ -86,7 +86,7 @@ class CommandQueue:
         Raises ``asyncio.TimeoutError`` if *timeout* elapses.
         """
         with self._lock:
-            if plugin_name in self._queues and self._queues[plugin_name]:
+            if self._queues.get(plugin_name):
                 return
             if plugin_name not in self._events:
                 self._events[plugin_name] = asyncio.Event()

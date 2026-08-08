@@ -280,7 +280,6 @@ class BasePlugin:
 
         Subclasses should override for periodic work (e.g. timer countdown).
         """
-        pass
 
     def get_overlay_html(self) -> str:
         """Return the HTML string for the overlay.

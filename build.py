@@ -249,7 +249,7 @@ def _run_python_tests() -> None:
             cprint(stripped, Color.GRAY)
     proc.wait(timeout=300)
     if proc.returncode != 0:
-        raise RuntimeError("Python tests FAILED (exit code %d)." % proc.returncode)
+        raise RuntimeError(f"Python tests FAILED (exit code {proc.returncode}).")
     cprint("All Python tests passed.", Color.GREEN)
 
 
@@ -743,7 +743,7 @@ def cmd_app(args):
                     "    [],",
                     "    exclude_binaries=True,",
                     f"    name={exe_name!r},",
-                    f"    console={str(console)},",
+                    f"    console={console!s},",
                     "    debug=False,",
                     "    bootloader_ignore_signals=False,",
                     "    strip=False,",

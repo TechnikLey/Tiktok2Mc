@@ -326,7 +326,7 @@ def start_UPDATE_EXE_PATH():
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
         with open(log_file, "a", encoding="utf-8") as lf:
-            proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, preexec_fn=os.setsid)
+            proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, start_new_session=True)
 
     max_logs = cfg.get("update", {}).get("max_update_logs", 20)
     try:
@@ -351,7 +351,7 @@ def start_UPDATE_EXE_PATH():
                     log.info("Please restart the application.")
                     time.sleep(2)
                     return "kill"
-            except (OSError, IOError):
+            except OSError:
                 pass
 
         try:

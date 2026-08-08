@@ -101,7 +101,7 @@ class TestPluginLauncher:
         )
         launcher = self._make_launcher(plugins_dir=empty_plugins_dir)
         plugins = launcher.get_plugins()
-        p = [x for x in plugins if x.name == "mapper"][0]
+        p = next(x for x in plugins if x.name == "mapper")
         assert p.path == Path("/m.exe")
         assert p.enable is True
         assert p.level == 3

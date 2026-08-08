@@ -111,7 +111,7 @@ async def list_versions():
     return VersionsResponse(
         versions=versions,
         current_version=current_version,
-        safe_versions=list(sorted(SAFE_VERSIONS)),
+        safe_versions=sorted(SAFE_VERSIONS),
     )
 
 

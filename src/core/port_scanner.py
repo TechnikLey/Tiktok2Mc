@@ -65,7 +65,7 @@ def is_port_in_use(host: str, port: int) -> bool:
     try:
         with socket.create_connection((host, port), timeout=1):
             return True
-    except (ConnectionRefusedError, OSError, socket.timeout):
+    except (ConnectionRefusedError, OSError, TimeoutError):
         return False
 
 

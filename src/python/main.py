@@ -267,7 +267,7 @@ def _apply_config(config: dict) -> None:
     ctx._followed_cache = set()
     if ctx.follow_tracking_file.exists():
         with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
-            ctx._followed_cache = set(line.strip().lower() for line in f if line.strip())
+            ctx._followed_cache = {line.strip().lower() for line in f if line.strip()}
         log.info(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
     if ctx.follow_tracking_mode == "per_stream":
         ctx.follow_tracking_file.write_text("")
@@ -544,7 +544,7 @@ async def rcon_worker():
         commands, source_user = await ctx.rcon_queue.get()
         try:
             if not ctx.queue_active:
-                retry_key = f"queue_active_{repr((commands, source_user))}"
+                retry_key = f"queue_active_{(commands, source_user)!r}"
                 retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
                 if retries <= ctx.max_rcon_retries:
                     ctx.rcon_queue_retries[retry_key] = retries

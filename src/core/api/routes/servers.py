@@ -8,7 +8,7 @@ import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -376,7 +376,7 @@ async def list_servers():
     return ServersListResponse(
         instances=instances,
         installed=[ServerVersionInfo(**v) for v in installed],
-        safe_versions=list(sorted(SAFE_VERSIONS)),
+        safe_versions=sorted(SAFE_VERSIONS),
     )
 
 
@@ -690,7 +690,7 @@ async def download_version(body: DownloadRequest):
         try:
             log.info("Downloading PaperMC %s build %s -> %s (attempt %d/3)", version, build_num, target_jar, attempt + 1)
             req = urllib.request.Request(download_url, headers={"User-Agent": "TikTok2Mc/1.0"})
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = await asyncio.to_thread(urllib.request.urlopen, req, timeout=120)
             try:
                 with target_jar.open("wb") as f:
                     shutil.copyfileobj(resp, f)
@@ -825,7 +825,7 @@ async def switch_version(body: SwitchRequest):
 
 @router.post("/servers/custom", response_model=CustomJarResponse)
 async def upload_custom_jar(
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
     name: str = Form(...),
 ):
     if not file.filename or not file.filename.endswith(".jar"):

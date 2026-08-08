@@ -10,7 +10,6 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Union
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +59,7 @@ COMMAND_PREFIX_CHARS: tuple[str, ...] = ("/", "!", "$", "&")
 
 class DiagnosticCodeInfo:
     """Metadata for a single diagnostic code."""
-    __slots__ = ("severity", "message")
+    __slots__ = ("message", "severity")
 
     def __init__(self, severity: str, message: str) -> None:
         self.severity = severity
@@ -520,7 +519,7 @@ def validate_text(text: str) -> list[Diagnostic]:
 
 
 def validate_file(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     raise_on_error: bool = True,
 ) -> list[Diagnostic]:
     """Read and validate a trigger/command file.

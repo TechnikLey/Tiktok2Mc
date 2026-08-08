@@ -313,7 +313,7 @@ class TestRestartFlow:
         assert result is not None
         assert result != "kill"
         assert result != 5
-        assert not (result is None)
+        assert result is not None
 
     def test_skip_on_code_five(self):
         """Return code 5 skips restart (up to date)."""

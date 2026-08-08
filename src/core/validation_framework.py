@@ -507,11 +507,11 @@ _CONFIG_SCHEMA: dict[str, type] = {
 def validate_config_schema(data: Any, path: str = "") -> None:
     """Validate *data* against the config schema.
 
-    Raises ``ValueError`` on the first violation.
+    Raises ``TypeError`` on the first violation.
     ``config_version`` must be a recognised semantic version.
     """
     if not isinstance(data, dict):
-        raise ValueError(f"Config must be a dict, got {type(data).__name__}")
+        raise TypeError(f"Config must be a dict, got {type(data).__name__}")
 
     for key, expected_type in _CONFIG_SCHEMA.items():
         full_key = f"{path}.{key}" if path else key
@@ -519,7 +519,7 @@ def validate_config_schema(data: Any, path: str = "") -> None:
             continue
         value = data[key]
         if not isinstance(value, expected_type):
-            raise ValueError(
+            raise TypeError(
                 f"{full_key!r} must be {expected_type.__name__}, "
                 f"got {type(value).__name__}"
             )

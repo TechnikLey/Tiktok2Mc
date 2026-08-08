@@ -424,23 +424,23 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
                     status_code=422,
                     detail=f"Plugin '{name}' depends on unregistered plugin(s): {', '.join(missing)}",
                 )
-        kwargs: dict[str, Any] = dict(
-            enabled=body.enabled,
-            level=body.level,
-            ics=body.ics,
-            path=body.path,
-            version=body.version,
-            description=body.description,
-            entry_point=body.entry_point,
-            display_name=body.display_name,
-            capabilities=body.capabilities,
-            depends_on=body.depends_on,
-            update_url=body.update_url,
-            author=body.author,
-            homepage=body.homepage,
-            health_status=body.health_status,
-            last_heartbeat=body.last_heartbeat,
-        )
+        kwargs: dict[str, Any] = {
+            "enabled": body.enabled,
+            "level": body.level,
+            "ics": body.ics,
+            "path": body.path,
+            "version": body.version,
+            "description": body.description,
+            "entry_point": body.entry_point,
+            "display_name": body.display_name,
+            "capabilities": body.capabilities,
+            "depends_on": body.depends_on,
+            "update_url": body.update_url,
+            "author": body.author,
+            "homepage": body.homepage,
+            "health_status": body.health_status,
+            "last_heartbeat": body.last_heartbeat,
+        }
         # Strip None values so registry.update only touches provided fields
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         result = registry.update(name, **kwargs)

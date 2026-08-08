@@ -211,7 +211,7 @@ class PluginLauncher:
                 # Normalise dev path → release executable path
                 entry_point = entry_point.replace("\\", "/")
                 if entry_point.startswith("src/"):
-                    entry_point = entry_point[len("src/"):]
+                    entry_point = entry_point.removeprefix("src/")
                 if entry_point.endswith(".py"):
                     entry_point = entry_point[: -len(".py")] + suffix
 
