@@ -100,6 +100,16 @@ class TestCommandQueue:
         cmds = q.dequeue_all("p")
         assert cmds == []
 
+    def test_queue_is_bounded_drops_oldest(self):
+        from core.api.plugin_overlay import CommandQueue
+
+        q = CommandQueue()
+        q.MAX_QUEUE_SIZE = 3
+        for i in range(5):
+            q.enqueue("p", f"cmd{i}")
+        cmds = q.dequeue_all("p")
+        assert [c["command"] for c in cmds] == ["cmd2", "cmd3", "cmd4"]
+
     def test_clear_nonexistent(self):
         from core.api.plugin_overlay import CommandQueue
 

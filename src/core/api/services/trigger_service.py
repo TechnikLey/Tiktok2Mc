@@ -64,6 +64,7 @@ class TriggerService:
     """
 
     DEBOUNCE_SECONDS = 1.5
+    MAX_HISTORY: int = 500
 
     def __init__(self, engine: TriggerEngine | None = None) -> None:
         if engine is None:
@@ -128,7 +129,7 @@ class TriggerService:
             user=user,
             gift_id=gift_id,
         )
-        self._history.append(result)
+        self._record(result)
         return self._result_to_api_dict(result, trigger, user)
 
     def toggle_tiktok_connection(self) -> dict[str, Any]:
@@ -141,7 +142,7 @@ class TriggerService:
             trigger_name="tiktok",
             user="System",
         )
-        self._history.append(result)
+        self._record(result)
 
         connected = True
         message = result.error_message
@@ -180,12 +181,18 @@ class TriggerService:
             superfan=superfan,
             fanclub=fanclub,
         )
-        self._history.append(result)
+        self._record(result)
         return self._result_to_api_dict(result, "comment", user)
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _record(self, result: TriggerResult) -> None:
+        """Append to history, trimming to ``MAX_HISTORY`` entries."""
+        self._history.append(result)
+        if len(self._history) > self.MAX_HISTORY:
+            del self._history[: len(self._history) - self.MAX_HISTORY]
 
     @staticmethod
     def _result_to_api_dict(

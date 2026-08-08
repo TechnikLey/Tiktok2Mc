@@ -46,6 +46,8 @@ class CommandQueue:
     a command arrives (zero-latency, no wasted CPU).
     """
 
+    MAX_QUEUE_SIZE: int = 1000
+
     def __init__(self) -> None:
         self._queues: dict[str, list[dict[str, Any]]] = {}
         self._events: dict[str, asyncio.Event] = {}
@@ -65,7 +67,13 @@ class CommandQueue:
         }
         event: asyncio.Event | None = None
         with self._lock:
-            self._queues.setdefault(plugin_name, []).append(entry)
+            queue = self._queues.setdefault(plugin_name, [])
+            if len(queue) >= self.MAX_QUEUE_SIZE:
+                queue.pop(0)
+                log.warning(
+                    "[CMD-QUEUE] %s queue full — dropped oldest command", plugin_name
+                )
+            queue.append(entry)
             event = self._events.get(plugin_name)
         if event is not None and self._loop is not None and self._loop.is_running():
             self._loop.call_soon_threadsafe(event.set)

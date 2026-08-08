@@ -238,3 +238,26 @@ class TestTriggerService:
         assert len(svc.get_history()) == 2
         assert svc.get_history()[0]["payload"]["user"] == "B"
         assert svc.get_history()[1]["payload"]["user"] == "A"
+
+    def test_history_is_bounded(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+
+        def side_effect(trigger_name, user="System", gift_id=None, gift_name=None):
+            return TriggerResult(
+                success=True,
+                trigger_name=trigger_name,
+                status=ExecutionStatus.SUCCESS,
+                execution_time_ms=5.0,
+                payload={"trigger": trigger_name, "user": user},
+            )
+
+        mock_engine.execute_trigger.side_effect = side_effect
+        svc = TriggerService(engine=mock_engine)
+        svc.MAX_HISTORY = 3
+        for i in range(6):
+            svc._last_execution = time.time() - 10
+            svc.execute_trigger("follow", str(i))
+
+        history = svc.get_history()
+        assert len(history) == 3
+        assert {entry["payload"]["user"] for entry in history} == {"3", "4", "5"}
