@@ -1,8 +1,5 @@
-from core.overlay import (
-    OverlayClient,
-    OverlayConfig,
-    OverlayManager,
-)
+from core.overlay import OverlayConfig, OverlayManager
+from core.overlay_base import OverlayClient
 from core.yaml_utils import save_yaml
 
 
@@ -27,7 +24,7 @@ class TestOverlayConfig:
             {"overlay": {"display_mode": "queue", "fade_in": 1000}},
             backup=False,
         )
-        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         cfg = OverlayConfig()
         assert cfg.get("display_mode") == "queue"
@@ -37,7 +34,7 @@ class TestOverlayConfig:
     def test_fallback_defaults(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         cfg = OverlayConfig()
         assert cfg.get("display_mode") == "overwrite"
@@ -59,7 +56,7 @@ class TestOverlayManager:
             },
             backup=False,
         )
-        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         html = mgr.render_html("alerts", chroma=True)
@@ -72,7 +69,7 @@ class TestOverlayManager:
     def test_render_html_escapes_overlay_name(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         html = mgr.render_html('x";alert(1);//', chroma=False)
@@ -82,7 +79,7 @@ class TestOverlayManager:
     def test_render_html_sanitizes_theme_overrides(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         html = mgr.render_html(
@@ -99,7 +96,7 @@ class TestOverlayManager:
     def test_dispatch_unknown_overlay(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         assert mgr.dispatch("T", "S", 3, "missing") is False

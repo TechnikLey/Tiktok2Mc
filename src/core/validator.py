@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from core.diagnostics import Diagnostic, Severity, _make_diag
+
 log = logging.getLogger(__name__)
 
 __all__ = [
@@ -21,22 +23,6 @@ __all__ = [
     "validate_file",
     "validate_text",
 ]
-
-
-class Severity(Enum):
-    ERROR = "ERROR"
-    WARNING = "WARNING"
-    INFO = "INFO"
-
-
-@dataclass
-class Diagnostic:
-    line: int
-    start_char: int
-    end_char: int
-    message: str
-    severity: Severity
-    code: str | None = None
 
 
 # -- Regex patterns -----------------------------------------------------------
@@ -127,27 +113,6 @@ DIAGNOSTIC_CODES: dict[str, DiagnosticCodeInfo] = {
 
 
 # -- Helpers ------------------------------------------------------------------
-
-
-def _make_diag(
-    line: int,
-    start_char: int,
-    end_char: int,
-    msg: str,
-    severity: Severity,
-    code: str | None = None,
-) -> Diagnostic:
-    return Diagnostic(
-        line=line,
-        start_char=start_char,
-        end_char=end_char,
-        message=msg,
-        severity=severity,
-        code=code,
-    )
-
-
-# -- Output -------------------------------------------------------------------
 
 
 def print_diagnostics(diags: list[Diagnostic]) -> None:

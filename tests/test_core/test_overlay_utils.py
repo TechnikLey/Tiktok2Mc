@@ -1,7 +1,5 @@
-from core.overlay_utils import (
-    OverlayClient,
-    OverlayManager,
-)
+from core.overlay_base import OverlayClient
+from core.overlay_utils import OverlayManager
 
 
 class TestOverlayClient:
@@ -49,7 +47,7 @@ class TestOverlayManager:
             },
             backup=False,
         )
-        monkeypatch.setattr("core.overlay_utils.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         assert "alerts" in mgr.clients
@@ -62,7 +60,7 @@ class TestOverlayManager:
 
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay_utils.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         assert "default" in mgr.clients
@@ -74,7 +72,7 @@ class TestOverlayManager:
 
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay_utils.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         result = mgr.dispatch("Title", "Subtitle", 3, "nonexistent")
@@ -85,7 +83,7 @@ class TestOverlayManager:
 
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
-        monkeypatch.setattr("core.overlay_utils.get_config_file", lambda: config_file)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
 
         mgr = OverlayManager()
         client = mgr.clients["default"]

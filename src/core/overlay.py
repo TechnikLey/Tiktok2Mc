@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
-"""Core overlay subsystem.
+"""Core overlay subsystem (API side).
 
-Overlay has been promoted from a plugin to a built-in core subsystem.
-This module manages:
-
-* overlay configuration (read from the global config file)
-* per-overlay circuit-breaker state
-* HTML template rendering
-* direct event-bus dispatch (no plugin indirection)
+Manages overlay configuration, circuit-breaker state, HTML template rendering,
+and direct event-bus dispatch.
 """
 
 from __future__ import annotations
@@ -16,14 +11,10 @@ import asyncio
 import copy
 import logging
 import threading
-import time
 from typing import Any
 
-from ruamel.yaml.error import YAMLError
-
-from core.paths import get_config_file
+from core.overlay_base import DEFAULT_OVERLAY_CONFIG, OverlayClient, OverlayManagerBase, _load_overlay_config
 from core.theme import load_plugin_theme, sanitize_css_value, theme_css
-from core.yaml_utils import load_yaml
 
 log = logging.getLogger(__name__)
 
@@ -42,27 +33,8 @@ def _escape_js_string(value: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-#  Defaults
-# ---------------------------------------------------------------------------
-
-DEFAULT_OVERLAY_CONFIG: dict[str, Any] = {
-    "enabled": True,
-    "display_mode": "overwrite",
-    "fade_in": 500,
-    "fade_out": 500,
-    "max_fails": 3,
-    "cooldown": 10,
-    "overlays": [{"name": "default"}],
-    "theme": {
-        "background": "#00FF00",
-        "text": "#ffffff",
-    },
-}
-
-# ---------------------------------------------------------------------------
 #  HTML Template
 # ---------------------------------------------------------------------------
-
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -168,16 +140,8 @@ class OverlayConfig:
 
     def reload(self) -> None:
         """Load overlay settings from the global config file."""
-        cfg_path = get_config_file()
-        try:
-            global_cfg = load_yaml(cfg_path) if cfg_path.exists() else {}
-        except (OSError, ValueError, YAMLError) as exc:
-            log.warning("Failed to load global config for overlay: %s", exc)
-            global_cfg = {}
-
-        overlay_cfg = global_cfg.get("overlay", {})
-        merged = copy.deepcopy(DEFAULT_OVERLAY_CONFIG)
-        merged.update(overlay_cfg)
+        merged = DEFAULT_OVERLAY_CONFIG.copy()
+        merged.update(_load_overlay_config())
 
         with self._lock:
             self._data = merged
@@ -192,83 +156,23 @@ class OverlayConfig:
 
 
 # ---------------------------------------------------------------------------
-#  Circuit-breaker client
+#  Manager (inherits shared base)
 # ---------------------------------------------------------------------------
 
 
-class OverlayClient:
-    """Per-overlay circuit breaker."""
-
-    def __init__(self, name: str, max_fails: int, cooldown: int) -> None:
-        self.name = name
-        self.max_fails = max_fails
-        self.cooldown = cooldown
-        self._fail_count = 0
-        self._last_fail_time = 0.0
-
-    def get_cooldown_status(self) -> tuple[bool, int]:
-        if self._fail_count >= self.max_fails:
-            elapsed = time.time() - self._last_fail_time
-            if elapsed < self.cooldown:
-                return True, int(self.cooldown - elapsed)
-            self._fail_count = 0
-        return False, 0
-
-    def mark_success(self) -> None:
-        self._fail_count = 0
-
-    def mark_failure(self) -> None:
-        self._fail_count += 1
-        self._last_fail_time = time.time()
-
-
-# ---------------------------------------------------------------------------
-#  Manager
-# ---------------------------------------------------------------------------
-
-
-class OverlayManager:
+class OverlayManager(OverlayManagerBase):
     """Central overlay manager — handles config, circuit breakers,
     HTML rendering, and direct event-bus dispatch.
     """
 
     def __init__(self) -> None:
         self.config = OverlayConfig()
-        self.clients: dict[str, OverlayClient] = {}
-        self._init_clients()
-
-    def _init_clients(self) -> None:
-        cfg = self.config.to_dict()
-        def_fails = cfg.get("max_fails", 3)
-        def_cooldown = cfg.get("cooldown", 10)
-
-        clients: dict[str, OverlayClient] = {}
-        for item in cfg.get("overlays", []):
-            name = item.get("name")
-            if not name:
-                log.warning("Skipping overlay with missing name: %s", item)
-                continue
-            clients[name] = OverlayClient(
-                name=name,
-                max_fails=def_fails,
-                cooldown=def_cooldown,
-            )
-
-        if "default" not in clients:
-            clients["default"] = OverlayClient(
-                name="default",
-                max_fails=def_fails,
-                cooldown=def_cooldown,
-            )
-            log.info("Created fallback 'default' overlay (not in config).")
-
-        self.clients = clients
-        log.info("Overlay manager initialised with %d overlay(s).", len(clients))
+        super().__init__()
 
     def reload(self) -> None:
         """Reload configuration and rebuild clients."""
         self.config.reload()
-        self._init_clients()
+        super().reload()
 
     # -- HTML rendering --------------------------------------------------
 
@@ -316,7 +220,7 @@ class OverlayManager:
         Returns ``True`` if the message was accepted and published to the
         event bus, ``False`` if the overlay is unknown or in cooldown.
         """
-        client = self.clients.get(target_name)
+        client = self.get_client(target_name)
         if not client:
             log.error("Overlay '%s' not found.", target_name)
             return False
