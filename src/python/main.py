@@ -178,6 +178,10 @@ class BotContext:
         # RCON retry tracking (keyed by repr(commands) to limit re-queue loops)
         self.max_rcon_retries = 3
         self.rcon_queue_retries: dict[str, int] = {}
+        # Global outage budget: once this many consecutive failures occur,
+        # failed commands are dropped instead of re-queued (prevents flooding).
+        self.rcon_consecutive_failures = 0
+        self.rcon_global_retry_budget = 5
 
 
 ctx = BotContext()
@@ -710,6 +714,10 @@ async def rcon_worker():
                     if inner_pause > 0:
                         await asyncio.sleep(inner_pause)
 
+                # Connection works again: reset retry counters and budget.
+                ctx.rcon_consecutive_failures = 0
+                ctx.rcon_queue_retries.clear()
+
         except (
             Exception
         ) as e:  # background worker must keep running; commands re-queued
@@ -719,25 +727,35 @@ async def rcon_worker():
                 MC_0004, exc=e, context_info={"source": "rcon_worker"}
             )
             await asyncio.sleep(5)
+            ctx.rcon_consecutive_failures += 1
             retry_key = repr((commands, source_user))
-            retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
-            if retries <= ctx.max_rcon_retries:
-                ctx.rcon_queue_retries[retry_key] = retries
-                try:
-                    await ctx.rcon_queue.put((commands, source_user))
-                except Exception as e:  # best-effort re-queue with reporting
-                    log.error(f"RCON Queue Error: {e}")
-                    get_crash_manager().report_exception(
-                        MC_0005, exc=e, context_info={"retries": retries}
-                    )
-            else:
+            if ctx.rcon_consecutive_failures > ctx.rcon_global_retry_budget:
                 log.error(
-                    f"[RCON] Dropping commands after {retries} failed attempts: {commands}"
+                    f"[RCON] Global retry budget exhausted — dropping: {commands}"
                 )
                 get_crash_manager().report_error(
-                    MC_0006, detail=f"After {retries} attempts: {commands}"
+                    MC_0006, detail=f"Outage budget exhausted: {commands}"
                 )
                 ctx.rcon_queue_retries.pop(retry_key, None)
+            else:
+                retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
+                if retries <= ctx.max_rcon_retries:
+                    ctx.rcon_queue_retries[retry_key] = retries
+                    try:
+                        await ctx.rcon_queue.put((commands, source_user))
+                    except Exception as e:  # best-effort re-queue with reporting
+                        log.error(f"RCON Queue Error: {e}")
+                        get_crash_manager().report_exception(
+                            MC_0005, exc=e, context_info={"retries": retries}
+                        )
+                else:
+                    log.error(
+                        f"[RCON] Dropping commands after {retries} failed attempts: {commands}"
+                    )
+                    get_crash_manager().report_error(
+                        MC_0006, detail=f"After {retries} attempts: {commands}"
+                    )
+                    ctx.rcon_queue_retries.pop(retry_key, None)
             await asyncio.sleep(wait_time)
             continue
         finally:

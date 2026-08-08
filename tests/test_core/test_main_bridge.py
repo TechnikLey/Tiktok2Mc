@@ -434,6 +434,106 @@ class TestEnqueueLikeTriggers:
         assert calls == []
 
 
+# =========================================================================
+# rcon_worker retry counter + global outage budget
+# =========================================================================
+
+
+class TestRconWorkerRetryBudget:
+    @staticmethod
+    def _setup(monkeypatch, commands, working=False):
+        import src.python.main as main_mod
+        from src.python.main import ctx, rcon_worker
+
+        real_sleep = asyncio.sleep
+
+        async def no_sleep(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(main_mod.asyncio, "sleep", no_sleep)
+
+        if working:
+
+            class _WorkingRcon:
+                def __init__(self, *a, **k):
+                    pass
+
+                def connect(self):
+                    return None
+
+                def command(self, cmd):
+                    return ""
+
+            monkeypatch.setattr(main_mod, "MCRcon", _WorkingRcon)
+        else:
+
+            class _FailingRcon:
+                def __init__(self, *a, **k):
+                    raise ConnectionError("server unreachable")
+
+            monkeypatch.setattr(main_mod, "MCRcon", _FailingRcon)
+
+        monkeypatch.setattr(ctx, "queue_active", True)
+        monkeypatch.setattr(ctx, "rcon_connection", None)
+        monkeypatch.setattr(ctx, "last_rcon_attempt", 0)
+        monkeypatch.setattr(ctx, "rcon_consecutive_failures", 0)
+        monkeypatch.setattr(ctx, "rcon_queue_retries", {})
+        ctx.rcon_queue = asyncio.Queue()
+        ctx.rcon_pool_lock = asyncio.Lock()
+        ctx.rcon_queue.put_nowait((commands, "viewer"))
+
+        monkeypatch.setattr(main_mod, "get_crash_manager", lambda: MagicMock())
+
+        return ctx, rcon_worker, real_sleep
+
+    def test_global_budget_stops_requeue(self, monkeypatch):
+        ctx, rcon_worker, real_sleep = self._setup(monkeypatch, ["/say hi"])
+        ctx.max_rcon_retries = 50
+        ctx.rcon_global_retry_budget = 2
+
+        async def scenario():
+            task = asyncio.create_task(rcon_worker())
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + 5
+            while ctx.rcon_consecutive_failures <= ctx.rcon_global_retry_budget:
+                if loop.time() > deadline:
+                    task.cancel()
+                    raise AssertionError("worker kept re-queueing past budget")
+                await real_sleep(0.01)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        asyncio.run(scenario())
+        assert ctx.rcon_consecutive_failures == 3
+        assert ctx.rcon_queue_retries == {}
+        assert ctx.rcon_queue.qsize() == 0
+
+    def test_success_resets_retries_and_budget(self, monkeypatch):
+        ctx, rcon_worker, real_sleep = self._setup(
+            monkeypatch, ["/say hi"], working=True
+        )
+        ctx.rcon_consecutive_failures = 7
+        ctx.rcon_queue_retries = {"old": 2}
+
+        async def scenario():
+            task = asyncio.create_task(rcon_worker())
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + 5
+            while ctx.rcon_consecutive_failures != 0:
+                if loop.time() > deadline:
+                    task.cancel()
+                    raise AssertionError("worker did not send the command")
+                await real_sleep(0.01)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        asyncio.run(scenario())
+        assert ctx.rcon_consecutive_failures == 0
+        assert ctx.rcon_queue_retries == {}
+
+
 class TestUpdateDailyRevenue:
     def test_writes_daily_revenue(self, tmp_path, monkeypatch):
         from src.python.main import ctx, update_daily_revenue
