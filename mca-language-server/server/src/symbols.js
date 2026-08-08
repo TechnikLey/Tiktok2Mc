@@ -36,6 +36,9 @@ function provideDocumentSymbols(document) {
       if (!result || result.isError) continue;
 
       let name = result.trigger;
+      // Skip if trigger name is empty (invalid line like ':command')
+      if (!name) continue;
+
       let kind = SymbolKind.Function;
       let detail = 'Trigger';
 
