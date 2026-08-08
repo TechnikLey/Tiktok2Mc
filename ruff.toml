@@ -1,25 +1,103 @@
+# ruff configuration
+#
+# Curated rule set: `ruff check .` is clean on this config (0 findings).
+# To tighten step by step: fix a rule's findings, then move it from the
+# "deferred" comment block below into `select`.
+
 [lint]
+
+# ── Enforced rules ─────────────────────────────────────────────────────
+#   F                pyflakes (unused imports, redefinitions, undefined names)
+#   I001             import sorting
+#   ISC001           implicit string concatenation
+#   UP006/8/9/17/29/34/35/37/45   type & annotation modernization
+#   RUF100           stale # noqa directives
+#   SIM114           identical if-branches (combine with `or`)
+#   BLE001 / S110    broad-except and try-except-pass policy — enforced
+#                    via per-file-ignores below (error-boundary architecture)
+select = [
+    "F",
+    "I001",
+    "ISC001",
+    "UP006",
+    "UP008",
+    "UP009",
+    "UP017",
+    "UP029",
+    "UP034",
+    "UP035",
+    "UP037",
+    "UP045",
+    "RUF100",
+    "SIM114",
+    "BLE001",
+    "S110",
+]
+
+# ── Deferred rules (fix findings first, then add to `select`) ─────────
+#   ruff-specific:    RUF010, RUF012, RUF015, RUF019, RUF022, RUF023, RUF059
+#   style/code-smell: SIM102, SIM103, SIM117, ISC004, C401, C408, C413,
+#                     PIE790, FURB188, PERF102, PLR1730, PLW0602, PLC0206
+#   modernization:    UP007, UP024, UP031, UP041, PYI034
+#   datetime/asyncio: DTZ005, ASYNC210, ASYNC220, ASYNC230
+#   refactor:         TRY203, TRY004, TRY401, B008, B017, PLW1509
+#   subprocess:       PLW1510
+#   pycodestyle:      E501 (line length) is intentionally not enforced;
+#                     remaining E/W findings (E402, E701, E741, W29x) are
+#                     cleanup candidates for a later step.
+
+# F841: unused local variables — kept off because several sites are
+# deliberate side-effect calls (overlay singleton init in overlay.py,
+# pywebview window creation in base_plugin.py) and test setup helpers.
+# Re-enable after those are refactored.
+ignore = ["F841"]
 
 # Error-boundary architecture: the app isolates failure behind deliberate
 # catch-all handlers (subprocess supervision, plugin/hook execution, worker
-# loops, GUI/pywebview lifecycle, atexit cleanup, logging). Those files are
-# exempted per-file below; every other `except Exception` / `except: pass`
-# in the codebase must be narrowed to specific exceptions or carry an
-# inline `# noqa` with a justification. See AGENTS.md §7.1.
+# loops, GUI/pywebview lifecycle, atexit cleanup, logging, health/overlay
+# dispatch, config/backup robustness). Those files are exempted per-file
+# below; every other `except Exception` / `except: pass` in the codebase
+# must be narrowed to specific exceptions or carry an inline `# noqa` with
+# a justification. See AGENTS.md §7.1.
 [lint.per-file-ignores]
+# Entry points / supervisors
 "src/python/main.py" = ["BLE001", "S110"]  # bridge: event/worker loops, entry point (AGENTS.md: minimize changes)
 "src/python/start.py" = ["BLE001", "S110"]  # supervisor: subprocess spawning, atexit cleanup, entry point
 "src/python/gui.py" = ["BLE001", "S110"]  # pywebview lifecycle, poll threads, atexit cleanup
 "src/python/overlay.py" = ["BLE001", "S110"]  # overlay process lifecycle, shutdown signal handling
 "src/python/update.py" = ["BLE001", "S110"]  # updater: best-effort fallbacks during install
 "src/python/server.py" = ["BLE001", "S110"]  # MC server manager: config fallbacks + subprocess management
+"src/python/spotify_setup.py" = ["BLE001"]  # spotify setup: top-level boundary, report and exit
+
+# Core services that must never crash (best-effort boundaries)
 "src/core/lifecycle.py" = ["BLE001", "S110"]  # lifecycle supervisor: shutdown/kill/cleanup paths
 "src/core/logger.py" = ["BLE001", "S110"]  # logging/crash reporting must never crash
 "src/core/java_utils.py" = ["BLE001", "S110"]  # java detection/install: many fallback probes
 "src/core/port_scanner.py" = ["BLE001", "S110"]  # port probing is inherently exception-prone
+"src/core/diagnostics.py" = ["BLE001"]  # diagnostics are best-effort, must never raise
+"src/core/health_monitor.py" = ["BLE001"]  # one broken state listener must not break health
+"src/core/base_plugin.py" = ["BLE001"]  # plugin lifecycle best-effort (health/window)
+"src/core/hook_loader.py" = ["BLE001"]  # third-party hook code must never crash the loader
+"src/core/hook_api.py" = ["BLE001"]  # hook action boundary: failures must never crash dispatch
+"src/core/overlay.py" = ["BLE001"]  # overlay dispatch must never throw to the trigger engine
+"src/core/yaml_utils.py" = ["BLE001"]  # backup must never block the save
+"src/core/plugin_config.py" = ["BLE001"]  # one broken plugin must not break config loading
+"src/core/event_command_mapper.py" = ["BLE001", "S110"]  # best-effort health reporting on dispatch failure
+"src/core/validation_framework.py" = ["BLE001"]  # purpose: capture any failure from the wrapped op
+"src/core/trigger_engine/engine.py" = ["BLE001"]  # never raise: convert to structured TriggerResult
+
+# API control plane
 "src/core/api/routes/*.py" = ["BLE001", "S110"]  # route handlers convert exceptions to HTTP error responses
 "src/core/api/updater.py" = ["BLE001", "S110"]  # updater service: install transaction with rollback
+"src/core/api/server.py" = ["BLE001", "S110"]  # app lifecycle + hook auto-discovery, best-effort
+"src/core/api/eventbus.py" = ["BLE001", "S110"]  # event publishing must never crash the producer
+"src/core/api/dashboard_publisher.py" = ["BLE001"]  # dashboard data is best-effort
+"src/core/api/services/actions.py" = ["BLE001"]  # script validation must not fail if hooks are unavailable
+
+# Plugins (subprocess resilience)
 "src/plugins/spotify/main.py" = ["BLE001", "S110"]  # spotify plugin subprocess: resilience
+
+# Build & tests
 "build.py" = ["BLE001", "S110"]  # build tool: keep going across artifacts, report per-target
 "tests/conftest.py" = ["BLE001", "S110"]  # fixture singleton reset (module/attr may be absent)
 "tests/test_core/test_health_monitor.py" = ["BLE001", "S110"]

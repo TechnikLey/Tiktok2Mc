@@ -68,8 +68,8 @@ Three layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS 
 - **pyright** — static type checker (optional; **not in CI, not in `requirements.txt`, no config file in repo**).
   - Commands: `pyright` or `pyright <path>`
   - When: after type-hint-sensitive changes (Pydantic models, API, `trigger_engine`); local check before committing.
-- **ruff** — linter (optional; **not in CI, no config file in repo** — runs on defaults).
-  - Commands: `ruff check .` · `ruff check --fix .` · `ruff format --check .`
+- **ruff** — linter (optional; **not in CI**). Config: `ruff.toml` — curated `select` that passes clean (`ruff check .` = 0 findings); rules with remaining findings are listed there as *deferred* (fix them, then move from deferred into `select`). Broad-except policy `BLE001`/`S110` is enforced via per-file-ignores (error-boundary architecture, see the config comments).
+  - Commands: `ruff check .` · `ruff check --fix .` · `ruff check --select <deferred-rule> .` (inspect a deferred rule) · `ruff format --check .`
   - When: after Python changes, before committing; keeps style consistent.
 
 ### 7.2 GUI — Vitest + jsdom, ESLint
@@ -118,7 +118,7 @@ python tools/diff_test_mca.py --count 500      # Python↔JS parity
 python build.py test                  # MCA tests (--all adds pytest)
 
 # Validation
-ruff check .                          # lint (no repo config; local-only)
+ruff check .                          # lint (config: ruff.toml; local-only)
 pyright                               # type check (not in CI; local-only)
 cd templates/gui && npx eslint .      # GUI lint
 
