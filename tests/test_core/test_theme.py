@@ -1,6 +1,5 @@
-import pytest
 
-from core.theme import load_plugin_theme, theme_css, _DEFAULT_THEMES
+from core.theme import _DEFAULT_THEMES, load_plugin_theme, theme_css
 
 
 class TestLoadPluginTheme:

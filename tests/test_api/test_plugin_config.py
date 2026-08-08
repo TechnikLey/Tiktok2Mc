@@ -1,6 +1,6 @@
 import json
+
 import pytest
-from pathlib import Path
 
 from core.yaml_utils import save_yaml
 

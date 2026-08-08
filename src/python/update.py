@@ -8,31 +8,35 @@
 # the user config to match the latest template.
 # ==================================================
 
-import sys
-import shutil
-import zipfile
-import tarfile
-import requests
-import subprocess
-import re
-import time
 import io
 import os
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import time
+import zipfile
 from pathlib import Path
+
+import requests
 from packaging import version
 from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.error import YAMLError
+
+from core.api.server import DEFAULT_PORT
 from core.backup import get_backup_manager
+from core.checksum import fetch_checksum, verify_checksum
+from core.crash_manager import get_crash_manager
+from core.error_codes import UPDATE_0001
+from core.logger import (
+    handle_unhandled_exception,
+    initialize_logging,
+    install_global_exception_hook,
+)
 from core.paths import get_base_dir
 from core.utils import load_config, normalize_config_version
-from core.api.server import DEFAULT_PORT
-from core.checksum import compute_sha256, fetch_checksum, verify_checksum
-from core.crash_manager import get_crash_manager
-from core.error_codes import UPDATE_0001, UPDATE_0002, UPDATE_0003
-
-import logging
-from core.logger import initialize_logging, install_global_exception_hook, handle_unhandled_exception
 
 log = initialize_logging(__name__)
 
@@ -202,7 +206,7 @@ def migrate_config_if_needed() -> bool:
     if not CONFIG_FILE.exists():
         try:
             shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
-            log.info(f"No config found. Created new config from template.")
+            log.info("No config found. Created new config from template.")
             return True
         except OSError as e:
             log.error(f"Failed to copy template: {e}")
@@ -320,7 +324,7 @@ def load_yaml_with_debug(path, yaml_obj, label):
 
         log.error(f"[FAIL] Details: {e}")
         return None
-    except Exception as e:  # noqa: BLE001  # best-effort config load; caller falls back to defaults
+    except Exception as e:  # best-effort config load; caller falls back to defaults
         log.error(f"[FAIL] Unexpected error while loading {label}: {path}")
         log.error(f"[FAIL] Details: {e}")
         return None
@@ -357,7 +361,7 @@ def run_update():
                     log.info("  - Or in config.yaml: github_token: your_token")
                     log.info("Create a token at: https://github.com/settings/tokens")
                 else:
-                    log.error(f"[FAIL] API error: 403 Forbidden")
+                    log.error("[FAIL] API error: 403 Forbidden")
                 wait_for_key()
                 sys.exit(5)
             response.raise_for_status()
@@ -605,7 +609,7 @@ if __name__ == "__main__":
         run_update()
     except KeyboardInterrupt:
         log.info("Update interrupted by user.")
-    except Exception as exc:  # noqa: BLE001  # top-level boundary: report via crash manager and exit
+    except Exception as exc:  # top-level boundary: report via crash manager and exit
         crash_mgr.report_exception(UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"})
         handle_unhandled_exception("update")
         sys.exit(1)

@@ -6,17 +6,14 @@ Users can start the API server on-demand from within the GUI.
 Supports --gui-hidden for headless mode.
 """
 
-import sys
-import os
-
 import argparse
-import logging
-import time
-import urllib.request
-import urllib.error
-import subprocess
-import threading
 import atexit
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 # Ensure src/ is on the path for development runs.
@@ -24,11 +21,16 @@ _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.paths import get_base_dir, get_root_dir
 from core.api.server import DEFAULT_PORT
-from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
-from core.health_monitor import get_health_monitor, HealthState
 from core.crash_manager import get_crash_manager
+from core.health_monitor import HealthState, get_health_monitor
+from core.logger import (
+    handle_unhandled_exception,
+    initialize_logging,
+    install_global_exception_hook,
+    start_heartbeat,
+)
+from core.paths import get_base_dir, get_root_dir
 
 log = initialize_logging(__name__)
 
@@ -107,13 +109,12 @@ class LauncherAPI:
         if _window is not None:
             try:
                 _window.destroy()
-            except Exception as e:  # noqa: BLE001  # webview teardown errors are best-effort
+            except Exception as e:  # webview teardown errors are best-effort
                 log.warning("Failed to destroy window: %s", e)
         return "closing"
 
     def download_file(self, content: str, filename: str) -> str:
         """Save content to the user's Downloads folder and return the path."""
-        import os
         downloads = Path.home() / "Downloads"
         try:
             downloads.mkdir(parents=True, exist_ok=True)
@@ -300,7 +301,7 @@ def _gui_already_running() -> bool:
                 return False
             else:
                 return True
-    except Exception:  # noqa: BLE001  # lock check is best-effort; false is safe
+    except Exception:  # lock check is best-effort; false is safe
         return False
 
 
@@ -350,7 +351,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         except EOFError:
             pass
         sys.exit(1)
-    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend failure
+    except Exception as exc:  # process exits with hints on any GUI backend failure
         hint = _linux_install_hint()
         log.error("GUI backend failed to load: %s", exc)
         if hint:
@@ -391,10 +392,10 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
                                     try:
                                         _window.load_url(GUI_URL)
                                         log.info("API came online — switched to dashboard.")
-                                    except Exception as nav_err:  # noqa: BLE001  # best-effort navigation
+                                    except Exception as nav_err:  # best-effort navigation
                                         log.warning("Navigation to dashboard failed: %s", nav_err)
                         break
-                except Exception as exc:  # noqa: BLE001  # poll loop must never die
+                except Exception as exc:  # poll loop must never die
                     log.debug("Poll error: %s", exc)
         t = get_crash_manager().supervised_thread(target=_poll_api, name="gui-api-poll", daemon=True)
         t.start()
@@ -409,7 +410,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
             webview.start(gui='qt', debug=False)
         else:
             webview.start(debug=False)
-    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend error
+    except Exception as exc:  # process exits with hints on any GUI backend error
         hint = _linux_install_hint()
         log.error("GUI backend error: %s", exc)
         if hint:
@@ -428,7 +429,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("GUI interrupted by user.")
         health.set_state("gui", HealthState.STOPPED)
-    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
+    except Exception:  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("gui")
         health.set_state("gui", HealthState.FAILED)
         sys.exit(1)

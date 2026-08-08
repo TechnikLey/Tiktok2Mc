@@ -6,15 +6,15 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from core.lifecycle import get_supervisor, ProcessState
-from core.minecraft_readiness import make_minecraft_readiness_check
-from core.paths import get_base_dir, get_config_file, get_root_dir, get_servers_dir
 from core.java_utils import (
     MIN_JAVA_VERSION,
     detect_java,
     install_java_linux,
     install_java_windows,
 )
+from core.lifecycle import ProcessState, get_supervisor
+from core.minecraft_readiness import make_minecraft_readiness_check
+from core.paths import get_base_dir, get_config_file, get_root_dir
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ async def _run_java_install() -> None:
             ok, message = await asyncio.to_thread(install_java_linux)
         _JAVA_INSTALL.update(message=message, done=True, ok=ok)
         log.info("Java install finished ok=%s: %s", ok, message)
-    except Exception as exc:  # noqa: BLE001  # background install: any crash is surfaced via install state
+    except Exception as exc:  # background install: any crash is surfaced via install state
         log.exception("Java installation crashed")
         _JAVA_INSTALL.update(message=f"Java installation crashed: {exc}", done=True, ok=False)
     finally:
@@ -209,7 +209,7 @@ async def server_instance_start(instance_id: str):
         if instance_id == "default":
             raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' is not registered")
 
-        from core.api.routes.servers import _load_instances, _get_instance_dir
+        from core.api.routes.servers import _get_instance_dir, _load_instances
         instances = _load_instances()
         if instance_id not in instances:
             raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found in configuration")
@@ -252,21 +252,21 @@ async def server_instance_start(instance_id: str):
     try:
         from core.api.routes.servers import _sync_datapack_to_instance
         _sync_datapack_to_instance(instance_id)
-    except Exception:  # noqa: BLE001  # best-effort sync; server starts with whatever is on disk
+    except Exception:  # best-effort sync; server starts with whatever is on disk
         log.warning("[DATAPACK] Failed to sync datapack for '%s' — server will use whatever is on disk", instance_id)
 
     try:
         success = await supervisor.start(pname)
         if success:
             # Start console capture for this instance
-            from core.api.services.console_capture import start_instance_capture
             from core.api.routes.servers import _get_instance_dir
+            from core.api.services.console_capture import start_instance_capture
             start_instance_capture(instance_id, _get_instance_dir(instance_id))
             return {"status": "started", "message": f"Server '{instance_id}' started"}
         raise HTTPException(status_code=500, detail=f"Server '{instance_id}' failed to start")
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to start server '%s'", instance_id)
         raise HTTPException(status_code=500, detail=f"Failed to start: {e}")
 
@@ -292,7 +292,7 @@ async def server_instance_stop(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Server '{instance_id}' failed to stop")
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to stop server '%s'", instance_id)
         raise HTTPException(status_code=500, detail=f"Failed to stop: {e}")
 
@@ -309,7 +309,7 @@ async def server_instance_restart(instance_id: str):
         try:
             await supervisor.stop(pname)
             await supervisor.start(pname)
-        except Exception:  # noqa: BLE001  # background restart failures are only logged
+        except Exception:  # background restart failures are only logged
             log.exception("Background restart failed for '%s'", instance_id)
 
     asyncio.create_task(_bg_restart())

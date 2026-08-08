@@ -7,9 +7,9 @@ These tests verify that:
 """
 
 import sys
-import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
+
 import pytest
 
 _src = Path(__file__).resolve().parent.parent.parent / "src"
@@ -28,8 +28,6 @@ sys.modules["core.logger"].handle_unhandled_exception = MagicMock()
 from python.gui import (
     LauncherAPI,
     _api_ready,
-    IS_WINDOWS,
-    START_EXE,
 )
 
 
@@ -195,7 +193,7 @@ class TestGuiAlreadyRunning:
     """Tests for the single-instance guard."""
 
     def test_no_lockfile_means_not_running(self, monkeypatch, tmp_path):
-        from python.gui import _gui_already_running, GUI_LOCKFILE
+        from python.gui import _gui_already_running
         monkeypatch.setattr("python.gui.GUI_LOCKFILE", tmp_path / "nonexistent.lock")
         assert _gui_already_running() is False
 

@@ -10,12 +10,16 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from ruamel.yaml.error import YAMLError
 
-from core.hook_registry import get_hook_registry, HookRegistration
-from core.hook_manifest import load_hook_manifest, discover_hooks_dirs, read_hook_version
+from core.hook_manifest import (
+    HookManifest,
+    discover_hooks_dirs,
+    load_hook_manifest,
+)
+from core.hook_registry import HookRegistration, get_hook_registry
 from core.plugin_config import save_plugin_config
 from core.yaml_utils import load_yaml
-from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -25,12 +29,12 @@ router = APIRouter(tags=["Hooks"])
 # ── Hook cache ────────────────────────────────────────────────────────
 # Avoid redundant filesystem scans on every hook listing.
 
-_hook_cache: dict[str, tuple[Path, "HookManifest"]] | None = None
+_hook_cache: dict[str, tuple[Path, HookManifest]] | None = None
 
 
-def _build_hook_cache() -> dict[str, tuple[Path, "HookManifest"]]:
+def _build_hook_cache() -> dict[str, tuple[Path, HookManifest]]:
     """Scan all hook directories once and return {name: (path, manifest)}."""
-    cache: dict[str, tuple[Path, "HookManifest"]] = {}
+    cache: dict[str, tuple[Path, HookManifest]] = {}
     for parent_dir in discover_hooks_dirs():
         for child in sorted(parent_dir.iterdir()):
             if not child.is_dir():
@@ -46,7 +50,7 @@ def _invalidate_hook_cache() -> None:
     _hook_cache = None
 
 
-def _get_hook_cache() -> dict[str, tuple[Path, "HookManifest"]]:
+def _get_hook_cache() -> dict[str, tuple[Path, HookManifest]]:
     global _hook_cache
     if _hook_cache is None:
         _hook_cache = _build_hook_cache()

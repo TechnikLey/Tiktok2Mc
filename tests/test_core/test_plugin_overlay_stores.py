@@ -1,5 +1,6 @@
-import threading
 import asyncio
+import threading
+
 import pytest
 
 

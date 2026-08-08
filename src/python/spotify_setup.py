@@ -16,7 +16,7 @@ import time
 import urllib.parse
 import urllib.request
 import webbrowser
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -25,11 +25,15 @@ _src = Path(__file__).resolve().parent.parent
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from core.utils import load_config
-from core.yaml_utils import save_yaml
+from core.logger import (
+    handle_unhandled_exception,
+    initialize_logging,
+    install_global_exception_hook,
+)
 from core.paths import get_root_dir
 from core.secure_storage import secure_storage
-from core.logger import initialize_logging, install_global_exception_hook, handle_unhandled_exception
+from core.utils import load_config
+from core.yaml_utils import save_yaml
 
 log = initialize_logging(__name__)
 
@@ -322,6 +326,6 @@ if __name__ == "__main__":
             main()
     except KeyboardInterrupt:
         log.info("Spotify setup interrupted by user.")
-    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
+    except Exception:  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("spotify_setup")
         sys.exit(1)

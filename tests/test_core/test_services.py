@@ -1,5 +1,5 @@
+
 import pytest
-from pathlib import Path
 
 
 class TestNormalizeConfigVersion:

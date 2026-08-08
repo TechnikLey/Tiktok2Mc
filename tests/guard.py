@@ -7,12 +7,11 @@ modify files outside the dedicated test workspace raises an immediate
 
 import builtins
 import io
+import logging
 import os
 import shutil
 import tempfile
-import logging
 from pathlib import Path
-from typing import Set
 
 logger = logging.getLogger("test_guard")
 
@@ -20,7 +19,7 @@ logger = logging.getLogger("test_guard")
 class WriteGuard:
     """Blocks file-system writes outside the allowed test roots."""
 
-    def __init__(self, allowed_roots: Set[Path]):
+    def __init__(self, allowed_roots: set[Path]):
         self.allowed_roots = frozenset(Path(p).resolve() for p in allowed_roots)
         self._originals: dict = {}
         self._active = False

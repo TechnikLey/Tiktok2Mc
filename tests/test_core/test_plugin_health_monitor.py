@@ -1,6 +1,6 @@
 import time
+
 import pytest
-from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture(autouse=True)
@@ -44,10 +44,11 @@ class TestPluginHealthMonitor:
         await phm.stop()
 
     def test_check_health_marks_unhealthy_plugin(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.models import PluginRegistration
         from core.api.plugin_health import PluginHealthMonitor
         from core.api.registry import PluginRegistry
-        from core.api.models import PluginRegistration
-        from pathlib import Path
 
         reg = PluginRegistry(Path(""))
         reg.register(PluginRegistration(
@@ -63,10 +64,11 @@ class TestPluginHealthMonitor:
         assert updated.health_status == "unhealthy"
 
     def test_check_health_skips_disabled_plugins(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.models import PluginRegistration
         from core.api.plugin_health import PluginHealthMonitor
         from core.api.registry import PluginRegistry
-        from core.api.models import PluginRegistration
-        from pathlib import Path
 
         reg = PluginRegistry(Path(""))
         reg.register(PluginRegistration(
@@ -82,10 +84,11 @@ class TestPluginHealthMonitor:
         assert updated.health_status == "healthy"
 
     def test_check_health_skips_no_heartbeat(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.models import PluginRegistration
         from core.api.plugin_health import PluginHealthMonitor
         from core.api.registry import PluginRegistry
-        from core.api.models import PluginRegistration
-        from pathlib import Path
 
         reg = PluginRegistry(Path(""))
         reg.register(PluginRegistration(
@@ -101,10 +104,11 @@ class TestPluginHealthMonitor:
         assert updated.health_status == "healthy"
 
     def test_check_health_promotes_to_healthy(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.models import PluginRegistration
         from core.api.plugin_health import PluginHealthMonitor
         from core.api.registry import PluginRegistry
-        from core.api.models import PluginRegistration
-        from pathlib import Path
 
         reg = PluginRegistry(Path(""))
         reg.register(PluginRegistration(
@@ -120,10 +124,11 @@ class TestPluginHealthMonitor:
         assert updated.health_status == "healthy"
 
     def test_check_health_dead_plugin_not_downgraded(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.models import PluginRegistration
         from core.api.plugin_health import PluginHealthMonitor
         from core.api.registry import PluginRegistry
-        from core.api.models import PluginRegistration
-        from pathlib import Path
 
         reg = PluginRegistry(Path(""))
         reg.register(PluginRegistration(
@@ -139,10 +144,11 @@ class TestPluginHealthMonitor:
         assert updated.health_status == "dead"
 
     def test_check_health_untouched_plugin_within_timeout(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.models import PluginRegistration
         from core.api.plugin_health import PluginHealthMonitor
         from core.api.registry import PluginRegistry
-        from core.api.models import PluginRegistration
-        from pathlib import Path
 
         reg = PluginRegistry(Path(""))
         reg.register(PluginRegistration(

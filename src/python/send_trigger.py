@@ -26,9 +26,6 @@ import argparse
 import json
 import logging
 import sys
-from typing import NoReturn
-
-import urllib.request
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +36,6 @@ logging.basicConfig(
 log = logging.getLogger("send_trigger")
 
 from core.trigger_engine import EngineConfig, TriggerEngine
-from core.trigger_engine.models import ExecutionStatus
 
 
 def _build_parser() -> argparse.ArgumentParser:

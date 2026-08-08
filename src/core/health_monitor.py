@@ -30,10 +30,9 @@ import enum
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
-
-from core.error_codes import ErrorCode, ErrorInstance, Severity, Subsystem, CORE_0009, HEARTBEAT_0001, HEARTBEAT_0002
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class HeartbeatRecord:
     alive: bool = True
     last_activity: float = 0.0
     last_successful_operation: float = 0.0
-    last_error: Optional[str] = None
+    last_error: str | None = None
     last_error_time: float = 0.0
     response_time_ms: float = 0.0
     uptime: float = 0.0
@@ -100,7 +99,7 @@ class HealthMonitor:
         self._heartbeats: dict[str, HeartbeatRecord] = {}
         self._state_listeners: list[Callable[[str, HealthState, HealthState], None]] = []
         self._start_time: float = time.time()
-        self._last_error: Optional[str] = None
+        self._last_error: str | None = None
         self._last_error_time: float = 0.0
 
     # ------------------------------------------------------------------
@@ -150,7 +149,7 @@ class HealthMonitor:
         for listener in self._state_listeners:
             try:
                 listener(component, old_state, new_state)
-            except Exception as exc:  # noqa: BLE001  # one broken listener must not break health updates
+            except Exception as exc:  # one broken listener must not break health updates
                 log.warning("[HEALTH] State listener failed for '%s': %s", component, exc)
         return True
 
@@ -229,7 +228,7 @@ class HealthMonitor:
             record.missed_beats = 0
             return True
 
-    def get_heartbeat(self, component: str) -> Optional[HeartbeatRecord]:
+    def get_heartbeat(self, component: str) -> HeartbeatRecord | None:
         with self._lock:
             record = self._heartbeats.get(component)
             if record:
@@ -272,7 +271,7 @@ class HealthMonitor:
 
 
 # Module-level singleton
-_monitor: Optional[HealthMonitor] = None
+_monitor: HealthMonitor | None = None
 _monitor_lock = threading.Lock()
 
 

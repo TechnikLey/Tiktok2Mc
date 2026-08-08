@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from core.paths import get_root_dir
-from core.validator import validate_text, Severity
+from core.validator import validate_text
 
 log = logging.getLogger(__name__)
 
@@ -317,7 +317,7 @@ class ActionsService:
         try:
             from core.hook_api import HOOK_ACTIONS
             return set(HOOK_ACTIONS.keys())
-        except Exception as e:  # noqa: BLE001  # script validation must not fail because hooks are unavailable
+        except Exception as e:  # script validation must not fail because hooks are unavailable
             log.warning(f"Failed to get registered scripts: {e}")
             return set()
 
@@ -360,7 +360,7 @@ class ActionsService:
                     if not script_name:
                         diagnostics.append({
                             "line": ti,
-                            "message": f"Script action has empty script name",
+                            "message": "Script action has empty script name",
                             "severity": "ERROR",
                             "code": "INVALID_SCRIPT"
                         })

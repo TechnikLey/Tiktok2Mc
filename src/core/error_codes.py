@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 class Severity(enum.IntEnum):
@@ -110,7 +110,7 @@ class ErrorCode:
     recovery_hint: str = ""
     impact: str = ""
 
-    def format(self, detail: str = "", context: Optional[dict[str, Any]] = None) -> str:
+    def format(self, detail: str = "", context: dict[str, Any] | None = None) -> str:
         parts = [self.code, self.message]
         if detail:
             parts.append("")
@@ -157,7 +157,7 @@ class ErrorInstance:
     recovery_hint: str = ""
     impact: str = ""
     context: dict[str, Any] = field(default_factory=dict)
-    root_exception: Optional[BaseException] = None
+    root_exception: BaseException | None = None
     timestamp: float = 0.0
     recovery_status: str = "none"
 

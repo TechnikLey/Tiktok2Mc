@@ -5,7 +5,6 @@ depending on installation type and GUI default mode.
 """
 
 from pathlib import Path
-import pytest
 
 INSTALLER_DIR = Path(__file__).resolve().parent.parent.parent / "installer"
 NSIS_SCRIPT = INSTALLER_DIR / "install.nsi"

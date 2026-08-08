@@ -5,22 +5,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.status import HTTP_401_UNAUTHORIZED
 
-from fastapi.staticfiles import StaticFiles
+from core.overlay import set_event_loop
+from core.paths import get_root_dir
 
-from .routes import api_router
+from .dashboard_publisher import get_dashboard_publisher
 from .eventbus import event_bus
 from .models import API_VERSION
 from .plugin_health import get_health_monitor
-from .plugin_watcher import get_plugin_watcher
 from .plugin_overlay import command_queue
-from .dashboard_publisher import get_dashboard_publisher
-from .tiktok_live import get_tiktok_live_tracker
-from .services.rcon import get_rcon_service
+from .plugin_watcher import get_plugin_watcher
+from .routes import api_router
 from .services import ApiService
-from core.paths import get_root_dir
-from core.overlay import set_event_loop
+from .services.rcon import get_rcon_service
+from .tiktok_live import get_tiktok_live_tracker
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def _discover_hooks_at_startup() -> None:
             )
         else:
             log.info("[HOOK] Auto-discovered %d hook(s) at startup", len(discovered))
-    except Exception as exc:  # noqa: BLE001  # hook discovery must never block API startup
+    except Exception as exc:  # hook discovery must never block API startup
         log.warning("[HOOK] Auto-discovery at startup failed: %s", exc)
 
 
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
             port=rcon_cfg.get("port", 25575),
             password=rcon_cfg.get("password", ""),
         )
-    except Exception:  # noqa: BLE001  # RCON is optional; console auto-configures on first request
+    except Exception:  # RCON is optional; console auto-configures on first request
         log.warning("Could not read RCON config — console will auto-configure on first request")
 
     await event_bus.publish("server.started", {"version": API_VERSION})
@@ -173,7 +173,7 @@ def create_app(
                 try:
                     await send({"type": "http.response.start", "status": 499, "headers": []})
                     await send({"type": "http.response.body", "body": b""})
-                except Exception:  # noqa: BLE001, S110  # client already gone; nothing more to do
+                except Exception:  # client already gone; nothing more to do
                     pass
 
     app.add_middleware(CancelledErrorMiddleware)

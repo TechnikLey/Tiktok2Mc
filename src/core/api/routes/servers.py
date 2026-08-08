@@ -1,22 +1,21 @@
 import asyncio
-import logging
 import json
+import logging
 import os
 import platform
 import shutil
 import subprocess
-import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+import urllib.request
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+from ruamel.yaml.error import YAMLError
 
 from core.api.services import ApiService
-from core.paths import get_root_dir, get_versions_dir, get_servers_dir
-from ruamel.yaml.error import YAMLError
+from core.paths import get_root_dir, get_servers_dir, get_versions_dir
 
 log = logging.getLogger(__name__)
 
@@ -205,7 +204,7 @@ def _get_active_version() -> str | None:
     try:
         cfg = svc.read_config()
         return cfg.get("mc_version")
-    except Exception:  # noqa: BLE001  # best-effort; caller falls back to None
+    except Exception:  # best-effort; caller falls back to None
         return None
 
 
@@ -218,7 +217,7 @@ def _get_server_status(instance_id: str = "default") -> str:
         if proc is None:
             return "unknown"
         return proc.state.value
-    except Exception:  # noqa: BLE001  # status reporting is best-effort
+    except Exception:  # status reporting is best-effort
         return "stopped"
 
 
@@ -248,7 +247,7 @@ def _load_instances(svc: ApiService | None = None) -> dict[str, dict[str, Any]]:
         if not isinstance(instances, dict) or not instances:
             return dict(DEFAULT_INSTANCES)
         return instances
-    except Exception:  # noqa: BLE001  # config read failures fall back to defaults
+    except Exception:  # config read failures fall back to defaults
         return dict(DEFAULT_INSTANCES)
 
 
@@ -651,7 +650,7 @@ async def download_version(body: DownloadRequest):
     # Verify version exists on PaperMC with a STABLE build
     try:
         builds = _fetch_json(f"{PAPER_API}/versions/{version}/builds")
-    except HTTPException as exc:
+    except HTTPException:
         raise HTTPException(
             status_code=400,
             detail=f"Version '{version}' is not available on PaperMC",
@@ -712,7 +711,7 @@ async def download_version(body: DownloadRequest):
             download_exc = f"Network error downloading build {build_num}: {e.reason}"
             log.warning("Download attempt %d/3 failed: %s", attempt + 1, download_exc)
             await asyncio.sleep(1)
-        except Exception as e:  # noqa: BLE001  # any download failure is retried, then surfaced
+        except Exception as e:  # any download failure is retried, then surfaced
             download_exc = f"Unexpected error downloading build {build_num}: {e}"
             log.exception("Download attempt %d/3 failed", attempt + 1)
             await asyncio.sleep(1)
@@ -763,7 +762,7 @@ async def switch_version(body: SwitchRequest):
     try:
         cfg = svc.read_config()
         current_version = cfg.get("mc_version", "")
-    except Exception:  # noqa: BLE001  # best-effort; defaults to no backup
+    except Exception:  # best-effort; defaults to no backup
         current_version = ""
 
     if target_jar.exists() and current_version and current_version != version:
@@ -800,7 +799,7 @@ async def switch_version(body: SwitchRequest):
     # Auto-restart the Minecraft Server if it is currently running
     restart_initiated = False
     try:
-        from core.lifecycle import get_supervisor, ProcessState
+        from core.lifecycle import ProcessState, get_supervisor
         supervisor = get_supervisor()
         proc = supervisor.get("Minecraft Server")
         if proc is not None and proc.state == ProcessState.RUNNING:
@@ -808,7 +807,7 @@ async def switch_version(body: SwitchRequest):
             await supervisor.stop("Minecraft Server")
             await supervisor.start("Minecraft Server")
             restart_initiated = True
-    except Exception as e:  # noqa: BLE001  # version switch succeeds even if auto-restart fails
+    except Exception as e:  # version switch succeeds even if auto-restart fails
         log.warning("Failed to auto-restart server after version switch: %s", e)
 
     is_safe = version in SAFE_VERSIONS

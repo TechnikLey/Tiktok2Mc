@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.trigger_engine.models import TriggerType, ValidationError
+from core.trigger_engine.models import ValidationError
 
 
 class PayloadValidator:

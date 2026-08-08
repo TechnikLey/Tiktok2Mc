@@ -1,8 +1,9 @@
 import json
-import pytest
-from unittest.mock import Mock
 from pathlib import Path
+from unittest.mock import Mock
 from urllib.error import URLError
+
+import pytest
 
 
 def _make_json_response(data: dict, status: int = 200):
@@ -130,7 +131,6 @@ class TestRegisterPluginFunction:
     def test_register_plugin_with_appconfig(self, monkeypatch):
         from core.api.client import register_plugin
         from core.models import AppConfig
-        from pathlib import Path
 
         config = AppConfig(
             name="test",
@@ -156,7 +156,6 @@ class TestRegisterPluginFunction:
     def test_raises_connection_error_on_failure(self, monkeypatch):
         from core.api.client import register_plugin
         from core.models import AppConfig
-        from pathlib import Path
 
         config = AppConfig(name="fail", path=Path("/f.exe"), enable=False, level=2, ics=False)
 

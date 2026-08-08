@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import time
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from core.api.services.trigger_service import TriggerService, get_trigger_service
 from core.trigger_engine import TriggerEngine

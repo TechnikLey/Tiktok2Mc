@@ -1,7 +1,5 @@
 import logging
-import time
 from pathlib import Path
-import pytest
 
 
 class TestCircularBufferHandler:
@@ -47,7 +45,6 @@ class TestCircularBufferHandler:
 class TestCrashReporter:
     def test_report_returns_none_for_none_exc(self):
         from core.logger import CrashReporter
-        from pathlib import Path
 
         tmp = Path(__file__).resolve().parent.parent / "workspace"
         reporter = CrashReporter("test", tmp)
@@ -86,7 +83,7 @@ class TestCrashReporter:
         reporter = CrashReporter("recur", tmp_path)
         for i in range(6):
             reporter._track_recurrence(f"sig_{i}")
-        count = reporter._history.get(f"sig_0", {}).get("count", 0)
+        count = reporter._history.get("sig_0", {}).get("count", 0)
         assert count >= 1
 
     def test_safe_config_snapshot(self, tmp_path):
@@ -137,8 +134,9 @@ class TestHeartbeat:
         hb.stop()
 
     def test_heartbeat_calls_subsystems(self):
-        from core.logger import Heartbeat
         import logging
+
+        from core.logger import Heartbeat
 
         called = []
 
@@ -152,8 +150,9 @@ class TestHeartbeat:
         hb.stop()
 
     def test_heartbeat_handles_subsystem_error(self):
-        from core.logger import Heartbeat
         import logging
+
+        from core.logger import Heartbeat
 
         def broken():
             raise RuntimeError("subsystem fail")
@@ -165,24 +164,27 @@ class TestHeartbeat:
 
 class TestInitializeLogging:
     def test_initialize_returns_logger(self):
-        from core.logger import initialize_logging
         import logging
+
+        from core.logger import initialize_logging
 
         logger = initialize_logging("test_init", level=logging.DEBUG, log_to_file=False)
         assert logger is not None
         assert logger.name == "test_init"
 
     def test_initialize_twice_returns_same_root_config(self):
-        from core.logger import initialize_logging
         import logging
+
+        from core.logger import initialize_logging
 
         l1 = initialize_logging("mod_a", level=logging.INFO, log_to_file=False)
         l2 = initialize_logging("mod_b", level=logging.INFO, log_to_file=False)
         assert l1 is not l2
 
     def test_get_recent_logs(self):
-        from core.logger import initialize_logging, get_recent_logs
         import logging
+
+        from core.logger import get_recent_logs, initialize_logging
 
         initialize_logging("recent_test", level=logging.DEBUG, log_to_file=False)
         logger = logging.getLogger("recent_test")
@@ -202,8 +204,8 @@ class TestEventBusHandler:
 
 class TestHelpers:
     def test_get_recent_logs_no_handler(self):
-        from core.logger import get_recent_logs
         import core.logger
+        from core.logger import get_recent_logs
 
         saved = core.logger._circular_handler
         core.logger._circular_handler = None

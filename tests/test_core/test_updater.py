@@ -1,8 +1,8 @@
 """Tests for the plugin update checker."""
 
 import json
+
 import pytest
-from pathlib import Path
 
 
 class TestExtractVersion:
@@ -33,8 +33,9 @@ class TestExtractVersion:
 
 class TestParseRemoteVersion:
     def test_github_release(self, monkeypatch):
-        from core.api.updater import _parse_remote_version
         import urllib.request
+
+        from core.api.updater import _parse_remote_version
 
         def fake_urlopen(req, **_kw):
             data = json.dumps({"tag_name": "v1.2.3"}).encode("utf-8")
@@ -44,8 +45,9 @@ class TestParseRemoteVersion:
         assert _parse_remote_version("https://api.github.com/repos/user/repo/releases/latest") == "1.2.3"
 
     def test_github_release_no_v(self, monkeypatch):
-        from core.api.updater import _parse_remote_version
         import urllib.request
+
+        from core.api.updater import _parse_remote_version
 
         def fake_urlopen(req, **_kw):
             data = json.dumps({"tag_name": "2.0.0"}).encode("utf-8")
@@ -55,8 +57,9 @@ class TestParseRemoteVersion:
         assert _parse_remote_version("https://api.github.com/repos/user/repo/releases/latest") == "2.0.0"
 
     def test_direct_json_with_version(self, monkeypatch):
-        from core.api.updater import _parse_remote_version
         import urllib.request
+
+        from core.api.updater import _parse_remote_version
 
         def fake_urlopen(req, **_kw):
             data = json.dumps({"version": "3.0.1"}).encode("utf-8")
@@ -66,8 +69,9 @@ class TestParseRemoteVersion:
         assert _parse_remote_version("https://example.com/version.json") == "3.0.1"
 
     def test_plain_text_version(self, monkeypatch):
-        from core.api.updater import _parse_remote_version
         import urllib.request
+
+        from core.api.updater import _parse_remote_version
 
         def fake_urlopen(req, **_kw):
             return _FakeResponse(b"1.2.3\n")
@@ -76,8 +80,9 @@ class TestParseRemoteVersion:
         assert _parse_remote_version("https://example.com/version.txt") == "1.2.3"
 
     def test_unreachable_returns_none(self, monkeypatch):
-        from core.api.updater import _parse_remote_version
         import urllib.request
+
+        from core.api.updater import _parse_remote_version
 
         def fake_urlopen(req, **_kw):
             raise urllib.error.URLError("timeout")
@@ -98,8 +103,9 @@ class TestPluginUpdateChecker:
         assert results == []
 
     def test_check_updates_reports_available(self, monkeypatch):
-        from core.api.updater import PluginUpdateChecker
         import urllib.request
+
+        from core.api.updater import PluginUpdateChecker
 
         def fake_urlopen(req, **_kw):
             return _FakeResponse(json.dumps({"tag_name": "v2.0.0"}).encode("utf-8"))
@@ -119,8 +125,9 @@ class TestPluginUpdateChecker:
         assert results[0]["current_version"] == "1.0.0"
 
     def test_check_updates_reports_current(self, monkeypatch):
-        from core.api.updater import PluginUpdateChecker
         import urllib.request
+
+        from core.api.updater import PluginUpdateChecker
 
         def fake_urlopen(req, **_kw):
             return _FakeResponse(json.dumps({"tag_name": "v1.0.0"}).encode("utf-8"))
@@ -138,8 +145,9 @@ class TestPluginUpdateChecker:
         assert results[0]["update_available"] is False
 
     def test_check_updates_handles_fetch_error(self, monkeypatch):
-        from core.api.updater import PluginUpdateChecker
         import urllib.request
+
+        from core.api.updater import PluginUpdateChecker
 
         def fake_urlopen(req, **_kw):
             raise urllib.error.URLError("timeout")
@@ -164,8 +172,9 @@ class TestPluginUpdateChecker:
         assert checker.get_cached_status("nonexistent") is None
 
     def test_cached_status_after_check(self, monkeypatch):
-        from core.api.updater import PluginUpdateChecker
         import urllib.request
+
+        from core.api.updater import PluginUpdateChecker
 
         def fake_urlopen(req, **_kw):
             return _FakeResponse(json.dumps({"tag_name": "v1.0.0"}).encode("utf-8"))

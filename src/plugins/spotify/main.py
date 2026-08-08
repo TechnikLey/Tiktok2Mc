@@ -1,19 +1,17 @@
-import json
-import time
-import threading
-import webbrowser
-import base64
 import hashlib
+import logging
 import os
-import urllib.request
-from urllib.parse import urlencode
+import threading
+import time
+import webbrowser
 from pathlib import Path
+from urllib.parse import urlencode
 
 import requests
-import logging
+
 from core.base_plugin import BasePlugin
-from core.yaml_utils import load_yaml, save_yaml
 from core.secure_storage import secure_storage
+from core.yaml_utils import load_yaml, save_yaml
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +61,7 @@ class SpotifyClient:
                 self.access_token = secure_storage.decrypt(cfg.get("access_token")) or None
                 self.refresh_token = secure_storage.decrypt(cfg.get("refresh_token")) or None
                 self.expires_at = cfg.get("token_expires_at", 0)
-            except Exception as e:  # noqa: BLE001  # token load is best-effort; plugin starts without auth
+            except Exception as e:  # token load is best-effort; plugin starts without auth
                 log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
@@ -74,7 +72,7 @@ class SpotifyClient:
                 cfg["refresh_token"] = secure_storage.encrypt(self.refresh_token) or ""
                 cfg["token_expires_at"] = int(self.expires_at) if self.expires_at else 0
                 save_yaml(self.config_path, cfg)
-            except Exception as e:  # noqa: BLE001  # token persistence is best-effort
+            except Exception as e:  # token persistence is best-effort
                 log.info(f"[SPOTIFY] Failed to save tokens: {e}")
 
     @property
@@ -350,7 +348,7 @@ class SpotifyControlPlugin(BasePlugin):
         try:
             if self._client.is_authenticated:
                 self._notify_overlay()
-        except Exception as e:  # noqa: BLE001  # tick polling must never kill the plugin thread
+        except Exception as e:  # tick polling must never kill the plugin thread
             log.info(f"[SPOTIFY-POLL] Error: {e}")
 
     # -- command handlers ---------------------------------------------------

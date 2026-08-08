@@ -1,16 +1,16 @@
-from pathlib import Path
-from threading import Lock
 import logging
 from datetime import datetime
+from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from ruamel.yaml.comments import CommentedMap
 
 import core.paths
 from core.utils import normalize_config_version
-from core.version import EXPECTED_CONFIG_VERSION
-from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
 from core.validation_framework import validate_config_schema
+from core.version import EXPECTED_CONFIG_VERSION
+from core.yaml_utils import deep_update_rt, load_yaml, save_yaml
 
 log = logging.getLogger(__name__)
 

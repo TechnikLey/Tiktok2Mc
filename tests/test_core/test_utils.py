@@ -1,6 +1,6 @@
-import pytest
 from pathlib import Path
-import yaml
+
+import pytest
 
 
 class TestLoadConfig:

@@ -1,4 +1,3 @@
-import pytest
 
 
 class TestEventCommandsEndpoints:
@@ -51,7 +50,7 @@ class TestEventCommandsEndpoints:
         assert cfg["event_commands"]["timer.zero"][0]["args"]["amount"] == 1
 
     def test_update_event_commands_overwrites(self, client, project_dir):
-        from core.yaml_utils import save_yaml, load_yaml
+        from core.yaml_utils import load_yaml, save_yaml
         data_file = project_dir / "data" / "event_commands.yaml"
         data_file.parent.mkdir(parents=True, exist_ok=True)
         save_yaml(data_file, {

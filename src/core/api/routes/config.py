@@ -26,7 +26,7 @@ async def get_config():
         cfg = svc.read_config()
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to read config")
         raise HTTPException(status_code=500, detail=str(e))
     return ConfigResponse(path=str(svc.config_path), config=cfg)
@@ -37,7 +37,7 @@ async def update_config(body: ConfigUpdateRequest):
     svc = _get_service()
     try:
         svc.write_config(body.config, backup=body.backup)
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to write config")
         raise HTTPException(status_code=500, detail=str(e))
     return ConfigResponse(path=str(svc.config_path), config=body.config)

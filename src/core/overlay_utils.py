@@ -1,16 +1,15 @@
-import time
-import threading
 import json
+import logging
+import threading
+import time
 import urllib.error
 import urllib.request
-import logging
-from pathlib import Path
 from typing import Any
 
 from ruamel.yaml.error import YAMLError
 
-from core.yaml_utils import load_yaml
 from core.paths import get_config_file
+from core.yaml_utils import load_yaml
 
 log = logging.getLogger(__name__)
 

@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
-from core.paths import get_root_dir
-import logging
+
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import YAMLError
-from core.yaml_utils import load_yaml
-from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
-from core.health_monitor import get_health_monitor, HealthState
+
 from core.crash_manager import get_crash_manager
 from core.error_codes import MC_0002, MC_0003
-from core.java_utils import ensure_java, MIN_JAVA_VERSION
+from core.health_monitor import HealthState, get_health_monitor
+from core.java_utils import MIN_JAVA_VERSION, ensure_java
+from core.logger import (
+    handle_unhandled_exception,
+    initialize_logging,
+    install_global_exception_hook,
+    start_heartbeat,
+)
+from core.paths import get_root_dir
+from core.yaml_utils import load_yaml
 
 log = initialize_logging(__name__)
 install_global_exception_hook("server")
@@ -332,7 +338,7 @@ except FileNotFoundError:
 except KeyboardInterrupt:
     log.info("\nServer was stopped manually.")
     health.set_state("mc_server", HealthState.STOPPED)
-except Exception as e:  # noqa: BLE001  # top-level boundary: report via crash manager and exit
+except Exception as e:  # top-level boundary: report via crash manager and exit
     log.error("Failed to start Minecraft server: %s", e)
     crash_mgr.report_exception(MC_0003, exc=e, context_info={"detail": str(e)})
     handle_unhandled_exception("server")

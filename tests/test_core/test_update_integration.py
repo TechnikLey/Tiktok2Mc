@@ -5,13 +5,9 @@ across version boundaries (v0.x → v1.0.0) by patching subprocess
 and HTTP calls.
 """
 
-import json
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
-
+from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -110,6 +106,7 @@ class TestVersionBoundaryUpgrade:
 
         # Simulate what run_update does: copy files + migrate config
         import shutil
+
         import yaml
 
         # Copy whitelisted files (like update.py does)
@@ -127,14 +124,6 @@ class TestVersionBoundaryUpgrade:
 
         # Migrate config
         from python.update import migrate_config_if_needed
-        from python.update import (
-            BASE_DIR as _BASE_DIR,
-            CONFIG_FILE as _CONFIG_FILE,
-            DEFAULT_CONFIG_FILE as _DEFAULT_CONFIG_FILE,
-            VERSION_FILE as _VERSION_FILE,
-            TEMP_DIR as _TEMP_DIR,
-            cfg as _cfg,
-        )
 
         with patch("python.update.BASE_DIR", base), \
              patch("python.update.CONFIG_FILE", paths["config"]), \

@@ -5,8 +5,8 @@ routes were intentionally removed — shutdown coordination is handled
 by the supervisor directly.  Only ``/shutdown/now`` (hard exit) remains.
 """
 
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from core.lifecycle import SupervisorState
@@ -32,8 +32,8 @@ def mock_supervisor(monkeypatch):
     def _get_supervisor():
         return supervisor
 
-    import core.lifecycle
     import core.api.routes.system as system_routes
+    import core.lifecycle
 
     monkeypatch.setattr(core.lifecycle, "get_supervisor", _get_supervisor)
     monkeypatch.setattr(system_routes, "get_supervisor", _get_supervisor)

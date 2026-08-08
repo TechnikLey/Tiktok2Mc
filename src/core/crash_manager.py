@@ -20,20 +20,18 @@ import sys
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from concurrent.futures import Future
-from typing import Any, Callable, Optional
+from typing import Any
 
 from core.error_codes import (
     CORE_0001,
     CORE_0002,
-    CORE_0004,
     ErrorCode,
     ErrorInstance,
     Severity,
-    Subsystem,
-    get_error_code,
 )
-from core.health_monitor import get_health_monitor, HealthState
+from core.health_monitor import get_health_monitor
 
 log = logging.getLogger(__name__)
 
@@ -165,9 +163,9 @@ class CrashManager:
         self,
         error_code: ErrorCode,
         exc: BaseException,
-        exc_type: Optional[type] = None,
-        exc_tb: Optional[Any] = None,
-        context_info: Optional[dict[str, Any]] = None,
+        exc_type: type | None = None,
+        exc_tb: Any | None = None,
+        context_info: dict[str, Any] | None = None,
     ) -> ErrorInstance:
         """Report an exception with a structured error code.
 
@@ -222,7 +220,7 @@ class CrashManager:
         self,
         error_code: ErrorCode,
         detail: str = "",
-        context_info: Optional[dict[str, Any]] = None,
+        context_info: dict[str, Any] | None = None,
     ) -> ErrorInstance:
         """Report a non-exception error with a structured error code."""
         self._crash_count += 1
@@ -321,7 +319,7 @@ class CrashManager:
         def _wrapped() -> None:
             try:
                 target()
-            except Exception as exc:  # noqa: BLE001  # supervision must capture any exception from wrapped target
+            except Exception as exc:  # supervision must capture any exception from wrapped target
                 self.report_exception(
                     error_code=CORE_0002,
                     exc=exc,
@@ -339,7 +337,7 @@ class CrashManager:
             return await coro
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # noqa: BLE001  # supervision must capture any exception from wrapped coroutine
+        except Exception as exc:  # supervision must capture any exception from wrapped coroutine
             self.report_exception(
                 error_code=CORE_0001,
                 exc=exc,

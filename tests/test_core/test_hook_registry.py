@@ -1,4 +1,3 @@
-from pathlib import Path
 import pytest
 
 
@@ -62,8 +61,9 @@ class TestHookRegistration:
         assert restored.capabilities == ["chat"]
 
     def test_registered_at_defaults(self):
-        from core.hook_registry import HookRegistration
         import time
+
+        from core.hook_registry import HookRegistration
 
         before = time.time()
         r = HookRegistration(name="timing")
@@ -206,8 +206,8 @@ class TestHookRegistry:
 
 class TestGetHookRegistry:
     def test_singleton(self):
-        from core.hook_registry import get_hook_registry
         import core.hook_registry as hr
+        from core.hook_registry import get_hook_registry
 
         hr._registry = None
         r1 = get_hook_registry()

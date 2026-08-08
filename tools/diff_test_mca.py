@@ -9,13 +9,11 @@ Usage:
     python tools/diff_test_mca.py [--count N] [--seed S]
 """
 
-import re
-import sys
 import json
 import random
-import subprocess
 import shutil
-import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -26,8 +24,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from core.validator import validate_text, Severity, Diagnostic
-
+from core.validator import validate_text
 
 # ── Test case generators ────────────────────────────────────────────────
 

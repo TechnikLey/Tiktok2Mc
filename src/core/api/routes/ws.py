@@ -71,7 +71,7 @@ async def websocket_endpoint(ws: WebSocket):
 
     try:
         await asyncio.gather(reader(), writer())
-    except Exception:  # noqa: BLE001  # socket teardown errors are expected; nothing to surface
+    except Exception:  # socket teardown errors are expected; nothing to surface
         pass
     finally:
         async with state_lock:

@@ -7,27 +7,31 @@ Each window loads its rendered HTML from the central API server.
 This replaces the former ``plugins/overlaytxt/main.py`` plugin process.
 """
 
-import sys
-import os
-
 import argparse
-import logging
+import os
+import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 # Ensure src/ is on the path for development runs.
 _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.paths import get_base_dir
-from core.api.server import DEFAULT_PORT
-from core.yaml_utils import load_yaml
 from ruamel.yaml.error import YAMLError
-from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
-from core.health_monitor import get_health_monitor, HealthState
+
+from core.api.server import DEFAULT_PORT
 from core.crash_manager import get_crash_manager
+from core.health_monitor import HealthState, get_health_monitor
+from core.logger import (
+    handle_unhandled_exception,
+    initialize_logging,
+    install_global_exception_hook,
+    start_heartbeat,
+)
+from core.paths import get_base_dir
+from core.yaml_utils import load_yaml
 
 log = initialize_logging(__name__)
 
@@ -61,7 +65,7 @@ def _api_ready(timeout: float = 20.0) -> bool:
             with urllib.request.urlopen(f"{API_URL}/api/v1/health", timeout=1) as resp:
                 if resp.status == 200:
                     return True
-        except Exception:  # noqa: BLE001  # readiness polling must keep retrying on any error
+        except Exception:  # readiness polling must keep retrying on any error
             pass
         time.sleep(0.5)
     return False
@@ -121,7 +125,7 @@ def main() -> None:
     except ImportError as exc:
         log.error("pywebview not installed: %s", exc)
         sys.exit(1)
-    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend failure
+    except Exception as exc:  # process exits with hints on any GUI backend failure
         hint = _linux_install_hint()
         log.error("GUI backend failed to load: %s", exc)
         if hint:
@@ -148,7 +152,7 @@ def main() -> None:
             webview.start(gui='qt')
         else:
             webview.start()
-    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend error
+    except Exception as exc:  # process exits with hints on any GUI backend error
         hint = _linux_install_hint()
         log.error("GUI backend error: %s", exc)
         if hint:
@@ -169,7 +173,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("Overlay interrupted by user.")
         health.set_state("overlay", HealthState.STOPPED)
-    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
+    except Exception:  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("overlay")
         health.set_state("overlay", HealthState.FAILED)
         sys.exit(1)

@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-from core import load_config, parse_args, get_plugin_dir, get_plugin_config_file, get_base_file
-import sys
 import logging
+import sys
+
+from core import (
+    get_base_file,
+    get_plugin_config_file,
+    get_plugin_dir,
+    load_config,
+    parse_args,
+)
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
 log = logging.getLogger(__name__)
 

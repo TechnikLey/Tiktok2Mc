@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import shutil
 import time
@@ -22,7 +21,11 @@ from typing import Any
 
 from packaging import version as version_parse
 
-from core.checksum import compute_sha256, fetch_checksum, find_checksum_asset_url, verify_checksum
+from core.checksum import (
+    fetch_checksum,
+    find_checksum_asset_url,
+    verify_checksum,
+)
 
 log = logging.getLogger(__name__)
 
@@ -122,7 +125,6 @@ def check_tool_update(current_version: str) -> dict[str, Any]:
 
     Returns a dict with keys matching ``ToolUpdateCheckResponse``.
     """
-    from core.api.models import API_VERSION
 
     result: dict[str, Any] = {
         "current_version": current_version,

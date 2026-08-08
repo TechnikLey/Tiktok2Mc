@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ class HookManifest:
         self.min_api_version: str = data.get("min_api_version", "1.0.0")
         self.capabilities: list[str] = data.get("capabilities", [])
         self.plugin: str = data.get("plugin", "")
-        self.config_schema: Optional[dict] = data.get("config_schema")
+        self.config_schema: dict | None = data.get("config_schema")
         self.update_url: str = data.get("update_url", "")
         self.depends_on: list[str] = data.get("depends_on", [])
 
@@ -34,7 +33,7 @@ class HookManifest:
         return bool(self.name)
 
 
-def load_hook_manifest(hook_dir: Path) -> Optional[HookManifest]:
+def load_hook_manifest(hook_dir: Path) -> HookManifest | None:
     """Read ``hook.json`` from a hook directory.
 
     Returns ``None`` if the file doesn't exist or is invalid.

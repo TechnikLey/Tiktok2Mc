@@ -6,7 +6,8 @@ the absence of the API server gracefully.
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 import pytest
 
 _src = Path(__file__).resolve().parent.parent.parent / "src"
@@ -76,6 +77,7 @@ class TestActionsAPIOfflineBlocking:
     def test_get_actions_returns_error_on_service_failure(self, monkeypatch):
         """When ActionsService fails, route should return 500."""
         from fastapi import HTTPException
+
         from core.api.routes.actions import get_actions
 
         monkeypatch.setattr(
@@ -90,9 +92,9 @@ class TestActionsAPIOfflineBlocking:
 
     def test_actions_service_lazy_initialization(self):
         """_get_service should create service on first call."""
-        from core.api.routes.actions import _get_service, _service
         # Reset internal state for test
         import core.api.routes.actions as actions_mod
+        from core.api.routes.actions import _get_service
         actions_mod._service = None
         svc = _get_service()
         assert svc is not None

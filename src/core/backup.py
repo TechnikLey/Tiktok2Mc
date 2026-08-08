@@ -28,9 +28,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from core.error_codes import BACKUP_0001, BACKUP_0002
-from core.crash_manager import get_crash_manager
-
 log = logging.getLogger(__name__)
 
 # ── defaults ──────────────────────────────────────────────────────────

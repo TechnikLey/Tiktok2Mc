@@ -25,12 +25,12 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import YAMLError
 
-from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
+from core.yaml_utils import deep_update_rt, load_yaml, save_yaml
 
 log = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ def discover_plugins_dir() -> Path:
     return dev_dir
 
 
-def load_plugin_manifest(plugin_dir: Path) -> Optional[dict]:
+def load_plugin_manifest(plugin_dir: Path) -> dict | None:
     """Read ``plugin.json`` from the given plugin directory."""
     manifest_path = plugin_dir / "plugin.json"
     if not manifest_path.exists():
@@ -358,7 +358,7 @@ def _validate_field_value(value: Any, field: dict, path: str) -> list[str]:
     return errors
 
 
-def validate_plugin_config(data: dict, schema: Optional[dict]) -> list[str]:
+def validate_plugin_config(data: dict, schema: dict | None) -> list[str]:
     """Validate *data* against the given schema.
 
     Returns a list of human-readable error strings (empty on success).
@@ -400,7 +400,7 @@ def load_all_plugin_configs() -> dict[str, dict]:
             continue
         try:
             result[name] = load_plugin_config(child)
-        except Exception as exc:  # noqa: BLE001  # one broken plugin must not break config loading
+        except Exception as exc:  # one broken plugin must not break config loading
             log.warning("Failed to load config for plugin '%s': %s", name, exc)
             result[name] = {}
 

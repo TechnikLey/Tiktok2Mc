@@ -7,7 +7,6 @@ from typing import Any
 from core.trigger_engine.dispatcher import BridgeDispatcher
 from core.trigger_engine.models import (
     EngineConfig,
-    ExecutionStatus,
     TriggerDefinition,
     TriggerResult,
     TriggerType,
@@ -182,7 +181,7 @@ class TriggerEngine:
                 error_detail=str(exc),
                 start_time=start,
             )
-        except Exception as exc:  # noqa: BLE001  # never raise: convert to structured TriggerResult
+        except Exception as exc:  # never raise: convert to structured TriggerResult
             result = TriggerResult.exception_result(
                 trigger_name=trigger_name,
                 payload=payload,
@@ -246,7 +245,7 @@ class TriggerEngine:
                 error_detail=str(exc),
                 start_time=start,
             )
-        except Exception as exc:  # noqa: BLE001  # never raise: convert to structured TriggerResult
+        except Exception as exc:  # never raise: convert to structured TriggerResult
             result = TriggerResult.exception_result(
                 trigger_name="comment",
                 payload=payload,

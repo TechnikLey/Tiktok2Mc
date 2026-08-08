@@ -16,12 +16,12 @@ from fastapi import APIRouter, HTTPException
 
 from core.api.eventbus import event_bus
 from core.api.models import (
+    TiktokToggleResponse,
     TriggerCommentRequest,
     TriggerExecuteRequest,
     TriggerHistoryResponse,
     TriggerResponse,
     TriggerTypesResponse,
-    TiktokToggleResponse,
 )
 from core.api.services.trigger_service import get_trigger_service
 
@@ -35,7 +35,7 @@ async def list_trigger_types():
     try:
         types = get_trigger_service().get_event_types()
         return TriggerTypesResponse(types=types)
-    except Exception as exc:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to list trigger types")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -72,7 +72,7 @@ async def execute_trigger(body: TriggerExecuteRequest):
         )
     except HTTPException:
         raise
-    except Exception as exc:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Trigger execution failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -97,7 +97,7 @@ async def toggle_tiktok_connection():
         )
     except HTTPException:
         raise
-    except Exception as exc:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("TikTok toggle failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -134,7 +134,7 @@ async def send_test_comment(body: TriggerCommentRequest):
         )
     except HTTPException:
         raise
-    except Exception as exc:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Comment trigger failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -144,6 +144,6 @@ async def get_trigger_history():
     try:
         entries = get_trigger_service().get_history()
         return TriggerHistoryResponse(history=entries)
-    except Exception as exc:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get trigger history")
         raise HTTPException(status_code=500, detail=str(exc))

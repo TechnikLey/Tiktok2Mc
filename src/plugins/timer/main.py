@@ -13,7 +13,6 @@ Published EventBus events:
     timer.tick, timer.zero, timer.milestone
 """
 
-import time
 import logging
 
 from core.base_plugin import BasePlugin

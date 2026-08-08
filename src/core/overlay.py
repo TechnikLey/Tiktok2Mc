@@ -15,15 +15,15 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
-import time
 import threading
-from pathlib import Path
+import time
 from typing import Any
 
+from ruamel.yaml.error import YAMLError
+
+from core.paths import get_config_file
 from core.theme import load_plugin_theme, theme_css
 from core.yaml_utils import load_yaml
-from core.paths import get_config_file
-from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -318,7 +318,7 @@ class OverlayManager:
             )
             client.mark_success()
             return True
-        except Exception as exc:  # noqa: BLE001  # dispatch must never throw to trigger engine
+        except Exception as exc:  # dispatch must never throw to trigger engine
             log.error("[OVERLAY] Dispatch to %s failed: %s", client.name, exc)
             client.mark_failure()
         return False

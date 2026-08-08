@@ -1,7 +1,6 @@
 """Tests for ``GET /api/v1/updates/check``."""
 
 import json
-import pytest
 
 
 class TestToolUpdateCheck:
@@ -58,6 +57,7 @@ class TestToolUpdateCheck:
 
     def test_no_update_when_same_version(self, client, monkeypatch):
         import urllib.request
+
         from core.api.models import API_VERSION
 
         def fake_urlopen(req, **_kw):
@@ -113,8 +113,9 @@ class TestToolUpdateCheck:
         assert result["current_version"] == "1.0.0"
 
     def test_check_tool_update_with_mocked_newer(self, monkeypatch):
-        from core.api.updater import check_tool_update
         import urllib.request
+
+        from core.api.updater import check_tool_update
 
         def fake_urlopen(req, **_kw):
             data = {
@@ -130,8 +131,9 @@ class TestToolUpdateCheck:
         assert result["latest_version"] == "2.0.0"
 
     def test_check_tool_update_with_mocked_error(self, monkeypatch):
-        from core.api.updater import check_tool_update
         import urllib.request
+
+        from core.api.updater import check_tool_update
 
         def fake_urlopen(req, **_kw):
             raise urllib.error.URLError("network error")
@@ -142,8 +144,9 @@ class TestToolUpdateCheck:
         assert result["update_available"] is False
 
     def test_check_tool_update_empty_tag(self, monkeypatch):
-        from core.api.updater import check_tool_update
         import urllib.request
+
+        from core.api.updater import check_tool_update
 
         def fake_urlopen(req, **_kw):
             data = {"tag_name": ""}

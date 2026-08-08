@@ -1,11 +1,7 @@
 """Lifecycle tests: signal file concept, manifest discovery, health check, bridge init."""
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
-
 
 # =========================================================================
 # Signal file concept

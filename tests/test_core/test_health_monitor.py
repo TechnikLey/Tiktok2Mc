@@ -1,7 +1,5 @@
-import time
 import threading
-import pytest
-from unittest.mock import MagicMock, patch
+import time
 
 
 class TestHealthState:

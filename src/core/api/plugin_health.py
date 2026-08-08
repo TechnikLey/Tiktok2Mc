@@ -6,13 +6,12 @@ unhealthy.  Active process-level health checking is done by
 ``start.py`` which calls into this module via the API.
 """
 
-import time
 import asyncio
 import logging
+import time
 from threading import Lock
 
 from core.api.registry import get_registry
-from core.api.eventbus import event_bus
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class PluginHealthMonitor:
                 self._check_health()
             except asyncio.CancelledError:
                 break
-            except Exception:  # noqa: BLE001  # health monitor loop must never die
+            except Exception:  # health monitor loop must never die
                 log.exception("Health monitor check failed")
 
     def _check_health(self) -> None:

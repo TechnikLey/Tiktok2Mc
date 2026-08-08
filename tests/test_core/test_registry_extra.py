@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import pytest
 
@@ -42,7 +41,6 @@ class TestPluginRegistryBackup:
         reg_file = tmp_path / "api_plugin_registry.json"
         reg_file.write_text("{corrupt json", encoding="utf-8")
 
-        from core.api.registry import PluginRegistry
 
         registry = PluginRegistry(tmp_path)
         assert registry.list() == []
@@ -58,7 +56,6 @@ class TestPluginRegistryBackup:
             ]),
             encoding="utf-8",
         )
-        from core.api.registry import PluginRegistry
 
         registry = PluginRegistry(tmp_path)
         names = [p.name for p in registry.list()]
@@ -78,8 +75,8 @@ class TestPluginRegistryBackupNumbering:
             reg_file.unlink()
 
     def test_backup_numbers_increment(self, project_dir):
-        from core.api.registry import PluginRegistry
         from core.api.models import PluginRegistration
+        from core.api.registry import PluginRegistry
 
         # Pre-seed the registry file so that __init__ triggers a startup backup.
         reg_file = project_dir / "api_plugin_registry.json"

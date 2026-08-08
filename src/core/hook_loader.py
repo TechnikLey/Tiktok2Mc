@@ -3,23 +3,29 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
-import sys
 import logging
+import sys
 from pathlib import Path
-from typing import Optional
 
+from ruamel.yaml.error import YAMLError
+
+from core.crash_manager import get_crash_manager
+from core.error_codes import (
+    HOOK_0002,
+    HOOK_0003,
+    HOOK_0004,
+    HOOK_0005,
+    HOOK_0007,
+)
 from core.hook_api import HookAPI
 from core.hook_manifest import (
-    load_hook_manifest,
-    discover_hooks_dirs,
-    read_hook_version,
     HookManifest,
+    discover_hooks_dirs,
+    load_hook_manifest,
+    read_hook_version,
 )
-from core.hook_registry import get_hook_registry, HookRegistration
-from core.plugin_config import load_plugin_config, save_plugin_config
-from core.crash_manager import get_crash_manager
-from core.error_codes import HOOK_0001, HOOK_0002, HOOK_0003, HOOK_0004, HOOK_0005, HOOK_0007
-from ruamel.yaml.error import YAMLError
+from core.hook_registry import get_hook_registry
+from core.plugin_config import load_plugin_config
 
 log = logging.getLogger(__name__)
 
@@ -258,7 +264,7 @@ def _load_single_hook(
         log.warning("[HOOK] Syntax error in %s: %s", manifest.name, e)
         get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
         return False
-    except Exception as e:  # noqa: BLE001  # hook module code runs here — must never crash the loader
+    except Exception as e:  # hook module code runs here — must never crash the loader
         log.warning("[HOOK] Failed to load %s: %s", manifest.name, e)
         get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
         return False
@@ -268,7 +274,7 @@ def _load_single_hook(
             module.register(api)
             log.info("[HOOK] Loaded: %s v%s", manifest.name, manifest.version)
             return True
-        except Exception as e:  # noqa: BLE001  # hook code runs here — must never crash the loader
+        except Exception as e:  # hook code runs here — must never crash the loader
             log.warning("[HOOK] register() failed in %s: %s", manifest.name, e)
             get_crash_manager().report_exception(HOOK_0005, exc=e, context_info={"hook": manifest.name})
             return False

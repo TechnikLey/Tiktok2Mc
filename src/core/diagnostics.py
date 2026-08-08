@@ -17,10 +17,10 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from core.health_monitor import get_health_monitor, HealthState
-from core.error_codes import list_all_codes, get_error_code
+from core.error_codes import list_all_codes
+from core.health_monitor import get_health_monitor
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def _get_memory_stats() -> dict[str, Any]:
         }
     except ImportError:
         return {}
-    except Exception:  # noqa: BLE001  # diagnostics are best-effort, must never raise
+    except Exception:  # diagnostics are best-effort, must never raise
         return {}
 
 
@@ -97,12 +97,12 @@ def _get_queue_stats(crash_manager: Any = None) -> dict[str, Any]:
             }
         else:
             stats["bridge"] = "not loaded in this process"
-    except Exception:  # noqa: BLE001  # diagnostics are best-effort, must never raise
+    except Exception:  # diagnostics are best-effort, must never raise
         stats["bridge"] = "not available"
     return stats
 
 
-def generate_diagnostics_report(crash_manager: Optional[Any] = None, extra: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def generate_diagnostics_report(crash_manager: Any | None = None, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     """Generate a comprehensive diagnostics snapshot.
 
     This is the main entry point for runtime diagnostics.
@@ -139,7 +139,7 @@ def generate_diagnostics_report(crash_manager: Optional[Any] = None, extra: Opti
     return report
 
 
-def generate_diagnostics_markdown(crash_manager: Optional[Any] = None, extra: Optional[dict[str, Any]] = None) -> str:
+def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[str, Any] | None = None) -> str:
     """Generate a human-readable diagnostics report in Markdown format."""
     report = generate_diagnostics_report(crash_manager, extra)
     lines: list[str] = []

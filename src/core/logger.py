@@ -31,9 +31,10 @@ import threading
 import time
 import traceback
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 # Optional psutil for memory diagnostics
 try:
@@ -73,15 +74,15 @@ class _CircularBufferHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             self._buffer.append(self._formatter.format(record))
-        except Exception:  # noqa: BLE001  # a logging handler must never raise
+        except Exception:  # a logging handler must never raise
             self.handleError(record)
 
-    def get_recent(self, count: int = 100) -> List[str]:
+    def get_recent(self, count: int = 100) -> list[str]:
         return list(self._buffer)[-count:]
 
 
 # Global reference so we can retrieve recent logs without scanning root handlers
-_circular_handler: Optional[_CircularBufferHandler] = None
+_circular_handler: _CircularBufferHandler | None = None
 
 # ---------------------------------------------------------------------------
 # Crash Reporter
@@ -91,18 +92,18 @@ _circular_handler: Optional[_CircularBufferHandler] = None
 class CrashReporter:
     """Generates structured JSON crash reports and tracks recurrence."""
 
-    _history: Dict[str, Dict[str, Any]] = {}
+    _history: dict[str, dict[str, Any]] = {}
     _history_lock = threading.Lock()
 
     def __init__(self, module_name: str, log_dir: Path) -> None:
         self.module_name = module_name
         self.crash_dir = log_dir / "crash_reports"
         self.crash_dir.mkdir(parents=True, exist_ok=True)
-        self._last_signature: Optional[str] = None
+        self._last_signature: str | None = None
         self._last_time: float = 0.0
 
     @staticmethod
-    def _safe_config_snapshot() -> Optional[Dict[str, Any]]:
+    def _safe_config_snapshot() -> dict[str, Any] | None:
         """Attempt to load the active config without crashing."""
         try:
             from core.paths import get_config_file
@@ -111,7 +112,7 @@ class CrashReporter:
             cfg_path = get_config_file()
             if cfg_path.exists():
                 return load_config(cfg_path)
-        except Exception:  # noqa: BLE001  # snapshot is best-effort — must never crash the reporter
+        except Exception:  # snapshot is best-effort — must never crash the reporter
             pass
         return None
 
@@ -138,11 +139,11 @@ class CrashReporter:
 
     def report(
         self,
-        exc_type: Optional[type],
-        exc_value: Optional[BaseException],
-        exc_tb: Optional[Any],
-        recent_logs: List[str],
-    ) -> Optional[Path]:
+        exc_type: type | None,
+        exc_value: BaseException | None,
+        exc_tb: Any | None,
+        recent_logs: list[str],
+    ) -> Path | None:
         """Write a crash report file. Returns the path or None on failure."""
         if exc_type is None or exc_value is None:
             return None
@@ -158,7 +159,7 @@ class CrashReporter:
 
         stack = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "module": self.module_name,
             "python_version": sys.version,
@@ -212,15 +213,15 @@ class Heartbeat:
         self,
         logger: logging.Logger,
         interval: float = _DEFAULT_HEARTBEAT_INTERVAL,
-        subsystems: Optional[List[Callable[[], bool]]] = None,
+        subsystems: list[Callable[[], bool]] | None = None,
     ) -> None:
         self.logger = logger
         self.interval = max(interval, 5.0)
         self.subsystems = subsystems or []
         self._stop_event = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
-    def _memory_snapshot(self) -> Optional[Dict[str, Any]]:
+    def _memory_snapshot(self) -> dict[str, Any] | None:
         if not _PSUTIL_AVAILABLE:
             return None
         try:
@@ -231,7 +232,7 @@ class Heartbeat:
                 "vms_mb": round(mem.vms / (1024 * 1024), 2),
                 "percent": round(proc.memory_percent(), 2),
             }
-        except Exception:  # noqa: BLE001  # memory snapshot is best-effort
+        except Exception:  # memory snapshot is best-effort
             return None
 
     def _loop(self) -> None:
@@ -245,7 +246,7 @@ class Heartbeat:
             for i, check in enumerate(self.subsystems):
                 try:
                     ok = "ok" if check() else "fail"
-                except Exception:  # noqa: BLE001  # a broken subsystem check must not break the heartbeat
+                except Exception:  # a broken subsystem check must not break the heartbeat
                     ok = "error"
                 parts.append(f"subsystem_{i}={ok}")
 
@@ -261,10 +262,10 @@ class Heartbeat:
                 from core.health_monitor import get_health_monitor
                 hm = get_health_monitor()
                 hm.record_heartbeat("process." + (self.logger.name or "unknown"))
-            except Exception:  # noqa: BLE001  # heartbeat reporting is best-effort
+            except Exception:  # heartbeat reporting is best-effort
                 pass
 
-        except Exception as exc:  # noqa: BLE001  # the heartbeat loop must never die
+        except Exception as exc:  # the heartbeat loop must never die
             self.logger.debug("Heartbeat error: %s", exc)
 
     def start(self) -> None:
@@ -308,7 +309,7 @@ class _EventBusHandler(logging.Handler):
                 from core.api.eventbus import event_bus
 
                 self._event_bus = event_bus
-            except Exception:  # noqa: BLE001  # event bus is optional; logging must never block
+            except Exception:  # event bus is optional; logging must never block
                 pass
         return self._event_bus
 
@@ -337,7 +338,7 @@ class _EventBusHandler(logging.Handler):
             # No running loop — best-effort sync publish (should not happen
             # in normal asyncio apps but keeps the handler safe everywhere).
             pass
-        except Exception:  # noqa: BLE001  # a logging handler must never raise
+        except Exception:  # a logging handler must never raise
             self.handleError(record)
 
 
@@ -351,11 +352,11 @@ def _get_log_dir() -> Path:
     return (get_root_dir() / "logs").resolve()
 
 
-def _stop_queue_listener(listener: Optional[logging.handlers.QueueListener]) -> None:
+def _stop_queue_listener(listener: logging.handlers.QueueListener | None) -> None:
     if listener is not None:
         try:
             listener.stop()
-        except Exception:  # noqa: BLE001  # shutdown must never raise
+        except Exception:  # shutdown must never raise
             pass
 
 
@@ -439,7 +440,7 @@ def initialize_logging(
     return logger
 
 
-def get_recent_logs(count: int = 100) -> List[str]:
+def get_recent_logs(count: int = 100) -> list[str]:
     """Retrieve recent log lines from the circular buffer."""
     if _circular_handler is not None:
         return _circular_handler.get_recent(count)
@@ -525,7 +526,7 @@ def handle_unhandled_exception(module_name: str) -> None:
 def start_heartbeat(
     logger: logging.Logger,
     interval: float = _DEFAULT_HEARTBEAT_INTERVAL,
-    subsystems: Optional[List[Callable[[], bool]]] = None,
+    subsystems: list[Callable[[], bool]] | None = None,
 ) -> Heartbeat:
     """Start a periodic heartbeat for the current process."""
     hb = Heartbeat(logger, interval=interval, subsystems=subsystems)

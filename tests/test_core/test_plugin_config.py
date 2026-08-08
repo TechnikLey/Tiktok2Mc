@@ -1,19 +1,16 @@
 import json
-import pytest
-from pathlib import Path
 
 from core.plugin_config import (
-    load_plugin_manifest,
-    load_plugin_config,
-    save_plugin_config,
-    validate_plugin_config,
-    load_all_plugin_configs,
-    discover_plugins_dir,
-    get_plugin_config_path,
+    _deep_update,
     _generate_defaults_from_fields,
     _get_nested,
     _set_nested,
-    _deep_update,
+    get_plugin_config_path,
+    load_all_plugin_configs,
+    load_plugin_config,
+    load_plugin_manifest,
+    save_plugin_config,
+    validate_plugin_config,
 )
 from core.yaml_utils import save_yaml
 

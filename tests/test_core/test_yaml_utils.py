@@ -1,7 +1,7 @@
-import pytest
-from pathlib import Path
 
-from core.yaml_utils import create_yaml_rt, load_yaml, save_yaml, deep_update_rt
+import pytest
+
+from core.yaml_utils import create_yaml_rt, deep_update_rt, load_yaml, save_yaml
 
 
 class TestLoadYaml:

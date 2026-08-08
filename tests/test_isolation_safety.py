@@ -4,7 +4,6 @@ These verify that the write guard is active and that no files outside the
 dedicated test workspace were modified during the test session.
 """
 
-import tempfile
 from pathlib import Path
 
 import pytest

@@ -1,5 +1,6 @@
 import json
 import logging
+
 from core.base_plugin import BasePlugin
 
 log = logging.getLogger(__name__)

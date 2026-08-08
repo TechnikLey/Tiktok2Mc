@@ -37,13 +37,13 @@ async def event_stream(
         q = event_bus.subscribe(*filter_types)
         try:
             # Signal that the connection is established
-            yield f": connected\n\n"
+            yield ": connected\n\n"
             while True:
                 try:
                     msg = await asyncio.wait_for(q.get(), timeout=30)
                     yield f"data: {json.dumps(msg)}\n\n"
                 except asyncio.TimeoutError:
-                    yield f": keepalive\n\n"
+                    yield ": keepalive\n\n"
                 except (ConnectionResetError, ConnectionAbortedError, OSError) as exc:
                     log.debug("SSE client disconnected abruptly: %s", exc)
                     break
@@ -80,6 +80,6 @@ async def inject_event(body: dict):
         return {"status": "ok", "event": event_type}
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to inject event")
         raise HTTPException(status_code=500, detail=str(e))

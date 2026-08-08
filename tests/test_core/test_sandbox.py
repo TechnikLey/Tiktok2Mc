@@ -3,8 +3,6 @@
 import subprocess
 import sys
 
-import pytest
-
 from core.sandbox import PluginSandbox
 
 

@@ -12,7 +12,6 @@ signaling limitation).  The underlying ``EventBus.subscribe()`` /
 ``tests/test_core/test_eventbus.py``.
 """
 
-import pytest
 
 
 class TestWebSocket:
@@ -44,7 +43,6 @@ class TestWebSocket:
 
     def test_websocket_disconnect_cleanup(self, client):
         """WebSocket disconnect unsubscribes from EventBus."""
-        from core.api.eventbus import event_bus
 
         with client.websocket_connect("/api/v1/ws") as ws:
             pass  # disconnect on context exit

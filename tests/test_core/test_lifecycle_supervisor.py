@@ -2,7 +2,6 @@
 
 import asyncio
 import sys
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -215,10 +214,10 @@ class TestReadinessEarlyExit:
 class TestWaitForPort:
     @pytest.mark.asyncio
     async def test_wait_for_port_free_returns_immediately(self, supervisor, tmp_path):
-        from core.lifecycle import _wait_for_port_free
-
         # Use a high ephemeral port that is almost certainly free.
         import socket
+
+        from core.lifecycle import _wait_for_port_free
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))

@@ -1,12 +1,12 @@
 import asyncio
-import time
-import threading
 import logging
+import threading
+import time
 from collections import defaultdict
 from typing import Any
 
 from core.error_codes import CORE_0006
-from core.health_monitor import get_health_monitor, HealthState
+from core.health_monitor import get_health_monitor
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class EventBus:
                 log.warning("Event queue full, dropping %s event", event_type)
                 try:
                     get_health_monitor().record_error("eventbus", f"{CORE_0006.code}: Queue full, dropping {event_type}")
-                except Exception:  # noqa: BLE001, S110  # best-effort health reporting
+                except Exception:  # best-effort health reporting
                     pass
 
 

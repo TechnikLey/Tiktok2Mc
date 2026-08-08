@@ -3,8 +3,8 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from core.api.models import API_VERSION, HealthResponse, StatusDetail
-from core.api.services import ApiService
 from core.api.registry import get_registry
+from core.api.services import ApiService
 from core.api.tiktok_live import get_tiktok_live_tracker
 from core.health_monitor import get_health_monitor as get_global_health_monitor
 
@@ -45,7 +45,7 @@ async def status():
             tiktok_live_last_event=tracker.get("tiktok_live_last_event"),
             tiktok_live_source=tracker.get("tiktok_live_source", ""),
         )
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get status")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -70,6 +70,6 @@ async def health_extended():
             "uptime_seconds": _get_service().get_uptime(),
             "subsystems": global_health.summary(),
         }
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get extended health")
         raise HTTPException(status_code=500, detail=str(e))

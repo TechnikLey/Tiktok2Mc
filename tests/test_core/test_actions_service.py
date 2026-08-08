@@ -1,6 +1,5 @@
 """Tests for the ActionsService parser and serializer."""
 
-import pytest
 from core.api.services.actions import ActionsService, _detect_prefix, _strip_prefix
 
 

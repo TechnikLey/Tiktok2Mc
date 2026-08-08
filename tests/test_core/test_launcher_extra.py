@@ -1,6 +1,5 @@
 import json
 import urllib.request
-from io import BytesIO
 
 
 class _FakeResponse:

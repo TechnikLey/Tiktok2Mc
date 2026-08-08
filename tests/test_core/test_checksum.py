@@ -3,9 +3,11 @@
 import hashlib
 from pathlib import Path
 
-import pytest
-
-from core.checksum import compute_sha256, fetch_checksum, find_checksum_asset_url, verify_checksum
+from core.checksum import (
+    compute_sha256,
+    find_checksum_asset_url,
+    verify_checksum,
+)
 
 
 class TestComputeSha256:

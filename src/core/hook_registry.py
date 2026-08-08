@@ -7,11 +7,11 @@ their versions, enable state, and metadata.
 from __future__ import annotations
 
 import json
-import time
-import threading
 import logging
+import threading
+import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from core.backup import get_backup_manager
 
@@ -75,7 +75,7 @@ class HookRegistration:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "HookRegistration":
+    def from_dict(cls, data: dict) -> HookRegistration:
         return cls(**data)
 
 

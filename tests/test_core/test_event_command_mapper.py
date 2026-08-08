@@ -3,10 +3,10 @@
 Tests the mapping logic without relying on a running event bus.
 """
 
-import json
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 
 class TestEventCommandMapperConfig:
@@ -124,8 +124,8 @@ class TestEventCommandMapperDispatch:
 
     def test_skips_bad_mapping(self, mapper, monkeypatch):
         """Mappings missing target or command are skipped with a warning."""
+
         from core.yaml_utils import save_yaml
-        import copy
 
         # Add a broken mapping directly
         data_dir = Path(mapper._config_path()).parent

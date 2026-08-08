@@ -1,8 +1,9 @@
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import Mock
 from urllib.error import URLError
+
+import pytest
 
 
 def _mock_urlopen_factory(client):
@@ -110,6 +111,7 @@ class TestPluginLauncher:
         import os
         monkeypatch.setitem(os.environ, "API_BASE_URL", "http://127.0.0.1:1/api/v1")
         import importlib
+
         import core.api.launcher as launcher_mod
         importlib.reload(launcher_mod)
         from core.api.launcher import PluginLauncher

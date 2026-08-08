@@ -3,10 +3,11 @@
 # create_hook.py - Event Hook Scaffolding (Cross-Platform)
 # ==========================================
 
-import sys
-import re
-from pathlib import Path
 import logging
+import re
+import sys
+from pathlib import Path
+
 logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
 
 log = logging.getLogger(__name__)
@@ -15,7 +16,6 @@ _src = Path(__file__).resolve().parent / "src"
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from core.version import TOOL_VERSION as VERSION
 
 MAIN_HOOKS_DIR = Path("src/hooks")
 PLUGINS_DIR = Path("src/plugins")
@@ -212,7 +212,7 @@ def main():
     log.info(f"\n\033[92mHook '{hook_name}' created successfully!\033[0m")
     log.info(f"  Location: {hook_path}")
     log.info(f"  Action: ${action_name} (use in actions.mca)")
-    log.info(f"  Register function: register(api) in main.py")
+    log.info("  Register function: register(api) in main.py")
     log.info(f"  Config: api.get_hook_config(\"{hook_name}\")")
 
     input("\nPress Enter to exit...")

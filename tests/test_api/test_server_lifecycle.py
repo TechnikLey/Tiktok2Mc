@@ -1,6 +1,5 @@
 """Tests for server lifecycle Java pre-flight + status/install endpoints."""
 
-import pytest
 
 from core import java_utils
 from core.api.routes import server_lifecycle

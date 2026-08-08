@@ -25,7 +25,6 @@ import inspect
 import json
 import logging
 import os
-import sys
 import threading
 import time
 import urllib.error
@@ -33,10 +32,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from core import parse_args, get_base_dir
+from core import get_base_dir, parse_args
+from core.health_monitor import HealthState, get_health_monitor
 from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
-from core.health_monitor import get_health_monitor, HealthState
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +108,7 @@ class BasePlugin:
             hm = get_health_monitor()
             hm.register(f"plugin.{self.PLUGIN_NAME}", HealthState.STARTING)
             self._health = hm
-        except Exception:  # noqa: BLE001  # health registration is best-effort; plugin must still start
+        except Exception:  # health registration is best-effort; plugin must still start
             self._health = None
 
     # -- properties --------------------------------------------------------
@@ -225,7 +224,7 @@ class BasePlugin:
                 if handler:
                     try:
                         handler(args)
-                    except Exception as e:  # noqa: BLE001  # handler is user code — must never kill the polling loop
+                    except Exception as e:  # handler is user code — must never kill the polling loop
                         log.exception("[%s] Handler '%s' failed: %s", self.PLUGIN_NAME, cmd, e)
                         if self._health:
                             self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"handler '{cmd}' failed: {e}")
@@ -248,7 +247,7 @@ class BasePlugin:
         while self._running:
             try:
                 self.on_tick()
-            except Exception as e:  # noqa: BLE001  # on_tick is user code — must never kill the tick loop
+            except Exception as e:  # on_tick is user code — must never kill the tick loop
                 log.exception("[%s] Tick failed: %s", self.PLUGIN_NAME, e)
                 if self._health:
                     self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"on_tick failed: {e}")

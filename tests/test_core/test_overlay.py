@@ -1,12 +1,8 @@
-import pytest
-from fastapi.testclient import TestClient
 
 from core.overlay import (
-    OverlayConfig,
     OverlayClient,
+    OverlayConfig,
     OverlayManager,
-    get_overlay_manager,
-    send_overlay_text,
 )
 from core.yaml_utils import save_yaml
 

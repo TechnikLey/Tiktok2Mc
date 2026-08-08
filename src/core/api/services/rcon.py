@@ -1,5 +1,6 @@
 import asyncio
 import logging
+
 from mcrcon import MCRcon, MCRconException
 
 log = logging.getLogger(__name__)

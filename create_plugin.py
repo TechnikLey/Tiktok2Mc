@@ -10,10 +10,11 @@
 #   - README.md (documentation)
 # ==========================================
 
-import sys
-import re
-from pathlib import Path
 import logging
+import re
+import sys
+from pathlib import Path
+
 logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
 
 log = logging.getLogger(__name__)

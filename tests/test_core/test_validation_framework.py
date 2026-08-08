@@ -1,5 +1,5 @@
 import asyncio
-from pathlib import Path
+
 import pytest
 
 
@@ -25,8 +25,8 @@ class TestValidationResult:
         assert "[FAIL] check: bad" in r.format()
 
     def test_format_with_error_code(self):
-        from core.validation_framework import ValidationResult
         from core.error_codes import CORE_0004
+        from core.validation_framework import ValidationResult
 
         r = ValidationResult(name="timeout", passed=False, error_code=CORE_0004)
         text = r.format()
@@ -34,8 +34,8 @@ class TestValidationResult:
         assert "[FAIL]" in text
 
     def test_to_dict(self):
-        from core.validation_framework import ValidationResult
         from core.error_codes import Severity
+        from core.validation_framework import ValidationResult
 
         r = ValidationResult(name="x", passed=True, severity=Severity.ERROR)
         d = r.to_dict()
@@ -44,8 +44,8 @@ class TestValidationResult:
         assert d["severity"] == "ERROR"
 
     def test_to_dict_with_error_code(self):
-        from core.validation_framework import ValidationResult
         from core.error_codes import CONFIG_0001
+        from core.validation_framework import ValidationResult
 
         r = ValidationResult(name="cfg", passed=False, error_code=CONFIG_0001)
         d = r.to_dict()
@@ -62,7 +62,7 @@ class TestValidationSuite:
         assert s.failures() == []
 
     def test_all_passed(self):
-        from core.validation_framework import ValidationSuite, ValidationResult
+        from core.validation_framework import ValidationResult, ValidationSuite
 
         s = ValidationSuite(name="all-good")
         s.add(ValidationResult("a", True))
@@ -71,7 +71,7 @@ class TestValidationSuite:
         assert s.failures() == []
 
     def test_some_failed(self):
-        from core.validation_framework import ValidationSuite, ValidationResult
+        from core.validation_framework import ValidationResult, ValidationSuite
 
         s = ValidationSuite(name="partial")
         s.add(ValidationResult("a", True))
@@ -80,8 +80,8 @@ class TestValidationSuite:
         assert len(s.failures()) == 1
 
     def test_warnings(self):
-        from core.validation_framework import ValidationSuite, ValidationResult
         from core.error_codes import Severity
+        from core.validation_framework import ValidationResult, ValidationSuite
 
         s = ValidationSuite(name="w")
         s.add(ValidationResult("a", True, severity=Severity.INFO))
@@ -89,8 +89,8 @@ class TestValidationSuite:
         assert len(s.warnings()) == 1
 
     def test_critical_failures(self):
-        from core.validation_framework import ValidationSuite, ValidationResult
         from core.error_codes import Severity
+        from core.validation_framework import ValidationResult, ValidationSuite
 
         s = ValidationSuite(name="crit")
         s.add(ValidationResult("a", False, severity=Severity.ERROR))
@@ -98,7 +98,7 @@ class TestValidationSuite:
         assert len(s.critical_failures()) == 1
 
     def test_summary(self):
-        from core.validation_framework import ValidationSuite, ValidationResult
+        from core.validation_framework import ValidationResult, ValidationSuite
 
         s = ValidationSuite(name="sum")
         s.add(ValidationResult("a", True))
@@ -109,7 +109,7 @@ class TestValidationSuite:
         assert "[FAIL]" in text
 
     def test_to_dict(self):
-        from core.validation_framework import ValidationSuite, ValidationResult
+        from core.validation_framework import ValidationResult, ValidationSuite
 
         s = ValidationSuite(name="d")
         s.add(ValidationResult("a", True))
@@ -186,8 +186,9 @@ class TestRunWithTimeoutSync:
         assert result.result == 42
 
     def test_sync_timeout(self):
-        from core.validation_framework import run_with_timeout_sync
         import time
+
+        from core.validation_framework import run_with_timeout_sync
 
         def slow():
             time.sleep(10)
@@ -279,8 +280,9 @@ class TestStartupValidation:
         assert result.passed is False
 
     def test_validate_port_free(self):
-        from core.validation_framework import validate_port_free
         import socket
+
+        from core.validation_framework import validate_port_free
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))
@@ -334,8 +336,8 @@ class TestStartupValidation:
 
 class TestRuntimeValidation:
     def test_runtime_validation_healthy(self):
-        from core.validation_framework import validate_runtime
         from core.health_monitor import HealthMonitor, HealthState
+        from core.validation_framework import validate_runtime
 
         hm = HealthMonitor()
         hm.register("svc", HealthState.RUNNING)
@@ -344,8 +346,8 @@ class TestRuntimeValidation:
         assert suite.all_passed() is True
 
     def test_runtime_validation_failed(self):
-        from core.validation_framework import validate_runtime
         from core.health_monitor import HealthMonitor, HealthState
+        from core.validation_framework import validate_runtime
 
         hm = HealthMonitor()
         hm.register("svc", HealthState.FAILED)
@@ -353,8 +355,8 @@ class TestRuntimeValidation:
         assert suite.all_passed() is False
 
     def test_runtime_validation_unknown(self):
-        from core.validation_framework import validate_runtime
         from core.health_monitor import HealthMonitor, HealthState
+        from core.validation_framework import validate_runtime
 
         hm = HealthMonitor()
         hm.register("svc", HealthState.UNKNOWN)
@@ -362,8 +364,8 @@ class TestRuntimeValidation:
         assert suite.all_passed() is False
 
     def test_runtime_validation_missing_component(self):
-        from core.validation_framework import validate_runtime
         from core.health_monitor import HealthMonitor
+        from core.validation_framework import validate_runtime
 
         hm = HealthMonitor()
         suite = validate_runtime(health_monitor=hm, components=["missing"])
@@ -378,8 +380,9 @@ class TestShutdownValidation:
         assert suite.all_passed() is True
 
     def test_shutdown_with_completed_thread(self):
-        from core.validation_framework import validate_shutdown
         import threading
+
+        from core.validation_framework import validate_shutdown
 
         done = threading.Thread(target=lambda: None, name="done")
         done.start()

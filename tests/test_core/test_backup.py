@@ -1,10 +1,6 @@
 """Tests for the BackupManager (core/backup.py)."""
 
-import shutil
-import time
 from pathlib import Path
-
-import pytest
 
 
 class TestReadHash:

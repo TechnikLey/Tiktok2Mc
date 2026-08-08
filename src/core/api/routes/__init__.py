@@ -1,26 +1,26 @@
 from fastapi import APIRouter
 
-from .health import router as health_router
-from .config import router as config_router
-from .plugins import router as plugins_router
-from .plugin_config import router as plugin_config_router
-from .events import router as events_router
-from .ws import router as ws_router
-from .updater import router as updater_router
-from .system import router as system_router
-from .reload import router as reload_router
 from .actions import router as actions_router
-from .plugin_overlay import router as plugin_overlay_router
-from .overlay import router as overlay_router
-from .hooks import router as hooks_router
-from .event_commands import router as event_commands_router
-from .rcon import router as rcon_router
-from .versions import router as versions_router
-from .triggers import router as triggers_router
-from .logs import router as logs_router
-from .servers import router as servers_router
-from .server_lifecycle import router as server_lifecycle_router
+from .config import router as config_router
 from .diagnostics import router as diagnostics_router
+from .event_commands import router as event_commands_router
+from .events import router as events_router
+from .health import router as health_router
+from .hooks import router as hooks_router
+from .logs import router as logs_router
+from .overlay import router as overlay_router
+from .plugin_config import router as plugin_config_router
+from .plugin_overlay import router as plugin_overlay_router
+from .plugins import router as plugins_router
+from .rcon import router as rcon_router
+from .reload import router as reload_router
+from .server_lifecycle import router as server_lifecycle_router
+from .servers import router as servers_router
+from .system import router as system_router
+from .triggers import router as triggers_router
+from .updater import router as updater_router
+from .versions import router as versions_router
+from .ws import router as ws_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)

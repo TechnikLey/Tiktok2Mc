@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from pathlib import Path
-import sys
 import logging
+from pathlib import Path
 from typing import Any
 
 from ruamel.yaml.error import YAMLError

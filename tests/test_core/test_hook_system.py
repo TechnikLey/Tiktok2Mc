@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 import pytest
@@ -48,9 +47,10 @@ def test_each_hook_dir_has_hook_json(hooks_dir):
 
 
 def test_hook_registration(clean_registry, hooks_dir):
-    from core.hook_loader import load_event_hooks
-    from core.hook_api import HookAPI
     import asyncio
+
+    from core.hook_api import HookAPI
+    from core.hook_loader import load_event_hooks
 
     loop = asyncio.new_event_loop()
     rcon_queue = asyncio.Queue()
@@ -67,9 +67,10 @@ def test_hook_registration(clean_registry, hooks_dir):
 
 
 def test_registration_names_are_strings(clean_registry, hooks_dir):
-    from core.hook_loader import load_event_hooks
-    from core.hook_api import HookAPI
     import asyncio
+
+    from core.hook_api import HookAPI
+    from core.hook_loader import load_event_hooks
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
@@ -80,9 +81,10 @@ def test_registration_names_are_strings(clean_registry, hooks_dir):
 
 
 def test_registration_names_are_nonempty(clean_registry, hooks_dir):
-    from core.hook_loader import load_event_hooks
-    from core.hook_api import HookAPI
     import asyncio
+
+    from core.hook_api import HookAPI
+    from core.hook_loader import load_event_hooks
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
@@ -93,9 +95,10 @@ def test_registration_names_are_nonempty(clean_registry, hooks_dir):
 
 
 def test_duplicate_registration_is_ignored(clean_registry, hooks_dir):
-    from core.hook_loader import load_event_hooks
-    from core.hook_api import HookAPI, HOOK_ACTIONS
     import asyncio
+
+    from core.hook_api import HOOK_ACTIONS, HookAPI
+    from core.hook_loader import load_event_hooks
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
@@ -111,8 +114,9 @@ def test_duplicate_registration_is_ignored(clean_registry, hooks_dir):
 
 
 def test_invalid_name_is_rejected(clean_registry):
-    from core.hook_api import HookAPI, HOOK_ACTIONS
     import asyncio
+
+    from core.hook_api import HOOK_ACTIONS, HookAPI
 
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), asyncio.new_event_loop(), {}, set())
     api.register_action("", lambda u, t, c: None)
@@ -123,9 +127,10 @@ def test_invalid_name_is_rejected(clean_registry):
 
 
 def test_api_response_format_matches_endpoint(clean_registry, hooks_dir):
-    from core.hook_loader import load_event_hooks
-    from core.hook_api import HookAPI, HOOK_ACTIONS
     import asyncio
+
+    from core.hook_api import HOOK_ACTIONS, HookAPI
+    from core.hook_loader import load_event_hooks
 
     loop = asyncio.new_event_loop()
     api = HookAPI(asyncio.Queue(), asyncio.Queue(), loop, {}, set())
@@ -154,8 +159,9 @@ def test_spotify_hook_manifest_exists():
 
 
 def test_hook_api_get_hook_config():
-    from core.hook_api import HookAPI
     import asyncio
+
+    from core.hook_api import HookAPI
 
     loop = asyncio.new_event_loop()
     api = HookAPI(

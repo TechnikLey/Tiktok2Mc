@@ -15,21 +15,21 @@
 #   clean            Clean build artifacts
 # ==========================================
 
-import sys
-import os
-import shlex
+import argparse
+import ast
+import fnmatch
 import hashlib
 import json
+import logging
+import os
+import shlex
 import shutil
 import subprocess
-import uuid
+import sys
 import time
-import fnmatch
-import ast
-import argparse
-from pathlib import Path
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -1073,17 +1073,17 @@ def cmd_app(args):
                 raise RuntimeError("One or more build tasks failed.")
 
         if USE_CACHE:
-            cprint(f"\n--- Cache Summary ---", Color.CYAN)
+            cprint("\n--- Cache Summary ---", Color.CYAN)
             total = len(all_build_tasks)
             ok = total - len(cache_missing)
             cprint(f"  Total: {total}  |  From cache: {ok}  |  Missing: {len(cache_missing)}  |  Outdated: {len(cache_outdated)}", Color.CYAN)
             if cache_missing:
-                cprint(f"\n  Missing executables (not in cache):", Color.RED)
+                cprint("\n  Missing executables (not in cache):", Color.RED)
                 for name in cache_missing:
                     cprint(f"    - {name}", Color.RED)
-                cprint(f"\n  Run a full build first:  python build.py app", Color.YELLOW)
+                cprint("\n  Run a full build first:  python build.py app", Color.YELLOW)
             if cache_outdated:
-                cprint(f"\n  Outdated executables (source changed since last build):", Color.YELLOW)
+                cprint("\n  Outdated executables (source changed since last build):", Color.YELLOW)
                 for name in cache_outdated:
                     cprint(f"    - {name}", Color.YELLOW)
 
@@ -1314,19 +1314,19 @@ def cmd_app(args):
         # --- Finish ---
         elapsed = time.time() - start
         minutes, seconds = divmod(elapsed, 60)
-        cprint(f"\n======================================", Color.GREEN)
+        cprint("\n======================================", Color.GREEN)
         cprint(f"Build completed in {int(minutes):02d}:{seconds:06.3f}", Color.GREEN)
-        cprint(f"======================================", Color.GREEN)
+        cprint("======================================", Color.GREEN)
 
     except Exception as e:
         elapsed = time.time() - start
         minutes, seconds = divmod(elapsed, 60)
-        cprint(f"\n======================================", Color.RED)
+        cprint("\n======================================", Color.RED)
         cprint(f"Build FAILED in {int(minutes):02d}:{seconds:06.3f}", Color.RED)
-        cprint(f"======================================", Color.RED)
-        cprint(f"\nError message:", Color.YELLOW)
+        cprint("======================================", Color.RED)
+        cprint("\nError message:", Color.YELLOW)
         cprint(str(e), Color.RED)
-        cprint(f"======================================", Color.RED)
+        cprint("======================================", Color.RED)
         sys.exit(1)
 
 

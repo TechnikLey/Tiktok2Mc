@@ -19,70 +19,74 @@
 #   as a fallback.
 # ==================================================
 
-import sys
-import os
-import subprocess
-import atexit
-import time
-import shutil
-import threading
-import json
-import enum
-import urllib.error
-import urllib.parse
-import urllib.request
-import shlex
 import asyncio
-import logging
-from datetime import datetime
-from pathlib import Path
-from typing import Any
+import atexit
+import json
 
 # multiprocessing is not used by this module, but pre-importing it with
 # freeze_support() keeps PyInstaller happy if a downstream dependency
 # instantiates a ProcessPool.
 import multiprocessing
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 multiprocessing.freeze_support()
 
 # Pre-import uvicorn so the API server task does not trigger a late load of
 # _multiprocessing from a non-main thread.
 try:
-    import uvicorn
-    from core.api import create_app
-except Exception as _exc:  # pragma: no cover  # noqa: BLE001  # pre-import is best-effort
+    pass
+except Exception as _exc:  # pragma: no cover  # pre-import is best-effort
     import logging as _logging
     _pre_log = _logging.getLogger("start.preimport")
     _pre_log.warning("Failed to pre-import uvicorn/core.api: %s", _exc)
 
-from core.models import AppConfig
-from core.utils import load_config
-from core.paths import get_base_dir, get_root_dir
+from core.api.eventbus import event_bus
+from core.api.launcher import PluginLauncher
+from core.api.models import API_VERSION
 from core.api.server import DEFAULT_PORT
-from core.sandbox import PluginSandbox
+from core.crash_manager import CrashManager
+from core.diagnostics import generate_diagnostics_report
+from core.error_codes import CORE_0001, LIFECYCLE_0001
+from core.health_monitor import HealthState, get_health_monitor
 from core.lifecycle import (
-    ProcessSupervisor,
-    get_supervisor,
-    SupervisorState,
     ProcessState,
+    SupervisorState,
+    get_supervisor,
     shutdown_cancel_event,
 )
-from core.api.eventbus import event_bus
-from core.api.models import API_VERSION
+from core.logger import (
+    initialize_logging,
+    install_global_exception_hook,
+    start_heartbeat,
+)
+from core.models import AppConfig
+from core.paths import get_base_dir, get_root_dir
 from core.port_scanner import (
     PortPolicy,
-    scan_bind_ports,
     build_resolved_map,
-    write_runtime_file,
-    ports_to_env,
     persist_to_config,
+    ports_to_env,
+    scan_bind_ports,
+    write_runtime_file,
 )
-from core.api.launcher import PluginLauncher
-from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
-from core.health_monitor import get_health_monitor, HealthState, HealthMonitor
-from core.crash_manager import CrashManager
-from core.error_codes import LIFECYCLE_0001, CORE_0001
-from core.diagnostics import generate_diagnostics_report, generate_diagnostics_markdown
-from core.validation_framework import run_startup_validation, validate_runtime, validate_shutdown, ValidationSuite
+from core.sandbox import PluginSandbox
+from core.utils import load_config
+from core.validation_framework import (
+    run_startup_validation,
+    validate_runtime,
+    validate_shutdown,
+)
 
 log = initialize_logging(__name__)
 
@@ -424,7 +428,7 @@ def _stop_all_atexit():
         if loop.is_running():
             return
         loop.run_until_complete(supervisor.stop_all())
-    except Exception as exc:  # noqa: BLE001  # atexit cleanup is best-effort
+    except Exception as exc:  # atexit cleanup is best-effort
         log.debug("atexit cleanup skipped: %s", exc)
 
 
@@ -456,7 +460,7 @@ def _gui_already_running() -> bool:
                 return False
             else:
                 return True
-    except Exception:  # noqa: BLE001  # lock check is best-effort; false is safe
+    except Exception:  # lock check is best-effort; false is safe
         return False
 
 
@@ -573,6 +577,7 @@ _launcher = PluginLauncher()
 async def start_api_server() -> None:
     """Start the FastAPI/uvicorn server as an asyncio task."""
     import uvicorn
+
     from core.api import create_app
 
     api_key = cfg.get("api_key", "")
@@ -655,7 +660,7 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
             )
             with urllib.request.urlopen(req, timeout=5):
                 pass
-        except Exception:  # noqa: BLE001  # re-raise; surfaced to the health-loop caller
+        except Exception:  # re-raise; surfaced to the health-loop caller
             raise
 
     await asyncio.to_thread(_put)
@@ -673,7 +678,7 @@ async def _restart_server_process() -> None:
         await supervisor.stop("Minecraft Server")
         await supervisor.start("Minecraft Server")
         log.info("Minecraft Server restarted")
-    except Exception as exc:  # noqa: BLE001  # background restart failures are only logged
+    except Exception as exc:  # background restart failures are only logged
         log.exception("Failed to restart Minecraft Server: %s", exc)
 
 
@@ -831,7 +836,7 @@ async def _plugin_health_check_loop() -> None:
             try:
                 await _mark_plugin_dead(proc.name)
                 log.info("Plugin '%s' marked as dead in registry", proc.name)
-            except Exception as exc:  # noqa: BLE001  # health reporting is best-effort
+            except Exception as exc:  # health reporting is best-effort
                 log.warning("Failed to update health for plugin '%s': %s", proc.name, exc)
 
             if _AUTO_RESTART_PLUGINS:
@@ -930,7 +935,7 @@ async def main() -> None:
     try:
         plugin_registry: list[AppConfig] = await asyncio.to_thread(_launcher.get_plugins)
         _register_plugins(plugin_registry)
-    except Exception as exc:  # noqa: BLE001  # non-fatal; reported via crash manager
+    except Exception as exc:  # non-fatal; reported via crash manager
         crash_mgr.report_error(
             LIFECYCLE_0001,
             detail=f"Plugin discovery failed: {exc}",
@@ -1020,7 +1025,7 @@ if __name__ == "__main__":
         # This is normal network behavior and must not crash the supervisor.
         log.warning("[NET] Connection reset by remote host: %s", exc)
         _health_mon.set_state("start_process", HealthState.STOPPED)
-    except Exception:  # noqa: BLE001  # top-level boundary: report via crash manager and exit
+    except Exception:  # top-level boundary: report via crash manager and exit
         crash_mgr.report_exception(
             CORE_0001,
             exc=sys.exc_info()[1],
@@ -1039,5 +1044,5 @@ if __name__ == "__main__":
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(supervisor.stop_all())
                 loop.close()
-            except Exception:  # noqa: BLE001  # best-effort final cleanup
+            except Exception:  # best-effort final cleanup
                 pass

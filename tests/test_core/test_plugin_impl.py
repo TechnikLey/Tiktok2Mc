@@ -4,10 +4,7 @@ All plugins have been refactored to BasePlugin — these tests verify
 command handlers, state logic, and overlay HTML without HTTP calls.
 """
 
-import json
 import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 

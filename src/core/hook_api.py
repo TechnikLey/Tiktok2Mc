@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Callable, Optional
 import logging
+from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
@@ -105,11 +105,11 @@ class HookAPI:
     def log(self, msg: str) -> None:
         log.info(f"[HOOK] {msg}")
 
-    def send_overlay_text(self, title: str, subtitle: Optional[str] = "", duration: Optional[int] = 3, overlay_name: Optional[str] = "default") -> bool:
+    def send_overlay_text(self, title: str, subtitle: str | None = "", duration: int | None = 3, overlay_name: str | None = "default") -> bool:
         try:
             from core.overlay_utils import send_overlay_text as _send_overlay
             return _send_overlay(title, subtitle, duration, overlay_name)
-        except Exception as e:  # noqa: BLE001  # hook boundary: overlay failure must never crash trigger dispatch
+        except Exception as e:  # hook boundary: overlay failure must never crash trigger dispatch
             log.error(f"[HOOK] send_overlay_text failed: {e}")
             return False
 

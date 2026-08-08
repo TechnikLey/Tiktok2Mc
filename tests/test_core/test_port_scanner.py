@@ -1,24 +1,21 @@
-import os
 import json
-import socket
+import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
-import pytest
+from unittest.mock import MagicMock, patch
 
 from core.port_scanner import (
-    PortPolicy,
-    PortCheckResult,
-    is_port_in_use,
-    find_available_port,
-    scan_bind_ports,
-    build_resolved_map,
-    write_runtime_file,
-    clear_runtime_file,
-    get_resolved_port,
-    ports_to_env,
-    persist_to_config,
     RUNTIME_FILE,
-    BIND_PORTS,
+    PortCheckResult,
+    PortPolicy,
+    build_resolved_map,
+    clear_runtime_file,
+    find_available_port,
+    get_resolved_port,
+    is_port_in_use,
+    persist_to_config,
+    ports_to_env,
+    scan_bind_ports,
+    write_runtime_file,
 )
 
 

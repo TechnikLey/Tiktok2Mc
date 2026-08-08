@@ -1,8 +1,10 @@
-from pydantic import BaseModel, Field
 from typing import Any, Optional
 
-from core.version import API_VERSION
+from pydantic import BaseModel, Field
 
+from core.version import (
+    API_VERSION,  # noqa: F401  # re-export: importers use core.api.models.API_VERSION
+)
 
 # ── Plugin Config Schema ──────────────────────────────────────────────
 
@@ -18,12 +20,12 @@ class ConfigSchemaField(BaseModel):
     category: str = Field("General", description="Grouping category for the GUI")
     required: bool = Field(False, description="Whether the field is mandatory")
     secret: bool = Field(False, description="If true, value should be masked in the GUI")
-    min: Optional[int] = Field(None, description="Minimum value (for integer/number)")
-    max: Optional[int] = Field(None, description="Maximum value (for integer/number)")
+    min: int | None = Field(None, description="Minimum value (for integer/number)")
+    max: int | None = Field(None, description="Maximum value (for integer/number)")
     options: list[str] = Field(default_factory=list, description="Allowed values (for select)")
     advanced: bool = Field(False, description="Hide from basic / first-run wizard view")
-    widget: Optional[str] = Field(None, description="GUI widget hint (e.g. 'textarea', 'color')")
-    item_schema: Optional[dict] = Field(None, description="Schema for array items or nested objects")
+    widget: str | None = Field(None, description="GUI widget hint (e.g. 'textarea', 'color')")
+    item_schema: dict | None = Field(None, description="Schema for array items or nested objects")
 
 
 class PluginConfigSchemaModel(BaseModel):
@@ -48,13 +50,13 @@ class StatusDetail(BaseModel):
     plugins_total: int
     config_loaded: bool
     uptime_seconds: float
-    tiktok_live: Optional[bool] = Field(
+    tiktok_live: bool | None = Field(
         None, description="Whether the TikTok live connection is currently active (None = unknown)"
     )
-    tiktok_live_last_update: Optional[float] = Field(
+    tiktok_live_last_update: float | None = Field(
         None, description="Unix timestamp of the last live-status report from the bridge"
     )
-    tiktok_live_last_event: Optional[float] = Field(
+    tiktok_live_last_event: float | None = Field(
         None, description="Unix timestamp of the last genuine TikTok event (test triggers excluded)"
     )
     tiktok_live_source: str = Field(
@@ -87,7 +89,7 @@ class PluginManifest(BaseModel):
     homepage: str = Field("", description="Project URL")
 
     min_api_version: str = Field("1.0.0", description="Lowest API version supported")
-    max_api_version: Optional[str] = Field(
+    max_api_version: str | None = Field(
         None, description="Highest API version supported (None = no limit)"
     )
     capabilities: list[str] = Field(
@@ -106,7 +108,7 @@ class PluginManifest(BaseModel):
         "", description="URL for checking plugin updates (GitHub Releases API or direct)")
     ics: bool = Field(True, description="Interface Control System flag")
     level: int = Field(4, ge=1, le=4, description="Default visibility level")
-    config_schema: Optional[PluginConfigSchemaModel] = Field(
+    config_schema: PluginConfigSchemaModel | None = Field(
         None, description="Schema for plugin-local config (GUI + validation)"
     )
     comment_handler: Optional["CommentHandler"] = Field(
@@ -154,10 +156,10 @@ class PluginRegistration(BaseModel):
         "", description="URL for checking plugin updates")
     author: str = Field("", description="Plugin author or maintainer")
     homepage: str = Field("", description="Project URL")
-    registered_at: Optional[float] = Field(
+    registered_at: float | None = Field(
         None, description="Unix timestamp of first registration"
     )
-    updated_at: Optional[float] = Field(
+    updated_at: float | None = Field(
         None, description="Unix timestamp of last update"
     )
     comment_handler: Optional["CommentHandler"] = Field(
@@ -166,7 +168,7 @@ class PluginRegistration(BaseModel):
     health_status: str = Field(
         "unknown", description="Current health: unknown, healthy, unhealthy, dead"
     )
-    last_heartbeat: Optional[float] = Field(
+    last_heartbeat: float | None = Field(
         None, description="Unix timestamp of last successful health check"
     )
     error: str = Field("", description="Error message if plugin manifest is broken")
@@ -202,28 +204,28 @@ class PluginRegisterRequest(BaseModel):
         None, description="Comment prefix this plugin handles"
     )
     health_status: str = "unknown"
-    last_heartbeat: Optional[float] = None
+    last_heartbeat: float | None = None
 
 
 class PluginUpdateRequest(BaseModel):
     """Partial-update body for ``PUT /plugins/{name}``."""
 
-    enabled: Optional[bool] = None
-    level: Optional[int] = Field(None, ge=1, le=4)
-    ics: Optional[bool] = None
-    path: Optional[str] = None
-    version: Optional[str] = None
-    description: Optional[str] = None
-    entry_point: Optional[str] = None
-    display_name: Optional[str] = None
-    capabilities: Optional[list[str]] = None
-    depends_on: Optional[list[str]] = None
-    update_url: Optional[str] = None
-    author: Optional[str] = None
-    homepage: Optional[str] = None
+    enabled: bool | None = None
+    level: int | None = Field(None, ge=1, le=4)
+    ics: bool | None = None
+    path: str | None = None
+    version: str | None = None
+    description: str | None = None
+    entry_point: str | None = None
+    display_name: str | None = None
+    capabilities: list[str] | None = None
+    depends_on: list[str] | None = None
+    update_url: str | None = None
+    author: str | None = None
+    homepage: str | None = None
     comment_handler: Optional["CommentHandler"] = None
-    health_status: Optional[str] = None
-    last_heartbeat: Optional[float] = None
+    health_status: str | None = None
+    last_heartbeat: float | None = None
 
 
 class PluginListResponse(BaseModel):

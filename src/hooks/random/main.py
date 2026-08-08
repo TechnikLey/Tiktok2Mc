@@ -1,5 +1,6 @@
-import random
 import logging
+import random
+
 from core.hook_api import HookAPI
 
 log = logging.getLogger(__name__)

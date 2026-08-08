@@ -55,7 +55,7 @@ def save_yaml(path: Path, data: Any, backup: bool = False) -> None:
         bm = get_backup_manager()
         try:
             bm.create_backup(path)
-        except Exception as exc:  # noqa: BLE001  # backup must never block the save
+        except Exception as exc:  # backup must never block the save
             log.warning("Failed to create backup for %s: %s", path, exc)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:

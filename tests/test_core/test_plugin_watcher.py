@@ -1,6 +1,7 @@
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from core.api.plugin_watcher import PluginWatcher, _get_plugin_dirs
 from core.api.registry import get_registry

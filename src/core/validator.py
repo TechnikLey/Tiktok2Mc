@@ -5,12 +5,12 @@ Provides line-level validation of trigger syntax, bracket balance,
 command prefixes, multipliers, and duplicate detection.
 """
 
-import re
 import logging
-from enum import Enum
+import re
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Set, Union
+from typing import Union
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class Diagnostic:
     end_char: int
     message: str
     severity: Severity
-    code: Optional[str] = None
+    code: str | None = None
 
 
 # -- Regex patterns -----------------------------------------------------------
@@ -97,7 +97,7 @@ def _make_diag(
     end_char: int,
     msg: str,
     severity: Severity,
-    code: Optional[str] = None,
+    code: str | None = None,
 ) -> Diagnostic:
     return Diagnostic(
         line=line,
@@ -112,7 +112,7 @@ def _make_diag(
 # -- Output -------------------------------------------------------------------
 
 
-def print_diagnostics(diags: List[Diagnostic]) -> None:
+def print_diagnostics(diags: list[Diagnostic]) -> None:
     """Log all diagnostics in a human-readable format (1-based line numbers)."""
     if not diags:
         log.info("[VALIDATOR] No errors found.")
@@ -135,7 +135,7 @@ def print_diagnostics(diags: List[Diagnostic]) -> None:
 # -- Core validation ----------------------------------------------------------
 
 
-def validate_text(text: str) -> List[Diagnostic]:
+def validate_text(text: str) -> list[Diagnostic]:
     """Validate trigger/command definition text and return diagnostics.
 
     Args:
@@ -145,9 +145,9 @@ def validate_text(text: str) -> List[Diagnostic]:
         A list of Diagnostic objects (empty if no issues found).
     """
 
-    diagnostics: List[Diagnostic] = []
-    seen_triggers: Set[str] = set()
-    seen_disabled_triggers: Set[str] = set()
+    diagnostics: list[Diagnostic] = []
+    seen_triggers: set[str] = set()
+    seen_disabled_triggers: set[str] = set()
 
     lines = text.splitlines()
     for line_number, raw_line in enumerate(lines):
@@ -522,7 +522,7 @@ def validate_text(text: str) -> List[Diagnostic]:
 def validate_file(
     file_path: Union[str, Path],
     raise_on_error: bool = True,
-) -> List[Diagnostic]:
+) -> list[Diagnostic]:
     """Read and validate a trigger/command file.
 
     Args:

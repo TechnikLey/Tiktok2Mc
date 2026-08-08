@@ -1,18 +1,17 @@
-from fastapi import APIRouter, HTTPException
+from copy import deepcopy
 from typing import Any
 
-from copy import deepcopy
+from fastapi import APIRouter, HTTPException
+from ruamel.yaml.error import YAMLError
 
 from core.plugin_config import (
     _FRAMEWORK_FIELDS,
     discover_plugins_dir,
-    load_plugin_manifest,
     load_plugin_config,
+    load_plugin_manifest,
     save_plugin_config,
     validate_plugin_config,
 )
-from core.api.models import ConfigResponse
-from ruamel.yaml.error import YAMLError
 
 router = APIRouter(tags=["Plugin Config"])
 
@@ -108,5 +107,5 @@ async def get_plugin_schema(name: str):
                         break
 
         return {"name": name, "schema": schema}
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))

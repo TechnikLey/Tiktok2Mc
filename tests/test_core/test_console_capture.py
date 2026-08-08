@@ -1,5 +1,3 @@
-import asyncio
-from pathlib import Path
 import pytest
 
 
@@ -99,9 +97,9 @@ class TestConsoleCaptureManager:
 
     def test_start_stop_instance_capture(self, tmp_path):
         from core.api.services.console_capture import (
+            get_instance_capture,
             start_instance_capture,
             stop_instance_capture,
-            get_instance_capture,
         )
 
         cap = start_instance_capture("svr_1", tmp_path)

@@ -1,11 +1,7 @@
-import json
-import pytest
-from pathlib import Path
 
 from core.overlay_utils import (
     OverlayClient,
     OverlayManager,
-    send_overlay_text,
 )
 
 

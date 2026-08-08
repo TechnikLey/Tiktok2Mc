@@ -13,10 +13,10 @@ Usage
     python run.py --host 0.0.0.0 # network access (use with care)
 """
 
-import sys
-import os
 import argparse
 import logging
+import os
+import sys
 
 # Ensure src/ is on the path for development runs.
 _src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")

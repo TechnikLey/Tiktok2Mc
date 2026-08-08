@@ -25,8 +25,8 @@ class TestDiagnosticsReport:
         assert report["application"]["platform"] is not None
 
     def test_report_with_crash_manager(self):
-        from core.diagnostics import generate_diagnostics_report
         from core.crash_manager import CrashManager
+        from core.diagnostics import generate_diagnostics_report
 
         cm = CrashManager("test")
         report = generate_diagnostics_report(crash_manager=cm)
@@ -34,8 +34,8 @@ class TestDiagnosticsReport:
         assert report["crash_manager"]["module"] == "test"
 
     def test_report_with_crash_history(self):
-        from core.diagnostics import generate_diagnostics_report
         from core.crash_manager import CrashManager
+        from core.diagnostics import generate_diagnostics_report
         from core.error_codes import CORE_0001
 
         cm = CrashManager("test")
@@ -51,7 +51,7 @@ class TestDiagnosticsReport:
 
     def test_report_with_health_state(self):
         from core.diagnostics import generate_diagnostics_report
-        from core.health_monitor import get_health_monitor, HealthState
+        from core.health_monitor import HealthState, get_health_monitor
 
         hm = get_health_monitor()
         hm.register("svc", HealthState.RUNNING)
@@ -101,7 +101,7 @@ class TestDiagnosticsMarkdown:
 
     def test_markdown_with_failed_components(self):
         from core.diagnostics import generate_diagnostics_markdown
-        from core.health_monitor import get_health_monitor, HealthState
+        from core.health_monitor import HealthState, get_health_monitor
 
         hm = get_health_monitor()
         hm.register("broken", HealthState.FAILED)
@@ -110,8 +110,8 @@ class TestDiagnosticsMarkdown:
         assert "broken" in md
 
     def test_markdown_with_crash_history(self):
-        from core.diagnostics import generate_diagnostics_markdown
         from core.crash_manager import CrashManager
+        from core.diagnostics import generate_diagnostics_markdown
         from core.error_codes import CORE_0001
 
         cm = CrashManager("test")

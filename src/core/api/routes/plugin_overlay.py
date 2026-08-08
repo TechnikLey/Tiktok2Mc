@@ -8,9 +8,9 @@ from starlette.responses import HTMLResponse, StreamingResponse
 
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import (
-    state_store,
     command_queue,
     overlay_html_store,
+    state_store,
 )
 
 log = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ async def poll_commands(name: str, wait: int = 0):
     try:
         from core.api.registry import get_registry
         get_registry().update(name, last_heartbeat=time.time())
-    except Exception:  # noqa: BLE001  # heartbeat reporting is best-effort
+    except Exception:  # heartbeat reporting is best-effort
         pass
     return {"commands": cmds}
 
@@ -154,7 +154,7 @@ async def update_plugin_state(name: str, body: dict):
     try:
         from core.api.registry import get_registry
         get_registry().update(name, last_heartbeat=__import__("time").time())
-    except Exception:  # noqa: BLE001  # heartbeat reporting is best-effort
+    except Exception:  # heartbeat reporting is best-effort
         pass
     await event_bus.publish(f"plugin.{name}.state_update", state)
     return {"status": "ok"}

@@ -1,10 +1,11 @@
-import sys
-import os
-import uuid
-import shutil
 import logging
+import os
+import shutil
+import sys
+import uuid
 from pathlib import Path
 from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -152,11 +153,11 @@ def project_dir(tmp_path):
 @pytest.fixture(scope="function", autouse=True)
 def _patch_paths(project_dir):
     """Redirect every core.paths function into the isolated project_dir."""
-    import core.paths
     import core.api.registry
     import core.backup
     import core.overlay
     import core.overlay_utils
+    import core.paths
     import core.secure_storage
 
     _orig = {

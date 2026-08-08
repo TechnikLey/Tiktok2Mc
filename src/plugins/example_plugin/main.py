@@ -21,6 +21,7 @@ TOPICS COVERED:
 
 import logging
 from typing import Any
+
 from core.base_plugin import BasePlugin
 
 log = logging.getLogger(__name__)

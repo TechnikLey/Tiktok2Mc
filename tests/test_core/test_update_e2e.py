@@ -8,15 +8,12 @@ Covers the full update flow that the compiled update.exe performs:
   - Full run_update() flow with mocks
 """
 
-import json
 import sys
-import os
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open, call
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # =========================================================================
 # _inject_values_strictly — pure config injection logic
@@ -363,7 +360,7 @@ class TestRunUpdateOrchestration:
             sys.modules["core.api.server"] = _mock_server
 
         import python.update
-        from core.backup import BackupManager, _backup_manager as _bm_ref
+        from core.backup import BackupManager
 
         base_dir = tmp_path / "install"
         base_dir.mkdir()

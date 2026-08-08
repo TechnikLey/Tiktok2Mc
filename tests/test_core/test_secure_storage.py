@@ -1,8 +1,6 @@
 """Tests for core.secure_storage"""
 
-from pathlib import Path
 
-import pytest
 
 from core.secure_storage import SecureStorage, secure_storage
 

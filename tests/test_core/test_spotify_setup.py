@@ -4,12 +4,7 @@ Memory-efficient: tests file structure and logic without executing
 spotify_setup.py (which would load heavy deps like urllib, webbrowser).
 """
 
-import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 
 SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "src" / "python" / "spotify_setup.py"
 

@@ -1,7 +1,9 @@
 import json
-import urllib.request
-from core.hook_api import HookAPI
 import logging
+import urllib.request
+
+from core.hook_api import HookAPI
+
 log = logging.getLogger(__name__)
 
 API_BASE = "http://127.0.0.1:29185/api/v1"

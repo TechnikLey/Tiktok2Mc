@@ -1,8 +1,9 @@
 """Tests for the plugin manifest discovery system."""
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 class TestPluginManifestModel:
@@ -19,8 +20,9 @@ class TestPluginManifestModel:
         assert m.name == "test-plugin"
 
     def test_invalid_name_rejected(self):
-        from core.api.models import PluginManifest
         from pydantic import ValidationError
+
+        from core.api.models import PluginManifest
 
         with pytest.raises(ValidationError):
             PluginManifest(
@@ -31,8 +33,9 @@ class TestPluginManifestModel:
             )
 
     def test_empty_name_rejected(self):
-        from core.api.models import PluginManifest
         from pydantic import ValidationError
+
+        from core.api.models import PluginManifest
 
         with pytest.raises(ValidationError):
             PluginManifest(
@@ -43,8 +46,9 @@ class TestPluginManifestModel:
             )
 
     def test_missing_entry_point_rejected(self):
-        from core.api.models import PluginManifest
         from pydantic import ValidationError
+
+        from core.api.models import PluginManifest
 
         with pytest.raises(ValidationError):
             PluginManifest(
@@ -232,8 +236,8 @@ class TestManifestDiscovery:
         assert manifests == []
 
     def test_plugins_directory_default(self, monkeypatch):
+
         from core.api.launcher import PluginLauncher
-        from pathlib import Path
 
         launcher = PluginLauncher()
         pd = launcher._plugins_directory()
@@ -263,8 +267,9 @@ class TestManifestRegistrationViaAPI:
     with the API and that they appear in the plugin list."""
 
     def test_manifest_plugins_appear_in_list(self, tmp_path, client, monkeypatch):
-        from core.api.launcher import PluginLauncher
         import urllib.request
+
+        from core.api.launcher import PluginLauncher
 
         plugins_dir = tmp_path / "src" / "plugins"
         plugins_dir.mkdir(parents=True)

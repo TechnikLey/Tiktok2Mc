@@ -13,16 +13,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.api.services.actions import EVENT_TRIGGERS, TRIGGER_TYPE_MAP
 from core.validator import (
-    COMMAND_PREFIX_CHARS,
-    DIAGNOSTIC_CODES,
-    HIGH_MULTI_THRESHOLD,
     _RE_INVALID_MULTIPLIER,
     _RE_MULTIPLIER,
     _RE_OVERLAY_PREFIX,
     _RE_TRAILING_SEMICOLON,
+    COMMAND_PREFIX_CHARS,
+    DIAGNOSTIC_CODES,
+    HIGH_MULTI_THRESHOLD,
 )
-from core.api.services.actions import EVENT_TRIGGERS, TRIGGER_TYPE_MAP
 
 
 def export_spec() -> dict[str, Any]:

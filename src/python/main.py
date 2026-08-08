@@ -9,39 +9,65 @@
 # plugin and forwards overlay updates.
 # ==================================================
 
-import sys
-import os
 import asyncio
-import re
-import shutil
-import subprocess
-import shlex
-import threading
-import logging
-import traceback
-import time
 import datetime
 import json
+import logging
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import threading
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, FollowEvent, ConnectEvent, DisconnectEvent, LikeEvent, CommentEvent, JoinEvent, ShareEvent, LiveEndEvent
-from mcrcon import MCRcon
+
 from flask import Flask, request
-from core.validator import validate_file, print_diagnostics, Severity
-from core.paths import get_base_dir, get_runtime_dir
-from core.hook_api import HookAPI, HOOK_ACTIONS
-from core.hook_loader import load_event_hooks
-from core.overlay_utils import send_overlay_text
-from core.yaml_utils import load_yaml
+from mcrcon import MCRcon
+from TikTokLive import TikTokLiveClient
+from TikTokLive.events import (
+    CommentEvent,
+    ConnectEvent,
+    DisconnectEvent,
+    FollowEvent,
+    GiftEvent,
+    JoinEvent,
+    LikeEvent,
+    LiveEndEvent,
+    ShareEvent,
+)
+
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import command_queue
-from core.plugin_config import discover_plugins_dir, load_plugin_manifest
-from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
-from core.health_monitor import get_health_monitor, HealthState
 from core.crash_manager import get_crash_manager
-from core.error_codes import TIKTOK_0001, TIKTOK_0002, TIKTOK_0003, TIKTOK_0004, TIKTOK_0005, MC_0004, MC_0005, MC_0006, MC_0007, HOOK_0006
+from core.error_codes import (
+    HOOK_0006,
+    MC_0004,
+    MC_0005,
+    MC_0006,
+    TIKTOK_0001,
+    TIKTOK_0002,
+    TIKTOK_0003,
+    TIKTOK_0004,
+    TIKTOK_0005,
+)
+from core.health_monitor import HealthState, get_health_monitor
+from core.hook_api import HOOK_ACTIONS, HookAPI
+from core.hook_loader import load_event_hooks
+from core.logger import (
+    handle_unhandled_exception,
+    initialize_logging,
+    install_global_exception_hook,
+    start_heartbeat,
+)
+from core.overlay_utils import send_overlay_text
+from core.paths import get_base_dir, get_runtime_dir
+from core.plugin_config import discover_plugins_dir, load_plugin_manifest
+from core.validator import Severity, print_diagnostics, validate_file
+from core.yaml_utils import load_yaml
 
 log = initialize_logging(__name__)
 
@@ -360,7 +386,7 @@ def load_config():
         config = load_yaml(CONFIG_FILE)
         _apply_config(config)
         return True
-    except Exception as e:  # noqa: BLE001  # malformed user config must not crash the bridge
+    except Exception as e:  # malformed user config must not crash the bridge
         log.error(f"Config error: {e}")
         return False
 
@@ -503,7 +529,7 @@ def generate_datapack():
         zip_path = Path(ctx.datapack_root) / ctx.datapack_name
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
 
-    except Exception as e:  # noqa: BLE001  # datapack build errors are logged; bridge keeps running
+    except Exception as e:  # datapack build errors are logged; bridge keeps running
         log.exception("Datapack build failed: %s", e)
 
 # ================================
@@ -566,7 +592,7 @@ async def rcon_worker():
                     if inner_pause > 0:
                         await asyncio.sleep(inner_pause)
 
-        except Exception as e:  # noqa: BLE001  # background worker must keep running; commands re-queued
+        except Exception as e:  # background worker must keep running; commands re-queued
             log.info(f"[RCON OFFLINE] {e}")
             ctx.rcon_connection = None
             get_crash_manager().report_exception(MC_0004, exc=e, context_info={"source": "rcon_worker"})
@@ -577,7 +603,7 @@ async def rcon_worker():
                 ctx.rcon_queue_retries[retry_key] = retries
                 try:
                     await ctx.rcon_queue.put((commands, source_user))
-                except Exception as e:  # noqa: BLE001  # best-effort re-queue with reporting
+                except Exception as e:  # best-effort re-queue with reporting
                     log.info(f"RCON Queue Error: {e}")
                     get_crash_manager().report_exception(MC_0005, exc=e, context_info={"retries": retries})
             else:
@@ -612,7 +638,7 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
                 try:
                     ctx.hook_api.set_depth(chain_depth)
                     HOOK_ACTIONS[action](source_user, action, {})
-                except Exception as e:  # noqa: BLE001  # third-party hook action must not crash the bridge
+                except Exception as e:  # third-party hook action must not crash the bridge
                     log.warning(f"[HOOK] Error in action '{action}': {e}")
                     get_crash_manager().report_exception(HOOK_0006, exc=e, context_info={"action": action, "trigger": trigger_name})
             elif action:
@@ -680,12 +706,12 @@ async def trigger_worker():
                 chain_depth = 0
             try:
                 await execute_global_command(trigger, source_user, chain_depth)
-            except Exception as e:  # noqa: BLE001  # a failing trigger must not kill the worker
+            except Exception as e:  # a failing trigger must not kill the worker
                 log.info(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
                 get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"trigger": trigger, "user": str(source_user)})
             finally:
                 ctx.trigger_queue.task_done()
-        except Exception as e_outer:  # noqa: BLE001  # worker loop must never die
+        except Exception as e_outer:  # worker loop must never die
             log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             get_crash_manager().report_exception(TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"})
             await asyncio.sleep(0.1)  
@@ -715,7 +741,7 @@ def _publish_event(event_type: str, event_data: dict) -> None:
 def handle_minecraft_events():
     try:
         data = request.json
-    except Exception as e:  # noqa: BLE001  # malformed webhook JSON returns 400
+    except Exception as e:  # malformed webhook JSON returns 400
         log.error(f"Webhook invalid JSON: {e}")
         return {"status": "invalid json"}, 400
 
@@ -797,8 +823,8 @@ def _fetch_comment_handlers() -> dict[str, str]:
 
 
 def _dispatch_comment_http(cmd_url, username, cmd_text):
-    import urllib.request
     import urllib.parse
+    import urllib.request
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -810,9 +836,9 @@ def _dispatch_comment_http(cmd_url, username, cmd_text):
 
 
 def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
-    import urllib.request
-    import urllib.parse
     import json
+    import urllib.parse
+    import urllib.request
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -868,7 +894,7 @@ async def _tiktok_status_heartbeat():
     while True:
         try:
             _publish_tiktok_status(bool(ctx.tiktok_live))
-        except Exception:  # noqa: BLE001  # heartbeat must never die
+        except Exception:  # heartbeat must never die
             pass
         await asyncio.sleep(30)
 
@@ -959,7 +985,7 @@ async def _event_bridge_worker():
                     data={k: v for k, v in data.items() if k not in ("type", "user")},
                 )
 
-        except Exception as e:  # noqa: BLE001  # worker must never die
+        except Exception as e:  # worker must never die
             log.info(f"[EVENT-BRIDGE] Error handling event: {e}")
             get_crash_manager().report_exception(TIKTOK_0004, exc=e, context_info={"source": "_event_bridge_worker"})
         finally:
@@ -1017,13 +1043,12 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                 continue
 
             allowed = False
-            if "all" in group["roles"]:
-                allowed = True
-            elif "moderator" in group["roles"] and is_moderator:
-                allowed = True
-            elif "superfan" in group["roles"] and is_super_fan:
-                allowed = True
-            elif "fanclub" in group["roles"] and in_fanclub:
+            if (
+                "all" in group["roles"]
+                or "moderator" in group["roles"] and is_moderator
+                or "superfan" in group["roles"] and is_super_fan
+                or "fanclub" in group["roles"] and in_fanclub
+            ):
                 allowed = True
 
             if not allowed:
@@ -1051,13 +1076,12 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
             cmd_roles = ccfg.get("roles")
             if cmd_roles:
                 cmd_allowed = False
-                if "all" in cmd_roles:
-                    cmd_allowed = True
-                elif "moderator" in cmd_roles and is_moderator:
-                    cmd_allowed = True
-                elif "superfan" in cmd_roles and is_super_fan:
-                    cmd_allowed = True
-                elif "fanclub" in cmd_roles and in_fanclub:
+                if (
+                    "all" in cmd_roles
+                    or "moderator" in cmd_roles and is_moderator
+                    or "superfan" in cmd_roles and is_super_fan
+                    or "fanclub" in cmd_roles and in_fanclub
+                ):
                     cmd_allowed = True
                 if not cmd_allowed:
                     log.info(f"{log_prefix} {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
@@ -1178,7 +1202,7 @@ def handle_test_comment():
 
         return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
 
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.info(f"[TEST COMMENT] Error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
@@ -1245,7 +1269,7 @@ def handle_custom_trigger():
 
         return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
 
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         return {"status": "error", "message": str(e)}, 500
 # =========================================
 
@@ -1253,7 +1277,7 @@ def handle_custom_trigger():
 def run_signal_server():
     try:
         app.run(host=ctx.server_host, port=ctx.mcserver_api_port, threaded=True, debug=False, use_reloader=False)
-    except Exception as exc:  # noqa: BLE001  # best-effort webhook server thread; failure must not take down the bridge
+    except Exception as exc:  # best-effort webhook server thread; failure must not take down the bridge
         log.error("Bridge webhook server failed to start on %s:%s: %s", ctx.server_host, ctx.mcserver_api_port, exc)
 
 # ==========================================
@@ -1337,7 +1361,7 @@ def create_client(user):
                 except asyncio.QueueFull:
                     log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
 
-        except Exception as exc:  # noqa: BLE001  # TikTok event handler must not crash the client
+        except Exception as exc:  # TikTok event handler must not crash the client
             log.exception("ERROR IN ON_GIFT EVENT")
             get_crash_manager().report_exception(TIKTOK_0003, exc=exc, context_info={"source": "on_gift"})
 
@@ -1373,7 +1397,7 @@ def create_client(user):
                 delta = total_since_start
                 _publish_tiktok_event("like", username or "unknown", delta=delta, total=event.total)
                 ctx._last_like_event = now
-        except Exception as e:  # noqa: BLE001  # TikTok event handler must not crash the client
+        except Exception as e:  # TikTok event handler must not crash the client
             log.info(f"[EVENT ERROR] Error in like handling: {e}")
             get_crash_manager().report_exception(TIKTOK_0003, exc=e, context_info={"source": "on_like"})
 
@@ -1405,9 +1429,11 @@ def create_client(user):
         fan_ticket_count = getattr(event.user, 'fan_ticket_count', None)
         fans_club = getattr(event.user, 'fans_club', None)
         fans_club_info = getattr(event.user, 'fans_club_info', None)
-        if fan_ticket_count and fan_ticket_count > 0:
-            in_fanclub = True
-        elif hasattr(fans_club, 'club_name') or hasattr(fans_club_info, 'club_name'):
+        if (
+            fan_ticket_count and fan_ticket_count > 0
+            or hasattr(fans_club, 'club_name')
+            or hasattr(fans_club_info, 'club_name')
+        ):
             in_fanclub = True
 
         is_moderator = bool(getattr(event.user, 'is_moderator', None))
@@ -1563,11 +1589,11 @@ async def reload_config():
         if old_user != ctx.tiktok_user and ctx.tiktok_client is not None:
             try:
                 ctx.tiktok_client.stop()
-            except Exception:  # noqa: BLE001  # best-effort stop
+            except Exception:  # best-effort stop
                 pass
 
         log.info("[RELOAD] Config reloaded successfully")
-    except Exception as e:  # noqa: BLE001  # runtime reload is best-effort; old config stays active
+    except Exception as e:  # runtime reload is best-effort; old config stays active
         log.error("[RELOAD] Config reload failed: %s", e)
 
 
@@ -1607,7 +1633,7 @@ async def reload_actions(send_minecraft_reload: bool = False):
                 )
 
         log.info("[RELOAD] Actions reloaded successfully")
-    except Exception as e:  # noqa: BLE001  # runtime reload is best-effort; previous state stays active
+    except Exception as e:  # runtime reload is best-effort; previous state stays active
         log.error("[RELOAD] Actions reload failed: %s", e)
 
 
@@ -1640,7 +1666,7 @@ async def _reload_signal_watcher():
                 except OSError:
                     pass
                 await reload_actions(send_minecraft_reload=options.get("send_minecraft_reload", True))
-        except Exception as e:  # noqa: BLE001  # watcher must never die
+        except Exception as e:  # watcher must never die
             log.error("[RELOAD] Signal watcher error: %s", e)
 
 
@@ -1746,7 +1772,7 @@ async def run_bot():
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
             await asyncio.to_thread(client.run)
 
-        except Exception as e:  # noqa: BLE001  # TikTok client connection errors are reported; reconnect loop continues
+        except Exception as e:  # TikTok client connection errors are reported; reconnect loop continues
             log.exception("CRITICAL ERROR IN TIKTOK CLIENT")
 
             error_str = str(e)
@@ -1767,7 +1793,7 @@ async def run_bot():
             _publish_tiktok_status(False)
             try:
                 client.stop()
-            except Exception as e:  # noqa: BLE001  # best-effort stop
+            except Exception as e:  # best-effort stop
                 log.info(f"[TIKTOK] Error stopping client: {e}")
             await asyncio.sleep(2)
 
@@ -1790,7 +1816,7 @@ if __name__ == "__main__":
         # disconnect). This is normal network behavior, not a fatal crash.
         log.warning("[NET] Connection reset by remote host: %s", exc)
         health.set_state("tiktok_bridge", HealthState.STOPPED)
-    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
+    except Exception:  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("main")
         health.set_state("tiktok_bridge", HealthState.FAILED)
         sys.exit(1)

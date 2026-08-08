@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import pytest
 
 
@@ -27,43 +28,49 @@ class TestAppConfig:
         assert cfg.depends_on == ["other"]
 
     def test_empty_name_raises_value_error(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         with pytest.raises(ValueError, match="non-empty"):
             AppConfig(name="", path=Path("/exe"), enable=True, level=1, ics=False)
 
     def test_whitespace_name_raises_value_error(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         with pytest.raises(ValueError, match="non-empty"):
             AppConfig(name="   ", path=Path("/exe"), enable=True, level=1, ics=False)
 
     def test_enable_non_bool_raises_type_error(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         with pytest.raises(TypeError):
             AppConfig(name="test", path=Path("/exe"), enable=1, level=1, ics=False)
 
     def test_ics_non_bool_raises_type_error(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         with pytest.raises(TypeError):
             AppConfig(name="test", path=Path("/exe"), enable=True, level=1, ics=1)
 
     def test_negative_level_raises_value_error(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         with pytest.raises(ValueError, match="non-negative"):
             AppConfig(name="test", path=Path("/exe"), enable=True, level=-1, ics=False)
 
     def test_level_non_int_raises_value_error(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         with pytest.raises(ValueError, match="non-negative"):
             AppConfig(name="test", path=Path("/exe"), enable=True, level="1", ics=False)
@@ -98,8 +105,9 @@ class TestAppConfig:
         assert cfg.depends_on == ["other"]
 
     def test_roundtrip(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
 
         original = AppConfig(name="roundtrip", path=Path("/bin"), enable=True, level=0, ics=False, depends_on=[])
         data = original.to_dict()

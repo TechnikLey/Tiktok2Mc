@@ -55,6 +55,6 @@ async def tool_update_check():
     try:
         result = check_tool_update(API_VERSION)
         return ToolUpdateCheckResponse(**result)
-    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
+    except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to check tool updates")
         raise HTTPException(status_code=500, detail=str(e))

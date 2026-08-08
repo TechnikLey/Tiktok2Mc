@@ -15,32 +15,24 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import shutil
 import socket
-import subprocess
 import sys
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
-from core.utils import normalize_config_version
-from core.version import EXPECTED_CONFIG_VERSION
 from core.error_codes import (
-    CORE_0004,
     CONFIG_0001,
-    CONFIG_0002,
-    LIFECYCLE_0001,
-    LIFECYCLE_0009,
-    STARTUP_0001,
+    CORE_0004,
     STARTUP_0003,
-    VALIDATE_0001,
     ErrorCode,
-    ErrorInstance,
     Severity,
 )
-from core.health_monitor import get_health_monitor, HealthState
+from core.health_monitor import HealthState
+from core.utils import normalize_config_version
+from core.version import EXPECTED_CONFIG_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +48,7 @@ class ValidationResult:
     name: str
     passed: bool
     message: str = ""
-    error_code: Optional[ErrorCode] = None
+    error_code: ErrorCode | None = None
     severity: Severity = Severity.WARNING
     detail: str = ""
 
@@ -136,7 +128,7 @@ class TimeoutResult:
     result: Any = None
     elapsed: float = 0.0
     timed_out: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 async def run_with_timeout(coro, timeout: float, label: str = "operation") -> TimeoutResult:
@@ -158,7 +150,7 @@ async def run_with_timeout(coro, timeout: float, label: str = "operation") -> Ti
         )
         return TimeoutResult(success=False, timed_out=True, elapsed=elapsed,
                              error=f"Timed out after {elapsed:.1f}s (limit {timeout:.1f}s)")
-    except Exception as exc:  # noqa: BLE001  # framework purpose: capture any failure from wrapped op
+    except Exception as exc:  # framework purpose: capture any failure from wrapped op
         elapsed = time.time() - start
         return TimeoutResult(success=False, elapsed=elapsed, error=str(exc))
 
@@ -167,12 +159,12 @@ def run_with_timeout_sync(func, timeout: float, label: str = "operation") -> Tim
     """Run a synchronous operation with a timeout via threading."""
     start = time.time()
     result_container: list[Any] = []
-    error_container: list[Optional[Exception]] = [None]
+    error_container: list[Exception | None] = [None]
 
     def _target():
         try:
             result_container.append(func())
-        except Exception as e:  # noqa: BLE001  # framework purpose: capture any failure from wrapped op
+        except Exception as e:  # framework purpose: capture any failure from wrapped op
             error_container[0] = e
 
     t = threading.Thread(target=_target, daemon=True)
@@ -316,11 +308,11 @@ def validate_executable(path: Path, name: str) -> ValidationResult:
 
 
 def run_startup_validation(
-    config_path: Optional[Path] = None,
-    required_dirs: Optional[list[tuple[Path, str, bool]]] = None,
-    required_files: Optional[list[tuple[Path, str]]] = None,
-    required_ports: Optional[list[tuple[str, int, str]]] = None,
-    required_executables: Optional[list[tuple[Path, str]]] = None,
+    config_path: Path | None = None,
+    required_dirs: list[tuple[Path, str, bool]] | None = None,
+    required_files: list[tuple[Path, str]] | None = None,
+    required_ports: list[tuple[str, int, str]] | None = None,
+    required_executables: list[tuple[Path, str]] | None = None,
 ) -> ValidationSuite:
     """Run a comprehensive startup validation suite.
 
@@ -358,8 +350,8 @@ def run_startup_validation(
 
 def validate_shutdown(
     *,
-    threads_to_check: Optional[list[threading.Thread]] = None,
-    tasks_to_check: Optional[list[asyncio.Task]] = None,
+    threads_to_check: list[threading.Thread] | None = None,
+    tasks_to_check: list[asyncio.Task] | None = None,
     timeout: float = 10.0,
 ) -> ValidationSuite:
     """Run shutdown validation to ensure clean termination.
@@ -418,7 +410,7 @@ def validate_shutdown(
 
 def validate_runtime(
     health_monitor=None,
-    components: Optional[list[str]] = None,
+    components: list[str] | None = None,
     heartbeat_timeout: float = 60.0,
 ) -> ValidationSuite:
     """Run runtime validation checks.
@@ -441,14 +433,14 @@ def validate_runtime(
                 suite.add(ValidationResult(
                     name=f"Component '{comp}' health",
                     passed=False,
-                    message=f"Component is in FAILED state",
+                    message="Component is in FAILED state",
                     severity=Severity.ERROR,
                 ))
             elif state == HealthState.DEGRADED:
                 suite.add(ValidationResult(
                     name=f"Component '{comp}' health",
                     passed=False,
-                    message=f"Component is in DEGRADED state",
+                    message="Component is in DEGRADED state",
                     severity=Severity.WARNING,
                 ))
             elif state == HealthState.UNKNOWN:

@@ -11,8 +11,8 @@ import logging
 from typing import Any
 
 from core.api.eventbus import event_bus
-from core.api.registry import get_registry
 from core.api.plugin_overlay import state_store
+from core.api.registry import get_registry
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class DashboardPublisher:
         try:
             from core.event_command_mapper import get_event_command_mapper
             return get_event_command_mapper().get_diagnostics()
-        except Exception as exc:  # noqa: BLE001  # dashboard data is best-effort
+        except Exception as exc:  # dashboard data is best-effort
             log.debug("[DASHBOARD] Could not fetch ECM diagnostics: %s", exc)
             return None
 
@@ -88,7 +88,7 @@ class DashboardPublisher:
 
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # noqa: BLE001  # push loop must survive individual failures
+            except Exception as exc:  # push loop must survive individual failures
                 log.warning("[DASHBOARD] Push error: %s", exc)
         log.info("[DASHBOARD] Publisher stopped")
 

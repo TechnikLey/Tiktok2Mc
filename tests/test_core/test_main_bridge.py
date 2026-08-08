@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # =========================================================================
 # sanitize_filename
 # =========================================================================
@@ -144,7 +143,7 @@ class TestDupCmdConfig:
 
 class TestGenerateDatapackShell:
     def test_parses_shell_prefix(self, tmp_path: Path):
-        from src.python.main import generate_datapack, ctx, ACTIONS_FILE
+        from src.python.main import ctx, generate_datapack
         actions_file = tmp_path / "actions.mca"
         actions_file.write_text("12345:&curl http://localhost:29191/add\n", encoding="utf-8")
         dp_root = tmp_path / "datapacks"
@@ -156,7 +155,7 @@ class TestGenerateDatapackShell:
         assert ctx.shell_actions_cache.get("12345") == ["curl http://localhost:29191/add"]
 
     def test_parses_chained_shell_commands(self, tmp_path: Path):
-        from src.python.main import generate_datapack, ctx, ACTIONS_FILE
+        from src.python.main import ctx, generate_datapack
         actions_file = tmp_path / "actions.mca"
         actions_file.write_text("12345:&echo hello ; &echo world\n", encoding="utf-8")
         dp_root = tmp_path / "datapacks"
@@ -167,7 +166,7 @@ class TestGenerateDatapackShell:
         assert ctx.shell_actions_cache.get("12345") == ["echo hello", "echo world"]
 
     def test_parses_shell_multiplier(self, tmp_path: Path):
-        from src.python.main import generate_datapack, ctx, ACTIONS_FILE
+        from src.python.main import ctx, generate_datapack
         actions_file = tmp_path / "actions.mca"
         actions_file.write_text("12345:&echo hi x3\n", encoding="utf-8")
         dp_root = tmp_path / "datapacks"
@@ -222,7 +221,7 @@ class TestRuntimeReloadWatcher:
 
 class TestUpdateDailyRevenue:
     def test_writes_daily_revenue(self, tmp_path, monkeypatch):
-        from src.python.main import update_daily_revenue, ctx
+        from src.python.main import ctx, update_daily_revenue
 
         log_file = tmp_path / "data" / "revenue_log.jsonl"
         today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -241,7 +240,7 @@ class TestUpdateDailyRevenue:
         assert data["date"] == today
 
     def test_updates_existing_entry(self, tmp_path, monkeypatch):
-        from src.python.main import update_daily_revenue, ctx
+        from src.python.main import ctx, update_daily_revenue
 
         log_file = tmp_path / "data" / "revenue_log.jsonl"
         log_file.parent.mkdir(parents=True, exist_ok=True)

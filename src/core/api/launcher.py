@@ -198,6 +198,7 @@ class PluginLauncher:
         launcher points to the compiled binary.
         """
         import sys
+
         from core.paths import get_root_dir
 
         root = get_root_dir()

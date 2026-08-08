@@ -3,9 +3,12 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from core.api.services.rcon import get_rcon_service
-from core.api.services.console_capture import start_instance_capture, stop_instance_capture
 from core.api.services import ApiService
+from core.api.services.console_capture import (
+    start_instance_capture,
+    stop_instance_capture,
+)
+from core.api.services.rcon import get_rcon_service
 from core.paths import get_root_dir
 
 log = logging.getLogger(__name__)

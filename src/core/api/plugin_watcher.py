@@ -7,14 +7,12 @@ and removed plugins are auto-unregistered.
 
 import json
 import logging
-import time
 import threading
 from pathlib import Path
-from typing import Set
 
-from core.api.registry import get_registry
 from core.api.models import PluginRegistration
-from core.health_monitor import get_health_monitor, HealthState
+from core.api.registry import get_registry
+from core.health_monitor import HealthState, get_health_monitor
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +55,7 @@ class PluginWatcher:
         self._plugins_dir: Path | None = plugins_dir
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-        self._known: Set[str] = set()
+        self._known: set[str] = set()
         self._health = get_health_monitor()
         self._health.register("plugin_watcher", HealthState.STARTING)
 
@@ -110,7 +108,7 @@ class PluginWatcher:
 
         try:
             current = _get_plugin_dirs(plugins_dir)
-            current_names: Set[str] = set(current.keys())
+            current_names: set[str] = set(current.keys())
             registry = get_registry()
 
             # New plugins on disk not in registry → auto-register
@@ -137,7 +135,7 @@ class PluginWatcher:
                     log.warning("Failed to auto-register plugin '%s': %s", name, exc)
 
             # Plugins in registry but gone from disk → auto-unregister
-            reg_names: Set[str] = {p.name for p in registry.list()}
+            reg_names: set[str] = {p.name for p in registry.list()}
             gone = reg_names - current_names
             for name in gone:
                 if name in self._known:

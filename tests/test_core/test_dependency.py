@@ -62,7 +62,7 @@ class TestTopologicalSort:
         assert names.index("b") < names.index("c")
 
     def test_circular_dep_raises_error(self):
-        from core.api.dependency import topological_sort, DependencyError
+        from core.api.dependency import DependencyError, topological_sort
         plugins = [
             {"name": "a", "depends_on": ["b"]},
             {"name": "b", "depends_on": ["a"]},
@@ -71,7 +71,7 @@ class TestTopologicalSort:
             topological_sort(plugins)
 
     def test_self_dep_raises_error(self):
-        from core.api.dependency import topological_sort, DependencyError
+        from core.api.dependency import DependencyError, topological_sort
         plugins = [
             {"name": "a", "depends_on": ["a"]},
         ]
@@ -79,8 +79,9 @@ class TestTopologicalSort:
             topological_sort(plugins)
 
     def test_missing_dep_ignored_with_warning(self, caplog):
-        from core.api.dependency import topological_sort
         import logging
+
+        from core.api.dependency import topological_sort
         caplog.set_level(logging.WARNING)
         plugins = [
             {"name": "b", "depends_on": ["missing"]},
@@ -144,8 +145,9 @@ class TestGetDependencyOrder:
         assert names.index("a") < names.index("b")
 
     def test_falls_back_on_circular(self, caplog):
-        from core.api.dependency import get_dependency_order
         import logging
+
+        from core.api.dependency import get_dependency_order
         caplog.set_level(logging.WARNING)
         plugins = [
             {"name": "a", "depends_on": ["b"]},
@@ -164,21 +166,23 @@ class TestGetDependencyOrder:
 
 class TestAppConfigDependency:
     def test_appconfig_has_depends_on(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
         cfg = AppConfig(name="test", path=Path("."), enable=True, level=2, ics=False)
         assert hasattr(cfg, "depends_on")
         assert cfg.depends_on == []
 
     def test_appconfig_with_deps(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
         cfg = AppConfig(name="test", path=Path("."), enable=True, level=2, ics=False, depends_on=["a", "b"])
         assert cfg.depends_on == ["a", "b"]
 
     def test_from_dict_preserves_depends_on(self):
+
         from core.models import AppConfig
-        from pathlib import Path
         cfg = AppConfig.from_dict({
             "name": "test",
             "path": ".",
@@ -190,8 +194,9 @@ class TestAppConfigDependency:
         assert cfg.depends_on == ["a"]
 
     def test_to_dict_includes_depends_on(self):
-        from core.models import AppConfig
         from pathlib import Path
+
+        from core.models import AppConfig
         cfg = AppConfig(name="test", path=Path("."), enable=True, level=2, ics=False, depends_on=["x"])
         d = cfg.to_dict()
         assert "depends_on" in d
