@@ -11,7 +11,7 @@
 # {user}                                   →  placeholder: viewer name (only replaced in RCON/!rc)
 # {comment}                                →  placeholder: comment text (comment trigger only)
 # ## <trigger>:...                         →  disabled (kept as template)
-# Gift ID format:  <position><id>          →  e.g. 1<id> = slot 1, 8<id> = slot 8
+# Gift ID format:  <gift_id>               →  just the numeric gift ID from gifts.json
 # All gift IDs and names: defaults/gifts.json
 # ─── Event Examples ────────────────────────────────────────────────────────────
 
