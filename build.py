@@ -260,7 +260,16 @@ def _run_python_tests() -> None:
 
     cprint("Running Python test suite...", Color.CYAN)
     proc = subprocess.Popen(
-        [sys.executable, "-m", "pytest", "tests/", "-x", "--timeout=60"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/",
+            "-x",
+            "--timeout=60",
+            "-p",
+            "no:randomly",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
