@@ -72,7 +72,7 @@ class TriggerService:
             config = EngineConfig(bridge_port=bridge_port)
             engine = TriggerEngine(config=config)
         self._engine = engine
-        self._history: list[TriggerResult] = []
+        self._history: list[tuple[float, TriggerResult]] = []
         self._last_execution: float = 0.0
 
     # ------------------------------------------------------------------
@@ -98,14 +98,15 @@ class TriggerService:
     def get_history(self) -> list[dict[str, Any]]:
         return [
             {
-                "timestamp": r.execution_time_ms,
+                "timestamp": completed_at,
+                "duration_ms": r.execution_time_ms,
                 "kind": r.trigger_name,
                 "payload": r.payload,
                 "status": r.status.value,
                 "message": r.error_message,
                 "success": r.success,
             }
-            for r in reversed(self._history)
+            for completed_at, r in reversed(self._history)
         ]
 
     def can_execute(self) -> tuple[bool, str]:
@@ -189,8 +190,9 @@ class TriggerService:
     # ------------------------------------------------------------------
 
     def _record(self, result: TriggerResult) -> None:
-        """Append to history, trimming to ``MAX_HISTORY`` entries."""
-        self._history.append(result)
+        """Append to history with the wall-clock completion time, trimming to
+        ``MAX_HISTORY`` entries."""
+        self._history.append((time.time(), result))
         if len(self._history) > self.MAX_HISTORY:
             del self._history[: len(self._history) - self.MAX_HISTORY]
 

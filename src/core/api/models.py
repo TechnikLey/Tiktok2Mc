@@ -400,6 +400,7 @@ class TiktokToggleResponse(BaseModel):
 
 class TriggerHistoryEntry(BaseModel):
     timestamp: float
+    duration_ms: float = 0.0
     kind: str
     payload: dict[str, Any]
     status: str

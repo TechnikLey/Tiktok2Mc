@@ -413,6 +413,7 @@ class TestBridgeDispatcher:
         ) as mock_urlopen:
             mock_resp = MagicMock()
             mock_resp.__enter__.return_value = mock_resp
+            mock_resp.status = 200
             mock_urlopen.return_value = mock_resp
 
             assert dispatcher.check_connectivity() is True
@@ -425,6 +426,20 @@ class TestBridgeDispatcher:
             "core.trigger_engine.dispatcher.urllib.request.urlopen"
         ) as mock_urlopen:
             mock_urlopen.side_effect = urllib.error.URLError("fail")
+            assert dispatcher.check_connectivity() is False
+
+    def test_check_connectivity_non_200(self):
+        dispatcher = BridgeDispatcher(
+            EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1)
+        )
+        with patch(
+            "core.trigger_engine.dispatcher.urllib.request.urlopen"
+        ) as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.__enter__.return_value = mock_resp
+            mock_resp.status = 503
+            mock_urlopen.return_value = mock_resp
+
             assert dispatcher.check_connectivity() is False
 
 

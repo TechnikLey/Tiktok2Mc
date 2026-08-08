@@ -9,6 +9,7 @@ Covers the full update flow that the compiled update.exe performs:
 """
 
 import sys
+import requests
 from contextlib import contextmanager
 from pathlib import Path
 from typing import ClassVar
@@ -467,6 +468,7 @@ class TestRunUpdateOrchestration:
 
             with (
                 patch("python.update.requests.get") as mock_get,
+                patch("python.update.verify_checksum", return_value=True),
                 patch("python.update.sys.exit", side_effect=SystemExit),
                 patch("python.update.shutil.copy2") as mock_copy2,
                 patch("python.update.shutil.rmtree"),
@@ -475,18 +477,38 @@ class TestRunUpdateOrchestration:
             ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
-                mock_resp = MagicMock()
-                mock_resp.status_code = 200
-                mock_resp.json.return_value = {
+                release_resp = MagicMock()
+                release_resp.status_code = 200
+                release_resp.json.return_value = {
                     "tag_name": "v1.0.0",
                     "assets": [
                         {
                             "name": "Tiktok2Mc_v1.0.0_Windows.zip",
                             "url": "https://fake.url/asset",
-                        }
+                        },
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
+                            "url": "https://fake.url/asset.sha256",
+                        },
                     ],
                 }
-                mock_get.return_value = mock_resp
+                checksum_resp = MagicMock()
+                checksum_resp.status_code = 200
+                checksum_resp.text = "a" * 64 + "\n"  # valid 64-char hex
+
+                def mock_get_side_effect(url, **kwargs):
+                    if "releases/latest" in url or "/releases" in url:
+                        return release_resp
+                    if "asset.sha256" in url:
+                        return checksum_resp
+                    if "updater/signal" in url:
+                        signal_resp = MagicMock()
+                        signal_resp.status_code = 200
+                        signal_resp.json.return_value = {"signal": None}
+                        return signal_resp
+                    raise requests.exceptions.RequestException("unexpected URL")
+
+                mock_get.side_effect = mock_get_side_effect
 
                 with pytest.raises(SystemExit):
                     run_update()
@@ -522,6 +544,7 @@ class TestRunUpdateOrchestration:
 
             with (
                 patch("python.update.requests.get") as mock_get,
+                patch("python.update.verify_checksum", return_value=True),
                 patch("python.update.sys.exit", side_effect=SystemExit),
                 patch("python.update.time.sleep"),
                 patch("python.update.shutil.rmtree"),
@@ -531,18 +554,38 @@ class TestRunUpdateOrchestration:
             ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
-                mock_resp = MagicMock()
-                mock_resp.status_code = 200
-                mock_resp.json.return_value = {
+                release_resp = MagicMock()
+                release_resp.status_code = 200
+                release_resp.json.return_value = {
                     "tag_name": "v1.0.0",
                     "assets": [
                         {
                             "name": "Tiktok2Mc_v1.0.0_Windows.zip",
                             "url": "https://fake.url/asset",
-                        }
+                        },
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
+                            "url": "https://fake.url/asset.sha256",
+                        },
                     ],
                 }
-                mock_get.return_value = mock_resp
+                checksum_resp = MagicMock()
+                checksum_resp.status_code = 200
+                checksum_resp.text = "a" * 64 + "\n"
+
+                def mock_get_side_effect(url, **kwargs):
+                    if "releases/latest" in url or "/releases" in url:
+                        return release_resp
+                    if "asset.sha256" in url:
+                        return checksum_resp
+                    if "updater/signal" in url:
+                        signal_resp = MagicMock()
+                        signal_resp.status_code = 200
+                        signal_resp.json.return_value = {"signal": None}
+                        return signal_resp
+                    raise requests.exceptions.RequestException("unexpected URL")
+
+                mock_get.side_effect = mock_get_side_effect
 
                 with patch.object(Path, "write_text", tracking_write_text):
                     with pytest.raises(SystemExit):
@@ -568,6 +611,7 @@ class TestRunUpdateOrchestration:
                 patch("python.update.requests.get") as mock_get,
                 patch("python.update.requests.put", side_effect=tracking_put),
                 patch("python.update.requests.delete"),
+                patch("python.update.verify_checksum", return_value=True),
                 patch("python.update.sys.exit", side_effect=SystemExit),
                 patch("python.update.time.sleep"),
                 patch("python.update.shutil.rmtree"),
@@ -577,18 +621,38 @@ class TestRunUpdateOrchestration:
             ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
-                mock_resp = MagicMock()
-                mock_resp.status_code = 200
-                mock_resp.json.return_value = {
+                release_resp = MagicMock()
+                release_resp.status_code = 200
+                release_resp.json.return_value = {
                     "tag_name": "v1.0.0",
                     "assets": [
                         {
                             "name": "Tiktok2Mc_v1.0.0_Windows.zip",
                             "url": "https://fake.url/asset",
-                        }
+                        },
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
+                            "url": "https://fake.url/asset.sha256",
+                        },
                     ],
                 }
-                mock_get.return_value = mock_resp
+                checksum_resp = MagicMock()
+                checksum_resp.status_code = 200
+                checksum_resp.text = "a" * 64 + "\n"
+
+                def mock_get_side_effect(url, **kwargs):
+                    if "releases/latest" in url or "/releases" in url:
+                        return release_resp
+                    if "asset.sha256" in url:
+                        return checksum_resp
+                    if "updater/signal" in url:
+                        signal_resp = MagicMock()
+                        signal_resp.status_code = 200
+                        signal_resp.json.return_value = {"signal": None}
+                        return signal_resp
+                    raise requests.exceptions.RequestException("unexpected URL")
+
+                mock_get.side_effect = mock_get_side_effect
 
                 with pytest.raises(SystemExit):
                     run_update()
@@ -654,6 +718,7 @@ class TestRunUpdateOrchestration:
             with (
                 patch("python.update.requests.get") as mock_get,
                 patch("python.update.subprocess.Popen") as mock_popen,
+                patch("python.update.verify_checksum", return_value=True),
                 patch("python.update.sys.exit", side_effect=SystemExit),
                 patch("python.update.shutil.copy2"),
                 patch("python.update.shutil.rmtree"),
@@ -663,18 +728,38 @@ class TestRunUpdateOrchestration:
             ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
-                mock_resp = MagicMock()
-                mock_resp.status_code = 200
-                mock_resp.json.return_value = {
+                release_resp = MagicMock()
+                release_resp.status_code = 200
+                release_resp.json.return_value = {
                     "tag_name": "v1.0.0",
                     "assets": [
                         {
                             "name": "Tiktok2Mc_v1.0.0_Windows.zip",
                             "url": "https://fake.url/asset",
-                        }
+                        },
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
+                            "url": "https://fake.url/asset.sha256",
+                        },
                     ],
                 }
-                mock_get.return_value = mock_resp
+                checksum_resp = MagicMock()
+                checksum_resp.status_code = 200
+                checksum_resp.text = "a" * 64 + "\n"
+
+                def mock_get_side_effect(url, **kwargs):
+                    if "releases/latest" in url or "/releases" in url:
+                        return release_resp
+                    if "asset.sha256" in url:
+                        return checksum_resp
+                    if "updater/signal" in url:
+                        signal_resp = MagicMock()
+                        signal_resp.status_code = 200
+                        signal_resp.json.return_value = {"signal": None}
+                        return signal_resp
+                    raise requests.exceptions.RequestException("unexpected URL")
+
+                mock_get.side_effect = mock_get_side_effect
 
                 with pytest.raises(SystemExit):
                     run_update()

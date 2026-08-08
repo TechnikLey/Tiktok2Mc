@@ -215,6 +215,23 @@ class TestTriggerService:
         assert "message" in entry
         assert "success" in entry
 
+    def test_history_timestamp_is_wall_clock_not_duration(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="follow",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "follow", "user": "Alice"},
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+        svc.execute_trigger("follow", "Alice")
+        entry = svc.get_history()[0]
+        assert entry["duration_ms"] == 5.0
+        assert entry["timestamp"] > 1_600_000_000
+        assert abs(entry["timestamp"] - time.time()) < 10
+
     def test_multiple_executions_in_history(self):
         mock_engine = MagicMock(spec=TriggerEngine)
 

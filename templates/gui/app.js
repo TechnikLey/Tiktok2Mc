@@ -879,7 +879,7 @@ function renderServerCard(inst) {
     <div class="server-card-footer">
       <button class="btn btn--sm btn--secondary" onclick="openServerSwitchModal()">Switch Version</button>
       <button class="btn btn--sm btn--secondary" onclick="openServerFolder('${instId}')">Open Folder</button>
-      ${instId !== 'default' ? '<button class="btn btn--sm btn--danger-ghost" onclick="deleteServerInstance(\'' + instId + '\')" title="Delete server">Delete</button>' : ''}
+      ${instId !== 'default' ? '<button class="btn btn--sm btn--danger-ghost" onclick="deleteServerInstance(\'' + escapeHtml(instId) + '\')" title="Delete server">Delete</button>' : ''}
     </div>
   </div>`;
 }
@@ -1352,7 +1352,7 @@ function renderPluginManager() {
     const errorTitle = hasError ? ` title="${escapeHtml(p.error)}"` : '';
     const enableDisabled = hasError ? ' disabled' : '';
     const action = p.enabled
-      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Disable</button>`
+      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">Disable</button>`
       : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Enable</button>`;
     const editDisabled = hasError ? ' disabled' : '';
     html += `<tr${errorTitle}>

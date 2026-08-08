@@ -470,7 +470,7 @@ def run_update():
         expected_hash = None
         # Look for a companion .sha256 asset in the same release
         for a in release.get("assets", []):
-            if a["name"].lower() == archive_name.lower() + ".sha256":
+            if a["name"].lower() == asset["name"].lower() + ".sha256":
                 try:
                     r = requests.get(
                         a["url"],
@@ -491,9 +491,12 @@ def run_update():
                     log.debug("Could not fetch checksum asset: %s", exc)
                 break
         if not expected_hash:
-            expected_hash = fetch_checksum(asset["url"])
+            log.error("[FAIL] Could not determine expected checksum (no .sha256 asset, no fallback). Aborting update.")
+            if TEMP_DIR.exists():
+                shutil.rmtree(TEMP_DIR, ignore_errors=True)
+            sys.exit(5)
 
-        if expected_hash and not verify_checksum(archive_path, expected_hash):
+        if not verify_checksum(archive_path, expected_hash):
             log.error(
                 "[FAIL] Downloaded archive checksum does not match expected value."
             )
@@ -502,12 +505,27 @@ def run_update():
             sys.exit(5)
         # ─────────────────────────────────────────────────────────────
 
+        def safe_extract_zip(zip_path: Path, dest: Path) -> None:
+            with zipfile.ZipFile(zip_path, "r") as z:
+                # Validate all member paths first (zip slip protection)
+                for member in z.infolist():
+                    target = (dest / member.filename).resolve()
+                    if not str(target).startswith(str(dest.resolve())):
+                        raise ValueError(f"Zip slip attempt: {member.filename}")
+                z.extractall(dest)
+
+        def safe_extract_tar(tar_path: Path, dest: Path) -> None:
+            with tarfile.open(tar_path, "r:gz") as t:
+                for member in t.getmembers():
+                    target = (dest / member.name).resolve()
+                    if not str(target).startswith(str(dest.resolve())):
+                        raise ValueError(f"Path traversal attempt: {member.name}")
+                t.extractall(dest)
+
         if sys.platform == "win32":
-            with zipfile.ZipFile(archive_path, "r") as z:
-                z.extractall(TEMP_DIR)
+            safe_extract_zip(archive_path, TEMP_DIR)
         else:
-            with tarfile.open(archive_path, "r:gz") as t:
-                t.extractall(TEMP_DIR)
+            safe_extract_tar(archive_path, TEMP_DIR)
 
         if (TEMP_DIR / "version.txt").exists():
             extracted_root = TEMP_DIR

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -197,7 +198,7 @@ def create_app(
 
             if client_host not in _LOCALHOSTS:
                 req_key = request.headers.get("X-API-Key", "")
-                if req_key != api_key:
+                if not secrets.compare_digest(req_key, api_key):
                     return JSONResponse(
                         {
                             "detail": "Missing or invalid API key. Provide X-API-Key header."

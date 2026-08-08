@@ -137,6 +137,7 @@ class BotContext:
         self.valid_functions = set()
         self.vanilla_functions = set()
         self.shell_actions_cache = {}
+        self.shell_tasks: set[asyncio.Task] = set()
         self.script_actions = {}
         self.overlay_actions = {}
         self.rcon_only_actions = {}
@@ -835,12 +836,10 @@ async def execute_global_command(
     if name in ctx.shell_actions_cache:
         cmds = ctx.shell_actions_cache[name]
         if cmds:
-            try:
-                asyncio.create_task(execute_shell_commands(cmds))
-            except RuntimeError as e:
-                log.warning(
-                    f"[SHELL] Error scheduling shell commands for '{name}': {e}"
-                )
+            # Store task reference to prevent silent exception loss
+            task = asyncio.create_task(execute_shell_commands(cmds))
+            ctx.shell_tasks.add(task)
+            task.add_done_callback(ctx.shell_tasks.discard)
 
     if not commands_to_send:
         return
@@ -915,6 +914,11 @@ def _publish_event(event_type: str, event_data: dict) -> None:
             exc=exc,
             context_info={"event_type": event_type, "target": "eventbus_api"},
         )
+
+
+@app.route("/health", methods=["GET"])
+def handle_health():
+    return {"status": "ok", "service": "bridge", "tiktok_disabled": ctx.disable_tiktok_connect}, 200
 
 
 @app.route("/webhook", methods=["POST"])
@@ -1701,6 +1705,12 @@ def handle_custom_trigger():
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
+    if ctx.server_host == "0.0.0.0":
+        log.warning(
+            "SECURITY: Webhook server binding to 0.0.0.0 (all interfaces). "
+            "Ensure an API key is configured in the control plane (config.yaml: api_key) "
+            "and consider restricting to localhost in production."
+        )
     try:
         app.run(
             host=ctx.server_host,
@@ -1726,10 +1736,16 @@ def run_signal_server():
 def execute_http_command_sync(cmd: str):
     try:
         args = shlex.split(cmd)
-        subprocess.run(args, check=True)
+    except ValueError as e:
+        log.warning(f"[SHELL] Invalid command syntax: {cmd} ({e})")
+        return
+    try:
+        subprocess.run(args, check=True, timeout=30)
         log.info(f"Success: {cmd}")
     except subprocess.CalledProcessError as e:
         log.warning(f"[FAIL] Error: {cmd} ({e})")
+    except subprocess.TimeoutExpired:
+        log.warning(f"[SHELL] Command timed out after 30s: {cmd}")
 
 
 async def execute_http_command(cmd: str):
@@ -1835,23 +1851,21 @@ def create_client(user):
                 log.info(f"[LIKE] Initial count set: {ctx.start_likes}")
                 return
             total_since_start = event.total - ctx.start_likes
-        try:
-            now = time.time()
-            # Throttle like events to ~1 per 3 seconds
-            if not hasattr(ctx, "_last_like_event"):
-                ctx._last_like_event = 0
-            if now - ctx._last_like_event >= 3:
-                delta = total_since_start
-                _publish_tiktok_event(
-                    "like", username or "unknown", delta=delta, total=event.total
+            try:
+                now = time.time()
+                # Throttle like events to ~1 per 3 seconds
+                if now - ctx._last_like_event >= 3:
+                    delta = total_since_start
+                    _publish_tiktok_event(
+                        "like", username or "unknown", delta=delta, total=event.total
+                    )
+                    _enqueue_like_triggers(total_since_start, username)
+                    ctx._last_like_event = now
+            except Exception as e:  # TikTok event handler must not crash the client
+                log.error(f"[EVENT ERROR] Error in like handling: {e}")
+                get_crash_manager().report_exception(
+                    TIKTOK_0003, exc=e, context_info={"source": "on_like"}
                 )
-                _enqueue_like_triggers(total_since_start, username)
-                ctx._last_like_event = now
-        except Exception as e:  # TikTok event handler must not crash the client
-            log.error(f"[EVENT ERROR] Error in like handling: {e}")
-            get_crash_manager().report_exception(
-                TIKTOK_0003, exc=e, context_info={"source": "on_like"}
-            )
 
     # ========================
     # Join events
