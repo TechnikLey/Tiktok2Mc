@@ -132,6 +132,9 @@ class BotContext:
         self.namespace = "streamingtool"
         self.actions_valid = True
         self.start_likes = None
+        self._last_like_event = 0.0
+        self._last_likes_trigger = 0
+        self._like_2_fired = False
         self.valid_functions = set()
         self.vanilla_functions = set()
         self.shell_actions_cache = {}
@@ -185,6 +188,11 @@ werkzeug_log = logging.getLogger("werkzeug")
 werkzeug_log.setLevel(logging.WARNING)
 
 _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
+
+# 'likes' fires every N cumulative likes since stream start; 'like_2' fires
+# once at the mega milestone. Values match the documented MCA defaults.
+LIKE_TRIGGER_INTERVAL = 100
+LIKE_MEGA_THRESHOLD = 100_000
 
 # ==========================================
 # SETUP & HELPER FUNCTIONS
@@ -1186,6 +1194,27 @@ def _process_follow(username: str, persist: bool = True):
         enqueue_threadsafe(("follow", username), label="follow")
 
 
+def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None:
+    """Enqueue milestone-based like triggers ('likes' every N, 'like_2' at mega).
+
+    Fires only for triggers configured in actions.mca and only once per
+    milestone, so bursts of like events cannot flood the trigger queue.
+    """
+    with ctx.like_lock:
+        if "likes" in ctx.valid_functions and LIKE_TRIGGER_INTERVAL > 0:
+            milestones = total_since_start // LIKE_TRIGGER_INTERVAL
+            if milestones > ctx._last_likes_trigger:
+                ctx._last_likes_trigger = milestones
+                enqueue_threadsafe(("likes", username or "system"), label="like:likes")
+        if (
+            "like_2" in ctx.valid_functions
+            and not ctx._like_2_fired
+            and total_since_start >= LIKE_MEGA_THRESHOLD
+        ):
+            ctx._like_2_fired = True
+            enqueue_threadsafe(("like_2", username or "system"), label="like:like_2")
+
+
 def _process_comment_command(
     username,
     comment_text,
@@ -1689,6 +1718,7 @@ def create_client(user):
                 _publish_tiktok_event(
                     "like", username or "unknown", delta=delta, total=event.total
                 )
+                _enqueue_like_triggers(total_since_start, username)
                 ctx._last_like_event = now
         except Exception as e:  # TikTok event handler must not crash the client
             log.error(f"[EVENT ERROR] Error in like handling: {e}")

@@ -359,6 +359,81 @@ class TestExecuteGlobalCommandOverlay:
         assert args == ("Title", "Subtitle", 5, "default")
 
 
+# =========================================================================
+# _enqueue_like_triggers (like milestone triggers)
+# =========================================================================
+
+
+class TestEnqueueLikeTriggers:
+    def _call(self, monkeypatch, total, user="viewer"):
+        import src.python.main as main_mod
+        from src.python.main import _enqueue_like_triggers
+
+        calls = []
+
+        def fake_enqueue(item, label=None):
+            calls.append((item, label))
+
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue)
+        _enqueue_like_triggers(total, user)
+        return calls
+
+    def test_likes_fires_once_per_milestone(self, monkeypatch):
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "valid_functions", {"likes"})
+        monkeypatch.setattr(ctx, "_last_likes_trigger", 0)
+        calls = self._call(monkeypatch, 250, "viewer")
+        assert calls == [(("likes", "viewer"), "like:likes")]
+
+        calls = self._call(monkeypatch, 250, "viewer")
+        assert calls == []  # same milestone: no duplicate
+
+    def test_likes_fires_again_on_next_milestone(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import _enqueue_like_triggers, ctx
+
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", lambda *a, **k: None)
+        monkeypatch.setattr(ctx, "valid_functions", {"likes"})
+        monkeypatch.setattr(ctx, "_last_likes_trigger", 1)
+        monkeypatch.setattr(ctx, "_like_2_fired", False)
+
+        calls = []
+        monkeypatch.setattr(
+            main_mod, "enqueue_threadsafe", lambda item, label=None: calls.append(item)
+        )
+        _enqueue_like_triggers(350, "viewer")  # milestones = 3 > 1
+        assert calls == [("likes", "viewer")]
+
+    def test_like_2_fires_once_at_mega(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import _enqueue_like_triggers, ctx
+
+        calls = []
+
+        def fake_enqueue(item, label=None):
+            calls.append(item)
+
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue)
+        monkeypatch.setattr(ctx, "valid_functions", {"like_2"})
+        monkeypatch.setattr(ctx, "_last_likes_trigger", 0)
+        monkeypatch.setattr(ctx, "_like_2_fired", False)
+
+        _enqueue_like_triggers(100_000, "viewer")
+        assert calls == [("like_2", "viewer")]
+
+        calls.clear()
+        _enqueue_like_triggers(150_000, "viewer")
+        assert calls == []  # already fired
+
+    def test_no_enqueue_when_not_configured(self, monkeypatch):
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "valid_functions", {"follow"})
+        calls = self._call(monkeypatch, 500, "viewer")
+        assert calls == []
+
+
 class TestUpdateDailyRevenue:
     def test_writes_daily_revenue(self, tmp_path, monkeypatch):
         from src.python.main import ctx, update_daily_revenue

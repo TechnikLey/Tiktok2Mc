@@ -88,7 +88,7 @@ TikTok-Event → on_comment() → trigger_worker()
 # TikTok-Standard-Events
 follow:  $begruessung ; /give @a minecraft:bread 1
 join:    >>Willkommen!|{user}|3
-like:    $like-effekt ; /playsound minecraft:entity.experience_orb.pickup master @a x3
+likes:   $like-effekt ; /playsound minecraft:entity.experience_orb.pickup master @a x3
 
 # Gift-IDs
 5655:    $geschenk ; !tnt 2 0.1 2
