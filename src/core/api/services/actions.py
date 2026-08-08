@@ -9,7 +9,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from core.mca_parser import parse_mca, serialize_mca, ParsedTrigger, ParsedCommand, EVENT_TRIGGERS
+from core.mca_parser import (
+    TRIGGER_TYPE_MAP,  # noqa: F401
+    ParsedCommand,
+    ParsedTrigger,
+    _detect_prefix,  # noqa: F401
+    _strip_prefix,  # noqa: F401
+    parse_mca,
+    serialize_mca,
+)
 from core.paths import get_root_dir
 from core.validator import validate_text
 
@@ -194,6 +202,20 @@ class ActionsService:
                             }
                         )
 
+                # Validate vanilla commands: warn if {user} used without !rc
+                elif cmd_type == "vanilla":
+                    body = cmd.get("command", "")
+                    dynamic = cmd.get("dynamic_vanilla", False)
+                    if "{user}" in body and not dynamic:
+                        diagnostics.append(
+                            {
+                                "line": ti,
+                                "message": "Vanilla command uses {user} but lacks !rc suffix — {user} will NOT be substituted. Add ' !rc' to send via RCON for dynamic substitution.",
+                                "severity": "WARNING",
+                                "code": "USER_PLACEHOLDER_NEEDS_RC",
+                            }
+                        )
+
         return diagnostics
 
     # ── Serialize (structured → raw) ──────────────────────────────────
@@ -216,14 +238,8 @@ class ActionsService:
             for cmd in t.get("commands", []):
                 commands.append(ParsedCommand.from_dict(cmd))
             parsed_triggers.append(
-                ParsedTrigger(name=name, raw_name=raw_name, enabled=enabled, commands=commands)
+                ParsedTrigger(
+                    name=name, raw_name=raw_name, enabled=enabled, commands=commands
+                )
             )
         return serialize_mca(parsed_triggers)
-
-
-# Re-export for backward compatibility
-from core.mca_parser import (
-    TRIGGER_TYPE_MAP,
-    _detect_prefix,
-    _strip_prefix,
-)  # noqa: F401,E402

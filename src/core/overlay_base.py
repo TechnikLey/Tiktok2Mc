@@ -7,7 +7,6 @@ Bridge-side HTTP client (overlay_utils.py).
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from typing import Any
 

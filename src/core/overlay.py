@@ -13,7 +13,11 @@ import logging
 import threading
 from typing import Any
 
-from core.overlay_base import DEFAULT_OVERLAY_CONFIG, OverlayClient, OverlayManagerBase, _load_overlay_config
+from core.overlay_base import (
+    DEFAULT_OVERLAY_CONFIG,
+    OverlayManagerBase,
+    _load_overlay_config,
+)
 from core.theme import load_plugin_theme, sanitize_css_value, theme_css
 
 log = logging.getLogger(__name__)

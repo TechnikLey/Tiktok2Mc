@@ -9,13 +9,13 @@ Covers the full update flow that the compiled update.exe performs:
 """
 
 import sys
-import requests
 from contextlib import contextmanager
 from pathlib import Path
 from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 # =========================================================================
 # _inject_values_strictly — pure config injection logic

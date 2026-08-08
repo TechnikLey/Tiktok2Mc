@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from core.diagnostics import Diagnostic, Severity, _make_diag
+from core.diagnostics import Diagnostic
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 _RE_OVERLAY_PREFIX = re.compile(r"^@(\w+)>>")
 _RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
+_RE_DYNAMIC_VANILLA = re.compile(r"\s+!rc\s*$")
 
 # ── Known event trigger names ──────────────────────────────────────────
 
@@ -57,6 +58,9 @@ class ParsedCommand:
     type: str  # "vanilla" | "rcon" | "script" | "overlay" | "named_overlay" | "shell"
     body: str  # command body without prefix, without multiplier
     multiplier: int = 1
+    dynamic_vanilla: bool = (
+        False  # if True, vanilla cmd sent via RCON for {user} substitution
+    )
     # Overlay-specific fields
     title: str = ""
     subtitle: str = ""
@@ -68,6 +72,7 @@ class ParsedCommand:
             "type": self.type,
             "command": self.body,
             "multiplier": self.multiplier,
+            "dynamic_vanilla": self.dynamic_vanilla,
             "title": self.title,
             "subtitle": self.subtitle,
             "duration": self.duration,
@@ -75,11 +80,12 @@ class ParsedCommand:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ParsedCommand":
+    def from_dict(cls, d: dict[str, Any]) -> ParsedCommand:
         return cls(
             type=d.get("type", "vanilla"),
             body=d.get("command", ""),
             multiplier=d.get("multiplier", 1),
+            dynamic_vanilla=d.get("dynamic_vanilla", False),
             title=d.get("title", ""),
             subtitle=d.get("subtitle", ""),
             duration=d.get("duration", 3),
@@ -199,7 +205,10 @@ def parse_mca(text: str, *, gifts: list[dict] | None = None) -> ParseResult:
     - Inline ``#`` on an active line = inline comment, stripped
     - Disabled triggers (##) are parsed normally but marked enabled=False
     """
-    from core.validator import Diagnostic, Severity, _make_diag  # local import to avoid cycle
+    from core.validator import (
+        Severity,
+        _make_diag,
+    )  # local import to avoid cycle
 
     result = ParseResult()
     lines = text.splitlines()
@@ -296,9 +305,21 @@ def parse_mca(text: str, *, gifts: list[dict] | None = None) -> ParseResult:
             else:
                 multiplier = 1
 
+            # Extract dynamic vanilla flag (e.g., "command !rc")
+            dynamic_vanilla = False
+            if cmd_type == "vanilla":
+                rc_match = _RE_DYNAMIC_VANILLA.search(body)
+                if rc_match:
+                    body = body[: rc_match.start()].strip()
+                    dynamic_vanilla = True
+
             if cmd_type in ("overlay", "named_overlay"):
                 overlay_data = _parse_overlay_body(body)
-                overlay_name = extra.get("overlay_name", "default") if cmd_type == "named_overlay" else "default"
+                overlay_name = (
+                    extra.get("overlay_name", "default")
+                    if cmd_type == "named_overlay"
+                    else "default"
+                )
                 commands.append(
                     ParsedCommand(
                         type=cmd_type,
@@ -316,6 +337,7 @@ def parse_mca(text: str, *, gifts: list[dict] | None = None) -> ParseResult:
                         type=cmd_type,
                         body=body,
                         multiplier=multiplier,
+                        dynamic_vanilla=dynamic_vanilla,
                     )
                 )
 
@@ -389,6 +411,10 @@ def serialize_mca(triggers: list[ParsedTrigger]) -> str:
             mult = cmd.multiplier
             if mult and mult > 1 and cmd.type not in ("overlay", "named_overlay"):
                 part += f" x{mult}"
+
+            # Append dynamic vanilla flag
+            if cmd.type == "vanilla" and cmd.dynamic_vanilla:
+                part += " !rc"
 
             cmd_parts.append(part)
 

@@ -2,12 +2,12 @@
 from core.cli import parse_args
 from core.models import AppConfig
 from core.overlay import (
-    OverlayClient,
     OverlayConfig,
     OverlayManager,
     get_overlay_manager,
     send_overlay_text,
 )
+from core.overlay_base import OverlayClient
 from core.paths import (
     get_base_dir,
     get_base_file,

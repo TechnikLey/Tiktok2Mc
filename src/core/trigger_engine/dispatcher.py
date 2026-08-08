@@ -44,12 +44,11 @@ class BridgeDispatcher:
 
     def check_connectivity(self) -> bool:
         """Check whether the bridge is reachable via its ``/health`` endpoint."""
-        url = (
-            f"http://{self._config.bridge_host}:{self._config.bridge_port}"
-            "/health"
-        )
+        url = f"http://{self._config.bridge_host}:{self._config.bridge_port}/health"
         try:
-            with urllib.request.urlopen(url, timeout=self._config.bridge_timeout) as resp:
+            with urllib.request.urlopen(
+                url, timeout=self._config.bridge_timeout
+            ) as resp:
                 return resp.status == 200
         except (urllib.error.URLError, ConnectionResetError, OSError):
             return False

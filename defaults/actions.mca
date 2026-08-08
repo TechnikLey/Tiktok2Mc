@@ -1,13 +1,14 @@
 # ─── Syntax Quick Reference ───────────────────────────────────────────────────
 # <trigger>:<command1> ; <command2>        →  chain multiple with ;
 # >>Title|Subtitle|Seconds                 →  overlay text (on-screen)
-# /command                                 →  Minecraft vanilla (datapack)
+# /command                                 →  Minecraft vanilla (datapack, static)
+# /command !rc                             →  Vanilla via RCON (dynamic, {user} replaced)
 # !command                                 →  RCON (direct to server)
 # $name                                    →  hook script (Python)
 # &command                                 →  shell command (PC, e.g. webhook)
 # @slot>>Title                             →  overlay in named slot
 # x<number>                                →  multiplier (run command N times)
-# {user}                                   →  placeholder: viewer name
+# {user}                                   →  placeholder: viewer name (only replaced in RCON/!rc)
 # {comment}                                →  placeholder: comment text (comment trigger only)
 # ## <trigger>:...                         →  disabled (kept as template)
 # Gift ID format:  <position><id>          →  e.g. 1<id> = slot 1, 8<id> = slot 8
@@ -16,6 +17,9 @@
 
 # 1. Follow: golden apple + overlay (; chains both)
 follow:/give @a minecraft:golden_apple 7 ; >>New Follower!|{user} is now following!|5
+
+# 1b. Follow (dynamic): send personalized message via RCON (supports {user})
+#follow:/say Welcome {user}! !rc
 
 # 2. Likes (every 100): creeper spawn with x3 multiplier
 likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x3

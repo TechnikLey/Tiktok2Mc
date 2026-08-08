@@ -564,6 +564,11 @@ def generate_datapack():
                         elif cmd.startswith("/"):
                             kind = "vanilla"
                             body = cmd[1:].strip()
+                            # Check for !rc suffix (dynamic vanilla via RCON)
+                            rc_match = re.search(r"\s+!rc\s*$", body)
+                            if rc_match:
+                                kind = "vanilla_rc"
+                                body = body[: rc_match.start()].strip()
                         elif cmd.startswith("&"):
                             kind = "shell"
                             body = cmd[1:].strip()
@@ -603,6 +608,17 @@ def generate_datapack():
                                 elif kind == "rcon":
                                     ctx.rcon_only_actions.setdefault(name, []).append(
                                         base_cmd
+                                    )
+                                    ctx.valid_functions.add(name)
+                                elif kind == "vanilla_rc":
+                                    # dynamic vanilla via RCON: keep {user} literal, route to RCON
+                                    rc_cmd = (
+                                        body[: multi_match.start()]
+                                        if multi_match
+                                        else body
+                                    )
+                                    ctx.rcon_only_actions.setdefault(name, []).append(
+                                        rc_cmd
                                     )
                                     ctx.valid_functions.add(name)
                                 elif kind == "vanilla":
@@ -830,7 +846,11 @@ async def execute_global_command(
 
     # --- 2. RCON-ONLY COMMANDS ---
     if name in ctx.rcon_only_actions:
-        commands_to_send.extend(ctx.rcon_only_actions[name])
+        for cmd in ctx.rcon_only_actions[name]:
+            # Substitute {user} placeholder for dynamic vanilla/RCON commands
+            if "{user}" in cmd and user_display:
+                cmd = cmd.replace("{user}", user_display)
+            commands_to_send.append(cmd)
 
     # --- 3. SHELL COMMANDS ---
     if name in ctx.shell_actions_cache:
@@ -918,7 +938,11 @@ def _publish_event(event_type: str, event_data: dict) -> None:
 
 @app.route("/health", methods=["GET"])
 def handle_health():
-    return {"status": "ok", "service": "bridge", "tiktok_disabled": ctx.disable_tiktok_connect}, 200
+    return {
+        "status": "ok",
+        "service": "bridge",
+        "tiktok_disabled": ctx.disable_tiktok_connect,
+    }, 200
 
 
 @app.route("/webhook", methods=["POST"])

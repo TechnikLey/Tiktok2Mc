@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -55,7 +55,7 @@ def generate_diagnostics_report(crash_manager: Any | None) -> dict[str, Any]:
 
     try:
         return {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "module": crash_manager.module_name,
             "crash_count": crash_manager.get_crash_count(),
             "history": crash_manager.get_crash_history(),
@@ -76,7 +76,7 @@ def generate_diagnostics_markdown(crash_manager: Any | None) -> str:
 
         lines = [
             f"# Diagnostics Report: {stats.get('module', 'unknown')}",
-            f"**Generated:** {datetime.now().isoformat()}",
+            f"**Generated:** {datetime.now(timezone.utc).isoformat()}",
             f"**Crash Count:** {stats.get('crash_count', 0)}",
             f"**History Size:** {stats.get('history_size', 0)}",
             "",

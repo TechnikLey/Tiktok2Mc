@@ -7,8 +7,6 @@ command prefixes, multipliers, and duplicate detection.
 
 import logging
 import re
-from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 from core.diagnostics import Diagnostic, Severity, _make_diag

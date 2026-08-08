@@ -27,7 +27,7 @@ from ruamel.yaml.error import YAMLError
 
 from core.api.server import DEFAULT_PORT
 from core.backup import get_backup_manager
-from core.checksum import fetch_checksum, verify_checksum
+from core.checksum import verify_checksum
 from core.crash_manager import get_crash_manager
 from core.error_codes import UPDATE_0001
 from core.logger import (
@@ -491,7 +491,9 @@ def run_update():
                     log.debug("Could not fetch checksum asset: %s", exc)
                 break
         if not expected_hash:
-            log.error("[FAIL] Could not determine expected checksum (no .sha256 asset, no fallback). Aborting update.")
+            log.error(
+                "[FAIL] Could not determine expected checksum (no .sha256 asset, no fallback). Aborting update."
+            )
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
             sys.exit(5)

@@ -11,9 +11,10 @@ import json
 import logging
 import urllib.error
 import urllib.request
-from typing import Any
 
-from core.overlay_base import DEFAULT_OVERLAY_CONFIG, OverlayClient, OverlayManagerBase, _load_overlay_config
+from core.overlay_base import (
+    OverlayManagerBase,
+)
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +29,9 @@ API_BASE = "http://127.0.0.1:29185/api/v1"
 class OverlayManager(OverlayManagerBase):
     """Bridge-side overlay manager — uses HTTP POST to the core API."""
 
-    def dispatch(self, title: str, subtitle: str, duration: int, target_name: str) -> bool:
+    def dispatch(
+        self, title: str, subtitle: str, duration: int, target_name: str
+    ) -> bool:
         """Send an overlay text message to *target_name* via HTTP POST.
 
         Returns ``True`` if the message was accepted by the API,
