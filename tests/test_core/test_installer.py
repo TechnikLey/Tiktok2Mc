@@ -4,13 +4,8 @@ These tests verify the NSIS script structure and the build.py
 installer integration without requiring the actual makensis compiler.
 """
 
-import sys
-import subprocess
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
-
+from unittest.mock import MagicMock
 
 # Directory where the installer script lives
 INSTALLER_DIR = Path(__file__).resolve().parent.parent.parent / "installer"
@@ -131,8 +126,10 @@ class TestLinuxInstallerScript:
 
     def test_linux_script_has_desktop_entries(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
-        assert "/usr/share/applications/tiktok2mc.desktop" in content
-        assert "/usr/share/applications/tiktok2mc-fullsystem.desktop" in content
+        # Installer is per-user (no root) -> desktop entries live under ~/.local/share/applications
+        assert 'DESKTOP_DIR="$DATA_HOME/applications"' in content
+        assert "$DESKTOP_DIR/tiktok2mc.desktop" in content
+        assert "$DESKTOP_DIR/tiktok2mc-fullsystem.desktop" in content
 
     def test_linux_script_has_archive_marker(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
@@ -161,7 +158,7 @@ class TestBuildPyInstallerIntegration:
 
     def test_build_py_warns_when_makensis_missing(self, monkeypatch, capsys):
         """When makensis is not found, build.py prints a warning."""
-        from build import Color, cprint
+        from build import Color
 
         captured = []
         def mock_cprint(msg, color):

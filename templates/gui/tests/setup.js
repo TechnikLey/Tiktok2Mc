@@ -9,7 +9,7 @@ const html = readFileSync(join(__dirname, '..', 'index.html'), 'utf-8');
 document.documentElement.innerHTML = html;
 
 // --- Global browser mocks (JSDOM doesn't provide these) ---
-window.fetch = async (url) => ({
+window.fetch = async () => ({
   ok: true,
   status: 200,
   statusText: 'OK',

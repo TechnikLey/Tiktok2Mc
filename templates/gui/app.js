@@ -1848,7 +1848,7 @@ class HookConfigEditor {
     const help = field.help || '';
     const err = this.errors.get(path) || '';
 
-    let widget = '';
+    let widget;
     const ftype = field.type || 'string';
 
     if (ftype === 'boolean') {
@@ -3030,7 +3030,7 @@ class ConfigEditor {
 
   buildSection(key, value) {
     const meta = SECTION_META[key] || { title: toTitle(key), desc: '' };
-    let body = '';
+    let body;
     if (key === 'theme') {
       body = this.buildThemeEditor(key, value);
     } else if (key === 'overlay') {
@@ -3128,7 +3128,7 @@ class ConfigEditor {
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
     const isReq = meta.required;
 
-    let inputHtml = '';
+    let inputHtml;
     if (meta.readonly) {
       inputHtml = `<input type="text" id="${id}" value="${escapeHtml(value !== undefined ? String(value) : '')}" data-path="${path}" data-type="string" readonly style="opacity:0.6;cursor:not-allowed;">`;
     } else if (meta.type === 'bool' || (meta.type === undefined && typeof value === 'boolean')) {
@@ -3339,7 +3339,7 @@ class ConfigEditor {
   buildOverrideWidget(key, value, path) {
     const label = toTitle(key);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
-    let widget = '';
+    let widget;
 
     if (key === 'roles') {
       const roles = ['all','moderator','superfan','fanclub'];
@@ -4126,7 +4126,7 @@ class PluginConfigEditor {
     const help = field.help || '';
     const err = this.errors.get(path) || '';
 
-    let widget = '';
+    let widget;
     const ftype = field.type || 'string';
 
     if (ftype === 'boolean') {

@@ -2,9 +2,10 @@ import asyncio
 import sys
 import threading
 import time
+from concurrent.futures import Future
+from unittest.mock import patch
+
 import pytest
-from concurrent.futures import Future, ThreadPoolExecutor
-from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture(autouse=True)
@@ -151,14 +152,16 @@ class TestCrashManagerBasics:
 
 class TestCrashManagerSupervisedThread:
     def test_supervised_thread_catches_and_reports(self, crash_mgr):
-        from core.error_codes import CORE_0002
 
         def target():
             raise RuntimeError("thread boom")
 
-        t = crash_mgr.supervised_thread(target, name="test-thread")
-        t.start()
-        t.join(timeout=5)
+        # The supervised thread re-raises so threading.excepthook can observe it.
+        # Swallow it here to avoid PytestUnhandledThreadExceptionWarning.
+        with patch("threading.excepthook"):
+            t = crash_mgr.supervised_thread(target, name="test-thread")
+            t.start()
+            t.join(timeout=5)
         assert crash_mgr.get_crash_count() >= 1
 
     def test_supervised_thread_runs_successfully(self, crash_mgr):
@@ -305,8 +308,6 @@ class TestCrashManagerInstallation:
         crash_mgr.install_asyncio(loop)
         captured = []
 
-        original = loop.get_exception_handler()
-
         def fake_original(l, ctx):
             captured.append(ctx)
 
@@ -331,8 +332,8 @@ class TestCrashManagerInstallation:
 
 class TestGetCrashManager:
     def test_singleton(self):
-        from core.crash_manager import get_crash_manager
         import core.crash_manager as cm
+        from core.crash_manager import get_crash_manager
 
         cm._crash_manager = None
         m1 = get_crash_manager()
@@ -340,8 +341,8 @@ class TestGetCrashManager:
         assert m1 is m2
 
     def test_reset_creates_new(self):
-        from core.crash_manager import get_crash_manager
         import core.crash_manager as cm
+        from core.crash_manager import get_crash_manager
 
         cm._crash_manager = None
         m1 = get_crash_manager()
@@ -350,8 +351,8 @@ class TestGetCrashManager:
         assert m1 is not m2
 
     def test_default_module_name(self):
-        from core.crash_manager import get_crash_manager
         import core.crash_manager as cm
+        from core.crash_manager import get_crash_manager
 
         cm._crash_manager = None
         mgr = get_crash_manager()

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 /* ─── fetchJSON / postJSON / putJSON ─── */
 describe('API helpers', () => {
   beforeEach(() => {
-    globalThis.fetch = async (url) => ({
+    globalThis.fetch = async () => ({
       ok: true,
       status: 200,
       statusText: 'OK',
