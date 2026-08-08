@@ -104,10 +104,13 @@ async def reload_runtime(body: ReloadRequest):
     if not signals:
         raise HTTPException(status_code=400, detail="No reload targets selected")
 
-    await event_bus.publish("system.reload_requested", {
-        "config": body.config,
-        "actions": body.actions,
-    })
+    await event_bus.publish(
+        "system.reload_requested",
+        {
+            "config": body.config,
+            "actions": body.actions,
+        },
+    )
 
     log.info("[RELOAD] Requested signals: %s", signals)
     return ReloadResponse(status="reload_requested", signals=signals)

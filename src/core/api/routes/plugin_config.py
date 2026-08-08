@@ -98,7 +98,9 @@ async def get_plugin_schema(name: str):
                         "framework": True,
                     },
                 )
-            elif not any(f.get("framework") for f in schema["fields"] if f.get("key") == fname):
+            elif not any(
+                f.get("framework") for f in schema["fields"] if f.get("key") == fname
+            ):
                 # Mark existing enabled field as framework-managed
                 for f in schema["fields"]:
                     if f.get("key") == fname:

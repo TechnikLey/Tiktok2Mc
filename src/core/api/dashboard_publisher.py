@@ -54,6 +54,7 @@ class DashboardPublisher:
         """Return current Event-Command Mapper diagnostics."""
         try:
             from core.event_command_mapper import get_event_command_mapper
+
             return get_event_command_mapper().get_diagnostics()
         except Exception as exc:  # dashboard data is best-effort
             log.debug("[DASHBOARD] Could not fetch ECM diagnostics: %s", exc)
@@ -84,7 +85,6 @@ class DashboardPublisher:
                         "dashboard.ecm_diagnostics",
                         ecm_diag,
                     )
-
 
             except asyncio.CancelledError:
                 break

@@ -22,9 +22,7 @@ class BridgeDispatcher:
     def __init__(self, config: EngineConfig | None = None) -> None:
         self._config = config or EngineConfig()
 
-    def dispatch_trigger(
-        self, payload: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    def dispatch_trigger(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         """POST a trigger payload to the bridge.
 
         Returns the bridge's JSON response or *None* if the response
@@ -36,9 +34,7 @@ class BridgeDispatcher:
         )
         return self._post(url, payload)
 
-    def dispatch_comment(
-        self, payload: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    def dispatch_comment(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         """POST a test comment payload to the bridge."""
         url = (
             f"http://{self._config.bridge_host}:{self._config.bridge_port}"

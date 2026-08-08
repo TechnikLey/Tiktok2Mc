@@ -148,13 +148,17 @@ def test_api_response_format_matches_endpoint(clean_registry, hooks_dir):
 def test_spotify_hook_exists_in_plugin_dir():
     """Spotify hook moved to plugins/spotify/hooks/spotify_control/."""
     base = Path(__file__).resolve().parent.parent.parent
-    spotify_hook = base / "src" / "plugins" / "spotify" / "hooks" / "spotify_control" / "main.py"
+    spotify_hook = (
+        base / "src" / "plugins" / "spotify" / "hooks" / "spotify_control" / "main.py"
+    )
     assert spotify_hook.exists(), f"Spotify hook not found: {spotify_hook}"
 
 
 def test_spotify_hook_manifest_exists():
     base = Path(__file__).resolve().parent.parent.parent
-    manifest = base / "src" / "plugins" / "spotify" / "hooks" / "spotify_control" / "hook.json"
+    manifest = (
+        base / "src" / "plugins" / "spotify" / "hooks" / "spotify_control" / "hook.json"
+    )
     assert manifest.exists(), f"Spotify hook manifest not found: {manifest}"
 
 
@@ -165,7 +169,10 @@ def test_hook_api_get_hook_config():
 
     loop = asyncio.new_event_loop()
     api = HookAPI(
-        asyncio.Queue(), asyncio.Queue(), loop, {},
+        asyncio.Queue(),
+        asyncio.Queue(),
+        loop,
+        {},
         set(),
         hook_configs={"test_hook": {"mode": "deny-all", "triggers": ["foo"]}},
     )

@@ -44,9 +44,7 @@ class RconService:
                 ),
                 timeout=5.0,
             )
-            await asyncio.wait_for(
-                asyncio.to_thread(conn.connect), timeout=5.0
-            )
+            await asyncio.wait_for(asyncio.to_thread(conn.connect), timeout=5.0)
             self._conn = conn
             self._connected = True
             log.info("[RCON] Connected to %s:%s", self._host, self._port)

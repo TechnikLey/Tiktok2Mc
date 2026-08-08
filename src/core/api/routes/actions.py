@@ -50,7 +50,7 @@ def _build_gift_image_map() -> dict[str, str]:
         us_pos = stem.find("_")
         if us_pos == -1:
             continue
-        name_part = stem[us_pos + 1:]
+        name_part = stem[us_pos + 1 :]
         normalized = _normalize_name(name_part)
         mapping[normalized] = f"/gifts-pictures/{f.name}"
     return mapping
@@ -69,12 +69,14 @@ async def get_actions():
 @router.put("/actions", response_model=ActionsResponse)
 async def update_actions(body: ActionsUpdateRequest):
     try:
-        validation_diags = _get_service().validate_triggers([t.model_dump() for t in body.triggers])
+        validation_diags = _get_service().validate_triggers(
+            [t.model_dump() for t in body.triggers]
+        )
         errors = [d for d in validation_diags if d.get("severity") == "ERROR"]
         if errors:
             raise HTTPException(
                 status_code=422,
-                detail=f"Invalid action configuration: {errors[0]['message']}"
+                detail=f"Invalid action configuration: {errors[0]['message']}",
             )
 
         raw = _get_service().serialize([t.model_dump() for t in body.triggers])
@@ -138,9 +140,11 @@ def _load_gifts() -> list[dict]:
     if not gifts_file.exists():
         gifts_file = root / "defaults" / "gifts.json"
     if not gifts_file.exists():
-        log.warning("gifts.json not found at %s or %s",
-                     root / "defaults" / "gifts.json",
-                     root / "core" / "gifts.json")
+        log.warning(
+            "gifts.json not found at %s or %s",
+            root / "defaults" / "gifts.json",
+            root / "core" / "gifts.json",
+        )
         return []
     try:
         return json.loads(gifts_file.read_text(encoding="utf-8"))
@@ -166,7 +170,6 @@ async def get_gifts():
 @router.get("/actions/scripts")
 async def get_registered_scripts():
     try:
-
         from core.hook_api import HOOK_ACTIONS
         from core.hook_loader import load_event_hooks
 
@@ -188,22 +191,26 @@ async def get_registered_scripts():
                         break
 
                 if hooks_dir:
+
                     class _StubAPI:
                         def register_action(self, name: str, fn) -> None:
                             HOOK_ACTIONS[name] = fn
+
                         def __getattr__(self, _name: str):
                             return lambda *args, **kwargs: None
+
                     load_event_hooks(_StubAPI(), hooks_dir)
-                    log.info(f"[SCRIPTS] Lazy-loaded {len(HOOK_ACTIONS)} hook(s) from {hooks_dir}")
+                    log.info(
+                        f"[SCRIPTS] Lazy-loaded {len(HOOK_ACTIONS)} hook(s) from {hooks_dir}"
+                    )
                 else:
-                    log.warning(f"[SCRIPTS] No hooks directory found among: {candidates}")
+                    log.warning(
+                        f"[SCRIPTS] No hooks directory found among: {candidates}"
+                    )
             except Exception as e:  # script listing must survive lazy-load failures
                 log.warning(f"[SCRIPTS] Could not lazy-load hooks: {e}")
 
-        scripts = [
-            {"name": name}
-            for name in sorted(HOOK_ACTIONS.keys())
-        ]
+        scripts = [{"name": name} for name in sorted(HOOK_ACTIONS.keys())]
         return {"scripts": scripts}
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.error(f"Failed to get registered scripts: {e}")

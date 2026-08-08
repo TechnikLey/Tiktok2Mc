@@ -1,4 +1,3 @@
-
 import pytest
 
 from core.yaml_utils import create_yaml_rt, deep_update_rt, load_yaml, save_yaml
@@ -31,9 +30,7 @@ class TestLoadYaml:
 
     def test_load_preserves_comments(self, tmp_path):
         p = tmp_path / "with_comments.yaml"
-        p.write_text(
-            "# Section header\nkey: value  # inline\n", encoding="utf-8"
-        )
+        p.write_text("# Section header\nkey: value  # inline\n", encoding="utf-8")
         data = load_yaml(p)
         assert data["key"] == "value"
         # ruamel.yaml stores comments internally; verify round-trip below
@@ -56,6 +53,7 @@ class TestSaveYaml:
 
     def test_save_backup(self, tmp_path, monkeypatch):
         from core.backup import BackupManager
+
         bm = BackupManager(root_dir=tmp_path)
         monkeypatch.setattr("core.yaml_utils.get_backup_manager", lambda: bm)
         p = tmp_path / "out.yaml"
@@ -81,7 +79,7 @@ class TestRoundTripPreservation:
         p = tmp_path / "rt.yaml"
         original = (
             "# Server settings\n"
-            "server_host: \"127.0.0.1\"  # local only\n"
+            'server_host: "127.0.0.1"  # local only\n'
             "\n"
             "# Java settings\n"
             "java:\n"
@@ -104,16 +102,12 @@ class TestRoundTripPreservation:
         assert "# local only" in content
         assert "# initial RAM" in content
         assert "# Random comment" in content
-        assert "server_host: \"0.0.0.0\"" in content
+        assert 'server_host: "0.0.0.0"' in content
         assert "xms: 2G" in content
 
     def test_unknown_keys_and_comments_preserved(self, tmp_path):
         p = tmp_path / "rt.yaml"
-        original = (
-            "known: 1\n"
-            "# user comment\n"
-            "unknown: value\n"
-        )
+        original = "known: 1\n# user comment\nunknown: value\n"
         p.write_text(original, encoding="utf-8")
 
         data = load_yaml(p)
@@ -130,10 +124,7 @@ class TestRoundTripPreservation:
     def test_nested_dict_comments_preserved(self, tmp_path):
         p = tmp_path / "nested.yaml"
         original = (
-            "theme:\n"
-            "  # Background color\n"
-            "  background: \"#000000\"\n"
-            "  text: \"#ffffff\"\n"
+            'theme:\n  # Background color\n  background: "#000000"\n  text: "#ffffff"\n'
         )
         p.write_text(original, encoding="utf-8")
 
@@ -143,16 +134,12 @@ class TestRoundTripPreservation:
 
         content = p.read_text(encoding="utf-8")
         assert "# Background color" in content
-        assert "background: \"#111111\"" in content
-        assert "text: \"#ffffff\"" in content
+        assert 'background: "#111111"' in content
+        assert 'text: "#ffffff"' in content
 
     def test_array_comments_partially_preserved(self, tmp_path):
         p = tmp_path / "arr.yaml"
-        original = (
-            "items:\n"
-            "  - a: 1\n"
-            "  - a: 2\n"
-        )
+        original = "items:\n  - a: 1\n  - a: 2\n"
         p.write_text(original, encoding="utf-8")
 
         data = load_yaml(p)

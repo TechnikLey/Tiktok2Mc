@@ -213,9 +213,7 @@ class WriteGuard:
 
         def _open(file, mode="r", *args, **kwargs):
             if isinstance(file, int):
-                return guard._originals["builtins.open"](
-                    file, mode, *args, **kwargs
-                )
+                return guard._originals["builtins.open"](file, mode, *args, **kwargs)
             write_modes = ("w", "a", "x", "r+", "w+", "a+", "x+")
             if any(str(mode).startswith(m) for m in write_modes):
                 guard._check(file, f"open(mode={mode})")

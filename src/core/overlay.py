@@ -143,6 +143,7 @@ HTML_TEMPLATE = """
 #  Config
 # ---------------------------------------------------------------------------
 
+
 class OverlayConfig:
     """Overlay configuration backed by the global ``config.yaml``."""
 
@@ -180,6 +181,7 @@ class OverlayConfig:
 #  Circuit-breaker client
 # ---------------------------------------------------------------------------
 
+
 class OverlayClient:
     """Per-overlay circuit breaker."""
 
@@ -209,6 +211,7 @@ class OverlayClient:
 # ---------------------------------------------------------------------------
 #  Manager
 # ---------------------------------------------------------------------------
+
 
 class OverlayManager:
     """Central overlay manager — handles config, circuit breakers,
@@ -255,7 +258,12 @@ class OverlayManager:
 
     # -- HTML rendering --------------------------------------------------
 
-    def render_html(self, overlay_name: str = "default", chroma: bool = True, theme_overrides: dict | None = None) -> str:
+    def render_html(
+        self,
+        overlay_name: str = "default",
+        chroma: bool = True,
+        theme_overrides: dict | None = None,
+    ) -> str:
         """Render the overlay HTML page for *overlay_name*.
 
         If *theme_overrides* is given it is merged on top of the resolved
@@ -273,8 +281,7 @@ class OverlayManager:
             else "background-color: transparent;"
         )
         return (
-            HTML_TEMPLATE
-            .replace("{{ theme_style }}", theme_style)
+            HTML_TEMPLATE.replace("{{ theme_style }}", theme_style)
             .replace("{{ chroma_background }}", chroma_background)
             .replace("{{ display_mode }}", str(cfg.get("display_mode", "overwrite")))
             .replace("{{ fade_in }}", str(cfg.get("fade_in", 500)))
@@ -284,7 +291,9 @@ class OverlayManager:
 
     # -- Dispatch --------------------------------------------------------
 
-    def dispatch(self, title: str, subtitle: str, duration: int, target_name: str) -> bool:
+    def dispatch(
+        self, title: str, subtitle: str, duration: int, target_name: str
+    ) -> bool:
         """Send an overlay text message to *target_name*.
 
         Returns ``True`` if the message was accepted and published to the

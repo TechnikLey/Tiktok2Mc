@@ -62,6 +62,7 @@ def save_yaml(path: Path, data: Any, backup: bool = False) -> None:
         yaml.dump(data, f)
     tmp_path.replace(path)
 
+
 def deep_update_rt(base: Any, overlay: Any) -> None:
     """Recursively merge *overlay* into *base* in-place.
 
@@ -85,9 +86,8 @@ def deep_update_rt(base: Any, overlay: Any) -> None:
             del base[-1]
         for i, value in enumerate(overlay):
             if i < len(base):
-                if (
-                    isinstance(base[i], (CommentedMap, dict))
-                    and isinstance(value, dict)
+                if isinstance(base[i], (CommentedMap, dict)) and isinstance(
+                    value, dict
                 ):
                     deep_update_rt(base[i], value)
                 else:

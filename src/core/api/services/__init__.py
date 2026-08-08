@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 _config_write_lock = Lock()
 
+
 class ApiService:
     """Central business logic for the API server.
 
@@ -49,9 +50,7 @@ class ApiService:
     def read_config(self) -> dict[str, Any]:
         """Load the YAML config file and normalise its version."""
         if not self.config_path.exists():
-            raise FileNotFoundError(
-                f"Config file not found: {self.config_path}"
-            )
+            raise FileNotFoundError(f"Config file not found: {self.config_path}")
         data = load_yaml(self.config_path)
 
         # Normalise legacy integer / string config_version on load
@@ -70,7 +69,10 @@ class ApiService:
         return data
 
     def write_config(
-        self, data: dict[str, Any], backup: bool = True, replace_keys: list[str] | None = None
+        self,
+        data: dict[str, Any],
+        backup: bool = True,
+        replace_keys: list[str] | None = None,
     ) -> None:
         """Validate and write a config dict back to the YAML file atomically.
 
@@ -88,9 +90,13 @@ class ApiService:
         data["config_version"] = EXPECTED_CONFIG_VERSION
 
         # Load existing config to preserve comments/formatting
-        existing = load_yaml(self.config_path) if self.config_path.exists() else CommentedMap()
+        existing = (
+            load_yaml(self.config_path) if self.config_path.exists() else CommentedMap()
+        )
         if not isinstance(existing, CommentedMap):
-            existing = CommentedMap(existing) if isinstance(existing, dict) else CommentedMap()
+            existing = (
+                CommentedMap(existing) if isinstance(existing, dict) else CommentedMap()
+            )
 
         # For keys marked as replace, remove nested keys in existing that are not in data
         if replace_keys:
@@ -98,7 +104,9 @@ class ApiService:
                 if key in data and key in existing:
                     old_val = existing[key]
                     new_val = data[key]
-                    if isinstance(old_val, (CommentedMap, dict)) and isinstance(new_val, dict):
+                    if isinstance(old_val, (CommentedMap, dict)) and isinstance(
+                        new_val, dict
+                    ):
                         for old_nested_key in list(old_val.keys()):
                             if old_nested_key not in new_val:
                                 del old_val[old_nested_key]

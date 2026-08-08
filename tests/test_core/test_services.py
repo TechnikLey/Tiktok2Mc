@@ -1,42 +1,48 @@
-
 import pytest
 
 
 class TestNormalizeConfigVersion:
     def test_legacy_int(self):
         from core.utils import normalize_config_version
+
         assert normalize_config_version(7) == "0.7"
         assert normalize_config_version(0) == "0.0"
         assert normalize_config_version(10) == "0.10"
 
     def test_legacy_string_number(self):
         from core.utils import normalize_config_version
+
         assert normalize_config_version("7") == "0.7"
         assert normalize_config_version("0") == "0.0"
 
     def test_semantic_minor(self):
         from core.utils import normalize_config_version
+
         assert normalize_config_version("0.7") == "0.7"
         assert normalize_config_version("1.0") == "1.0"
         assert normalize_config_version("2.5") == "2.5"
 
     def test_v_prefix(self):
         from core.utils import normalize_config_version
+
         assert normalize_config_version("v1.0.0") == "1.0"
         assert normalize_config_version("v0.7.0") == "0.7"
 
     def test_triple_dot(self):
         from core.utils import normalize_config_version
+
         assert normalize_config_version("1.0.0") == "1.0"
         assert normalize_config_version("0.7.5") == "0.7"
 
     def test_whitespace_handling(self):
         from core.utils import normalize_config_version
+
         assert normalize_config_version("  1.0  ") == "1.0"
         assert normalize_config_version("  v2.0.0  ") == "2.0"
 
     def test_rejects_bad_strings(self):
         from core.utils import normalize_config_version
+
         with pytest.raises(ValueError):
             normalize_config_version("abc")
         with pytest.raises(ValueError):
@@ -46,6 +52,7 @@ class TestNormalizeConfigVersion:
 
     def test_rejects_bad_types(self):
         from core.utils import normalize_config_version
+
         with pytest.raises(ValueError):
             normalize_config_version([])
         with pytest.raises(ValueError):
@@ -55,6 +62,7 @@ class TestNormalizeConfigVersion:
 @pytest.fixture
 def svc(project_dir):
     from core.api.services import ApiService
+
     return ApiService()
 
 
@@ -66,6 +74,7 @@ class TestApiService:
 
     def test_read_config_normalises_version(self, svc, project_dir):
         from core.yaml_utils import save_yaml
+
         config_file = project_dir / "config.yaml"
         original = config_file.read_text(encoding="utf-8")
         save_yaml(config_file, {"config_version": 7}, backup=False)
@@ -78,6 +87,7 @@ class TestApiService:
 
     def test_read_config_file_not_found(self, project_dir):
         from core.api.services import ApiService
+
         svc = ApiService()
         svc.config_path = project_dir / "nonexistent.yaml"
         with pytest.raises(FileNotFoundError):
@@ -123,6 +133,7 @@ class TestApiService:
 
     def test_config_status_false_when_missing(self, project_dir):
         from core.api.services import ApiService
+
         svc = ApiService()
         svc.config_path = project_dir / "nonexistent.yaml"
         assert svc.get_config_status() is False

@@ -10,8 +10,9 @@ from pathlib import Path
 import pytest
 
 
-def _create_manifest(root: Path, name: str, version: str = "1.0.0",
-                      entry_point: str = "main.py") -> None:
+def _create_manifest(
+    root: Path, name: str, version: str = "1.0.0", entry_point: str = "main.py"
+) -> None:
     """Create a temporary plugin manifest on disk."""
     plugin_dir = root / "src" / "plugins" / name
     plugin_dir.mkdir(parents=True, exist_ok=True)
@@ -21,9 +22,7 @@ def _create_manifest(root: Path, name: str, version: str = "1.0.0",
         "entry_point": entry_point,
         "display_name": name.replace("-", " ").title(),
     }
-    (plugin_dir / "plugin.json").write_text(
-        json.dumps(manifest), encoding="utf-8"
-    )
+    (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
 def _clean_plugins(root: Path) -> None:
@@ -31,6 +30,7 @@ def _clean_plugins(root: Path) -> None:
     plugins_dir = root / "src" / "plugins"
     if plugins_dir.exists():
         import shutil
+
         shutil.rmtree(plugins_dir)
 
 
@@ -79,10 +79,13 @@ class TestPluginDiscoveryEndpoint:
         _create_manifest(project_dir, "toggler")
 
         # Register the plugin as enabled
-        client.post("/api/v1/plugins/register", json={
-            "name": "toggler",
-            "enabled": True,
-        })
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "toggler",
+                "enabled": True,
+            },
+        )
 
         resp = client.get("/api/v1/plugins/discover")
         assert resp.status_code == 200
@@ -93,9 +96,7 @@ class TestPluginDiscoveryEndpoint:
         # Disable via API
         client.post("/api/v1/plugins/toggler/disable")
         resp = client.get("/api/v1/plugins/discover")
-        toggler = next(
-            p for p in resp.json()["plugins"] if p["name"] == "toggler"
-        )
+        toggler = next(p for p in resp.json()["plugins"] if p["name"] == "toggler")
         assert toggler["enabled"] is False
 
         _clean_plugins(project_dir)

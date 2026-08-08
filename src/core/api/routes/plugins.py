@@ -136,7 +136,11 @@ async def list_plugins():
         # Check each registered plugin's manifest for errors
         for plugin in plugins:
             if plugin.path:
-                plugin_dir = Path(plugin.path).parent if Path(plugin.path).is_file() else Path(plugin.path)
+                plugin_dir = (
+                    Path(plugin.path).parent
+                    if Path(plugin.path).is_file()
+                    else Path(plugin.path)
+                )
                 if plugin_dir.is_dir():
                     manifest_path = plugin_dir / "plugin.json"
                     if manifest_path.exists():
@@ -170,19 +174,20 @@ async def list_plugins():
                 if any(p.name == name for p in plugins):
                     continue
                 from core.api.models import PluginRegistration
-                plugins.append(PluginRegistration(
-                    name=name,
-                    display_name=name,
-                    version="0.0.0",
-                    error=error,
-                    enabled=False,
-                    path=str(child),
-                ))
+
+                plugins.append(
+                    PluginRegistration(
+                        name=name,
+                        display_name=name,
+                        version="0.0.0",
+                        error=error,
+                        enabled=False,
+                        path=str(child),
+                    )
+                )
 
         enabled = sum(1 for p in plugins if p.enabled)
-        return PluginListResponse(
-            total=len(plugins), enabled=enabled, plugins=plugins
-        )
+        return PluginListResponse(total=len(plugins), enabled=enabled, plugins=plugins)
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to list plugins")
         raise HTTPException(status_code=500, detail=str(e))
@@ -200,9 +205,7 @@ async def check_plugin_updates():
         registry = get_registry()
         plugins = [p.model_dump(mode="json") for p in registry.list()]
         results = _updater.check_updates(plugins)
-        updates_available = sum(
-            1 for r in results if r.get("update_available")
-        )
+        updates_available = sum(1 for r in results if r.get("update_available"))
         return PluginUpdatesResponse(
             plugins=[PluginUpdateStatus(**r) for r in results],
             total=len(results),
@@ -226,7 +229,9 @@ async def install_plugin_updates():
         if not plugins_dir.is_dir():
             plugins_dir = core.paths.get_root_dir() / "src" / "plugins"
         if not plugins_dir.is_dir():
-            raise HTTPException(status_code=500, detail="Cannot locate plugins directory")
+            raise HTTPException(
+                status_code=500, detail="Cannot locate plugins directory"
+            )
 
         install_results: list[PluginUpdateInstallResult] = []
         for r in results:
@@ -339,7 +344,10 @@ async def enable_plugin(name: str):
         # Use "starting" — the first heartbeat will promote to healthy.
         result = registry.update(name, enabled=True, health_status="starting")
         if result is None:
-            log.error("Enable plugin '%s': registry.update returned None after get succeeded", name)
+            log.error(
+                "Enable plugin '%s': registry.update returned None after get succeeded",
+                name,
+            )
             raise HTTPException(
                 status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
             )
@@ -349,7 +357,9 @@ async def enable_plugin(name: str):
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to enable plugin '%s'", name)
-        raise HTTPException(status_code=500, detail=f"Failed to enable plugin '{name}': {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to enable plugin '{name}': {e}"
+        )
 
 
 @router.post("/plugins/{name}/disable", response_model=PluginRegistration)
@@ -375,7 +385,10 @@ async def disable_plugin(name: str):
         # Only update registry after signal was written successfully
         result = registry.update(name, enabled=False, health_status="unknown")
         if result is None:
-            log.error("Disable plugin '%s': registry.update returned None after get succeeded", name)
+            log.error(
+                "Disable plugin '%s': registry.update returned None after get succeeded",
+                name,
+            )
             raise HTTPException(
                 status_code=500, detail=f"Registry inconsistency for plugin '{name}'"
             )
@@ -385,7 +398,9 @@ async def disable_plugin(name: str):
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to disable plugin '%s'", name)
-        raise HTTPException(status_code=500, detail=f"Failed to disable plugin '{name}': {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to disable plugin '{name}': {e}"
+        )
 
 
 # ── Get single ───────────────────────────────────────────────────────
@@ -534,6 +549,7 @@ async def remove_comment_handler(name: str):
     """Remove a plugin's comment handler."""
     try:
         from core.api.registry import _UNSET
+
         registry = get_registry()
         plugin = registry.get(name)
         if not plugin:
@@ -566,5 +582,3 @@ async def list_comment_handlers():
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to list comment handlers")
         raise HTTPException(status_code=500, detail=str(e))
-
-

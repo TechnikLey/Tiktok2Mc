@@ -17,7 +17,13 @@ class TestPluginSandbox:
         assert sb.priority_class == "below_normal"
 
     def test_custom_init(self):
-        sb = PluginSandbox(max_memory_mb=128, max_cpu_time=60, max_files=64, max_processes=8, priority_class="idle")
+        sb = PluginSandbox(
+            max_memory_mb=128,
+            max_cpu_time=60,
+            max_files=64,
+            max_processes=8,
+            priority_class="idle",
+        )
         assert sb.max_memory_mb == 128
         assert sb.max_cpu_time == 60
         assert sb.max_files == 64
@@ -46,7 +52,10 @@ class TestPluginSandbox:
 
     def test_linux_preexec_sets_limits(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "linux")
-        sb = PluginSandbox(max_memory_mb=64, max_cpu_time=30, max_files=32, max_processes=4)
+        sb = PluginSandbox(
+            max_memory_mb=64, max_cpu_time=30, max_files=32, max_processes=4
+        )
+
         # Mock resource module
         class FakeResource:
             RLIMIT_AS = 0

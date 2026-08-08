@@ -1,5 +1,3 @@
-
-
 class TestEventCommandsEndpoints:
     def test_get_event_commands_empty(self, client, project_dir):
         # Ensure no file exists at data/event_commands.yaml
@@ -15,15 +13,18 @@ class TestEventCommandsEndpoints:
 
     def test_get_event_commands_with_data(self, client, project_dir):
         from core.yaml_utils import save_yaml
+
         data_file = project_dir / "data" / "event_commands.yaml"
         data_file.parent.mkdir(parents=True, exist_ok=True)
-        save_yaml(data_file, {
-            "event_commands": {
-                "minecraft.player_death": [
-                    {"target": "timer", "command": "pause"}
-                ]
-            }
-        }, backup=False)
+        save_yaml(
+            data_file,
+            {
+                "event_commands": {
+                    "minecraft.player_death": [{"target": "timer", "command": "pause"}]
+                }
+            },
+            backup=False,
+        )
         resp = client.get("/api/v1/event-commands")
         assert resp.status_code == 200
         body = resp.json()
@@ -32,10 +33,15 @@ class TestEventCommandsEndpoints:
 
     def test_update_event_commands_persists(self, client, project_dir):
         from core.yaml_utils import load_yaml
+
         payload = {
             "event_commands": {
                 "timer.zero": [
-                    {"target": "win-counter", "command": "add_win", "args": {"amount": 1}}
+                    {
+                        "target": "win-counter",
+                        "command": "add_win",
+                        "args": {"amount": 1},
+                    }
                 ]
             }
         }
@@ -51,13 +57,18 @@ class TestEventCommandsEndpoints:
 
     def test_update_event_commands_overwrites(self, client, project_dir):
         from core.yaml_utils import load_yaml, save_yaml
+
         data_file = project_dir / "data" / "event_commands.yaml"
         data_file.parent.mkdir(parents=True, exist_ok=True)
-        save_yaml(data_file, {
-            "event_commands": {
-                "old.event": [{"target": "timer", "command": "start"}]
-            }
-        }, backup=False)
+        save_yaml(
+            data_file,
+            {
+                "event_commands": {
+                    "old.event": [{"target": "timer", "command": "start"}]
+                }
+            },
+            backup=False,
+        )
 
         resp = client.put("/api/v1/event-commands", json={"event_commands": {}})
         assert resp.status_code == 200

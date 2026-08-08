@@ -42,17 +42,19 @@ def _discover_hooks_at_startup() -> None:
         discovered = _discover_hook_dirs()
         hook_infos = []
         for info in discovered:
-            hook_infos.append({
-                "name": info["name"],
-                "version": info["version"],
-                "display_name": info["display_name"],
-                "description": info["description"],
-                "author": info["author"],
-                "capabilities": info["capabilities"],
-                "plugin": info["plugin"],
-                "update_url": info["update_url"],
-                "source": info["source"],
-            })
+            hook_infos.append(
+                {
+                    "name": info["name"],
+                    "version": info["version"],
+                    "display_name": info["display_name"],
+                    "description": info["description"],
+                    "author": info["author"],
+                    "capabilities": info["capabilities"],
+                    "plugin": info["plugin"],
+                    "update_url": info["update_url"],
+                    "source": info["source"],
+                }
+            )
         registry = get_hook_registry()
         new_count = registry.sync_from_discovery(hook_infos)
         active_names = {info["name"] for info in discovered}
@@ -60,7 +62,8 @@ def _discover_hooks_at_startup() -> None:
         if new_count or cleaned:
             log.info(
                 "[HOOK] Auto-discovered: %d new, %d removed at startup",
-                new_count, cleaned,
+                new_count,
+                cleaned,
             )
         else:
             log.info("[HOOK] Auto-discovered %d hook(s) at startup", len(discovered))
@@ -75,7 +78,7 @@ async def lifespan(app: FastAPI):
     log.info("API server v%s starting up ...", API_VERSION)
     log.info(
         "CORS origin restricted to localhost — "
-        "use create_app(cors_origins=[\"*\"]) to open for development"
+        'use create_app(cors_origins=["*"]) to open for development'
     )
     set_event_loop(asyncio.get_running_loop())
     command_queue.set_loop(asyncio.get_running_loop())
@@ -95,7 +98,9 @@ async def lifespan(app: FastAPI):
             password=rcon_cfg.get("password", ""),
         )
     except Exception:  # RCON is optional; console auto-configures on first request
-        log.warning("Could not read RCON config — console will auto-configure on first request")
+        log.warning(
+            "Could not read RCON config — console will auto-configure on first request"
+        )
 
     await event_bus.publish("server.started", {"version": API_VERSION})
     try:
@@ -147,7 +152,8 @@ def create_app(
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins or [
+        allow_origins=cors_origins
+        or [
             "http://127.0.0.1",
             "http://localhost",
         ],
@@ -158,6 +164,7 @@ def create_app(
 
     class CancelledErrorMiddleware:
         """Suppress CancelledError spam when clients disconnect or the server shuts down."""
+
         def __init__(self, app):
             self.app = app
 
@@ -171,7 +178,9 @@ def create_app(
                 # Client disconnected or the supervisor is shutting down.
                 # Send a 499 (client closed request) if possible, then stop.
                 try:
-                    await send({"type": "http.response.start", "status": 499, "headers": []})
+                    await send(
+                        {"type": "http.response.start", "status": 499, "headers": []}
+                    )
                     await send({"type": "http.response.body", "body": b""})
                 except Exception:  # client already gone; nothing more to do
                     pass
@@ -181,6 +190,7 @@ def create_app(
     app.include_router(api_router)
 
     if api_key:
+
         @app.middleware("http")
         async def check_api_key(request: Request, call_next):
             client_host = request.client.host if request.client else ""
@@ -189,7 +199,9 @@ def create_app(
                 req_key = request.headers.get("X-API-Key", "")
                 if req_key != api_key:
                     return JSONResponse(
-                        {"detail": "Missing or invalid API key. Provide X-API-Key header."},
+                        {
+                            "detail": "Missing or invalid API key. Provide X-API-Key header."
+                        },
                         status_code=HTTP_401_UNAUTHORIZED,
                     )
             return await call_next(request)

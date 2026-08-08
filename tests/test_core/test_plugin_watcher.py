@@ -31,7 +31,8 @@ class TestPluginDirs:
         plugin_dir = tmp_path / "no-name"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
-            json.dumps({"version": "1.0.0"}), encoding="utf-8",
+            json.dumps({"version": "1.0.0"}),
+            encoding="utf-8",
         )
         assert _get_plugin_dirs(tmp_path) == {}
 
@@ -51,11 +52,13 @@ class TestPluginWatcherSync:
         plugin_dir = tmp_path / "new-plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
-            json.dumps({
-                "name": "new-plugin",
-                "version": "1.0.0",
-                "entry_point": "main.py",
-            }),
+            json.dumps(
+                {
+                    "name": "new-plugin",
+                    "version": "1.0.0",
+                    "entry_point": "main.py",
+                }
+            ),
             encoding="utf-8",
         )
 

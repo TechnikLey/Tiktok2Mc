@@ -87,7 +87,9 @@ class TestEventCommandMapperDispatch:
             enqueued.append({"target": plugin_name, "command": command, "args": kwargs})
             return "fake-id"
 
-        monkeypatch.setattr("core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue))
+        monkeypatch.setattr(
+            "core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue)
+        )
         mapper._dispatch("minecraft.player_death", {"player": "Steve"})
 
         assert len(enqueued) == 2
@@ -102,7 +104,9 @@ class TestEventCommandMapperDispatch:
             enqueued.append({"target": plugin_name, "command": command, "args": kwargs})
             return "fake-id"
 
-        monkeypatch.setattr("core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue))
+        monkeypatch.setattr(
+            "core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue)
+        )
         mapper._dispatch("timer.zero", {})
 
         assert len(enqueued) == 1
@@ -117,7 +121,9 @@ class TestEventCommandMapperDispatch:
             enqueued.append({"target": plugin_name, "command": command, "args": kwargs})
             return "fake-id"
 
-        monkeypatch.setattr("core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue))
+        monkeypatch.setattr(
+            "core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue)
+        )
         mapper._dispatch("unknown.event", {})
 
         assert len(enqueued) == 0
@@ -133,11 +139,14 @@ class TestEventCommandMapperDispatch:
         save_yaml(data_dir / "event_commands.yaml", cfg)
 
         enqueued = []
+
         def fake_enqueue(plugin_name, command, **kwargs):
             enqueued.append({"target": plugin_name, "command": command, "args": kwargs})
             return "fake-id"
 
-        monkeypatch.setattr("core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue))
+        monkeypatch.setattr(
+            "core.api.plugin_overlay.command_queue", MagicMock(enqueue=fake_enqueue)
+        )
         mapper._dispatch("bad.event", {})
 
         assert len(enqueued) == 0  # skipped because command is missing

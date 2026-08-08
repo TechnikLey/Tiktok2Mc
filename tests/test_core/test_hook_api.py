@@ -127,6 +127,7 @@ class TestHookAPI:
 
     def test_log(self, api, caplog):
         import logging
+
         caplog.set_level(logging.INFO, logger="core.hook_api")
         api.log("test message")
         assert "test message" in caplog.text
@@ -148,13 +149,17 @@ class TestHookAPI:
         assert api._valid_functions == {"valid_fn"}
 
     def test_send_overlay_text_success(self, api):
-        with patch("core.overlay_utils.send_overlay_text", return_value=True) as mock_send:
+        with patch(
+            "core.overlay_utils.send_overlay_text", return_value=True
+        ) as mock_send:
             result = api.send_overlay_text("Title", "Sub", 5, "default")
         assert result is True
         mock_send.assert_called_once_with("Title", "Sub", 5, "default")
 
     def test_send_overlay_text_failure(self, api):
-        with patch("core.overlay_utils.send_overlay_text", side_effect=Exception("fail")):
+        with patch(
+            "core.overlay_utils.send_overlay_text", side_effect=Exception("fail")
+        ):
             result = api.send_overlay_text("Title")
         assert result is False
 

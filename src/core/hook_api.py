@@ -45,6 +45,7 @@ class HookAPI:
     def config(self) -> dict:
         """Read-only access to the loaded global config.yaml values."""
         from copy import deepcopy
+
         return deepcopy(self._config)
 
     def get_hook_config(self, name: str) -> dict:
@@ -84,16 +85,20 @@ class HookAPI:
 
     def enqueue_trigger(self, action_name: str, user: str = "hook") -> None:
         if action_name in self._banned_triggers:
-            log.error(f"[HOOK] enqueue_trigger('{action_name}') permanently blocked "
-                  f"— trigger was banned after loop detection.")
+            log.error(
+                f"[HOOK] enqueue_trigger('{action_name}') permanently blocked "
+                f"— trigger was banned after loop detection."
+            )
             return
         depth = self._current_depth + 1
         if depth > MAX_CHAIN_DEPTH:
             self._banned_triggers.add(action_name)
-            log.error(f"[HOOK] enqueue_trigger('{action_name}') blocked — "
-                  f"chain depth {depth} exceeds maximum ({MAX_CHAIN_DEPTH}). "
-                  f"Trigger '{action_name}' is now permanently banned for this session. "
-                  f"Possible infinite loop.")
+            log.error(
+                f"[HOOK] enqueue_trigger('{action_name}') blocked — "
+                f"chain depth {depth} exceeds maximum ({MAX_CHAIN_DEPTH}). "
+                f"Trigger '{action_name}' is now permanently banned for this session. "
+                f"Possible infinite loop."
+            )
             return
         try:
             self._main_loop.call_soon_threadsafe(
@@ -105,11 +110,20 @@ class HookAPI:
     def log(self, msg: str) -> None:
         log.info(f"[HOOK] {msg}")
 
-    def send_overlay_text(self, title: str, subtitle: str | None = "", duration: int | None = 3, overlay_name: str | None = "default") -> bool:
+    def send_overlay_text(
+        self,
+        title: str,
+        subtitle: str | None = "",
+        duration: int | None = 3,
+        overlay_name: str | None = "default",
+    ) -> bool:
         try:
             from core.overlay_utils import send_overlay_text as _send_overlay
+
             return _send_overlay(title, subtitle, duration, overlay_name)
-        except Exception as e:  # hook boundary: overlay failure must never crash trigger dispatch
+        except (
+            Exception
+        ) as e:  # hook boundary: overlay failure must never crash trigger dispatch
             log.error(f"[HOOK] send_overlay_text failed: {e}")
             return False
 

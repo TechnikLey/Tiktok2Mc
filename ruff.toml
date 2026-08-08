@@ -4,6 +4,14 @@
 # To tighten step by step: fix a rule's findings, then move it from the
 # "deferred" comment block below into `select`.
 
+# ── Formatter ───────────────────────────────────────────────────────────
+# `ruff format` is the project's Python formatter (see AGENTS.md §7.1).
+# Formatting scope is restricted to Python files: ruff 0.16+ would otherwise
+# also format Python code blocks embedded in Markdown docs. Non-Python files
+# are deliberately never changed purely for formatting.
+[format]
+exclude = ["*.md"]
+
 [lint]
 
 # ── Enforced rules ─────────────────────────────────────────────────────

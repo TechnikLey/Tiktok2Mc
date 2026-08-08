@@ -60,8 +60,8 @@ class TestInstallerScript:
     def test_nsis_script_has_product_definitions(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         assert '!define PRODUCT_NAME "TikTok2MC"' in content
-        assert 'PRODUCT_PUBLISHER' in content
-        assert 'PRODUCT_WEB_SITE' in content
+        assert "PRODUCT_PUBLISHER" in content
+        assert "PRODUCT_WEB_SITE" in content
 
     def test_nsis_script_has_install_sections(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
@@ -72,8 +72,8 @@ class TestInstallerScript:
     def test_nsis_script_has_uninstall_section(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         assert 'Section "Uninstall"' in content
-        assert 'DeleteRegValue HKCU' in content
-        assert 'DeleteRegKey HKLM' in content
+        assert "DeleteRegValue HKCU" in content
+        assert "DeleteRegKey HKLM" in content
 
     def test_nsis_script_preserves_existing_config(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
@@ -85,8 +85,8 @@ class TestInstallerScript:
         assert "GuiDefaultMode" in content
         assert "CreateShortCut" in content
         # Desktop shortcut respects GUI mode
-        assert '$INSTDIR\\core\\gui.exe' in content
-        assert '$INSTDIR\\start.exe' in content
+        assert "$INSTDIR\\core\\gui.exe" in content
+        assert "$INSTDIR\\start.exe" in content
 
     def test_nsis_script_startup_page_for_both_modes(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
@@ -161,6 +161,7 @@ class TestBuildPyInstallerIntegration:
         from build import Color
 
         captured = []
+
         def mock_cprint(msg, color):
             captured.append((msg, color))
 
@@ -168,7 +169,9 @@ class TestBuildPyInstallerIntegration:
         try:
             raise FileNotFoundError("makensis not found")
         except FileNotFoundError:
-            mock_cprint("makensis not found — install NSIS to build installer", Color.YELLOW)
+            mock_cprint(
+                "makensis not found — install NSIS to build installer", Color.YELLOW
+            )
 
         assert any("makensis not found" in msg for msg, _ in captured)
 

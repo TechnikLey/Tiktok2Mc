@@ -47,4 +47,3 @@ class AppConfig:
             ics=data["ics"],
             depends_on=data.get("depends_on", []),
         )
-

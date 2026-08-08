@@ -118,7 +118,13 @@ class TestDetect:
 
     def test_bundled_java(self, monkeypatch, tmp_path, fake_java):
         _no_java(monkeypatch)
-        bundled = tmp_path / "server" / "java" / "bin" / ("java.exe" if __import__("sys").platform == "win32" else "java")
+        bundled = (
+            tmp_path
+            / "server"
+            / "java"
+            / "bin"
+            / ("java.exe" if __import__("sys").platform == "win32" else "java")
+        )
         bundled.parent.mkdir(parents=True, exist_ok=True)
         bundled.write_text("fake", encoding="utf-8")
         monkeypatch.setattr(java_utils, "bundled_java_path", lambda root: bundled)

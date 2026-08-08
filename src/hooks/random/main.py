@@ -17,7 +17,11 @@ def register(api: HookAPI):
         random_cfg = api.get_hook_config("random")
         mode = str(random_cfg.get("mode", "deny-all")).lower()
         raw_list = random_cfg.get("triggers", [])
-        configured = [str(t).strip().lower() for t in raw_list if str(t).strip()] if isinstance(raw_list, list) else []
+        configured = (
+            [str(t).strip().lower() for t in raw_list if str(t).strip()]
+            if isinstance(raw_list, list)
+            else []
+        )
 
         candidates = []
         for func in all_valid:

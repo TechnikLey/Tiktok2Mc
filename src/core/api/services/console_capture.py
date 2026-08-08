@@ -26,7 +26,11 @@ class ConsoleCapture:
             return
         self._running = True
         self._task = asyncio.create_task(self._run())
-        log.info("ConsoleCapture started for '%s' — watching %s", self.instance_id, self._log_path)
+        log.info(
+            "ConsoleCapture started for '%s' — watching %s",
+            self.instance_id,
+            self._log_path,
+        )
 
     async def stop(self) -> None:
         self._running = False
@@ -45,8 +49,12 @@ class ConsoleCapture:
                 await self._tail()
             except asyncio.CancelledError:
                 break
-            except Exception:  # capture loop must survive individual failures and restart
-                log.exception("ConsoleCapture error for '%s', restarting in 5s", self.instance_id)
+            except (
+                Exception
+            ):  # capture loop must survive individual failures and restart
+                log.exception(
+                    "ConsoleCapture error for '%s', restarting in 5s", self.instance_id
+                )
                 await asyncio.sleep(5)
 
     async def _tail(self) -> None:
@@ -62,7 +70,9 @@ class ConsoleCapture:
         # so rotation is detected by checking if the path still exists.
         inode = self._get_inode()
 
-        f = await asyncio.to_thread(open, self._log_path, "r", encoding="utf-8", errors="replace")
+        f = await asyncio.to_thread(
+            open, self._log_path, "r", encoding="utf-8", errors="replace"
+        )
         try:
             await asyncio.to_thread(f.seek, 0, 2)  # start at end, only new lines
             while self._running:
@@ -72,12 +82,18 @@ class ConsoleCapture:
                     if line:
                         await event_bus.publish(
                             "server.console",
-                            {"line": line, "timestamp": time.time(), "instance_id": self.instance_id},
+                            {
+                                "line": line,
+                                "timestamp": time.time(),
+                                "instance_id": self.instance_id,
+                            },
                         )
                 else:
                     # Check for log rotation
                     if not self._log_path.exists() or self._get_inode() != inode:
-                        log.info("Log file rotated for '%s', reopening", self.instance_id)
+                        log.info(
+                            "Log file rotated for '%s', reopening", self.instance_id
+                        )
                         break
                     await asyncio.sleep(0.1)
         finally:

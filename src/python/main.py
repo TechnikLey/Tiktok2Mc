@@ -84,8 +84,10 @@ RUNTIME_DIR = get_runtime_dir()
 RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
 RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
 
+
 class BotContext:
     """Central state container for the TikTok-to-Minecraft bridge."""
+
     def __init__(self):
         # RCON
         self.mc_host = "localhost"
@@ -179,7 +181,7 @@ ctx = BotContext()
 
 app = Flask(__name__)
 
-werkzeug_log = logging.getLogger('werkzeug')
+werkzeug_log = logging.getLogger("werkzeug")
 werkzeug_log.setLevel(logging.WARNING)
 
 _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
@@ -187,6 +189,7 @@ _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
 # ==========================================
 # SETUP & HELPER FUNCTIONS
 # ==========================================
+
 
 def _validate_dup_cmd_config():
     """Validate raw YAML for duplicate keys in commands_config sections.
@@ -218,7 +221,9 @@ def _validate_dup_cmd_config():
             if ":" in cline and indent == base_indent + 2:
                 key = cline.strip().split(":")[0].strip().lower()
                 if key in seen:
-                    log.error(f"command_config: Command '{key}' configured multiple times! (line {j+1}, first at line {seen[key]})")
+                    log.error(
+                        f"command_config: Command '{key}' configured multiple times! (line {j + 1}, first at line {seen[key]})"
+                    )
                     found = True
                 else:
                     seen[key] = j + 1
@@ -258,7 +263,9 @@ def _apply_config(config: dict) -> None:
             config.get("minecraft_server_api", {}).get("web_server_port", 29188),
         )
     )
-    ctx.autosave_interval_seconds = config.get("tiktok", {}).get("autosave_interval_seconds", 60)
+    ctx.autosave_interval_seconds = config.get("tiktok", {}).get(
+        "autosave_interval_seconds", 60
+    )
 
     ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
     ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
@@ -268,7 +275,9 @@ def _apply_config(config: dict) -> None:
     if ctx.follow_tracking_file.exists():
         with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
             ctx._followed_cache = {line.strip().lower() for line in f if line.strip()}
-        log.info(f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded")
+        log.info(
+            f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded"
+        )
     if ctx.follow_tracking_mode == "per_stream":
         ctx.follow_tracking_file.write_text("")
         ctx._followed_cache.clear()
@@ -277,18 +286,22 @@ def _apply_config(config: dict) -> None:
     comment_cmd_cfg = config.get("comment_commands", {})
     ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
     ctx.comment_cmd_global_cooldown = max(0, int(comment_cmd_cfg.get("cooldown", 0)))
-    ctx.comment_cmd_global_user_cooldown = max(0, int(comment_cmd_cfg.get("user_cooldown", 0)))
+    ctx.comment_cmd_global_user_cooldown = max(
+        0, int(comment_cmd_cfg.get("user_cooldown", 0))
+    )
     raw_groups = comment_cmd_cfg.get("groups", None)
     if raw_groups is None:
-        raw_groups = [{
-            "enabled": True,
-            "prefix": comment_cmd_cfg.get("prefix", "#"),
-            "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
-            "mode": comment_cmd_cfg.get("mode", "deny-all"),
-            "commands": comment_cmd_cfg.get("commands", []),
-            "handler": "rcon",
-            "url": "",
-        }]
+        raw_groups = [
+            {
+                "enabled": True,
+                "prefix": comment_cmd_cfg.get("prefix", "#"),
+                "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
+                "mode": comment_cmd_cfg.get("mode", "deny-all"),
+                "commands": comment_cmd_cfg.get("commands", []),
+                "handler": "rcon",
+                "url": "",
+            }
+        ]
         log.info("[CONFIG] comment_commands: using legacy single-group format")
     ctx.comment_cmd_groups = []
     ctx.comment_cmd_all_prefixes = set()
@@ -301,11 +314,17 @@ def _apply_config(config: dict) -> None:
             log.info(f"[CONFIG] comment_commands group '{prefix}': disabled by config")
             continue
         if prefix in seen_prefixes:
-            log.warning(f"comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate")
+            log.warning(
+                f"comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate"
+            )
             continue
         seen_prefixes.add(prefix)
         raw_roles = g.get("allowed_roles", ["moderator"])
-        roles = [str(r).strip().lower() for r in raw_roles if str(r).strip()] if isinstance(raw_roles, list) else ["moderator"]
+        roles = (
+            [str(r).strip().lower() for r in raw_roles if str(r).strip()]
+            if isinstance(raw_roles, list)
+            else ["moderator"]
+        )
         mode = str(g.get("mode", "deny-all")).lower()
         raw_commands = g.get("commands", [])
         commands = []
@@ -320,12 +339,16 @@ def _apply_config(config: dict) -> None:
                         if cname in seen_cmd:
                             dup_warn_count += 1
                             if dup_warn_count <= dup_warn_max:
-                                log.warning(f"comment_commands group '{prefix}': '{cname}' listed multiple times in commands")
+                                log.warning(
+                                    f"comment_commands group '{prefix}': '{cname}' listed multiple times in commands"
+                                )
                         seen_cmd.add(cname)
                         commands.append(cname)
         if dup_warn_count > dup_warn_max:
             remaining = dup_warn_count - dup_warn_max
-            log.warning(f"comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed")
+            log.warning(
+                f"comment_commands group '{prefix}': {remaining} further duplicate command warnings suppressed"
+            )
         commands_config = {}
         raw_config = g.get("commands_config", {})
         if isinstance(raw_config, dict):
@@ -338,7 +361,9 @@ def _apply_config(config: dict) -> None:
         cooldown = max(0, int(g.get("cooldown", 0)))
         user_cooldown = max(0, int(g.get("user_cooldown", 0)))
         if mode == "allow-all" and not commands and handler == "rcon":
-            log.warning(f"comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!")
+            log.warning(
+                f"comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!"
+            )
         trigger_comment = g.get("trigger_comment_event", True)
 
         # Warn about commands_config entries that can never be used
@@ -348,27 +373,35 @@ def _apply_config(config: dict) -> None:
             if mode == "deny-all" and cname not in commands:
                 cmd_warn_count += 1
                 if cmd_warn_count <= cmd_warn_max:
-                    log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match")
+                    log.warning(
+                        f"comment_commands group '{prefix}': '{cname}' in commands_config but NOT in commands list (deny-all) — will never match"
+                    )
             elif mode == "allow-all" and cname in commands:
                 cmd_warn_count += 1
                 if cmd_warn_count <= cmd_warn_max:
-                    log.warning(f"comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode")
+                    log.warning(
+                        f"comment_commands group '{prefix}': '{cname}' in commands_config AND in commands list (allow-all) — blocked by mode"
+                    )
         if cmd_warn_count > cmd_warn_max:
             remaining = cmd_warn_count - cmd_warn_max
-            log.warning(f"comment_commands group '{prefix}': {remaining} further command config warnings suppressed")
+            log.warning(
+                f"comment_commands group '{prefix}': {remaining} further command config warnings suppressed"
+            )
 
-        ctx.comment_cmd_groups.append({
-            "prefix": prefix,
-            "roles": roles,
-            "mode": mode,
-            "commands": commands,
-            "commands_config": commands_config,
-            "handler": handler,
-            "url": url,
-            "cooldown": cooldown,
-            "user_cooldown": user_cooldown,
-            "trigger_comment_event": trigger_comment,
-        })
+        ctx.comment_cmd_groups.append(
+            {
+                "prefix": prefix,
+                "roles": roles,
+                "mode": mode,
+                "commands": commands,
+                "commands_config": commands_config,
+                "handler": handler,
+                "url": url,
+                "cooldown": cooldown,
+                "user_cooldown": user_cooldown,
+                "trigger_comment_event": trigger_comment,
+            }
+        )
 
     ctx.datapack_root = (BASE_DIR / ".." / "server" / "datapack").resolve()
     ctx.datapack_root.mkdir(parents=True, exist_ok=True)
@@ -390,10 +423,12 @@ def load_config():
         log.error(f"Config error: {e}")
         return False
 
+
 def sanitize_filename(name):
     """Returns a Minecraft-safe name (only a-z, 0-9, _, -)."""
     name = str(name).lower().replace(" ", "_")
     return re.sub(r"[^a-z0-9_-]", "", name)
+
 
 def generate_datapack():
     """Generates datapack files for vanilla commands and stores
@@ -406,7 +441,9 @@ def generate_datapack():
     try:
         ctx.datapack_root.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        log.error(f"[BUILD] Cannot create datapack root directory {ctx.datapack_root}: {e}")
+        log.error(
+            f"[BUILD] Cannot create datapack root directory {ctx.datapack_root}: {e}"
+        )
         return
 
     full_dp_path = ctx.datapack_root / ctx.datapack_name
@@ -457,7 +494,7 @@ def generate_datapack():
                         if _overlay_match:
                             kind = "overlay"
                             overlay_name = _overlay_match.group(1)
-                            body = cmd[_overlay_match.end():].strip()
+                            body = cmd[_overlay_match.end() :].strip()
                         elif cmd.startswith(">>"):
                             kind = "overlay"
                             overlay_name = "default"
@@ -475,39 +512,59 @@ def generate_datapack():
                             kind = "shell"
                             body = cmd[1:].strip()
                         else:
-                            log.error(f"Invalid command without prefix on line {line_num}: {cmd}")
+                            log.error(
+                                f"Invalid command without prefix on line {line_num}: {cmd}"
+                            )
                             continue
 
                         # Parse multiplier (e.g. "command x3")
                         multi_match = re.search(r"\s+x(\d+)\s*$", body)
                         if multi_match:
-                            base_cmd = body[:multi_match.start()].replace("{user}", "@a")
+                            base_cmd = body[: multi_match.start()].replace(
+                                "{user}", "@a"
+                            )
                             times = int(multi_match.group(1))
                         else:
                             base_cmd = body.replace("{user}", "@a")
                             times = 1
                         times = max(times, 1)
 
-                        overlay_body = body[:multi_match.start()] if multi_match else body
+                        overlay_body = (
+                            body[: multi_match.start()] if multi_match else body
+                        )
                         if kind == "overlay":
-                            ctx.overlay_actions.setdefault(name, []).append((overlay_name, overlay_body))
+                            ctx.overlay_actions.setdefault(name, []).append(
+                                (overlay_name, overlay_body)
+                            )
                             ctx.valid_functions.add(name)
                         else:
                             for _ in range(times):
                                 if kind == "script":
-                                    ctx.script_actions.setdefault(name, []).append(base_cmd)
+                                    ctx.script_actions.setdefault(name, []).append(
+                                        base_cmd
+                                    )
                                     ctx.valid_functions.add(name)
                                 elif kind == "rcon":
-                                    ctx.rcon_only_actions.setdefault(name, []).append(base_cmd)
+                                    ctx.rcon_only_actions.setdefault(name, []).append(
+                                        base_cmd
+                                    )
                                     ctx.valid_functions.add(name)
                                 elif kind == "vanilla":
-                                    collected_vanilla.setdefault(name, []).append(base_cmd)
+                                    collected_vanilla.setdefault(name, []).append(
+                                        base_cmd
+                                    )
                                     ctx.valid_functions.add(name)
                                     ctx.vanilla_functions.add(name)
                                 elif kind == "shell":
                                     # shell commands keep the raw body (do not replace {user})
-                                    shell_cmd = body[:multi_match.start()] if multi_match else body
-                                    ctx.shell_actions_cache.setdefault(name, []).append(shell_cmd)
+                                    shell_cmd = (
+                                        body[: multi_match.start()]
+                                        if multi_match
+                                        else body
+                                    )
+                                    ctx.shell_actions_cache.setdefault(name, []).append(
+                                        shell_cmd
+                                    )
                                     ctx.valid_functions.add(name)
 
         # === Write datapack files (vanilla commands only) ===
@@ -522,7 +579,9 @@ def generate_datapack():
         # Meta file
         meta_file = full_dp_path / "pack.mcmeta"
         with meta_file.open("w", encoding="utf-8") as f:
-            f.write('{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}')
+            f.write(
+                '{"pack": {"pack_format": 15, "description": "TikTok Streaming Tool"}}'
+            )
 
         # Create ZIP archive
         zip_path = Path(ctx.datapack_root) / ctx.datapack_name
@@ -531,9 +590,11 @@ def generate_datapack():
     except Exception as e:  # datapack build errors are logged; bridge keeps running
         log.exception("Datapack build failed")
 
+
 # ================================
 # RCON WORKER
 # ================================
+
 
 async def rcon_worker():
     """Background worker that dequeues RCON commands and sends them to the Minecraft server."""
@@ -549,7 +610,9 @@ async def rcon_worker():
                     ctx.rcon_queue_retries[retry_key] = retries
                     await ctx.rcon_queue.put((commands, source_user))
                 else:
-                    log.info(f"[RCON] Dropping commands after queue inactive for {retries} attempts: {commands}")
+                    log.info(
+                        f"[RCON] Dropping commands after queue inactive for {retries} attempts: {commands}"
+                    )
                     ctx.rcon_queue_retries.pop(retry_key, None)
                 await asyncio.sleep(1)
                 continue
@@ -575,12 +638,15 @@ async def rcon_worker():
                     ctx.last_rcon_attempt = now
                     try:
                         ctx.rcon_connection = await asyncio.wait_for(
-                            asyncio.to_thread(lambda: MCRcon(ctx.mc_host, ctx.mc_pass, port=ctx.mc_port)),
-                            timeout=3.0
+                            asyncio.to_thread(
+                                lambda: MCRcon(
+                                    ctx.mc_host, ctx.mc_pass, port=ctx.mc_port
+                                )
+                            ),
+                            timeout=3.0,
                         )
                         await asyncio.wait_for(
-                            asyncio.to_thread(ctx.rcon_connection.connect),
-                            timeout=3.0
+                            asyncio.to_thread(ctx.rcon_connection.connect), timeout=3.0
                         )
                     except (OSError, TimeoutError, ConnectionError) as e:
                         ctx.rcon_connection = None
@@ -591,10 +657,14 @@ async def rcon_worker():
                     if inner_pause > 0:
                         await asyncio.sleep(inner_pause)
 
-        except Exception as e:  # background worker must keep running; commands re-queued
+        except (
+            Exception
+        ) as e:  # background worker must keep running; commands re-queued
             log.info(f"[RCON OFFLINE] {e}")
             ctx.rcon_connection = None
-            get_crash_manager().report_exception(MC_0004, exc=e, context_info={"source": "rcon_worker"})
+            get_crash_manager().report_exception(
+                MC_0004, exc=e, context_info={"source": "rcon_worker"}
+            )
             await asyncio.sleep(5)
             retry_key = repr((commands, source_user))
             retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
@@ -604,10 +674,16 @@ async def rcon_worker():
                     await ctx.rcon_queue.put((commands, source_user))
                 except Exception as e:  # best-effort re-queue with reporting
                     log.info(f"RCON Queue Error: {e}")
-                    get_crash_manager().report_exception(MC_0005, exc=e, context_info={"retries": retries})
+                    get_crash_manager().report_exception(
+                        MC_0005, exc=e, context_info={"retries": retries}
+                    )
             else:
-                log.info(f"[RCON] Dropping commands after {retries} failed attempts: {commands}")
-                get_crash_manager().report_error(MC_0006, detail=f"After {retries} attempts: {commands}")
+                log.info(
+                    f"[RCON] Dropping commands after {retries} failed attempts: {commands}"
+                )
+                get_crash_manager().report_error(
+                    MC_0006, detail=f"After {retries} attempts: {commands}"
+                )
                 ctx.rcon_queue_retries.pop(retry_key, None)
             await asyncio.sleep(wait_time)
             continue
@@ -615,7 +691,10 @@ async def rcon_worker():
             ctx.rcon_queue.task_done()
             await asyncio.sleep(wait_time)
 
-async def execute_global_command(trigger_name: str, source_user: str | dict, chain_depth: int = 0):
+
+async def execute_global_command(
+    trigger_name: str, source_user: str | dict, chain_depth: int = 0
+):
     """Resolves a trigger name into RCON commands and enqueues them."""
     name = sanitize_filename(trigger_name)
 
@@ -623,8 +702,8 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
         return
 
     if isinstance(source_user, dict):
-        comment_text = source_user.get('comment', '')
-        user_display = source_user.get('user', '')
+        comment_text = source_user.get("comment", "")
+        user_display = source_user.get("user", "")
     else:
         comment_text = None
         user_display = source_user
@@ -637,9 +716,15 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
                 try:
                     ctx.hook_api.set_depth(chain_depth)
                     HOOK_ACTIONS[action](source_user, action, {})
-                except Exception as e:  # third-party hook action must not crash the bridge
+                except (
+                    Exception
+                ) as e:  # third-party hook action must not crash the bridge
                     log.warning(f"[HOOK] Error in action '{action}': {e}")
-                    get_crash_manager().report_exception(HOOK_0006, exc=e, context_info={"action": action, "trigger": trigger_name})
+                    get_crash_manager().report_exception(
+                        HOOK_0006,
+                        exc=e,
+                        context_info={"action": action, "trigger": trigger_name},
+                    )
             elif action:
                 log.warning(f"[HOOK] Unknown script action: '{action}'")
 
@@ -649,12 +734,18 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
         for overlay_name, raw_body in ctx.overlay_actions[name]:
             parts = raw_body.split("|")
             title = parts[0].replace("{user}", user_display) if len(parts) > 0 else ""
-            subtitle = parts[1].replace("{user}", user_display) if len(parts) > 1 else ""
+            subtitle = (
+                parts[1].replace("{user}", user_display) if len(parts) > 1 else ""
+            )
             if comment_text is not None:
                 title = title.replace("{comment}", comment_text)
                 subtitle = subtitle.replace("{comment}", comment_text)
             try:
-                duration = int(parts[2]) if len(parts) > 2 and parts[2].strip().isdigit() else 3
+                duration = (
+                    int(parts[2])
+                    if len(parts) > 2 and parts[2].strip().isdigit()
+                    else 3
+                )
             except (ValueError, IndexError):
                 duration = 3
             send_overlay_text(title, subtitle, duration, overlay_name)
@@ -674,7 +765,9 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
             try:
                 asyncio.create_task(execute_shell_commands(cmds))
             except RuntimeError as e:
-                log.warning(f"[SHELL] Error scheduling shell commands for '{name}': {e}")
+                log.warning(
+                    f"[SHELL] Error scheduling shell commands for '{name}': {e}"
+                )
 
     if not commands_to_send:
         return
@@ -685,9 +778,13 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
             ctx.rcon_queue.put_nowait((commands_to_send, source_user))
         except asyncio.QueueFull:
             log.info(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
+
     ctx.main_loop.call_soon_threadsafe(_enqueue)
     if ctx.rcon_queue.qsize() < 10:
-        log.info(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
+        log.info(
+            f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued."
+        )
+
 
 # ================================
 # TRIGGER WORKER
@@ -706,15 +803,22 @@ async def trigger_worker():
             try:
                 await execute_global_command(trigger, source_user, chain_depth)
             except Exception as e:  # a failing trigger must not kill the worker
-                log.info(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
-                get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"trigger": trigger, "user": str(source_user)})
+                log.info(
+                    f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}"
+                )
+                get_crash_manager().report_exception(
+                    TIKTOK_0005,
+                    exc=e,
+                    context_info={"trigger": trigger, "user": str(source_user)},
+                )
             finally:
                 ctx.trigger_queue.task_done()
         except Exception as e_outer:  # worker loop must never die
             log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
-            get_crash_manager().report_exception(TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"})
+            get_crash_manager().report_exception(
+                TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"}
+            )
             await asyncio.sleep(0.1)
-
 
 
 # ==========================================
@@ -733,10 +837,14 @@ def _publish_event(event_type: str, event_data: dict) -> None:
         urllib.request.urlopen(req, timeout=3)
     except (OSError, ValueError) as exc:
         log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
-        get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type, "target": "eventbus_api"})
+        get_crash_manager().report_exception(
+            TIKTOK_0004,
+            exc=exc,
+            context_info={"event_type": event_type, "target": "eventbus_api"},
+        )
 
 
-@app.route('/webhook', methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def handle_minecraft_events():
     try:
         data = request.json
@@ -786,23 +894,30 @@ def _publish_event(event_type: str, event_data: dict) -> None:
         urllib.request.urlopen(req, timeout=3)
     except (OSError, ValueError) as exc:
         log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
-        get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type, "target": "eventbus_api_webhook"})
+        get_crash_manager().report_exception(
+            TIKTOK_0004,
+            exc=exc,
+            context_info={"event_type": event_type, "target": "eventbus_api_webhook"},
+        )
 
 
 def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) -> None:
     """Post a comment command to a plugin's command queue via the API."""
     url = f"{API_BASE}/plugins/{plugin_name}/command"
-    body = json.dumps({
-        "command": "comment",
-        "args": {"text": cmd_text, "username": username},
-    }).encode("utf-8")
+    body = json.dumps(
+        {
+            "command": "comment",
+            "args": {"text": cmd_text, "username": username},
+        }
+    ).encode("utf-8")
     try:
-        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+        req = urllib.request.Request(
+            url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+        )
         urllib.request.urlopen(req, timeout=3)
         log.debug("Routed '%s' to plugin '%s'", cmd_text, plugin_name)
     except (OSError, ValueError) as exc:
         log.info("Failed to route comment to plugin '%s': %s", plugin_name, exc)
-
 
 
 def _fetch_comment_handlers() -> dict[str, str]:
@@ -817,13 +932,16 @@ def _fetch_comment_handlers() -> dict[str, str]:
             data = json.loads(resp.read().decode("utf-8"))
             return data.get("handlers") or {}
     except (OSError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        log.info("No comment handlers from API (plugins may not be registered yet): %s", exc)
+        log.info(
+            "No comment handlers from API (plugins may not be registered yet): %s", exc
+        )
         return {}
 
 
 def _dispatch_comment_http(cmd_url, username, cmd_text):
     import urllib.parse
     import urllib.request
+
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -831,13 +949,18 @@ def _dispatch_comment_http(cmd_url, username, cmd_text):
         urllib.request.urlopen(req, timeout=5)
     except (OSError, ValueError) as e:
         log.info(f"[COMMENT CMD] HTTP dispatch failed: {e}")
-        get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"source": "_dispatch_comment_http", "url": cmd_url})
+        get_crash_manager().report_exception(
+            TIKTOK_0005,
+            exc=e,
+            context_info={"source": "_dispatch_comment_http", "url": cmd_url},
+        )
 
 
 def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
     import json
     import urllib.parse
     import urllib.request
+
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -849,9 +972,6 @@ def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
         return None
 
 
-
-
-
 def _publish_tiktok_event(event_type: str, user: str, **extra):
     """Publish a TikTok event to the EventBus for plugins to consume."""
     if ctx.main_loop is not None:
@@ -861,15 +981,19 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
                 event_bus.publish(f"tiktok.{event_type}", data), ctx.main_loop
             )
         except (RuntimeError, ValueError) as exc:
-            get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type})
+            get_crash_manager().report_exception(
+                TIKTOK_0004, exc=exc, context_info={"event_type": event_type}
+            )
 
 
 def _publish_tiktok_status(connected: bool):
     """Report the TikTok live connection state to the API EventBus (GUI)."""
-    body = json.dumps({
-        "type": "tiktok.live_status",
-        "data": {"connected": bool(connected), "source": "tiktok_bridge"},
-    }).encode("utf-8")
+    body = json.dumps(
+        {
+            "type": "tiktok.live_status",
+            "data": {"connected": bool(connected), "source": "tiktok_bridge"},
+        }
+    ).encode("utf-8")
     try:
         req = urllib.request.Request(
             f"{API_BASE}/events",
@@ -880,7 +1004,9 @@ def _publish_tiktok_status(connected: bool):
         urllib.request.urlopen(req, timeout=3)
     except (OSError, ValueError) as exc:
         log.info("Failed to publish TikTok live status to EventBus: %s", exc)
-        get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_live_status"})
+        get_crash_manager().report_exception(
+            TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_live_status"}
+        )
 
 
 async def _tiktok_status_heartbeat():
@@ -986,7 +1112,9 @@ async def _event_bridge_worker():
 
         except Exception as e:  # worker must never die
             log.info(f"[EVENT-BRIDGE] Error handling event: {e}")
-            get_crash_manager().report_exception(TIKTOK_0004, exc=e, context_info={"source": "_event_bridge_worker"})
+            get_crash_manager().report_exception(
+                TIKTOK_0004, exc=e, context_info={"source": "_event_bridge_worker"}
+            )
         finally:
             q.task_done()
 
@@ -1006,10 +1134,19 @@ def _process_follow(username: str, persist: bool = True):
         except OSError as e:
             log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
     if "follow" in ctx.valid_functions:
-        ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
+        ctx.main_loop.call_soon_threadsafe(
+            ctx.trigger_queue.put_nowait, ("follow", username)
+        )
 
 
-def _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[COMMENT CMD]"):
+def _process_comment_command(
+    username,
+    comment_text,
+    is_moderator,
+    is_super_fan,
+    in_fanclub,
+    log_prefix="[COMMENT CMD]",
+):
     """Shared comment command processing. Returns True if 'comment' event trigger should be suppressed."""
     suppress = False
     if not ctx.comment_cmd_enable or not ctx.comment_cmd_groups:
@@ -1022,7 +1159,9 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
         gcd = ctx.comment_cmd_global_cooldown
         if gcd > 0 and now - ctx.comment_cmd_global_last < gcd:
             remaining = gcd - (now - ctx.comment_cmd_global_last)
-            log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
+            log.info(
+                f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)"
+            )
             return True
 
         gucd = ctx.comment_cmd_global_user_cooldown
@@ -1030,28 +1169,35 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
             last_user = ctx.comment_cmd_global_user_last.get(username, 0)
             if now - last_user < gucd:
                 remaining = gucd - (now - last_user)
-                log.info(f"{log_prefix} {username} blocked by global user cooldown ({remaining:.1f}s left)")
+                log.info(
+                    f"{log_prefix} {username} blocked by global user cooldown ({remaining:.1f}s left)"
+                )
                 return True
 
         for group in ctx.comment_cmd_groups:
             prefix = group["prefix"]
             if not prefix or not comment_text.startswith(prefix):
                 continue
-            cmd_text = comment_text[len(prefix):].strip()
+            cmd_text = comment_text[len(prefix) :].strip()
             if not cmd_text:
                 continue
 
             allowed = False
             if (
                 "all" in group["roles"]
-                or "moderator" in group["roles"] and is_moderator
-                or "superfan" in group["roles"] and is_super_fan
-                or "fanclub" in group["roles"] and in_fanclub
+                or "moderator" in group["roles"]
+                and is_moderator
+                or "superfan" in group["roles"]
+                and is_super_fan
+                or "fanclub" in group["roles"]
+                and in_fanclub
             ):
                 allowed = True
 
             if not allowed:
-                log.info(f"{log_prefix} {username} no permission for prefix '{prefix}' (roles: {group['roles']})")
+                log.info(
+                    f"{log_prefix} {username} no permission for prefix '{prefix}' (roles: {group['roles']})"
+                )
                 if not group.get("trigger_comment_event", True):
                     suppress = True
                 continue
@@ -1059,13 +1205,17 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
             base_cmd = cmd_text.split()[0].lower()
             if group["mode"] == "deny-all":
                 if base_cmd not in group["commands"]:
-                    log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)")
+                    log.info(
+                        f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' not allowed (deny-all)"
+                    )
                     if not group.get("trigger_comment_event", True):
                         suppress = True
                     continue
             else:
                 if base_cmd in group["commands"]:
-                    log.info(f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)")
+                    log.info(
+                        f"{log_prefix} {username} tried '{cmd_text}' via '{prefix}' — '{base_cmd}' blocked (allow-all)"
+                    )
                     if not group.get("trigger_comment_event", True):
                         suppress = True
                     continue
@@ -1077,13 +1227,18 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                 cmd_allowed = False
                 if (
                     "all" in cmd_roles
-                    or "moderator" in cmd_roles and is_moderator
-                    or "superfan" in cmd_roles and is_super_fan
-                    or "fanclub" in cmd_roles and in_fanclub
+                    or "moderator" in cmd_roles
+                    and is_moderator
+                    or "superfan" in cmd_roles
+                    and is_super_fan
+                    or "fanclub" in cmd_roles
+                    and in_fanclub
                 ):
                     cmd_allowed = True
                 if not cmd_allowed:
-                    log.info(f"{log_prefix} {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})")
+                    log.info(
+                        f"{log_prefix} {username} no permission for '{base_cmd}' (per-command roles: {cmd_roles})"
+                    )
                     if not group.get("trigger_comment_event", True):
                         suppress = True
                     continue
@@ -1094,15 +1249,21 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                 last = ctx.comment_cmd_last_global.get(prefix, 0)
                 if now - last < cd:
                     remaining = cd - (now - last)
-                    log.info(f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)")
+                    log.info(
+                        f"{log_prefix} {username} blocked by global cooldown ({remaining:.1f}s left)"
+                    )
                     if not group.get("trigger_comment_event", True):
                         suppress = True
                     continue
             if ucd > 0:
-                last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(username, 0)
+                last_user = ctx.comment_cmd_last_user.setdefault(prefix, {}).get(
+                    username, 0
+                )
                 if now - last_user < ucd:
                     remaining = ucd - (now - last_user)
-                    log.info(f"{log_prefix} {username} blocked by user cooldown ({remaining:.1f}s left)")
+                    log.info(
+                        f"{log_prefix} {username} blocked by user cooldown ({remaining:.1f}s left)"
+                    )
                     if not group.get("trigger_comment_event", True):
                         suppress = True
                     continue
@@ -1121,10 +1282,15 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
 
             if len(ctx.comment_cmd_last_global) > 1000:
                 cutoff = now - 3600
-                ctx.comment_cmd_last_global = {k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff}
+                ctx.comment_cmd_last_global = {
+                    k: v for k, v in ctx.comment_cmd_last_global.items() if v >= cutoff
+                }
             if len(ctx.comment_cmd_last_user) > 1000:
                 cutoff = now - 3600
-                ctx.comment_cmd_last_user = {k: {u: t for u, t in v.items() if t >= cutoff} for k, v in ctx.comment_cmd_last_user.items()}
+                ctx.comment_cmd_last_user = {
+                    k: {u: t for u, t in v.items() if t >= cutoff}
+                    for k, v in ctx.comment_cmd_last_user.items()
+                }
 
             # 1. API-registered handler (declarative, dynamic)
             plugin_name = ctx.comment_handler_map.get(prefix)
@@ -1132,7 +1298,9 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                 _dispatch_comment_to_plugin(plugin_name, cmd_text, username)
             # 2. Legacy RCON handler
             elif cmd_handler == "rcon":
-                ctx.main_loop.call_soon_threadsafe(ctx.rcon_queue.put_nowait, ([cmd_text], username))
+                ctx.main_loop.call_soon_threadsafe(
+                    ctx.rcon_queue.put_nowait, ([cmd_text], username)
+                )
             # 3. Legacy HTTP handler (backward compat)
             elif cmd_handler == "http" and cmd_url:
                 if conditional:
@@ -1144,16 +1312,22 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
                         ctx.comment_cmd_global_user_last[username] = now
                         mode_label = resp_data.get("mode", "replace")
                         if mode_label == "queue":
-                            log.info(f"{log_prefix} {username} → '{base_cmd}' successful — conditional response: mode={mode_label}")
+                            log.info(
+                                f"{log_prefix} {username} → '{base_cmd}' successful — conditional response: mode={mode_label}"
+                            )
                     else:
-                        log.info(f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered")
+                        log.info(
+                            f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered"
+                        )
                 else:
-                    url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
+                    url = cmd_url.replace(
+                        "{user}", urllib.parse.quote(username, safe="")
+                    )
                     url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
                     threading.Thread(
                         target=_dispatch_comment_http,
                         args=(url, username, cmd_text),
-                        daemon=True
+                        daemon=True,
                     ).start()
 
             if not group.get("trigger_comment_event", True):
@@ -1165,7 +1339,7 @@ def _process_comment_command(username, comment_text, is_moderator, is_super_fan,
 # ==========================================
 # Custom trigger + test comment endpoints
 # ==========================================
-@app.route('/test_comment', methods=['POST'])
+@app.route("/test_comment", methods=["POST"])
 def handle_test_comment():
     try:
         data = request.json
@@ -1180,7 +1354,9 @@ def handle_test_comment():
         in_fanclub = bool(data.get("fanclub", False))
 
         log.info(f"[TEST COMMENT] {username}: {comment_text}")
-        log.info(f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}")
+        log.info(
+            f"  Moderator: {is_moderator}, Superfan: {is_super_fan}, Fanclub: {in_fanclub}"
+        )
 
         if ctx.comment_cmd_all_prefixes:
             matched_prefix = None
@@ -1189,17 +1365,33 @@ def handle_test_comment():
                     matched_prefix = p
                     break
             if matched_prefix:
-                cmd_part = comment_text[len(matched_prefix):].strip()
+                cmd_part = comment_text[len(matched_prefix) :].strip()
                 if cmd_part:
-                    group_enabled = any(g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups)
+                    group_enabled = any(
+                        g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups
+                    )
                     if not ctx.comment_cmd_enable:
-                        log.info(f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally")
+                        log.info(
+                            f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally"
+                        )
                     elif not group_enabled:
-                        log.info(f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled")
+                        log.info(
+                            f"[TEST COMMENT] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled"
+                        )
 
-        _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[TEST COMMENT]")
+        _process_comment_command(
+            username,
+            comment_text,
+            is_moderator,
+            is_super_fan,
+            in_fanclub,
+            log_prefix="[TEST COMMENT]",
+        )
 
-        return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
+        return {
+            "status": "ok",
+            "message": f"Comment '{comment_text}' from '{username}' processed.",
+        }
 
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.info(f"[TEST COMMENT] Error: {e}")
@@ -1209,7 +1401,7 @@ def handle_test_comment():
 # ==========================================
 # Webhook endpoint for custom trigger injection (test/simulation)
 # ==========================================
-@app.route('/custom_trigger', methods=['POST'])
+@app.route("/custom_trigger", methods=["POST"])
 def handle_custom_trigger():
     try:
         data = request.json
@@ -1224,20 +1416,34 @@ def handle_custom_trigger():
         elif isinstance(trigger, str):
             trigger = trigger.strip()
             if not trigger:
-                return {"status": "error", "message": "Field 'trigger' is required and must not be empty."}, 400
+                return {
+                    "status": "error",
+                    "message": "Field 'trigger' is required and must not be empty.",
+                }, 400
             sanitized = sanitize_filename(trigger)
             if not sanitized:
-                return {"status": "error", "message": f"Trigger '{trigger}' contains no valid characters after sanitizing."}, 400
+                return {
+                    "status": "error",
+                    "message": f"Trigger '{trigger}' contains no valid characters after sanitizing.",
+                }, 400
         else:
-            return {"status": "error", "message": "Field 'trigger' must be string or int."}, 400
+            return {
+                "status": "error",
+                "message": "Field 'trigger' must be string or int.",
+            }, 400
 
         # Special toggle: if trigger is 'tiktok', toggle TikTok connection
         if sanitized == "tiktok":
             with ctx.tiktok_lock:
                 ctx.disable_tiktok_connect = not ctx.disable_tiktok_connect
                 new_state = ctx.disable_tiktok_connect
-            log.info(f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}")
-            return {"status": "ok", "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}"}, 200
+            log.info(
+                f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}"
+            )
+            return {
+                "status": "ok",
+                "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}",
+            }, 200
 
         # Route 'follow' through the shared dedup logic so custom_trigger respects _followed_cache
         # persist=False damit Test-User nicht in followed_users.txt landen
@@ -1250,38 +1456,68 @@ def handle_custom_trigger():
 
         if sanitized in ctx.valid_functions:
             try:
-                ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (sanitized, user))
+                ctx.main_loop.call_soon_threadsafe(
+                    ctx.trigger_queue.put_nowait, (sanitized, user)
+                )
             except asyncio.QueueFull:
-                return {"status": "error", "message": "Trigger queue is full. Try again later."}, 503
+                return {
+                    "status": "error",
+                    "message": "Trigger queue is full. Try again later.",
+                }, 503
             log.info(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         raw_trigger = str(data.get("trigger", "")).strip()
-        cmds = ctx.shell_actions_cache.get(raw_trigger) or ctx.shell_actions_cache.get(sanitized)
+        cmds = ctx.shell_actions_cache.get(raw_trigger) or ctx.shell_actions_cache.get(
+            sanitized
+        )
         if cmds:
             try:
-                asyncio.run_coroutine_threadsafe(execute_shell_commands(cmds), ctx.main_loop)
+                asyncio.run_coroutine_threadsafe(
+                    execute_shell_commands(cmds), ctx.main_loop
+                )
             except (RuntimeError, ValueError) as e:
                 return {"status": "error", "message": str(e)}, 500
-            log.info(f"[CUSTOM TRIGGER] Shell action for '{raw_trigger}' executed ({len(cmds)} command(s))")
+            log.info(
+                f"[CUSTOM TRIGGER] Shell action for '{raw_trigger}' executed ({len(cmds)} command(s))"
+            )
             return {"status": "ok", "trigger": raw_trigger, "user": user}, 200
 
-        return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
+        return {
+            "status": "error",
+            "message": f"Trigger '{sanitized}' does not exist or is not valid.",
+        }, 400
 
     except Exception as e:  # any unexpected error becomes an HTTP 500
         return {"status": "error", "message": str(e)}, 500
+
+
 # =========================================
+
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
     try:
-        app.run(host=ctx.server_host, port=ctx.mcserver_api_port, threaded=True, debug=False, use_reloader=False)
+        app.run(
+            host=ctx.server_host,
+            port=ctx.mcserver_api_port,
+            threaded=True,
+            debug=False,
+            use_reloader=False,
+        )
     except Exception as exc:  # best-effort webhook server thread; failure must not take down the bridge
-        log.error("Bridge webhook server failed to start on %s:%s: %s", ctx.server_host, ctx.mcserver_api_port, exc)
+        log.error(
+            "Bridge webhook server failed to start on %s:%s: %s",
+            ctx.server_host,
+            ctx.mcserver_api_port,
+            exc,
+        )
+
 
 # ==========================================
 # HTTP command executor
 # ==========================================
+
 
 def execute_http_command_sync(cmd: str):
     try:
@@ -1291,20 +1527,26 @@ def execute_http_command_sync(cmd: str):
     except subprocess.CalledProcessError as e:
         log.info(f"[FAIL] Error: {cmd} ({e})")
 
+
 async def execute_http_command(cmd: str):
     await asyncio.to_thread(execute_http_command_sync, cmd)
+
 
 async def execute_shell_commands(cmds: list[str]):
     """Execute a list of shell commands sequentially."""
     for cmd in cmds:
         await execute_http_command(cmd)
 
+
 # ==========================================
 # User-friendly name extraction
 # =========================================
 def get_safe_username(user):
-    name = getattr(user, 'unique_id', None) or getattr(user, 'nickname', None) or "Unknown"
+    name = (
+        getattr(user, "unique_id", None) or getattr(user, "nickname", None) or "Unknown"
+    )
     return name
+
 
 # =========================================
 # Like trigger validation
@@ -1315,6 +1557,7 @@ def get_safe_username(user):
 # ==========================================
 # TIKTOK CLIENT
 # ==========================================
+
 
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
@@ -1329,7 +1572,7 @@ def create_client(user):
     def on_gift(event: GiftEvent):
         try:
             if event.gift.combo:
-                if getattr(event, 'streaking', False):
+                if getattr(event, "streaking", False):
                     return
 
                 count = event.repeat_count
@@ -1343,7 +1586,9 @@ def create_client(user):
                 ctx.gift_value_usd += event.value
 
             username = get_safe_username(event.user)
-            _publish_tiktok_event("gift", username, gift_name=gift_name, gift_id=gift_id, count=count)
+            _publish_tiktok_event(
+                "gift", username, gift_name=gift_name, gift_id=gift_id, count=count
+            )
 
             target = None
             if gift_name in ctx.valid_functions:
@@ -1356,13 +1601,17 @@ def create_client(user):
 
             for _ in range(count):
                 try:
-                    ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, (target, username))
+                    ctx.main_loop.call_soon_threadsafe(
+                        ctx.trigger_queue.put_nowait, (target, username)
+                    )
                 except asyncio.QueueFull:
                     log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
 
         except Exception as exc:  # TikTok event handler must not crash the client
             log.exception("ERROR IN ON_GIFT EVENT")
-            get_crash_manager().report_exception(TIKTOK_0003, exc=exc, context_info={"source": "on_gift"})
+            get_crash_manager().report_exception(
+                TIKTOK_0003, exc=exc, context_info={"source": "on_gift"}
+            )
 
     # =========================
     # FOLLOW events
@@ -1378,7 +1627,7 @@ def create_client(user):
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
-        username = get_safe_username(event.user) if hasattr(event, 'user') else None
+        username = get_safe_username(event.user) if hasattr(event, "user") else None
         if username:
             _publish_tiktok_event("like", username)
         with ctx.like_lock:
@@ -1394,11 +1643,15 @@ def create_client(user):
                 ctx._last_like_event = 0
             if now - ctx._last_like_event >= 3:
                 delta = total_since_start
-                _publish_tiktok_event("like", username or "unknown", delta=delta, total=event.total)
+                _publish_tiktok_event(
+                    "like", username or "unknown", delta=delta, total=event.total
+                )
                 ctx._last_like_event = now
         except Exception as e:  # TikTok event handler must not crash the client
             log.info(f"[EVENT ERROR] Error in like handling: {e}")
-            get_crash_manager().report_exception(TIKTOK_0003, exc=e, context_info={"source": "on_like"})
+            get_crash_manager().report_exception(
+                TIKTOK_0003, exc=e, context_info={"source": "on_like"}
+            )
 
     # ========================
     # Join events
@@ -1408,34 +1661,40 @@ def create_client(user):
         username = get_safe_username(event.user)
         _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
-            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("join", username))
+            ctx.main_loop.call_soon_threadsafe(
+                ctx.trigger_queue.put_nowait, ("join", username)
+            )
 
     # =========================
     # COMMENT events
     # =========================
     @client.on(CommentEvent)
     def on_comment(event):
-        if _connect_time[0] is None or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS:
+        if (
+            _connect_time[0] is None
+            or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS
+        ):
             return
 
         username = get_safe_username(event.user)
         _publish_tiktok_event("comment", username)
-        comment_text = getattr(event, 'comment', '')
+        comment_text = getattr(event, "comment", "")
 
-        is_super_fan = bool(getattr(event, 'user_is_super_fan', None))
+        is_super_fan = bool(getattr(event, "user_is_super_fan", None))
 
         in_fanclub = False
-        fan_ticket_count = getattr(event.user, 'fan_ticket_count', None)
-        fans_club = getattr(event.user, 'fans_club', None)
-        fans_club_info = getattr(event.user, 'fans_club_info', None)
+        fan_ticket_count = getattr(event.user, "fan_ticket_count", None)
+        fans_club = getattr(event.user, "fans_club", None)
+        fans_club_info = getattr(event.user, "fans_club_info", None)
         if (
-            fan_ticket_count and fan_ticket_count > 0
-            or hasattr(fans_club, 'club_name')
-            or hasattr(fans_club_info, 'club_name')
+            fan_ticket_count
+            and fan_ticket_count > 0
+            or hasattr(fans_club, "club_name")
+            or hasattr(fans_club_info, "club_name")
         ):
             in_fanclub = True
 
-        is_moderator = bool(getattr(event.user, 'is_moderator', None))
+        is_moderator = bool(getattr(event.user, "is_moderator", None))
 
         log.info(f"[COMMENT] {username}: {comment_text}")
         log.info(f"  Superfan: {is_super_fan}")
@@ -1449,18 +1708,34 @@ def create_client(user):
                     matched_prefix = p
                     break
             if matched_prefix:
-                cmd_part = comment_text[len(matched_prefix):].strip()
+                cmd_part = comment_text[len(matched_prefix) :].strip()
                 if cmd_part:
-                    group_enabled = any(g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups)
+                    group_enabled = any(
+                        g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups
+                    )
                     if not ctx.comment_cmd_enable:
-                        log.info(f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally")
+                        log.info(
+                            f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally"
+                        )
                     elif not group_enabled:
-                        log.info(f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled")
+                        log.info(
+                            f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled"
+                        )
 
-        suppress_comment_trigger = _process_comment_command(username, comment_text, is_moderator, is_super_fan, in_fanclub, log_prefix="[COMMENT CMD]")
+        suppress_comment_trigger = _process_comment_command(
+            username,
+            comment_text,
+            is_moderator,
+            is_super_fan,
+            in_fanclub,
+            log_prefix="[COMMENT CMD]",
+        )
 
         if "comment" in ctx.valid_functions and not suppress_comment_trigger:
-            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("comment", {"user": username, "comment": comment_text}))
+            ctx.main_loop.call_soon_threadsafe(
+                ctx.trigger_queue.put_nowait,
+                ("comment", {"user": username, "comment": comment_text}),
+            )
 
     # =========================
     # Share events
@@ -1470,7 +1745,9 @@ def create_client(user):
         username = get_safe_username(event.user)
         _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
-            ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("share", username))
+            ctx.main_loop.call_soon_threadsafe(
+                ctx.trigger_queue.put_nowait, ("share", username)
+            )
 
     # =========================
     # Live end events
@@ -1503,6 +1780,7 @@ def create_client(user):
         _publish_tiktok_status(True)
 
     return client
+
 
 # ========================
 # Counter for gift revenue estimation
@@ -1564,6 +1842,7 @@ async def gift_revenue_counter():
 # RUNTIME RELOAD
 # ==========================================
 
+
 async def reload_config():
     """Reload config.yaml at runtime without restarting the bridge."""
     log.info("[RELOAD] Config reload requested")
@@ -1602,7 +1881,9 @@ async def reload_actions(send_minecraft_reload: bool = False):
     ``send_minecraft_reload`` asks the bridge to push ``/reload`` to the
     Minecraft server via RCON after the datapack has been regenerated.
     """
-    log.info("[RELOAD] Actions reload requested (send /reload: %s)", send_minecraft_reload)
+    log.info(
+        "[RELOAD] Actions reload requested (send /reload: %s)", send_minecraft_reload
+    )
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)
         if any(d.severity == Severity.ERROR for d in diags):
@@ -1664,7 +1945,9 @@ async def _reload_signal_watcher():
                     RELOAD_ACTIONS_SIGNAL.unlink()
                 except OSError:
                     pass
-                await reload_actions(send_minecraft_reload=options.get("send_minecraft_reload", True))
+                await reload_actions(
+                    send_minecraft_reload=options.get("send_minecraft_reload", True)
+                )
         except Exception as e:  # watcher must never die
             log.error("[RELOAD] Signal watcher error: %s", e)
 
@@ -1672,6 +1955,7 @@ async def _reload_signal_watcher():
 # ==========================================
 # MAIN ENTRY POINT
 # ==========================================
+
 
 async def run_bot():
     """Main async loop: initializes config, builds the datapack,
@@ -1725,8 +2009,11 @@ async def run_bot():
         generate_datapack()
 
     ctx.hook_api = HookAPI(
-        ctx.rcon_queue, ctx.trigger_queue, ctx.main_loop,
-        ctx.config, ctx.valid_functions,
+        ctx.rcon_queue,
+        ctx.trigger_queue,
+        ctx.main_loop,
+        ctx.config,
+        ctx.valid_functions,
     )
     load_event_hooks(ctx.hook_api, config=ctx.config)
 
@@ -1759,7 +2046,9 @@ async def run_bot():
             continue
 
         if ctx.tiktok_user == default_user or not ctx.tiktok_user:
-            log.info("[TIKTOK] No valid username configured yet. Waiting for config reload...")
+            log.info(
+                "[TIKTOK] No valid username configured yet. Waiting for config reload..."
+            )
             await asyncio.sleep(ctx.reconnect_delay)
             continue
 
@@ -1777,14 +2066,22 @@ async def run_bot():
             error_str = str(e)
             log.info(f"[..] Connection lost: {error_str}")
 
-            if "DEVICE_BLOCKED" in error_str or bool(_RE_ERR_CODE_200.search(error_str)):
+            if "DEVICE_BLOCKED" in error_str or bool(
+                _RE_ERR_CODE_200.search(error_str)
+            ):
                 log.info("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 log.info("[TIP] Wait 15 minutes or restart your router.")
-                get_crash_manager().report_exception(TIKTOK_0001, exc=e, context_info={"block_reason": "DEVICE_BLOCKED"})
+                get_crash_manager().report_exception(
+                    TIKTOK_0001, exc=e, context_info={"block_reason": "DEVICE_BLOCKED"}
+                )
                 await asyncio.sleep(900)
             else:
                 log.info(f"[..] Reconnect in {ctx.reconnect_delay}s...")
-                get_crash_manager().report_exception(TIKTOK_0002, exc=e, context_info={"reconnect_delay": ctx.reconnect_delay})
+                get_crash_manager().report_exception(
+                    TIKTOK_0002,
+                    exc=e,
+                    context_info={"reconnect_delay": ctx.reconnect_delay},
+                )
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
@@ -1795,6 +2092,7 @@ async def run_bot():
             except Exception as e:  # best-effort stop
                 log.info(f"[TIKTOK] Error stopping client: {e}")
             await asyncio.sleep(2)
+
 
 if __name__ == "__main__":
     install_global_exception_hook("main")

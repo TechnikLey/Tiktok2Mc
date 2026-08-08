@@ -6,7 +6,12 @@ spotify_setup.py (which would load heavy deps like urllib, webbrowser).
 
 from pathlib import Path
 
-SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "src" / "python" / "spotify_setup.py"
+SCRIPT_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "src"
+    / "python"
+    / "spotify_setup.py"
+)
 
 
 class TestScriptExists:
@@ -68,13 +73,16 @@ class TestOAuthUrlConstruction:
     def test_authorization_url_format(self):
         """The URL format that the script constructs."""
         import urllib.parse
-        params = urllib.parse.urlencode({
-            "client_id": "test_id",
-            "response_type": "code",
-            "redirect_uri": "http://localhost:8888/callback",
-            "scope": "user-read-playback-state user-modify-playback-state",
-            "show_dialog": "true",
-        })
+
+        params = urllib.parse.urlencode(
+            {
+                "client_id": "test_id",
+                "response_type": "code",
+                "redirect_uri": "http://localhost:8888/callback",
+                "scope": "user-read-playback-state user-modify-playback-state",
+                "show_dialog": "true",
+            }
+        )
         url = f"https://accounts.spotify.com/authorize?{params}"
         assert "client_id=test_id" in url
         assert "response_type=code" in url
@@ -86,13 +94,16 @@ class TestTokenExchangeLogic:
 
     def test_exchange_code_payload(self):
         import urllib.parse
-        payload = urllib.parse.urlencode({
-            "grant_type": "authorization_code",
-            "code": "my_code",
-            "redirect_uri": "http://localhost:8888/callback",
-            "client_id": "my_id",
-            "client_secret": "my_secret",
-        }).encode("utf-8")
+
+        payload = urllib.parse.urlencode(
+            {
+                "grant_type": "authorization_code",
+                "code": "my_code",
+                "redirect_uri": "http://localhost:8888/callback",
+                "client_id": "my_id",
+                "client_secret": "my_secret",
+            }
+        ).encode("utf-8")
         decoded = payload.decode()
         assert "grant_type=authorization_code" in decoded
         assert "code=my_code" in decoded
@@ -100,12 +111,15 @@ class TestTokenExchangeLogic:
 
     def test_refresh_token_payload(self):
         import urllib.parse
-        payload = urllib.parse.urlencode({
-            "grant_type": "refresh_token",
-            "refresh_token": "old_refresh",
-            "client_id": "my_id",
-            "client_secret": "my_secret",
-        }).encode("utf-8")
+
+        payload = urllib.parse.urlencode(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": "old_refresh",
+                "client_id": "my_id",
+                "client_secret": "my_secret",
+            }
+        ).encode("utf-8")
         decoded = payload.decode()
         assert "grant_type=refresh_token" in decoded
         assert "refresh_token=old_refresh" in decoded

@@ -49,14 +49,39 @@ class HealthState(str, enum.Enum):
 
 
 _VALID_TRANSITIONS: dict[HealthState, set[HealthState]] = {
-    HealthState.UNKNOWN:    {HealthState.STARTING},
-    HealthState.STARTING:   {HealthState.RUNNING, HealthState.FAILED, HealthState.DEGRADED, HealthState.STOPPING, HealthState.STOPPED},
-    HealthState.RUNNING:    {HealthState.DEGRADED, HealthState.FAILED, HealthState.STOPPING, HealthState.RECOVERING},
-    HealthState.DEGRADED:   {HealthState.RUNNING, HealthState.FAILED, HealthState.STOPPING, HealthState.RECOVERING},
-    HealthState.RECOVERING: {HealthState.RUNNING, HealthState.DEGRADED, HealthState.FAILED, HealthState.STOPPING},
-    HealthState.FAILED:     {HealthState.RECOVERING, HealthState.STOPPED, HealthState.STARTING},
-    HealthState.STOPPING:   {HealthState.STOPPED, HealthState.FAILED},
-    HealthState.STOPPED:    {HealthState.STARTING},
+    HealthState.UNKNOWN: {HealthState.STARTING},
+    HealthState.STARTING: {
+        HealthState.RUNNING,
+        HealthState.FAILED,
+        HealthState.DEGRADED,
+        HealthState.STOPPING,
+        HealthState.STOPPED,
+    },
+    HealthState.RUNNING: {
+        HealthState.DEGRADED,
+        HealthState.FAILED,
+        HealthState.STOPPING,
+        HealthState.RECOVERING,
+    },
+    HealthState.DEGRADED: {
+        HealthState.RUNNING,
+        HealthState.FAILED,
+        HealthState.STOPPING,
+        HealthState.RECOVERING,
+    },
+    HealthState.RECOVERING: {
+        HealthState.RUNNING,
+        HealthState.DEGRADED,
+        HealthState.FAILED,
+        HealthState.STOPPING,
+    },
+    HealthState.FAILED: {
+        HealthState.RECOVERING,
+        HealthState.STOPPED,
+        HealthState.STARTING,
+    },
+    HealthState.STOPPING: {HealthState.STOPPED, HealthState.FAILED},
+    HealthState.STOPPED: {HealthState.STARTING},
 }
 
 
@@ -97,7 +122,9 @@ class HealthMonitor:
         self._lock = threading.Lock()
         self._states: dict[str, HealthState] = {}
         self._heartbeats: dict[str, HeartbeatRecord] = {}
-        self._state_listeners: list[Callable[[str, HealthState, HealthState], None]] = []
+        self._state_listeners: list[
+            Callable[[str, HealthState, HealthState], None]
+        ] = []
         self._start_time: float = time.time()
         self._last_error: str | None = None
         self._last_error_time: float = 0.0
@@ -106,7 +133,9 @@ class HealthMonitor:
     # State management
     # ------------------------------------------------------------------
 
-    def register(self, component: str, initial_state: HealthState = HealthState.UNKNOWN) -> None:
+    def register(
+        self, component: str, initial_state: HealthState = HealthState.UNKNOWN
+    ) -> None:
         with self._lock:
             if component in self._states:
                 return
@@ -115,7 +144,9 @@ class HealthMonitor:
                 component=component,
                 last_activity=time.time(),
             )
-        log.debug("[HEALTH] Registered '%s' with state %s", component, initial_state.value)
+        log.debug(
+            "[HEALTH] Registered '%s' with state %s", component, initial_state.value
+        )
 
     def unregister(self, component: str) -> None:
         with self._lock:
@@ -128,7 +159,9 @@ class HealthMonitor:
             current = self._states.get(component)
             if current is None:
                 self._states[component] = new_state
-                self._heartbeats.setdefault(component, HeartbeatRecord(component=component))
+                self._heartbeats.setdefault(
+                    component, HeartbeatRecord(component=component)
+                )
                 return True
 
             if current == new_state:
@@ -138,19 +171,27 @@ class HealthMonitor:
             if new_state not in allowed:
                 log.error(
                     "[HEALTH] Illegal state transition '%s': %s -> %s",
-                    component, current.value, new_state.value,
+                    component,
+                    current.value,
+                    new_state.value,
                 )
                 return False
 
             self._states[component] = new_state
             old_state = current
 
-        log.info("[HEALTH] '%s' state: %s -> %s", component, old_state.value, new_state.value)
+        log.info(
+            "[HEALTH] '%s' state: %s -> %s", component, old_state.value, new_state.value
+        )
         for listener in self._state_listeners:
             try:
                 listener(component, old_state, new_state)
-            except Exception as exc:  # one broken listener must not break health updates
-                log.warning("[HEALTH] State listener failed for '%s': %s", component, exc)
+            except (
+                Exception
+            ) as exc:  # one broken listener must not break health updates
+                log.warning(
+                    "[HEALTH] State listener failed for '%s': %s", component, exc
+                )
         return True
 
     def get_state(self, component: str) -> HealthState:
@@ -161,7 +202,9 @@ class HealthMonitor:
         with self._lock:
             return {k: v.value for k, v in self._states.items()}
 
-    def add_state_listener(self, callback: Callable[[str, HealthState, HealthState], None]) -> None:
+    def add_state_listener(
+        self, callback: Callable[[str, HealthState, HealthState], None]
+    ) -> None:
         self._state_listeners.append(callback)
 
     # ------------------------------------------------------------------
@@ -184,7 +227,12 @@ class HealthMonitor:
                 record.uptime = now
             # Also set state if component exists
             current = self._states.get(component)
-            if current in (HealthState.UNKNOWN, HealthState.STARTING, HealthState.RECOVERING, HealthState.DEGRADED):
+            if current in (
+                HealthState.UNKNOWN,
+                HealthState.STARTING,
+                HealthState.RECOVERING,
+                HealthState.DEGRADED,
+            ):
                 self._states[component] = HealthState.RUNNING
 
     def record_error(self, component: str, error_message: str) -> None:
@@ -217,7 +265,9 @@ class HealthMonitor:
                 if record.missed_beats == 1 or record.missed_beats % 5 == 0:
                     log.warning(
                         "[HEALTH] '%s' missed heartbeat (%ds since last activity, %d missed)",
-                        component, elapsed, record.missed_beats,
+                        component,
+                        elapsed,
+                        record.missed_beats,
                     )
                 if record.missed_beats >= 3:
                     record.alive = False

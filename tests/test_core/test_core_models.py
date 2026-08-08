@@ -7,7 +7,9 @@ class TestAppConfig:
     def test_default_construction(self):
         from core.models import AppConfig
 
-        cfg = AppConfig(name="test_app", path=Path("/exe"), enable=True, level=1, ics=False)
+        cfg = AppConfig(
+            name="test_app", path=Path("/exe"), enable=True, level=1, ics=False
+        )
         assert cfg.name == "test_app"
         assert cfg.enable is True
         assert cfg.level == 1
@@ -17,14 +19,23 @@ class TestAppConfig:
     def test_path_coercion_from_string(self):
         from core.models import AppConfig
 
-        cfg = AppConfig(name="test", path="C:/some/path", enable=True, level=0, ics=False)
+        cfg = AppConfig(
+            name="test", path="C:/some/path", enable=True, level=0, ics=False
+        )
         assert isinstance(cfg.path, Path)
         assert str(cfg.path) == "C:\\some\\path" or str(cfg.path) == "C:/some/path"
 
     def test_depends_on_list(self):
         from core.models import AppConfig
 
-        cfg = AppConfig(name="test", path=Path("/exe"), enable=True, level=1, ics=False, depends_on=["other"])
+        cfg = AppConfig(
+            name="test",
+            path=Path("/exe"),
+            enable=True,
+            level=1,
+            ics=False,
+            depends_on=["other"],
+        )
         assert cfg.depends_on == ["other"]
 
     def test_empty_name_raises_value_error(self):
@@ -78,7 +89,14 @@ class TestAppConfig:
     def test_to_dict(self):
         from core.models import AppConfig
 
-        cfg = AppConfig(name="test", path=Path("/exe"), enable=True, level=2, ics=True, depends_on=["a"])
+        cfg = AppConfig(
+            name="test",
+            path=Path("/exe"),
+            enable=True,
+            level=2,
+            ics=True,
+            depends_on=["a"],
+        )
         d = cfg.to_dict()
         assert d["name"] == "test"
         assert d["enable"] is True
@@ -109,7 +127,14 @@ class TestAppConfig:
 
         from core.models import AppConfig
 
-        original = AppConfig(name="roundtrip", path=Path("/bin"), enable=True, level=0, ics=False, depends_on=[])
+        original = AppConfig(
+            name="roundtrip",
+            path=Path("/bin"),
+            enable=True,
+            level=0,
+            ics=False,
+            depends_on=[],
+        )
         data = original.to_dict()
         restored = AppConfig.from_dict(data)
         assert restored.name == original.name

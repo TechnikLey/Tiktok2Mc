@@ -1,5 +1,3 @@
-
-
 class TestConfigEndpoints:
     def test_get_config_returns_config(self, client):
         resp = client.get("/api/v1/config")
@@ -19,7 +17,9 @@ class TestConfigEndpoints:
 
         new_config = current["config"].copy()
         new_config["server_host"] = "0.0.0.0"
-        resp = client.put("/api/v1/config", json={"config": new_config, "backup": False})
+        resp = client.put(
+            "/api/v1/config", json={"config": new_config, "backup": False}
+        )
         assert resp.status_code == 200
         assert resp.json()["config"]["server_host"] == "0.0.0.0"
 
@@ -33,7 +33,9 @@ class TestConfigEndpoints:
 
     def test_update_config_validates_schema(self, client):
         # Sending a type-violating update must still fail after merge
-        resp = client.put("/api/v1/config", json={"config": {"java": "not_a_dict"}, "backup": False})
+        resp = client.put(
+            "/api/v1/config", json={"config": {"java": "not_a_dict"}, "backup": False}
+        )
         assert resp.status_code == 500
 
     def test_update_config_upgrades_version_on_write(self, client):
@@ -51,7 +53,9 @@ class TestConfigEndpoints:
         assert resp.status_code == 200
 
     def test_update_config_rejects_non_dict(self, client):
-        resp = client.put("/api/v1/config", json={"config": "not_a_dict", "backup": False})
+        resp = client.put(
+            "/api/v1/config", json={"config": "not_a_dict", "backup": False}
+        )
         assert resp.status_code == 422
 
     def test_get_config_file_not_found_404(self, client, project_dir):
@@ -66,6 +70,7 @@ class TestConfigEndpoints:
 
     def test_get_config_corrupt_500(self, client, project_dir):
         from core.yaml_utils import save_yaml
+
         config_file = project_dir / "config.yaml"
         config_file.write_text(": broken yaml [", encoding="utf-8")
         try:
@@ -73,4 +78,5 @@ class TestConfigEndpoints:
             assert resp.status_code == 500
         finally:
             from tests.conftest import MINIMAL_CONFIG
+
             save_yaml(config_file, MINIMAL_CONFIG, backup=False)

@@ -33,13 +33,23 @@ log = logging.getLogger(__name__)
 # Allowed imports for event hook scripts — AST-checked at load time
 # ---------------------------------------------------------------------------
 
-ALLOWED_IMPORTS: frozenset[str] = frozenset({
-    "time", "random", "logging", "json", "urllib", "requests",
-})
+ALLOWED_IMPORTS: frozenset[str] = frozenset(
+    {
+        "time",
+        "random",
+        "logging",
+        "json",
+        "urllib",
+        "requests",
+    }
+)
 
-ALLOWED_HOOK_MODULES: frozenset[str] = frozenset({
-    "core.hook_api", "core.plugin_config",
-})
+ALLOWED_HOOK_MODULES: frozenset[str] = frozenset(
+    {
+        "core.hook_api",
+        "core.plugin_config",
+    }
+)
 
 
 def _check_imports(path: Path) -> list[str]:
@@ -127,48 +137,55 @@ def _discover_hook_dirs() -> list[dict]:
                     error = "hook.json is missing or invalid"
 
                 if error:
-                    hooks.append({
-                        "name": fallback_name,
-                        "version": "0.0.0",
-                        "display_name": fallback_name,
-                        "description": "",
-                        "author": "",
-                        "capabilities": [],
-                        "plugin": plugin_name,
-                        "update_url": "",
-                        "source": str(child.resolve()),
-                        "source_type": source_type,
-                        "_manifest": None,
-                        "_error": error,
-                    })
+                    hooks.append(
+                        {
+                            "name": fallback_name,
+                            "version": "0.0.0",
+                            "display_name": fallback_name,
+                            "description": "",
+                            "author": "",
+                            "capabilities": [],
+                            "plugin": plugin_name,
+                            "update_url": "",
+                            "source": str(child.resolve()),
+                            "source_type": source_type,
+                            "_manifest": None,
+                            "_error": error,
+                        }
+                    )
                     log.debug("[HOOK] Hook '%s' has errors: %s", fallback_name, error)
                 continue
 
             if manifest.name in seen_names:
                 log.debug(
                     "[HOOK] Duplicate hook name '%s' in %s — skipping",
-                    manifest.name, child,
+                    manifest.name,
+                    child,
                 )
                 continue
             seen_names.add(manifest.name)
 
             version = read_hook_version(child)
-            hooks.append({
-                "name": manifest.name,
-                "version": version,
-                "display_name": manifest.display_name,
-                "description": manifest.description,
-                "author": manifest.author,
-                "capabilities": manifest.capabilities,
-                "plugin": plugin_name,
-                "update_url": manifest.update_url,
-                "source": str(child.resolve()),
-                "source_type": source_type,
-                "_manifest": manifest,
-            })
+            hooks.append(
+                {
+                    "name": manifest.name,
+                    "version": version,
+                    "display_name": manifest.display_name,
+                    "description": manifest.description,
+                    "author": manifest.author,
+                    "capabilities": manifest.capabilities,
+                    "plugin": plugin_name,
+                    "update_url": manifest.update_url,
+                    "source": str(child.resolve()),
+                    "source_type": source_type,
+                    "_manifest": manifest,
+                }
+            )
             log.debug(
                 "[HOOK] Discovered hook '%s' v%s in %s",
-                manifest.name, version, child,
+                manifest.name,
+                version,
+                child,
             )
 
     return hooks
@@ -194,6 +211,7 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
         manifest_path = hook_dir / ".hook_schema.tmp"
         try:
             import json
+
             manifest_path.write_text(json.dumps(fake_manifest), encoding="utf-8")
             cfg = load_plugin_config(hook_dir, apply_defaults=True)
             return cfg
@@ -206,10 +224,13 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
     # No schema: load raw if exists, return empty otherwise
     if config_path.exists():
         from core.yaml_utils import load_yaml
+
         try:
             return load_yaml(config_path) or {}
         except (OSError, ValueError, YAMLError) as exc:
-            log.warning("[HOOK] Failed to load config.yaml for '%s': %s", manifest.name, exc)
+            log.warning(
+                "[HOOK] Failed to load config.yaml for '%s': %s", manifest.name, exc
+            )
     return {}
 
 
@@ -231,7 +252,9 @@ def _load_single_hook(
     main_py = hook_dir / "main.py"
     if not main_py.exists():
         log.warning("[HOOK] %s: no main.py found — skipping", hook_dir)
-        get_crash_manager().report_error(HOOK_0002, detail=f"{manifest.name}: {main_py}")
+        get_crash_manager().report_error(
+            HOOK_0002, detail=f"{manifest.name}: {main_py}"
+        )
         return False
 
     disallowed = _check_imports(main_py)
@@ -239,21 +262,27 @@ def _load_single_hook(
         for name in disallowed:
             log.error(
                 "[HOOK] %s uses disallowed import: '%s' — hook skipped.",
-                manifest.name, name,
+                manifest.name,
+                name,
             )
-            get_crash_manager().report_error(HOOK_0003, detail=f"{manifest.name}: {name}")
+            get_crash_manager().report_error(
+                HOOK_0003, detail=f"{manifest.name}: {name}"
+            )
         return False
 
     module_name = f"hooks.{manifest.name}"
     try:
         if "hooks" not in sys.modules:
             import types
+
             sys.modules["hooks"] = types.ModuleType("hooks")
 
         spec = importlib.util.spec_from_file_location(module_name, main_py)
         if spec is None or spec.loader is None:
             log.warning("[HOOK] Could not create spec for: %s", manifest.name)
-            get_crash_manager().report_error(HOOK_0004, detail=f"{manifest.name}: spec creation failed")
+            get_crash_manager().report_error(
+                HOOK_0004, detail=f"{manifest.name}: spec creation failed"
+            )
             return False
 
         module = importlib.util.module_from_spec(spec)
@@ -261,11 +290,15 @@ def _load_single_hook(
         spec.loader.exec_module(module)
     except SyntaxError as e:
         log.warning("[HOOK] Syntax error in %s: %s", manifest.name, e)
-        get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
+        get_crash_manager().report_exception(
+            HOOK_0004, exc=e, context_info={"hook": manifest.name}
+        )
         return False
     except Exception as e:  # hook module code runs here — must never crash the loader
         log.warning("[HOOK] Failed to load %s: %s", manifest.name, e)
-        get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
+        get_crash_manager().report_exception(
+            HOOK_0004, exc=e, context_info={"hook": manifest.name}
+        )
         return False
 
     if hasattr(module, "register") and callable(module.register):
@@ -275,7 +308,9 @@ def _load_single_hook(
             return True
         except Exception as e:  # hook code runs here — must never crash the loader
             log.warning("[HOOK] register() failed in %s: %s", manifest.name, e)
-            get_crash_manager().report_exception(HOOK_0005, exc=e, context_info={"hook": manifest.name})
+            get_crash_manager().report_exception(
+                HOOK_0005, exc=e, context_info={"hook": manifest.name}
+            )
             return False
     else:
         log.error("[HOOK] %s/main.py has no register() function — skipped.", hook_dir)
@@ -326,54 +361,60 @@ def load_event_hooks(
                             error = "hook.json is missing or invalid"
                     if error:
                         if not any(h["name"] == child.name for h in discovered):
-                            discovered.append({
-                                "name": child.name,
-                                "version": "0.0.0",
-                                "display_name": child.name,
-                                "description": "",
-                                "author": "",
-                                "capabilities": [],
-                                "plugin": "",
-                                "update_url": "",
-                                "source": str(child.resolve()),
-                                "source_type": "main",
-                                "_manifest": None,
-                                "_error": error,
-                            })
+                            discovered.append(
+                                {
+                                    "name": child.name,
+                                    "version": "0.0.0",
+                                    "display_name": child.name,
+                                    "description": "",
+                                    "author": "",
+                                    "capabilities": [],
+                                    "plugin": "",
+                                    "update_url": "",
+                                    "source": str(child.resolve()),
+                                    "source_type": "main",
+                                    "_manifest": None,
+                                    "_error": error,
+                                }
+                            )
                         continue
                     if m and not any(h["name"] == m.name for h in discovered):
                         # Already caught by discover_hooks_dirs, but ensure we don't
                         # double-count
                         version = read_hook_version(child)
-                        discovered.append({
-                            "name": m.name,
-                            "version": version,
-                            "display_name": m.display_name,
-                            "description": m.description,
-                            "author": m.author,
-                            "capabilities": m.capabilities,
-                            "plugin": "",
-                            "update_url": m.update_url,
-                            "source": str(child.resolve()),
-                            "source_type": "main",
-                            "_manifest": m,
-                        })
+                        discovered.append(
+                            {
+                                "name": m.name,
+                                "version": version,
+                                "display_name": m.display_name,
+                                "description": m.description,
+                                "author": m.author,
+                                "capabilities": m.capabilities,
+                                "plugin": "",
+                                "update_url": m.update_url,
+                                "source": str(child.resolve()),
+                                "source_type": "main",
+                                "_manifest": m,
+                            }
+                        )
 
     # Sync registry: add new hooks, update versions
     hook_infos = []
     for info in discovered:
-        hook_infos.append({
-            "name": info["name"],
-            "version": info["version"],
-            "display_name": info["display_name"],
-            "description": info["description"],
-            "author": info["author"],
-            "capabilities": info["capabilities"],
-            "plugin": info["plugin"],
-            "update_url": info["update_url"],
-            "source": info["source"],
-            "_error": info.get("_error", ""),
-        })
+        hook_infos.append(
+            {
+                "name": info["name"],
+                "version": info["version"],
+                "display_name": info["display_name"],
+                "description": info["description"],
+                "author": info["author"],
+                "capabilities": info["capabilities"],
+                "plugin": info["plugin"],
+                "update_url": info["update_url"],
+                "source": info["source"],
+                "_error": info.get("_error", ""),
+            }
+        )
 
     new_count = registry.sync_from_discovery(hook_infos)
     if new_count:
@@ -396,7 +437,11 @@ def load_event_hooks(
     skipped = 0
     for info in discovered:
         if info.get("_error"):
-            log.warning("[HOOK] Hook '%s' has errors — skipping: %s", info["name"], info["_error"])
+            log.warning(
+                "[HOOK] Hook '%s' has errors — skipping: %s",
+                info["name"],
+                info["_error"],
+            )
             skipped += 1
             continue
         manifest: HookManifest = info["_manifest"]
@@ -413,7 +458,8 @@ def load_event_hooks(
 
     log.info(
         "[HOOK] Loaded %d hook(s), %d skipped/disabled",
-        loaded, skipped,
+        loaded,
+        skipped,
     )
 
     # Clean stale registry entries

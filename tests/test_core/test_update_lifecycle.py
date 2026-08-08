@@ -9,6 +9,7 @@ from pathlib import Path
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class FakeResponse:
     def __init__(self, data: bytes, status: int = 200):
         self.data = data
@@ -27,6 +28,7 @@ class FakeResponse:
 # ---------------------------------------------------------------------------
 # Signal file mechanism
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateSignalFile:
     """Tests the file-based kill-signal mechanism used by the updater."""
@@ -66,12 +68,14 @@ class TestUpdateSignalFile:
 
     def test_update_signal_path_constant(self):
         from core.paths import get_base_dir
+
         base = get_base_dir()
         signal_path = base / "update_signal.tmp"
         assert str(signal_path).endswith("update_signal.tmp")
 
     def test_start_imports_update_exe_path(self):
         from core.paths import get_base_dir
+
         base = get_base_dir()
         exe_suffix = ".exe" if sys.platform == "win32" else ".bin"
         update_path = base / f"update{exe_suffix}"
@@ -100,6 +104,7 @@ class TestUpdateAPISignal:
 # ---------------------------------------------------------------------------
 # Restart polling helpers (replacing the 3-second blind sleep)
 # ---------------------------------------------------------------------------
+
 
 class TestRestartPollingLogic:
     """Tests the polling-based restart logic that replaced blind sleep()."""
@@ -189,6 +194,7 @@ class TestReplaceUpdaterLogic:
 # Update return code handling
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateReturnCodeHandling:
     """Tests the decision logic for update process return codes."""
 
@@ -214,6 +220,7 @@ class TestUpdateReturnCodeHandling:
 # ---------------------------------------------------------------------------
 # Config / update safety
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateSafety:
     """Tests that update configuration is correctly read."""
@@ -241,5 +248,3 @@ class TestUpdateSafety:
 # ---------------------------------------------------------------------------
 # Restart flow verification
 # ---------------------------------------------------------------------------
-
-

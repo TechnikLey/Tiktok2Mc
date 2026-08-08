@@ -179,7 +179,10 @@ class HookRegistry:
                 reg_info["error"] = error
                 self.register(HookRegistration(**reg_info))
                 count += 1
-            elif existing.version != info.get("version", existing.version) or error != existing.error:
+            elif (
+                existing.version != info.get("version", existing.version)
+                or error != existing.error
+            ):
                 self.update(
                     info["name"],
                     version=info.get("version", existing.version),

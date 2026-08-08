@@ -1,4 +1,3 @@
-
 from core.overlay import (
     OverlayClient,
     OverlayConfig,

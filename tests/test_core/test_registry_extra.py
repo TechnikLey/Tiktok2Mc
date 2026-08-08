@@ -27,9 +27,7 @@ class TestPluginRegistryBackup:
         p = PluginRegistration(name="test_plugin", path="/exe")
         registry.register(p)
         # Force a second save to trigger backup of the first.
-        p2 = PluginRegistration(
-            name="test_plugin", path="/exe", version="2.0.0"
-        )
+        p2 = PluginRegistration(name="test_plugin", path="/exe", version="2.0.0")
         registry.register(p2)
 
         backups = list((project_dir / "data" / "backups" / "plugin_registry").glob("*"))
@@ -41,7 +39,6 @@ class TestPluginRegistryBackup:
         reg_file = tmp_path / "api_plugin_registry.json"
         reg_file.write_text("{corrupt json", encoding="utf-8")
 
-
         registry = PluginRegistry(tmp_path)
         assert registry.list() == []
 
@@ -50,10 +47,20 @@ class TestPluginRegistryBackup:
 
         reg_file = tmp_path / "api_plugin_registry.json"
         reg_file.write_text(
-            json.dumps([
-                {"name": "good", "path": "/a", "version": "1.0.0", "enabled": False, "level": 2, "ics": False, "description": ""},
-                {"name": "bad", "path": "/b", "version": 123},
-            ]),
+            json.dumps(
+                [
+                    {
+                        "name": "good",
+                        "path": "/a",
+                        "version": "1.0.0",
+                        "enabled": False,
+                        "level": 2,
+                        "ics": False,
+                        "description": "",
+                    },
+                    {"name": "bad", "path": "/b", "version": 123},
+                ]
+            ),
             encoding="utf-8",
         )
 

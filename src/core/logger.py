@@ -16,6 +16,7 @@ Usage:
     install_global_exception_hook("my_module")
     hb = start_heartbeat(log, interval=60.0)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -135,7 +136,10 @@ class CrashReporter:
             entry["count"] += 1
             entry["last_seen"] = now
             # Warn every 5 occurrences within the history window
-            return entry["count"] % 5 == 0 and (now - entry["first_seen"]) < _CRASH_HISTORY_WINDOW
+            return (
+                entry["count"] % 5 == 0
+                and (now - entry["first_seen"]) < _CRASH_HISTORY_WINDOW
+            )
 
     def report(
         self,
@@ -152,7 +156,10 @@ class CrashReporter:
 
         # Dedup rapid duplicate reports
         now = time.time()
-        if signature == self._last_signature and (now - self._last_time) < _CRASH_DEDUP_SECONDS:
+        if (
+            signature == self._last_signature
+            and (now - self._last_time) < _CRASH_DEDUP_SECONDS
+        ):
             return None
         self._last_signature = signature
         self._last_time = now
@@ -246,7 +253,9 @@ class Heartbeat:
             for i, check in enumerate(self.subsystems):
                 try:
                     ok = "ok" if check() else "fail"
-                except Exception:  # a broken subsystem check must not break the heartbeat
+                except (
+                    Exception
+                ):  # a broken subsystem check must not break the heartbeat
                     ok = "error"
                 parts.append(f"subsystem_{i}={ok}")
 
@@ -260,6 +269,7 @@ class Heartbeat:
             # Report heartbeat to health monitor
             try:
                 from core.health_monitor import get_health_monitor
+
                 hm = get_health_monitor()
                 hm.record_heartbeat("process." + (self.logger.name or "unknown"))
             except Exception:  # heartbeat reporting is best-effort
@@ -272,7 +282,9 @@ class Heartbeat:
         if self._thread is not None:
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="Heartbeat")
+        self._thread = threading.Thread(
+            target=self._loop, daemon=True, name="Heartbeat"
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -285,6 +297,7 @@ class Heartbeat:
 # ---------------------------------------------------------------------------
 # EventBus log publisher (lightweight, non-blocking)
 # ---------------------------------------------------------------------------
+
 
 class _EventBusHandler(logging.Handler):
     """Publish log records to the central EventBus as ``log.unified`` events.
@@ -345,6 +358,7 @@ class _EventBusHandler(logging.Handler):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_log_dir() -> Path:
     from core.paths import get_root_dir
@@ -429,13 +443,19 @@ def initialize_logging(
     # Per-module file (direct, not queued — low volume, easy to grep)
     if log_to_file and not already_initialized:
         log_dir = _get_log_dir()
-        module_fh = logging.FileHandler(log_dir / f"{module_name}.log", encoding="utf-8")
+        module_fh = logging.FileHandler(
+            log_dir / f"{module_name}.log", encoding="utf-8"
+        )
         module_fh.setFormatter(formatter)
         module_fh.setLevel(level)
         logger.addHandler(module_fh)
 
     if not already_initialized:
-        logger.info("Unified logging initialized for '%s' at level %s", module_name, logging.getLevelName(level))
+        logger.info(
+            "Unified logging initialized for '%s' at level %s",
+            module_name,
+            logging.getLevelName(level),
+        )
 
     return logger
 

@@ -8,7 +8,7 @@ import re
 import sys
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def register(api: HookAPI):
     log.info("[{display_name}] Registered action: {action_name}")
 '''
 
-HOOK_JSON_TEMPLATE = '''\
+HOOK_JSON_TEMPLATE = """\
 {{
   "name": "{name}",
   "version": "1.0.0",
@@ -63,9 +63,9 @@ HOOK_JSON_TEMPLATE = '''\
     ]
   }}
 }}
-'''
+"""
 
-CONFIG_YAML_TEMPLATE = '''\
+CONFIG_YAML_TEMPLATE = """\
 # ==========================================
 # Hook configuration
 # ==========================================
@@ -73,15 +73,19 @@ CONFIG_YAML_TEMPLATE = '''\
 # Settings defined here are accessible via api.get_hook_config("{name}").
 
 enabled: true
-'''
+"""
 
 
 def get_valid_hook_name():
     while True:
-        name = input("Please enter hook name (a-z, 0-9, hyphens, underscores): ").strip()
+        name = input(
+            "Please enter hook name (a-z, 0-9, hyphens, underscores): "
+        ).strip()
 
-        if not re.match(r'^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$|^[a-z0-9]$', name):
-            log.info("\033[91mInvalid name! Only a-z, 0-9, hyphens, and underscores allowed (must start/end with letter/digit).\033[0m")
+        if not re.match(r"^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$|^[a-z0-9]$", name):
+            log.info(
+                "\033[91mInvalid name! Only a-z, 0-9, hyphens, and underscores allowed (must start/end with letter/digit).\033[0m"
+            )
         else:
             return name
 
@@ -90,7 +94,9 @@ def check_name_unique(name: str, target_dir: Path) -> bool:
     """Check that no hook with this name exists in target location."""
     hook_json_path = target_dir / name / "hook.json"
     if hook_json_path.exists():
-        log.info(f"\033[93mA hook named '{name}' already exists in {target_dir / name}\033[0m")
+        log.info(
+            f"\033[93mA hook named '{name}' already exists in {target_dir / name}\033[0m"
+        )
         return False
 
     # Also scan existing hooks via their manifests
@@ -102,7 +108,9 @@ def check_name_unique(name: str, target_dir: Path) -> bool:
                 continue
             manifest = load_hook_manifest(child)
             if manifest and manifest.name == name:
-                log.info(f"\033[93mHook name '{name}' is already used by {child}\033[0m")
+                log.info(
+                    f"\033[93mHook name '{name}' is already used by {child}\033[0m"
+                )
                 return False
     return True
 
@@ -110,14 +118,18 @@ def check_name_unique(name: str, target_dir: Path) -> bool:
 def get_action_name(hook_name: str):
     """Default action name based on hook name, but let user override."""
     default_action = hook_name
-    user_input = input(f"Action name for actions.mca (default: ${default_action}): ").strip()
+    user_input = input(
+        f"Action name for actions.mca (default: ${default_action}): "
+    ).strip()
     if not user_input:
         return default_action
     return user_input
 
 
 def get_update_url():
-    url = input("GitHub API update URL (optional, Enter to skip):\nhttps://api.github.com/repos/").strip()
+    url = input(
+        "GitHub API update URL (optional, Enter to skip):\nhttps://api.github.com/repos/"
+    ).strip()
     if not url:
         return ""
     full_url = f"https://api.github.com/repos/{url}"
@@ -141,7 +153,11 @@ def main():
     plugin_name = ""
     if choice == "2":
         # List available plugins
-        plugins = [d.name for d in sorted(PLUGINS_DIR.iterdir()) if d.is_dir() and (d / "plugin.json").exists()]
+        plugins = [
+            d.name
+            for d in sorted(PLUGINS_DIR.iterdir())
+            if d.is_dir() and (d / "plugin.json").exists()
+        ]
         if not plugins:
             log.info("\033[93mNo plugins found in src/plugins/.\033[0m")
             log.info("Falling back to main hooks directory.")
@@ -153,7 +169,13 @@ def main():
             plugin_name = input("Enter plugin name: ").strip()
             plugin_hooks_dir = PLUGINS_DIR / plugin_name / "hooks"
             if not plugin_hooks_dir.exists():
-                create = input(f"Plugin hooks dir {plugin_hooks_dir} doesn't exist. Create it? (y/n, default: y): ").strip().lower()
+                create = (
+                    input(
+                        f"Plugin hooks dir {plugin_hooks_dir} doesn't exist. Create it? (y/n, default: y): "
+                    )
+                    .strip()
+                    .lower()
+                )
                 if create == "n":
                     log.info("Cancelled.")
                     return
@@ -213,7 +235,7 @@ def main():
     log.info(f"  Location: {hook_path}")
     log.info(f"  Action: ${action_name} (use in actions.mca)")
     log.info("  Register function: register(api) in main.py")
-    log.info(f"  Config: api.get_hook_config(\"{hook_name}\")")
+    log.info(f'  Config: api.get_hook_config("{hook_name}")')
 
     input("\nPress Enter to exit...")
 

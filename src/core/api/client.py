@@ -68,16 +68,23 @@ class PluginAPIClient:
     def register(self, body: dict[str, Any]) -> dict[str, Any] | None:
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
-            self._url("plugins/register"), data=data,
-            headers={"Content-Type": "application/json"}, method="POST",
+            self._url("plugins/register"),
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
         try:
             with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
                 if resp.status in (200, 201):
                     return json.loads(resp.read().decode("utf-8")).get("plugin")
                 return None
-        except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            ConnectionResetError,
+            TimeoutError,
+            OSError,
+        ):
             return None
 
     def unregister(self, name: str) -> bool:
@@ -88,8 +95,13 @@ class PluginAPIClient:
         try:
             with urllib.request.urlopen(req, timeout=_TIMEOUT):
                 return True
-        except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            ConnectionResetError,
+            TimeoutError,
+            OSError,
+        ):
             return False
 
     def get(self, name: str) -> dict[str, Any] | None:
@@ -102,8 +114,13 @@ class PluginAPIClient:
                 if resp.status == 200:
                     return json.loads(resp.read().decode("utf-8"))
                 return None
-        except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            ConnectionResetError,
+            TimeoutError,
+            OSError,
+        ):
             return None
 
     def update(self, name: str, body: dict[str, Any]) -> dict[str, Any] | None:
@@ -119,8 +136,13 @@ class PluginAPIClient:
                 if resp.status == 200:
                     return json.loads(resp.read().decode("utf-8"))
                 return None
-        except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            ConnectionResetError,
+            TimeoutError,
+            OSError,
+        ):
             return None
 
     def list(self) -> list[dict[str, Any]]:
@@ -129,8 +151,13 @@ class PluginAPIClient:
             with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data.get("plugins", [])
-        except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            ConnectionResetError,
+            TimeoutError,
+            OSError,
+        ):
             return []
 
 
@@ -165,6 +192,7 @@ def register_plugin(config: AppConfig | dict[str, Any]) -> AppConfig:
 
     log.info(
         "Registered via API: %s (enabled=%s)",
-        result.get("name"), result.get("enabled"),
+        result.get("name"),
+        result.get("enabled"),
     )
     return _api_to_app_config(result)

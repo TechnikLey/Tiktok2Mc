@@ -53,7 +53,10 @@ def _is_supported_version(version: str) -> bool:
         minor = int(parts[1]) if len(parts) > 1 else 0
     except (ValueError, IndexError):
         return False
-    return major > _MIN_SUPPORTED_MAJOR or (major == _MIN_SUPPORTED_MAJOR and minor >= _MIN_SUPPORTED_MINOR)
+    return major > _MIN_SUPPORTED_MAJOR or (
+        major == _MIN_SUPPORTED_MAJOR and minor >= _MIN_SUPPORTED_MINOR
+    )
+
 
 _service: ApiService | None = None
 
@@ -99,7 +102,9 @@ def _sync_datapack_to_instance(instance_id: str) -> Path | None:
     """
     dp_dir = get_servers_dir() / "datapack"
     if not dp_dir.exists():
-        log.warning("[DATAPACK] Datapack source not found at %s — nothing to sync", dp_dir)
+        log.warning(
+            "[DATAPACK] Datapack source not found at %s — nothing to sync", dp_dir
+        )
         return None
 
     instance_dp = get_servers_dir() / instance_id / "world" / "datapacks"
@@ -124,10 +129,14 @@ def _sync_datapack_to_instance(instance_id: str) -> Path | None:
         if src_zip.exists():
             shutil.copy2(src_zip, dst_zip)
 
-        log.info("[DATAPACK] Synced '%s' datapack to instance '%s'", dp_name, instance_id)
+        log.info(
+            "[DATAPACK] Synced '%s' datapack to instance '%s'", dp_name, instance_id
+        )
         return instance_dp
     except OSError as exc:
-        log.warning("[DATAPACK] Failed to sync datapack to instance '%s': %s", instance_id, exc)
+        log.warning(
+            "[DATAPACK] Failed to sync datapack to instance '%s': %s", instance_id, exc
+        )
         return None
 
 
@@ -188,13 +197,15 @@ def _list_installed_versions() -> list[dict[str, Any]]:
                 jar = subdir / "server.jar"
                 if jar.exists():
                     meta = _read_meta(subdir)
-                    versions.append({
-                        "version": subdir.name,
-                        "path": str(subdir.relative_to(get_root_dir())),
-                        "type": _resolve_type(subdir.name, meta),
-                        "hasJar": True,
-                        "size": jar.stat().st_size,
-                    })
+                    versions.append(
+                        {
+                            "version": subdir.name,
+                            "path": str(subdir.relative_to(get_root_dir())),
+                            "type": _resolve_type(subdir.name, meta),
+                            "hasJar": True,
+                            "size": jar.stat().st_size,
+                        }
+                    )
 
     return versions
 
@@ -211,6 +222,7 @@ def _get_active_version() -> str | None:
 def _get_server_status(instance_id: str = "default") -> str:
     try:
         from core.lifecycle import get_supervisor
+
         supervisor = get_supervisor()
         proc_name = _instance_process_name(instance_id)
         proc = supervisor.get(proc_name)
@@ -360,18 +372,20 @@ async def list_servers():
     instances: list[InstanceInfo] = []
     for inst_id, inst_data in raw_instances.items():
         version = inst_data.get("version", "1.21.11")
-        instances.append(InstanceInfo(
-            id=inst_id,
-            name=inst_data.get("name", inst_id),
-            version=version,
-            port=inst_data.get("port", 25565),
-            enabled=inst_data.get("enabled", True),
-            auto_start=inst_data.get("auto_start", False),
-            java_args=inst_data.get("java_args", ""),
-            status=_get_server_status(inst_id),
-            path=str(_get_instance_dir(inst_id).relative_to(get_root_dir())),
-            hasJar=_instance_has_jar(inst_id),
-        ))
+        instances.append(
+            InstanceInfo(
+                id=inst_id,
+                name=inst_data.get("name", inst_id),
+                version=version,
+                port=inst_data.get("port", 25565),
+                enabled=inst_data.get("enabled", True),
+                auto_start=inst_data.get("auto_start", False),
+                java_args=inst_data.get("java_args", ""),
+                status=_get_server_status(inst_id),
+                path=str(_get_instance_dir(inst_id).relative_to(get_root_dir())),
+                hasJar=_instance_has_jar(inst_id),
+            )
+        )
 
     return ServersListResponse(
         instances=instances,
@@ -400,19 +414,31 @@ def _new_instance_id(name: str, existing: dict) -> str:
 async def create_instance(body: CreateInstanceRequest):
     log.info(
         "CREATE_INSTANCE request: name='%s' version='%s' port=%d java_args='%s'",
-        body.name, body.version, body.port, body.java_args,
+        body.name,
+        body.version,
+        body.port,
+        body.java_args,
     )
     instances = _load_instances()
 
     # Validate name uniqueness
-    existing_names = {data.get("name", "").strip().lower() for data in instances.values()}
+    existing_names = {
+        data.get("name", "").strip().lower() for data in instances.values()
+    }
     if body.name.strip().lower() in existing_names:
-        raise HTTPException(status_code=409, detail=f"A server instance named '{body.name}' already exists.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"A server instance named '{body.name}' already exists.",
+        )
 
     # Validate port uniqueness
     existing_ports = {data.get("port", 25565) for data in instances.values()}
     if body.port in existing_ports:
-        conflicting = [iid for iid, data in instances.items() if data.get("port", 25565) == body.port]
+        conflicting = [
+            iid
+            for iid, data in instances.items()
+            if data.get("port", 25565) == body.port
+        ]
         raise HTTPException(
             status_code=409,
             detail=f"Port {body.port} is already in use by instance(s): {', '.join(conflicting)}.",
@@ -454,7 +480,9 @@ async def create_instance(body: CreateInstanceRequest):
         _set_server_property(props_file, "server-port", str(body.port))
         _set_server_property(props_file, "enable-rcon", "true")
     except OSError as e:
-        log.warning("Failed to write server.properties for instance '%s': %s", inst_id, e)
+        log.warning(
+            "Failed to write server.properties for instance '%s': %s", inst_id, e
+        )
 
     # Accept EULA
     eula_file = instance_dir / "eula.txt"
@@ -475,7 +503,11 @@ async def create_instance(body: CreateInstanceRequest):
         "java_args": body.java_args,
     }
     _save_instances(instances)
-    return {"status": "ok", "id": inst_id, "message": f"Server instance '{body.name}' created"}
+    return {
+        "status": "ok",
+        "id": inst_id,
+        "message": f"Server instance '{body.name}' created",
+    }
 
 
 def _set_server_property(file_path: Path, key: str, value: str) -> None:
@@ -502,17 +534,19 @@ async def list_instances():
     raw = _load_instances()
     result = []
     for inst_id, data in raw.items():
-        result.append({
-            "id": inst_id,
-            "name": data.get("name", inst_id),
-            "version": data.get("version", "1.21.11"),
-            "port": data.get("port", 25565),
-            "enabled": data.get("enabled", True),
-            "auto_start": data.get("auto_start", False),
-            "java_args": data.get("java_args", ""),
-            "status": _get_server_status(inst_id),
-            "hasJar": _instance_has_jar(inst_id),
-        })
+        result.append(
+            {
+                "id": inst_id,
+                "name": data.get("name", inst_id),
+                "version": data.get("version", "1.21.11"),
+                "port": data.get("port", 25565),
+                "enabled": data.get("enabled", True),
+                "auto_start": data.get("auto_start", False),
+                "java_args": data.get("java_args", ""),
+                "status": _get_server_status(inst_id),
+                "hasJar": _instance_has_jar(inst_id),
+            }
+        )
     return {"instances": result}
 
 
@@ -520,7 +554,9 @@ async def list_instances():
 async def get_instance(instance_id: str):
     data = _get_instance(instance_id)
     if data is None:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
     return {
         "id": instance_id,
         "name": data.get("name", instance_id),
@@ -538,7 +574,9 @@ async def get_instance(instance_id: str):
 async def update_instance(instance_id: str, body: UpdateInstanceRequest):
     instances = _load_instances()
     if instance_id not in instances:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
     data = instances[instance_id]
     if body.name is not None:
         data["name"] = body.name
@@ -559,10 +597,14 @@ async def update_instance(instance_id: str, body: UpdateInstanceRequest):
 @router.delete("/servers/instances/{instance_id}")
 async def delete_instance(instance_id: str):
     if instance_id == "default":
-        raise HTTPException(status_code=400, detail="Cannot delete the default server instance")
+        raise HTTPException(
+            status_code=400, detail="Cannot delete the default server instance"
+        )
     instances = _load_instances()
     if instance_id not in instances:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
 
     # Remove from configuration first
     del instances[instance_id]
@@ -584,10 +626,14 @@ async def delete_instance(instance_id: str):
 async def open_instance_folder(instance_id: str):
     instances = _load_instances()
     if instance_id not in instances:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
     target_path = _get_instance_dir(instance_id)
     if not target_path.exists():
-        raise HTTPException(status_code=404, detail=f"Directory does not exist: {target_path}")
+        raise HTTPException(
+            status_code=404, detail=f"Directory does not exist: {target_path}"
+        )
 
     # Open the folder in the OS file explorer
     opened = False
@@ -598,12 +644,18 @@ async def open_instance_folder(instance_id: str):
             opened = True
         elif system == "Darwin":
             await asyncio.to_thread(
-                subprocess.Popen, ["open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                subprocess.Popen,
+                ["open", str(target_path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             opened = True
         else:
             await asyncio.to_thread(
-                subprocess.Popen, ["xdg-open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                subprocess.Popen,
+                ["xdg-open", str(target_path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             opened = True
     except OSError as e:
@@ -619,10 +671,16 @@ async def set_instance_version(instance_id: str, body: SwitchRequest):
         raise HTTPException(status_code=400, detail="Version cannot be empty")
     instances = _load_instances()
     if instance_id not in instances:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
     instances[instance_id]["version"] = version
     _save_instances(instances)
-    return {"status": "ok", "version": version, "message": f"Instance '{instance_id}' version set to {version}"}
+    return {
+        "status": "ok",
+        "version": version,
+        "message": f"Instance '{instance_id}' version set to {version}",
+    }
 
 
 @router.post("/servers/download", response_model=DownloadResponse)
@@ -661,18 +719,26 @@ async def download_version(body: DownloadRequest):
         )
 
     if not isinstance(builds, list) or not builds:
-        raise HTTPException(status_code=400, detail=f"No builds found for version '{version}'")
+        raise HTTPException(
+            status_code=400, detail=f"No builds found for version '{version}'"
+        )
 
     _channel_priority = {"STABLE": 0, "BETA": 1, "ALPHA": 2}
     candidates = [
-        b for b in builds
+        b
+        for b in builds
         if b.get("channel") in _channel_priority
         and b.get("downloads", {}).get("server:default")
     ]
     if not candidates:
-        raise HTTPException(status_code=400, detail=f"No successful builds found for version '{version}'")
+        raise HTTPException(
+            status_code=400,
+            detail=f"No successful builds found for version '{version}'",
+        )
 
-    candidates.sort(key=lambda b: (_channel_priority.get(b.get("channel"), 99), -b.get("id", 0)))
+    candidates.sort(
+        key=lambda b: (_channel_priority.get(b.get("channel"), 99), -b.get("id", 0))
+    )
     try:
         latest = candidates[0]
         build_num = latest["id"]
@@ -680,10 +746,16 @@ async def download_version(body: DownloadRequest):
         download_url = download_obj["url"]
     except (KeyError, TypeError) as e:
         log.exception("Unexpected PaperMC API format for version %s", version)
-        raise HTTPException(status_code=502, detail=f"Unexpected API response from PaperMC for version '{version}': {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unexpected API response from PaperMC for version '{version}': {e}",
+        )
 
     if not download_url:
-        raise HTTPException(status_code=502, detail=f"PaperMC did not return a download URL for version '{version}' build {build_num}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"PaperMC did not return a download URL for version '{version}' build {build_num}",
+        )
 
     # Prepare target directory
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -692,8 +764,16 @@ async def download_version(body: DownloadRequest):
     download_exc = None
     for attempt in range(3):
         try:
-            log.info("Downloading PaperMC %s build %s -> %s (attempt %d/3)", version, build_num, target_jar, attempt + 1)
-            req = urllib.request.Request(download_url, headers={"User-Agent": "TikTok2Mc/1.0"})
+            log.info(
+                "Downloading PaperMC %s build %s -> %s (attempt %d/3)",
+                version,
+                build_num,
+                target_jar,
+                attempt + 1,
+            )
+            req = urllib.request.Request(
+                download_url, headers={"User-Agent": "TikTok2Mc/1.0"}
+            )
             resp = await asyncio.to_thread(urllib.request.urlopen, req, timeout=120)
             try:
                 with target_jar.open("wb") as f:
@@ -787,7 +867,9 @@ async def switch_version(body: SwitchRequest):
             log.info("Switched active server.jar to %s", target_jar)
         except OSError as e:
             log.exception("Failed to copy jar")
-            raise HTTPException(status_code=500, detail=f"Failed to activate version: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to activate version: {e}"
+            )
     else:
         log.info("Version %s is already active at %s", version, target_jar)
 
@@ -798,12 +880,15 @@ async def switch_version(body: SwitchRequest):
         svc.write_config(cfg, backup=True)
     except (OSError, ValueError, YAMLError) as e:
         log.exception("Failed to update config")
-        raise HTTPException(status_code=500, detail=f"Version switched but config update failed: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Version switched but config update failed: {e}"
+        )
 
     # Auto-restart the Minecraft Server if it is currently running
     restart_initiated = False
     try:
         from core.lifecycle import ProcessState, get_supervisor
+
         supervisor = get_supervisor()
         proc = supervisor.get("Minecraft Server")
         if proc is not None and proc.state == ProcessState.RUNNING:
@@ -853,7 +938,9 @@ async def upload_custom_jar(
         with target_jar.open("wb") as f:
             while chunk := file.file.read(8192):
                 f.write(chunk)
-        log.info("Saved custom jar to %s (%s bytes)", target_jar, target_jar.stat().st_size)
+        log.info(
+            "Saved custom jar to %s (%s bytes)", target_jar, target_jar.stat().st_size
+        )
         _write_meta(target_dir, {"origin": "custom", "originalName": file.filename})
     except OSError as e:
         log.exception("Failed to save custom jar")

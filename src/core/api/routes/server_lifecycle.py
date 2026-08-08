@@ -52,7 +52,9 @@ def _java_status_payload() -> dict:
 
 async def _run_java_install() -> None:
     """Run the platform-appropriate Java installer in the background."""
-    _JAVA_INSTALL.update(installing=True, message="Starting Java installation...", done=False, ok=False)
+    _JAVA_INSTALL.update(
+        installing=True, message="Starting Java installation...", done=False, ok=False
+    )
     try:
         if IS_WINDOWS:
             ok, message = await asyncio.to_thread(install_java_windows, get_root_dir())
@@ -60,9 +62,13 @@ async def _run_java_install() -> None:
             ok, message = await asyncio.to_thread(install_java_linux)
         _JAVA_INSTALL.update(message=message, done=True, ok=ok)
         log.info("Java install finished ok=%s: %s", ok, message)
-    except Exception as exc:  # background install: any crash is surfaced via install state
+    except (
+        Exception
+    ) as exc:  # background install: any crash is surfaced via install state
         log.exception("Java installation crashed")
-        _JAVA_INSTALL.update(message=f"Java installation crashed: {exc}", done=True, ok=False)
+        _JAVA_INSTALL.update(
+            message=f"Java installation crashed: {exc}", done=True, ok=False
+        )
     finally:
         _JAVA_INSTALL["installing"] = False
 
@@ -100,7 +106,9 @@ def _find_server_exe() -> Path | None:
         if candidate.exists():
             return candidate.resolve()
     # Development fallback: server.py
-    dev_server = Path(__file__).resolve().parent.parent.parent.parent / "python" / "server.py"
+    dev_server = (
+        Path(__file__).resolve().parent.parent.parent.parent / "python" / "server.py"
+    )
     if dev_server.exists():
         return dev_server
     return None
@@ -110,7 +118,9 @@ def _build_server_cmd(instance_dir: Path, port: int) -> list[str]:
     """Build the command list to start a Minecraft server instance."""
     server_exe = _find_server_exe()
     if server_exe is None:
-        raise HTTPException(status_code=500, detail="Minecraft server executable not found")
+        raise HTTPException(
+            status_code=500, detail="Minecraft server executable not found"
+        )
 
     cmd: list[str] = []
     if server_exe.suffix == ".py":
@@ -123,6 +133,7 @@ def _build_server_cmd(instance_dir: Path, port: int) -> list[str]:
 # ---------------------------------------------------------------------------
 # Status builder
 # ---------------------------------------------------------------------------
+
 
 def _build_status(proc) -> dict:
     if proc is None:
@@ -162,7 +173,8 @@ async def java_install():
     if _JAVA_INSTALL["installing"]:
         return {
             "status": "in_progress",
-            "message": _JAVA_INSTALL["message"] or "Java installation is already in progress...",
+            "message": _JAVA_INSTALL["message"]
+            or "Java installation is already in progress...",
         }
 
     status = detect_java(get_root_dir(), get_config_file())
@@ -176,7 +188,8 @@ async def java_install():
             status_code=400,
             detail=(
                 f"Automatic installation is not supported on this system. "
-                f"Install Java {MIN_JAVA_VERSION}+ manually:\n" + "\n".join(status.hints)
+                f"Install Java {MIN_JAVA_VERSION}+ manually:\n"
+                + "\n".join(status.hints)
             ),
         )
 
@@ -207,12 +220,19 @@ async def server_instance_start(instance_id: str):
     # If not registered, dynamically register the instance process
     if proc is None:
         if instance_id == "default":
-            raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' is not registered")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Server instance '{instance_id}' is not registered",
+            )
 
         from core.api.routes.servers import _get_instance_dir, _load_instances
+
         instances = _load_instances()
         if instance_id not in instances:
-            raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' not found in configuration")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Server instance '{instance_id}' not found in configuration",
+            )
 
         inst_data = instances[instance_id]
         instance_dir = _get_instance_dir(instance_id)
@@ -235,22 +255,33 @@ async def server_instance_start(instance_id: str):
                 readiness_check=make_minecraft_readiness_check(instance_dir),
                 readiness_timeout=120.0,
             )
-            log.info("Dynamically registered server process '%s' with cmd: %s", pname, cmd)
+            log.info(
+                "Dynamically registered server process '%s' with cmd: %s", pname, cmd
+            )
         except ValueError:
             # Race: already registered between our get() and register()
             proc = supervisor.get(pname)
             if proc is None:
-                raise HTTPException(status_code=500, detail="Failed to register process")
+                raise HTTPException(
+                    status_code=500, detail="Failed to register process"
+                )
 
     if proc.state == ProcessState.RUNNING:
-        return {"status": "already_running", "message": f"Server '{instance_id}' is already running"}
+        return {
+            "status": "already_running",
+            "message": f"Server '{instance_id}' is already running",
+        }
 
     # Sync datapack from default server before starting
     try:
         from core.api.routes.servers import _sync_datapack_to_instance
+
         _sync_datapack_to_instance(instance_id)
     except Exception:  # best-effort sync; server starts with whatever is on disk
-        log.warning("[DATAPACK] Failed to sync datapack for '%s' — server will use whatever is on disk", instance_id)
+        log.warning(
+            "[DATAPACK] Failed to sync datapack for '%s' — server will use whatever is on disk",
+            instance_id,
+        )
 
     try:
         success = await supervisor.start(pname)
@@ -258,9 +289,12 @@ async def server_instance_start(instance_id: str):
             # Start console capture for this instance
             from core.api.routes.servers import _get_instance_dir
             from core.api.services.console_capture import start_instance_capture
+
             start_instance_capture(instance_id, _get_instance_dir(instance_id))
             return {"status": "started", "message": f"Server '{instance_id}' started"}
-        raise HTTPException(status_code=500, detail=f"Server '{instance_id}' failed to start")
+        raise HTTPException(
+            status_code=500, detail=f"Server '{instance_id}' failed to start"
+        )
     except HTTPException:
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
@@ -274,19 +308,27 @@ async def server_instance_stop(instance_id: str):
     pname = _proc_name(instance_id)
     proc = supervisor.get(pname)
     if proc is None:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' is not registered")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' is not registered"
+        )
 
     if proc.state == ProcessState.STOPPED:
-        return {"status": "already_stopped", "message": f"Server '{instance_id}' is already stopped"}
+        return {
+            "status": "already_stopped",
+            "message": f"Server '{instance_id}' is already stopped",
+        }
 
     try:
         success = await supervisor.stop(pname)
         if success:
             # Stop console capture for this instance
             from core.api.services.console_capture import stop_instance_capture
+
             stop_instance_capture(instance_id)
             return {"status": "stopped", "message": f"Server '{instance_id}' stopped"}
-        raise HTTPException(status_code=500, detail=f"Server '{instance_id}' failed to stop")
+        raise HTTPException(
+            status_code=500, detail=f"Server '{instance_id}' failed to stop"
+        )
     except HTTPException:
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
@@ -300,7 +342,9 @@ async def server_instance_restart(instance_id: str):
     pname = _proc_name(instance_id)
     proc = supervisor.get(pname)
     if proc is None:
-        raise HTTPException(status_code=404, detail=f"Server instance '{instance_id}' is not registered")
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' is not registered"
+        )
 
     async def _bg_restart():
         try:
@@ -310,7 +354,10 @@ async def server_instance_restart(instance_id: str):
             log.exception("Background restart failed for '%s'", instance_id)
 
     asyncio.create_task(_bg_restart())
-    return {"status": "restart_requested", "message": f"Server '{instance_id}' restart initiated"}
+    return {
+        "status": "restart_requested",
+        "message": f"Server '{instance_id}' restart initiated",
+    }
 
 
 # ── Legacy default-server endpoints (backward compat) ──────────────

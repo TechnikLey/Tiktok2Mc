@@ -13,12 +13,18 @@ class TestWriteGuardIsActive:
     """Prove that the write guard blocks writes outside tests/workspace/."""
 
     def test_guard_blocks_path_write_text(self):
-        blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_write_text.txt"
+        blocked = (
+            Path(__file__).resolve().parent.parent / "src" / "guard_test_write_text.txt"
+        )
         with pytest.raises(PermissionError, match="TEST GUARD"):
             blocked.write_text("must fail")
 
     def test_guard_blocks_path_write_bytes(self):
-        blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_write_bytes.bin"
+        blocked = (
+            Path(__file__).resolve().parent.parent
+            / "src"
+            / "guard_test_write_bytes.bin"
+        )
         with pytest.raises(PermissionError, match="TEST GUARD"):
             blocked.write_bytes(b"must fail")
 
@@ -28,24 +34,33 @@ class TestWriteGuardIsActive:
             blocked.mkdir()
 
     def test_guard_blocks_path_touch(self):
-        blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_touch.txt"
+        blocked = (
+            Path(__file__).resolve().parent.parent / "src" / "guard_test_touch.txt"
+        )
         with pytest.raises(PermissionError, match="TEST GUARD"):
             blocked.touch()
 
     def test_guard_blocks_path_unlink(self):
-        blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_unlink.txt"
+        blocked = (
+            Path(__file__).resolve().parent.parent / "src" / "guard_test_unlink.txt"
+        )
         with pytest.raises(PermissionError, match="TEST GUARD"):
             blocked.unlink(missing_ok=True)
 
     def test_guard_blocks_open_for_write(self):
         blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_open.txt"
-        with pytest.raises(PermissionError, match="TEST GUARD"), open(blocked, "w") as fh:
+        with (
+            pytest.raises(PermissionError, match="TEST GUARD"),
+            open(blocked, "w") as fh,
+        ):
             fh.write("must fail")
 
     def test_guard_blocks_os_makedirs(self):
         import os
 
-        blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_os_makedirs"
+        blocked = (
+            Path(__file__).resolve().parent.parent / "src" / "guard_test_os_makedirs"
+        )
         with pytest.raises(PermissionError, match="TEST GUARD"):
             os.makedirs(blocked)
 
@@ -54,7 +69,11 @@ class TestWriteGuardIsActive:
 
         src = tmp_path / "src.txt"
         src.write_text("hello")
-        dst = Path(__file__).resolve().parent.parent / "src" / "guard_test_shutil_copy.txt"
+        dst = (
+            Path(__file__).resolve().parent.parent
+            / "src"
+            / "guard_test_shutil_copy.txt"
+        )
         with pytest.raises(PermissionError, match="TEST GUARD"):
             shutil.copy(src, dst)
 
@@ -119,6 +138,5 @@ class TestNoProjectFilesModified:
 
         assert not changes, (
             "SESSION ISOLATION VIOLATION: files outside tests/workspace/ "
-            "were modified during test execution:\n"
-            + "\n".join(changes[:50])
+            "were modified during test execution:\n" + "\n".join(changes[:50])
         )

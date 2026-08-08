@@ -91,20 +91,23 @@ async def list_hooks():
     hooks = registry.list()
     if not hooks:
         from core.hook_loader import _discover_hook_dirs
+
         discovered = _discover_hook_dirs()
         hook_infos = []
         for info in discovered:
-            hook_infos.append({
-                "name": info["name"],
-                "version": info["version"],
-                "display_name": info["display_name"],
-                "description": info["description"],
-                "author": info["author"],
-                "capabilities": info["capabilities"],
-                "plugin": info["plugin"],
-                "update_url": info["update_url"],
-                "source": info["source"],
-            })
+            hook_infos.append(
+                {
+                    "name": info["name"],
+                    "version": info["version"],
+                    "display_name": info["display_name"],
+                    "description": info["description"],
+                    "author": info["author"],
+                    "capabilities": info["capabilities"],
+                    "plugin": info["plugin"],
+                    "update_url": info["update_url"],
+                    "source": info["source"],
+                }
+            )
         registry.sync_from_discovery(hook_infos)
         active_names = {info["name"] for info in discovered}
         registry.clean_stale(active_names)
@@ -132,17 +135,19 @@ async def discover_hooks():
 
     hook_infos = []
     for info in discovered:
-        hook_infos.append({
-            "name": info["name"],
-            "version": info["version"],
-            "display_name": info["display_name"],
-            "description": info["description"],
-            "author": info["author"],
-            "capabilities": info["capabilities"],
-            "plugin": info["plugin"],
-            "update_url": info["update_url"],
-            "source": info["source"],
-        })
+        hook_infos.append(
+            {
+                "name": info["name"],
+                "version": info["version"],
+                "display_name": info["display_name"],
+                "description": info["description"],
+                "author": info["author"],
+                "capabilities": info["capabilities"],
+                "plugin": info["plugin"],
+                "update_url": info["update_url"],
+                "source": info["source"],
+            }
+        )
 
     new_count = registry.sync_from_discovery(hook_infos)
 

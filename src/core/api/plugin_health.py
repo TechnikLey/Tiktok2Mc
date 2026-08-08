@@ -70,10 +70,15 @@ class PluginHealthMonitor:
                 new_status = "unhealthy"
                 log.warning(
                     "Plugin '%s' heartbeat timeout (%.0fs) — marking %s",
-                    plugin.name, age, new_status,
+                    plugin.name,
+                    age,
+                    new_status,
                 )
                 registry.update(plugin.name, health_status=new_status)
-            elif age <= _HEARTBEAT_TIMEOUT and plugin.health_status in ("starting", "unknown"):
+            elif age <= _HEARTBEAT_TIMEOUT and plugin.health_status in (
+                "starting",
+                "unknown",
+            ):
                 # Promote to healthy once a recent heartbeat is seen.
                 registry.update(plugin.name, health_status="healthy")
 

@@ -51,12 +51,14 @@ class TestPluginHealthMonitor:
         from core.api.registry import PluginRegistry
 
         reg = PluginRegistry(Path(""))
-        reg.register(PluginRegistration(
-            name="stale_plugin",
-            enabled=True,
-            last_heartbeat=time.time() - 200,
-            health_status="healthy",
-        ))
+        reg.register(
+            PluginRegistration(
+                name="stale_plugin",
+                enabled=True,
+                last_heartbeat=time.time() - 200,
+                health_status="healthy",
+            )
+        )
         monkeypatch.setattr("core.api.plugin_health.get_registry", lambda: reg)
         phm = PluginHealthMonitor()
         phm._check_health()
@@ -71,12 +73,14 @@ class TestPluginHealthMonitor:
         from core.api.registry import PluginRegistry
 
         reg = PluginRegistry(Path(""))
-        reg.register(PluginRegistration(
-            name="disabled_plugin",
-            enabled=False,
-            last_heartbeat=time.time() - 200,
-            health_status="healthy",
-        ))
+        reg.register(
+            PluginRegistration(
+                name="disabled_plugin",
+                enabled=False,
+                last_heartbeat=time.time() - 200,
+                health_status="healthy",
+            )
+        )
         monkeypatch.setattr("core.api.plugin_health.get_registry", lambda: reg)
         phm = PluginHealthMonitor()
         phm._check_health()
@@ -91,12 +95,14 @@ class TestPluginHealthMonitor:
         from core.api.registry import PluginRegistry
 
         reg = PluginRegistry(Path(""))
-        reg.register(PluginRegistration(
-            name="no_hb",
-            enabled=True,
-            last_heartbeat=None,
-            health_status="healthy",
-        ))
+        reg.register(
+            PluginRegistration(
+                name="no_hb",
+                enabled=True,
+                last_heartbeat=None,
+                health_status="healthy",
+            )
+        )
         monkeypatch.setattr("core.api.plugin_health.get_registry", lambda: reg)
         phm = PluginHealthMonitor()
         phm._check_health()
@@ -111,12 +117,14 @@ class TestPluginHealthMonitor:
         from core.api.registry import PluginRegistry
 
         reg = PluginRegistry(Path(""))
-        reg.register(PluginRegistration(
-            name="fresh_plugin",
-            enabled=True,
-            last_heartbeat=time.time() - 5,
-            health_status="starting",
-        ))
+        reg.register(
+            PluginRegistration(
+                name="fresh_plugin",
+                enabled=True,
+                last_heartbeat=time.time() - 5,
+                health_status="starting",
+            )
+        )
         monkeypatch.setattr("core.api.plugin_health.get_registry", lambda: reg)
         phm = PluginHealthMonitor()
         phm._check_health()
@@ -131,12 +139,14 @@ class TestPluginHealthMonitor:
         from core.api.registry import PluginRegistry
 
         reg = PluginRegistry(Path(""))
-        reg.register(PluginRegistration(
-            name="dead",
-            enabled=True,
-            last_heartbeat=time.time() - 200,
-            health_status="dead",
-        ))
+        reg.register(
+            PluginRegistration(
+                name="dead",
+                enabled=True,
+                last_heartbeat=time.time() - 200,
+                health_status="dead",
+            )
+        )
         monkeypatch.setattr("core.api.plugin_health.get_registry", lambda: reg)
         phm = PluginHealthMonitor()
         phm._check_health()
@@ -151,12 +161,14 @@ class TestPluginHealthMonitor:
         from core.api.registry import PluginRegistry
 
         reg = PluginRegistry(Path(""))
-        reg.register(PluginRegistration(
-            name="recent",
-            enabled=True,
-            last_heartbeat=time.time() - 10,
-            health_status="healthy",
-        ))
+        reg.register(
+            PluginRegistration(
+                name="recent",
+                enabled=True,
+                last_heartbeat=time.time() - 10,
+                health_status="healthy",
+            )
+        )
         monkeypatch.setattr("core.api.plugin_health.get_registry", lambda: reg)
         phm = PluginHealthMonitor()
         phm._check_health()

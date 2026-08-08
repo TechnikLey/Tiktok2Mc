@@ -125,35 +125,50 @@ class EventCommandMapper:
 
             try:
                 command_queue.enqueue(target, command, **args)
-                self._history.append({
-                    "timestamp": time.time(),
-                    "event": event_type,
-                    "target": target,
-                    "command": command,
-                    "args": args,
-                    "status": "ok",
-                })
-                self._dispatch_counts[event_type] = self._dispatch_counts.get(event_type, 0) + 1
+                self._history.append(
+                    {
+                        "timestamp": time.time(),
+                        "event": event_type,
+                        "target": target,
+                        "command": command,
+                        "args": args,
+                        "status": "ok",
+                    }
+                )
+                self._dispatch_counts[event_type] = (
+                    self._dispatch_counts.get(event_type, 0) + 1
+                )
                 log.info(
                     "[ECM] Dispatched %s → %s/%s (args=%s)",
-                    event_type, target, command, args,
+                    event_type,
+                    target,
+                    command,
+                    args,
                 )
             except (TypeError, ValueError, KeyError) as exc:
-                self._history.append({
-                    "timestamp": time.time(),
-                    "event": event_type,
-                    "target": target,
-                    "command": command,
-                    "args": args,
-                    "status": "error",
-                    "error": str(exc),
-                })
+                self._history.append(
+                    {
+                        "timestamp": time.time(),
+                        "event": event_type,
+                        "target": target,
+                        "command": command,
+                        "args": args,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
                 log.error(
                     "[ECM] Failed to dispatch %s → %s/%s: %s",
-                    event_type, target, command, exc,
+                    event_type,
+                    target,
+                    command,
+                    exc,
                 )
                 try:
-                    self._health.record_error("event_command_mapper", f"Dispatch failed: {event_type} -> {target}/{command}: {exc}")
+                    self._health.record_error(
+                        "event_command_mapper",
+                        f"Dispatch failed: {event_type} -> {target}/{command}: {exc}",
+                    )
                     self._health.set_state("event_command_mapper", HealthState.DEGRADED)
                 except Exception:  # best-effort health reporting
                     pass

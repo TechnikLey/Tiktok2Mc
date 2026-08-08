@@ -31,8 +31,9 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 log = logging.getLogger(__name__)
+
 
 # ---- Colors (ANSI, works on modern Windows 10+ and Linux) ----
 class Color:
@@ -42,6 +43,7 @@ class Color:
     CYAN = "\033[96m"
     GRAY = "\033[90m"
     RESET = "\033[0m"
+
 
 def cprint(msg, color=Color.RESET):
     log.info(f"{color}{msg}{Color.RESET}")
@@ -69,7 +71,9 @@ def _task_matches(task: dict, token: str) -> bool:
     return src == t + ".py" or src.endswith("/" + t + ".py")
 
 
-def _filter_build_tasks(all_build_tasks: list[dict], tokens: list[str]) -> tuple[list[dict], list[str], list[str]]:
+def _filter_build_tasks(
+    all_build_tasks: list[dict], tokens: list[str]
+) -> tuple[list[dict], list[str], list[str]]:
     """Filter build tasks by ``--only`` tokens.
 
     Returns ``(kept_tasks, matched_names, unmatched_tokens)``.
@@ -81,16 +85,24 @@ def _filter_build_tasks(all_build_tasks: list[dict], tokens: list[str]) -> tuple
         if any(_task_matches(task, t) for t in clean):
             keep.append(task)
             matched_names.add(task["name"])
-    unmatched = [t for t in clean if not any(_task_matches(task, t) for task in all_build_tasks)]
+    unmatched = [
+        t for t in clean if not any(_task_matches(task, t) for task in all_build_tasks)
+    ]
     return keep, sorted(matched_names), unmatched
+
 
 def _kill_proc_tree(pid):
     """Kill a process and all descendants (Windows)."""
     if sys.platform == "win32":
         try:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], check=False, capture_output=True)
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                check=False,
+                capture_output=True,
+            )
         except Exception:
             pass
+
 
 # Enable ANSI colors on Windows
 if sys.platform == "win32":
@@ -145,7 +157,9 @@ def _generate_mca_spec(force: bool = False) -> bool:
 
     # Incremental: check if any source file has changed
     if not force:
-        cache = Path(__file__).resolve().parent / "build" / "cache" / "mca_spec_hashes.json"
+        cache = (
+            Path(__file__).resolve().parent / "build" / "cache" / "mca_spec_hashes.json"
+        )
         current_hashes = _spec_source_hashes()
         if cache.exists():
             try:
@@ -161,12 +175,13 @@ def _generate_mca_spec(force: bool = False) -> bool:
     cprint("Generating MCA language specification...", Color.CYAN)
     result = subprocess.run(
         [sys.executable, str(script)],
-        capture_output=True, text=True, timeout=30, check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"MCA spec generation failed:\n{result.stderr.strip()}"
-        )
+        raise RuntimeError(f"MCA spec generation failed:\n{result.stderr.strip()}")
     for line in result.stdout.strip().split("\n"):
         cprint(f"  {line}", Color.GRAY)
 
@@ -194,19 +209,35 @@ def _validate_mca_spec() -> None:
     except json.JSONDecodeError as e:
         raise RuntimeError(f"MCA spec is not valid JSON: {e}")
 
-    required = ["version", "event_triggers", "command_prefixes", "diagnostic_codes",
-                 "placeholders", "patterns", "validation_rules"]
+    required = [
+        "version",
+        "event_triggers",
+        "command_prefixes",
+        "diagnostic_codes",
+        "placeholders",
+        "patterns",
+        "validation_rules",
+    ]
     missing = [k for k in required if k not in data]
     if missing:
         raise RuntimeError(f"MCA spec missing required fields: {', '.join(missing)}")
 
-    if not isinstance(data.get("event_triggers"), list) or len(data["event_triggers"]) == 0:
+    if (
+        not isinstance(data.get("event_triggers"), list)
+        or len(data["event_triggers"]) == 0
+    ):
         raise RuntimeError("MCA spec: event_triggers must be a non-empty list")
 
-    if not isinstance(data.get("command_prefixes"), dict) or len(data["command_prefixes"]) == 0:
+    if (
+        not isinstance(data.get("command_prefixes"), dict)
+        or len(data["command_prefixes"]) == 0
+    ):
         raise RuntimeError("MCA spec: command_prefixes must be a non-empty dict")
 
-    if not isinstance(data.get("diagnostic_codes"), list) or len(data["diagnostic_codes"]) == 0:
+    if (
+        not isinstance(data.get("diagnostic_codes"), list)
+        or len(data["diagnostic_codes"]) == 0
+    ):
         raise RuntimeError("MCA spec: diagnostic_codes must be a non-empty list")
 
     cprint("MCA specification valid.", Color.GRAY)
@@ -219,19 +250,21 @@ def _run_python_tests() -> None:
     """
     try:
         import importlib.util
+
         if importlib.util.find_spec("pytest") is None:
             raise ImportError
     except ImportError:
         raise RuntimeError(
-            "pytest is not installed.\n"
-            "Install it: pip install pytest pytest-timeout"
+            "pytest is not installed.\nInstall it: pip install pytest pytest-timeout"
         )
 
     cprint("Running Python test suite...", Color.CYAN)
     proc = subprocess.Popen(
         [sys.executable, "-m", "pytest", "tests/", "-x", "--timeout=60"],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
     stdout_lines: list[str] = []
     for line in proc.stdout or []:
@@ -274,12 +307,19 @@ def _run_mca_tests() -> None:
     cprint("Running MCA language server tests...", Color.CYAN)
     result = subprocess.run(
         ["node", str(test_runner)],
-        capture_output=True, text=True, timeout=60, check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
     # Print test output regardless of pass/fail
     for line in result.stdout.strip().split("\n"):
-        cprint(f"  {line}", Color.GRAY if "PASS" in line else (
-            Color.RED if "FAIL" in line else Color.GRAY))
+        cprint(
+            f"  {line}",
+            Color.GRAY
+            if "PASS" in line
+            else (Color.RED if "FAIL" in line else Color.GRAY),
+        )
 
     if result.returncode != 0 or "FAIL" in result.stdout:
         raise RuntimeError("MCA language server tests FAILED.")
@@ -307,9 +347,7 @@ def _find_vsce() -> str:
         if npx_path:
             return f"{npx_path} --yes @vscode/vsce"
 
-    raise RuntimeError(
-        "vsce not found. Install it: npm install -g @vscode/vsce"
-    )
+    raise RuntimeError("vsce not found. Install it: npm install -g @vscode/vsce")
 
 
 def _package_vsix(extension_dir: Path) -> Path:
@@ -327,8 +365,11 @@ def _package_vsix(extension_dir: Path) -> Path:
         raise RuntimeError("npm not found. Install Node.js: https://nodejs.org/")
     npm_result = subprocess.run(
         [npm_path, "install"],
-        capture_output=True, text=True, timeout=120,
-        cwd=str(extension_dir), check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=str(extension_dir),
+        check=False,
     )
     if npm_result.returncode != 0:
         raise RuntimeError(
@@ -339,9 +380,13 @@ def _package_vsix(extension_dir: Path) -> Path:
     # vsce outputs the vsix to the current directory
     # posix=False on Windows keeps backslashes in the tool path intact
     result = subprocess.run(
-        shlex.split(vsce_cmd, posix=(sys.platform != "win32")) + ["package", "--allow-missing-repository"],
-        capture_output=True, text=True, timeout=120,
-        cwd=str(extension_dir), check=False,
+        shlex.split(vsce_cmd, posix=(sys.platform != "win32"))
+        + ["package", "--allow-missing-repository"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=str(extension_dir),
+        check=False,
     )
     for line in result.stdout.strip().split("\n"):
         cprint(f"  {line}", Color.GRAY)
@@ -356,9 +401,7 @@ def _package_vsix(extension_dir: Path) -> Path:
 
     if not vsix_name:
         if result.returncode != 0:
-            raise RuntimeError(
-                f"VSIX packaging failed:\n{result.stderr.strip()}"
-            )
+            raise RuntimeError(f"VSIX packaging failed:\n{result.stderr.strip()}")
         # Fallback: guess the filename from package name + version
         pkg = json.loads((extension_dir / "package.json").read_text(encoding="utf-8"))
         vsix_name = f"{pkg['name']}-{pkg['version']}.vsix"
@@ -432,11 +475,12 @@ def _build_vsix_pipeline(start_time: float) -> None:
 
 # ── Command handlers ─────────────────────────────────────────────────────────
 
+
 def cmd_app(args):
     start = time.time()
-    BUILD_INSTALLER = getattr(args, 'installer', False)
-    USE_CACHE = getattr(args, 'use_cache', False)
-    ONLY_FILES = getattr(args, 'only', None)
+    BUILD_INSTALLER = getattr(args, "installer", False)
+    USE_CACHE = getattr(args, "use_cache", False)
+    ONLY_FILES = getattr(args, "only", None)
 
     IS_WINDOWS = sys.platform == "win32"
     SUFFIX = ".exe" if IS_WINDOWS else ".bin"
@@ -450,17 +494,17 @@ def cmd_app(args):
     HASH_CACHE_DIR = CACHE_DIR / "hashes"
     PARALLEL_TEMP_DIR = SCRIPT_DIR / "build" / "temp_parallel"
 
-    MAX_THREADS = getattr(args, 'threads', None) or min(16, (os.cpu_count() or 4))
+    MAX_THREADS = getattr(args, "threads", None) or min(16, (os.cpu_count() or 4))
     MAX_COPY_THREADS = min(32, (os.cpu_count() or 4) * 4)
 
     CORE_EXECUTABLES = [
-        {"name": "app",            "src": "src/python/main.py",           "dest": "core"},
-        {"name": "gui",            "src": "src/python/gui.py",            "dest": "core", "windowed": True},
-        {"name": "update",         "src": "src/python/update.py",         "dest": ""},
-        {"name": "server",         "src": "src/python/server.py",         "dest": "core"},
-        {"name": "overlay",        "src": "src/python/overlay.py",        "dest": "core"},
-        {"name": "start",          "src": "src/python/start.py",          "dest": ""},
-        {"name": "test_trigger",   "src": "src/python/send_trigger.py",    "dest": "test"},
+        {"name": "app", "src": "src/python/main.py", "dest": "core"},
+        {"name": "gui", "src": "src/python/gui.py", "dest": "core", "windowed": True},
+        {"name": "update", "src": "src/python/update.py", "dest": ""},
+        {"name": "server", "src": "src/python/server.py", "dest": "core"},
+        {"name": "overlay", "src": "src/python/overlay.py", "dest": "core"},
+        {"name": "start", "src": "src/python/start.py", "dest": ""},
+        {"name": "test_trigger", "src": "src/python/send_trigger.py", "dest": "test"},
     ]
 
     try:
@@ -471,7 +515,10 @@ def cmd_app(args):
             shutil.rmtree(OUT_DIR)
 
         REQUIRED_DIRS = [
-            EXE_CACHE_DIR, HASH_CACHE_DIR, OUT_DIR, PARALLEL_TEMP_DIR,
+            EXE_CACHE_DIR,
+            HASH_CACHE_DIR,
+            OUT_DIR,
+            PARALLEL_TEMP_DIR,
             OUT_DIR / "core",
             OUT_DIR / "plugins",
             OUT_DIR / "core" / "runtime",
@@ -486,7 +533,13 @@ def cmd_app(args):
             OUT_DIR / "test",
             OUT_DIR / "logs",
             OUT_DIR / "server" / "default" / "plugins" / "MinecraftServerAPI",
-            OUT_DIR / "server" / "datapack" / "StreamingTool" / "data" / "streamingtool" / "function",
+            OUT_DIR
+            / "server"
+            / "datapack"
+            / "StreamingTool"
+            / "data"
+            / "streamingtool"
+            / "function",
             OUT_DIR / "server" / "default" / "plugins" / "DelayedTNT",
             OUT_DIR / "hooks",
             OUT_DIR / "docs",
@@ -520,20 +573,30 @@ def cmd_app(args):
             for py_file in src_plugins_root.rglob("*.py"):
                 if "__pycache__" in str(py_file):
                     continue
-                if py_file.parent.name in ("test", "example_plugin") and py_file.parent.parent.name == "plugins":
+                if (
+                    py_file.parent.name in ("test", "example_plugin")
+                    and py_file.parent.parent.name == "plugins"
+                ):
                     continue
                 if "hooks" in py_file.parent.parts:
                     plugin_hook_dirs.append(py_file.parent)
                     continue
                 rel = py_file.parent.relative_to(src_plugins_root)
                 dest = str(Path("plugins") / rel) if str(rel) != "." else "plugins"
-                all_build_tasks.append({
-                    "name": f"{py_file.stem}{SUFFIX}",
-                    "src": str(py_file),
-                    "dest": dest,
-                })
+                all_build_tasks.append(
+                    {
+                        "name": f"{py_file.stem}{SUFFIX}",
+                        "src": str(py_file),
+                        "dest": dest,
+                    }
+                )
 
-                for extra_file in ["plugin.json", "version.txt", "README.md", "config.yaml"]:
+                for extra_file in [
+                    "plugin.json",
+                    "version.txt",
+                    "README.md",
+                    "config.yaml",
+                ]:
                     extra_path = py_file.parent / extra_file
                     if extra_path.exists():
                         target_dir = OUT_DIR / dest
@@ -542,7 +605,9 @@ def cmd_app(args):
 
         if ONLY_FILES:
             available_names = sorted({t["name"] for t in all_build_tasks})
-            all_build_tasks, matched_names, unmatched = _filter_build_tasks(all_build_tasks, ONLY_FILES)
+            all_build_tasks, matched_names, unmatched = _filter_build_tasks(
+                all_build_tasks, ONLY_FILES
+            )
             if unmatched:
                 raise RuntimeError(
                     f"No build task matches: {', '.join(unmatched)}.\n"
@@ -583,7 +648,9 @@ def cmd_app(args):
                     result.append(str(init.relative_to(SCRIPT_DIR)))
             return result
 
-        def _try_resolve_local(module: str, src_root: Path, source_path: Path) -> list[str]:
+        def _try_resolve_local(
+            module: str, src_root: Path, source_path: Path
+        ) -> list[str]:
             resolved: list[str] = []
             if module.startswith("."):
                 parts = module.split(".")
@@ -671,10 +738,14 @@ def cmd_app(args):
             prefix = module + "."
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
-                    if any(a.name == module or a.name.startswith(prefix) for a in node.names):
+                    if any(
+                        a.name == module or a.name.startswith(prefix)
+                        for a in node.names
+                    ):
                         return True
                 elif (
-                    isinstance(node, ast.ImportFrom) and node.module
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
                     and (node.module == module or node.module.startswith(prefix))
                 ):
                     return True
@@ -710,7 +781,9 @@ def cmd_app(args):
         def _bundle_exe_name(task: dict) -> str:
             """Unique PyInstaller EXE name for a task (plugins are all ``main.py``)."""
             src = Path(task["src"]).resolve()
-            return str(src.relative_to(SCRIPT_DIR)).replace(os.sep, "_").replace(".py", "")
+            return (
+                str(src.relative_to(SCRIPT_DIR)).replace(os.sep, "_").replace(".py", "")
+            )
 
         def _write_qt_spec(spec_path: Path, qt_tasks: list[dict]) -> None:
             """Write a shared-COLLECT onedir spec so all Qt binaries share one _internal."""
@@ -756,7 +829,12 @@ def cmd_app(args):
                 ]
             collect_args: list[str] = []
             for name in names:
-                collect_args += [f"{name}_exe", f"{name}_a.binaries", f"{name}_a.zipfiles", f"{name}_a.datas"]
+                collect_args += [
+                    f"{name}_exe",
+                    f"{name}_a.binaries",
+                    f"{name}_a.zipfiles",
+                    f"{name}_a.datas",
+                ]
             lines += ["coll = COLLECT("]
             lines += [f"    {a}," for a in collect_args]
             lines += [
@@ -778,7 +856,10 @@ def cmd_app(args):
             try:
                 os.symlink(target, link)
             except OSError as e:
-                cprint(f"WARNING: could not create symlink {link} -> {target}: {e}", Color.YELLOW)
+                cprint(
+                    f"WARNING: could not create symlink {link} -> {target}: {e}",
+                    Color.YELLOW,
+                )
 
         def _deploy_qt_bundle(cache_dir: Path, qt_tasks: list[dict]) -> None:
             internal_src = cache_dir / "_internal"
@@ -806,7 +887,9 @@ def cmd_app(args):
                 rel_up = "/".join([".."] * depth)
                 link_dir = OUT_DIR / task["dest"]
                 link_dir.mkdir(parents=True, exist_ok=True)
-                _make_symlink(f"{rel_up}/core/runtime/_internal", link_dir / "_internal")
+                _make_symlink(
+                    f"{rel_up}/core/runtime/_internal", link_dir / "_internal"
+                )
 
         def _build_linux_qt_bundle(qt_tasks: list[dict]) -> bool:
             """Build all Qt binaries as one onedir bundle sharing a single PyQt6 runtime."""
@@ -816,11 +899,17 @@ def cmd_app(args):
             bundle_hash = _qt_bundle_hash(qt_tasks)
             cache_dir = QT_BUNDLE_CACHE / bundle_hash
             stamp = QT_BUNDLE_CACHE / "current.txt"
-            cached = cache_dir.exists() and stamp.exists() and stamp.read_text().strip() == bundle_hash
+            cached = (
+                cache_dir.exists()
+                and stamp.exists()
+                and stamp.read_text().strip() == bundle_hash
+            )
 
             if USE_CACHE:
                 if not cached:
-                    cprint("  MISSING: qt-bundle — cache entry does not exist", Color.RED)
+                    cprint(
+                        "  MISSING: qt-bundle — cache entry does not exist", Color.RED
+                    )
                     cache_missing.append("qt-bundle")
                     return False
                 cprint("Cache hit: qt-bundle (use-cache)", Color.GRAY)
@@ -832,7 +921,10 @@ def cmd_app(args):
                 _deploy_qt_bundle(cache_dir, qt_tasks)
                 return True
 
-            cprint(f"[Linux] Building shared PyQt6 runtime for {len(qt_tasks)} binaries...", Color.YELLOW)
+            cprint(
+                f"[Linux] Building shared PyQt6 runtime for {len(qt_tasks)} binaries...",
+                Color.YELLOW,
+            )
             unique_id = uuid.uuid4().hex[:8]
             t_dist = PARALLEL_TEMP_DIR / f"qtdist_{unique_id}"
             t_work = PARALLEL_TEMP_DIR / f"qtwork_{unique_id}"
@@ -844,12 +936,17 @@ def cmd_app(args):
             _write_qt_spec(spec_path, qt_tasks)
 
             cmd = [
-                sys.executable, "-m", "PyInstaller",
+                sys.executable,
+                "-m",
+                "PyInstaller",
                 str(spec_path),
-                "--distpath", str(t_dist),
-                "--workpath", str(t_work),
+                "--distpath",
+                str(t_dist),
+                "--workpath",
+                str(t_work),
                 "--noconfirm",
-                "--log-level", "ERROR",
+                "--log-level",
+                "ERROR",
             ]
             try:
                 with open(log_file, "w", encoding="utf-8") as lf:
@@ -920,16 +1017,26 @@ def cmd_app(args):
             # --use-cache: only copy from cache, never build
             if USE_CACHE:
                 if not cache_exe.exists():
-                    cprint(f"  MISSING: {item['name']} — cache entry does not exist", Color.RED)
-                    cache_missing.append(item['name'])
+                    cprint(
+                        f"  MISSING: {item['name']} — cache entry does not exist",
+                        Color.RED,
+                    )
+                    cache_missing.append(item["name"])
                     return False
 
-                cached_hash = hash_file.read_text().strip() if hash_file.exists() else ""
-                cached_dep_hash = dep_hash_file.read_text().strip() if dep_hash_file.exists() else ""
+                cached_hash = (
+                    hash_file.read_text().strip() if hash_file.exists() else ""
+                )
+                cached_dep_hash = (
+                    dep_hash_file.read_text().strip() if dep_hash_file.exists() else ""
+                )
 
                 if cached_hash != current_hash or cached_dep_hash != combined_hash:
-                    cprint(f"  OUTDATED: {item['name']} — source changed since last build", Color.YELLOW)
-                    cache_outdated.append(item['name'])
+                    cprint(
+                        f"  OUTDATED: {item['name']} — source changed since last build",
+                        Color.YELLOW,
+                    )
+                    cache_outdated.append(item["name"])
 
                 cprint(f"Cache hit: {item['name']} (use-cache)", Color.GRAY)
                 shutil.copy2(cache_exe, final_path)
@@ -937,9 +1044,13 @@ def cmd_app(args):
 
             # Normal build: check cache first
             need_build = True
-            if (hash_file.exists() and dep_hash_file.exists() and cache_exe.exists()
-                    and hash_file.read_text().strip() == current_hash
-                    and dep_hash_file.read_text().strip() == combined_hash):
+            if (
+                hash_file.exists()
+                and dep_hash_file.exists()
+                and cache_exe.exists()
+                and hash_file.read_text().strip() == current_hash
+                and dep_hash_file.read_text().strip() == combined_hash
+            ):
                 need_build = False
 
             target_dir = OUT_DIR if not item["dest"] else OUT_DIR / item["dest"]
@@ -954,6 +1065,7 @@ def cmd_app(args):
                     )
                 try:
                     import importlib.util
+
                     if importlib.util.find_spec("PyInstaller") is None:
                         raise ImportError
                 except ImportError:
@@ -970,18 +1082,27 @@ def cmd_app(args):
                 t_spec = PARALLEL_TEMP_DIR / f"spec_{unique_id}"
                 log_file = PARALLEL_TEMP_DIR / f"log_{unique_id}.txt"
 
-                pyinstaller_name = item["name"] if not IS_WINDOWS else item["name"].replace(SUFFIX, "")
+                pyinstaller_name = (
+                    item["name"] if not IS_WINDOWS else item["name"].replace(SUFFIX, "")
+                )
                 cmd = [
-                    sys.executable, "-m", "PyInstaller",
+                    sys.executable,
+                    "-m",
+                    "PyInstaller",
                     "--onefile",
                     "--path=src",
                     str(full_src),
-                    "--name", pyinstaller_name,
-                    "--distpath", str(t_dist),
-                    "--workpath", str(t_work),
-                    "--specpath", str(t_spec),
+                    "--name",
+                    pyinstaller_name,
+                    "--distpath",
+                    str(t_dist),
+                    "--workpath",
+                    str(t_work),
+                    "--specpath",
+                    str(t_spec),
                     "--noconfirm",
-                    "--log-level", "ERROR",
+                    "--log-level",
+                    "ERROR",
                     "--hidden-import=_multiprocessing",
                 ]
                 if not IS_WINDOWS and needs_qt:
@@ -995,7 +1116,9 @@ def cmd_app(args):
 
                 try:
                     with open(log_file, "w", encoding="utf-8") as lf:
-                        proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT)
+                        proc = subprocess.Popen(
+                            cmd, stdout=lf, stderr=subprocess.STDOUT
+                        )
                         try:
                             return_code = proc.wait(timeout=600)
                         except subprocess.TimeoutExpired:
@@ -1005,11 +1128,15 @@ def cmd_app(args):
                                 cprint(log_file.read_text(errors="replace"), Color.RED)
                             return False
                 except Exception as e:
-                    cprint(f"ERROR running PyInstaller for {item['name']}: {e}", Color.RED)
+                    cprint(
+                        f"ERROR running PyInstaller for {item['name']}: {e}", Color.RED
+                    )
                     return False
 
                 if return_code != 0:
-                    cprint(f"FAILED: {item['name']} (exit code {return_code})", Color.RED)
+                    cprint(
+                        f"FAILED: {item['name']} (exit code {return_code})", Color.RED
+                    )
                     if log_file.exists():
                         cprint(log_file.read_text(errors="replace"), Color.RED)
                     return False
@@ -1077,19 +1204,28 @@ def cmd_app(args):
             cprint("\n--- Cache Summary ---", Color.CYAN)
             total = len(all_build_tasks)
             ok = total - len(cache_missing)
-            cprint(f"  Total: {total}  |  From cache: {ok}  |  Missing: {len(cache_missing)}  |  Outdated: {len(cache_outdated)}", Color.CYAN)
+            cprint(
+                f"  Total: {total}  |  From cache: {ok}  |  Missing: {len(cache_missing)}  |  Outdated: {len(cache_outdated)}",
+                Color.CYAN,
+            )
             if cache_missing:
                 cprint("\n  Missing executables (not in cache):", Color.RED)
                 for name in cache_missing:
                     cprint(f"    - {name}", Color.RED)
                 cprint("\n  Run a full build first:  python build.py app", Color.YELLOW)
             if cache_outdated:
-                cprint("\n  Outdated executables (source changed since last build):", Color.YELLOW)
+                cprint(
+                    "\n  Outdated executables (source changed since last build):",
+                    Color.YELLOW,
+                )
                 for name in cache_outdated:
                     cprint(f"    - {name}", Color.YELLOW)
 
         # ----- Assets & Resources -----
-        cprint(f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...", Color.CYAN)
+        cprint(
+            f"\nSynchronizing assets and resources with {MAX_COPY_THREADS} threads...",
+            Color.CYAN,
+        )
 
         def sync_folder(source, destination, threads=MAX_COPY_THREADS, exclude=None):
             src = Path(source)
@@ -1098,6 +1234,7 @@ def cmd_app(args):
                 return
             dst.mkdir(parents=True, exist_ok=True)
             exclude = exclude or []
+
             def is_excluded(path):
                 rel = path.relative_to(src)
                 for pattern in exclude:
@@ -1108,21 +1245,23 @@ def cmd_app(args):
                     elif fnmatch.fnmatch(str(rel), pattern):
                         return True
                 return False
+
             all_files = [
-                f for f in src.rglob("*")
-                if f.is_file() and not is_excluded(f)
+                f for f in src.rglob("*") if f.is_file() and not is_excluded(f)
             ]
+
             def copy_one(f):
                 rel = f.relative_to(src)
                 target = dst / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, target)
+
             with ThreadPoolExecutor(max_workers=threads) as pool:
                 pool.map(copy_one, all_files)
 
-        sync_folder("assets",          OUT_DIR / "core" / "assets")
-        sync_folder("templates",          OUT_DIR / "core" / "templates")
-        sync_folder("tools/Java",      OUT_DIR / "server" / "java")
+        sync_folder("assets", OUT_DIR / "core" / "assets")
+        sync_folder("templates", OUT_DIR / "core" / "templates")
+        sync_folder("tools/Java", OUT_DIR / "server" / "java")
         sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
         for hook_src_dir in set(plugin_hook_dirs):
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
@@ -1130,19 +1269,28 @@ def cmd_app(args):
         sync_folder("docs", OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
 
         FILES = [
-            ("defaults/config.yaml",                "config/config.yaml"),
-            ("defaults/gifts.json",                 "core/gifts.json"),
-            ("LICENSE",                             "LICENSE"),
-            ("README.md",                           "README.md"),
-            ("defaults/actions.mca",                "data/actions.mca"),
-            ("defaults/configServerAPI.yml",        "server/default/plugins/MinecraftServerAPI/config.yml"),
-            ("defaults/DelayedTNTconfig.yml",       "server/default/plugins/DelayedTNT/config.yml"),
-            ("tools/MinecraftServerAPI-1.21.x.jar", "server/default/plugins/MinecraftServerAPI-1.21.x.jar"),
-            ("tools/DelayedTNT.jar",                "server/default/plugins/DelayedTNT.jar"),
-            ("tools/server.jar",                    "server/default/server.jar"),
-            ("tools/server.jar",                    "versions/1.21.11/server.jar"),
-            ("tools/mca.vsix",                      "core/assets/mca.vsix"),
-            ("AIPrompt.md",                         "AIPrompt.md"),
+            ("defaults/config.yaml", "config/config.yaml"),
+            ("defaults/gifts.json", "core/gifts.json"),
+            ("LICENSE", "LICENSE"),
+            ("README.md", "README.md"),
+            ("defaults/actions.mca", "data/actions.mca"),
+            (
+                "defaults/configServerAPI.yml",
+                "server/default/plugins/MinecraftServerAPI/config.yml",
+            ),
+            (
+                "defaults/DelayedTNTconfig.yml",
+                "server/default/plugins/DelayedTNT/config.yml",
+            ),
+            (
+                "tools/MinecraftServerAPI-1.21.x.jar",
+                "server/default/plugins/MinecraftServerAPI-1.21.x.jar",
+            ),
+            ("tools/DelayedTNT.jar", "server/default/plugins/DelayedTNT.jar"),
+            ("tools/server.jar", "server/default/server.jar"),
+            ("tools/server.jar", "versions/1.21.11/server.jar"),
+            ("tools/mca.vsix", "core/assets/mca.vsix"),
+            ("AIPrompt.md", "AIPrompt.md"),
         ]
 
         for src_rel, dst_rel in FILES:
@@ -1182,60 +1330,60 @@ def cmd_app(args):
         # ----- Release / Upload Script -----
         cprint("Creating upload.py...", Color.CYAN)
         upload_content = (
-            '#!/usr/bin/env python3\n'
-            'import subprocess\n'
-            'import sys\n'
-            'import os\n'
-            'from pathlib import Path\n'
-            'import logging\n'
-            '\n'
-            'logging.basicConfig(level=logging.INFO, format=\'%(message)s\', stream=sys.stdout)\n'
-            'log = logging.getLogger(__name__)\n'
-            '\n'
+            "#!/usr/bin/env python3\n"
+            "import subprocess\n"
+            "import sys\n"
+            "import os\n"
+            "from pathlib import Path\n"
+            "import logging\n"
+            "\n"
+            "logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)\n"
+            "log = logging.getLogger(__name__)\n"
+            "\n"
             '_src = Path(__file__).resolve().parent / "src"\n'
-            'if str(_src) not in sys.path:\n'
-            '    sys.path.insert(0, str(_src))\n'
-            '\n'
-            'from core.version import TOOL_VERSION\n'
-            '\n'
-            'os.chdir(Path(__file__).resolve().parent)\n'
-            '\n'
+            "if str(_src) not in sys.path:\n"
+            "    sys.path.insert(0, str(_src))\n"
+            "\n"
+            "from core.version import TOOL_VERSION\n"
+            "\n"
+            "os.chdir(Path(__file__).resolve().parent)\n"
+            "\n"
             'C = "\\033[96m"\n'
             'G = "\\033[92m"\n'
             'Y = "\\033[93m"\n'
             'R = "\\033[91m"\n'
             'X = "\\033[0m"\n'
-            '\n'
-            'def run(cmd, check=True):\n'
-            '    log.info(f"{C}> {\' \'.join(cmd)}{X}")\n'
-            '    return subprocess.run(cmd, check=check, capture_output=False)\n'
-            '\n'
-            '# 1. Stage all changes\n'
+            "\n"
+            "def run(cmd, check=True):\n"
+            "    log.info(f\"{C}> {' '.join(cmd)}{X}\")\n"
+            "    return subprocess.run(cmd, check=check, capture_output=False)\n"
+            "\n"
+            "# 1. Stage all changes\n"
             'log.info(f"\\n{C}Staging changes...{X}")\n'
             'run(["git", "add", "-A"])\n'
-            '\n'
-            '# 2. Commit (ask for message)\n'
-            f'msg = input(f"\\n{{Y}}Commit message (Enter = \'Release {TOOL_VERSION}\'): {{X}}").strip()\n'
-            'if not msg:\n'
+            "\n"
+            "# 2. Commit (ask for message)\n"
+            f"msg = input(f\"\\n{{Y}}Commit message (Enter = 'Release {TOOL_VERSION}'): {{X}}\").strip()\n"
+            "if not msg:\n"
             f'    msg = "Release {TOOL_VERSION}"\n'
             'result = run(["git", "commit", "-m", msg], check=False)\n'
-            'if result.returncode != 0:\n'
+            "if result.returncode != 0:\n"
             '    log.info(f"{Y}No changes to commit, continuing...{X}")\n'
-            '\n'
-            '# 3. Push\n'
+            "\n"
+            "# 3. Push\n"
             'log.info(f"\\n{C}Pushing to remote...{X}")\n'
             'run(["git", "push"])\n'
-            '\n'
-            '# 4. Create and push tag\n'
+            "\n"
+            "# 4. Create and push tag\n"
             f'log.info(f"\\n{{C}}Creating tag {TOOL_VERSION}...{{X}}")\n'
             f'run(["git", "tag", "-d", "{TOOL_VERSION}"], check=False)\n'
             f'run(["git", "push", "origin", "--delete", "{TOOL_VERSION}"], check=False)\n'
             f'run(["git", "tag", "{TOOL_VERSION}"])\n'
             f'run(["git", "push", "origin", "{TOOL_VERSION}"])\n'
-            '\n'
+            "\n"
             f'log.info(f"\\n{{G}}Done! GitHub Actions will now build & release {TOOL_VERSION}{{X}}")\n'
             'log.info(f"{C}   Check progress: https://github.com/<OWNER>/<REPO>/actions{X}")\n'
-            '\n'
+            "\n"
             'input("\\nPress Enter to exit...")\n'
         )
         Path("upload.py").write_text(upload_content, encoding="utf-8")
@@ -1244,6 +1392,7 @@ def cmd_app(args):
         if BUILD_INSTALLER and IS_WINDOWS:
             cprint("Building GUI installer...", Color.CYAN)
             import subprocess as _sp
+
             nsis_script = SCRIPT_DIR / "installer" / "install.nsi"
             installer_out = SCRIPT_DIR / "build" / "TikTok2MC-Setup.exe"
             if nsis_script.exists():
@@ -1252,30 +1401,45 @@ def cmd_app(args):
                     for nsis_path in [
                         Path("C:/Program Files (x86)/NSIS/Bin/makensis.exe"),
                         Path("C:/Program Files/NSIS/Bin/makensis.exe"),
-                        Path(os.environ.get("LOCALAPPDATA", "")) / "NSIS" / "Bin" / "makensis.exe",
+                        Path(os.environ.get("LOCALAPPDATA", ""))
+                        / "NSIS"
+                        / "Bin"
+                        / "makensis.exe",
                     ]:
                         if nsis_path.exists():
                             makensis_cmd = str(nsis_path)
                             break
 
                 if not makensis_cmd:
-                    cprint("makensis not found — install NSIS or restart your terminal", Color.YELLOW)
+                    cprint(
+                        "makensis not found — install NSIS or restart your terminal",
+                        Color.YELLOW,
+                    )
 
                 if makensis_cmd:
                     try:
                         _sp.run(
-                            [makensis_cmd,
-                             f"-DPRODUCT_VERSION={TOOL_VERSION}",
-                             f"-DOUT_FILE={installer_out}",
-                             str(nsis_script)],
-                            check=True, capture_output=True,
+                            [
+                                makensis_cmd,
+                                f"-DPRODUCT_VERSION={TOOL_VERSION}",
+                                f"-DOUT_FILE={installer_out}",
+                                str(nsis_script),
+                            ],
+                            check=True,
+                            capture_output=True,
                         )
                         cprint(f"Installer created: {installer_out}", Color.GREEN)
                         installer_in_release = OUT_DIR / installer_out.name
                         shutil.copy2(installer_out, installer_in_release)
-                        cprint(f"Installer copied to release: {installer_in_release}", Color.GREEN)
+                        cprint(
+                            f"Installer copied to release: {installer_in_release}",
+                            Color.GREEN,
+                        )
                     except _sp.CalledProcessError as e:
-                        cprint(f"Installer build failed: {e.stderr.decode(errors='replace')}", Color.RED)
+                        cprint(
+                            f"Installer build failed: {e.stderr.decode(errors='replace')}",
+                            Color.RED,
+                        )
             else:
                 cprint(f"NSIS script not found at {nsis_script}", Color.YELLOW)
 
@@ -1284,6 +1448,7 @@ def cmd_app(args):
             linux_template = SCRIPT_DIR / "installer" / "install_linux.sh"
             if linux_template.exists():
                 import tarfile
+
                 installer_out = SCRIPT_DIR / "build" / "TikTok2Mc-Linux-Setup.sh"
                 tar_path = SCRIPT_DIR / "build" / "TikTok2Mc-Linux.tar.gz"
 
@@ -1295,7 +1460,7 @@ def cmd_app(args):
                 marker = b"__ARCHIVE_BELOW__"
                 template_data = linux_template.read_bytes().rstrip(b"\r\n")
                 if template_data.endswith(marker):
-                    template_data = template_data[:-len(marker)].rstrip(b"\r\n")
+                    template_data = template_data[: -len(marker)].rstrip(b"\r\n")
 
                 with open(installer_out, "wb") as outf:
                     outf.write(template_data)
@@ -1308,9 +1473,14 @@ def cmd_app(args):
 
                 installer_in_release = OUT_DIR / installer_out.name
                 shutil.copy2(installer_out, installer_in_release)
-                cprint(f"Installer copied to release: {installer_in_release}", Color.GREEN)
+                cprint(
+                    f"Installer copied to release: {installer_in_release}", Color.GREEN
+                )
             else:
-                cprint(f"Linux installer template not found at {linux_template}", Color.YELLOW)
+                cprint(
+                    f"Linux installer template not found at {linux_template}",
+                    Color.YELLOW,
+                )
 
         # --- Finish ---
         elapsed = time.time() - start
@@ -1351,7 +1521,7 @@ def cmd_spec(_args):
 
 
 def cmd_test(args):
-    if getattr(args, 'all', False):
+    if getattr(args, "all", False):
         _run_python_tests()
         _run_mca_tests()
     else:
@@ -1397,6 +1567,7 @@ def cmd_clean(_args):
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 
+
 def _run_dep_check():
     """Run check_deps.py --install before building. Abort on failure."""
     check_script = Path(__file__).resolve().parent / "check_deps.py"
@@ -1407,7 +1578,8 @@ def _run_dep_check():
     cprint("Running dependency check + install...", Color.CYAN)
     result = subprocess.run(
         [sys.executable, str(check_script), "--install"],
-        timeout=300, check=False,
+        timeout=300,
+        check=False,
     )
     if result.returncode != 0:
         cprint("\nBuild aborted: missing dependencies.", Color.RED)
@@ -1420,38 +1592,71 @@ def main():
     parser = argparse.ArgumentParser(
         description="TikTok-MC-Gift build system",
     )
-    parser.add_argument("--check", action="store_true",
-                        help="Verify all dependencies before building (runs check_deps.py)")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Verify all dependencies before building (runs check_deps.py)",
+    )
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("spec", help="Generate MCA language specification")
     sub.add_parser("vsix", help="Build VS Code extension (.vsix)")
     p_test = sub.add_parser("test", help="Run tests")
-    p_test.add_argument("--all", action="store_true",
-                        help="Run all tests (Python + MCA)")
+    p_test.add_argument(
+        "--all", action="store_true", help="Run all tests (Python + MCA)"
+    )
 
     p_app = sub.add_parser("app", help="Build application via PyInstaller")
-    p_app.add_argument("--installer", action="store_true",
-                       help="Also build GUI installer (NSIS on Windows, shell on Linux)")
-    p_app.add_argument("--threads", type=int, default=None,
-                       help="Number of parallel build threads (default: auto)")
-    p_app.add_argument("--use-cache", action="store_true",
-                       help="Skip building — copy executables from cache (warns on missing/outdated)")
-    p_app.add_argument("--only", nargs="+", default=None, metavar="FILE",
-                       help="Build only the given .py file(s). Accepts task names (server, overlay, ...), "
-                            "source basenames (server.py) or source paths (src/python/server.py)")
+    p_app.add_argument(
+        "--installer",
+        action="store_true",
+        help="Also build GUI installer (NSIS on Windows, shell on Linux)",
+    )
+    p_app.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Number of parallel build threads (default: auto)",
+    )
+    p_app.add_argument(
+        "--use-cache",
+        action="store_true",
+        help="Skip building — copy executables from cache (warns on missing/outdated)",
+    )
+    p_app.add_argument(
+        "--only",
+        nargs="+",
+        default=None,
+        metavar="FILE",
+        help="Build only the given .py file(s). Accepts task names (server, overlay, ...), "
+        "source basenames (server.py) or source paths (src/python/server.py)",
+    )
 
     p_all = sub.add_parser("all", help="Run spec + app + vsix")
-    p_all.add_argument("--threads", type=int, default=None,
-                       help="Number of parallel build threads (default: auto)")
-    p_all.add_argument("--use-cache", action="store_true",
-                       help="Skip building — copy executables from cache (warns on missing/outdated)")
+    p_all.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Number of parallel build threads (default: auto)",
+    )
+    p_all.add_argument(
+        "--use-cache",
+        action="store_true",
+        help="Skip building — copy executables from cache (warns on missing/outdated)",
+    )
 
     p_ci = sub.add_parser("ci", help="CI pipeline: spec + test + app")
-    p_ci.add_argument("--threads", type=int, default=None,
-                       help="Number of parallel build threads (default: auto)")
-    p_ci.add_argument("--use-cache", action="store_true",
-                       help="Skip building — copy executables from cache (warns on missing/outdated)")
+    p_ci.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Number of parallel build threads (default: auto)",
+    )
+    p_ci.add_argument(
+        "--use-cache",
+        action="store_true",
+        help="Skip building — copy executables from cache (warns on missing/outdated)",
+    )
     sub.add_parser("clean", help="Clean build artifacts")
 
     parsed = parser.parse_args()

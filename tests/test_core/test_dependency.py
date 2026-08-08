@@ -6,15 +6,18 @@ import pytest
 class TestTopologicalSort:
     def test_empty_list(self):
         from core.api.dependency import topological_sort
+
         assert topological_sort([]) == []
 
     def test_single_plugin_no_deps(self):
         from core.api.dependency import topological_sort
+
         plugins = [{"name": "a", "depends_on": []}]
         assert topological_sort(plugins) == plugins
 
     def test_simple_linear_deps(self):
         from core.api.dependency import topological_sort
+
         plugins = [
             {"name": "b", "depends_on": ["a"]},
             {"name": "a", "depends_on": []},
@@ -25,6 +28,7 @@ class TestTopologicalSort:
 
     def test_chain_deps(self):
         from core.api.dependency import topological_sort
+
         plugins = [
             {"name": "c", "depends_on": ["b"]},
             {"name": "b", "depends_on": ["a"]},
@@ -36,6 +40,7 @@ class TestTopologicalSort:
 
     def test_diamond_deps(self):
         from core.api.dependency import topological_sort
+
         plugins = [
             {"name": "d", "depends_on": ["b", "c"]},
             {"name": "b", "depends_on": ["a"]},
@@ -51,6 +56,7 @@ class TestTopologicalSort:
 
     def test_multiple_deps(self):
         from core.api.dependency import topological_sort
+
         plugins = [
             {"name": "c", "depends_on": ["a", "b"]},
             {"name": "b", "depends_on": []},
@@ -63,6 +69,7 @@ class TestTopologicalSort:
 
     def test_circular_dep_raises_error(self):
         from core.api.dependency import DependencyError, topological_sort
+
         plugins = [
             {"name": "a", "depends_on": ["b"]},
             {"name": "b", "depends_on": ["a"]},
@@ -72,6 +79,7 @@ class TestTopologicalSort:
 
     def test_self_dep_raises_error(self):
         from core.api.dependency import DependencyError, topological_sort
+
         plugins = [
             {"name": "a", "depends_on": ["a"]},
         ]
@@ -82,6 +90,7 @@ class TestTopologicalSort:
         import logging
 
         from core.api.dependency import topological_sort
+
         caplog.set_level(logging.WARNING)
         plugins = [
             {"name": "b", "depends_on": ["missing"]},
@@ -95,6 +104,7 @@ class TestTopologicalSort:
 
     def test_no_depends_on_key(self):
         from core.api.dependency import topological_sort
+
         plugins = [
             {"name": "b"},
             {"name": "a"},
@@ -104,6 +114,7 @@ class TestTopologicalSort:
 
     def test_custom_keys(self):
         from core.api.dependency import topological_sort
+
         plugins = [
             {"id": "b", "needs": ["a"]},
             {"id": "a", "needs": []},
@@ -116,19 +127,23 @@ class TestTopologicalSort:
 class TestValidateDependencies:
     def test_no_deps(self):
         from core.api.dependency import validate_dependencies
+
         assert validate_dependencies("p", [], {"a": "x"}) == []
 
     def test_all_satisfied(self):
         from core.api.dependency import validate_dependencies
+
         assert validate_dependencies("p", ["a", "b"], {"a": "x", "b": "y"}) == []
 
     def test_some_missing(self):
         from core.api.dependency import validate_dependencies
+
         missing = validate_dependencies("p", ["a", "b"], {"a": "x"})
         assert missing == ["b"]
 
     def test_all_missing(self):
         from core.api.dependency import validate_dependencies
+
         missing = validate_dependencies("p", ["a", "b"], {})
         assert sorted(missing) == ["a", "b"]
 
@@ -136,6 +151,7 @@ class TestValidateDependencies:
 class TestGetDependencyOrder:
     def test_returns_topological_order(self):
         from core.api.dependency import get_dependency_order
+
         plugins = [
             {"name": "b", "depends_on": ["a"]},
             {"name": "a", "depends_on": []},
@@ -148,6 +164,7 @@ class TestGetDependencyOrder:
         import logging
 
         from core.api.dependency import get_dependency_order
+
         caplog.set_level(logging.WARNING)
         plugins = [
             {"name": "a", "depends_on": ["b"]},
@@ -157,10 +174,13 @@ class TestGetDependencyOrder:
         # Falls back to alphabetical
         names = [p["name"] for p in result]
         assert names == ["a", "b"]
-        assert any("falling back to alphabetical" in rec.message for rec in caplog.records)
+        assert any(
+            "falling back to alphabetical" in rec.message for rec in caplog.records
+        )
 
     def test_empty_list(self):
         from core.api.dependency import get_dependency_order
+
         assert get_dependency_order([]) == []
 
 
@@ -169,6 +189,7 @@ class TestAppConfigDependency:
         from pathlib import Path
 
         from core.models import AppConfig
+
         cfg = AppConfig(name="test", path=Path("."), enable=True, level=2, ics=False)
         assert hasattr(cfg, "depends_on")
         assert cfg.depends_on == []
@@ -177,27 +198,46 @@ class TestAppConfigDependency:
         from pathlib import Path
 
         from core.models import AppConfig
-        cfg = AppConfig(name="test", path=Path("."), enable=True, level=2, ics=False, depends_on=["a", "b"])
+
+        cfg = AppConfig(
+            name="test",
+            path=Path("."),
+            enable=True,
+            level=2,
+            ics=False,
+            depends_on=["a", "b"],
+        )
         assert cfg.depends_on == ["a", "b"]
 
     def test_from_dict_preserves_depends_on(self):
 
         from core.models import AppConfig
-        cfg = AppConfig.from_dict({
-            "name": "test",
-            "path": ".",
-            "enable": True,
-            "level": 2,
-            "ics": False,
-            "depends_on": ["a"],
-        })
+
+        cfg = AppConfig.from_dict(
+            {
+                "name": "test",
+                "path": ".",
+                "enable": True,
+                "level": 2,
+                "ics": False,
+                "depends_on": ["a"],
+            }
+        )
         assert cfg.depends_on == ["a"]
 
     def test_to_dict_includes_depends_on(self):
         from pathlib import Path
 
         from core.models import AppConfig
-        cfg = AppConfig(name="test", path=Path("."), enable=True, level=2, ics=False, depends_on=["x"])
+
+        cfg = AppConfig(
+            name="test",
+            path=Path("."),
+            enable=True,
+            level=2,
+            ics=False,
+            depends_on=["x"],
+        )
         d = cfg.to_dict()
         assert "depends_on" in d
         assert d["depends_on"] == ["x"]
@@ -207,56 +247,72 @@ class TestRegistrationDependencyValidation:
     @pytest.fixture(autouse=True)
     def _clear_registry(self):
         from core.api.registry import get_registry
+
         reg = get_registry()
         for p in reg.list():
             reg.unregister(p.name)
 
     def test_register_without_deps_succeeds(self, client):
-        resp = client.post("/api/v1/plugins/register", json={
-            "name": "standalone",
-            "version": "1.0.0",
-            "display_name": "Standalone",
-            "entry_point": "test/main.py",
-            "depends_on": [],
-        })
+        resp = client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "standalone",
+                "version": "1.0.0",
+                "display_name": "Standalone",
+                "entry_point": "test/main.py",
+                "depends_on": [],
+            },
+        )
         assert resp.status_code == 201
 
     def test_register_with_satisfied_deps_succeeds(self, client):
-        client.post("/api/v1/plugins/register", json={
-            "name": "dependency",
-            "version": "1.0.0",
-            "display_name": "Dependency",
-            "entry_point": "test/dep.py",
-        })
-        resp = client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-            "depends_on": ["dependency"],
-        })
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependency",
+                "version": "1.0.0",
+                "display_name": "Dependency",
+                "entry_point": "test/dep.py",
+            },
+        )
+        resp = client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+                "depends_on": ["dependency"],
+            },
+        )
         assert resp.status_code == 201
 
     def test_register_with_missing_dep_fails(self, client):
-        resp = client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-            "depends_on": ["nonexistent"],
-        })
+        resp = client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+                "depends_on": ["nonexistent"],
+            },
+        )
         assert resp.status_code == 422
         data = resp.json()
         assert "nonexistent" in data["detail"]
 
     def test_register_with_multiple_missing_deps_fails(self, client):
-        resp = client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-            "depends_on": ["missing_a", "missing_b"],
-        })
+        resp = client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+                "depends_on": ["missing_a", "missing_b"],
+            },
+        )
         assert resp.status_code == 422
         data = resp.json()
         assert "missing_a" in data["detail"]
@@ -264,15 +320,21 @@ class TestRegistrationDependencyValidation:
 
     def test_put_with_unregistered_dep_fails(self, client):
         """PUT rejecting unregistered dependency should leave plugin unchanged."""
-        client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-        })
-        resp = client.put("/api/v1/plugins/dependent", json={
-            "depends_on": ["missing_dep"],
-        })
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+            },
+        )
+        resp = client.put(
+            "/api/v1/plugins/dependent",
+            json={
+                "depends_on": ["missing_dep"],
+            },
+        )
         assert resp.status_code == 422
         # Verify depends_on was NOT changed
         resp = client.get("/api/v1/plugins/dependent")
@@ -280,19 +342,25 @@ class TestRegistrationDependencyValidation:
 
     def test_enable_with_unregistered_dep_fails(self, client):
         """Register dependency, register dependent, unregister dep, enable fails."""
-        client.post("/api/v1/plugins/register", json={
-            "name": "base",
-            "version": "1.0.0",
-            "display_name": "Base",
-            "entry_point": "test/base.py",
-        })
-        client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-            "depends_on": ["base"],
-        })
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "base",
+                "version": "1.0.0",
+                "display_name": "Base",
+                "entry_point": "test/base.py",
+            },
+        )
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+                "depends_on": ["base"],
+            },
+        )
         # Unregister the dependency
         client.delete("/api/v1/plugins/base")
         resp = client.post("/api/v1/plugins/dependent/enable")
@@ -300,19 +368,25 @@ class TestRegistrationDependencyValidation:
         assert "base" in resp.json()["detail"]
 
     def test_enable_with_disabled_dep_fails(self, client):
-        client.post("/api/v1/plugins/register", json={
-            "name": "base",
-            "version": "1.0.0",
-            "display_name": "Base",
-            "entry_point": "test/base.py",
-        })
-        client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-            "depends_on": ["base"],
-        })
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "base",
+                "version": "1.0.0",
+                "display_name": "Base",
+                "entry_point": "test/base.py",
+            },
+        )
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+                "depends_on": ["base"],
+            },
+        )
         # base is not enabled
         resp = client.post("/api/v1/plugins/dependent/enable")
         assert resp.status_code == 422
@@ -320,19 +394,25 @@ class TestRegistrationDependencyValidation:
         assert "not enabled" in resp.json()["detail"]
 
     def test_enable_with_enabled_dep_succeeds(self, client):
-        client.post("/api/v1/plugins/register", json={
-            "name": "base",
-            "version": "1.0.0",
-            "display_name": "Base",
-            "entry_point": "test/base.py",
-        })
-        client.post("/api/v1/plugins/register", json={
-            "name": "dependent",
-            "version": "1.0.0",
-            "display_name": "Dependent",
-            "entry_point": "test/main.py",
-            "depends_on": ["base"],
-        })
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "base",
+                "version": "1.0.0",
+                "display_name": "Base",
+                "entry_point": "test/base.py",
+            },
+        )
+        client.post(
+            "/api/v1/plugins/register",
+            json={
+                "name": "dependent",
+                "version": "1.0.0",
+                "display_name": "Dependent",
+                "entry_point": "test/main.py",
+                "depends_on": ["base"],
+            },
+        )
         client.post("/api/v1/plugins/base/enable")
         resp = client.post("/api/v1/plugins/dependent/enable")
         assert resp.status_code == 200

@@ -52,9 +52,7 @@ class PluginSandbox:
         if not job:
             return False
         info = ctypes.c_int()
-        ret = kernel.IsProcessInJob(
-            kernel.GetCurrentProcess(), job, ctypes.byref(info)
-        )
+        ret = kernel.IsProcessInJob(kernel.GetCurrentProcess(), job, ctypes.byref(info))
         kernel.CloseHandle(job)
         return bool(info.value) if ret else False
 
@@ -135,7 +133,10 @@ class PluginSandbox:
             )
         try:
             os.nice(10)
-        except (OSError, AttributeError):  # best-effort priority lowering (os.nice absent on Windows)
+        except (
+            OSError,
+            AttributeError,
+        ):  # best-effort priority lowering (os.nice absent on Windows)
             pass
 
     # -----------------------------------------------------------------

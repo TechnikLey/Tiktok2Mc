@@ -110,7 +110,11 @@ class TriggerEngine:
         Returns a list of errors (empty = valid).
         """
         errors: list[ValidationError] = []
-        errors.extend(self._validator.validate_trigger(trigger_name, gift_id=gift_id, gift_name=gift_name))
+        errors.extend(
+            self._validator.validate_trigger(
+                trigger_name, gift_id=gift_id, gift_name=gift_name
+            )
+        )
         errors.extend(self._validator.validate_user(user))
         return errors
 
@@ -124,7 +128,9 @@ class TriggerEngine:
         fanclub: bool = False,
     ) -> list[ValidationError]:
         """Validate a comment trigger."""
-        return self._validator.validate_comment(user, text, moderator=moderator, superfan=superfan, fanclub=fanclub)
+        return self._validator.validate_comment(
+            user, text, moderator=moderator, superfan=superfan, fanclub=fanclub
+        )
 
     # ------------------------------------------------------------------
     # Execution
@@ -150,7 +156,9 @@ class TriggerEngine:
             A structured ``TriggerResult``.
         """
         # 1. Validate
-        errors = self.validate_trigger(trigger_name, user=user, gift_id=gift_id, gift_name=gift_name)
+        errors = self.validate_trigger(
+            trigger_name, user=user, gift_id=gift_id, gift_name=gift_name
+        )
         if errors:
             return TriggerResult.validation_failure(
                 trigger_name=trigger_name,
@@ -163,7 +171,9 @@ class TriggerEngine:
 
         log.info(
             "Trigger execution starting | name=%s user=%s gift_id=%s",
-            trigger_name, user, gift_id,
+            trigger_name,
+            user,
+            gift_id,
         )
 
         try:
@@ -199,7 +209,9 @@ class TriggerEngine:
         if not result.success:
             log.warning(
                 "Trigger execution failed | name=%s code=%s message=%s",
-                trigger_name, result.error_code, result.error_message,
+                trigger_name,
+                result.error_code,
+                result.error_message,
             )
 
         return result
@@ -214,12 +226,16 @@ class TriggerEngine:
         fanclub: bool = False,
     ) -> TriggerResult:
         """Execute a test comment through the bridge."""
-        errors = self.validate_comment(user, text, moderator=moderator, superfan=superfan, fanclub=fanclub)
+        errors = self.validate_comment(
+            user, text, moderator=moderator, superfan=superfan, fanclub=fanclub
+        )
         if errors:
             return TriggerResult.validation_failure(
                 trigger_name="comment",
                 errors=errors,
-                payload=self._build_comment_payload(user, text, moderator, superfan, fanclub),
+                payload=self._build_comment_payload(
+                    user, text, moderator, superfan, fanclub
+                ),
             )
 
         payload = self._build_comment_payload(user, text, moderator, superfan, fanclub)
@@ -227,7 +243,11 @@ class TriggerEngine:
 
         log.info(
             "Comment execution starting | user=%s text=%s moderator=%s superfan=%s fanclub=%s",
-            user, text[:50], moderator, superfan, fanclub,
+            user,
+            text[:50],
+            moderator,
+            superfan,
+            fanclub,
         )
 
         try:
@@ -255,7 +275,8 @@ class TriggerEngine:
 
         log.info(
             "Comment execution finished | status=%s time_ms=%.1f",
-            result.status.value, result.execution_time_ms,
+            result.status.value,
+            result.execution_time_ms,
         )
 
         return result

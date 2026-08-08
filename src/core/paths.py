@@ -4,10 +4,12 @@ from pathlib import Path
 
 SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 
+
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
+
 
 def get_root_dir() -> Path:
     base = get_base_dir()
@@ -23,9 +25,11 @@ def get_root_dir() -> Path:
             return parent.resolve()
     return base.parent.parent.resolve()
 
+
 def get_base_file() -> Path:
     base = get_base_dir()
     return (base / f"main{SUFFIX}").resolve()
+
 
 def get_config_file() -> Path:
     root = get_root_dir()
@@ -36,14 +40,17 @@ def get_runtime_dir() -> Path:
     root = get_root_dir()
     return (root / "core" / "runtime").resolve()
 
+
 def get_plugin_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     try:
         import __main__
+
         return Path(__main__.__file__).resolve().parent
     except (AttributeError, ImportError):
         return Path(sys.executable).resolve().parent
+
 
 def get_plugin_config_file() -> Path:
     return get_plugin_dir() / "config.yaml"

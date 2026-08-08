@@ -1,7 +1,5 @@
 """Tests for core.secure_storage"""
 
-
-
 from core.secure_storage import SecureStorage, secure_storage
 
 

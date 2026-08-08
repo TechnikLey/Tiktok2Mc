@@ -17,7 +17,10 @@ class TestDetectPrefix:
         assert _detect_prefix(">>text") == ("overlay", {})
 
     def test_named_overlay(self):
-        assert _detect_prefix("@name>>text") == ("named_overlay", {"overlay_name": "name"})
+        assert _detect_prefix("@name>>text") == (
+            "named_overlay",
+            {"overlay_name": "name"},
+        )
 
     def test_shell(self):
         assert _detect_prefix("&curl http://localhost") == ("shell", {})
@@ -25,7 +28,10 @@ class TestDetectPrefix:
 
 class TestStripPrefix:
     def test_shell(self):
-        assert _strip_prefix("&curl http://localhost", "shell", {}) == "curl http://localhost"
+        assert (
+            _strip_prefix("&curl http://localhost", "shell", {})
+            == "curl http://localhost"
+        )
 
 
 class TestParse:
@@ -34,7 +40,9 @@ class TestParse:
         triggers = svc.parse(text="12345:&curl http://localhost:29191/add")
         assert len(triggers) == 1
         assert triggers[0]["commands"][0]["type"] == "shell"
-        assert triggers[0]["commands"][0]["command"] == "curl http://localhost:29191/add"
+        assert (
+            triggers[0]["commands"][0]["command"] == "curl http://localhost:29191/add"
+        )
 
     def test_parses_shell_multiplier(self):
         svc = ActionsService()
@@ -88,38 +96,51 @@ class TestValidateTriggers:
         ]
         diags = svc.validate_triggers(triggers)
         assert not any(d["code"] == "DUPLICATE_TRIGGER" for d in diags)
+
     def test_serializes_shell_command(self):
         svc = ActionsService()
-        raw = svc.serialize([{
-            "name": "12345",
-            "enabled": True,
-            "type": "Gift",
-            "commands": [{
-                "type": "shell",
-                "command": "curl http://localhost",
-                "multiplier": 1,
-                "title": "",
-                "subtitle": "",
-                "duration": 3,
-                "overlay_name": "default",
-            }],
-        }])
+        raw = svc.serialize(
+            [
+                {
+                    "name": "12345",
+                    "enabled": True,
+                    "type": "Gift",
+                    "commands": [
+                        {
+                            "type": "shell",
+                            "command": "curl http://localhost",
+                            "multiplier": 1,
+                            "title": "",
+                            "subtitle": "",
+                            "duration": 3,
+                            "overlay_name": "default",
+                        }
+                    ],
+                }
+            ]
+        )
         assert "12345:&curl http://localhost" in raw
 
     def test_serializes_shell_with_multiplier(self):
         svc = ActionsService()
-        raw = svc.serialize([{
-            "name": "12345",
-            "enabled": True,
-            "type": "Gift",
-            "commands": [{
-                "type": "shell",
-                "command": "echo hi",
-                "multiplier": 3,
-                "title": "",
-                "subtitle": "",
-                "duration": 3,
-                "overlay_name": "default",
-            }],
-        }])
+        raw = svc.serialize(
+            [
+                {
+                    "name": "12345",
+                    "enabled": True,
+                    "type": "Gift",
+                    "commands": [
+                        {
+                            "type": "shell",
+                            "command": "echo hi",
+                            "multiplier": 3,
+                            "title": "",
+                            "subtitle": "",
+                            "duration": 3,
+                            "overlay_name": "default",
+                        }
+                    ],
+                }
+            ]
+        )
         assert "12345:&echo hi x3" in raw

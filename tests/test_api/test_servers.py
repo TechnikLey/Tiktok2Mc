@@ -1,5 +1,3 @@
-
-
 class TestServersList:
     def test_default_instance_reports_missing_jar(self, client, project_dir):
         resp = client.get("/api/v1/servers")

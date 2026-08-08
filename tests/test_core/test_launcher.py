@@ -15,7 +15,11 @@ def _mock_urlopen_factory(client):
             path = req_or_url
         else:
             method = req_or_url.method or "GET"
-            path = req_or_url.selector if hasattr(req_or_url, "selector") else "/api/v1/plugins"
+            path = (
+                req_or_url.selector
+                if hasattr(req_or_url, "selector")
+                else "/api/v1/plugins"
+            )
 
         if "/api/v1/plugins" in path and method == "GET":
             resp = client.get("/api/v1/plugins")
@@ -50,14 +54,14 @@ class TestPluginLauncher:
         d.mkdir()
         return d
 
-    def test_using_api_true_when_api_responds(self, client, monkeypatch, empty_plugins_dir):
+    def test_using_api_true_when_api_responds(
+        self, client, monkeypatch, empty_plugins_dir
+    ):
         client.post(
             "/api/v1/plugins/register",
             json={"name": "launcher-test", "path": "/fake.exe", "enabled": True},
         )
-        monkeypatch.setattr(
-            "urllib.request.urlopen", _mock_urlopen_factory(client)
-        )
+        monkeypatch.setattr("urllib.request.urlopen", _mock_urlopen_factory(client))
         launcher = self._make_launcher(plugins_dir=empty_plugins_dir)
         plugins = launcher.get_plugins()
         assert launcher.using_api is True
@@ -66,7 +70,9 @@ class TestPluginLauncher:
         assert "launcher-test" in names
 
     def test_returns_empty_when_api_unreachable(self, empty_plugins_dir):
-        launcher = self._make_launcher("http://127.0.0.1:1/api/v1", plugins_dir=empty_plugins_dir)
+        launcher = self._make_launcher(
+            "http://127.0.0.1:1/api/v1", plugins_dir=empty_plugins_dir
+        )
         plugins = launcher.get_plugins()
         assert plugins == []
         assert launcher.using_api is False
@@ -78,14 +84,14 @@ class TestPluginLauncher:
                 "/api/v1/plugins/register",
                 json={"name": f"cnt-{i}", "path": f"/p{i}.exe"},
             )
-        monkeypatch.setattr(
-            "urllib.request.urlopen", _mock_urlopen_factory(client)
-        )
+        monkeypatch.setattr("urllib.request.urlopen", _mock_urlopen_factory(client))
         launcher = self._make_launcher(plugins_dir=empty_plugins_dir)
         launcher.get_plugins()
         assert launcher.plugin_count == 2
 
-    def test_maps_api_fields_to_app_config(self, client, monkeypatch, empty_plugins_dir):
+    def test_maps_api_fields_to_app_config(
+        self, client, monkeypatch, empty_plugins_dir
+    ):
         client.post(
             "/api/v1/plugins/register",
             json={
@@ -96,9 +102,7 @@ class TestPluginLauncher:
                 "ics": True,
             },
         )
-        monkeypatch.setattr(
-            "urllib.request.urlopen", _mock_urlopen_factory(client)
-        )
+        monkeypatch.setattr("urllib.request.urlopen", _mock_urlopen_factory(client))
         launcher = self._make_launcher(plugins_dir=empty_plugins_dir)
         plugins = launcher.get_plugins()
         p = next(x for x in plugins if x.name == "mapper")
@@ -109,10 +113,12 @@ class TestPluginLauncher:
 
     def test_env_var_overrides_base_url(self, monkeypatch, empty_plugins_dir):
         import os
+
         monkeypatch.setitem(os.environ, "API_BASE_URL", "http://127.0.0.1:1/api/v1")
         import importlib
 
         import core.api.launcher as launcher_mod
+
         importlib.reload(launcher_mod)
         from core.api.launcher import PluginLauncher
 

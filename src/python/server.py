@@ -33,6 +33,7 @@ install_global_exception_hook("server")
 # EULA acceptance, and the MinecraftServerAPI plugin.
 # ==================================================
 
+
 def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
@@ -45,12 +46,14 @@ def _wait_or_skip(prompt: str = "Press Enter to continue..."):
             pass
 
 
-
-
-
 # === Parse arguments (instance-based only) ===
 _parser = argparse.ArgumentParser(add_help=False)
-_parser.add_argument("--instance-dir", type=str, default=None, help="Path to the server instance directory")
+_parser.add_argument(
+    "--instance-dir",
+    type=str,
+    default=None,
+    help="Path to the server instance directory",
+)
 _parser.add_argument("--port", type=str, default=None, help="Override the server port")
 _args, _ = _parser.parse_known_args()
 
@@ -81,7 +84,9 @@ except (OSError, ValueError, YAMLError):
 
 if not SERVER_JAR.exists():
     log.error("server.jar not found at %s", SERVER_JAR)
-    log.error("Place a valid Minecraft server.jar in the instance directory and restart.")
+    log.error(
+        "Place a valid Minecraft server.jar in the instance directory and restart."
+    )
     _wait_or_skip()
     sys.exit(1)
 
@@ -115,7 +120,10 @@ else:
 
 # === MinecraftServerAPI config — create default if missing ===
 if not CONFIGSERVERAPI_FILE.exists():
-    log.info("MinecraftServerAPI config not found at %s — creating default.", CONFIGSERVERAPI_FILE)
+    log.info(
+        "MinecraftServerAPI config not found at %s — creating default.",
+        CONFIGSERVERAPI_FILE,
+    )
     CONFIGSERVERAPI_FILE.parent.mkdir(parents=True, exist_ok=True)
     yaml_obj = YAML(typ="rt")
     yaml_obj.preserve_quotes = True
@@ -146,13 +154,26 @@ try:
         cfg = load_yaml(CONFIG_FILE)
         Xms = cfg.get("java", {}).get("xms", "1G")
         Xmx = cfg.get("java", {}).get("xmx", "1G")
-        MC_PORT = int(os.environ.get("RESOLVED_PORT_MC_GAME_PORT",
-                       cfg.get("java", {}).get("port", 25565)))
-        WEBSERVERPORT = int(os.environ.get("RESOLVED_PORT_WEBHOOK_PORT",
-                           cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)))
-        APIPORT = int(os.environ.get("RESOLVED_PORT_MCSERVER_API_PORT",
-                       cfg.get("minecraft_server_api", {}).get("api_port", 29187)))
-        MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get("enabled", True)
+        MC_PORT = int(
+            os.environ.get(
+                "RESOLVED_PORT_MC_GAME_PORT", cfg.get("java", {}).get("port", 25565)
+            )
+        )
+        WEBSERVERPORT = int(
+            os.environ.get(
+                "RESOLVED_PORT_WEBHOOK_PORT",
+                cfg.get("minecraft_server_api", {}).get("web_server_port", 29188),
+            )
+        )
+        APIPORT = int(
+            os.environ.get(
+                "RESOLVED_PORT_MCSERVER_API_PORT",
+                cfg.get("minecraft_server_api", {}).get("api_port", 29187),
+            )
+        )
+        MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get(
+            "enabled", True
+        )
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
         MC_VERSION = cfg.get("mc_version", "1.21.11")
     else:
@@ -221,7 +242,7 @@ else:
         log.info("Plugin not found, activation failed.")
 
 # === RCON settings ===
-RCON = cfg.get("rcon", {}) if 'cfg' in dir() else {}
+RCON = cfg.get("rcon", {}) if "cfg" in dir() else {}
 RCON_ENABLED = RCON.get("enabled", False)
 RCON_PASSWORD = RCON.get("password", "")
 RCON_PORT = RCON.get("port", 25575)
@@ -230,7 +251,9 @@ RCON_PORT = RCON.get("port", 25575)
 if not RCON_ENABLED and not IGNORE_RCON_FILE.exists() and _is_interactive():
     log.info("\nWARNING: RCON is disabled!")
     log.info("Some features may not work correctly without RCON.")
-    log.info("It is recommended to enable RCON in the config file unless you know exactly what you are doing.\n")
+    log.info(
+        "It is recommended to enable RCON in the config file unless you know exactly what you are doing.\n"
+    )
     log.info("Type one of the following options and press ENTER:")
     log.info("  continue  - Start the server anyway")
     log.info("  ignore    - Do not show this warning again")
@@ -268,6 +291,7 @@ if not EULA_FILE.exists():
     except OSError as e:
         log.warning("Could not write eula.txt: %s", e)
 
+
 # === Update server.properties ===
 def set_server_property(file_path: Path, key, value):
     try:
@@ -301,8 +325,12 @@ set_server_property(SERVER_PROPERTIES, "server-port", MC_PORT)
 
 # === Empty RCON password warning ===
 if RCON_ENABLED and not RCON_PASSWORD:
-    log.warning("RCON password is not set! Set one in config.yaml or use the setup wizard.")
-    log.info("Starting Minecraft server with RCON disabled until a password is configured.")
+    log.warning(
+        "RCON password is not set! Set one in config.yaml or use the setup wizard."
+    )
+    log.info(
+        "Starting Minecraft server with RCON disabled until a password is configured."
+    )
     set_server_property(SERVER_PROPERTIES, "enable-rcon", "false")
 
 # === Start Minecraft server ===
@@ -322,7 +350,8 @@ try:
     health.set_state("mc_server", HealthState.RUNNING)
     proc = subprocess.run(
         [str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"],
-        cwd=str(INSTANCE_DIR), check=False,
+        cwd=str(INSTANCE_DIR),
+        check=False,
     )
     if proc.returncode != 0:
         log.warning("Minecraft server exited with code %s", proc.returncode)

@@ -78,7 +78,10 @@ class EventBus:
             except asyncio.QueueFull:
                 log.warning("Event queue full, dropping %s event", event_type)
                 try:
-                    get_health_monitor().record_error("eventbus", f"{CORE_0006.code}: Queue full, dropping {event_type}")
+                    get_health_monitor().record_error(
+                        "eventbus",
+                        f"{CORE_0006.code}: Queue full, dropping {event_type}",
+                    )
                 except Exception:  # best-effort health reporting
                     pass
 

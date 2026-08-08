@@ -23,9 +23,7 @@ def _get_service() -> ApiService:
 
 @router.get("/health", response_model=HealthResponse)
 async def health():
-    return HealthResponse(
-        status="ok", version=API_VERSION, api_version=API_VERSION
-    )
+    return HealthResponse(status="ok", version=API_VERSION, api_version=API_VERSION)
 
 
 @router.get("/status", response_model=StatusDetail)

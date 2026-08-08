@@ -13,6 +13,7 @@ from unittest.mock import patch
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_v07_install(base: Path) -> dict:
     """Create a simulated v0.7 installation directory tree.
 
@@ -50,9 +51,7 @@ def _make_v07_install(base: Path) -> dict:
         "  xms: 512M\n"
         "  xmx: 1G\n"
     )
-    paths["version"].write_text(
-        "ToolVersion: 0.7.0\nUpdaterVersion: 0.1.0\n"
-    )
+    paths["version"].write_text("ToolVersion: 0.7.0\nUpdaterVersion: 0.1.0\n")
     paths["update_exe"].write_text("old updater")
     paths["start_exe"].write_text("old start")
     return paths
@@ -63,9 +62,7 @@ def _make_v100_release(tmp: Path) -> Path:
     release = tmp / "release_v100"
     release.mkdir(parents=True, exist_ok=True)
 
-    (release / "version.txt").write_text(
-        "ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n"
-    )
+    (release / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
     (release / "README.md").write_text("v1.0.0 readme")
     (release / "start.exe").write_text("new start")
     (release / "LICENSE").write_text("MIT license")
@@ -79,8 +76,7 @@ def _make_v100_release(tmp: Path) -> Path:
     config.mkdir()
     (config / "config.yaml").write_text("should be skipped via whitelist")
     (config / "config.default.yaml").write_text(
-        "config_version: '1.0'\n"
-        "server_host: 0.0.0.0\n"
+        "config_version: '1.0'\nserver_host: 0.0.0.0\n"
     )
 
     plugins = release / "plugins" / "wincounter"
@@ -118,23 +114,23 @@ class TestVersionBoundaryUpgrade:
         shutil.copytree(release / "plugins", base / "plugins", dirs_exist_ok=True)
 
         # Update version file
-        (base / "version.txt").write_text(
-            "ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n"
-        )
+        (base / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
 
         # Migrate config
         from python.update import migrate_config_if_needed
 
-        with patch("python.update.BASE_DIR", base), \
-             patch("python.update.CONFIG_FILE", paths["config"]), \
-             patch("python.update.DEFAULT_CONFIG_FILE", paths["default_config"]), \
-             patch("python.update.VERSION_FILE", paths["version"]), \
-             patch("python.update.TEMP_DIR", tmp_path / "_update_tmp"), \
-             patch("python.update.cfg", {"auto_update_config": True}), \
-             patch("python.update.CONFIG_UPDATE_ENABLE", True), \
-             patch("python.update.AUTO_MODE", True), \
-             patch("python.update.wait_for_key"), \
-             patch("python.update.log"):
+        with (
+            patch("python.update.BASE_DIR", base),
+            patch("python.update.CONFIG_FILE", paths["config"]),
+            patch("python.update.DEFAULT_CONFIG_FILE", paths["default_config"]),
+            patch("python.update.VERSION_FILE", paths["version"]),
+            patch("python.update.TEMP_DIR", tmp_path / "_update_tmp"),
+            patch("python.update.cfg", {"auto_update_config": True}),
+            patch("python.update.CONFIG_UPDATE_ENABLE", True),
+            patch("python.update.AUTO_MODE", True),
+            patch("python.update.wait_for_key"),
+            patch("python.update.log"),
+        ):
             migrate_config_if_needed()
 
         # Read migrated config
@@ -176,6 +172,7 @@ class TestVersionBoundaryUpgrade:
         release = _make_v100_release(tmp_path)
 
         import shutil
+
         for root, dirs, files in release.walk():
             rel = root.relative_to(release)
             for f in files:
@@ -197,6 +194,7 @@ class TestVersionBoundaryUpgrade:
         release = _make_v100_release(tmp_path)
 
         import shutil
+
         for root, dirs, files in release.walk():
             rel = root.relative_to(release)
             for f in files:
@@ -215,9 +213,7 @@ class TestVersionBoundaryUpgrade:
         paths = _make_v07_install(base)
         release = _make_v100_release(tmp_path)
 
-        (base / "version.txt").write_text(
-            "ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n"
-        )
+        (base / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
         content = (base / "version.txt").read_text()
         assert "ToolVersion: 1.0.0" in content
         assert "UpdaterVersion: 0.2.0" in content
@@ -333,6 +329,7 @@ class TestRestartFlow:
 
     def test_update_loop_restart_decision(self):
         """Simulate the update loop decision logic from start.py lines 537-562."""
+
         def update_decision(result):
             if result is None:
                 return "break"
@@ -380,6 +377,7 @@ class TestRollbackOnInterruption:
         release = _make_v100_release(tmp_path)
 
         import shutil
+
         # Simulate copying only core/app.exe then crashing
         (base / "core").mkdir(parents=True, exist_ok=True)
         shutil.copy2(release / "core" / "app.exe", base / "core" / "app.exe")

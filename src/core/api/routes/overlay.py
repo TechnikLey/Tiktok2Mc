@@ -68,7 +68,9 @@ async def overlay_preview(body: dict):
     overlay_name = body.get("overlay_name", "default")
     chroma = body.get("chroma", True)
     theme_overrides = body.get("theme", None)
-    html = mgr.render_html(overlay_name=overlay_name, chroma=chroma, theme_overrides=theme_overrides)
+    html = mgr.render_html(
+        overlay_name=overlay_name, chroma=chroma, theme_overrides=theme_overrides
+    )
     return {"html": html}
 
 
@@ -90,7 +92,11 @@ async def overlay_display(body: dict):
     if not success:
         # Distinguish between "not found" and "cooldown"
         if overlay_name not in mgr.clients:
-            raise HTTPException(status_code=404, detail=f"Overlay '{overlay_name}' not found")
-        raise HTTPException(status_code=429, detail=f"Overlay '{overlay_name}' is in cooldown")
+            raise HTTPException(
+                status_code=404, detail=f"Overlay '{overlay_name}' not found"
+            )
+        raise HTTPException(
+            status_code=429, detail=f"Overlay '{overlay_name}' is in cooldown"
+        )
 
     return {"status": "ok", "overlay": overlay_name}

@@ -27,21 +27,21 @@ class TestPortPolicy:
         assert p.max_offset == 10
 
     def test_from_config_overrides(self):
-        p = PortPolicy.from_config({
-            "port_policy": {
-                "auto_resolve": False,
-                "session_only": False,
-                "max_offset": 5,
+        p = PortPolicy.from_config(
+            {
+                "port_policy": {
+                    "auto_resolve": False,
+                    "session_only": False,
+                    "max_offset": 5,
+                }
             }
-        })
+        )
         assert p.auto_resolve is False
         assert p.session_only is False
         assert p.max_offset == 5
 
     def test_from_config_partial(self):
-        p = PortPolicy.from_config({
-            "port_policy": {"auto_resolve": False}
-        })
+        p = PortPolicy.from_config({"port_policy": {"auto_resolve": False}})
         assert p.auto_resolve is False
         assert p.session_only is True
         assert p.max_offset == 10
@@ -120,9 +120,16 @@ class TestScanBindPorts:
     def test_custom_bind_ports(self, mock_check):
         mock_check.return_value = True
         custom_ports = [
-            {"key": "test", "config_path": "test.port", "default": 9999, "desc": "test"},
+            {
+                "key": "test",
+                "config_path": "test.port",
+                "default": 9999,
+                "desc": "test",
+            },
         ]
-        results = scan_bind_ports("127.0.0.1", PortPolicy(auto_resolve=True), bind_ports=custom_ports)
+        results = scan_bind_ports(
+            "127.0.0.1", PortPolicy(auto_resolve=True), bind_ports=custom_ports
+        )
         assert len(results) == 1
         assert results[0].key == "test"
         assert results[0].in_use is True
@@ -132,8 +139,12 @@ class TestScanBindPorts:
 class TestBuildResolvedMap:
     def test_no_resolution_needed(self):
         results = [
-            PortCheckResult(port=29185, key="api_port", description="API", in_use=False),
-            PortCheckResult(port=29188, key="webhook_port", description="Webhook", in_use=False),
+            PortCheckResult(
+                port=29185, key="api_port", description="API", in_use=False
+            ),
+            PortCheckResult(
+                port=29188, key="webhook_port", description="Webhook", in_use=False
+            ),
         ]
         m = build_resolved_map(results)
         assert m["api_port"] == 29185
@@ -141,8 +152,16 @@ class TestBuildResolvedMap:
 
     def test_with_resolutions(self):
         results = [
-            PortCheckResult(port=29185, key="api_port", description="API", in_use=True, resolved_port=29186),
-            PortCheckResult(port=29188, key="webhook_port", description="Webhook", in_use=False),
+            PortCheckResult(
+                port=29185,
+                key="api_port",
+                description="API",
+                in_use=True,
+                resolved_port=29186,
+            ),
+            PortCheckResult(
+                port=29188, key="webhook_port", description="Webhook", in_use=False
+            ),
         ]
         m = build_resolved_map(results)
         assert m["api_port"] == 29186

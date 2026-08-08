@@ -157,7 +157,9 @@ class TestRegisterPluginFunction:
         from core.api.client import register_plugin
         from core.models import AppConfig
 
-        config = AppConfig(name="fail", path=Path("/f.exe"), enable=False, level=2, ics=False)
+        config = AppConfig(
+            name="fail", path=Path("/f.exe"), enable=False, level=2, ics=False
+        )
 
         def mock_urlopen(*_a, **_kw):
             raise URLError("fail")

@@ -13,7 +13,6 @@ signaling limitation).  The underlying ``EventBus.subscribe()`` /
 """
 
 
-
 class TestWebSocket:
     def test_websocket_receives_injected_events(self, client):
         """Connect WS (ALL_EVENTS), inject event via HTTP, verify arrival."""

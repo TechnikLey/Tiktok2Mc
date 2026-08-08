@@ -124,6 +124,7 @@ async def poll_commands(name: str, wait: int = 0):
     # Record heartbeat for health monitoring
     try:
         from core.api.registry import get_registry
+
         get_registry().update(name, last_heartbeat=time.time())
     except Exception:  # heartbeat reporting is best-effort
         pass
@@ -153,6 +154,7 @@ async def update_plugin_state(name: str, body: dict):
     # Record heartbeat for health monitoring
     try:
         from core.api.registry import get_registry
+
         get_registry().update(name, last_heartbeat=__import__("time").time())
     except Exception:  # heartbeat reporting is best-effort
         pass
@@ -181,7 +183,9 @@ async def oauth_callback(name: str, code: str = "", state: str = "", error: str 
     to the plugin as a command.
     """
     if error:
-        return HTMLResponse(f"<h1>Authorization failed</h1><p>{error}</p>", status_code=400)
+        return HTMLResponse(
+            f"<h1>Authorization failed</h1><p>{error}</p>", status_code=400
+        )
     if not code:
         return HTMLResponse("<h1>Missing authorization code</h1>", status_code=400)
     command_queue.enqueue(name, "oauth_callback", code=code, state=state)

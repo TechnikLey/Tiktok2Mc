@@ -81,7 +81,9 @@ class CrashManager:
         """Install the asyncio exception handler on the given loop."""
         original_handler = loop.get_exception_handler()
 
-        def _handle_exception(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        def _handle_exception(
+            loop: asyncio.AbstractEventLoop, context: dict[str, Any]
+        ) -> None:
             exc = context.get("exception")
             message = context.get("message", "Unknown asyncio error")
             future = context.get("future")
@@ -141,7 +143,9 @@ class CrashManager:
 
             logger.critical(
                 "Unhandled exception in thread '%s': %s: %s",
-                name, exc_type.__name__, exc_value,
+                name,
+                exc_type.__name__,
+                exc_value,
                 exc_info=(exc_type, exc_value, exc_tb),
             )
             self.report_exception(
@@ -175,7 +179,11 @@ class CrashManager:
         exc_type = exc_type or type(exc)
         exc_tb = exc_tb or getattr(exc, "__traceback__", None)
 
-        stack = "".join(traceback.format_exception(exc_type, exc, exc_tb)) if exc_tb else str(exc)
+        stack = (
+            "".join(traceback.format_exception(exc_type, exc, exc_tb))
+            if exc_tb
+            else str(exc)
+        )
 
         instance = error_code.with_context(
             module=self.module_name,
@@ -198,7 +206,9 @@ class CrashManager:
         )
 
         # Update health monitor
-        self._health.record_error(self.module_name, f"{error_code.code}: {error_code.message}: {exc}")
+        self._health.record_error(
+            self.module_name, f"{error_code.code}: {error_code.message}: {exc}"
+        )
 
         # Record to history
         crash_record = {
@@ -309,7 +319,9 @@ class CrashManager:
     # Worker wrappers
     # ------------------------------------------------------------------
 
-    def supervised_thread(self, target: Callable, name: str = "", daemon: bool = False) -> threading.Thread:
+    def supervised_thread(
+        self, target: Callable, name: str = "", daemon: bool = False
+    ) -> threading.Thread:
         """Create a thread that catches and reports all exceptions.
 
         The thread is wrapped so any unhandled exception is caught and
@@ -319,11 +331,16 @@ class CrashManager:
         def _wrapped() -> None:
             try:
                 target()
-            except Exception as exc:  # supervision must capture any exception from wrapped target
+            except (
+                Exception
+            ) as exc:  # supervision must capture any exception from wrapped target
                 self.report_exception(
                     error_code=CORE_0002,
                     exc=exc,
-                    context_info={"source": "supervised_thread", "thread_name": name or target.__name__},
+                    context_info={
+                        "source": "supervised_thread",
+                        "thread_name": name or target.__name__,
+                    },
                 )
                 raise
 
@@ -337,7 +354,9 @@ class CrashManager:
             return await coro
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # supervision must capture any exception from wrapped coroutine
+        except (
+            Exception
+        ) as exc:  # supervision must capture any exception from wrapped coroutine
             self.report_exception(
                 error_code=CORE_0001,
                 exc=exc,
@@ -383,6 +402,7 @@ def get_crash_manager() -> CrashManager:
 
 def _severity_to_logging_level(severity: Severity) -> int:
     import logging
+
     mapping = {
         Severity.DEBUG: logging.DEBUG,
         Severity.INFO: logging.INFO,

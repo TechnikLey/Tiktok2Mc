@@ -1,6 +1,5 @@
 """Tests for server lifecycle Java pre-flight + status/install endpoints."""
 
-
 from core import java_utils
 from core.api.routes import server_lifecycle
 
@@ -32,13 +31,17 @@ class TestJavaStatusEndpoint:
         assert "install" in body
 
     def test_install_already_installed(self, client, monkeypatch):
-        monkeypatch.setattr(server_lifecycle, "detect_java", lambda *a, **k: _status(True))
+        monkeypatch.setattr(
+            server_lifecycle, "detect_java", lambda *a, **k: _status(True)
+        )
         resp = client.post("/api/v1/server/java/install")
         assert resp.status_code == 200
         assert resp.json()["status"] == "already_installed"
 
     def test_install_in_progress(self, client, monkeypatch):
-        monkeypatch.setattr(server_lifecycle, "detect_java", lambda *a, **k: _status(False))
+        monkeypatch.setattr(
+            server_lifecycle, "detect_java", lambda *a, **k: _status(False)
+        )
         server_lifecycle._JAVA_INSTALL["installing"] = True
         try:
             resp = client.post("/api/v1/server/java/install")
@@ -57,13 +60,17 @@ class TestJavaStatusEndpoint:
 
 class TestStartPrefight:
     def test_start_blocked_without_java(self, client, monkeypatch):
-        monkeypatch.setattr(server_lifecycle, "detect_java", lambda *a, **k: _status(False))
+        monkeypatch.setattr(
+            server_lifecycle, "detect_java", lambda *a, **k: _status(False)
+        )
         resp = client.post("/api/v1/server/start")
         assert resp.status_code == 400
         assert "Java" in resp.json()["detail"]
 
     def test_start_proceeds_with_java(self, client, monkeypatch):
-        monkeypatch.setattr(server_lifecycle, "detect_java", lambda *a, **k: _status(True))
+        monkeypatch.setattr(
+            server_lifecycle, "detect_java", lambda *a, **k: _status(True)
+        )
         resp = client.post("/api/v1/server/start")
         # Pre-flight passed; the default server is not registered in the test
         # app, so the supervisor reports 404 instead of starting a server.

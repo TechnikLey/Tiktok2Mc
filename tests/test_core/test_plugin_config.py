@@ -105,7 +105,9 @@ class TestLoadPluginConfig:
         plugin_dir.mkdir()
         manifest = {"name": "myplugin", "config_schema": {"version": 1, "fields": []}}
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
-        save_yaml(plugin_dir / "config.yaml", {"enabled": True, "port": 1234}, backup=False)
+        save_yaml(
+            plugin_dir / "config.yaml", {"enabled": True, "port": 1234}, backup=False
+        )
 
         cfg = load_plugin_config(plugin_dir, apply_defaults=False)
         assert cfg["enabled"] is True
@@ -147,7 +149,7 @@ class TestLoadPluginConfig:
 
         cfg = load_plugin_config(plugin_dir)
         assert cfg["enabled"] is True  # framework default
-        assert cfg["port"] == 9090    # existing
+        assert cfg["port"] == 9090  # existing
         assert cfg["host"] == "localhost"  # default
 
     def test_corrupt_config_fallback(self, tmp_path):
@@ -232,9 +234,7 @@ class TestValidatePluginConfig:
         assert errors == []
 
     def test_invalid_type(self):
-        schema = {
-            "fields": [{"key": "enabled", "type": "boolean"}]
-        }
+        schema = {"fields": [{"key": "enabled", "type": "boolean"}]}
         errors = validate_plugin_config({"enabled": "yes"}, schema)
         assert any("must be a boolean" in e for e in errors)
 
@@ -249,16 +249,12 @@ class TestValidatePluginConfig:
         assert any("must be <= 65535" in e for e in errors)
 
     def test_required_field(self):
-        schema = {
-            "fields": [{"key": "name", "type": "string", "required": True}]
-        }
+        schema = {"fields": [{"key": "name", "type": "string", "required": True}]}
         errors = validate_plugin_config({}, schema)
         assert any("is required" in e for e in errors)
 
     def test_invalid_color(self):
-        schema = {
-            "fields": [{"key": "bg", "type": "color"}]
-        }
+        schema = {"fields": [{"key": "bg", "type": "color"}]}
         errors = validate_plugin_config({"bg": "red"}, schema)
         assert any("hex color" in e for e in errors)
 
@@ -266,9 +262,7 @@ class TestValidatePluginConfig:
         assert errors == []
 
     def test_select_validation(self):
-        schema = {
-            "fields": [{"key": "mode", "type": "select", "options": ["a", "b"]}]
-        }
+        schema = {"fields": [{"key": "mode", "type": "select", "options": ["a", "b"]}]}
         errors = validate_plugin_config({"mode": "c"}, schema)
         assert any("must be one of" in e for e in errors)
 
@@ -280,9 +274,7 @@ class TestValidatePluginConfig:
                     "type": "array",
                     "item_schema": {
                         "type": "object",
-                        "fields": [
-                            {"key": "id", "type": "string", "required": True}
-                        ],
+                        "fields": [{"key": "id", "type": "string", "required": True}],
                     },
                 }
             ]
@@ -295,9 +287,7 @@ class TestValidatePluginConfig:
         assert errors == []
 
     def test_dotted_key_validation(self):
-        schema = {
-            "fields": [{"key": "theme.background", "type": "color"}]
-        }
+        schema = {"fields": [{"key": "theme.background", "type": "color"}]}
         errors = validate_plugin_config({"theme": {"background": "#000000"}}, schema)
         assert errors == []
 
@@ -359,17 +349,21 @@ class TestConfigValidationOnLoad:
         plugin_dir = tmp_path / "test-plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
-            json.dumps({
-                "name": "test-plugin",
-                "config_schema": {
-                    "fields": [
-                        {"key": "port", "type": "integer", "default": 8080},
-                    ],
-                },
-            }),
+            json.dumps(
+                {
+                    "name": "test-plugin",
+                    "config_schema": {
+                        "fields": [
+                            {"key": "port", "type": "integer", "default": 8080},
+                        ],
+                    },
+                }
+            ),
             encoding="utf-8",
         )
-        save_yaml(plugin_dir / "config.yaml", {"enabled": False, "port": 9090}, backup=False)
+        save_yaml(
+            plugin_dir / "config.yaml", {"enabled": False, "port": 9090}, backup=False
+        )
         cfg = load_plugin_config(plugin_dir)
         assert cfg["enabled"] is False  # preserved from config
         assert cfg["port"] == 9090
@@ -378,12 +372,14 @@ class TestConfigValidationOnLoad:
         plugin_dir = tmp_path / "test-plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
-            json.dumps({
-                "name": "test-plugin",
-                "config_schema": {
-                    "fields": [],
-                },
-            }),
+            json.dumps(
+                {
+                    "name": "test-plugin",
+                    "config_schema": {
+                        "fields": [],
+                    },
+                }
+            ),
             encoding="utf-8",
         )
         # enabled is "yes" (string) instead of boolean — should be corrected
@@ -395,14 +391,16 @@ class TestConfigValidationOnLoad:
         plugin_dir = tmp_path / "test-plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
-            json.dumps({
-                "name": "test-plugin",
-                "config_schema": {
-                    "fields": [
-                        {"key": "color", "type": "color"},
-                    ],
-                },
-            }),
+            json.dumps(
+                {
+                    "name": "test-plugin",
+                    "config_schema": {
+                        "fields": [
+                            {"key": "color", "type": "color"},
+                        ],
+                    },
+                }
+            ),
             encoding="utf-8",
         )
         save_yaml(plugin_dir / "config.yaml", {"color": "not-a-color"}, backup=False)
@@ -415,14 +413,16 @@ class TestConfigValidationOnLoad:
         plugin_dir = tmp_path / "test-plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
-            json.dumps({
-                "name": "test-plugin",
-                "config_schema": {
-                    "fields": [
-                        {"key": "port", "type": "integer", "default": 8080},
-                    ],
-                },
-            }),
+            json.dumps(
+                {
+                    "name": "test-plugin",
+                    "config_schema": {
+                        "fields": [
+                            {"key": "port", "type": "integer", "default": 8080},
+                        ],
+                    },
+                }
+            ),
             encoding="utf-8",
         )
         # enabled is a framework field; invalid value is corrected by

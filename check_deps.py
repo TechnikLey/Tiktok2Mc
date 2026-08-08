@@ -33,13 +33,16 @@ class C:
     BOLD = "\033[1m"
     RESET = "\033[0m"
 
+
 def cprint(msg, color=C.RESET):
     print(f"{color}{msg}{C.RESET}")
+
 
 def header(msg):
     print(f"\n{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}")
     print(f"{C.BOLD}{C.CYAN}  {msg}{C.RESET}")
     print(f"{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}")
+
 
 # ---- Package manager detection ----
 def _detect_package_manager():
@@ -48,7 +51,12 @@ def _detect_package_manager():
         for name in ["winget", "choco", "scoop"]:
             if shutil.which(name):
                 if name == "winget":
-                    return name, ["winget", "install", "--accept-package-agreements", "--accept-source-agreements"]
+                    return name, [
+                        "winget",
+                        "install",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ]
                 elif name == "choco":
                     return name, ["choco", "install", "-y"]
                 elif name == "scoop":
@@ -70,58 +78,59 @@ def _detect_package_manager():
                 return name, ["brew", "install"]
     return None, None
 
+
 # ---- Python package definitions ----
 # (import_name, pip_name, required_for, optional)
 PYTHON_PACKAGES = [
     # Core
-    ("yaml",             "PyYAML",          "core",        False),
-    ("webview",          "pywebview",       "core",        False),
-    ("flask",            "Flask",           "core",        False),
-    ("fastapi",          "fastapi",         "core",        False),
-    ("uvicorn",          "uvicorn",         "core",        False),
-    ("pydantic",         "pydantic",        "core",        False),
-    ("requests",         "requests",        "core",        False),
-    ("multipart",        "python-multipart","core",        False),
-    ("psutil",           "psutil",          "core",        False),
-
+    ("yaml", "PyYAML", "core", False),
+    ("webview", "pywebview", "core", False),
+    ("flask", "Flask", "core", False),
+    ("fastapi", "fastapi", "core", False),
+    ("uvicorn", "uvicorn", "core", False),
+    ("pydantic", "pydantic", "core", False),
+    ("requests", "requests", "core", False),
+    ("multipart", "python-multipart", "core", False),
+    ("psutil", "psutil", "core", False),
     # Streaming
-    ("TikTokLive",       "TikTokLive",      "streaming",   False),
-    ("mcrcon",           "mcrcon",          "streaming",   False),
-
+    ("TikTokLive", "TikTokLive", "streaming", False),
+    ("mcrcon", "mcrcon", "streaming", False),
     # Build
-    ("PyInstaller",      "pyinstaller",     "build",       False),
-    ("packaging",        "packaging",       "build",       False),
-    ("ruamel.yaml",      "ruamel.yaml",     "build",       False),
-
+    ("PyInstaller", "pyinstaller", "build", False),
+    ("packaging", "packaging", "build", False),
+    ("ruamel.yaml", "ruamel.yaml", "build", False),
     # Security
-    ("cryptography",     "cryptography",    "core",        False),
-
+    ("cryptography", "cryptography", "core", False),
     # Qt backend
-    ("PyQt6",            "PyQt6",           "gui",         False),
-    ("PyQt6.WebEngine",  "PyQt6-WebEngine", "gui",         False),
-    ("qtpy",             "qtpy",            "gui",         False),
-
+    ("PyQt6", "PyQt6", "gui", False),
+    ("PyQt6.WebEngine", "PyQt6-WebEngine", "gui", False),
+    ("qtpy", "qtpy", "gui", False),
     # Testing
-    ("pytest",           "pytest",          "testing",     True),
-    ("pytest_timeout",   "pytest-timeout",  "testing",     True),
+    ("pytest", "pytest", "testing", True),
+    ("pytest_timeout", "pytest-timeout", "testing", True),
 ]
 
 # ---- System tools ----
 # (name, check_func, pkg_names, required_for, optional, platform, min_version)
 
+
 def _get_version(cmd, flag="--version"):
     """Get version string from a command. Returns (major, minor) or None."""
     try:
-        result = subprocess.run([cmd, flag], capture_output=True, text=True, timeout=5, check=False)
+        result = subprocess.run(
+            [cmd, flag], capture_output=True, text=True, timeout=5, check=False
+        )
         output = (result.stdout + result.stderr).strip()
         # Extract first digits like "20.19.1" or "v20.19.1"
         import re
+
         m = re.search(r"(\d+)\.(\d+)", output)
         if m:
             return int(m.group(1)), int(m.group(2))
     except (OSError, subprocess.TimeoutExpired):
         pass
     return None
+
 
 def _check_node():
     path = shutil.which("node")
@@ -134,6 +143,7 @@ def _check_node():
         return False, f"{ver[0]}.{ver[1]} (need >= 20)"
     return True, f"{ver[0]}.{ver[1]}"
 
+
 def _check_npm():
     path = shutil.which("npm")
     if not path:
@@ -145,8 +155,10 @@ def _check_npm():
         return False, f"{ver[0]}.{ver[1]} (need >= 10)"
     return True, f"{ver[0]}.{ver[1]}"
 
+
 def _check_binutils():
     return shutil.which("ld") is not None, None
+
 
 def _check_qt6_webengine():
     """Check if Qt6 WebEngine is available (Linux only)."""
@@ -161,34 +173,112 @@ def _check_qt6_webengine():
             return True, None
     return False, None
 
+
 def _check_git():
     return shutil.which("git") is not None, None
+
 
 def _check_java():
     return shutil.which("java") is not None, None
 
+
 SYSTEM_TOOLS = [
     # (name, check_func, pkg_names, required_for, optional, platform)
     # pkg_names: dict {pm_name: pkg} for auto-install
-    ("node",    _check_node,    {"apt":"nodejs", "dnf":"nodejs", "pacman":"nodejs", "zypper":"nodejs", "brew":"node",
-                                 "winget":"OpenJS.NodeJS.LTS", "choco":"nodejs-lts", "scoop":"nodejs"},
-                                 "vsix/mca-tests",  False, None),
-    ("npm",     _check_npm,     {"apt":"npm", "dnf":"npm", "pacman":"npm", "zypper":"npm", "brew":"npm",
-                                 "winget":"OpenJS.NodeJS.LTS", "choco":"nodejs-lts", "scoop":"nodejs"},
-                                 "vsix",            False, None),
-    ("binutils",_check_binutils,{"apt":"binutils", "dnf":"binutils", "pacman":"binutils", "zypper":"binutils"},
-                                 "pyinstaller",     False, "linux"),
-    ("git",     _check_git,     {"apt":"git", "dnf":"git", "pacman":"git", "zypper":"git", "brew":"git",
-                                 "winget":"Git.Git", "choco":"git", "scoop":"git"},
-                                 "general",         False, None),
-    ("java",    _check_java,    {"apt":"openjdk-21-jre-headless", "dnf":"java-21-openjdk", "pacman":"jre21-openjdk",
-                                 "zypper":"java-21-openjdk", "brew":"openjdk@21",
-                                 "winget":"Microsoft.OpenJDK.21", "choco":"temurin21", "scoop":"openjdk21"},
-                                 "minecraft-server",False, None),
-    ("qt6-webengine", _check_qt6_webengine,
-                                 {"apt":"libqt6webenginecore6 qt6-wayland", "dnf":"qt6-qtwebengine qt6-qtwayland",
-                                  "pacman":"qt6-webengine qt6-wayland", "zypper":"qt6-webengine"},
-                                 "gui",             False, "linux"),
+    (
+        "node",
+        _check_node,
+        {
+            "apt": "nodejs",
+            "dnf": "nodejs",
+            "pacman": "nodejs",
+            "zypper": "nodejs",
+            "brew": "node",
+            "winget": "OpenJS.NodeJS.LTS",
+            "choco": "nodejs-lts",
+            "scoop": "nodejs",
+        },
+        "vsix/mca-tests",
+        False,
+        None,
+    ),
+    (
+        "npm",
+        _check_npm,
+        {
+            "apt": "npm",
+            "dnf": "npm",
+            "pacman": "npm",
+            "zypper": "npm",
+            "brew": "npm",
+            "winget": "OpenJS.NodeJS.LTS",
+            "choco": "nodejs-lts",
+            "scoop": "nodejs",
+        },
+        "vsix",
+        False,
+        None,
+    ),
+    (
+        "binutils",
+        _check_binutils,
+        {
+            "apt": "binutils",
+            "dnf": "binutils",
+            "pacman": "binutils",
+            "zypper": "binutils",
+        },
+        "pyinstaller",
+        False,
+        "linux",
+    ),
+    (
+        "git",
+        _check_git,
+        {
+            "apt": "git",
+            "dnf": "git",
+            "pacman": "git",
+            "zypper": "git",
+            "brew": "git",
+            "winget": "Git.Git",
+            "choco": "git",
+            "scoop": "git",
+        },
+        "general",
+        False,
+        None,
+    ),
+    (
+        "java",
+        _check_java,
+        {
+            "apt": "openjdk-21-jre-headless",
+            "dnf": "java-21-openjdk",
+            "pacman": "jre21-openjdk",
+            "zypper": "java-21-openjdk",
+            "brew": "openjdk@21",
+            "winget": "Microsoft.OpenJDK.21",
+            "choco": "temurin21",
+            "scoop": "openjdk21",
+        },
+        "minecraft-server",
+        False,
+        None,
+    ),
+    (
+        "qt6-webengine",
+        _check_qt6_webengine,
+        {
+            "apt": "libqt6webenginecore6 qt6-wayland",
+            "dnf": "qt6-qtwebengine qt6-qtwayland",
+            "pacman": "qt6-webengine qt6-wayland",
+            "zypper": "qt6-webengine",
+        },
+        "gui",
+        False,
+        "linux",
+    ),
 ]
 
 
@@ -206,7 +296,9 @@ def install_pip_package(pip_name):
     cprint(f"  Installing {pip_name}...", C.YELLOW)
     result = subprocess.run(
         [sys.executable, "-m", "pip", "install", pip_name],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
         check=False,
     )
     if result.returncode == 0:
@@ -214,7 +306,9 @@ def install_pip_package(pip_name):
         cprint(f"  + {pip_name} installed  {C.GRAY}{last_line[0]}{C.RESET}", C.GREEN)
         return True
     else:
-        cprint(f"  ! Failed to install {pip_name}: {result.stderr.strip()[:200]}", C.RED)
+        cprint(
+            f"  ! Failed to install {pip_name}: {result.stderr.strip()[:200]}", C.RED
+        )
         return False
 
 
@@ -227,7 +321,9 @@ def pip_install_requirements(req_path):
     cprint(f"\n  Installing from {req_path.name}...", C.CYAN)
     result = subprocess.run(
         [sys.executable, "-m", "pip", "install", "-r", str(req_path)],
-        capture_output=True, text=True, timeout=300,
+        capture_output=True,
+        text=True,
+        timeout=300,
         check=False,
     )
     if result.returncode == 0:
@@ -243,7 +339,9 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
     """Install a system tool via the detected package manager."""
     pkg = pkg_names.get(pm_name)
     if not pkg:
-        cprint(f"  ! No package mapping for {pm_name} — install {name} manually", C.YELLOW)
+        cprint(
+            f"  ! No package mapping for {pm_name} — install {name} manually", C.YELLOW
+        )
         return False
 
     cprint(f"  Installing {name} via {pm_name}...", C.YELLOW)
@@ -252,7 +350,10 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
     try:
         result = subprocess.run(cmd, text=True, timeout=120, check=False)
     except FileNotFoundError:
-        cprint(f"  ! Package manager '{pm_name}' not found — install {name} manually", C.RED)
+        cprint(
+            f"  ! Package manager '{pm_name}' not found — install {name} manually",
+            C.RED,
+        )
         return False
     except subprocess.TimeoutExpired:
         cprint(f"  ! Installation timed out for {name}", C.RED)
@@ -295,15 +396,27 @@ def _install_node_nodesource():
         cmds = [
             ["sudo", "apt-get", "install", "-y", "ca-certificates", "curl", "gnupg"],
             ["sudo", "mkdir", "-p", "/etc/apt/keyrings"],
-            ["bash", "-c", 'curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg'],
-            ["bash", "-c", 'echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list'],
+            [
+                "bash",
+                "-c",
+                "curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg",
+            ],
+            [
+                "bash",
+                "-c",
+                'echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list',
+            ],
             ["sudo", "apt-get", "update"],
             ["sudo", "apt-get", "install", "-y", "nodejs"],
         ]
     elif distro == "fedora":
         cmds = [
             ["sudo", "dnf", "install", "-y", "curl"],
-            ["bash", "-c", 'curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -'],
+            [
+                "bash",
+                "-c",
+                "curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -",
+            ],
             ["sudo", "dnf", "install", "-y", "nodejs"],
         ]
     elif distro == "arch":
@@ -354,16 +467,25 @@ def main():
     parser = argparse.ArgumentParser(
         description="Check and install dependencies for TikTok2Mc",
     )
-    parser.add_argument("--install", action="store_true",
-                        help="Install everything: Python packages + system tools")
-    parser.add_argument("--requirements", action="store_true",
-                        help="Force re-run pip install -r requirements.txt (also runs by default)")
-    parser.add_argument("--check-only", action="store_true",
-                        help="Only check, don't install anything")
-    parser.add_argument("--system-only", action="store_true",
-                        help="Only check system tools")
-    parser.add_argument("--pip-only", action="store_true",
-                        help="Only check/install Python packages")
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="Install everything: Python packages + system tools",
+    )
+    parser.add_argument(
+        "--requirements",
+        action="store_true",
+        help="Force re-run pip install -r requirements.txt (also runs by default)",
+    )
+    parser.add_argument(
+        "--check-only", action="store_true", help="Only check, don't install anything"
+    )
+    parser.add_argument(
+        "--system-only", action="store_true", help="Only check system tools"
+    )
+    parser.add_argument(
+        "--pip-only", action="store_true", help="Only check/install Python packages"
+    )
     args = parser.parse_args()
 
     # --install implies everything (overrides check-only)
@@ -393,15 +515,28 @@ def main():
     # ── System tools ──
     if not args.pip_only:
         header("System Tools")
-        for name, check_func, pkg_names, category, optional, platform_filter in SYSTEM_TOOLS:
-            available, version_info = check_system_tool(name, check_func, pkg_names, category, optional, platform_filter)
+        for (
+            name,
+            check_func,
+            pkg_names,
+            category,
+            optional,
+            platform_filter,
+        ) in SYSTEM_TOOLS:
+            available, version_info = check_system_tool(
+                name, check_func, pkg_names, category, optional, platform_filter
+            )
             if available is None:
                 continue
             if not available and not optional:
                 if auto_install and pm_name:
                     # Special handling: outdated node -> use NodeSource
-                    if (name == "node" and version_info and "need >=" in version_info
-                            and _install_node_nodesource()):
+                    if (
+                        name == "node"
+                        and version_info
+                        and "need >=" in version_info
+                        and _install_node_nodesource()
+                    ):
                         installed_count += 1
                         continue
                     if install_system_tool(name, pkg_names, pm_name, pm_prefix):
@@ -418,7 +553,9 @@ def main():
         header("Python Packages")
         categories = {}
         for import_name, pip_name, category, optional in PYTHON_PACKAGES:
-            categories.setdefault(category, []).append((import_name, pip_name, optional))
+            categories.setdefault(category, []).append(
+                (import_name, pip_name, optional)
+            )
 
         for cat, pkgs in categories.items():
             cprint(f"\n  {cat.upper()}", C.BOLD)
@@ -437,7 +574,9 @@ def main():
                         skipped_count += 1
                 else:
                     if optional:
-                        cprint(f"  [{C.YELLOW}installing (optional){C.RESET}] {pip_name}")
+                        cprint(
+                            f"  [{C.YELLOW}installing (optional){C.RESET}] {pip_name}"
+                        )
                     if install_pip_package(pip_name):
                         installed_count += 1
                     elif not optional:
@@ -469,26 +608,39 @@ def main():
             sys.exit(0)
     else:
         if missing_python:
-            cprint(f"  {C.RED}{len(missing_python)} Python packages could not be installed:{C.RESET}")
+            cprint(
+                f"  {C.RED}{len(missing_python)} Python packages could not be installed:{C.RESET}"
+            )
             for p in missing_python:
                 cprint(f"    - {p}", C.RED)
         if missing_system:
-            cprint(f"\n  {C.YELLOW}System tools that need manual installation:{C.RESET}")
+            cprint(
+                f"\n  {C.YELLOW}System tools that need manual installation:{C.RESET}"
+            )
             for name, _ in missing_system:
-                hint = next((t[2].get(pm_name, "") for t in SYSTEM_TOOLS if t[0] == name), "")
+                hint = next(
+                    (t[2].get(pm_name, "") for t in SYSTEM_TOOLS if t[0] == name), ""
+                )
                 if hint:
                     cprint(f"    - {name}: {hint}", C.YELLOW)
                 else:
                     cprint(f"    - {name}", C.YELLOW)
             if not auto_install and pm_name:
-                cprint(f"\n  {C.CYAN}Tipp: Use --install to auto-install system tools via {pm_name}.{C.RESET}")
+                cprint(
+                    f"\n  {C.CYAN}Tipp: Use --install to auto-install system tools via {pm_name}.{C.RESET}"
+                )
 
         if not missing_python and not missing_system:
             cprint("  Everything is installed.", C.GREEN)
         elif not missing_python and missing_system:
-            cprint("\n  All Python packages OK. Some system tools need manual installation.", C.YELLOW)
+            cprint(
+                "\n  All Python packages OK. Some system tools need manual installation.",
+                C.YELLOW,
+            )
             if not auto_install and pm_name:
-                cprint(f"  {C.CYAN}Tipp: Use --install to auto-install system tools via {pm_name}.{C.RESET}")
+                cprint(
+                    f"  {C.CYAN}Tipp: Use --install to auto-install system tools via {pm_name}.{C.RESET}"
+                )
             sys.exit(0)
         else:
             sys.exit(1)

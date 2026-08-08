@@ -54,13 +54,23 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gift-id", default=None, help="Gift ID (for gift events)")
     p.add_argument("--gift-name", default=None, help="Gift display name")
     p.add_argument("--text", default=None, help="Comment text (for comment events)")
-    p.add_argument("--moderator", action="store_true", help="Mark comment as from a moderator")
-    p.add_argument("--superfan", action="store_true", help="Mark comment as from a superfan")
-    p.add_argument("--fanclub", action="store_true", help="Mark comment as from a fanclub member")
+    p.add_argument(
+        "--moderator", action="store_true", help="Mark comment as from a moderator"
+    )
+    p.add_argument(
+        "--superfan", action="store_true", help="Mark comment as from a superfan"
+    )
+    p.add_argument(
+        "--fanclub", action="store_true", help="Mark comment as from a fanclub member"
+    )
     p.add_argument("--host", default="127.0.0.1", help="Bridge host")
     p.add_argument("--port", type=int, default=29188, help="Bridge webhook port")
-    p.add_argument("--timeout", type=float, default=5.0, help="Bridge request timeout (seconds)")
-    p.add_argument("--list", action="store_true", help="List available trigger types and exit")
+    p.add_argument(
+        "--timeout", type=float, default=5.0, help="Bridge request timeout (seconds)"
+    )
+    p.add_argument(
+        "--list", action="store_true", help="List available trigger types and exit"
+    )
     p.add_argument("--json", action="store_true", help="Output result as JSON")
     p.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     return p

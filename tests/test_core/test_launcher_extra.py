@@ -40,9 +40,7 @@ class TestPluginLauncherBadResponse:
 
         def fake_urlopen(*args, **kwargs):
             return _FakeResponse(
-                json.dumps(
-                    {"total": 0, "enabled": 0, "plugins": None}
-                ).encode()
+                json.dumps({"total": 0, "enabled": 0, "plugins": None}).encode()
             )
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)

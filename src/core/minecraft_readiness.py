@@ -42,6 +42,7 @@ def make_minecraft_readiness_check(instance_dir: Path) -> Callable[[], Awaitable
         # Primary: RCON readiness (server accepting commands)
         if rcon_enabled and rcon_password:
             try:
+
                 def _try_rcon():
                     conn = MCRcon("localhost", rcon_password, port=rcon_port)
                     conn.connect()

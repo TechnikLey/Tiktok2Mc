@@ -40,6 +40,7 @@ async def get_diagnostics_markdown():
     try:
         md = generate_diagnostics_markdown(_crash_manager)
         from fastapi.responses import PlainTextResponse
+
         return PlainTextResponse(md, media_type="text/markdown")
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to generate diagnostics markdown")

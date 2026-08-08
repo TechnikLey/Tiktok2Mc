@@ -24,6 +24,7 @@ class TestActionsServiceOffline:
         """ActionsService should read from local files without API."""
         # Monkeypatch to point to a temp directory with known content
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             data_dir = tmp_path / "data"
@@ -59,8 +60,12 @@ class TestActionsServiceOffline:
         """Serialize and parse roundtrip should work offline."""
         svc = ActionsService()
         triggers = [
-            {"name": "follow", "type": "event", "enabled": True,
-             "commands": [{"command": "/say hi", "enabled": True}]},
+            {
+                "name": "follow",
+                "type": "event",
+                "enabled": True,
+                "commands": [{"command": "/say hi", "enabled": True}],
+            },
         ]
         raw = svc.serialize(triggers)
         parsed = svc.parse(text=raw)
@@ -82,10 +87,11 @@ class TestActionsAPIOfflineBlocking:
 
         monkeypatch.setattr(
             "core.api.routes.actions._get_service",
-            MagicMock(side_effect=RuntimeError("Simulated failure"))
+            MagicMock(side_effect=RuntimeError("Simulated failure")),
         )
 
         import asyncio
+
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(get_actions())
         assert exc_info.value.status_code == 500
@@ -95,6 +101,7 @@ class TestActionsAPIOfflineBlocking:
         # Reset internal state for test
         import core.api.routes.actions as actions_mod
         from core.api.routes.actions import _get_service
+
         actions_mod._service = None
         svc = _get_service()
         assert svc is not None

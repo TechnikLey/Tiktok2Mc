@@ -185,6 +185,7 @@ class TestBasePluginCommandPolling:
         p.register_handler("test_cmd", lambda args: calls.append(args))
 
         call_count = [0]
+
         def mock_get(path, timeout=None):
             call_count[0] += 1
             if call_count[0] == 1:
@@ -220,6 +221,7 @@ class TestBasePluginCommandPolling:
 
         p = P()
         call_count = [0]
+
         def mock_get(path, timeout=None):
             call_count[0] += 1
             if call_count[0] == 1:
@@ -239,12 +241,14 @@ class TestBasePluginCommandPolling:
         p.register_handler("cmd", lambda args: calls.append(2))
         dispatch = {"commands": [{"command": "cmd", "args": {}}]}
         call_count = [0]
+
         def mock_get(path, timeout=None):
             call_count[0] += 1
             if call_count[0] == 1:
                 return dispatch
             p._running = False
             return {"commands": []}
+
         monkeypatch.setattr(p, "api_get", mock_get)
         p._running = True
         p._command_polling_loop()
@@ -256,6 +260,7 @@ class TestBasePluginCommandPolling:
         p.save_window_state(1024, 768)
         assert p._state_file.exists()
         import json
+
         data = json.loads(p._state_file.read_text(encoding="utf-8"))
         assert data["width"] == 1024
         assert data["height"] == 768
@@ -348,7 +353,9 @@ class TestTimerPlugin:
     def test_save_dims(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch)
         saved = {}
-        monkeypatch.setattr(t, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        monkeypatch.setattr(
+            t, "save_window_state", lambda w, h: saved.update({"w": w, "h": h})
+        )
         t._on_save_dims({"width": 800, "height": 600})
         assert saved["w"] == 800
         assert saved["h"] == 600
@@ -406,10 +413,14 @@ class TestTimerPlugin:
         monkeypatch.setattr(t, "push_state", lambda: None)
         t.on_tick()
         assert len(events) >= 1
-        assert any(e[0] == "/events" and e[1].get("type") == "timer.zero" for e in events)
+        assert any(
+            e[0] == "/events" and e[1].get("type") == "timer.zero" for e in events
+        )
 
     def test_milestone_publishes_event(self, tmp_path, monkeypatch):
-        t = self._make_timer(tmp_path, monkeypatch, signal_on=["milestone"], milestones=[5, 10])
+        t = self._make_timer(
+            tmp_path, monkeypatch, signal_on=["milestone"], milestones=[5, 10]
+        )
         t._is_paused = False
         t._milestones_sent.clear()  # reset tracking so we can observe the hit
         t._current = 10
@@ -422,7 +433,9 @@ class TestTimerPlugin:
         monkeypatch.setattr(t, "api_post", capture)
         monkeypatch.setattr(t, "push_state", lambda: None)
         t.on_tick()  # 10 -> 9, should trigger milestone 10 for down direction
-        assert any(e[0] == "/events" and e[1].get("type") == "timer.milestone" for e in events)
+        assert any(
+            e[0] == "/events" and e[1].get("type") == "timer.milestone" for e in events
+        )
 
     # -- formatting -------------------------------------------------------
 

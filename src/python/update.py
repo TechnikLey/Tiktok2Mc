@@ -40,8 +40,8 @@ from core.utils import load_config, normalize_config_version
 
 log = initialize_logging(__name__)
 
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+if sys.stdout.encoding != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 
@@ -60,12 +60,13 @@ CONFIG_UPDATE_ENABLE = True
 GITHUB_TOKEN = None
 HEADERS_API = {
     "Accept": "application/vnd.github+json",
-    "User-Agent": "Streaming-Tool-Updater"
+    "User-Agent": "Streaming-Tool-Updater",
 }
 HEADERS_ASSET = {
     "Accept": "application/octet-stream",
-    "User-Agent": "Streaming-Tool-Updater"
+    "User-Agent": "Streaming-Tool-Updater",
 }
+
 
 # ---------------------------------------------------------------------------
 def wait_for_key(msg="Press Enter to exit..."):
@@ -75,9 +76,22 @@ def wait_for_key(msg="Press Enter to exit..."):
         except EOFError:
             log.info("\nNo input available.")
 
+
 def _init():
-    global BASE_DIR, TEMP_DIR, VERSION_FILE, DEFAULT_CONFIG_FILE, CONFIG_FILE, START_FILE
-    global AUTO_MODE, cfg, CONFIG_UPDATE_ENABLE, GITHUB_TOKEN, HEADERS_API, HEADERS_ASSET
+    global \
+        BASE_DIR, \
+        TEMP_DIR, \
+        VERSION_FILE, \
+        DEFAULT_CONFIG_FILE, \
+        CONFIG_FILE, \
+        START_FILE
+    global \
+        AUTO_MODE, \
+        cfg, \
+        CONFIG_UPDATE_ENABLE, \
+        GITHUB_TOKEN, \
+        HEADERS_API, \
+        HEADERS_ASSET
     BASE_DIR = get_base_dir()
     TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
     VERSION_FILE = (BASE_DIR / "version.txt").resolve()
@@ -94,24 +108,29 @@ def _init():
     if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
         if os.geteuid() != 0:
             if sys.stdin.isatty():
-                log.error("This script must be run as root on Linux to perform updates.")
+                log.error(
+                    "This script must be run as root on Linux to perform updates."
+                )
                 wait_for_key()
                 sys.exit(1)
             else:
-                log.warning("Not running as root (no TTY). Continuing anyway — updates may fail.")
+                log.warning(
+                    "Not running as root (no TTY). Continuing anyway — updates may fail."
+                )
     CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
     HEADERS_API = {
         "Accept": "application/vnd.github+json",
-        "User-Agent": "Streaming-Tool-Updater"
+        "User-Agent": "Streaming-Tool-Updater",
     }
     HEADERS_ASSET = {
         "Accept": "application/octet-stream",
-        "User-Agent": "Streaming-Tool-Updater"
+        "User-Agent": "Streaming-Tool-Updater",
     }
     if GITHUB_TOKEN:
         HEADERS_API["Authorization"] = f"token {GITHUB_TOKEN}"
         HEADERS_ASSET["Authorization"] = f"token {GITHUB_TOKEN}"
+
 
 # Directories and individual files that may be overwritten by an update
 WHITELIST_DIRS = {
@@ -143,6 +162,7 @@ API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/la
 
 CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
 
+
 # =========================
 # Helper functions
 # =========================
@@ -151,6 +171,7 @@ def extract_version(text):
         return "0.0.0"
     m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", str(text))
     return m.group(1) if m else "0.0.0"
+
 
 def get_versions(path):
     v = {"tool": "0.0.0", "updater": "0.0.0"}
@@ -171,10 +192,12 @@ def get_versions(path):
 
     return v
 
+
 def save_versions(tool_v, updater_v):
     with VERSION_FILE.open("w", encoding="utf-8") as f:
         f.write(f"ToolVersion: {tool_v}\n")
         f.write(f"UpdaterVersion: {updater_v}\n")
+
 
 def download_with_progress(url, target):
     target = Path(target) if isinstance(target, str) else target
@@ -188,9 +211,12 @@ def download_with_progress(url, target):
                     f.write(chunk)
                     done += len(chunk)
                     if total:
-                        sys.stdout.write(f"\r>> Downloading: {done / total * 100:5.1f}%")
+                        sys.stdout.write(
+                            f"\r>> Downloading: {done / total * 100:5.1f}%"
+                        )
                         sys.stdout.flush()
     log.info("\nDownload complete.")
+
 
 # =========================
 # Config migration
@@ -274,15 +300,20 @@ def migrate_config_if_needed() -> bool:
         log.error(f"[FAIL] Error writing migrated config: {e}")
         return False
 
+
 def _inject_values_strictly(template, user_source, path=""):
     # 1. BASE GUARD: If user_source is None or not a dictionary-like object
     if user_source is None:
         if path:
-            log.warning(f"Configuration path '{path}' is empty in user config. Skipping.")
+            log.warning(
+                f"Configuration path '{path}' is empty in user config. Skipping."
+            )
         return
     if not isinstance(user_source, (dict, CommentedMap)):
         if path:
-            log.warning(f"Expected a section at '{path}', but found {type(user_source).__name__}. Skipping.")
+            log.warning(
+                f"Expected a section at '{path}', but found {type(user_source).__name__}. Skipping."
+            )
         return
     # 2. ITERATE: Only if user_source is guaranteed to be a dict
     for key in template:
@@ -297,18 +328,25 @@ def _inject_values_strictly(template, user_source, path=""):
                     _inject_values_strictly(template_value, user_value, current_path)
                 elif user_value is None:
                     # User left a whole category empty (e.g., 'Java: ')
-                    log.warning(f"Section '{current_path}' is empty in user config. Keeping defaults.")
+                    log.warning(
+                        f"Section '{current_path}' is empty in user config. Keeping defaults."
+                    )
                 else:
-                    log.warning(f"Type mismatch at '{current_path}': Expected a section, got a value. Skipping.")
+                    log.warning(
+                        f"Type mismatch at '{current_path}': Expected a section, got a value. Skipping."
+                    )
             # CASE B: Template expects a simple value (String, Int, Bool, List)
             else:
                 if user_value is not None:
                     template[key] = user_value
                     log.debug(f"Migrated: {current_path}")
                 else:
-                    log.debug(f"Value for '{current_path}' is null/empty. Using default.")
+                    log.debug(
+                        f"Value for '{current_path}' is null/empty. Using default."
+                    )
         else:
             log.debug(f"Key '{current_path}' missing in user config. Using default.")
+
 
 def load_yaml_with_debug(path, yaml_obj, label):
     try:
@@ -331,6 +369,7 @@ def load_yaml_with_debug(path, yaml_obj, label):
         log.error(f"[FAIL] Unexpected error while loading {label}: {path}")
         log.error(f"[FAIL] Details: {e}")
         return None
+
 
 # =========================
 # Main update process
@@ -386,19 +425,35 @@ def run_update():
             if AUTO_MODE:
                 sys.exit(5)  # skip beta in auto mode
             try:
-                choice = input(f"[!] Beta version {online_tag} available. Install? (y/N): ").lower()
+                choice = input(
+                    f"[!] Beta version {online_tag} available. Install? (y/N): "
+                ).lower()
             except EOFError:
                 choice = "n"
-            if choice != 'y':
+            if choice != "y":
                 sys.exit(5)
 
         # Download & extract
         log.info("[>>] Downloading package...")
         if sys.platform == "win32":
-            asset = next((a for a in release.get("assets", []) if "Windows" in a["name"] and a["name"].endswith(".zip")), None)
+            asset = next(
+                (
+                    a
+                    for a in release.get("assets", [])
+                    if "Windows" in a["name"] and a["name"].endswith(".zip")
+                ),
+                None,
+            )
             archive_name = "release.zip"
         else:
-            asset = next((a for a in release.get("assets", []) if "Linux" in a["name"] and a["name"].endswith(".tar.gz")), None)
+            asset = next(
+                (
+                    a
+                    for a in release.get("assets", [])
+                    if "Linux" in a["name"] and a["name"].endswith(".tar.gz")
+                ),
+                None,
+            )
             archive_name = "release.tar.gz"
 
         if not asset:
@@ -439,7 +494,9 @@ def run_update():
             expected_hash = fetch_checksum(asset["url"])
 
         if expected_hash and not verify_checksum(archive_path, expected_hash):
-            log.error("[FAIL] Downloaded archive checksum does not match expected value.")
+            log.error(
+                "[FAIL] Downloaded archive checksum does not match expected value."
+            )
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
             sys.exit(5)
@@ -465,7 +522,9 @@ def run_update():
                 extracted_root = TEMP_DIR  # Fallback
 
     # Read versions from the downloaded package
-    extracted_root_path = Path(extracted_root) if isinstance(extracted_root, str) else extracted_root
+    extracted_root_path = (
+        Path(extracted_root) if isinstance(extracted_root, str) else extracted_root
+    )
     zip_v = get_versions(extracted_root_path / "version.txt")
 
     # ==========================================
@@ -487,12 +546,19 @@ def run_update():
             # execv replaces the current process with the new updater
             # Pass --resume so it continues directly at step 2
             if sys.platform == "win32":
-                subprocess.Popen([str(new_up_dest), "--resume", str(extracted_root_path)])
+                subprocess.Popen(
+                    [str(new_up_dest), "--resume", str(extracted_root_path)]
+                )
             else:
-                os.execv(str(new_up_dest), [str(new_up_dest), "--resume", str(extracted_root_path)])
+                os.execv(
+                    str(new_up_dest),
+                    [str(new_up_dest), "--resume", str(extracted_root_path)],
+                )
             sys.exit(0)
 
-    log.info(f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update...")
+    log.info(
+        f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update..."
+    )
 
     # ==========================================
     # 2. TOOL UPDATE (copy files)
@@ -536,17 +602,22 @@ def run_update():
         walk_iter = walk_method()
     else:
         import os as _os
+
         def _fallback_walk():
             for root, dirs, files in _os.walk(extracted_root_path):
                 yield Path(root), dirs, files
+
         walk_iter = _fallback_walk()
     for root, dirs, files in walk_iter:
         rel_path = root.relative_to(extracted_root_path)
         rel_path_str = str(rel_path).replace("\\", "/")
-        if rel_path_str != "." and not any(
-            rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
-        ) and not any(
-            f.startswith(rel_path_str + "/") for f in WHITELIST_DIR_FILES
+        if (
+            rel_path_str != "."
+            and not any(
+                rel_path_str == d or rel_path_str.startswith(d + "/")
+                for d in WHITELIST_DIRS
+            )
+            and not any(f.startswith(rel_path_str + "/") for f in WHITELIST_DIR_FILES)
         ):
             continue
 
@@ -556,9 +627,13 @@ def run_update():
             # For subdirectories not covered by WHITELIST_DIRS, only copy whitelisted files
             if rel_path_str != ".":
                 dir_whitelisted = any(
-                    rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
+                    rel_path_str == d or rel_path_str.startswith(d + "/")
+                    for d in WHITELIST_DIRS
                 )
-                if not dir_whitelisted and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES:
+                if (
+                    not dir_whitelisted
+                    and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES
+                ):
                     continue
             if file.lower() == f"update{SUFFIX}".lower():
                 continue
@@ -579,7 +654,7 @@ def run_update():
             for fname in filenames:
                 fpath = os.path.join(dirpath, fname)
                 # Check if file has no extension or .bin extension
-                if not os.path.splitext(fname)[1] or fname.endswith('.bin'):
+                if not os.path.splitext(fname)[1] or fname.endswith(".bin"):
                     try:
                         os.chmod(fpath, 0o755)
                         log.info(f"[PERM] Set executable: {fpath}")
@@ -613,6 +688,7 @@ def run_update():
 
     sys.exit(0)
 
+
 if __name__ == "__main__":
     install_global_exception_hook("update")
     crash_mgr = get_crash_manager()
@@ -622,6 +698,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("Update interrupted by user.")
     except Exception as exc:  # top-level boundary: report via crash manager and exit
-        crash_mgr.report_exception(UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"})
+        crash_mgr.report_exception(
+            UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"}
+        )
         handle_unhandled_exception("update")
         sys.exit(1)

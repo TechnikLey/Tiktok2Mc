@@ -20,6 +20,7 @@ router = APIRouter(tags=["Logs"])
 # SSE log stream
 # ---------------------------------------------------------------------------
 
+
 @router.get("/logs/stream")
 async def logs_stream():
     """Server-Sent Events stream of unified log entries.
@@ -54,6 +55,7 @@ async def logs_stream():
 # ---------------------------------------------------------------------------
 # Crash reports
 # ---------------------------------------------------------------------------
+
 
 @router.get("/logs/crash-reports")
 async def list_crash_reports():

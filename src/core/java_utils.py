@@ -274,8 +274,10 @@ def detect_java(root_dir: Path, config_path: Path | None = None) -> JavaStatus:
     if custom_note:
         reason = custom_note + " No other usable Java runtime was found."
     else:
-        reason = "No Java installation was found on this system " \
-                 "(checked the bundled runtime and PATH)."
+        reason = (
+            "No Java installation was found on this system "
+            "(checked the bundled runtime and PATH)."
+        )
     return JavaStatus(
         ok=False,
         reason=reason,
@@ -349,8 +351,10 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
         zip_path.unlink(missing_ok=True)
         return (
             False,
-            (f"Could not download Java automatically (network error): {exc}. "
-            "Check your internet connection and try again."),
+            (
+                f"Could not download Java automatically (network error): {exc}. "
+                "Check your internet connection and try again."
+            ),
         )
 
     try:
@@ -408,36 +412,53 @@ def install_java_linux() -> tuple[bool, str]:
     else:
         return (
             False,
-            (f"Automatic installation is not possible (no pkexec/sudo). "
-            f"Run the following in a terminal:\n  {INSTALL_HINTS[pm]}"),
+            (
+                f"Automatic installation is not possible (no pkexec/sudo). "
+                f"Run the following in a terminal:\n  {INSTALL_HINTS[pm]}"
+            ),
         )
 
     cmd = prefix + install_args + [pkg]
     log.info("Installing Java via %s: %s", how, " ".join(cmd))
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=300, check=False
+        )
     except subprocess.TimeoutExpired:
         return False, f"Java installation timed out. Run manually: {INSTALL_HINTS[pm]}"
     except FileNotFoundError:
-        return False, f"Privileged installer not found. Run manually: {INSTALL_HINTS[pm]}"
+        return (
+            False,
+            f"Privileged installer not found. Run manually: {INSTALL_HINTS[pm]}",
+        )
     except OSError as exc:
-        return False, f"Java installation failed ({exc}). Run manually: {INSTALL_HINTS[pm]}"
+        return (
+            False,
+            f"Java installation failed ({exc}). Run manually: {INSTALL_HINTS[pm]}",
+        )
 
     if result.returncode != 0:
         stderr = (result.stderr or result.stdout or "").strip()[:400]
         return (
             False,
-            (f"Java installation failed ({pm} exit {result.returncode}). "
-            f"{stderr}\nRun the following in a terminal:\n  {INSTALL_HINTS[pm]}"),
+            (
+                f"Java installation failed ({pm} exit {result.returncode}). "
+                f"{stderr}\nRun the following in a terminal:\n  {INSTALL_HINTS[pm]}"
+            ),
         )
 
     java_path = _system_java_path()
     if java_path is not None and java_is_usable(java_path):
         version = java_version_string(java_path)
-        return True, f"Java installed successfully {how}: {java_path} (version {version})"
+        return (
+            True,
+            f"Java installed successfully {how}: {java_path} (version {version})",
+        )
 
     return (
         False,
-        (f"Package manager reported success but Java is still not usable. "
-        f"Run manually: {INSTALL_HINTS[pm]}"),
+        (
+            f"Package manager reported success but Java is still not usable. "
+            f"Run manually: {INSTALL_HINTS[pm]}"
+        ),
     )

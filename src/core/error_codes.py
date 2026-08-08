@@ -171,7 +171,9 @@ class ErrorInstance:
             self.message,
         ]
         if self.root_exception:
-            parts.append(f"Reason: {type(self.root_exception).__name__}: {self.root_exception}")
+            parts.append(
+                f"Reason: {type(self.root_exception).__name__}: {self.root_exception}"
+            )
         if self.impact:
             parts.append(f"Impact: {self.impact}")
         if self.recovery_hint:
@@ -1315,10 +1317,12 @@ HEARTBEAT_0002 = ErrorCode(
 
 _CODE_MAP: dict[str, ErrorCode] = {}
 
+
 def _build_map() -> None:
     for _obj in globals().values():
         if isinstance(_obj, ErrorCode):
             _CODE_MAP[_obj.code] = _obj
+
 
 _build_map()
 

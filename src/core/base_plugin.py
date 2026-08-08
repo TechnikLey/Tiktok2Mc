@@ -55,6 +55,7 @@ def _api_url(path: str) -> str:
 #  BasePlugin
 # ---------------------------------------------------------------------------
 
+
 class BasePlugin:
     """Abstract base for TikTok2MC plugins.
 
@@ -169,7 +170,8 @@ class BasePlugin:
         try:
             body = json.dumps(data).encode("utf-8")
             req = urllib.request.Request(
-                _api_url(path), data=body,
+                _api_url(path),
+                data=body,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
@@ -193,7 +195,9 @@ class BasePlugin:
         """Push current ``self.state`` to the API state endpoint."""
         self.api_post(f"/plugins/{self.PLUGIN_NAME}/state", {"state": self.state})
 
-    def send_command(self, target_plugin: str, command: str, args: dict[str, Any] | None = None) -> bool:
+    def send_command(
+        self, target_plugin: str, command: str, args: dict[str, Any] | None = None
+    ) -> bool:
         """Send a command to another plugin via the API."""
         payload = {"command": command, "args": args or {}}
         return self.api_post(f"/plugins/{target_plugin}/command", payload)
@@ -224,10 +228,15 @@ class BasePlugin:
                 if handler:
                     try:
                         handler(args)
-                    except Exception as e:  # handler is user code — must never kill the polling loop
+                    except (
+                        Exception
+                    ) as e:  # handler is user code — must never kill the polling loop
                         log.exception("[%s] Handler '%s' failed", self.PLUGIN_NAME, cmd)
                         if self._health:
-                            self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"handler '{cmd}' failed: {e}")
+                            self._health.record_error(
+                                f"plugin.{self.PLUGIN_NAME}",
+                                f"handler '{cmd}' failed: {e}",
+                            )
                 else:
                     # Fall through to subclass ``on_command`` override
                     self.on_command(cmd, args)
@@ -247,10 +256,14 @@ class BasePlugin:
         while self._running:
             try:
                 self.on_tick()
-            except Exception as e:  # on_tick is user code — must never kill the tick loop
+            except (
+                Exception
+            ) as e:  # on_tick is user code — must never kill the tick loop
                 log.exception("[%s] Tick failed", self.PLUGIN_NAME)
                 if self._health:
-                    self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"on_tick failed: {e}")
+                    self._health.record_error(
+                        f"plugin.{self.PLUGIN_NAME}", f"on_tick failed: {e}"
+                    )
             heartbeat_counter += 1
             if heartbeat_counter >= self._HEARTBEAT_INTERVAL:
                 heartbeat_counter = 0
@@ -314,6 +327,7 @@ class BasePlugin:
         if not self.gui_hidden:
             try:
                 import webview
+
                 window = webview.create_window(
                     self.PLUGIN_NAME,
                     f"http://{_SERVER_HOST}:29185/api/v1/plugins/{self.PLUGIN_NAME}/overlay",
@@ -324,11 +338,16 @@ class BasePlugin:
                 )
                 webview.start()
             except ImportError:
-                log.error("[%s] pywebview not installed — cannot open GUI window", self.PLUGIN_NAME)
+                log.error(
+                    "[%s] pywebview not installed — cannot open GUI window",
+                    self.PLUGIN_NAME,
+                )
         else:
             log.info(
                 "[%s] Running in gui_hidden mode. Open "
                 "http://%s:29185/api/v1/plugins/%s/overlay in OBS as a Browser Source.",
-                self.PLUGIN_NAME, _SERVER_HOST, self.PLUGIN_NAME,
+                self.PLUGIN_NAME,
+                _SERVER_HOST,
+                self.PLUGIN_NAME,
             )
             tick_thread.join()

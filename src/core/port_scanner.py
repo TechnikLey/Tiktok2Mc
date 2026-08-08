@@ -23,9 +23,24 @@ RUNTIME_FILE = "ports_resolved.json"
 
 # Ports the application binds (in order they should be checked)
 BIND_PORTS: list[dict[str, Any]] = [
-    {"key": "api_port",         "config_path": "api.port",         "default": 29185, "desc": "Central API server (FastAPI)"},
-    {"key": "webhook_port",     "config_path": "minecraft_server_api.web_server_port", "default": 29188, "desc": "Bot webhook (Flask)"},
-    {"key": "mcserver_api_port","config_path": "minecraft_server_api.api_port",        "default": 29187, "desc": "MC Server API plugin"},
+    {
+        "key": "api_port",
+        "config_path": "api.port",
+        "default": 29185,
+        "desc": "Central API server (FastAPI)",
+    },
+    {
+        "key": "webhook_port",
+        "config_path": "minecraft_server_api.web_server_port",
+        "default": 29188,
+        "desc": "Bot webhook (Flask)",
+    },
+    {
+        "key": "mcserver_api_port",
+        "config_path": "minecraft_server_api.api_port",
+        "default": 29187,
+        "desc": "MC Server API plugin",
+    },
 ]
 
 # Connect-only ports that don't need scanning
@@ -69,9 +84,7 @@ def is_port_in_use(host: str, port: int) -> bool:
         return False
 
 
-def find_available_port(
-    host: str, preferred: int, max_offset: int
-) -> int:
+def find_available_port(host: str, preferred: int, max_offset: int) -> int:
     """Return the first available port starting at *preferred*.
 
     Tries ``preferred``, then ``preferred + 1``, up to
@@ -135,9 +148,7 @@ def scan_bind_ports(
     """
     results: list[PortCheckResult] = []
     for bp in bind_ports or BIND_PORTS:
-        preferred = _read_config_port(
-            config, bp.get("config_path", ""), bp["default"]
-        )
+        preferred = _read_config_port(config, bp.get("config_path", ""), bp["default"])
         in_use = is_port_in_use(host, preferred)
         r = PortCheckResult(
             port=preferred,
@@ -146,9 +157,7 @@ def scan_bind_ports(
             in_use=in_use,
         )
         if in_use and policy.auto_resolve:
-            r.resolved_port = find_available_port(
-                host, preferred, policy.max_offset
-            )
+            r.resolved_port = find_available_port(host, preferred, policy.max_offset)
         results.append(r)
     return results
 
@@ -168,9 +177,7 @@ def write_runtime_file(
     runtime_dir.mkdir(parents=True, exist_ok=True)
     path = runtime_dir / RUNTIME_FILE
     try:
-        path.write_text(
-            json.dumps(resolved, indent=2), encoding="utf-8"
-        )
+        path.write_text(json.dumps(resolved, indent=2), encoding="utf-8")
         log.debug("Wrote resolved ports to %s", path)
     except OSError as exc:
         log.warning("Failed to write port runtime file: %s", exc)

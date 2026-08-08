@@ -68,8 +68,11 @@ Three layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS 
 - **pyright** — static type checker (optional; **not in CI, not in `requirements.txt`, no config file in repo**).
   - Commands: `pyright` or `pyright <path>`
   - When: after type-hint-sensitive changes (Pydantic models, API, `trigger_engine`); local check before committing.
-- **ruff** — linter (optional; **not in CI**). Config: `ruff.toml` — curated `select` that passes clean (`ruff check .` = 0 findings); rules with remaining findings are listed there as *deferred* (fix them, then move from deferred into `select`). Broad-except policy `BLE001`/`S110` is enforced via per-file-ignores (error-boundary architecture, see the config comments).
-  - Commands: `ruff check .` · `ruff check --fix .` · `ruff check --select <deferred-rule> .` (inspect a deferred rule) · `ruff format --check .`
+- **ruff (format)** — the project's **formatter** (Python only). All Python files are formatted with `ruff format`; scope is `[format]` in `ruff.toml` (restricted to `.py`/`.pyi` — non-Python files are never changed purely for formatting). `ruff format` is the one and only formatting style — don't replace it with hand-made formatting. Formatting is **required**, not optional.
+  - Commands: `ruff format .` · `ruff format --check .`
+  - When: after any change to Python files, run `ruff format` on the touched files; `ruff format --check .` must pass before committing.
+- **ruff (lint)** — linter (optional; **not in CI**). Config: `ruff.toml` — curated `select` that passes clean (`ruff check .` = 0 findings); rules with remaining findings are listed there as *deferred* (fix them, then move from deferred into `select`). Broad-except policy `BLE001`/`S110` is enforced via per-file-ignores (error-boundary architecture, see the config comments).
+  - Commands: `ruff check .` · `ruff check --fix .` · `ruff check --select <deferred-rule> .` (inspect a deferred rule)
   - When: after Python changes, before committing; keeps style consistent.
 
 ### 7.2 GUI — Vitest + jsdom, ESLint
@@ -97,7 +100,7 @@ Three layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS 
 
 ### 7.5 Test style & validation priority
 - One `test_<module>.py` per module in `tests/test_core/` or `tests/test_api/`.
-- **Validation priority:** relevant pytest file → vitest (only if GUI touched) → LSP + diff test (only for `.mca` changes). Static analysis (ruff/pyright/eslint) before larger changes.
+- **Validation priority:** relevant pytest file → vitest (only if GUI touched) → LSP + diff test (only for `.mca` changes). Static analysis (ruff/pyright/eslint) before larger changes; `ruff format --check .` before committing.
 
 ## 8. Commands (reference)
 ```bash
@@ -118,6 +121,7 @@ python tools/diff_test_mca.py --count 500      # Python↔JS parity
 python build.py test                  # MCA tests (--all adds pytest)
 
 # Validation
+ruff format --check .                  # format check (config: [format] in ruff.toml)
 ruff check .                          # lint (config: ruff.toml; local-only)
 pyright                               # type check (not in CI; local-only)
 cd templates/gui && npx eslint .      # GUI lint

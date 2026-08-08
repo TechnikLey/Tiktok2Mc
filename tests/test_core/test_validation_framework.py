@@ -252,7 +252,11 @@ class TestStartupValidation:
         from core.validation_framework import validate_directory
 
         d = tmp_path / "fail_create"
-        monkeypatch.setattr(type(d), "mkdir", lambda self, **kw: (_ for _ in ()).throw(PermissionError("denied")))
+        monkeypatch.setattr(
+            type(d),
+            "mkdir",
+            lambda self, **kw: (_ for _ in ()).throw(PermissionError("denied")),
+        )
         result = validate_directory(d, "fail", create=True)
         assert result.passed is False
 

@@ -90,9 +90,7 @@ class PluginRegistry:
         with self._lock:
             return list(self._plugins.values())
 
-    def update(
-        self, name: str, **updates: Any
-    ) -> PluginRegistration | None:
+    def update(self, name: str, **updates: Any) -> PluginRegistration | None:
         """Partial update of a plugin entry.
 
         Only the supplied keyword arguments are changed; everything

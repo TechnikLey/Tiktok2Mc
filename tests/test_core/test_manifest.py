@@ -97,9 +97,7 @@ class TestPluginRegistrationFromManifest:
             entry_point="src/plugins/timer/main.py",
             display_name="Timer",
         )
-        reg = PluginRegistration.from_manifest(
-            manifest, enabled=True, level=3
-        )
+        reg = PluginRegistration.from_manifest(manifest, enabled=True, level=3)
         assert reg.enabled is True
         assert reg.level == 3
 
@@ -118,9 +116,7 @@ class TestManifestDiscovery:
             "entry_point": "src/plugins/timer/main.py",
             "display_name": "Timer",
         }
-        (timer_dir / "plugin.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (timer_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
 
         launcher = PluginLauncher(plugins_dir=plugins_dir)
         manifests = launcher._discover_from_manifests()
@@ -136,12 +132,14 @@ class TestManifestDiscovery:
             d = plugins_dir / name
             d.mkdir()
             (d / "plugin.json").write_text(
-                json.dumps({
-                    "name": name,
-                    "version": "1.0.0",
-                    "entry_point": f"src/plugins/{name}/main.py",
-                    "display_name": name.title(),
-                }),
+                json.dumps(
+                    {
+                        "name": name,
+                        "version": "1.0.0",
+                        "entry_point": f"src/plugins/{name}/main.py",
+                        "display_name": name.title(),
+                    }
+                ),
                 encoding="utf-8",
             )
 
@@ -157,12 +155,14 @@ class TestManifestDiscovery:
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "has-manifest").mkdir()
         (plugins_dir / "has-manifest" / "plugin.json").write_text(
-            json.dumps({
-                "name": "has-manifest",
-                "version": "1.0.0",
-                "entry_point": "p.py",
-                "display_name": "Has Manifest",
-            }),
+            json.dumps(
+                {
+                    "name": "has-manifest",
+                    "version": "1.0.0",
+                    "entry_point": "p.py",
+                    "display_name": "Has Manifest",
+                }
+            ),
             encoding="utf-8",
         )
         (plugins_dir / "no-manifest").mkdir()
@@ -179,9 +179,7 @@ class TestManifestDiscovery:
         plugins_dir.mkdir(parents=True)
         d = plugins_dir / "bad-json"
         d.mkdir()
-        (d / "plugin.json").write_text(
-            "this is not json", encoding="utf-8"
-        )
+        (d / "plugin.json").write_text("this is not json", encoding="utf-8")
 
         launcher = PluginLauncher(plugins_dir=plugins_dir)
         manifests = launcher._discover_from_manifests()
@@ -196,12 +194,14 @@ class TestManifestDiscovery:
             d = plugins_dir / sub
             d.mkdir()
             (d / "plugin.json").write_text(
-                json.dumps({
-                    "name": "dup",
-                    "version": "1.0.0",
-                    "entry_point": "p.py",
-                    "display_name": "Dup",
-                }),
+                json.dumps(
+                    {
+                        "name": "dup",
+                        "version": "1.0.0",
+                        "entry_point": "p.py",
+                        "display_name": "Dup",
+                    }
+                ),
                 encoding="utf-8",
             )
 
@@ -217,10 +217,12 @@ class TestManifestDiscovery:
         d = plugins_dir / "bad-schema"
         d.mkdir()
         (d / "plugin.json").write_text(
-            json.dumps({
-                "name": "bad",    # missing entry_point, display_name
-                "version": "1.0.0",
-            }),
+            json.dumps(
+                {
+                    "name": "bad",  # missing entry_point, display_name
+                    "version": "1.0.0",
+                }
+            ),
             encoding="utf-8",
         )
 
@@ -275,13 +277,15 @@ class TestManifestRegistrationViaAPI:
         plugins_dir.mkdir(parents=True)
         (plugins_dir / "timer").mkdir()
         (plugins_dir / "timer" / "plugin.json").write_text(
-            json.dumps({
-                "name": "timer",
-                "version": "1.0.0",
-                "entry_point": "src/plugins/timer/main.py",
-                "display_name": "Timer",
-                "capabilities": ["timer:schedule"],
-            }),
+            json.dumps(
+                {
+                    "name": "timer",
+                    "version": "1.0.0",
+                    "entry_point": "src/plugins/timer/main.py",
+                    "display_name": "Timer",
+                    "capabilities": ["timer:schedule"],
+                }
+            ),
             encoding="utf-8",
         )
 

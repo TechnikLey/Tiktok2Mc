@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 # Signal file concept
 # =========================================================================
 
+
 class TestSignalFileConcept:
     """Tests for the runtime signal file pattern used by start.py."""
 
@@ -39,6 +40,7 @@ class TestSignalFileConcept:
 # Plugin manifest discovery
 # =========================================================================
 
+
 class TestManifestDiscovery:
     """Tests for plugin.json manifest discovery (no API dependency)."""
 
@@ -54,6 +56,7 @@ class TestManifestDiscovery:
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
 
         from core.api.launcher import PluginLauncher
+
         launcher = PluginLauncher(plugins_dir=tmp_path / "plugins")
         discovered = launcher._discover_from_manifests()
         assert len(discovered) == 1
@@ -65,6 +68,7 @@ class TestManifestDiscovery:
         (plugin_dir / "plugin.json").write_text("not json")
 
         from core.api.launcher import PluginLauncher
+
         launcher = PluginLauncher(plugins_dir=tmp_path / "plugins")
         discovered = launcher._discover_from_manifests()
         assert len(discovered) == 0
@@ -74,6 +78,7 @@ class TestManifestDiscovery:
         plugin_dir.mkdir(parents=True)
 
         from core.api.launcher import PluginLauncher
+
         launcher = PluginLauncher(plugins_dir=tmp_path / "plugins")
         discovered = launcher._discover_from_manifests()
         assert len(discovered) == 0
@@ -83,11 +88,18 @@ class TestManifestDiscovery:
             d = tmp_path / "plugins" / f"dir{i}"
             d.mkdir(parents=True)
             (d / "plugin.json").write_text(
-                json.dumps({"name": "dup-plugin", "version": "1.0",
-                            "entry_point": "main.py", "display_name": "Dup"})
+                json.dumps(
+                    {
+                        "name": "dup-plugin",
+                        "version": "1.0",
+                        "entry_point": "main.py",
+                        "display_name": "Dup",
+                    }
+                )
             )
 
         from core.api.launcher import PluginLauncher
+
         launcher = PluginLauncher(plugins_dir=tmp_path / "plugins")
         discovered = launcher._discover_from_manifests()
         assert len(discovered) == 1
@@ -97,11 +109,18 @@ class TestManifestDiscovery:
             d = tmp_path / "plugins" / f"p{i}"
             d.mkdir(parents=True)
             (d / "plugin.json").write_text(
-                json.dumps({"name": f"p{i}", "version": "1.0",
-                            "entry_point": "main.py", "display_name": f"P{i}"})
+                json.dumps(
+                    {
+                        "name": f"p{i}",
+                        "version": "1.0",
+                        "entry_point": "main.py",
+                        "display_name": f"P{i}",
+                    }
+                )
             )
 
         from core.api.launcher import PluginLauncher
+
         launcher = PluginLauncher(plugins_dir=tmp_path / "plugins")
         discovered = launcher._discover_from_manifests()
         assert len(discovered) == 3
@@ -111,6 +130,7 @@ class TestManifestDiscovery:
 # =========================================================================
 # Plugin registration via API
 # =========================================================================
+
 
 class TestPluginRegistration:
     """Tests for the POST /api/v1/plugins/register endpoint."""
@@ -145,6 +165,7 @@ class TestPluginRegistration:
 # =========================================================================
 # Health check logic (process dictionary, standalone)
 # =========================================================================
+
 
 class TestHealthCheck:
     """Tests for the health check pattern used by start.py."""
@@ -183,6 +204,7 @@ class TestHealthCheck:
 # Bridge initialization
 # =========================================================================
 
+
 class TestBridgeInit:
     """Tests for config loading and comment handler fetch."""
 
@@ -191,6 +213,7 @@ class TestBridgeInit:
         config_file.write_text("server_host: 127.0.0.1\ntiktok:\n  user: test_user\n")
 
         from core.yaml_utils import load_yaml
+
         cfg = load_yaml(config_file)
         assert cfg["server_host"] == "127.0.0.1"
         assert cfg["tiktok"]["user"] == "test_user"
@@ -210,6 +233,7 @@ class TestBridgeInit:
         monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
 
         import urllib.request
+
         resp = urllib.request.urlopen("http://127.0.0.1:29185/api/v1/comment-handlers")
         data = json.loads(resp.read().decode())
         assert data == expected

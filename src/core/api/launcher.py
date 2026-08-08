@@ -39,6 +39,8 @@ _TIMEOUT = 5
 def _get_api_base() -> str:
     """Return the API base URL, checking the environment on every call."""
     return os.environ.get("API_BASE_URL", "http://127.0.0.1:29185/api/v1")
+
+
 _PLUGINS_DIR_NAME = "plugins"
 
 
@@ -112,7 +114,8 @@ class PluginLauncher:
             if plugins:
                 log.info(
                     "Plugin source: %s (%d plugin(s))",
-                    self.source, self.plugin_count,
+                    self.source,
+                    self.plugin_count,
                 )
             else:
                 log.info("Plugin source: %s — 0 plugins registered", self.source)
@@ -120,9 +123,7 @@ class PluginLauncher:
 
         self.source = "empty"
         self.plugin_count = 0
-        log.warning(
-            "Plugin source: API unreachable — no plugins loaded"
-        )
+        log.warning("Plugin source: API unreachable — no plugins loaded")
         return []
 
     # -- manifest discovery ------------------------------------------------
@@ -133,6 +134,7 @@ class PluginLauncher:
             return self._plugins_dir
         try:
             from core.paths import get_root_dir
+
             root = get_root_dir()
             # Dev layout: src/plugins/   Release layout: plugins/
             dev_dir = root / "src" / _PLUGINS_DIR_NAME
@@ -172,14 +174,16 @@ class PluginLauncher:
             except (json.JSONDecodeError, ValueError) as exc:
                 log.warning(
                     "Skipping invalid manifest %s: %s",
-                    manifest_file, exc,
+                    manifest_file,
+                    exc,
                 )
                 continue
 
             if manifest.name in seen_names:
                 log.warning(
                     "Duplicate plugin name '%s' in %s — skipping",
-                    manifest.name, manifest_file,
+                    manifest.name,
+                    manifest_file,
                 )
                 continue
             seen_names.add(manifest.name)
@@ -187,9 +191,7 @@ class PluginLauncher:
 
         return results
 
-    def _register_manifests(
-        self, manifests: list[PluginManifest]
-    ) -> None:
+    def _register_manifests(self, manifests: list[PluginManifest]) -> None:
         """Register each manifest with the central API.
 
         In release builds (frozen executables) the entry_point path
@@ -240,7 +242,8 @@ class PluginLauncher:
         data = json.dumps(body).encode("utf-8")
         try:
             req = urllib.request.Request(
-                url, data=data,
+                url,
+                data=data,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
@@ -259,9 +262,15 @@ class PluginLauncher:
         try:
             with urllib.request.urlopen(url, timeout=_TIMEOUT) as resp:
                 raw = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, urllib.error.HTTPError,
-                ConnectionResetError, TimeoutError, OSError,
-                json.JSONDecodeError, ValueError) as exc:
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            ConnectionResetError,
+            TimeoutError,
+            OSError,
+            json.JSONDecodeError,
+            ValueError,
+        ) as exc:
             log.debug("API GET /plugins failed: %s", exc)
             return None
 
@@ -269,13 +278,12 @@ class PluginLauncher:
         result: list[AppConfig] = []
         for entry in plugins_raw:
             try:
-                result.append(
-                    AppConfig.from_dict(_api_to_legacy_dict(entry))
-                )
+                result.append(AppConfig.from_dict(_api_to_legacy_dict(entry)))
             except (ValueError, TypeError) as exc:
                 log.warning(
                     "Skipping invalid API entry %s: %s",
-                    entry.get("name", "<unknown>"), exc,
+                    entry.get("name", "<unknown>"),
+                    exc,
                 )
         # Sort by dependency order so dependants start after dependencies
         result = [

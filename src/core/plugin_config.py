@@ -155,7 +155,9 @@ def _heal_plugin_config(data: dict, schema: dict) -> dict:
         if field and "default" in field:
             log.warning(
                 "Healing plugin config field '%s': %s — using default %r",
-                key, err, field["default"],
+                key,
+                err,
+                field["default"],
             )
             _set_nested(healed, key, copy.deepcopy(field["default"]))
         else:
@@ -319,9 +321,7 @@ def _validate_field_value(value: Any, field: dict, path: str) -> list[str]:
         return errors
 
     if ftype == "color":
-        if not isinstance(value, str) or not re.fullmatch(
-            r"#[0-9a-fA-F]{6}", value
-        ):
+        if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
             errors.append(f"{path} must be a hex color like #RRGGBB")
         return errors
 

@@ -28,15 +28,15 @@ class TimerPlugin(BasePlugin):
         cfg = self.config
 
         # ---- configuration -------------------------------------------------
-        self._direction = cfg.get("direction", "down")          # "up" | "down"
-        self._start_time = int(cfg.get("start_time", 600))      # seconds
+        self._direction = cfg.get("direction", "down")  # "up" | "down"
+        self._start_time = int(cfg.get("start_time", 600))  # seconds
         self._auto_start = cfg.get("auto_start", False)
         self._loop = cfg.get("loop", False)
-        self._reset_on = set(cfg.get("reset_on", ["zero"]))    # list of str
+        self._reset_on = set(cfg.get("reset_on", ["zero"]))  # list of str
         self._signal_on = set(cfg.get("signal_on", ["zero"]))  # list of str
         self._milestones = sorted({int(m) for m in cfg.get("milestones", [])})
-        self._format = cfg.get("format", "mm:ss")               # "mm:ss" | "hh:mm:ss" | "seconds"
-        self._time_step = int(cfg.get("time_step", 1))          # seconds per tick
+        self._format = cfg.get("format", "mm:ss")  # "mm:ss" | "hh:mm:ss" | "seconds"
+        self._time_step = int(cfg.get("time_step", 1))  # seconds per tick
 
         # ---- runtime state -------------------------------------------------
         self._current = 0 if self._direction == "up" else self._start_time
@@ -83,7 +83,11 @@ class TimerPlugin(BasePlugin):
 
     def _maybe_signal(self, trigger: str, extra: dict | None = None):
         if self._should_signal(trigger):
-            data = {"current": self._current, "initial": self._start_time, "direction": self._direction}
+            data = {
+                "current": self._current,
+                "initial": self._start_time,
+                "direction": self._direction,
+            }
             if extra:
                 data.update(extra)
             self._publish(f"timer.{trigger}", data)
@@ -166,8 +170,9 @@ class TimerPlugin(BasePlugin):
         # Milestones (for count-down: trigger at or below; for count-up: trigger at or above)
         for ms in self._milestones:
             if ms not in self._milestones_sent:
-                hit = (self._direction == "down" and self._current <= ms) or \
-                      (self._direction == "up" and self._current >= ms)
+                hit = (self._direction == "down" and self._current <= ms) or (
+                    self._direction == "up" and self._current >= ms
+                )
                 if hit:
                     self._milestones_sent.add(ms)
                     self._maybe_signal("milestone", {"milestone": ms})
@@ -302,5 +307,5 @@ class TimerPlugin(BasePlugin):
 </html>"""
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     TimerPlugin().run()

@@ -85,7 +85,11 @@ class TestSendTriggerCLI:
         rc = st.main(["comment", "--user", "TestUser", "--text", "hello"])
         assert rc == 0
         mock_engine.execute_comment.assert_called_once_with(
-            user="TestUser", text="hello", moderator=False, superfan=False, fanclub=False
+            user="TestUser",
+            text="hello",
+            moderator=False,
+            superfan=False,
+            fanclub=False,
         )
 
     def test_comment_with_flags(self, mock_engine):
@@ -98,10 +102,17 @@ class TestSendTriggerCLI:
             execution_time_ms=5.0,
             payload={"user": "TestUser", "text": "hello"},
         )
-        rc = st.main([
-            "comment", "--user", "TestUser", "--text", "hello",
-            "--moderator", "--superfan",
-        ])
+        rc = st.main(
+            [
+                "comment",
+                "--user",
+                "TestUser",
+                "--text",
+                "hello",
+                "--moderator",
+                "--superfan",
+            ]
+        )
         assert rc == 0
         mock_engine.execute_comment.assert_called_once_with(
             user="TestUser", text="hello", moderator=True, superfan=True, fanclub=False
@@ -158,6 +169,7 @@ class TestSendTriggerCLI:
 
     def test_no_arguments_returns_error(self, mock_engine):
         import python.send_trigger as st
+
         rc = st.main([])
         assert rc == 1
 
@@ -192,9 +204,21 @@ class TestSendTriggerCLI:
         from core.trigger_engine.models import TriggerDefinition
 
         mock_engine.get_trigger_definitions.return_value = [
-            TriggerDefinition(name="follow", display_name="Follow", description="A follow event"),
-            TriggerDefinition(name="gift", display_name="Gift", description="A gift event", requires_gift_selection=True),
-            TriggerDefinition(name="comment", display_name="Comment", description="A comment", supports_comment_text=True),
+            TriggerDefinition(
+                name="follow", display_name="Follow", description="A follow event"
+            ),
+            TriggerDefinition(
+                name="gift",
+                display_name="Gift",
+                description="A gift event",
+                requires_gift_selection=True,
+            ),
+            TriggerDefinition(
+                name="comment",
+                display_name="Comment",
+                description="A comment",
+                supports_comment_text=True,
+            ),
         ]
         rc = st.main(["--list"])
         assert rc == 0

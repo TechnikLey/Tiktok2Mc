@@ -158,8 +158,8 @@ def check_tool_update(current_version: str) -> dict[str, Any]:
     result["published_at"] = release.get("published_at", "")
 
     try:
-        result["update_available"] = (
-            version_parse.parse(latest) > version_parse.parse(current_version)
+        result["update_available"] = version_parse.parse(latest) > version_parse.parse(
+            current_version
         )
     except version_parse.InvalidVersion as exc:
         result["error"] = f"Version comparison failed: {exc}"
@@ -177,9 +177,7 @@ class PluginUpdateChecker:
     def __init__(self) -> None:
         self._last_check: dict[str, dict[str, Any]] = {}
 
-    def check_updates(
-        self, plugins: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def check_updates(self, plugins: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Check all plugins that have an ``update_url``.
 
         ``plugins`` should be a list of ``PluginRegistration`` dicts
@@ -207,10 +205,9 @@ class PluginUpdateChecker:
                 error = "Could not fetch remote version"
             else:
                 try:
-                    update_available = (
-                        version_parse.parse(latest_version)
-                        > version_parse.parse(current_version)
-                    )
+                    update_available = version_parse.parse(
+                        latest_version
+                    ) > version_parse.parse(current_version)
                 except version_parse.InvalidVersion as exc:
                     error = f"Version comparison failed: {exc}"
 
@@ -229,9 +226,7 @@ class PluginUpdateChecker:
 
         return results
 
-    def get_cached_status(
-        self, name: str
-    ) -> dict[str, Any] | None:
+    def get_cached_status(self, name: str) -> dict[str, Any] | None:
         """Return the last check result for a plugin, or ``None``."""
         return self._last_check.get(name)
 
@@ -272,7 +267,8 @@ class PluginUpdateChecker:
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 log.error(
                     "Failed to fetch release info for '%s': %s",
-                    name, exc,
+                    name,
+                    exc,
                 )
                 return False
 
@@ -296,9 +292,7 @@ class PluginUpdateChecker:
                     None,
                 )
             if not target_asset:
-                log.error(
-                    "No downloadable asset found for '%s'", name
-                )
+                log.error("No downloadable asset found for '%s'", name)
                 return False
 
             download_url = target_asset["url"]
@@ -325,7 +319,10 @@ class PluginUpdateChecker:
                 try:
                     req = urllib.request.Request(
                         checksum_url,
-                        headers={"User-Agent": _USER_AGENT, "Accept": "application/octet-stream"},
+                        headers={
+                            "User-Agent": _USER_AGENT,
+                            "Accept": "application/octet-stream",
+                        },
                     )
                     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
                         body = resp.read().decode("utf-8").strip()
@@ -393,12 +390,8 @@ class PluginUpdateChecker:
                     latest_version = plugin.get("latest_version", "")
                     if latest_version:
                         manifest["version"] = latest_version
-                        with manifest_file.open(
-                            "w", encoding="utf-8"
-                        ) as fh:
-                            json.dump(
-                                manifest, fh, indent=2, ensure_ascii=False
-                            )
+                        with manifest_file.open("w", encoding="utf-8") as fh:
+                            json.dump(manifest, fh, indent=2, ensure_ascii=False)
                 except (json.JSONDecodeError, OSError, TypeError) as exc:
                     log.warning(
                         "Could not update version in manifest: %s",
@@ -408,9 +401,7 @@ class PluginUpdateChecker:
             return True
 
         except OSError as exc:
-            log.error(
-                "Failed to install update for '%s': %s", name, exc
-            )
+            log.error("Failed to install update for '%s': %s", name, exc)
             # Restore backup
             if backup_dir.exists():
                 if plugin_dir.exists():

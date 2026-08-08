@@ -80,7 +80,9 @@ class TestCrashManagerBasics:
     def test_report_error_with_context(self, crash_mgr):
         from core.error_codes import CORE_0002
 
-        instance = crash_mgr.report_error(CORE_0002, detail="fail", context_info={"user": "alice"})
+        instance = crash_mgr.report_error(
+            CORE_0002, detail="fail", context_info={"user": "alice"}
+        )
         assert instance.context.get("user") == "alice"
 
     def test_report_exception_with_traceback(self, crash_mgr):

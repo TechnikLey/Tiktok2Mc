@@ -164,7 +164,18 @@ class TestHookRegistry:
 
     def test_sync_from_discovery_new_hooks(self, registry):
         discovered = [
-            {"name": "new_hook", "version": "1.0", "display_name": "New", "description": "", "author": "", "capabilities": [], "plugin": "", "update_url": "", "source": "/path", "_error": ""}
+            {
+                "name": "new_hook",
+                "version": "1.0",
+                "display_name": "New",
+                "description": "",
+                "author": "",
+                "capabilities": [],
+                "plugin": "",
+                "update_url": "",
+                "source": "/path",
+                "_error": "",
+            }
         ]
         count = registry.sync_from_discovery(discovered)
         assert count == 1
@@ -172,8 +183,30 @@ class TestHookRegistry:
 
     def test_sync_from_discovery_duplicates(self, registry):
         discovered = [
-            {"name": "existing", "version": "1.0", "display_name": "E", "description": "", "author": "", "capabilities": [], "plugin": "", "update_url": "", "source": "/p1", "_error": ""},
-            {"name": "existing", "version": "1.0", "display_name": "E", "description": "", "author": "", "capabilities": [], "plugin": "", "update_url": "", "source": "/p2", "_error": ""},
+            {
+                "name": "existing",
+                "version": "1.0",
+                "display_name": "E",
+                "description": "",
+                "author": "",
+                "capabilities": [],
+                "plugin": "",
+                "update_url": "",
+                "source": "/p1",
+                "_error": "",
+            },
+            {
+                "name": "existing",
+                "version": "1.0",
+                "display_name": "E",
+                "description": "",
+                "author": "",
+                "capabilities": [],
+                "plugin": "",
+                "update_url": "",
+                "source": "/p2",
+                "_error": "",
+            },
         ]
         count = registry.sync_from_discovery(discovered)
         assert count == 1

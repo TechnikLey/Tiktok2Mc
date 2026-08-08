@@ -47,23 +47,28 @@ class TestApiReady:
         mock_resp = MagicMock()
         mock_resp.status = 200
         # urlopen is used as a context manager
-        mock_cm = MagicMock(__enter__=MagicMock(return_value=mock_resp), __exit__=MagicMock(return_value=False))
+        mock_cm = MagicMock(
+            __enter__=MagicMock(return_value=mock_resp),
+            __exit__=MagicMock(return_value=False),
+        )
         monkeypatch.setattr("urllib.request.urlopen", MagicMock(return_value=mock_cm))
         assert _api_ready(timeout=1.0) is True
 
     def test_api_ready_false_when_connection_fails(self, monkeypatch):
         import urllib.request
+
         monkeypatch.setattr(
-            urllib.request, "urlopen",
-            MagicMock(side_effect=urllib.error.URLError("Connection refused"))
+            urllib.request,
+            "urlopen",
+            MagicMock(side_effect=urllib.error.URLError("Connection refused")),
         )
         assert _api_ready(timeout=0.1) is False
 
     def test_api_ready_false_on_timeout(self, monkeypatch):
         import urllib.request
+
         monkeypatch.setattr(
-            urllib.request, "urlopen",
-            MagicMock(side_effect=TimeoutError())
+            urllib.request, "urlopen", MagicMock(side_effect=TimeoutError())
         )
         assert _api_ready(timeout=0.1) is False
 
@@ -129,8 +134,7 @@ class TestLauncherAPIStartSystem:
         monkeypatch.setattr("python.gui._full_system_proc", None)
 
         monkeypatch.setattr(
-            "subprocess.Popen",
-            MagicMock(side_effect=OSError("Permission denied"))
+            "subprocess.Popen", MagicMock(side_effect=OSError("Permission denied"))
         )
 
         api = LauncherAPI()
@@ -194,13 +198,16 @@ class TestGuiAlreadyRunning:
 
     def test_no_lockfile_means_not_running(self, monkeypatch, tmp_path):
         from python.gui import _gui_already_running
+
         monkeypatch.setattr("python.gui.GUI_LOCKFILE", tmp_path / "nonexistent.lock")
         assert _gui_already_running() is False
 
     def test_lockfile_with_own_pid_is_not_running(self, monkeypatch, tmp_path):
         from python.gui import _gui_already_running
+
         lockfile = tmp_path / "gui.lock"
         import os
+
         lockfile.write_text(str(os.getpid()))
         monkeypatch.setattr("python.gui.GUI_LOCKFILE", lockfile)
         assert _gui_already_running() is False
@@ -217,6 +224,7 @@ class TestGuiAlreadyRunning:
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
+
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 0
@@ -234,6 +242,7 @@ class TestGuiStartup:
 
     def test_launcher_html_exists(self):
         from python.gui import LAUNCHER_HTML
+
         assert LAUNCHER_HTML.exists(), f"Launcher HTML not found at {LAUNCHER_HTML}"
 
     def test_main_opens_launcher_when_api_offline(self, monkeypatch):
@@ -249,6 +258,7 @@ class TestGuiStartup:
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
+
         main()
 
         assert len(opened_urls) == 1
@@ -267,6 +277,7 @@ class TestGuiStartup:
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
+
         main()
 
         assert len(opened_urls) == 1

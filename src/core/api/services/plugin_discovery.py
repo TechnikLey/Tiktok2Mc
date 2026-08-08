@@ -50,13 +50,15 @@ def discover_plugins_from_manifests(base_path: str) -> list[dict[str, Any]]:
             if name in seen_names:
                 continue
             seen_names.add(name)
-            results.append({
-                "name": name,
-                "version": "0.0.0",
-                "entry_point": "",
-                "enabled_by_registry": False,
-                "error": error,
-            })
+            results.append(
+                {
+                    "name": name,
+                    "version": "0.0.0",
+                    "entry_point": "",
+                    "enabled_by_registry": False,
+                    "error": error,
+                }
+            )
             log.warning("Discovered plugin '%s' with broken manifest: %s", name, error)
             continue
 
@@ -74,13 +76,15 @@ def discover_plugins_from_manifests(base_path: str) -> list[dict[str, Any]]:
             continue
         seen_names.add(name)
 
-        results.append({
-            "name": name,
-            "version": raw.get("version", "0.0.0"),
-            "entry_point": raw.get("entry_point", ""),
-            "enabled_by_registry": False,
-            "error": "",
-        })
+        results.append(
+            {
+                "name": name,
+                "version": raw.get("version", "0.0.0"),
+                "entry_point": raw.get("entry_point", ""),
+                "enabled_by_registry": False,
+                "error": "",
+            }
+        )
 
     # Sort by name for deterministic output
     results.sort(key=lambda p: p["name"])

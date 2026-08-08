@@ -118,9 +118,7 @@ class PayloadValidator:
             )
         return errors
 
-    def _validate_gift_id(
-        self, gift_id: str, errors: list[ValidationError]
-    ) -> None:
+    def _validate_gift_id(self, gift_id: str, errors: list[ValidationError]) -> None:
         if not gift_id or not gift_id.strip():
             errors.append(
                 ValidationError(

@@ -48,6 +48,7 @@ try:
     pass
 except Exception as _exc:  # pragma: no cover  # pre-import is best-effort
     import logging as _logging
+
     _pre_log = _logging.getLogger("start.preimport")
     _pre_log.warning("Failed to pre-import uvicorn/core.api: %s", _exc)
 
@@ -98,7 +99,9 @@ def _safe_input(prompt: str = "") -> str:
     try:
         return input(prompt)
     except EOFError:
-        log.warning("No interactive terminal available — treating input as empty/cancel")
+        log.warning(
+            "No interactive terminal available — treating input as empty/cancel"
+        )
         return ""
 
 
@@ -109,6 +112,7 @@ def _input_confirm_exit(prompt: str = "") -> None:
     except EOFError:
         pass
     sys.exit(1)
+
 
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
@@ -152,19 +156,25 @@ if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
             log.error("This script must be run as root on Linux to start the tool.")
             _input_confirm_exit("Press Enter to exit...")
         else:
-            log.warning("Not running as root. Continuing anyway (no TTY). Some features may fail.")
+            log.warning(
+                "Not running as root. Continuing anyway (no TTY). Some features may fail."
+            )
 
 # -----------------------------
 # Plugin sandbox
 # -----------------------------
 _sandbox_cfg = cfg.get("plugin_sandbox", {})
-_plugin_sandbox = PluginSandbox(
-    max_memory_mb=_sandbox_cfg.get("max_memory_mb"),
-    max_cpu_time=_sandbox_cfg.get("max_cpu_time"),
-    max_files=_sandbox_cfg.get("max_files", 256),
-    max_processes=_sandbox_cfg.get("max_processes", 32),
-    priority_class=_sandbox_cfg.get("priority_class", "below_normal"),
-) if _sandbox_cfg.get("enabled", False) else None
+_plugin_sandbox = (
+    PluginSandbox(
+        max_memory_mb=_sandbox_cfg.get("max_memory_mb"),
+        max_cpu_time=_sandbox_cfg.get("max_cpu_time"),
+        max_files=_sandbox_cfg.get("max_files", 256),
+        max_processes=_sandbox_cfg.get("max_processes", 32),
+        priority_class=_sandbox_cfg.get("priority_class", "below_normal"),
+    )
+    if _sandbox_cfg.get("enabled", False)
+    else None
+)
 
 # -----------------------------
 # Settings
@@ -193,7 +203,12 @@ SESSION_TOOL = None
 
 def _detect_package_manager():
     """Returns (install_cmd_tmux, install_cmd_screen) or (None, None)."""
-    for pm, flag in [("apt", "install -y"), ("dnf", "install -y"), ("pacman", "-S --noconfirm"), ("zypper", "install -y")]:
+    for pm, flag in [
+        ("apt", "install -y"),
+        ("dnf", "install -y"),
+        ("pacman", "-S --noconfirm"),
+        ("zypper", "install -y"),
+    ]:
         if shutil.which(pm):
             return (f"sudo {pm} {flag} tmux", f"sudo {pm} {flag} screen")
     return (None, None)
@@ -230,13 +245,17 @@ if not IS_WINDOWS:
                             SESSION_TOOL = "tmux"
                             log.info("tmux installed successfully.\n")
                         else:
-                            log.info("[FAIL] tmux was installed but could not be found.")
+                            log.info(
+                                "[FAIL] tmux was installed but could not be found."
+                            )
                             sys.exit(1)
                     else:
                         log.info("[FAIL] Installation failed. Please install manually.")
                         sys.exit(1)
                 else:
-                    log.info("[FAIL] No package manager detected. Please install manually:")
+                    log.info(
+                        "[FAIL] No package manager detected. Please install manually:"
+                    )
                     log.info("         Ubuntu/Debian : sudo apt install tmux")
                     log.info("         Fedora/RHEL   : sudo dnf install tmux")
                     log.info("         Arch Linux    : sudo pacman -S tmux")
@@ -244,20 +263,26 @@ if not IS_WINDOWS:
             elif choice == "2":
                 if screen_cmd:
                     log.info("\n=> %s", screen_cmd)
-                    ret = subprocess.run(shlex.split(screen_cmd), check=False).returncode
+                    ret = subprocess.run(
+                        shlex.split(screen_cmd), check=False
+                    ).returncode
                     if ret == 0:
                         SCREEN_PATH = shutil.which("screen")
                         if SCREEN_PATH:
                             SESSION_TOOL = "screen"
                             log.info("screen installed successfully.\n")
                         else:
-                            log.info("[FAIL] screen was installed but could not be found.")
+                            log.info(
+                                "[FAIL] screen was installed but could not be found."
+                            )
                             sys.exit(1)
                     else:
                         log.info("[FAIL] Installation failed. Please install manually.")
                         sys.exit(1)
                 else:
-                    log.info("[FAIL] No package manager detected. Please install manually:")
+                    log.info(
+                        "[FAIL] No package manager detected. Please install manually:"
+                    )
                     log.info("         Ubuntu/Debian : sudo apt install screen")
                     log.info("         Fedora/RHEL   : sudo dnf install screen")
                     log.info("         Arch Linux    : sudo pacman -S screen")
@@ -274,7 +299,9 @@ if not IS_WINDOWS:
 _PORT_RUNTIME_DIR = (ROOT_DIR / "core" / "runtime").resolve()
 _port_policy = PortPolicy.from_config(cfg)
 
-_results = scan_bind_ports(cfg.get("server_host", "127.0.0.1"), _port_policy, config=cfg)
+_results = scan_bind_ports(
+    cfg.get("server_host", "127.0.0.1"), _port_policy, config=cfg
+)
 _unresolved = [r for r in _results if r.in_use and not _port_policy.auto_resolve]
 if _unresolved:
     for r in _unresolved:
@@ -286,7 +313,12 @@ _resolved = build_resolved_map(_results)
 if any(r.in_use for r in _results):
     for r in _results:
         if r.in_use:
-            log.info("Port %d (%s) in use -> resolved to %d", r.port, r.description, r.resolved_port)
+            log.info(
+                "Port %d (%s) in use -> resolved to %d",
+                r.port,
+                r.description,
+                r.resolved_port,
+            )
 
 write_runtime_file(_resolved, _PORT_RUNTIME_DIR)
 os.environ.update(ports_to_env(_resolved))
@@ -297,6 +329,7 @@ if not _port_policy.session_only:
 _API_PORT = _resolved.get("api_port", DEFAULT_PORT)
 _API_BASE_URL = f"http://127.0.0.1:{_API_PORT}/api/v1"
 _SERVER_HOST = cfg.get("server_host", "127.0.0.1")
+
 
 # -----------------------------
 # Updater
@@ -318,10 +351,16 @@ def start_UPDATE_EXE_PATH():
     log_dir = ROOT_DIR / "logs" / "update_logs"
     if IS_WINDOWS:
         update_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
-        flags = subprocess.CREATE_NO_WINDOW if update_hidden else subprocess.CREATE_NEW_CONSOLE
+        flags = (
+            subprocess.CREATE_NO_WINDOW
+            if update_hidden
+            else subprocess.CREATE_NEW_CONSOLE
+        )
         proc = subprocess.Popen(cmd, creationflags=flags)
     else:
-        log.info("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
+        log.info(
+            "Starting updater. This may take a few minutes. Please do not close or interrupt the program..."
+        )
         log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
@@ -334,7 +373,9 @@ def start_UPDATE_EXE_PATH():
     except (TypeError, ValueError):
         max_logs = 20
     if max_logs >= 0:
-        logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
+        logs = sorted(
+            log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True
+        )
         for old_log in logs[max_logs:]:
             try:
                 old_log.unlink()
@@ -355,11 +396,15 @@ def start_UPDATE_EXE_PATH():
                 pass
 
         try:
-            with urllib.request.urlopen(f"{_API_BASE_URL}/updater/signal", timeout=2) as resp:
+            with urllib.request.urlopen(
+                f"{_API_BASE_URL}/updater/signal", timeout=2
+            ) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     if data.get("signal") == "kill":
-                        req = urllib.request.Request(f"{_API_BASE_URL}/updater/signal", method="DELETE")
+                        req = urllib.request.Request(
+                            f"{_API_BASE_URL}/updater/signal", method="DELETE"
+                        )
                         urllib.request.urlopen(req, timeout=2)
                         log.info("Please restart the application.")
                         time.sleep(2)
@@ -401,7 +446,11 @@ if UPDATE_ENABLED:
             env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
             if IS_WINDOWS:
                 restart_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
-                flags = subprocess.CREATE_NO_WINDOW if restart_hidden else subprocess.CREATE_NEW_CONSOLE
+                flags = (
+                    subprocess.CREATE_NO_WINDOW
+                    if restart_hidden
+                    else subprocess.CREATE_NEW_CONSOLE
+                )
                 subprocess.Popen(_args, creationflags=flags, close_fds=True, env=env)
             else:
                 subprocess.Popen(_args, env=env, start_new_session=True, close_fds=True)
@@ -506,9 +555,16 @@ def _register_builtin_processes() -> None:
         server_default_dir.mkdir(parents=True, exist_ok=True)
         default_port = cfg.get("java", {}).get("port", 25565)
         from core.minecraft_readiness import make_minecraft_readiness_check
+
         supervisor.register(
             "Minecraft Server",
-            [str(SERVER_EXE_PATH), "--instance-dir", str(server_default_dir), "--port", str(default_port)],
+            [
+                str(SERVER_EXE_PATH),
+                "--instance-dir",
+                str(server_default_dir),
+                "--port",
+                str(default_port),
+            ],
             cwd=server_default_dir,
             hidden=get_visibility(2),
             readiness_check=make_minecraft_readiness_check(server_default_dir),
@@ -547,10 +603,13 @@ def _register_plugins(plugins: list[AppConfig]) -> None:
 
         post_spawn = None
         if _plugin_sandbox and IS_WINDOWS:
+
             def make_post_spawn(sb):
                 def _post_spawn(proc):
                     sb.apply_post_spawn(proc)
+
                 return _post_spawn
+
             post_spawn = make_post_spawn(_plugin_sandbox)
 
         supervisor.register(
@@ -595,19 +654,25 @@ async def start_api_server() -> None:
 
     # Wait for API to become reachable.
     from core.lifecycle import _wait_for_api_ready
+
     ready = await _wait_for_api_ready(_API_BASE_URL, timeout=15.0)
     if ready:
         log.info("API server ready.")
         await _check_plugin_updates()
     else:
-        log.warning("API server not reachable within 15 s — continuing without plugin support")
+        log.warning(
+            "API server not reachable within 15 s — continuing without plugin support"
+        )
 
 
 async def _check_plugin_updates() -> None:
     """Query the API for available plugin updates without blocking the loop."""
+
     def _fetch():
         try:
-            with urllib.request.urlopen(f"{_API_BASE_URL}/plugins/updates", timeout=5) as resp:
+            with urllib.request.urlopen(
+                f"{_API_BASE_URL}/plugins/updates", timeout=5
+            ) as resp:
                 if resp.status == 200:
                     return json.loads(resp.read().decode("utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -632,10 +697,13 @@ async def _check_plugin_updates() -> None:
 
 async def _fetch_plugin_path(plugin_name: str) -> str:
     """Ask the API for a plugin's executable path without blocking the loop."""
+
     def _fetch():
         try:
             encoded = urllib.parse.quote(plugin_name, safe="")
-            with urllib.request.urlopen(f"{_API_BASE_URL}/plugins/{encoded}", timeout=3) as resp:
+            with urllib.request.urlopen(
+                f"{_API_BASE_URL}/plugins/{encoded}", timeout=3
+            ) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     return data.get("path", "")
@@ -648,6 +716,7 @@ async def _fetch_plugin_path(plugin_name: str) -> str:
 
 async def _mark_plugin_dead(plugin_name: str) -> None:
     """Update the plugin registry to mark a plugin as dead/non-enabled."""
+
     def _put():
         encoded = urllib.parse.quote(plugin_name, safe="")
         data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
@@ -697,8 +766,13 @@ async def check_and_run() -> None:
                     log.info("Shutdown signal detected, but Auto shutdown is disabled.")
                     continue
                 if supervisor.state != SupervisorState.COUNTDOWN:
-                    log.info("\nShutdown detected. System will shut down in %s seconds.", SHUTDOWN_DELAY_SECONDS)
-                    asyncio.create_task(supervisor.shutdown_countdown(SHUTDOWN_DELAY_SECONDS))
+                    log.info(
+                        "\nShutdown detected. System will shut down in %s seconds.",
+                        SHUTDOWN_DELAY_SECONDS,
+                    )
+                    asyncio.create_task(
+                        supervisor.shutdown_countdown(SHUTDOWN_DELAY_SECONDS)
+                    )
 
             elif name == "shutdown_now":
                 file.unlink(missing_ok=True)
@@ -712,13 +786,21 @@ async def check_and_run() -> None:
                 file.unlink(missing_ok=True)
                 log.info("\nRestart signal detected. Requesting clean restart...")
                 if supervisor.state in (SupervisorState.RUNNING, SupervisorState.IDLE):
-                    asyncio.create_task(event_bus.publish("server.restarting", {"version": API_VERSION}))
+                    asyncio.create_task(
+                        event_bus.publish("server.restarting", {"version": API_VERSION})
+                    )
                     asyncio.create_task(supervisor.restart())
 
             elif name == "restart_server":
                 file.unlink(missing_ok=True)
-                log.info("\nRestart server signal detected. Restarting Minecraft Server...")
-                if supervisor.state in (SupervisorState.RUNNING, SupervisorState.IDLE, SupervisorState.STARTING):
+                log.info(
+                    "\nRestart server signal detected. Restarting Minecraft Server..."
+                )
+                if supervisor.state in (
+                    SupervisorState.RUNNING,
+                    SupervisorState.IDLE,
+                    SupervisorState.STARTING,
+                ):
                     asyncio.create_task(_restart_server_process())
 
             elif name == "shutdown_cancel":
@@ -728,7 +810,7 @@ async def check_and_run() -> None:
 
             elif name.startswith("plugin_start_"):
                 file.unlink(missing_ok=True)
-                plugin_name = name[len("plugin_start_"):]
+                plugin_name = name[len("plugin_start_") :]
                 log.info("\nPlugin start signal detected for '%s'.", plugin_name)
                 proc = supervisor.get(plugin_name)
                 if proc is None:
@@ -738,13 +820,16 @@ async def check_and_run() -> None:
                         supervisor.register(plugin_name, [path])
                         await supervisor.start(plugin_name)
                     else:
-                        log.warning("Failed to start plugin '%s': could not resolve path", plugin_name)
+                        log.warning(
+                            "Failed to start plugin '%s': could not resolve path",
+                            plugin_name,
+                        )
                 else:
                     await supervisor.start(plugin_name)
 
             elif name.startswith("plugin_stop_"):
                 file.unlink(missing_ok=True)
-                plugin_name = name[len("plugin_stop_"):]
+                plugin_name = name[len("plugin_stop_") :]
                 log.info("\nPlugin stop signal detected for '%s'.", plugin_name)
                 await supervisor.stop(plugin_name)
 
@@ -824,17 +909,25 @@ async def _plugin_health_check_loop() -> None:
                 continue
 
             exit_code = proc.proc.returncode if proc.proc is not None else "?"
-            log.warning("Plugin '%s' process died (exit code %s) — updating registry", proc.name, exit_code)
+            log.warning(
+                "Plugin '%s' process died (exit code %s) — updating registry",
+                proc.name,
+                exit_code,
+            )
             proc.state = ProcessState.FAILED
             proc.restart_count += 1
             _health_mon.set_state(f"process.{proc.name}", HealthState.FAILED)
-            _health_mon.record_error(f"process.{proc.name}", f"Process died with exit code {exit_code}")
+            _health_mon.record_error(
+                f"process.{proc.name}", f"Process died with exit code {exit_code}"
+            )
 
             try:
                 await _mark_plugin_dead(proc.name)
                 log.info("Plugin '%s' marked as dead in registry", proc.name)
             except Exception as exc:  # health reporting is best-effort
-                log.warning("Failed to update health for plugin '%s': %s", proc.name, exc)
+                log.warning(
+                    "Failed to update health for plugin '%s': %s", proc.name, exc
+                )
 
             if _AUTO_RESTART_PLUGINS:
                 log.info("Auto-restarting plugin '%s' ...", proc.name)
@@ -842,7 +935,9 @@ async def _plugin_health_check_loop() -> None:
                 try:
                     signal_file.write_text(proc.name, encoding="utf-8")
                 except OSError as exc:
-                    log.warning("Failed to write restart signal for '%s': %s", proc.name, exc)
+                    log.warning(
+                        "Failed to write restart signal for '%s': %s", proc.name, exc
+                    )
 
 
 async def _runtime_validation_loop() -> None:
@@ -858,7 +953,8 @@ async def _runtime_validation_loop() -> None:
 
         # Only monitor running processes — disabled/stopped ones don't report heartbeats
         monitored_components = [
-            f"process.{p.name}" for p in supervisor.list_processes()
+            f"process.{p.name}"
+            for p in supervisor.list_processes()
             if p.state == ProcessState.RUNNING
         ]
         monitored_components.extend(["supervisor", "api_server"])
@@ -881,13 +977,23 @@ async def _runtime_validation_loop() -> None:
 def _log_diagnostics_report() -> None:
     """Generate and log a diagnostics report."""
     report = generate_diagnostics_report(crash_mgr)
-    log.info("[DIAGNOSTICS] Health: %d/%d running, %d degraded, %d failed",
-             report["health"]["running"], report["health"]["total_components"],
-             report["health"]["degraded"], report["health"]["failed"])
+    log.info(
+        "[DIAGNOSTICS] Health: %d/%d running, %d degraded, %d failed",
+        report["health"]["running"],
+        report["health"]["total_components"],
+        report["health"]["degraded"],
+        report["health"]["failed"],
+    )
     if report["health"]["failed_components"]:
-        log.warning("[DIAGNOSTICS] Failed components: %s", ", ".join(report["health"]["failed_components"]))
+        log.warning(
+            "[DIAGNOSTICS] Failed components: %s",
+            ", ".join(report["health"]["failed_components"]),
+        )
     if report["health"]["degraded_components"]:
-        log.warning("[DIAGNOSTICS] Degraded components: %s", ", ".join(report["health"]["degraded_components"]))
+        log.warning(
+            "[DIAGNOSTICS] Degraded components: %s",
+            ", ".join(report["health"]["degraded_components"]),
+        )
 
 
 # -----------------------------
@@ -920,7 +1026,10 @@ async def main() -> None:
     if critical_failures:
         for fail in critical_failures:
             log.error("[STARTUP-VALIDATION] %s", fail.format())
-        log.error("[STARTUP-VALIDATION] %d critical failure(s) — aborting", len(critical_failures))
+        log.error(
+            "[STARTUP-VALIDATION] %d critical failure(s) — aborting",
+            len(critical_failures),
+        )
         _health_mon.set_state("startup", HealthState.FAILED)
         _input_confirm_exit("Press Enter to exit...")
     _health_mon.set_state("startup", HealthState.RUNNING)
@@ -930,7 +1039,9 @@ async def main() -> None:
 
     # Discover plugins now that the API is available.
     try:
-        plugin_registry: list[AppConfig] = await asyncio.to_thread(_launcher.get_plugins)
+        plugin_registry: list[AppConfig] = await asyncio.to_thread(
+            _launcher.get_plugins
+        )
         _register_plugins(plugin_registry)
     except Exception as exc:  # non-fatal; reported via crash manager
         crash_mgr.report_error(
@@ -965,7 +1076,9 @@ async def main() -> None:
     # Background tasks.
     watcher = asyncio.create_task(check_and_run(), name="signal-watcher")
     health = asyncio.create_task(_plugin_health_check_loop(), name="plugin-health")
-    runtime_val = asyncio.create_task(_runtime_validation_loop(), name="runtime-validation")
+    runtime_val = asyncio.create_task(
+        _runtime_validation_loop(), name="runtime-validation"
+    )
     cmd_task = asyncio.create_task(command_loop(), name="command-loop")
 
     # Wait for shutdown to complete.

@@ -56,7 +56,9 @@ class TestProcessRegistration:
         assert proc.shell is True
 
     def test_register_disabled_process(self, supervisor):
-        supervisor.register("disabled", [sys.executable, "-c", "print('ok')"], enabled=False)
+        supervisor.register(
+            "disabled", [sys.executable, "-c", "print('ok')"], enabled=False
+        )
         proc = supervisor.get("disabled")
         assert proc.enabled is False
 
@@ -116,9 +118,10 @@ class TestRestart:
         supervisor._api_base_url = ""
         supervisor.state = SupervisorState.RUNNING
 
-        with patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop, patch.object(
-            supervisor, "start_all", new=AsyncMock()
-        ) as mock_start:
+        with (
+            patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop,
+            patch.object(supervisor, "start_all", new=AsyncMock()) as mock_start,
+        ):
             await supervisor.restart()
 
         mock_stop.assert_awaited_once_with(
@@ -138,9 +141,10 @@ class TestShutdownFromCountdown:
     @pytest.mark.asyncio
     async def test_shutdown_allowed_from_countdown(self, supervisor):
         supervisor.state = SupervisorState.COUNTDOWN
-        with patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop, patch.object(
-            supervisor, "stop_api_server", new=AsyncMock()
-        ) as mock_api:
+        with (
+            patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop,
+            patch.object(supervisor, "stop_api_server", new=AsyncMock()) as mock_api,
+        ):
             await supervisor.shutdown()
         assert supervisor.state == SupervisorState.COMPLETE
 

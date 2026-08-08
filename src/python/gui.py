@@ -76,7 +76,9 @@ def _linux_install_hint() -> str:
 def _api_ready(timeout: float = 1.0) -> bool:
     """Quick check if the API health endpoint responds."""
     try:
-        with urllib.request.urlopen(f"{API_URL}/api/v1/health", timeout=timeout) as resp:
+        with urllib.request.urlopen(
+            f"{API_URL}/api/v1/health", timeout=timeout
+        ) as resp:
             return resp.status == 200
     except OSError:
         return False
@@ -147,8 +149,13 @@ class LauncherAPI:
                 log_file = BASE_DIR / "logs" / "full_system.log"
                 log_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_file, "w", encoding="utf-8") as lf:
-                    _full_system_proc = subprocess.Popen([str(START_EXE)], stdout=lf, stderr=lf, stdin=subprocess.DEVNULL)
-            log.info("Full system process started (PID %s)", _full_system_proc.pid if _full_system_proc else "?")
+                    _full_system_proc = subprocess.Popen(
+                        [str(START_EXE)], stdout=lf, stderr=lf, stdin=subprocess.DEVNULL
+                    )
+            log.info(
+                "Full system process started (PID %s)",
+                _full_system_proc.pid if _full_system_proc else "?",
+            )
             return "started"
         except OSError as e:
             log.error("Failed to start full system: %s", e)
@@ -211,7 +218,10 @@ def _cleanup_processes():
         log.debug("Cleanup: no managed process to stop, skipping.")
         return
 
-    log.info("Cleanup: managed process (PID %s) still running, attempting graceful shutdown.", _full_system_proc.pid)
+    log.info(
+        "Cleanup: managed process (PID %s) still running, attempting graceful shutdown.",
+        _full_system_proc.pid,
+    )
 
     # Only send shutdown request if the API is actually reachable.
     # If the API is already down, skip the request and force-kill directly.
@@ -231,7 +241,9 @@ def _cleanup_processes():
                     log.info("Cleanup: process exited cleanly.")
                     return
                 time.sleep(0.25)
-            log.warning("Cleanup: process did not exit within 5s after API shutdown request.")
+            log.warning(
+                "Cleanup: process did not exit within 5s after API shutdown request."
+            )
         except OSError as exc:
             log.warning("Cleanup: API shutdown request failed: %s", exc)
     else:
@@ -286,6 +298,7 @@ def _gui_already_running() -> bool:
             return False
         if IS_WINDOWS:
             import ctypes
+
             kernel32 = ctypes.windll.kernel32
             handle = kernel32.OpenProcess(0x0400, False, pid)
             if handle:
@@ -374,6 +387,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
 
     if is_launcher:
         import threading as _threading
+
         _nav_lock = _threading.Lock()
 
         def _poll_api():
@@ -389,13 +403,23 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
                                 if _window is not None and hasattr(_window, "load_url"):
                                     try:
                                         _window.load_url(GUI_URL)
-                                        log.info("API came online — switched to dashboard.")
-                                    except Exception as nav_err:  # best-effort navigation
-                                        log.warning("Navigation to dashboard failed: %s", nav_err)
+                                        log.info(
+                                            "API came online — switched to dashboard."
+                                        )
+                                    except (
+                                        Exception
+                                    ) as nav_err:  # best-effort navigation
+                                        log.warning(
+                                            "Navigation to dashboard failed: %s",
+                                            nav_err,
+                                        )
                         break
                 except Exception as exc:  # poll loop must never die
                     log.debug("Poll error: %s", exc)
-        t = get_crash_manager().supervised_thread(target=_poll_api, name="gui-api-poll", daemon=True)
+
+        t = get_crash_manager().supervised_thread(
+            target=_poll_api, name="gui-api-poll", daemon=True
+        )
         t.start()
 
     def _on_closing():
@@ -405,7 +429,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
     _window.events.closing += _on_closing
     try:
         if sys.platform == "linux":
-            webview.start(gui='qt', debug=False)
+            webview.start(gui="qt", debug=False)
         else:
             webview.start(debug=False)
     except Exception as exc:  # process exits with hints on any GUI backend error

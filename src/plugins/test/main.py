@@ -10,7 +10,12 @@ from core import (
     parse_args,
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S', stream=sys.stdout)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+    stream=sys.stdout,
+)
 log = logging.getLogger(__name__)
 
 PLUGIN_DIR = get_plugin_dir()

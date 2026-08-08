@@ -127,8 +127,11 @@ class ExamplePlugin(BasePlugin):
         # ---- 6. Log startup confirmation --------------------------
         log.info(
             "[%s] Initialized. start=%s, step=%s, auto_tick=%s, max=%s",
-            self.PLUGIN_NAME, self._counter, self._step_size,
-            self._auto_tick, self._max_count,
+            self.PLUGIN_NAME,
+            self._counter,
+            self._step_size,
+            self._auto_tick,
+            self._max_count,
         )
 
     # ═══════════════════════════════════════════════════════════════

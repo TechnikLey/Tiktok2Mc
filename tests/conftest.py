@@ -14,9 +14,7 @@ from fastapi.testclient import TestClient
 sys.dont_write_bytecode = True
 
 # Ensure src/ is on sys.path so `import core.*` works.
-_src = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"
-)
+_src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
@@ -90,6 +88,7 @@ def _activate_write_guard():
 # tmp_path override → tests/workspace/<session>/<test>/
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def _session_workspace():
     """Create a session-scoped subdirectory under the test workspace."""
@@ -129,6 +128,7 @@ def tmp_path(_session_workspace):
 # project_dir — minimal project skeleton inside the test workspace
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="function")
 def project_dir(tmp_path):
     """Create a minimal isolated project directory for the current test."""
@@ -149,6 +149,7 @@ def project_dir(tmp_path):
 # ---------------------------------------------------------------------------
 # Path patching — ALL core.paths functions are redirected to project_dir
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="function", autouse=True)
 def _patch_paths(project_dir):
@@ -175,7 +176,9 @@ def _patch_paths(project_dir):
     core.paths.get_runtime_dir = lambda: project_dir / "core" / "runtime"
     core.paths.get_base_dir = lambda: project_dir / "src"
     core.paths.get_plugins_dir = lambda: project_dir / "src" / "plugins"
-    core.paths.get_base_file = lambda: core.paths.get_base_dir() / f"main{core.paths.SUFFIX}"
+    core.paths.get_base_file = lambda: (
+        core.paths.get_base_dir() / f"main{core.paths.SUFFIX}"
+    )
     core.paths.get_plugin_config_file = lambda: project_dir / "src" / "config.yaml"
 
     # Propagate patches to every module that did ``from core.paths import ...``
@@ -192,10 +195,7 @@ def _patch_paths(project_dir):
             "get_plugin_config_file",
         )
     }
-    _new_funcs = {
-        n: getattr(core.paths, n)
-        for n in _orig_funcs
-    }
+    _new_funcs = {n: getattr(core.paths, n) for n in _orig_funcs}
     for mod_name, mod in list(sys.modules.items()):
         if mod is None or not hasattr(mod, "__dict__"):
             continue
@@ -206,6 +206,7 @@ def _patch_paths(project_dir):
     # Reset singletons so they recreate with the new paths on next access.
     try:
         import core.api.registry
+
         core.api.registry._registry = None
     except Exception:
         pass
@@ -268,6 +269,7 @@ def _patch_paths(project_dir):
 # FastAPI TestClient
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="function")
 def client():
     from core.api import create_app
@@ -280,6 +282,7 @@ def client():
 # ---------------------------------------------------------------------------
 # Session-level filesystem snapshot for post-hoc isolation verification
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _session_isolation_snapshot(request):
@@ -325,6 +328,7 @@ def _session_isolation_snapshot(request):
 # ---------------------------------------------------------------------------
 # Ensure the safety test runs last
 # ---------------------------------------------------------------------------
+
 
 def pytest_collection_modifyitems(config, items):
     """Move isolation-safety tests to the end of the run."""

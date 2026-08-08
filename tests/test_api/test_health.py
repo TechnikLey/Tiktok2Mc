@@ -1,5 +1,3 @@
-
-
 class TestHealthEndpoints:
     def test_health_returns_ok(self, client):
         resp = client.get("/api/v1/health")
@@ -34,6 +32,7 @@ class TestHealthEndpoints:
 
     def test_tiktok_live_tracker_updates_status(self, client):
         from core.api.tiktok_live import get_tiktok_live_tracker
+
         tracker = get_tiktok_live_tracker()
         tracker.set_connected(True, source="tiktok_bridge")
         try:

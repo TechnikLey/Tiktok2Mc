@@ -8,26 +8,32 @@ import pytest
 class TestExtractVersion:
     def test_semver_tag(self):
         from core.api.updater import _extract_version
+
         assert _extract_version("v1.2.3") == "1.2.3"
 
     def test_semver_tag_no_v(self):
         from core.api.updater import _extract_version
+
         assert _extract_version("1.2.3") == "1.2.3"
 
     def test_major_minor(self):
         from core.api.updater import _extract_version
+
         assert _extract_version("v2.0") == "2.0"
 
     def test_with_prefix(self):
         from core.api.updater import _extract_version
+
         assert _extract_version("release-1.0.0-beta") == "1.0.0-beta"
 
     def test_empty_string(self):
         from core.api.updater import _extract_version
+
         assert _extract_version("") == ""
 
     def test_no_version(self):
         from core.api.updater import _extract_version
+
         assert _extract_version("no numbers here") == ""
 
 
@@ -42,7 +48,12 @@ class TestParseRemoteVersion:
             return _FakeResponse(data)
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-        assert _parse_remote_version("https://api.github.com/repos/user/repo/releases/latest") == "1.2.3"
+        assert (
+            _parse_remote_version(
+                "https://api.github.com/repos/user/repo/releases/latest"
+            )
+            == "1.2.3"
+        )
 
     def test_github_release_no_v(self, monkeypatch):
         import urllib.request
@@ -54,7 +65,12 @@ class TestParseRemoteVersion:
             return _FakeResponse(data)
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-        assert _parse_remote_version("https://api.github.com/repos/user/repo/releases/latest") == "2.0.0"
+        assert (
+            _parse_remote_version(
+                "https://api.github.com/repos/user/repo/releases/latest"
+            )
+            == "2.0.0"
+        )
 
     def test_direct_json_with_version(self, monkeypatch):
         import urllib.request
@@ -97,7 +113,12 @@ class TestPluginUpdateChecker:
 
         checker = PluginUpdateChecker()
         plugins = [
-            {"name": "no-update", "version": "1.0.0", "update_url": "", "display_name": "No Update"},
+            {
+                "name": "no-update",
+                "version": "1.0.0",
+                "update_url": "",
+                "display_name": "No Update",
+            },
         ]
         results = checker.check_updates(plugins)
         assert results == []
@@ -114,9 +135,12 @@ class TestPluginUpdateChecker:
 
         checker = PluginUpdateChecker()
         plugins = [
-            {"name": "outdated", "version": "1.0.0",
-             "update_url": "https://api.github.com/repos/user/repo/releases/latest",
-             "display_name": "Outdated Plugin"},
+            {
+                "name": "outdated",
+                "version": "1.0.0",
+                "update_url": "https://api.github.com/repos/user/repo/releases/latest",
+                "display_name": "Outdated Plugin",
+            },
         ]
         results = checker.check_updates(plugins)
         assert len(results) == 1
@@ -136,9 +160,12 @@ class TestPluginUpdateChecker:
 
         checker = PluginUpdateChecker()
         plugins = [
-            {"name": "current", "version": "1.0.0",
-             "update_url": "https://api.github.com/repos/user/repo/releases/latest",
-             "display_name": "Current"},
+            {
+                "name": "current",
+                "version": "1.0.0",
+                "update_url": "https://api.github.com/repos/user/repo/releases/latest",
+                "display_name": "Current",
+            },
         ]
         results = checker.check_updates(plugins)
         assert len(results) == 1
@@ -156,9 +183,12 @@ class TestPluginUpdateChecker:
 
         checker = PluginUpdateChecker()
         plugins = [
-            {"name": "failing", "version": "1.0.0",
-             "update_url": "https://api.github.com/repos/user/repo/releases/latest",
-             "display_name": "Failing"},
+            {
+                "name": "failing",
+                "version": "1.0.0",
+                "update_url": "https://api.github.com/repos/user/repo/releases/latest",
+                "display_name": "Failing",
+            },
         ]
         results = checker.check_updates(plugins)
         assert len(results) == 1
@@ -182,11 +212,16 @@ class TestPluginUpdateChecker:
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
         checker = PluginUpdateChecker()
-        checker.check_updates([
-            {"name": "cached", "version": "1.0.0",
-             "update_url": "https://api.github.com/repos/user/repo/releases/latest",
-             "display_name": "Cached"},
-        ])
+        checker.check_updates(
+            [
+                {
+                    "name": "cached",
+                    "version": "1.0.0",
+                    "update_url": "https://api.github.com/repos/user/repo/releases/latest",
+                    "display_name": "Cached",
+                },
+            ]
+        )
         cached = checker.get_cached_status("cached")
         assert cached is not None
         assert cached["name"] == "cached"
@@ -197,8 +232,12 @@ class TestPluginUpdateChecker:
         checker = PluginUpdateChecker()
         plugins = [
             {"name": "a", "version": "1.0.0", "update_url": "", "display_name": "A"},
-            {"name": "b", "version": "1.0.0", "update_url": "https://example.com/ver.json",
-             "display_name": "B"},
+            {
+                "name": "b",
+                "version": "1.0.0",
+                "update_url": "https://example.com/ver.json",
+                "display_name": "B",
+            },
         ]
         # Only b has update_url, but it will fail fetch -> returns with error
         results = checker.check_updates(plugins)

@@ -22,6 +22,7 @@ class FakeArgs:
 # WinCounterPlugin
 # =========================================================================
 
+
 class TestWinCounterPlugin:
     """WinCounter logic without HTTP."""
 
@@ -73,7 +74,9 @@ class TestWinCounterPlugin:
     def test_save_dims(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         saved = {}
-        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        monkeypatch.setattr(
+            p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h})
+        )
         p._on_save_dims({"width": 800, "height": 600})
         assert saved["w"] == 800
         assert saved["h"] == 600
@@ -135,7 +138,9 @@ class TestWinCounterPlugin:
     def test_save_dims_partial_args(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         saved = {}
-        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        monkeypatch.setattr(
+            p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h})
+        )
         p._on_save_dims({})
         assert saved["w"] == 600
         assert saved["h"] == 300
@@ -152,6 +157,7 @@ class TestWinCounterPlugin:
 # =========================================================================
 # DeathCounterPlugin
 # =========================================================================
+
 
 class TestDeathCounterPlugin:
     """DeathCounter logic without HTTP."""
@@ -186,7 +192,9 @@ class TestDeathCounterPlugin:
     def test_save_dims(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         saved = {}
-        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        monkeypatch.setattr(
+            p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h})
+        )
         p._on_save_dims({"width": 800, "height": 600})
         assert saved["w"] == 800
         assert saved["h"] == 600
@@ -212,6 +220,7 @@ class TestDeathCounterPlugin:
 
     def test_milestone_fires_signal(self, tmp_path, monkeypatch):
         from plugins.deathcounter.main import DeathCounterPlugin
+
         monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
         monkeypatch.setattr(
             "core.base_plugin.load_plugin_config",
@@ -230,6 +239,7 @@ class TestDeathCounterPlugin:
 
     def test_duplicate_milestone_suppressed(self, tmp_path, monkeypatch):
         from plugins.deathcounter.main import DeathCounterPlugin
+
         monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
         monkeypatch.setattr(
             "core.base_plugin.load_plugin_config",
@@ -249,7 +259,9 @@ class TestDeathCounterPlugin:
     def test_save_dims_partial_args(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         saved = {}
-        monkeypatch.setattr(p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h}))
+        monkeypatch.setattr(
+            p, "save_window_state", lambda w, h: saved.update({"w": w, "h": h})
+        )
         p._on_save_dims({})
         assert saved["w"] == 500
         assert saved["h"] == 400
@@ -261,10 +273,10 @@ class TestDeathCounterPlugin:
         assert state["deaths"] == 3
 
 
-
 # =========================================================================
 # SpotifyControlPlugin
 # =========================================================================
+
 
 class TestSpotifyControlPlugin:
     """Spotify plugin command handlers without real HTTP."""
@@ -303,9 +315,20 @@ class TestSpotifyControlPlugin:
     def test_command_handlers_registered(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         handlers = [
-            "start_oauth", "oauth_callback", "play", "pause",
-            "next", "previous", "volume", "volume_up", "volume_down",
-            "shuffle", "repeat", "save", "playtrack", "comment",
+            "start_oauth",
+            "oauth_callback",
+            "play",
+            "pause",
+            "next",
+            "previous",
+            "volume",
+            "volume_up",
+            "volume_down",
+            "shuffle",
+            "repeat",
+            "save",
+            "playtrack",
+            "comment",
         ]
         for cmd in handlers:
             assert cmd in p._handlers, f"Handler '{cmd}' not registered"

@@ -35,7 +35,9 @@ class TestDiscoverPluginsFromManifests:
 
         plugin_dir = tmp_path / "plugins" / "minimal"
         plugin_dir.mkdir(parents=True)
-        (plugin_dir / "plugin.json").write_text(json.dumps({"name": "minimal"}), encoding="utf-8")
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"name": "minimal"}), encoding="utf-8"
+        )
         result = discover_plugins_from_manifests(str(tmp_path / "plugins"))
         assert len(result) == 1
         assert result[0]["version"] == "0.0.0"
@@ -57,7 +59,9 @@ class TestDiscoverPluginsFromManifests:
 
         plugin_dir = tmp_path / "plugins" / "noname"
         plugin_dir.mkdir(parents=True)
-        (plugin_dir / "plugin.json").write_text(json.dumps({"version": "1.0"}), encoding="utf-8")
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"version": "1.0"}), encoding="utf-8"
+        )
         result = discover_plugins_from_manifests(str(tmp_path / "plugins"))
         assert result == []
 
@@ -66,7 +70,9 @@ class TestDiscoverPluginsFromManifests:
 
         plugin_dir = tmp_path / "plugins" / "badname"
         plugin_dir.mkdir(parents=True)
-        (plugin_dir / "plugin.json").write_text(json.dumps({"name": 123}), encoding="utf-8")
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"name": 123}), encoding="utf-8"
+        )
         result = discover_plugins_from_manifests(str(tmp_path / "plugins"))
         assert result == []
 

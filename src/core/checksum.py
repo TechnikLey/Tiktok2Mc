@@ -42,7 +42,9 @@ def verify_checksum(path: Path, expected: str | None) -> bool:
         return True
     log.error(
         "Checksum mismatch for %s: expected %s, got %s",
-        path.name, expected, actual,
+        path.name,
+        expected,
+        actual,
     )
     return False
 

@@ -64,6 +64,7 @@ class PluginWatcher:
             return self._plugins_dir
         try:
             from core.paths import get_root_dir
+
             root = get_root_dir()
             dev_dir = root / "src" / "plugins"
             if dev_dir.is_dir():
@@ -121,7 +122,9 @@ class PluginWatcher:
                     manifest_path_part = raw.get("entry_point", "")
                     registration = PluginRegistration(
                         name=name,
-                        path=str(plugin_dir / entry_point) if entry_point else str(plugin_dir),
+                        path=str(plugin_dir / entry_point)
+                        if entry_point
+                        else str(plugin_dir),
                         entry_point=manifest_path_part,
                         display_name=raw.get("display_name", name),
                         version=raw.get("version", "0.0.0"),

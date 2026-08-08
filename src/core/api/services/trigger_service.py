@@ -149,7 +149,9 @@ class TriggerService:
             connected = False
         elif "DISABLE_TIKTOK_CONNECT=False" in message:
             connected = True
-        elif message and ("disabled" in message.lower() or "now true" in message.lower()):
+        elif message and (
+            "disabled" in message.lower() or "now true" in message.lower()
+        ):
             connected = False
 
         return {

@@ -31,12 +31,14 @@ def _get_thread_stats() -> dict[str, Any]:
     active_count = threading.active_count()
     thread_details = []
     for t in threads:
-        thread_details.append({
-            "name": t.name,
-            "daemon": t.daemon,
-            "alive": t.is_alive(),
-            "ident": t.ident,
-        })
+        thread_details.append(
+            {
+                "name": t.name,
+                "daemon": t.daemon,
+                "alive": t.is_alive(),
+                "ident": t.ident,
+            }
+        )
     return {
         "active_count": active_count,
         "total_count": len(threads),
@@ -51,12 +53,16 @@ def _get_async_tasks() -> list[dict[str, Any]]:
         loop = asyncio.get_running_loop()
         all_tasks = asyncio.all_tasks(loop)
         for t in all_tasks:
-            tasks.append({
-                "name": t.get_name(),
-                "done": t.done(),
-                "cancelled": t.cancelled(),
-                "exception": str(t.exception()) if t.done() and not t.cancelled() and t.exception() else None,
-            })
+            tasks.append(
+                {
+                    "name": t.get_name(),
+                    "done": t.done(),
+                    "cancelled": t.cancelled(),
+                    "exception": str(t.exception())
+                    if t.done() and not t.cancelled() and t.exception()
+                    else None,
+                }
+            )
     except RuntimeError:
         pass
     return tasks
@@ -66,6 +72,7 @@ def _get_memory_stats() -> dict[str, Any]:
     """Collect memory statistics if psutil is available."""
     try:
         import psutil
+
         proc = psutil.Process()
         mem = proc.memory_info()
         return {
@@ -85,11 +92,16 @@ def _get_queue_stats(crash_manager: Any = None) -> dict[str, Any]:
     stats = {}
     try:
         import sys as _sys
+
         if "src.python.main" in _sys.modules:
             ctx = _sys.modules["src.python.main"].ctx
             stats["trigger_queue"] = {
-                "size": ctx.trigger_queue.qsize() if hasattr(ctx, "trigger_queue") else -1,
-                "maxsize": ctx.trigger_queue.maxsize if hasattr(ctx, "trigger_queue") else -1,
+                "size": ctx.trigger_queue.qsize()
+                if hasattr(ctx, "trigger_queue")
+                else -1,
+                "maxsize": ctx.trigger_queue.maxsize
+                if hasattr(ctx, "trigger_queue")
+                else -1,
             }
             stats["rcon_queue"] = {
                 "size": ctx.rcon_queue.qsize() if hasattr(ctx, "rcon_queue") else -1,
@@ -102,7 +114,9 @@ def _get_queue_stats(crash_manager: Any = None) -> dict[str, Any]:
     return stats
 
 
-def generate_diagnostics_report(crash_manager: Any | None = None, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+def generate_diagnostics_report(
+    crash_manager: Any | None = None, extra: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Generate a comprehensive diagnostics snapshot.
 
     This is the main entry point for runtime diagnostics.
@@ -139,22 +153,28 @@ def generate_diagnostics_report(crash_manager: Any | None = None, extra: dict[st
     return report
 
 
-def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[str, Any] | None = None) -> str:
+def generate_diagnostics_markdown(
+    crash_manager: Any | None = None, extra: dict[str, Any] | None = None
+) -> str:
     """Generate a human-readable diagnostics report in Markdown format."""
     report = generate_diagnostics_report(crash_manager, extra)
     lines: list[str] = []
 
     lines.append("# TikTok2Mc Diagnostics Report")
     lines.append(f"Generated: {report['generated_at_iso']}")
-    lines.append(f"PID: {report['application']['pid']}  |  Platform: {report['application']['platform']}")
+    lines.append(
+        f"PID: {report['application']['pid']}  |  Platform: {report['application']['platform']}"
+    )
     lines.append("")
 
     # Health summary
     health = report["health"]
     lines.append("## Health Status")
     lines.append(f"- Uptime: {health['uptime_seconds']:.0f}s")
-    lines.append(f"- Components: {health['total_components']} total, {health['running']} running, "
-                 f"{health['degraded']} degraded, {health['failed']} failed")
+    lines.append(
+        f"- Components: {health['total_components']} total, {health['running']} running, "
+        f"{health['degraded']} degraded, {health['failed']} failed"
+    )
     if health["failed_components"]:
         lines.append(f"- **Failed**: {', '.join(health['failed_components'])}")
     if health["degraded_components"]:
@@ -166,7 +186,13 @@ def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[
     # Component states
     lines.append("## Component States")
     for comp, state in sorted(health["states"].items()):
-        icon = {"RUNNING": "OK", "DEGRADED": "!", "FAILED": "X", "STOPPED": "-", "UNKNOWN": "?"}.get(state, "?")
+        icon = {
+            "RUNNING": "OK",
+            "DEGRADED": "!",
+            "FAILED": "X",
+            "STOPPED": "-",
+            "UNKNOWN": "?",
+        }.get(state, "?")
         lines.append(f"- [{icon}] {comp}: **{state}**")
     lines.append("")
 
@@ -193,7 +219,9 @@ def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[
     lines.append("## Queues")
     for qname, qstats in report["queue_stats"].items():
         if isinstance(qstats, dict):
-            lines.append(f"- {qname}: {qstats.get('size', '?')}/{qstats.get('maxsize', '?')} items")
+            lines.append(
+                f"- {qname}: {qstats.get('size', '?')}/{qstats.get('maxsize', '?')} items"
+            )
         else:
             lines.append(f"- {qname}: {qstats}")
     lines.append("")
@@ -201,9 +229,13 @@ def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[
     # Crash history
     if "crash_history" in report:
         lines.append("## Crash History")
-        lines.append(f"- Total crashes: {report['crash_manager'].get('crash_count', 0)}")
+        lines.append(
+            f"- Total crashes: {report['crash_manager'].get('crash_count', 0)}"
+        )
         for crash in report["crash_history"][-10:]:
-            lines.append(f"- [{crash.get('code', '?')}] {crash.get('exception', crash.get('detail', ''))}")
+            lines.append(
+                f"- [{crash.get('code', '?')}] {crash.get('exception', crash.get('detail', ''))}"
+            )
         lines.append("")
 
     # Error codes reference
@@ -216,4 +248,5 @@ def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[
 
 def _timestamp_iso() -> str:
     from datetime import UTC, datetime
+
     return datetime.now(tz=UTC).isoformat()

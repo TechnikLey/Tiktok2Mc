@@ -220,6 +220,7 @@ class TestPluginEndpoints:
 
     def test_heartbeat_recorded_on_register(self, client):
         import time
+
         before = time.time()
         client.post("/api/v1/plugins/register", json=self.PLUGIN)
         resp = client.get("/api/v1/plugins/test-plugin")

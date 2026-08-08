@@ -114,12 +114,14 @@ class OverlayManager:
             return False
 
         try:
-            body = json.dumps({
-                "title": title,
-                "subtitle": subtitle,
-                "duration": duration,
-                "overlay_name": target_name,
-            }).encode()
+            body = json.dumps(
+                {
+                    "title": title,
+                    "subtitle": subtitle,
+                    "duration": duration,
+                    "overlay_name": target_name,
+                }
+            ).encode()
             req = urllib.request.Request(
                 f"{API_BASE}/overlay/display",
                 data=body,
@@ -133,7 +135,9 @@ class OverlayManager:
             if e.code == 429:
                 log.warning("[%s] Server reported cooldown.", client.name)
             else:
-                log.error("[OVERLAY] Command to %s failed: HTTP %s", client.name, e.code)
+                log.error(
+                    "[OVERLAY] Command to %s failed: HTTP %s", client.name, e.code
+                )
             client.mark_failure()
         except (urllib.error.URLError, OSError, TypeError) as e:
             log.error("[OVERLAY] Command to %s failed: %s", client.name, e)
@@ -149,7 +153,13 @@ _manager = None
 _manager_lock = threading.Lock()
 
 
-def send_overlay_text(title, subtitle, duration=3, overlay_name="default", plugin_name: str = "overlay-text"):
+def send_overlay_text(
+    title,
+    subtitle,
+    duration=3,
+    overlay_name="default",
+    plugin_name: str = "overlay-text",
+):
     """Send overlay text via the core overlay subsystem.
 
     The *plugin_name* parameter is kept for backward compatibility but

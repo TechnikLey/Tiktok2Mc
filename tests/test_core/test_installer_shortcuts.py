@@ -17,19 +17,26 @@ class TestInstallerShortcuts:
     def test_desktop_shortcut_can_point_to_gui_or_start(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         # The script contains both gui.exe and start.exe variants
-        assert '$INSTDIR\\core\\gui.exe' in content
-        assert '$INSTDIR\\start.exe' in content
+        assert "$INSTDIR\\core\\gui.exe" in content
+        assert "$INSTDIR\\start.exe" in content
         # GuiDefaultMode controls which one is used
         assert "GuiDefaultMode" in content
 
     def test_desktop_shortcut_basic_uses_gui(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         # In basic mode, desktop shortcut always goes to gui.exe
-        lines = [ln for ln in content.splitlines() if "$DESKTOP" in ln and "CreateShortCut" in ln]
+        lines = [
+            ln
+            for ln in content.splitlines()
+            if "$DESKTOP" in ln and "CreateShortCut" in ln
+        ]
         assert len(lines) >= 1
         # The basic branch is: If $InstallType == 0 → gui.exe
-        assert '${If} $InstallType == 0' in content
-        assert 'CreateShortCut "$DESKTOP\\${PRODUCT_NAME}.lnk" "$INSTDIR\\core\\gui.exe"' in content
+        assert "${If} $InstallType == 0" in content
+        assert (
+            'CreateShortCut "$DESKTOP\\${PRODUCT_NAME}.lnk" "$INSTDIR\\core\\gui.exe"'
+            in content
+        )
 
     def test_start_menu_main_shortcut_respects_gui_mode(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
@@ -50,16 +57,19 @@ class TestInstallerShortcuts:
 
     def test_startup_registry_points_to_gui_or_start(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
-        assert 'WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run"' in content
+        assert (
+            'WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run"'
+            in content
+        )
         assert "$INSTDIR\\core\\gui.exe" in content
         assert "$INSTDIR\\start.exe" in content
 
     def test_startup_uses_gui_mode_for_advanced(self):
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         # Advanced mode autostart respects GuiDefaultMode
-        assert '${If} $GuiDefaultMode == 1' in content
-        assert '$INSTDIR\\start.exe' in content
-        assert '$INSTDIR\\core\\gui.exe' in content
+        assert "${If} $GuiDefaultMode == 1" in content
+        assert "$INSTDIR\\start.exe" in content
+        assert "$INSTDIR\\core\\gui.exe" in content
 
 
 class TestLinuxInstallerShortcuts:
@@ -79,12 +89,12 @@ class TestLinuxInstallerShortcuts:
 
     def test_linux_installs_per_user(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
-        assert 'XDG_DATA_HOME:-$HOME/.local/share' in content
+        assert "XDG_DATA_HOME:-$HOME/.local/share" in content
         assert 'INSTALL_DIR="$DATA_HOME/TikTok2Mc"' in content
 
     def test_linux_refuses_root(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
-        assert 'EUID' in content
+        assert "EUID" in content
         assert "do not run this installer" in content.lower()
 
     def test_linux_desktop_entry_respects_gui_mode(self):
@@ -115,7 +125,7 @@ class TestLinuxInstallerShortcuts:
     def test_linux_uses_gui_mode_for_autostart(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")
         # Autostart uses GUI_MODE variable (not separate mode selection)
-        assert 'Exec=$INSTALL_DIR/${GUI_MODE}' in content
+        assert "Exec=$INSTALL_DIR/${GUI_MODE}" in content
 
     def test_linux_has_component_selection(self):
         content = LINUX_SCRIPT.read_text(encoding="utf-8")

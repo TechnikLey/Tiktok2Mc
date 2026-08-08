@@ -45,6 +45,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class ValidationResult:
     """Result of a single validation step."""
+
     name: str
     passed: bool
     message: str = ""
@@ -74,6 +75,7 @@ class ValidationResult:
 @dataclass
 class ValidationSuite:
     """A collection of related validation steps."""
+
     name: str
     description: str = ""
     steps: list[ValidationResult] = field(default_factory=list)
@@ -124,6 +126,7 @@ class ValidationSuite:
 @dataclass
 class TimeoutResult:
     """Result of a timed operation."""
+
     success: bool
     result: Any = None
     elapsed: float = 0.0
@@ -131,7 +134,9 @@ class TimeoutResult:
     error: str | None = None
 
 
-async def run_with_timeout(coro, timeout: float, label: str = "operation") -> TimeoutResult:
+async def run_with_timeout(
+    coro, timeout: float, label: str = "operation"
+) -> TimeoutResult:
     """Run an async operation with a timeout.
 
     If the timeout expires, a CORE-0004 error is logged and the
@@ -146,16 +151,24 @@ async def run_with_timeout(coro, timeout: float, label: str = "operation") -> Ti
         elapsed = time.time() - start
         log.warning(
             "[CORE-0004] Operation '%s' timed out after %.1fs (timeout=%.1fs)",
-            label, elapsed, timeout,
+            label,
+            elapsed,
+            timeout,
         )
-        return TimeoutResult(success=False, timed_out=True, elapsed=elapsed,
-                             error=f"Timed out after {elapsed:.1f}s (limit {timeout:.1f}s)")
+        return TimeoutResult(
+            success=False,
+            timed_out=True,
+            elapsed=elapsed,
+            error=f"Timed out after {elapsed:.1f}s (limit {timeout:.1f}s)",
+        )
     except Exception as exc:  # framework purpose: capture any failure from wrapped op
         elapsed = time.time() - start
         return TimeoutResult(success=False, elapsed=elapsed, error=str(exc))
 
 
-def run_with_timeout_sync(func, timeout: float, label: str = "operation") -> TimeoutResult:
+def run_with_timeout_sync(
+    func, timeout: float, label: str = "operation"
+) -> TimeoutResult:
     """Run a synchronous operation with a timeout via threading."""
     start = time.time()
     result_container: list[Any] = []
@@ -174,13 +187,23 @@ def run_with_timeout_sync(func, timeout: float, label: str = "operation") -> Tim
     elapsed = time.time() - start
 
     if t.is_alive():
-        return TimeoutResult(success=False, timed_out=True, elapsed=elapsed,
-                             error=f"Timed out after {elapsed:.1f}s (limit {timeout:.1f}s)")
+        return TimeoutResult(
+            success=False,
+            timed_out=True,
+            elapsed=elapsed,
+            error=f"Timed out after {elapsed:.1f}s (limit {timeout:.1f}s)",
+        )
 
     if error_container[0] is not None:
-        return TimeoutResult(success=False, elapsed=elapsed, error=str(error_container[0]))
+        return TimeoutResult(
+            success=False, elapsed=elapsed, error=str(error_container[0])
+        )
 
-    return TimeoutResult(success=True, result=result_container[0] if result_container else None, elapsed=elapsed)
+    return TimeoutResult(
+        success=True,
+        result=result_container[0] if result_container else None,
+        elapsed=elapsed,
+    )
 
 
 # ==============================================================================
@@ -319,7 +342,10 @@ def run_startup_validation(
     Returns a ValidationSuite with all results. The caller should
     check critical_failures() and determine if startup should proceed.
     """
-    suite = ValidationSuite(name="Startup Validation", description="Validates system readiness before starting")
+    suite = ValidationSuite(
+        name="Startup Validation",
+        description="Validates system readiness before starting",
+    )
 
     if config_path is not None:
         suite.add(validate_config_exists(config_path))
@@ -358,24 +384,30 @@ def validate_shutdown(
 
     Checks that threads have exited and tasks have completed.
     """
-    suite = ValidationSuite(name="Shutdown Validation", description="Verifies clean shutdown")
+    suite = ValidationSuite(
+        name="Shutdown Validation", description="Verifies clean shutdown"
+    )
 
     if threads_to_check:
         for t in threads_to_check:
             t.join(timeout=timeout)
             if t.is_alive():
-                suite.add(ValidationResult(
-                    name=f"Thread '{t.name}' terminated",
-                    passed=False,
-                    message="Thread did not exit within timeout",
-                    severity=Severity.WARNING,
-                    error_code=CORE_0004,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Thread '{t.name}' terminated",
+                        passed=False,
+                        message="Thread did not exit within timeout",
+                        severity=Severity.WARNING,
+                        error_code=CORE_0004,
+                    )
+                )
             else:
-                suite.add(ValidationResult(
-                    name=f"Thread '{t.name}' terminated",
-                    passed=True,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Thread '{t.name}' terminated",
+                        passed=True,
+                    )
+                )
 
     if tasks_to_check:
         for task in tasks_to_check:
@@ -388,17 +420,21 @@ def validate_shutdown(
                             asyncio.wait_for(asyncio.shield(task), timeout=timeout)
                         )
                 except (asyncio.TimeoutError, asyncio.CancelledError, RuntimeError):
-                    suite.add(ValidationResult(
-                        name=f"Task '{task.get_name()}' terminated",
-                        passed=False,
-                        message="Task did not cancel cleanly",
-                        severity=Severity.WARNING,
-                    ))
+                    suite.add(
+                        ValidationResult(
+                            name=f"Task '{task.get_name()}' terminated",
+                            passed=False,
+                            message="Task did not cancel cleanly",
+                            severity=Severity.WARNING,
+                        )
+                    )
                     continue
-            suite.add(ValidationResult(
-                name=f"Task '{task.get_name()}' terminated",
-                passed=True,
-            ))
+            suite.add(
+                ValidationResult(
+                    name=f"Task '{task.get_name()}' terminated",
+                    passed=True,
+                )
+            )
 
     return suite
 
@@ -420,57 +456,72 @@ def validate_runtime(
     - Heartbeats are recent
     - No unexpected failures
     """
-    suite = ValidationSuite(name="Runtime Validation", description="Periodic runtime health checks")
+    suite = ValidationSuite(
+        name="Runtime Validation", description="Periodic runtime health checks"
+    )
 
     if health_monitor is None:
         from core.health_monitor import get_health_monitor
+
         health_monitor = get_health_monitor()
 
     if components:
         for comp in components:
             state = health_monitor.get_state(comp)
             if state in (HealthState.FAILED,):
-                suite.add(ValidationResult(
-                    name=f"Component '{comp}' health",
-                    passed=False,
-                    message="Component is in FAILED state",
-                    severity=Severity.ERROR,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Component '{comp}' health",
+                        passed=False,
+                        message="Component is in FAILED state",
+                        severity=Severity.ERROR,
+                    )
+                )
             elif state == HealthState.DEGRADED:
-                suite.add(ValidationResult(
-                    name=f"Component '{comp}' health",
-                    passed=False,
-                    message="Component is in DEGRADED state",
-                    severity=Severity.WARNING,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Component '{comp}' health",
+                        passed=False,
+                        message="Component is in DEGRADED state",
+                        severity=Severity.WARNING,
+                    )
+                )
             elif state == HealthState.UNKNOWN:
-                suite.add(ValidationResult(
-                    name=f"Component '{comp}' health",
-                    passed=False,
-                    message="Component state is UNKNOWN",
-                    severity=Severity.WARNING,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Component '{comp}' health",
+                        passed=False,
+                        message="Component state is UNKNOWN",
+                        severity=Severity.WARNING,
+                    )
+                )
             else:
-                suite.add(ValidationResult(
-                    name=f"Component '{comp}' health",
-                    passed=True,
-                    message=f"State: {state.value}",
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Component '{comp}' health",
+                        passed=True,
+                        message=f"State: {state.value}",
+                    )
+                )
 
             # Check heartbeat
             alive = health_monitor.check_heartbeat(comp, timeout=heartbeat_timeout)
             if not alive:
-                suite.add(ValidationResult(
-                    name=f"Component '{comp}' heartbeat",
-                    passed=False,
-                    message=f"Heartbeat timeout ({heartbeat_timeout}s)",
-                    severity=Severity.WARNING,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Component '{comp}' heartbeat",
+                        passed=False,
+                        message=f"Heartbeat timeout ({heartbeat_timeout}s)",
+                        severity=Severity.WARNING,
+                    )
+                )
             else:
-                suite.add(ValidationResult(
-                    name=f"Component '{comp}' heartbeat",
-                    passed=True,
-                ))
+                suite.add(
+                    ValidationResult(
+                        name=f"Component '{comp}' heartbeat",
+                        passed=True,
+                    )
+                )
 
     return suite
 
@@ -528,15 +579,14 @@ def validate_config_schema(data: Any, path: str = "") -> None:
     try:
         norm_ver = normalize_config_version(raw_ver)
     except ValueError as e:
-        raise ValueError(
-            f"config_version is not a recognised version format: {e}"
-        )
+        raise ValueError(f"config_version is not a recognised version format: {e}")
 
     major = int(norm_ver.split(".")[0])
     if major < 1:
         log.info(
             "Config version %s is legacy — will be normalised to %s on write",
-            norm_ver, EXPECTED_CONFIG_VERSION,
+            norm_ver,
+            EXPECTED_CONFIG_VERSION,
         )
 
     known = set(_CONFIG_SCHEMA)

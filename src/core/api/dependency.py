@@ -53,7 +53,8 @@ def topological_sort(
             if dep_name not in by_name:
                 log.warning(
                     "Plugin '%s' depends on '%s' which is not registered — ignoring",
-                    name, dep_name,
+                    name,
+                    dep_name,
                 )
                 continue
             adj.setdefault(dep_name, []).append(name)

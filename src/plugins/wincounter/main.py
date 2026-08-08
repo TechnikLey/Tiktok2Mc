@@ -29,11 +29,14 @@ class WinManager:
         try:
             self._stats_path.parent.mkdir(parents=True, exist_ok=True)
             self._stats_path.write_text(
-                json.dumps({
-                    "wins": self.wins,
-                    "needed": self.needed,
-                    "record_low": self.record_low,
-                }, indent=4),
+                json.dumps(
+                    {
+                        "wins": self.wins,
+                        "needed": self.needed,
+                        "record_low": self.record_low,
+                    },
+                    indent=4,
+                ),
                 encoding="utf-8",
             )
         except (OSError, TypeError):
@@ -56,7 +59,9 @@ class WinManager:
             "wins": self.wins,
             "needed": self.needed,
             "record_low": self.record_low,
-            "win_color": self._theme.get("danger", "#ff4444") if self.wins < 0 else self._theme.get("text", "#ffffff"),
+            "win_color": self._theme.get("danger", "#ff4444")
+            if self.wins < 0
+            else self._theme.get("text", "#ffffff"),
         }
 
 
@@ -95,7 +100,10 @@ class WinCounterPlugin(BasePlugin):
         prev_needed = self._manager.needed
         self._manager.add(int(args.get("amount", 1)))
         if self._manager.needed != prev_needed:
-            self._maybe_signal("milestone", {"milestone": self._manager.needed - self._milestone_increment})
+            self._maybe_signal(
+                "milestone",
+                {"milestone": self._manager.needed - self._milestone_increment},
+            )
         self.push_state()
 
     def _on_remove_win(self, args):

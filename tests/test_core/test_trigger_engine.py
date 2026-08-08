@@ -113,7 +113,11 @@ class TestPayloadValidator:
 
 class TestTriggerResult:
     def test_validation_failure_result(self):
-        errors = [ValidationError(field="trigger", message="Empty trigger", code="TRIGGER_EMPTY")]
+        errors = [
+            ValidationError(
+                field="trigger", message="Empty trigger", code="TRIGGER_EMPTY"
+            )
+        ]
         result = TriggerResult.validation_failure("test", errors)
         assert result.success is False
         assert result.status == ExecutionStatus.VALIDATION_ERROR
@@ -170,7 +174,9 @@ class TestTriggerResult:
         assert result.error_code == "TRIGGER_BRIDGE_NO_RESPONSE"
 
     def test_to_dict_serialization(self):
-        errors = [ValidationError(field="trigger", message="Empty", code="TRIGGER_EMPTY")]
+        errors = [
+            ValidationError(field="trigger", message="Empty", code="TRIGGER_EMPTY")
+        ]
         result = TriggerResult.validation_failure("test", errors)
         d = result.to_dict()
         assert d["success"] is False
@@ -182,7 +188,9 @@ class TestTriggerResult:
 class TestTriggerEngine:
     def setup_method(self):
         # Use config that won't hit real network
-        self.config = EngineConfig(bridge_host="127.0.0.1", bridge_port=9999, bridge_timeout=0.1)
+        self.config = EngineConfig(
+            bridge_host="127.0.0.1", bridge_port=9999, bridge_timeout=0.1
+        )
         self.engine = TriggerEngine(config=self.config)
 
     def test_get_event_types(self):
@@ -269,7 +277,9 @@ class TestTriggerEngine:
         assert result.payload.get("trigger") == "5655"
 
     def test_comment_payload_structure(self):
-        result = self.engine.execute_comment("Alice", "hello", moderator=True, superfan=True)
+        result = self.engine.execute_comment(
+            "Alice", "hello", moderator=True, superfan=True
+        )
         assert result.payload.get("user") == "Alice"
         assert result.payload.get("text") == "hello"
         assert result.payload.get("moderator") is True
@@ -313,7 +323,9 @@ class TestTriggerEngineWithMockDispatcher:
         assert result.error_code == "TRIGGER_NOT_FOUND"
 
     def test_dispatcher_raises_connection_error(self):
-        self.mock_dispatcher.dispatch_trigger.side_effect = ConnectionError("Connection refused")
+        self.mock_dispatcher.dispatch_trigger.side_effect = ConnectionError(
+            "Connection refused"
+        )
         result = self.engine.execute_trigger("follow")
         assert result.success is False
         assert result.status == ExecutionStatus.CONNECTION_ERROR
@@ -342,8 +354,12 @@ class TestBridgeDispatcher:
     """Tests for BridgeDispatcher HTTP logic."""
 
     def test_post_success(self):
-        dispatcher = BridgeDispatcher(EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1))
-        with patch("core.trigger_engine.dispatcher.urllib.request.urlopen") as mock_urlopen:
+        dispatcher = BridgeDispatcher(
+            EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1)
+        )
+        with patch(
+            "core.trigger_engine.dispatcher.urllib.request.urlopen"
+        ) as mock_urlopen:
             mock_resp = MagicMock()
             mock_resp.read.return_value = json.dumps({"status": "ok"}).encode()
             mock_resp.__enter__.return_value = mock_resp
@@ -354,8 +370,12 @@ class TestBridgeDispatcher:
             assert result["status"] == "ok"
 
     def test_http_error_returns_detail(self):
-        dispatcher = BridgeDispatcher(EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1))
-        with patch("core.trigger_engine.dispatcher.urllib.request.urlopen") as mock_urlopen:
+        dispatcher = BridgeDispatcher(
+            EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1)
+        )
+        with patch(
+            "core.trigger_engine.dispatcher.urllib.request.urlopen"
+        ) as mock_urlopen:
             from urllib.error import HTTPError
 
             mock_urlopen.side_effect = HTTPError(
@@ -371,8 +391,12 @@ class TestBridgeDispatcher:
             assert result["status"] == "error"
 
     def test_connection_error_raised(self):
-        dispatcher = BridgeDispatcher(EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1))
-        with patch("core.trigger_engine.dispatcher.urllib.request.urlopen") as mock_urlopen:
+        dispatcher = BridgeDispatcher(
+            EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1)
+        )
+        with patch(
+            "core.trigger_engine.dispatcher.urllib.request.urlopen"
+        ) as mock_urlopen:
             from urllib.error import URLError
 
             mock_urlopen.side_effect = URLError(reason="Connection refused")
@@ -381,8 +405,12 @@ class TestBridgeDispatcher:
                 dispatcher.dispatch_trigger({"trigger": "follow"})
 
     def test_check_connectivity(self):
-        dispatcher = BridgeDispatcher(EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1))
-        with patch("core.trigger_engine.dispatcher.urllib.request.urlopen") as mock_urlopen:
+        dispatcher = BridgeDispatcher(
+            EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1)
+        )
+        with patch(
+            "core.trigger_engine.dispatcher.urllib.request.urlopen"
+        ) as mock_urlopen:
             mock_resp = MagicMock()
             mock_resp.__enter__.return_value = mock_resp
             mock_urlopen.return_value = mock_resp
@@ -390,8 +418,12 @@ class TestBridgeDispatcher:
             assert dispatcher.check_connectivity() is True
 
     def test_check_connectivity_failure(self):
-        dispatcher = BridgeDispatcher(EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1))
-        with patch("core.trigger_engine.dispatcher.urllib.request.urlopen") as mock_urlopen:
+        dispatcher = BridgeDispatcher(
+            EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1)
+        )
+        with patch(
+            "core.trigger_engine.dispatcher.urllib.request.urlopen"
+        ) as mock_urlopen:
             mock_urlopen.side_effect = urllib.error.URLError("fail")
             assert dispatcher.check_connectivity() is False
 
@@ -424,7 +456,9 @@ class TestTriggerResultSerialization:
             status=ExecutionStatus.VALIDATION_ERROR,
             execution_time_ms=0.0,
             payload={},
-            validation_errors=[ValidationError(field="trigger", message="bad", code="ERR")],
+            validation_errors=[
+                ValidationError(field="trigger", message="bad", code="ERR")
+            ],
             error_code="TRIGGER_VALIDATION_ERROR",
             error_message="bad trigger",
         )

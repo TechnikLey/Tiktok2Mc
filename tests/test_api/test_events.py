@@ -18,9 +18,7 @@ class TestEventEndpoints:
         assert resp.json()["event"] == "external.event"
 
     def test_inject_event_rejects_non_string_type(self, client):
-        resp = client.post(
-            "/api/v1/events", json={"type": 42, "data": {}}
-        )
+        resp = client.post("/api/v1/events", json={"type": 42, "data": {}})
         assert resp.status_code == 422
 
     def test_inject_event_rejects_non_dict_data(self, client):
@@ -32,7 +30,7 @@ class TestEventEndpoints:
 
     @pytest.mark.skip(
         reason="TestClient blocks on open SSE stream (httpx limitation). "
-               "EventBus logic is covered by test_eventbus.py.",
+        "EventBus logic is covered by test_eventbus.py.",
     )
     def test_sse_stream_connects(self, client):
         with client.stream("GET", "/api/v1/events/stream") as r:
@@ -43,7 +41,5 @@ class TestEventEndpoints:
         reason="TestClient blocks on open SSE stream (httpx limitation).",
     )
     def test_sse_filtered_by_type(self, client):
-        with client.stream(
-            "GET", "/api/v1/events/stream?types=log,status"
-        ) as r:
+        with client.stream("GET", "/api/v1/events/stream?types=log,status") as r:
             assert r.status_code == 200

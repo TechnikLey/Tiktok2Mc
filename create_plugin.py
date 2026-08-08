@@ -15,7 +15,7 @@ import re
 import sys
 from pathlib import Path
 
-logging.basicConfig(level=logging.INFO, format='%(message)s', stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 
 log = logging.getLogger(__name__)
 
@@ -27,12 +27,12 @@ from core.version import TOOL_VERSION as VERSION  # noqa: E402
 
 PLUGINS_DIR = Path("src/plugins")
 
-CONFIG_YAML_TEMPLATE = '''\
+CONFIG_YAML_TEMPLATE = """\
 # Plugin configuration
 # All values here override the defaults defined in plugin.json → config_schema.
 
 enabled: true
-'''
+"""
 
 MAIN_PY_TEMPLATE = '''\
 import logging
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     {class_name}().run()
 '''
 
-PLUGIN_JSON_TEMPLATE = '''\
+PLUGIN_JSON_TEMPLATE = """\
 {{
   "name": "{name}",
   "version": "1.0.0",
@@ -117,23 +117,29 @@ PLUGIN_JSON_TEMPLATE = '''\
     ]
   }}
 }}
-'''
+"""
 
 
 def get_valid_plugin_name():
     while True:
         name = input("Please enter module name (a-z, 0-9, hyphens): ").strip()
 
-        if not re.match(r'^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$', name):
-            log.info("\033[91mInvalid name! Only a-z, 0-9, and hyphens allowed (must start/end with letter/digit).\033[0m")
+        if not re.match(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$", name):
+            log.info(
+                "\033[91mInvalid name! Only a-z, 0-9, and hyphens allowed (must start/end with letter/digit).\033[0m"
+            )
         elif (PLUGINS_DIR / name).exists():
-            log.info("\033[91mFolder already exists! Please choose another name.\033[0m")
+            log.info(
+                "\033[91mFolder already exists! Please choose another name.\033[0m"
+            )
         else:
             return name
 
 
 def get_update_url():
-    url = input("GitHub API update URL (optional, Enter to skip):\nhttps://api.github.com/repos/").strip()
+    url = input(
+        "GitHub API update URL (optional, Enter to skip):\nhttps://api.github.com/repos/"
+    ).strip()
     if not url:
         return ""
     full_url = f"https://api.github.com/repos/{url}"
@@ -153,7 +159,9 @@ def main():
     log.info(f"Folder '{plugin_name}' created.")
 
     # Derive class name from plugin name (kebab-case → PascalCase)
-    class_name = "".join(part.capitalize() for part in plugin_name.replace("-", "_").split("_"))
+    class_name = "".join(
+        part.capitalize() for part in plugin_name.replace("-", "_").split("_")
+    )
 
     display_name = plugin_name.replace("-", " ").replace("_", " ").title()
 

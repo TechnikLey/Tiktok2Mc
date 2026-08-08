@@ -83,7 +83,9 @@ class TestLoadHookManifest:
 
         hook_dir = tmp_path / "noname"
         hook_dir.mkdir()
-        (hook_dir / "hook.json").write_text(json.dumps({"version": "1.0"}), encoding="utf-8")
+        (hook_dir / "hook.json").write_text(
+            json.dumps({"version": "1.0"}), encoding="utf-8"
+        )
         manifest = load_hook_manifest(hook_dir)
         assert manifest is None
 

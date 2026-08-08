@@ -13,26 +13,39 @@ class ConfigSchemaField(BaseModel):
     """A single field inside a plugin's ``config_schema``."""
 
     key: str = Field(..., description="Dotted path, e.g. 'port' or 'theme.background'")
-    type: str = Field("string", description="Data type: string, integer, number, boolean, color, select, array, object")
+    type: str = Field(
+        "string",
+        description="Data type: string, integer, number, boolean, color, select, array, object",
+    )
     default: Any = Field(None, description="Default value used when the key is missing")
     label: str = Field("", description="Human-readable label for the GUI")
     help: str = Field("", description="Tooltip / help text shown in the GUI")
     category: str = Field("General", description="Grouping category for the GUI")
     required: bool = Field(False, description="Whether the field is mandatory")
-    secret: bool = Field(False, description="If true, value should be masked in the GUI")
+    secret: bool = Field(
+        False, description="If true, value should be masked in the GUI"
+    )
     min: int | None = Field(None, description="Minimum value (for integer/number)")
     max: int | None = Field(None, description="Maximum value (for integer/number)")
-    options: list[str] = Field(default_factory=list, description="Allowed values (for select)")
+    options: list[str] = Field(
+        default_factory=list, description="Allowed values (for select)"
+    )
     advanced: bool = Field(False, description="Hide from basic / first-run wizard view")
-    widget: str | None = Field(None, description="GUI widget hint (e.g. 'textarea', 'color')")
-    item_schema: dict | None = Field(None, description="Schema for array items or nested objects")
+    widget: str | None = Field(
+        None, description="GUI widget hint (e.g. 'textarea', 'color')"
+    )
+    item_schema: dict | None = Field(
+        None, description="Schema for array items or nested objects"
+    )
 
 
 class PluginConfigSchemaModel(BaseModel):
     """Root schema object embedded in ``plugin.json``."""
 
     version: int = Field(1, description="Schema format version")
-    fields: list[ConfigSchemaField] = Field(default_factory=list, description="Ordered list of fields")
+    fields: list[ConfigSchemaField] = Field(
+        default_factory=list, description="Ordered list of fields"
+    )
 
 
 # ── Plugin Manifest ──────────────────────────────────────────────────
@@ -51,13 +64,16 @@ class StatusDetail(BaseModel):
     config_loaded: bool
     uptime_seconds: float
     tiktok_live: bool | None = Field(
-        None, description="Whether the TikTok live connection is currently active (None = unknown)"
+        None,
+        description="Whether the TikTok live connection is currently active (None = unknown)",
     )
     tiktok_live_last_update: float | None = Field(
-        None, description="Unix timestamp of the last live-status report from the bridge"
+        None,
+        description="Unix timestamp of the last live-status report from the bridge",
     )
     tiktok_live_last_event: float | None = Field(
-        None, description="Unix timestamp of the last genuine TikTok event (test triggers excluded)"
+        None,
+        description="Unix timestamp of the last genuine TikTok event (test triggers excluded)",
     )
     tiktok_live_source: str = Field(
         "", description="Source of the last live-status report"
@@ -76,8 +92,9 @@ class PluginManifest(BaseModel):
     """
 
     name: str = Field(
-        min_length=1, pattern=r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
-        description="Unique kebab-case identifier"
+        min_length=1,
+        pattern=r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+        description="Unique kebab-case identifier",
     )
     version: str = Field("1.0.0", description="Semver MAJOR.MINOR.PATCH")
     entry_point: str = Field(
@@ -105,7 +122,9 @@ class PluginManifest(BaseModel):
         description="Event types this plugin wants to receive via CommandQueue. Supports wildcards: tiktok.*, tiktok.gift, etc.",
     )
     update_url: str = Field(
-        "", description="URL for checking plugin updates (GitHub Releases API or direct)")
+        "",
+        description="URL for checking plugin updates (GitHub Releases API or direct)",
+    )
     ics: bool = Field(True, description="Interface Control System flag")
     level: int = Field(4, ge=1, le=4, description="Default visibility level")
     config_schema: PluginConfigSchemaModel | None = Field(
@@ -122,9 +141,7 @@ class CommentHandler(BaseModel):
     prefix: str = Field(
         "$", description="Comment prefix this handler responds to (e.g. $, !, #)"
     )
-    enabled: bool = Field(
-        True, description="Whether this handler is currently active"
-    )
+    enabled: bool = Field(True, description="Whether this handler is currently active")
 
 
 # ── Plugin models ────────────────────────────────────────────────────
@@ -152,16 +169,13 @@ class PluginRegistration(BaseModel):
         default_factory=list,
         description="Plugins that must be running first",
     )
-    update_url: str = Field(
-        "", description="URL for checking plugin updates")
+    update_url: str = Field("", description="URL for checking plugin updates")
     author: str = Field("", description="Plugin author or maintainer")
     homepage: str = Field("", description="Project URL")
     registered_at: float | None = Field(
         None, description="Unix timestamp of first registration"
     )
-    updated_at: float | None = Field(
-        None, description="Unix timestamp of last update"
-    )
+    updated_at: float | None = Field(None, description="Unix timestamp of last update")
     comment_handler: Optional["CommentHandler"] = Field(
         None, description="Comment prefix this plugin handles"
     )
@@ -395,5 +409,3 @@ class TriggerHistoryEntry(BaseModel):
 
 class TriggerHistoryResponse(BaseModel):
     history: list[TriggerHistoryEntry]
-
-

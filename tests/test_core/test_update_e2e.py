@@ -20,6 +20,7 @@ import pytest
 # _inject_values_strictly — pure config injection logic
 # =========================================================================
 
+
 # Reimplement the function inline for testability (it's pure logic).
 # The canonical version lives in src/python/update.py.
 def _inject_values_strictly(template, user_source, path=""):
@@ -113,6 +114,7 @@ class TestInjectValuesStrictly:
 # Config migration (migrate_config_if_needed)
 # =========================================================================
 
+
 class TestMigrateConfigIfNeeded:
     """Tests the config migration flow — the function is imported from
     update.py after setting up the necessary path structure."""
@@ -121,6 +123,7 @@ class TestMigrateConfigIfNeeded:
     def _import_migrate(self, tmp_path: Path, auto_update: bool = True):
         """Context manager: patch module globals in update.py, yield the function."""
         import python.update
+
         base_dir = tmp_path / "base"
         base_dir.mkdir()
         config_dir = base_dir / "config"
@@ -128,17 +131,19 @@ class TestMigrateConfigIfNeeded:
         default_config = config_dir / "config.default.yaml"
         user_config = config_dir / "config.yaml"
 
-        with patch.object(python.update, "BASE_DIR", base_dir), \
-             patch.object(python.update, "CONFIG_FILE", user_config), \
-             patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config), \
-             patch.object(python.update, "VERSION_FILE", base_dir / "version.txt"), \
-             patch.object(python.update, "TEMP_DIR", tmp_path / "_update_tmp"), \
-             patch.object(python.update, "START_FILE", base_dir / "start.exe"), \
-             patch.object(python.update, "cfg", {"auto_update_config": auto_update}), \
-             patch.object(python.update, "CONFIG_UPDATE_ENABLE", auto_update), \
-             patch.object(python.update, "AUTO_MODE", True), \
-             patch.object(python.update, "wait_for_key"), \
-             patch.object(python.update, "log"):
+        with (
+            patch.object(python.update, "BASE_DIR", base_dir),
+            patch.object(python.update, "CONFIG_FILE", user_config),
+            patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config),
+            patch.object(python.update, "VERSION_FILE", base_dir / "version.txt"),
+            patch.object(python.update, "TEMP_DIR", tmp_path / "_update_tmp"),
+            patch.object(python.update, "START_FILE", base_dir / "start.exe"),
+            patch.object(python.update, "cfg", {"auto_update_config": auto_update}),
+            patch.object(python.update, "CONFIG_UPDATE_ENABLE", auto_update),
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "wait_for_key"),
+            patch.object(python.update, "log"),
+        ):
             yield python.update.migrate_config_if_needed, default_config, user_config
 
     def test_creates_config_when_missing(self, tmp_path):
@@ -163,6 +168,7 @@ class TestMigrateConfigIfNeeded:
             result = migrate()
             assert result is True
             import yaml
+
             with user_config.open() as f:
                 data = yaml.safe_load(f)
             assert data["config_version"] == "1.0"
@@ -180,6 +186,7 @@ class TestMigrateConfigIfNeeded:
             result = migrate()
             assert result is True
             import yaml
+
             with user_config.open() as f:
                 data = yaml.safe_load(f)
             assert data["config_version"] == "1.0"
@@ -190,36 +197,51 @@ class TestMigrateConfigIfNeeded:
 # Whitelist file copy logic
 # =========================================================================
 
+
 class TestUpdateWhitelist:
     """Tests the whitelist path filtering used during file copy."""
 
     WHITELIST_DIRS: ClassVar[set[str]] = {
-        "core", "scripts", "config",
+        "core",
+        "scripts",
+        "config",
         "plugins/deathcounter",
-        "plugins/timer", "plugins/wincounter", "plugins/spotify",
+        "plugins/timer",
+        "plugins/wincounter",
+        "plugins/spotify",
     }
     WHITELIST_DIR_FILES: ClassVar[set[str]] = {
         "hooks/random/main.py",
         "hooks/example_hook/main.py",
     }
     WHITELIST_FILES: ClassVar[set[str]] = {
-        "version.txt", "README.md", "LICENSE",
+        "version.txt",
+        "README.md",
+        "LICENSE",
         "start.exe",
     }
 
     def _should_copy(self, rel_path_str: str, file: str) -> bool:
         """Reimplements the path-filtering logic from update.py lines 484-503."""
         import sys
+
         SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
         WHITELIST_FILES = {
-            "version.txt", "README.md", "LICENSE",
+            "version.txt",
+            "README.md",
+            "LICENSE",
             f"start{SUFFIX}",
         }
 
-        if rel_path_str != "." and not any(
-            rel_path_str == d or rel_path_str.startswith(d + "/") for d in self.WHITELIST_DIRS
-        ) and not any(
-            f.startswith(rel_path_str + "/") for f in self.WHITELIST_DIR_FILES
+        if (
+            rel_path_str != "."
+            and not any(
+                rel_path_str == d or rel_path_str.startswith(d + "/")
+                for d in self.WHITELIST_DIRS
+            )
+            and not any(
+                f.startswith(rel_path_str + "/") for f in self.WHITELIST_DIR_FILES
+            )
         ):
             return False
 
@@ -228,9 +250,13 @@ class TestUpdateWhitelist:
 
         if rel_path_str != ".":
             dir_whitelisted = any(
-                rel_path_str == d or rel_path_str.startswith(d + "/") for d in self.WHITELIST_DIRS
+                rel_path_str == d or rel_path_str.startswith(d + "/")
+                for d in self.WHITELIST_DIRS
             )
-            if not dir_whitelisted and f"{rel_path_str}/{file}" not in self.WHITELIST_DIR_FILES:
+            if (
+                not dir_whitelisted
+                and f"{rel_path_str}/{file}" not in self.WHITELIST_DIR_FILES
+            ):
                 return False
 
         if file.lower() == f"update{SUFFIX}".lower():
@@ -263,7 +289,10 @@ class TestUpdateWhitelist:
     def test_hooks_whitelisted(self):
         assert self._should_copy("hooks/random", "main.py") is True
         assert self._should_copy("hooks/example_hook", "main.py") is True
-        assert self._should_copy("plugins/spotify/hooks/spotify_control", "main.py") is True
+        assert (
+            self._should_copy("plugins/spotify/hooks/spotify_control", "main.py")
+            is True
+        )
 
     def test_non_whitelisted_hook_skipped(self):
         assert self._should_copy("hooks", "custom_hook.py") is False
@@ -282,6 +311,7 @@ class TestUpdateWhitelist:
 # =========================================================================
 # Version file I/O
 # =========================================================================
+
 
 class TestVersionFileIO:
     """Tests version.txt read/write used by the updater."""
@@ -303,6 +333,7 @@ class TestVersionFileIO:
                 versions[k.lower()] = val
         assert "toolversion" in versions
         import re
+
         m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", versions["toolversion"])
         assert m.group(1) == "1.0.0-beta"
 
@@ -321,11 +352,13 @@ class TestVersionFileIO:
 # Extract version
 # =========================================================================
 
+
 class TestExtractVersion:
     """Tests the extract_version regex."""
 
     def test_standard_semver(self):
         import re
+
         def extract_version(text):
             if not text:
                 return "0.0.0"
@@ -344,6 +377,7 @@ class TestExtractVersion:
 # =========================================================================
 # Full run_update orchestration (with mocks)
 # =========================================================================
+
 
 class TestRunUpdateOrchestration:
     """Tests the full run_update() flow with mocked external dependencies."""
@@ -378,20 +412,22 @@ class TestRunUpdateOrchestration:
         # the test's tmp_path and relative_to() works in assertions.
         test_bm = BackupManager(root_dir=base_dir)
 
-        with patch.object(python.update, "BASE_DIR", base_dir), \
-             patch.object(python.update, "CONFIG_FILE", user_config), \
-             patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config), \
-             patch.object(python.update, "VERSION_FILE", version_file), \
-             patch.object(python.update, "TEMP_DIR", temp_dir), \
-             patch.object(python.update, "START_FILE", base_dir / "start.exe"), \
-             patch.object(python.update, "cfg", {"auto_update_config": True}), \
-             patch.object(python.update, "CONFIG_UPDATE_ENABLE", True), \
-             patch.object(python.update, "AUTO_MODE", True), \
-             patch.object(python.update, "get_base_dir", return_value=base_dir), \
-             patch.object(python.update, "wait_for_key"), \
-             patch.object(python.update, "log"), \
-             patch("core.backup._backup_manager", test_bm), \
-             patch("core.backup.get_backup_manager", return_value=test_bm):
+        with (
+            patch.object(python.update, "BASE_DIR", base_dir),
+            patch.object(python.update, "CONFIG_FILE", user_config),
+            patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config),
+            patch.object(python.update, "VERSION_FILE", version_file),
+            patch.object(python.update, "TEMP_DIR", temp_dir),
+            patch.object(python.update, "START_FILE", base_dir / "start.exe"),
+            patch.object(python.update, "cfg", {"auto_update_config": True}),
+            patch.object(python.update, "CONFIG_UPDATE_ENABLE", True),
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "get_base_dir", return_value=base_dir),
+            patch.object(python.update, "wait_for_key"),
+            patch.object(python.update, "log"),
+            patch("core.backup._backup_manager", test_bm),
+            patch("core.backup.get_backup_manager", return_value=test_bm),
+        ):
             yield python.update.run_update, base_dir, temp_dir
 
     def test_up_to_date_skips_update(self, tmp_path):
@@ -401,23 +437,26 @@ class TestRunUpdateOrchestration:
             patch("python.update.requests.get") as mock_get,
             patch("python.update.sys.exit", side_effect=SystemExit) as mock_exit,
         ):
-                mock_response = MagicMock()
-                mock_response.status_code = 200
-                mock_response.json.return_value = {
-                    "tag_name": "v0.7.0",
-                    "assets": [],
-                }
-                mock_get.return_value = mock_response
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {
+                "tag_name": "v0.7.0",
+                "assets": [],
+            }
+            mock_get.return_value = mock_response
 
-                with pytest.raises(SystemExit):
-                    run_update()
-                mock_exit.assert_called_once_with(5)
+            with pytest.raises(SystemExit):
+                run_update()
+            mock_exit.assert_called_once_with(5)
 
     def test_new_version_downloads_and_installs(self, tmp_path):
         """Simulate a complete update: download -> extract -> copy."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
+
             def fake_populate(path):
-                (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
+                (path / "version.txt").write_text(
+                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
+                )
                 (path / "README.md").write_text("new readme")
                 core_dir = path / "core"
                 core_dir.mkdir()
@@ -426,27 +465,38 @@ class TestRunUpdateOrchestration:
                 (path / "config" / "config.yaml").write_text("should_be_skipped\n")
                 (path / "update.exe").write_text("should_be_skipped\n")
 
-            with patch("python.update.requests.get") as mock_get, \
-                 patch("python.update.sys.exit", side_effect=SystemExit), \
-                 patch("python.update.shutil.copy2") as mock_copy2, \
-                 patch("python.update.shutil.rmtree"), \
-                 patch("python.update.download_with_progress"), \
-                 patch("python.update.zipfile.ZipFile") as mock_zip:
+            with (
+                patch("python.update.requests.get") as mock_get,
+                patch("python.update.sys.exit", side_effect=SystemExit),
+                patch("python.update.shutil.copy2") as mock_copy2,
+                patch("python.update.shutil.rmtree"),
+                patch("python.update.download_with_progress"),
+                patch("python.update.zipfile.ZipFile") as mock_zip,
+            ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
                 mock_resp = MagicMock()
                 mock_resp.status_code = 200
                 mock_resp.json.return_value = {
                     "tag_name": "v1.0.0",
-                    "assets": [{"name": "Tiktok2Mc_v1.0.0_Windows.zip", "url": "https://fake.url/asset"}],
+                    "assets": [
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                            "url": "https://fake.url/asset",
+                        }
+                    ],
                 }
                 mock_get.return_value = mock_resp
 
                 with pytest.raises(SystemExit):
                     run_update()
 
-                copied_dsts = [call_args[0][1] for call_args in mock_copy2.call_args_list]
-                dst_names = [str(p.relative_to(base_dir)).replace("\\", "/") for p in copied_dsts]
+                copied_dsts = [
+                    call_args[0][1] for call_args in mock_copy2.call_args_list
+                ]
+                dst_names = [
+                    str(p.relative_to(base_dir)).replace("\\", "/") for p in copied_dsts
+                ]
                 assert "core/new_file.py" in dst_names
                 assert "config/config.yaml" not in dst_names
                 assert "update.exe" not in " ".join(dst_names).lower()
@@ -455,8 +505,11 @@ class TestRunUpdateOrchestration:
     def test_kill_signal_written_before_copy(self, tmp_path):
         """The updater writes update_signal.tmp BEFORE copying files."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
+
             def fake_populate(path):
-                (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
+                (path / "version.txt").write_text(
+                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
+                )
 
             signal_path = base_dir / "update_signal.tmp"
             signal_written = [False]
@@ -467,20 +520,27 @@ class TestRunUpdateOrchestration:
                     signal_written[0] = True
                 return original_write_text(self, content)
 
-            with patch("python.update.requests.get") as mock_get, \
-                 patch("python.update.sys.exit", side_effect=SystemExit), \
-                 patch("python.update.time.sleep"), \
-                 patch("python.update.shutil.rmtree"), \
-                 patch("python.update.shutil.copy2"), \
-                 patch("python.update.download_with_progress"), \
-                 patch("python.update.zipfile.ZipFile") as mock_zip:
+            with (
+                patch("python.update.requests.get") as mock_get,
+                patch("python.update.sys.exit", side_effect=SystemExit),
+                patch("python.update.time.sleep"),
+                patch("python.update.shutil.rmtree"),
+                patch("python.update.shutil.copy2"),
+                patch("python.update.download_with_progress"),
+                patch("python.update.zipfile.ZipFile") as mock_zip,
+            ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
                 mock_resp = MagicMock()
                 mock_resp.status_code = 200
                 mock_resp.json.return_value = {
                     "tag_name": "v1.0.0",
-                    "assets": [{"name": "Tiktok2Mc_v1.0.0_Windows.zip", "url": "https://fake.url/asset"}],
+                    "assets": [
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                            "url": "https://fake.url/asset",
+                        }
+                    ],
                 }
                 mock_get.return_value = mock_resp
 
@@ -492,8 +552,11 @@ class TestRunUpdateOrchestration:
     def test_dual_signaling_file_and_api(self, tmp_path):
         """Update writes both file-based and API-based kill signals."""
         with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
+
             def fake_populate(path):
-                (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
+                (path / "version.txt").write_text(
+                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
+                )
 
             api_put_called = [False]
 
@@ -501,22 +564,29 @@ class TestRunUpdateOrchestration:
                 if "updater/signal" in url:
                     api_put_called[0] = True
 
-            with patch("python.update.requests.get") as mock_get, \
-                 patch("python.update.requests.put", side_effect=tracking_put), \
-                 patch("python.update.requests.delete"), \
-                 patch("python.update.sys.exit", side_effect=SystemExit), \
-                 patch("python.update.time.sleep"), \
-                 patch("python.update.shutil.rmtree"), \
-                 patch("python.update.shutil.copy2"), \
-                 patch("python.update.download_with_progress"), \
-                 patch("python.update.zipfile.ZipFile") as mock_zip:
+            with (
+                patch("python.update.requests.get") as mock_get,
+                patch("python.update.requests.put", side_effect=tracking_put),
+                patch("python.update.requests.delete"),
+                patch("python.update.sys.exit", side_effect=SystemExit),
+                patch("python.update.time.sleep"),
+                patch("python.update.shutil.rmtree"),
+                patch("python.update.shutil.copy2"),
+                patch("python.update.download_with_progress"),
+                patch("python.update.zipfile.ZipFile") as mock_zip,
+            ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
                 mock_resp = MagicMock()
                 mock_resp.status_code = 200
                 mock_resp.json.return_value = {
                     "tag_name": "v1.0.0",
-                    "assets": [{"name": "Tiktok2Mc_v1.0.0_Windows.zip", "url": "https://fake.url/asset"}],
+                    "assets": [
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                            "url": "https://fake.url/asset",
+                        }
+                    ],
                 }
                 mock_get.return_value = mock_resp
 
@@ -528,29 +598,39 @@ class TestRunUpdateOrchestration:
     def test_signal_wait_polling_loop(self, tmp_path):
         """After sending kill signal, updater polls until signal is consumed or timeout."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
+
             def fake_populate(path):
-                (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
+                (path / "version.txt").write_text(
+                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
+                )
 
             # Pre-write the signal file — run_update overwrites it then polls
             signal_file = base_dir / "update_signal.tmp"
             signal_file.write_text("kill")
 
-            with patch("python.update.requests.get") as mock_get, \
-                 patch("python.update.requests.put"), \
-                 patch("python.update.requests.delete"), \
-                 patch("python.update.sys.exit", side_effect=SystemExit), \
-                 patch("python.update.time.sleep"), \
-                 patch("python.update.shutil.rmtree"), \
-                 patch("python.update.shutil.copy2"), \
-                 patch("python.update.download_with_progress"), \
-                 patch("python.update.zipfile.ZipFile") as mock_zip:
+            with (
+                patch("python.update.requests.get") as mock_get,
+                patch("python.update.requests.put"),
+                patch("python.update.requests.delete"),
+                patch("python.update.sys.exit", side_effect=SystemExit),
+                patch("python.update.time.sleep"),
+                patch("python.update.shutil.rmtree"),
+                patch("python.update.shutil.copy2"),
+                patch("python.update.download_with_progress"),
+                patch("python.update.zipfile.ZipFile") as mock_zip,
+            ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
                 mock_resp = MagicMock()
                 mock_resp.status_code = 200
                 mock_resp.json.return_value = {
                     "tag_name": "v1.0.0",
-                    "assets": [{"name": "Tiktok2Mc_v1.0.0_Windows.zip", "url": "https://fake.url/asset"}],
+                    "assets": [
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                            "url": "https://fake.url/asset",
+                        }
+                    ],
                 }
                 mock_get.return_value = mock_resp
 
@@ -563,6 +643,7 @@ class TestRunUpdateOrchestration:
         """When a new updater version is detected, the old updater should
         copy the new updater and exit (to be resumed via --resume)."""
         with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
+
             def fake_populate(path):
                 (path / "version.txt").write_text(
                     "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
@@ -570,21 +651,28 @@ class TestRunUpdateOrchestration:
                 (path / "core").mkdir(exist_ok=True)
                 (path / "core" / "update.exe").write_text("new updater binary")
 
-            with patch("python.update.requests.get") as mock_get, \
-                 patch("python.update.subprocess.Popen") as mock_popen, \
-                 patch("python.update.sys.exit", side_effect=SystemExit), \
-                 patch("python.update.shutil.copy2"), \
-                 patch("python.update.shutil.rmtree"), \
-                 patch("python.update.os.chmod"), \
-                 patch("python.update.download_with_progress"), \
-                 patch("python.update.zipfile.ZipFile") as mock_zip:
+            with (
+                patch("python.update.requests.get") as mock_get,
+                patch("python.update.subprocess.Popen") as mock_popen,
+                patch("python.update.sys.exit", side_effect=SystemExit),
+                patch("python.update.shutil.copy2"),
+                patch("python.update.shutil.rmtree"),
+                patch("python.update.os.chmod"),
+                patch("python.update.download_with_progress"),
+                patch("python.update.zipfile.ZipFile") as mock_zip,
+            ):
                 mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
                 mock_resp = MagicMock()
                 mock_resp.status_code = 200
                 mock_resp.json.return_value = {
                     "tag_name": "v1.0.0",
-                    "assets": [{"name": "Tiktok2Mc_v1.0.0_Windows.zip", "url": "https://fake.url/asset"}],
+                    "assets": [
+                        {
+                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                            "url": "https://fake.url/asset",
+                        }
+                    ],
                 }
                 mock_get.return_value = mock_resp
 
@@ -599,6 +687,7 @@ class TestRunUpdateOrchestration:
 # =========================================================================
 # Signal cleanup after update
 # =========================================================================
+
 
 class TestUpdateSignalCleanup:
     """Tests that signal files are cleaned up after update completes."""
@@ -624,17 +713,20 @@ class TestUpdateSignalCleanup:
 # Platform path correctness
 # =========================================================================
 
+
 class TestUpdatePlatformPaths:
     """Windows/Linux path conventions used in the updater."""
 
     @pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific")
     def test_windows_suffix(self):
         import sys as _sys
+
         assert _sys.platform == "win32"
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Linux-specific")
     def test_linux_suffix(self):
         import sys as _sys
+
         assert _sys.platform != "win32"
 
     def test_suffix_constant_consistent(self):

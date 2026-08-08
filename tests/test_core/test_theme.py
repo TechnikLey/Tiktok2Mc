@@ -1,4 +1,3 @@
-
 from core.theme import _DEFAULT_THEMES, load_plugin_theme, theme_css
 
 

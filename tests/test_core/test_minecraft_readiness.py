@@ -107,7 +107,7 @@ class TestMakeMinecraftReadinessCheck:
         log_dir = instance_dir / "logs"
         log_dir.mkdir()
         (log_dir / "latest.log").write_text(
-            "[12:00:00] [Server thread/INFO]: Done (5.234s)! For help, type \"help\"\n",
+            '[12:00:00] [Server thread/INFO]: Done (5.234s)! For help, type "help"\n',
             encoding="utf-8",
         )
 

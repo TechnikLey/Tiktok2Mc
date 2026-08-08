@@ -217,6 +217,7 @@ class TestTriggerService:
 
     def test_multiple_executions_in_history(self):
         mock_engine = MagicMock(spec=TriggerEngine)
+
         def side_effect(trigger_name, user="System", gift_id=None, gift_name=None):
             return TriggerResult(
                 success=True,
@@ -225,6 +226,7 @@ class TestTriggerService:
                 execution_time_ms=5.0,
                 payload={"trigger": trigger_name, "user": user},
             )
+
         mock_engine.execute_trigger.side_effect = side_effect
         svc = TriggerService(engine=mock_engine)
         svc._last_execution = time.time() - 10

@@ -19,7 +19,13 @@ def fake_plugins_dir(tmp_path, monkeypatch):
         "config_schema": {
             "version": 1,
             "fields": [
-                {"key": "port", "type": "integer", "default": 8080, "min": 1024, "max": 65535},
+                {
+                    "key": "port",
+                    "type": "integer",
+                    "default": 8080,
+                    "min": 1024,
+                    "max": 65535,
+                },
                 {"key": "label", "type": "string", "default": "Test"},
             ],
         },
@@ -30,9 +36,7 @@ def fake_plugins_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "core.api.routes.plugin_config.discover_plugins_dir", lambda: plugins_dir
     )
-    monkeypatch.setattr(
-        "core.plugin_config.discover_plugins_dir", lambda: plugins_dir
-    )
+    monkeypatch.setattr("core.plugin_config.discover_plugins_dir", lambda: plugins_dir)
     return plugins_dir
 
 
@@ -149,7 +153,9 @@ class TestGetPluginSchema:
         # enabled (framework), port, label
         assert len(body["schema"]["fields"]) == 3
         # enabled should be marked as framework-managed
-        enabled_field = next(f for f in body["schema"]["fields"] if f["key"] == "enabled")
+        enabled_field = next(
+            f for f in body["schema"]["fields"] if f["key"] == "enabled"
+        )
         assert enabled_field["framework"] is True
         assert enabled_field["default"] is True
 

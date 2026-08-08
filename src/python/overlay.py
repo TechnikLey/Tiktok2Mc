@@ -90,7 +90,9 @@ def _load_overlay_names() -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="TikTok2Mc Overlay Process")
-    parser.add_argument("--gui-hidden", action="store_true", help="Hide GUI windows (headless mode)")
+    parser.add_argument(
+        "--gui-hidden", action="store_true", help="Hide GUI windows (headless mode)"
+    )
     args = parser.parse_args()
 
     log.info("Overlay process starting...")
@@ -146,10 +148,12 @@ def main() -> None:
             y=100 + (idx * 50),
         )
 
-    log.info("Starting webview event loop for %d overlay window(s)...", len(overlay_names))
+    log.info(
+        "Starting webview event loop for %d overlay window(s)...", len(overlay_names)
+    )
     try:
         if sys.platform == "linux":
-            webview.start(gui='qt')
+            webview.start(gui="qt")
         else:
             webview.start()
     except Exception as exc:  # process exits with hints on any GUI backend error

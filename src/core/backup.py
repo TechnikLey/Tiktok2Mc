@@ -1,23 +1,23 @@
 """Centralized backup manager — single source of truth for all backups.
 
- All backups are stored under ``data/backups/``, organized by category::
+All backups are stored under ``data/backups/``, organized by category::
 
-     data/backups/
-     ├── config/                 # Main config.yaml backups
-     ├── plugin_registry/        # api_plugin_registry.json backups
-     ├── migration/              # Pre-migration safety snapshots
-     └── plugins/
-         └── <plugin_name>/      # Per-plugin config.yaml backups
+    data/backups/
+    ├── config/                 # Main config.yaml backups
+    ├── plugin_registry/        # api_plugin_registry.json backups
+    ├── migration/              # Pre-migration safety snapshots
+    └── plugins/
+        └── <plugin_name>/      # Per-plugin config.yaml backups
 
- Features
- --------
- * **Content deduplication** — SHA-256 hash comparison skips identical backups.
- * **Time coalescing** — skips backup if one was created within the last 60 s.
- * **Retention enforcement** — keeps only the *N* newest backups per category
-   (default: 10, configurable).
- * **Timestamp-based naming** — lexicographically sortable, human-readable
-   filenames (``config.v20260529_143021_123456.yaml.bak``).
- """
+Features
+--------
+* **Content deduplication** — SHA-256 hash comparison skips identical backups.
+* **Time coalescing** — skips backup if one was created within the last 60 s.
+* **Retention enforcement** — keeps only the *N* newest backups per category
+  (default: 10, configurable).
+* **Timestamp-based naming** — lexicographically sortable, human-readable
+  filenames (``config.v20260529_143021_123456.yaml.bak``).
+"""
 
 from __future__ import annotations
 
@@ -121,9 +121,7 @@ class BackupManager:
             last = existing[-1]
             try:
                 if _read_hash(last) == current_hash:
-                    log.debug(
-                        "Backup skipped — content unchanged: %s", source
-                    )
+                    log.debug("Backup skipped — content unchanged: %s", source)
                     return None
             except OSError:
                 pass
@@ -153,9 +151,7 @@ class BackupManager:
 
         return bak_path
 
-    def list_backups(
-        self, category: str, max_count: int = 0
-    ) -> list[Path]:
+    def list_backups(self, category: str, max_count: int = 0) -> list[Path]:
         """Return backup paths in *category*, newest first.
 
         If *max_count* > 0 the list is truncated to the latest entries.
@@ -168,9 +164,7 @@ class BackupManager:
             files = files[:max_count]
         return files
 
-    def restore_backup(
-        self, backup_path: Path, target_path: Path
-    ) -> None:
+    def restore_backup(self, backup_path: Path, target_path: Path) -> None:
         """Restore *backup_path* to *target_path* (replaces target)."""
         shutil.copy2(backup_path, target_path)
         log.info("Restored %s → %s", backup_path, target_path)
@@ -189,18 +183,14 @@ class BackupManager:
             return self._enforce_retention(category, max_b)
         for child in sorted(self._backup_root.iterdir()):
             if child.is_dir():
-                removed += self._enforce_retention(
-                    child.name, max_b
-                )
+                removed += self._enforce_retention(child.name, max_b)
         return removed
 
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
 
-    def _enforce_retention(
-        self, category: str, max_backups: int | None = None
-    ) -> int:
+    def _enforce_retention(self, category: str, max_backups: int | None = None) -> int:
         """Keep the *max_backups* newest backups in *category*.
 
         Returns the count of files removed.

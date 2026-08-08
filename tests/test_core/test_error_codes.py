@@ -1,5 +1,3 @@
-
-
 class TestSeverity:
     def test_enum_values(self):
         from core.error_codes import Severity
@@ -257,13 +255,28 @@ class TestErrorCodeConstants:
                 subsystems_used.add(attr.subsystem)
 
         expected = {
-            Subsystem.CORE, Subsystem.PLUGIN, Subsystem.GUI, Subsystem.API,
-            Subsystem.NETWORK, Subsystem.CONFIG, Subsystem.OVERLAY,
-            Subsystem.LIFECYCLE, Subsystem.MC, Subsystem.TIKTOK, Subsystem.HOOK,
-            Subsystem.WATCHER, Subsystem.WORKER, Subsystem.SHUTDOWN,
-            Subsystem.STARTUP, Subsystem.VALIDATE, Subsystem.DIAG,
-            Subsystem.SANDBOX, Subsystem.SECURITY, Subsystem.BACKUP,
-            Subsystem.UPDATE, Subsystem.HEARTBEAT,
+            Subsystem.CORE,
+            Subsystem.PLUGIN,
+            Subsystem.GUI,
+            Subsystem.API,
+            Subsystem.NETWORK,
+            Subsystem.CONFIG,
+            Subsystem.OVERLAY,
+            Subsystem.LIFECYCLE,
+            Subsystem.MC,
+            Subsystem.TIKTOK,
+            Subsystem.HOOK,
+            Subsystem.WATCHER,
+            Subsystem.WORKER,
+            Subsystem.SHUTDOWN,
+            Subsystem.STARTUP,
+            Subsystem.VALIDATE,
+            Subsystem.DIAG,
+            Subsystem.SANDBOX,
+            Subsystem.SECURITY,
+            Subsystem.BACKUP,
+            Subsystem.UPDATE,
+            Subsystem.HEARTBEAT,
         }
         assert subsystems_used == expected
 

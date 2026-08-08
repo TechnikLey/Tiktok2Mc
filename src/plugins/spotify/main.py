@@ -32,7 +32,10 @@ def validate_spotify_client_secret(secret: str) -> tuple[bool, str]:
     if not secret:
         return False, "client_secret is empty"
     if len(secret) < 20:
-        return False, f"client_secret is too short ({len(secret)} chars, expected >= 20)"
+        return (
+            False,
+            f"client_secret is too short ({len(secret)} chars, expected >= 20)",
+        )
     if len(secret) == 32:
         try:
             int(secret, 16)
@@ -47,7 +50,11 @@ class SpotifyClient:
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
-        self.config_path = Path(config_path) if config_path else Path(__file__).resolve().parent / "config.yaml"
+        self.config_path = (
+            Path(config_path)
+            if config_path
+            else Path(__file__).resolve().parent / "config.yaml"
+        )
         self.access_token = None
         self.refresh_token = None
         self.expires_at = 0
@@ -58,10 +65,16 @@ class SpotifyClient:
         with self._token_lock:
             try:
                 cfg = load_yaml(self.config_path)
-                self.access_token = secure_storage.decrypt(cfg.get("access_token")) or None
-                self.refresh_token = secure_storage.decrypt(cfg.get("refresh_token")) or None
+                self.access_token = (
+                    secure_storage.decrypt(cfg.get("access_token")) or None
+                )
+                self.refresh_token = (
+                    secure_storage.decrypt(cfg.get("refresh_token")) or None
+                )
                 self.expires_at = cfg.get("token_expires_at", 0)
-            except Exception as e:  # token load is best-effort; plugin starts without auth
+            except (
+                Exception
+            ) as e:  # token load is best-effort; plugin starts without auth
                 log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
@@ -153,10 +166,14 @@ class SpotifyClient:
             return None
         url = f"{SPOTIFY_API}{path}"
         try:
-            resp = requests.request(method, url, headers=self._headers(), timeout=10, **kwargs)
+            resp = requests.request(
+                method, url, headers=self._headers(), timeout=10, **kwargs
+            )
             if resp.status_code == 401:
                 if self.refresh_access_token():
-                    resp = requests.request(method, url, headers=self._headers(), timeout=10, **kwargs)
+                    resp = requests.request(
+                        method, url, headers=self._headers(), timeout=10, **kwargs
+                    )
                 else:
                     return None
             if resp.status_code == 204:
@@ -196,7 +213,9 @@ class SpotifyClient:
         return self._request("POST", "/me/player/previous")
 
     def set_volume(self, percent):
-        return self._request("PUT", f"/me/player/volume?volume_percent={max(0, min(100, percent))}")
+        return self._request(
+            "PUT", f"/me/player/volume?volume_percent={max(0, min(100, percent))}"
+        )
 
     def toggle_shuffle(self, state):
         return self._request("PUT", f"/me/player/shuffle?state={str(state).lower()}")
@@ -240,10 +259,14 @@ class SpotifyClient:
             if resp.status_code == 200:
                 return resp.json()
             if resp.status_code == 401 and self.refresh_access_token():
-                resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
+                resp = requests.get(
+                    url, headers=self._headers(), params=params, timeout=10
+                )
                 if resp.status_code == 200:
                     return resp.json()
-            log.info(f"[SPOTIFY] Search API error {resp.status_code}: {resp.text[:200]}")
+            log.info(
+                f"[SPOTIFY] Search API error {resp.status_code}: {resp.text[:200]}"
+            )
             return None
         except requests.RequestException as e:
             log.info(f"[SPOTIFY] Search error: {e}")
@@ -257,6 +280,7 @@ class SpotifyClient:
 
     def queue_track(self, track_uri, device_id=None):
         import urllib.parse as up
+
         params = f"uri={up.quote(track_uri, safe='')}"
         if device_id:
             params += f"&device_id={up.quote(device_id, safe='')}"
@@ -272,7 +296,9 @@ def _format_track(data):
         "name": item.get("name", "Unknown"),
         "artists": ", ".join(a.get("name", "") for a in item.get("artists", [])),
         "album": item.get("album", {}).get("name", ""),
-        "image": item["album"]["images"][0]["url"] if item.get("album", {}).get("images") else "",
+        "image": item["album"]["images"][0]["url"]
+        if item.get("album", {}).get("images")
+        else "",
         "duration_ms": item.get("duration_ms", 0),
         "progress_ms": progress,
         "is_playing": is_playing,
@@ -402,13 +428,21 @@ class SpotifyControlPlugin(BasePlugin):
     def _on_volume_up(self, _):
         if self._client.is_authenticated:
             playback = self._client.get_playback()
-            current = playback["device"].get("volume_percent", 50) if playback and playback.get("device") else 50
+            current = (
+                playback["device"].get("volume_percent", 50)
+                if playback and playback.get("device")
+                else 50
+            )
             self._client.set_volume(min(100, current + self._volume_step))
 
     def _on_volume_down(self, _):
         if self._client.is_authenticated:
             playback = self._client.get_playback()
-            current = playback["device"].get("volume_percent", 50) if playback and playback.get("device") else 50
+            current = (
+                playback["device"].get("volume_percent", 50)
+                if playback and playback.get("device")
+                else 50
+            )
             self._client.set_volume(max(0, current - self._volume_step))
 
     def _on_shuffle(self, args):
@@ -431,7 +465,9 @@ class SpotifyControlPlugin(BasePlugin):
             playback = self._client.get_playback()
             current = playback.get("repeat_state", "off") if playback else "off"
             order = ["off", "context", "track"]
-            next_idx = (order.index(current) + 1) % len(order) if current in order else 1
+            next_idx = (
+                (order.index(current) + 1) % len(order) if current in order else 1
+            )
             self._client.set_repeat(order[next_idx])
         else:
             self._client.set_repeat(state_val)
@@ -487,11 +523,18 @@ class SpotifyControlPlugin(BasePlugin):
         with self._last_track_lock:
             if track_data["id"] and track_data["id"] != self._last_track_id:
                 self._last_track_id = track_data["id"]
-                self._maybe_signal("track_changed", {"track": track_data["name"], "artist": track_data["artists"]})
+                self._maybe_signal(
+                    "track_changed",
+                    {"track": track_data["name"], "artist": track_data["artists"]},
+                )
                 progress_ms = track_data.get("progress_ms", 0)
                 track_data["progress_ms"] = 0
                 track_data["progress_sec"] = 0
-                pct = progress_ms / track_data["duration_ms"] * 100 if track_data.get("duration_ms") else 0
+                pct = (
+                    progress_ms / track_data["duration_ms"] * 100
+                    if track_data.get("duration_ms")
+                    else 0
+                )
                 if pct < 90:
                     track_data["progress_ms"] = progress_ms
                     track_data["progress_sec"] = progress_ms // 1000
@@ -512,7 +555,7 @@ class SpotifyControlPlugin(BasePlugin):
     def _search_and_play(self, text: str):
         text = text.strip()
         if text.lower().startswith("playtrack"):
-            text = text[len("playtrack"):].strip()
+            text = text[len("playtrack") :].strip()
         parts = text.split(" - ", maxsplit=1)
         if len(parts) < 2:
             artist = ""
@@ -701,13 +744,21 @@ setInterval(updateProgress, 1000);
     # -- run ----------------------------------------------------------------
 
     def run(self) -> None:
-        if not self.gui_hidden and not self._client.is_authenticated and (self._client_id and self._client_secret):
+        if (
+            not self.gui_hidden
+            and not self._client.is_authenticated
+            and (self._client_id and self._client_secret)
+        ):
             self._on_start_oauth({})
         super().run()
 
 
 if __name__ == "__main__":
     plugin = SpotifyControlPlugin()
-    if not plugin.gui_hidden and not plugin._client.is_authenticated and (plugin._client_id and plugin._client_secret):
+    if (
+        not plugin.gui_hidden
+        and not plugin._client.is_authenticated
+        and (plugin._client_id and plugin._client_secret)
+    ):
         plugin._on_start_oauth({})
     plugin.run()

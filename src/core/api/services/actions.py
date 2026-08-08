@@ -23,7 +23,12 @@ _RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
 # ── Known event trigger names ──────────────────────────────────────────
 
 EVENT_TRIGGERS: set[str] = {
-    "follow", "join", "comment", "likes", "like_2", "share",
+    "follow",
+    "join",
+    "comment",
+    "likes",
+    "like_2",
+    "share",
 }
 
 TRIGGER_TYPE_MAP: dict[str, str] = {
@@ -59,7 +64,7 @@ def _strip_prefix(cmd_str: str, cmd_type: str, extra: dict[str, Any]) -> str:
         name = extra.get("overlay_name", "default")
         prefix = f"@{name}>>"
         if cmd_str.startswith(prefix):
-            return cmd_str[len(prefix):]
+            return cmd_str[len(prefix) :]
         return cmd_str
     if cmd_type == "overlay":
         return cmd_str[2:]
@@ -163,6 +168,7 @@ class ActionsService:
 
         if backup and path.exists():
             from core.backup import get_backup_manager
+
             mgr = get_backup_manager()
             mgr.create_backup(path, category="actions")
 
@@ -193,7 +199,9 @@ class ActionsService:
 
     # ── Parse (raw → structured) ─────────────────────────────────────
 
-    def parse(self, text: str | None = None, gifts: list[dict] | None = None) -> list[dict[str, Any]]:
+    def parse(
+        self, text: str | None = None, gifts: list[dict] | None = None
+    ) -> list[dict[str, Any]]:
         """Parse actions.mca text into a list of trigger dicts.
 
         Comment rules (strict):
@@ -281,32 +289,38 @@ class ActionsService:
 
                 if cmd_type in ("overlay", "named_overlay"):
                     overlay_data = _parse_overlay_body(body)
-                    commands.append({
-                        "type": cmd_type,
-                        "command": body,
-                        "multiplier": 1,
-                        "title": overlay_data["title"],
-                        "subtitle": overlay_data["subtitle"],
-                        "duration": overlay_data["duration"],
-                        "overlay_name": extra.get("overlay_name", "default"),
-                    })
+                    commands.append(
+                        {
+                            "type": cmd_type,
+                            "command": body,
+                            "multiplier": 1,
+                            "title": overlay_data["title"],
+                            "subtitle": overlay_data["subtitle"],
+                            "duration": overlay_data["duration"],
+                            "overlay_name": extra.get("overlay_name", "default"),
+                        }
+                    )
                 else:
-                    commands.append({
-                        "type": cmd_type,
-                        "command": body,
-                        "multiplier": multiplier,
-                        "title": "",
-                        "subtitle": "",
-                        "duration": 3,
-                        "overlay_name": "default",
-                    })
+                    commands.append(
+                        {
+                            "type": cmd_type,
+                            "command": body,
+                            "multiplier": multiplier,
+                            "title": "",
+                            "subtitle": "",
+                            "duration": 3,
+                            "overlay_name": "default",
+                        }
+                    )
 
-            triggers.append({
-                "name": display_name,
-                "enabled": not is_disabled,
-                "type": _detect_trigger_type(trigger_name, gifts),
-                "commands": commands,
-            })
+            triggers.append(
+                {
+                    "name": display_name,
+                    "enabled": not is_disabled,
+                    "type": _detect_trigger_type(trigger_name, gifts),
+                    "commands": commands,
+                }
+            )
 
         return triggers
 
@@ -316,8 +330,11 @@ class ActionsService:
         """Get the set of registered script names from the hook registry."""
         try:
             from core.hook_api import HOOK_ACTIONS
+
             return set(HOOK_ACTIONS.keys())
-        except Exception as e:  # script validation must not fail because hooks are unavailable
+        except (
+            Exception
+        ) as e:  # script validation must not fail because hooks are unavailable
             log.warning(f"Failed to get registered scripts: {e}")
             return set()
 
@@ -341,12 +358,14 @@ class ActionsService:
             if not name:
                 continue
             if name in seen:
-                diagnostics.append({
-                    "line": ti,
-                    "message": f"Duplicate trigger: '{trigger.get('name', '')}' defined multiple times.",
-                    "severity": "ERROR",
-                    "code": "DUPLICATE_TRIGGER"
-                })
+                diagnostics.append(
+                    {
+                        "line": ti,
+                        "message": f"Duplicate trigger: '{trigger.get('name', '')}' defined multiple times.",
+                        "severity": "ERROR",
+                        "code": "DUPLICATE_TRIGGER",
+                    }
+                )
             else:
                 seen[name] = ti
 
@@ -358,30 +377,36 @@ class ActionsService:
                 if cmd_type == "script":
                     script_name = cmd.get("command", "").strip()
                     if not script_name:
-                        diagnostics.append({
-                            "line": ti,
-                            "message": "Script action has empty script name",
-                            "severity": "ERROR",
-                            "code": "INVALID_SCRIPT"
-                        })
+                        diagnostics.append(
+                            {
+                                "line": ti,
+                                "message": "Script action has empty script name",
+                                "severity": "ERROR",
+                                "code": "INVALID_SCRIPT",
+                            }
+                        )
                     elif script_name not in registered_scripts:
-                        diagnostics.append({
-                            "line": ti,
-                            "message": f"Script '{script_name}' is not registered. Available: {', '.join(sorted(registered_scripts)) if registered_scripts else 'none'}",
-                            "severity": "WARNING",
-                            "code": "UNREGISTERED_SCRIPT"
-                        })
+                        diagnostics.append(
+                            {
+                                "line": ti,
+                                "message": f"Script '{script_name}' is not registered. Available: {', '.join(sorted(registered_scripts)) if registered_scripts else 'none'}",
+                                "severity": "WARNING",
+                                "code": "UNREGISTERED_SCRIPT",
+                            }
+                        )
 
                 # Validate overlay actions
                 elif cmd_type in ("overlay", "named_overlay"):
                     title = cmd.get("title", "").strip()
                     if not title:
-                        diagnostics.append({
-                            "line": ti,
-                            "message": f"{cmd_type} action must have a title",
-                            "severity": "WARNING",
-                            "code": "MISSING_OVERLAY_TITLE"
-                        })
+                        diagnostics.append(
+                            {
+                                "line": ti,
+                                "message": f"{cmd_type} action must have a title",
+                                "severity": "WARNING",
+                                "code": "MISSING_OVERLAY_TITLE",
+                            }
+                        )
 
         return diagnostics
 

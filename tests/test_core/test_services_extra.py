@@ -4,9 +4,7 @@ from core.yaml_utils import save_yaml
 
 
 class TestApiServiceFallback:
-    def test_fallback_to_defaults_when_config_missing(
-        self, project_dir, monkeypatch
-    ):
+    def test_fallback_to_defaults_when_config_missing(self, project_dir, monkeypatch):
         from core.api.services import ApiService
 
         main_config = project_dir / "config.yaml"
@@ -35,12 +33,8 @@ class TestApiServiceFallback:
             },
             backup=False,
         )
-        monkeypatch.setattr(
-            "core.paths.get_config_file", lambda: main_config
-        )
-        monkeypatch.setattr(
-            "core.paths.get_root_dir", lambda: project_dir
-        )
+        monkeypatch.setattr("core.paths.get_config_file", lambda: main_config)
+        monkeypatch.setattr("core.paths.get_root_dir", lambda: project_dir)
 
         svc = ApiService()
         assert svc.config_path == fallback
@@ -51,9 +45,7 @@ class TestConfigFileCorrupt:
     def test_read_corrupt_yaml_raises(self, project_dir, monkeypatch):
         config_file = project_dir / "config.yaml"
         config_file.write_text(": broken yaml [", encoding="utf-8")
-        monkeypatch.setattr(
-            "core.paths.get_config_file", lambda: config_file
-        )
+        monkeypatch.setattr("core.paths.get_config_file", lambda: config_file)
 
         from core.api.services import ApiService
 

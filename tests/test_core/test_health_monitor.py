@@ -171,7 +171,9 @@ class TestHealthMonitor:
         for initial, target in transitions:
             hm = HealthMonitor()
             hm.register("comp", initial)
-            assert hm.set_state("comp", target) is True, f"{initial.value} -> {target.value}"
+            assert hm.set_state("comp", target) is True, (
+                f"{initial.value} -> {target.value}"
+            )
 
     def test_illegal_transitions(self):
         from core.health_monitor import HealthMonitor, HealthState
@@ -196,7 +198,9 @@ class TestHealthMonitor:
         for initial, target in illegal:
             hm = HealthMonitor()
             hm.register("comp", initial)
-            assert hm.set_state("comp", target) is False, f"{initial.value} -> {target.value}"
+            assert hm.set_state("comp", target) is False, (
+                f"{initial.value} -> {target.value}"
+            )
 
     def test_record_heartbeat_creates_record(self):
         from core.health_monitor import HealthMonitor, HealthState

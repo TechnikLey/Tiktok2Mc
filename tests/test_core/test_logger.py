@@ -24,7 +24,9 @@ class TestCircularBufferHandler:
 
         h = _CircularBufferHandler(capacity=3)
         for i in range(5):
-            record = logging.LogRecord("test", logging.INFO, "", 0, f"msg{i}", None, None)
+            record = logging.LogRecord(
+                "test", logging.INFO, "", 0, f"msg{i}", None, None
+            )
             h.emit(record)
         recent = h.get_recent(10)
         assert len(recent) == 3
@@ -36,7 +38,9 @@ class TestCircularBufferHandler:
 
         h = _CircularBufferHandler(capacity=10)
         for i in range(5):
-            record = logging.LogRecord("test", logging.INFO, "", 0, f"msg{i}", None, None)
+            record = logging.LogRecord(
+                "test", logging.INFO, "", 0, f"msg{i}", None, None
+            )
             h.emit(record)
         recent = h.get_recent(2)
         assert len(recent) == 2

@@ -106,7 +106,9 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
         if "code" in params:
             _auth_code = params["code"][0]
-            self._send_response(200, "Authorization successful! You can close this tab.")
+            self._send_response(
+                200, "Authorization successful! You can close this tab."
+            )
         elif "error" in params:
             self._send_response(400, f"Authorization failed: {params['error'][0]}")
         else:
@@ -120,7 +122,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 <html>
 <head><title>Spotify Auth</title></head>
 <body style="font-family:sans-serif; text-align:center; padding:40px;">
-<h1>{'✅ Success' if status == 200 else '❌ Error'}</h1>
+<h1>{"✅ Success" if status == 200 else "❌ Error"}</h1>
 <p>{message}</p>
 </body>
 </html>"""
@@ -144,14 +146,19 @@ def _run_callback_server(port: int) -> str | None:
 
 # ── Token exchange ─────────────────────────────────────────────────────
 
-def _exchange_code(code: str, client_id: str, client_secret: str, redirect_uri: str) -> dict[str, Any] | None:
-    payload = urllib.parse.urlencode({
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": redirect_uri,
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }).encode("utf-8")
+
+def _exchange_code(
+    code: str, client_id: str, client_secret: str, redirect_uri: str
+) -> dict[str, Any] | None:
+    payload = urllib.parse.urlencode(
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
+    ).encode("utf-8")
 
     req = urllib.request.Request(
         SPOTIFY_TOKEN_URL,
@@ -174,13 +181,17 @@ def _exchange_code(code: str, client_id: str, client_secret: str, redirect_uri: 
         return None
 
 
-def _refresh_token(refresh_token: str, client_id: str, client_secret: str) -> dict[str, Any] | None:
-    payload = urllib.parse.urlencode({
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }).encode("utf-8")
+def _refresh_token(
+    refresh_token: str, client_id: str, client_secret: str
+) -> dict[str, Any] | None:
+    payload = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
+    ).encode("utf-8")
 
     req = urllib.request.Request(
         SPOTIFY_TOKEN_URL,
@@ -198,6 +209,7 @@ def _refresh_token(refresh_token: str, client_id: str, client_secret: str) -> di
 
 # ── Main wizard ──────────────────────────────────────────────────────────
 
+
 def main():
     _print_banner()
 
@@ -214,9 +226,10 @@ def main():
 
     client_id = _prompt_input("Client ID")
     client_secret = _prompt_input("Client Secret")
-    redirect_uri = _prompt_input(
-        f"Redirect URI (default: {DEFAULT_REDIRECT_URI})", required=False
-    ) or DEFAULT_REDIRECT_URI
+    redirect_uri = (
+        _prompt_input(f"Redirect URI (default: {DEFAULT_REDIRECT_URI})", required=False)
+        or DEFAULT_REDIRECT_URI
+    )
 
     # Parse port from redirect URI
     parsed = urllib.parse.urlparse(redirect_uri)
@@ -224,13 +237,15 @@ def main():
 
     # Build authorization URL
     scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
-    auth_params = urllib.parse.urlencode({
-        "client_id": client_id,
-        "response_type": "code",
-        "redirect_uri": redirect_uri,
-        "scope": scopes,
-        "show_dialog": "true",
-    })
+    auth_params = urllib.parse.urlencode(
+        {
+            "client_id": client_id,
+            "response_type": "code",
+            "redirect_uri": redirect_uri,
+            "scope": scopes,
+            "show_dialog": "true",
+        }
+    )
     auth_url = f"{SPOTIFY_AUTH_URL}?{auth_params}"
 
     print("\n[OK] Opening browser for authorization...")
@@ -240,7 +255,9 @@ def main():
     # Run local callback server
     auth_code = _run_callback_server(port)
     if not auth_code:
-        log.error("No authorization code received. Did you approve the app in your browser?")
+        log.error(
+            "No authorization code received. Did you approve the app in your browser?"
+        )
         return
 
     log.info("Authorization code received.")
@@ -252,6 +269,7 @@ def main():
         return
 
     import json
+
     token_data = json.loads(raw_response)
     access_token = token_data.get("access_token", "")
     refresh_token = token_data.get("refresh_token", "")
@@ -291,7 +309,9 @@ def refresh():
     client_id = spotify_cfg.get("client_id", "")
     raw_secret = spotify_cfg.get("client_secret", "")
     client_secret = secure_storage.decrypt(raw_secret) or raw_secret
-    refresh_token_val = secure_storage.decrypt(spotify_cfg.get("refresh_token")) or spotify_cfg.get("refresh_token", "")
+    refresh_token_val = secure_storage.decrypt(
+        spotify_cfg.get("refresh_token")
+    ) or spotify_cfg.get("refresh_token", "")
 
     if not all([client_id, client_secret, refresh_token_val]):
         log.error("Missing credentials. Run setup first.")
@@ -303,6 +323,7 @@ def refresh():
         return
 
     import json
+
     data = json.loads(raw)
     access_token = data.get("access_token", "")
     expires_in = data.get("expires_in", 3600)

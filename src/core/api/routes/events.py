@@ -16,8 +16,7 @@ router = APIRouter(tags=["Events"])
 async def event_stream(
     types: str = Query(
         "",
-        description="Comma-separated event types to subscribe to "
-        "(empty = all events)",
+        description="Comma-separated event types to subscribe to (empty = all events)",
     ),
 ):
     """Server-Sent Events (SSE) endpoint.
@@ -27,11 +26,7 @@ async def event_stream(
     lets consumers subscribe to only the events they need.
     """
 
-    filter_types = (
-        [t.strip() for t in types.split(",") if t.strip()]
-        if types
-        else []
-    )
+    filter_types = [t.strip() for t in types.split(",") if t.strip()] if types else []
 
     async def generate():
         q = event_bus.subscribe(*filter_types)
@@ -69,13 +64,9 @@ async def inject_event(body: dict):
         event_type = body.get("type", "external.event")
         data = body.get("data", {})
         if not isinstance(event_type, str):
-            raise HTTPException(
-                status_code=422, detail="'type' must be a string"
-            )
+            raise HTTPException(status_code=422, detail="'type' must be a string")
         if not isinstance(data, dict):
-            raise HTTPException(
-                status_code=422, detail="'data' must be a dict"
-            )
+            raise HTTPException(status_code=422, detail="'data' must be a dict")
         await event_bus.publish(event_type, data)
         return {"status": "ok", "event": event_type}
     except HTTPException:

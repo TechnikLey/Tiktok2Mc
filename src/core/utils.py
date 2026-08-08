@@ -55,9 +55,7 @@ def normalize_config_version(value: Any) -> str:
             return f"{major}.{minor}"
         if n == 1 and parts[0].isdigit():
             return f"0.{parts[0]}"
-        raise ValueError(
-            f"Unrecognised config version string: {value!r}"
-        )
+        raise ValueError(f"Unrecognised config version string: {value!r}")
 
     raise ValueError(
         f"config_version must be int, float or str, "

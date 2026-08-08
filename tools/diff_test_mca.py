@@ -29,40 +29,81 @@ from core.validator import validate_text  # noqa: E402
 # ── Test case generators ────────────────────────────────────────────────
 
 VALID_TRIGGER_NAMES = [
-    "follow", "join", "comment", "likes", "like_2", "share",
-    "test", "my_trigger", "abc123", "A", "z", "0", "_",
-    "gift_12345", "custom_event", "on_message",
+    "follow",
+    "join",
+    "comment",
+    "likes",
+    "like_2",
+    "share",
+    "test",
+    "my_trigger",
+    "abc123",
+    "A",
+    "z",
+    "0",
+    "_",
+    "gift_12345",
+    "custom_event",
+    "on_message",
 ]
 
 QUOTED_TRIGGER_NAMES = [
-    "'my trigger'", "'Tom the Tomato'", "'a'", "'hello world'",
-    "'test 123'", "'my_custom trigger'",
+    "'my trigger'",
+    "'Tom the Tomato'",
+    "'a'",
+    "'hello world'",
+    "'test 123'",
+    "'my_custom trigger'",
 ]
 
 INVALID_TRIGGER_NAMES = [
-    "bad-trigger", "trigger!", "@trigger", "#trigger", ".trigger",
-    "trigger name", "trigger,name", "trigger$", "trigger%",
+    "bad-trigger",
+    "trigger!",
+    "@trigger",
+    "#trigger",
+    ".trigger",
+    "trigger name",
+    "trigger,name",
+    "trigger$",
+    "trigger%",
 ]
 
 INVALID_QUOTED = [
-    "'bad-trigger!'", "'trigger@name'", "'a,b'", "'bad.name'",
-    "'test<script>'", "''", "'unclosed", "unclosed'",
+    "'bad-trigger!'",
+    "'trigger@name'",
+    "'a,b'",
+    "'bad.name'",
+    "'test<script>'",
+    "''",
+    "'unclosed",
+    "unclosed'",
 ]
 
 COMMAND_BODIES = [
-    "/say hello", "/give @a diamond", "/execute at @a run summon creeper",
-    "/clear @a *", "/kill @a", "/tp @a ~ ~5 ~",
-    "!tnt 2 0.1 2 Notch", "!cmd arg1 arg2",
-    "$random", "$my_script",
-    "&curl http://localhost:29191/add", "&echo hello",
+    "/say hello",
+    "/give @a diamond",
+    "/execute at @a run summon creeper",
+    "/clear @a *",
+    "/kill @a",
+    "/tp @a ~ ~5 ~",
+    "!tnt 2 0.1 2 Notch",
+    "!cmd arg1 arg2",
+    "$random",
+    "$my_script",
+    "&curl http://localhost:29191/add",
+    "&echo hello",
     ">>Welcome!|{user} joined!|5",
-    ">>Title", ">>Title|Subtitle",
+    ">>Title",
+    ">>Title|Subtitle",
     ">>{user} wrote:|{comment}",
     "@screen>>Title|Subtitle|3",
 ]
 
 INVALID_COMMANDS = [
-    "%bad command", "missingprefix", "@incomplete", "@|>>bad",
+    "%bad command",
+    "missingprefix",
+    "@incomplete",
+    "@|>>bad",
 ]
 
 MULTIPLIERS = ["x2", "x5", "x10", "x50", "x100"]
@@ -70,9 +111,15 @@ MULTIPLIERS = ["x2", "x5", "x10", "x50", "x100"]
 INVALID_MULTIPLIERS = ["xabc", "x", "x1.5", "x-1"]
 
 BRACKET_VARIANTS = [
-    "/say [test]", "/say {nbt}", "/say [{nested}]",
-    "/say [unclosed", "/say {unclosed", "/say ]extra",
-    "/say }extra", '/say "keep [balanced"', "/say 'keep [balanced'",
+    "/say [test]",
+    "/say {nbt}",
+    "/say [{nested}]",
+    "/say [unclosed",
+    "/say {unclosed",
+    "/say ]extra",
+    "/say }extra",
+    '/say "keep [balanced"',
+    "/say 'keep [balanced'",
     "/say [it\\'s ok]",
 ]
 
@@ -162,7 +209,9 @@ def generate_invalid_line(rng: random.Random) -> str:
     elif error_type == 9:
         # Unmatched brackets
         name = rng.choice(VALID_TRIGGER_NAMES)
-        bracket_case = rng.choice(["/say ]", "/say }", "/say [unclosed", "/say {unclosed"])
+        bracket_case = rng.choice(
+            ["/say ]", "/say }", "/say [unclosed", "/say {unclosed"]
+        )
         return f"{name}:{bracket_case}"
 
     elif error_type == 10:
@@ -182,7 +231,9 @@ def generate_test_case(rng: random.Random) -> str:
     for _ in range(num_lines):
         if rng.random() < 0.3:
             # Comment line
-            lines.append(f"# {rng.choice(['comment', 'disabled test', 'TODO', 'fix this'])}")
+            lines.append(
+                f"# {rng.choice(['comment', 'disabled test', 'TODO', 'fix this'])}"
+            )
         elif rng.random() < 0.15:
             # Disabled trigger
             name = rng.choice(VALID_TRIGGER_NAMES)
@@ -196,8 +247,16 @@ def generate_test_case(rng: random.Random) -> str:
             lines.append(generate_valid_line(rng))
 
     # Maybe add duplicate
-    if rng.random() < 0.3 and len([line for line in lines if ":" in line and not line.strip().startswith("#")]) >= 2:
-        valid_lines = [line for line in lines if ":" in line and not line.strip().startswith("#")]
+    if (
+        rng.random() < 0.3
+        and len(
+            [line for line in lines if ":" in line and not line.strip().startswith("#")]
+        )
+        >= 2
+    ):
+        valid_lines = [
+            line for line in lines if ":" in line and not line.strip().startswith("#")
+        ]
         dup = rng.choice(valid_lines)
         dup_name = dup.split(":")[0].strip()
         lines.append(f"{dup_name}:/another_command")
@@ -206,6 +265,7 @@ def generate_test_case(rng: random.Random) -> str:
 
 
 # ── Python validator runner ─────────────────────────────────────────────
+
 
 def run_python_validator(text: str) -> list[dict[str, Any]]:
     """Run the Python validator and return normalized diagnostics."""
@@ -225,24 +285,37 @@ def run_python_validator(text: str) -> list[dict[str, Any]]:
 
 # ── JS validator runner ─────────────────────────────────────────────────
 
+
 def run_js_validator(text: str) -> list[dict[str, Any]]:
     """Run the JS language server validator via Node.js subprocess."""
     if not shutil.which("node"):
         print("Error: Node.js is not installed or not in PATH.", file=sys.stderr)
-        print("Install it: https://nodejs.org/ or use your package manager:", file=sys.stderr)
+        print(
+            "Install it: https://nodejs.org/ or use your package manager:",
+            file=sys.stderr,
+        )
         print("  sudo apt install nodejs    # Debian / Ubuntu", file=sys.stderr)
         print("  sudo pacman -S nodejs      # Arch", file=sys.stderr)
         print("  sudo dnf install nodejs    # Fedora", file=sys.stderr)
         return []
 
-    js_runner = SCRIPT_DIR.parent / "mca-language-server" / "server" / "test" / "run_validator.js"
+    js_runner = (
+        SCRIPT_DIR.parent
+        / "mca-language-server"
+        / "server"
+        / "test"
+        / "run_validator.js"
+    )
 
     # Escape the text for passing as argument
     escaped = json.dumps(text)
 
     result = subprocess.run(
         ["node", str(js_runner), escaped],
-        capture_output=True, text=True, timeout=30, check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
         cwd=str(js_runner.parent),
     )
 
@@ -267,6 +340,7 @@ SEVERITY_MAP = {
     "INFO": 3,
 }
 
+
 def normalize_severity(sev: str | int) -> int:
     """Convert severity to integer for comparison."""
     if isinstance(sev, int):
@@ -281,7 +355,8 @@ def diagnostics_equal(a: dict, b: dict) -> bool:
         and a["start_char"] == b["start_char"]
         and a["end_char"] == b["end_char"]
         and a["code"] == b["code"]
-        and normalize_severity(a.get("severity", a.get("severity", 0))) == normalize_severity(b.get("severity", b.get("severity", 0)))
+        and normalize_severity(a.get("severity", a.get("severity", 0)))
+        == normalize_severity(b.get("severity", b.get("severity", 0)))
     )
 
 
@@ -324,14 +399,19 @@ def compare_diagnostics(
 
 # ── Main ────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = __import__("argparse").ArgumentParser(
         description="Differential test: compare Python vs JS MCA validators"
     )
     parser.add_argument("--count", type=int, default=500, help="Number of test cases")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--save", type=str, default=None, help="Save test cases to file")
-    parser.add_argument("--load", type=str, default=None, help="Load test cases from file")
+    parser.add_argument(
+        "--save", type=str, default=None, help="Save test cases to file"
+    )
+    parser.add_argument(
+        "--load", type=str, default=None, help="Load test cases from file"
+    )
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -363,8 +443,16 @@ def main():
 
         py_diag_count += len(py_diags)
         js_diag_count += len(js_diags)
-        errors_in_py += sum(1 for d in py_diags if d.get("severity", d.get("severity", "")) in ("ERROR", 1))
-        errors_in_js += sum(1 for d in js_diags if d.get("severity", d.get("severity", "")) in ("ERROR", 1))
+        errors_in_py += sum(
+            1
+            for d in py_diags
+            if d.get("severity", d.get("severity", "")) in ("ERROR", 1)
+        )
+        errors_in_js += sum(
+            1
+            for d in js_diags
+            if d.get("severity", d.get("severity", "")) in ("ERROR", 1)
+        )
 
         mismatches = compare_diagnostics(py_diags, js_diags, text)
 
@@ -383,7 +471,7 @@ def main():
                 break
 
     test_count = len(test_cases)
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Total test cases:     {test_count}")
     print(f"Cases with mismatches: {total_mismatches}")
     print(f"Python diagnostics:   {py_diag_count} ({errors_in_py} errors)")

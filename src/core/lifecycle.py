@@ -77,6 +77,8 @@ class _ProcessStartupError(Exception):
     def __init__(self, message: str, intentional: bool = False) -> None:
         super().__init__(message)
         self.intentional = intentional
+
+
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
 
@@ -314,7 +316,9 @@ class ProcessSupervisor:
             for listener in self._state_listeners:
                 try:
                     listener(value)
-                except Exception as exc:  # listener is user code — must not break state machine
+                except (
+                    Exception
+                ) as exc:  # listener is user code — must not break state machine
                     log.warning("State listener failed: %s", exc)
 
     def add_state_listener(self, callback: Callable[[SupervisorState], None]) -> None:
@@ -446,7 +450,9 @@ class ProcessSupervisor:
                         text=True,
                     )
                     return proc.session_name in res.stdout
-            except Exception:  # unknown session state is conservatively treated as alive
+            except (
+                Exception
+            ):  # unknown session state is conservatively treated as alive
                 return True
         return True
 
@@ -476,13 +482,19 @@ class ProcessSupervisor:
                 ready = False
                 exited_early = False
                 deadline = time.time() + proc.readiness_timeout
-                log.info("[SUPERVISOR] %s waiting for readiness (timeout %.0fs)...", name, proc.readiness_timeout)
+                log.info(
+                    "[SUPERVISOR] %s waiting for readiness (timeout %.0fs)...",
+                    name,
+                    proc.readiness_timeout,
+                )
                 while time.time() < deadline:
                     try:
                         if await proc.readiness_check():
                             ready = True
                             break
-                    except Exception:  # a failing readiness probe must not abort the loop
+                    except (
+                        Exception
+                    ):  # a failing readiness probe must not abort the loop
                         pass
                     # If the child already exited (e.g. missing server.jar),
                     # do not keep polling until the full readiness timeout.
@@ -499,7 +511,11 @@ class ProcessSupervisor:
                     await asyncio.sleep(1.0)
                 if not ready:
                     if not exited_early:
-                        log.error("[SUPERVISOR] %s failed readiness check within %.0fs", name, proc.readiness_timeout)
+                        log.error(
+                            "[SUPERVISOR] %s failed readiness check within %.0fs",
+                            name,
+                            proc.readiness_timeout,
+                        )
                     proc.state = ProcessState.FAILED
                     _update_process_health(name, ProcessState.FAILED)
                     return False
@@ -507,7 +523,11 @@ class ProcessSupervisor:
             proc.state = ProcessState.RUNNING
             proc.start_time = time.time()
             _update_process_health(name, ProcessState.RUNNING)
-            log.info("[SUPERVISOR] %s started (PID %s)", name, proc.proc.pid if proc.proc else "?")
+            log.info(
+                "[SUPERVISOR] %s started (PID %s)",
+                name,
+                proc.proc.pid if proc.proc else "?",
+            )
             return True
         except _ProcessStartupError as exc:
             if exc.intentional:
@@ -543,7 +563,11 @@ class ProcessSupervisor:
                 "env": env,
                 "close_fds": True,
             }
-            flags = subprocess.CREATE_NO_WINDOW if proc.hidden else subprocess.CREATE_NEW_CONSOLE
+            flags = (
+                subprocess.CREATE_NO_WINDOW
+                if proc.hidden
+                else subprocess.CREATE_NEW_CONSOLE
+            )
             kwargs["creationflags"] = flags
             proc.proc = await asyncio.to_thread(subprocess.Popen, cmd, **kwargs)
         elif self._session_tool == "tmux":
@@ -575,9 +599,7 @@ class ProcessSupervisor:
             )
             await asyncio.to_thread(
                 subprocess.Popen,
-                ["screen", "-dmS", session_name]
-                + _build_display_env_screen()
-                + cmd,
+                ["screen", "-dmS", session_name] + _build_display_env_screen() + cmd,
                 cwd=cwd,
                 env=env,
             )
@@ -589,6 +611,7 @@ class ProcessSupervisor:
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"{_sanitize_session_name(proc.name)}.log"
             kwargs = {"cwd": cwd, "env": env, "stdin": subprocess.DEVNULL}
+
             def _spawn_with_log() -> subprocess.Popen | None:
                 with open(log_file, "w", encoding="utf-8") as lf:
                     return subprocess.Popen(cmd, stdout=lf, stderr=lf, **kwargs)
@@ -598,7 +621,9 @@ class ProcessSupervisor:
         if proc.proc and proc.post_spawn:
             try:
                 proc.post_spawn(proc.proc)
-            except Exception as exc:  # post_spawn is a hook — failure must not abort startup
+            except (
+                Exception
+            ) as exc:  # post_spawn is a hook — failure must not abort startup
                 log.warning("[SUPERVISOR] post_spawn failed for %s: %s", proc.name, exc)
 
         # Brief wait to catch immediate startup failures.
@@ -618,7 +643,8 @@ class ProcessSupervisor:
         Disabled processes are tracked but skipped.
         """
         names = [
-            proc.name for proc in self.list_processes()
+            proc.name
+            for proc in self.list_processes()
             if not proc.shell and proc.enabled
         ]
         results_list = await asyncio.gather(
@@ -674,7 +700,9 @@ class ProcessSupervisor:
         _update_process_health(name, ProcessState.STOPPING)
 
         try:
-            await self._do_stop(proc, graceful_timeout=graceful_timeout, force_timeout=force_timeout)
+            await self._do_stop(
+                proc, graceful_timeout=graceful_timeout, force_timeout=force_timeout
+            )
             proc.state = ProcessState.STOPPED
             _update_process_health(name, ProcessState.STOPPED)
             proc.proc = None
@@ -715,7 +743,9 @@ class ProcessSupervisor:
                 if proc.session_name in self._linux_sessions:
                     self._linux_sessions.remove(proc.session_name)
             except OSError as exc:
-                log.warning("[SUPERVISOR] Session stop failed for %s: %s", proc.name, exc)
+                log.warning(
+                    "[SUPERVISOR] Session stop failed for %s: %s", proc.name, exc
+                )
             return
 
         # Direct Popen stop
@@ -844,7 +874,9 @@ class ProcessSupervisor:
             if not freed:
                 log.warning("[SUPERVISOR] API port %s:%s still in use", host, port)
                 return False
-        except Exception as exc:  # port wait is defensive; failure should not crash shutdown
+        except (
+            Exception
+        ) as exc:  # port wait is defensive; failure should not crash shutdown
             log.warning("[SUPERVISOR] Could not parse API URL: %s", exc)
 
         log.info("[SUPERVISOR] API server stopped")
@@ -897,7 +929,9 @@ class ProcessSupervisor:
             # Console countdown handled by caller; just sleep here.
             await asyncio.sleep(delay)
 
-        self.state = SupervisorState.SHUTTING_DOWN if not restart else SupervisorState.RESTARTING
+        self.state = (
+            SupervisorState.SHUTTING_DOWN if not restart else SupervisorState.RESTARTING
+        )
 
         # 1. Stop all backend child processes.
         await self.stop_all(keep_shell=restart, graceful_timeout=5.0, force_timeout=5.0)
@@ -938,9 +972,12 @@ class ProcessSupervisor:
         # Notify listeners (including the GUI via SSE) that the backend is back.
         try:
             from core.api.eventbus import event_bus
+
             await event_bus.publish("server.started", {})
         except Exception as exc:  # restart must succeed even if event publishing fails
-            log.debug("[SUPERVISOR] Could not publish restart completion event: %s", exc)
+            log.debug(
+                "[SUPERVISOR] Could not publish restart completion event: %s", exc
+            )
 
         self.state = SupervisorState.RUNNING
         log.info("[SUPERVISOR] Restart complete")
