@@ -323,6 +323,42 @@ class TestEnqueueThreadsafe:
         assert q.empty()
 
 
+# =========================================================================
+# execute_global_command overlay dispatch
+# =========================================================================
+
+
+class TestExecuteGlobalCommandOverlay:
+    def test_overlay_offloaded_to_thread(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import ctx, execute_global_command
+
+        monkeypatch.setattr(ctx, "valid_functions", {"overlaytest"})
+        monkeypatch.setattr(
+            ctx, "overlay_actions", {"overlaytest": [("default", "Title|Subtitle|5")]}
+        )
+        monkeypatch.setattr(ctx, "script_actions", {})
+        monkeypatch.setattr(ctx, "vanilla_functions", set())
+        monkeypatch.setattr(ctx, "rcon_only_actions", {})
+        monkeypatch.setattr(ctx, "shell_actions_cache", {})
+        monkeypatch.setattr(ctx, "namespace", "ns")
+
+        calls: list[tuple] = []
+
+        async def fake_to_thread(fn, *args):
+            calls.append((fn, args))
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        asyncio.run(execute_global_command("overlaytest", "viewer"))
+
+        assert len(calls) == 1
+        fn, args = calls[0]
+        assert fn is main_mod.send_overlay_text
+        assert args == ("Title", "Subtitle", 5, "default")
+
+
 class TestUpdateDailyRevenue:
     def test_writes_daily_revenue(self, tmp_path, monkeypatch):
         from src.python.main import ctx, update_daily_revenue

@@ -793,7 +793,11 @@ async def execute_global_command(
                 )
             except (ValueError, IndexError):
                 duration = 3
-            send_overlay_text(title, subtitle, duration, overlay_name)
+            # Offload the blocking overlay HTTP POST so a slow/unreachable
+            # API cannot stall the whole trigger worker.
+            await asyncio.to_thread(
+                send_overlay_text, title, subtitle, duration, overlay_name
+            )
 
     # --- 1. VANILLA COMMANDS ---
     if name in ctx.vanilla_functions:
