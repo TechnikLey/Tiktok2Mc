@@ -82,8 +82,8 @@ class EventBus:
                         "eventbus",
                         f"{CORE_0006.code}: Queue full, dropping {event_type}",
                     )
-                except Exception:  # best-effort health reporting
-                    pass
+                except Exception as e:  # best-effort health reporting
+                    log.debug("Health reporting for dropped event failed: %s", e)
 
 
 # Module-level singleton — import and use directly.
