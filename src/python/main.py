@@ -192,26 +192,6 @@ werkzeug_log.setLevel(logging.WARNING)
 
 _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
 
-# 'likes' fires every N cumulative likes since stream start; 'like_2' fires
-# once at the mega milestone. These are the fallback rules when a config has
-# no ``tiktok.like_triggers`` section (old configs before auto-merge).
-_DEFAULT_LIKE_TRIGGERS = [
-    {
-        "id": "likes_standard",
-        "every": 100,
-        "function": "likes",
-        "payload": "Community",
-        "enabled": True,
-    },
-    {
-        "id": "likes_100k",
-        "every": 100_000,
-        "function": "like_2",
-        "payload": "Community",
-        "enabled": True,
-    },
-]
-
 # ==========================================
 # SETUP & HELPER FUNCTIONS
 # ==========================================
@@ -354,10 +334,9 @@ def _apply_config(config: dict) -> None:
         ctx._followed_cache.clear()
         log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
 
-    raw_like_triggers = config.get("tiktok", {}).get("like_triggers")
-    if not raw_like_triggers:
-        raw_like_triggers = _DEFAULT_LIKE_TRIGGERS
-    ctx.like_triggers = validate_like_triggers(raw_like_triggers)
+    ctx.like_triggers = validate_like_triggers(
+        config.get("tiktok", {}).get("like_triggers", [])
+    )
 
     comment_cmd_cfg = config.get("comment_commands", {})
     ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
