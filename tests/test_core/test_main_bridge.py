@@ -360,7 +360,7 @@ class TestExecuteGlobalCommandOverlay:
 
 
 # =========================================================================
-# _enqueue_like_triggers (like milestone triggers)
+# _enqueue_like_triggers (configurable like milestone triggers)
 # =========================================================================
 
 
@@ -379,59 +379,182 @@ class TestEnqueueLikeTriggers:
         return calls
 
     def test_likes_fires_once_per_milestone(self, monkeypatch):
-        from src.python.main import ctx
+        from src.python.main import ctx, prepare_like_triggers
 
+        rule = {
+            "id": "likes_standard",
+            "every": 100,
+            "function": "likes",
+            "payload": "Community",
+            "enabled": True,
+        }
         monkeypatch.setattr(ctx, "valid_functions", {"likes"})
-        monkeypatch.setattr(ctx, "_last_likes_trigger", 0)
-        calls = self._call(monkeypatch, 250, "viewer")
-        assert calls == [(("likes", "viewer"), "like:likes")]
+        monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
+        calls = self._call(monkeypatch, 150, "viewer")  # 1 milestone crossed
+        assert calls == [(("likes", "Community"), "like:likes_standard")]
 
-        calls = self._call(monkeypatch, 250, "viewer")
+        calls = self._call(monkeypatch, 150, "viewer")
         assert calls == []  # same milestone: no duplicate
 
     def test_likes_fires_again_on_next_milestone(self, monkeypatch):
-        import src.python.main as main_mod
-        from src.python.main import _enqueue_like_triggers, ctx
+        from src.python.main import ctx, prepare_like_triggers
 
-        monkeypatch.setattr(main_mod, "enqueue_threadsafe", lambda *a, **k: None)
+        rule = {
+            "id": "likes_standard",
+            "every": 100,
+            "function": "likes",
+            "payload": "Community",
+            "enabled": True,
+        }
         monkeypatch.setattr(ctx, "valid_functions", {"likes"})
-        monkeypatch.setattr(ctx, "_last_likes_trigger", 1)
-        monkeypatch.setattr(ctx, "_like_2_fired", False)
+        prepared = prepare_like_triggers([rule])
+        prepared[0]["last_blocks"] = 1
+        monkeypatch.setattr(ctx, "like_triggers", prepared)
+        calls = self._call(monkeypatch, 250, "viewer")  # milestone 2 > 1
+        assert calls == [(("likes", "Community"), "like:likes_standard")]
 
-        calls = []
-        monkeypatch.setattr(
-            main_mod, "enqueue_threadsafe", lambda item, label=None: calls.append(item)
-        )
-        _enqueue_like_triggers(350, "viewer")  # milestones = 3 > 1
-        assert calls == [("likes", "viewer")]
+    def test_catches_up_when_multiple_milestones_crossed(self, monkeypatch):
+        from src.python.main import ctx, prepare_like_triggers
+
+        rule = {
+            "id": "likes_standard",
+            "every": 100,
+            "function": "likes",
+            "payload": "Community",
+            "enabled": True,
+        }
+        monkeypatch.setattr(ctx, "valid_functions", {"likes"})
+        monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
+        calls = self._call(monkeypatch, 350, "viewer")  # milestones 1,2,3
+        assert calls == [
+            (("likes", "Community"), "like:likes_standard"),
+            (("likes", "Community"), "like:likes_standard"),
+            (("likes", "Community"), "like:likes_standard"),
+        ]
 
     def test_like_2_fires_once_at_mega(self, monkeypatch):
-        import src.python.main as main_mod
-        from src.python.main import _enqueue_like_triggers, ctx
+        from src.python.main import ctx, prepare_like_triggers
 
-        calls = []
-
-        def fake_enqueue(item, label=None):
-            calls.append(item)
-
-        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue)
+        rule = {
+            "id": "likes_100k",
+            "every": 100_000,
+            "function": "like_2",
+            "payload": "Community",
+            "enabled": True,
+        }
         monkeypatch.setattr(ctx, "valid_functions", {"like_2"})
-        monkeypatch.setattr(ctx, "_last_likes_trigger", 0)
-        monkeypatch.setattr(ctx, "_like_2_fired", False)
+        monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
+        calls = self._call(monkeypatch, 100_000, "viewer")
+        assert calls == [(("like_2", "Community"), "like:likes_100k")]
 
-        _enqueue_like_triggers(100_000, "viewer")
-        assert calls == [("like_2", "viewer")]
-
-        calls.clear()
-        _enqueue_like_triggers(150_000, "viewer")
+        calls = self._call(monkeypatch, 150_000, "viewer")
         assert calls == []  # already fired
 
     def test_no_enqueue_when_not_configured(self, monkeypatch):
         from src.python.main import ctx
 
         monkeypatch.setattr(ctx, "valid_functions", {"follow"})
+        monkeypatch.setattr(ctx, "like_triggers", [])
         calls = self._call(monkeypatch, 500, "viewer")
         assert calls == []
+
+    def test_skips_rules_without_action(self, monkeypatch):
+        from src.python.main import ctx, prepare_like_triggers
+
+        rule = {
+            "id": "no_action",
+            "every": 50,
+            "function": "missing_trigger",
+            "payload": "Community",
+            "enabled": True,
+        }
+        monkeypatch.setattr(ctx, "valid_functions", {"likes"})
+        prepared = prepare_like_triggers([rule])
+        assert prepared == []  # function has no action in actions.mca
+
+    def test_disabled_rules_are_skipped(self, monkeypatch):
+        from src.python.main import ctx, prepare_like_triggers
+
+        rule = {
+            "id": "off",
+            "every": 50,
+            "function": "likes",
+            "payload": "Community",
+            "enabled": False,
+        }
+        monkeypatch.setattr(ctx, "valid_functions", {"likes"})
+        assert prepare_like_triggers([rule]) == []
+
+
+class TestValidateLikeTriggers:
+    def test_defaults_payload_and_enabled(self):
+        from src.python.main import validate_like_triggers
+
+        rules = validate_like_triggers([{"id": "a", "every": 100, "function": "likes"}])
+        assert rules == [
+            {
+                "id": "a",
+                "every": 100,
+                "function": "likes",
+                "payload": "Community",
+                "enabled": True,
+            }
+        ]
+
+    def test_accepts_underscore_every_and_string_enabled(self):
+        from src.python.main import validate_like_triggers
+
+        rules = validate_like_triggers(
+            [
+                {
+                    "id": "d",
+                    "every": "1_000",
+                    "function": "like_2",
+                    "payload": "Mega",
+                    "enabled": "false",
+                }
+            ]
+        )
+        assert rules == [
+            {
+                "id": "d",
+                "every": 1000,
+                "function": "like_2",
+                "payload": "Mega",
+                "enabled": False,
+            }
+        ]
+
+    def test_rejects_invalid_entries(self):
+        from src.python.main import validate_like_triggers
+
+        rules = validate_like_triggers(
+            [
+                {"id": "", "every": 100, "function": "likes"},
+                {"id": "b", "every": 0, "function": "likes"},
+                {"id": "c", "every": 100, "function": ""},
+                {"id": "d", "every": 100, "function": "likes", "payload": 42},
+                "not-a-dict",
+            ]
+        )
+        assert rules == []
+
+    def test_duplicate_ids_skipped(self):
+        from src.python.main import validate_like_triggers
+
+        rules = validate_like_triggers(
+            [
+                {"id": "a", "every": 100, "function": "likes"},
+                {"id": "a", "every": 200, "function": "likes"},
+            ]
+        )
+        assert [r["id"] for r in rules] == ["a"]
+
+    def test_non_list_returns_empty(self):
+        from src.python.main import validate_like_triggers
+
+        assert validate_like_triggers(None) == []
+        assert validate_like_triggers("nope") == []
 
 
 # =========================================================================

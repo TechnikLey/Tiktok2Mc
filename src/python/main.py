@@ -133,8 +133,7 @@ class BotContext:
         self.actions_valid = True
         self.start_likes = None
         self._last_like_event = 0.0
-        self._last_likes_trigger = 0
-        self._like_2_fired = False
+        self.like_triggers: list[dict] = []
         self.valid_functions = set()
         self.vanilla_functions = set()
         self.shell_actions_cache = {}
@@ -194,9 +193,24 @@ werkzeug_log.setLevel(logging.WARNING)
 _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
 
 # 'likes' fires every N cumulative likes since stream start; 'like_2' fires
-# once at the mega milestone. Values match the documented MCA defaults.
-LIKE_TRIGGER_INTERVAL = 100
-LIKE_MEGA_THRESHOLD = 100_000
+# once at the mega milestone. These are the fallback rules when a config has
+# no ``tiktok.like_triggers`` section (old configs before auto-merge).
+_DEFAULT_LIKE_TRIGGERS = [
+    {
+        "id": "likes_standard",
+        "every": 100,
+        "function": "likes",
+        "payload": "Community",
+        "enabled": True,
+    },
+    {
+        "id": "likes_100k",
+        "every": 100_000,
+        "function": "like_2",
+        "payload": "Community",
+        "enabled": True,
+    },
+]
 
 # ==========================================
 # SETUP & HELPER FUNCTIONS
@@ -339,6 +353,11 @@ def _apply_config(config: dict) -> None:
         ctx.follow_tracking_file.write_text("")
         ctx._followed_cache.clear()
         log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
+
+    raw_like_triggers = config.get("tiktok", {}).get("like_triggers")
+    if not raw_like_triggers:
+        raw_like_triggers = _DEFAULT_LIKE_TRIGGERS
+    ctx.like_triggers = validate_like_triggers(raw_like_triggers)
 
     comment_cmd_cfg = config.get("comment_commands", {})
     ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
@@ -1212,25 +1231,136 @@ def _process_follow(username: str, persist: bool = True):
         enqueue_threadsafe(("follow", username), label="follow")
 
 
-def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None:
-    """Enqueue milestone-based like triggers ('likes' every N, 'like_2' at mega).
+def validate_like_triggers(raw_triggers: object) -> list[dict]:
+    """Validate and normalize ``tiktok.like_triggers`` from the config.
 
-    Fires only for triggers configured in actions.mca and only once per
-    milestone, so bursts of like events cannot flood the trigger queue.
+    Rules per entry:
+    - id       — required, non-empty string, must be unique
+    - every    — required, int > 0 (accepts "100_000" strings)
+    - function — required, non-empty string
+    - payload  — optional, default "Community"
+    - enabled  — optional, default True (strings are cast to bool)
+
+    Invalid entries are logged and skipped.
     """
+    valid_triggers: list[dict] = []
+    seen_ids: set[str] = set()
+
+    if not isinstance(raw_triggers, list):
+        if raw_triggers:
+            log.warning("[CONFIG] 'tiktok.like_triggers' must be a list — ignored")
+        return valid_triggers
+
+    for i, rule in enumerate(raw_triggers):
+        if not isinstance(rule, dict):
+            log.info(
+                f"[CONFIG ERROR] like_triggers entry #{i} is not an object: {rule}"
+            )
+            continue
+
+        rule_id = rule.get("id")
+        if not isinstance(rule_id, str) or not rule_id.strip():
+            log.info(f"[CONFIG ERROR] Invalid or missing 'id': {rule}")
+            continue
+        if rule_id in seen_ids:
+            log.info(f"[CONFIG ERROR] Duplicate id '{rule_id}'")
+            continue
+        seen_ids.add(rule_id)
+
+        raw_every = rule.get("every")
+        if raw_every is None:
+            log.info(f"[CONFIG ERROR] 'every' missing for {rule_id}")
+            continue
+        try:
+            every = int(str(raw_every).replace("_", ""))
+            if every <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            log.info(f"[CONFIG ERROR] Invalid 'every' value for {rule_id}: {raw_every}")
+            continue
+
+        function_name = rule.get("function")
+        if not isinstance(function_name, str) or not function_name.strip():
+            log.info(f"[CONFIG ERROR] Invalid or missing 'function' for {rule_id}")
+            continue
+
+        payload = rule.get("payload", "Community")
+        if not isinstance(payload, str):
+            log.info(f"[CONFIG ERROR] 'payload' must be a string for {rule_id}")
+            continue
+
+        enabled = rule.get("enabled", True)
+        if isinstance(enabled, str):
+            enabled = enabled.lower() in ("true", "1", "yes", "on")
+        enabled = bool(enabled)
+
+        valid_triggers.append(
+            {
+                "id": rule_id,
+                "every": every,
+                "function": function_name,
+                "payload": payload,
+                "enabled": enabled,
+            }
+        )
+
+    return valid_triggers
+
+
+def prepare_like_triggers(raw_triggers: list[dict]) -> list[dict]:
+    """Filter validated like triggers down to enabled rules with actions.
+
+    The prepared rules carry ``last_blocks`` so ``_enqueue_like_triggers``
+    fires each function exactly once per crossed milestone.
+    """
+    prepared: list[dict] = []
+    for rule in raw_triggers:
+        if not rule.get("enabled", True):
+            continue
+        if rule["function"] not in ctx.valid_functions:
+            log.info(f"[CONFIG ERROR] Unknown function: {rule['function']}")
+            continue
+        prepared.append(
+            {
+                "id": rule["id"],
+                "every": rule["every"],
+                "function": rule["function"],
+                "payload": rule["payload"],
+                "last_blocks": 0,
+            }
+        )
+    return prepared
+
+
+def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None:
+    """Enqueue configured like triggers at their 'every' milestones.
+
+    Each rule fires its ``function`` once per crossed milestone, using its
+    ``payload`` as the subject (shown in logs and the ``{user}`` placeholder).
+    Rules are filtered by ``ctx.valid_functions``, so triggers without an
+    action in actions.mca never enqueue.
+    """
+    rules = ctx.like_triggers
+    if not rules:
+        return
     with ctx.like_lock:
-        if "likes" in ctx.valid_functions and LIKE_TRIGGER_INTERVAL > 0:
-            milestones = total_since_start // LIKE_TRIGGER_INTERVAL
-            if milestones > ctx._last_likes_trigger:
-                ctx._last_likes_trigger = milestones
-                enqueue_threadsafe(("likes", username or "system"), label="like:likes")
-        if (
-            "like_2" in ctx.valid_functions
-            and not ctx._like_2_fired
-            and total_since_start >= LIKE_MEGA_THRESHOLD
-        ):
-            ctx._like_2_fired = True
-            enqueue_threadsafe(("like_2", username or "system"), label="like:like_2")
+        for rule in rules:
+            every = rule["every"]
+            if every <= 0:
+                continue
+            blocks = total_since_start // every
+            if blocks > rule["last_blocks"]:
+                diff = blocks - rule["last_blocks"]
+                rule["last_blocks"] = blocks
+                log.info(
+                    f"[LIKE] Trigger '{rule['id']}' -> +{diff} "
+                    f"(total_since_start={total_since_start})"
+                )
+                for _ in range(diff):
+                    enqueue_threadsafe(
+                        (rule["function"], rule["payload"]),
+                        label=f"like:{rule['id']}",
+                    )
 
 
 def _process_comment_command(
@@ -1983,6 +2113,7 @@ async def reload_actions(send_minecraft_reload: bool = False):
         generate_datapack()
         ctx.actions_valid = True
         get_health_monitor().set_state("tiktok_bridge", HealthState.RUNNING)
+        ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
         if ctx.hook_api is not None:
             ctx.hook_api.update_runtime_state(valid_functions=ctx.valid_functions)
 
@@ -2095,6 +2226,8 @@ async def run_bot():
     if ctx.actions_valid:
         generate_datapack()
 
+    ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
+
     ctx.hook_api = HookAPI(
         ctx.rcon_queue,
         ctx.trigger_queue,
@@ -2140,6 +2273,7 @@ async def run_bot():
             continue
 
         ctx.start_likes = None
+        ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
         client = create_client(ctx.tiktok_user)
         ctx.tiktok_client = client
 

@@ -196,6 +196,34 @@ tiktok:
   follow_tracking:
     mode: "all_time"
 
+  # -----------------------------------------------------------------------
+  #  LIKE TRIGGERS
+  # -----------------------------------------------------------------------
+  # Like triggers fire when the total stream likes reach a threshold.
+  # You can define multiple triggers with different intervals.
+  #
+  # Each entry requires:
+  #   id       — A unique name for this trigger (used in logs)
+  #   every    — Like interval between activations (e.g., 100 = every 100 likes)
+  #   function — The trigger name used in data/actions.mca (connects config to command)
+  #   payload  — (optional) A label passed with the trigger (default: "Community")
+  #   enabled  — (optional) Set to false to disable without deleting (default: true)
+  #
+  # Example: With "every: 100" and function "likes", the trigger fires every
+  # 100 likes and executes whatever command you wrote for "likes" in actions.mca.
+  like_triggers:
+    - id: likes_standard
+      every: 100
+      function: likes
+      payload: Community
+      enabled: true
+
+    - id: likes_100k
+      every: 100_000
+      function: like_2
+      payload: Community
+      enabled: true
+
 # ===========================================================================
 #  COMMENT COMMANDS
 # ===========================================================================
