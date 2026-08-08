@@ -19,7 +19,7 @@
 follow:/give @a minecraft:golden_apple 7 ; >>New Follower!|{user} is now following!|5
 
 # 1b. Follow (dynamic): send personalized message via RCON (supports {user})
-#follow:/say Welcome {user}! !rc
+7654:/say Welcome {user}! !rc
 
 # 2. Likes (every 100): creeper spawn with x3 multiplier
 likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x3
