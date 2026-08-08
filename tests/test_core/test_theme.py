@@ -57,3 +57,15 @@ class TestThemeCss:
         css = theme_css({})
         assert ":root {" in css
         assert "}" in css
+
+    def test_strips_css_injection_from_values(self):
+        css = theme_css({"background": "red;} </style><script>alert(1)</script>"})
+        assert "</style>" not in css
+        assert "<script>" not in css
+        assert "};" not in css
+        assert "--background: red /stylescriptalert(1)/script;" in css
+
+    def test_sanitizes_keys(self):
+        css = theme_css({"bg color": "#000000", "x};--evil: 1": "#000000"})
+        assert "--bg-color: #000000;" in css
+        assert "--x---evil-1: #000000;" in css

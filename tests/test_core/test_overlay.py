@@ -69,6 +69,33 @@ class TestOverlayManager:
         assert "alerts" in html
         assert "#00FF00" in html  # default background
 
+    def test_render_html_escapes_overlay_name(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.yaml"
+        save_yaml(config_file, {}, backup=False)
+        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+
+        mgr = OverlayManager()
+        html = mgr.render_html('x";alert(1);//', chroma=False)
+        assert 'const OVERLAY_NAME = "x\\";alert(1);//";' in html
+        assert html.count("</script>") == 1
+
+    def test_render_html_sanitizes_theme_overrides(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.yaml"
+        save_yaml(config_file, {}, backup=False)
+        monkeypatch.setattr("core.overlay.get_config_file", lambda: config_file)
+
+        mgr = OverlayManager()
+        html = mgr.render_html(
+            "default",
+            chroma=True,
+            theme_overrides={
+                "background": "</style><script>alert(1)</script>",
+            },
+        )
+        assert html.count("</style>") == 1
+        assert html.count("<script>") == 1
+        assert "--background: /stylescriptalert(1)/script;" in html
+
     def test_dispatch_unknown_overlay(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)

@@ -1,3 +1,5 @@
+import re
+
 _DEFAULT_THEMES = {
     "death_counter": {
         "background": "#000000",
@@ -50,9 +52,26 @@ def load_plugin_theme(plugin_cfg: dict, plugin_key: str) -> dict:
     return {**defaults, **user_theme}
 
 
+_INVALID_CSS_KEY_CHARS = re.compile(r"[^A-Za-z0-9_-]+")
+_INVALID_CSS_VALUE_CHARS = re.compile(r"[\\;{}<>\r\n\x00-\x1f]+")
+
+
+def sanitize_css_key(key: str) -> str:
+    """Keep only characters that are safe inside a CSS custom-property name."""
+    cleaned = _INVALID_CSS_KEY_CHARS.sub("-", str(key))
+    return cleaned or "key"
+
+
+def sanitize_css_value(value: str) -> str:
+    """Strip characters that could break out of a CSS declaration block."""
+    cleaned = _INVALID_CSS_VALUE_CHARS.sub("", str(value)).strip()
+    return cleaned or "inherit"
+
+
 def theme_css(colors: dict) -> str:
     lines = ["    :root {"]
     for key, value in colors.items():
-        lines.append(f"        --{key.replace('_', '-')}: {value};")
+        name = sanitize_css_key(key).replace("_", "-")
+        lines.append(f"        --{name}: {sanitize_css_value(value)};")
     lines.append("    }")
     return "\n".join(lines)

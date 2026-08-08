@@ -22,10 +22,24 @@ from typing import Any
 from ruamel.yaml.error import YAMLError
 
 from core.paths import get_config_file
-from core.theme import load_plugin_theme, theme_css
+from core.theme import load_plugin_theme, sanitize_css_value, theme_css
 from core.yaml_utils import load_yaml
 
 log = logging.getLogger(__name__)
+
+
+def _escape_js_string(value: str) -> str:
+    """Escape *value* for a double-quoted JS string literal inside an HTML
+    ``<script>`` block: neutralises quotes, backslashes and ``</script>``
+    breakouts without corrupting the surrounding markup."""
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("<", "\\x3c")
+        .replace(">", "\\x3e")
+    )
+
 
 # ---------------------------------------------------------------------------
 #  Defaults
@@ -276,17 +290,20 @@ class OverlayManager:
         theme_style = theme_css(theme)
 
         chroma_background = (
-            f"background-color: {theme['background']};"
+            f"background-color: {sanitize_css_value(theme['background'])};"
             if chroma
             else "background-color: transparent;"
         )
         return (
             HTML_TEMPLATE.replace("{{ theme_style }}", theme_style)
             .replace("{{ chroma_background }}", chroma_background)
-            .replace("{{ display_mode }}", str(cfg.get("display_mode", "overwrite")))
+            .replace(
+                "{{ display_mode }}",
+                _escape_js_string(str(cfg.get("display_mode", "overwrite"))),
+            )
             .replace("{{ fade_in }}", str(cfg.get("fade_in", 500)))
             .replace("{{ fade_out }}", str(cfg.get("fade_out", 500)))
-            .replace("{{ overlay_name }}", overlay_name)
+            .replace("{{ overlay_name }}", _escape_js_string(overlay_name))
         )
 
     # -- Dispatch --------------------------------------------------------
