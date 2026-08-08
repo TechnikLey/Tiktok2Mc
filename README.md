@@ -38,7 +38,7 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 **Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it. The installer itself needs no `sudo` — it installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
 
-> Running the tool from a terminal on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail. Set `show_sudo_warning: false` in `config.yaml` to skip the check.
+> Running the tool on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail. Set `show_sudo_warning: false` in `config.yaml` to skip the check.
 
 > The portable archives include everything needed (including Java). No separate installation required.
 
@@ -54,15 +54,15 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 ## Overlay URLs (OBS Browser Source)
 
-All overlays are served through the central Dashboard at `http://127.0.0.1:29185`:
+All overlays are served through the central API at `http://127.0.0.1:29185`:
 
 | Overlay | URL |
 |---------|-----|
-| Text overlay | `http://127.0.0.1:29185/api/v1/overlay?overlay=default` |
+| Text overlay (default) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default` |
 | Timer | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
 | Death Counter | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
 | Win Counter | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
-| Spotify | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
+| Spotify Control | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
 
 ## Actions syntax (`.mca`)
 

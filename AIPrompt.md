@@ -58,22 +58,28 @@ Configure them under `comment_commands` in `config.yaml`.
 
 ## Test Without Going Live
 
-Use `test/test_trigger.exe` (Windows) or `test/test_trigger.bin` (Linux) to simulate events like `follow` or a gift ID.
+Use `send_trigger.py` (built as `test_trigger.exe` on Windows or `test_trigger.bin` on Linux) to simulate events like `follow` or a gift ID.
+
+```bash
+python src/python/send_trigger.py follow --user TestUser
+python src/python/send_trigger.py gift --user TestUser --gift-id 5655
+python src/python/send_trigger.py --list
+```
 
 ## Overlays
 
-Each plugin (and the core overlay) provides a web page you can add as a Browser Source in OBS:
+Each plugin (and the core overlay) provides a web page you can add as a Browser Source in OBS. All overlays are served through the central API at `http://127.0.0.1:29185`:
 
 - `http://127.0.0.1:29185/api/v1/plugins/timer/overlay`
 - `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay`
 - `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay`
-- `http://127.0.0.1:29185/api/v1/plugins/overlay-text/overlay`
+- `http://127.0.0.1:29185/api/v1/overlay?overlay=default`
 - `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay`
 
 ## Updating
 
-The tool checks for updates automatically on startup (configurable under `update` in `config.yaml`).  
-Before updating, back up `config/config.yaml`, `data/actions.mca`, and your Minecraft world (`server/mc/`).
+The tool checks for updates automatically on startup (configurable under `update` in `config.yaml`).
+Before updating, back up `config/config.yaml`, `data/actions.mca`, and your Minecraft world (`server/default/`).
 
 ## Getting Help
 
