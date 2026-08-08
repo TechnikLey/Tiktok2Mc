@@ -51,7 +51,7 @@ async def get_event_commands():
             path=str(path),
             event_commands=cfg.get("event_commands", {}),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.error("Failed to load event_commands: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -66,6 +66,6 @@ async def update_event_commands(body: EventCommandsUpdateRequest):
             path=str(path),
             event_commands=body.event_commands,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.error("Failed to write event_commands: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

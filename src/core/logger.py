@@ -73,7 +73,7 @@ class _CircularBufferHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             self._buffer.append(self._formatter.format(record))
-        except Exception:
+        except Exception:  # noqa: BLE001  # a logging handler must never raise
             self.handleError(record)
 
     def get_recent(self, count: int = 100) -> List[str]:
@@ -111,7 +111,7 @@ class CrashReporter:
             cfg_path = get_config_file()
             if cfg_path.exists():
                 return load_config(cfg_path)
-        except Exception:
+        except Exception:  # noqa: BLE001  # snapshot is best-effort — must never crash the reporter
             pass
         return None
 
@@ -178,7 +178,7 @@ class CrashReporter:
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
-            except Exception:
+            except (OSError, TypeError):
                 pass
 
         # Write in a daemon thread so we never block shutdown
@@ -231,7 +231,7 @@ class Heartbeat:
                 "vms_mb": round(mem.vms / (1024 * 1024), 2),
                 "percent": round(proc.memory_percent(), 2),
             }
-        except Exception:
+        except Exception:  # noqa: BLE001  # memory snapshot is best-effort
             return None
 
     def _loop(self) -> None:
@@ -245,7 +245,7 @@ class Heartbeat:
             for i, check in enumerate(self.subsystems):
                 try:
                     ok = "ok" if check() else "fail"
-                except Exception:
+                except Exception:  # noqa: BLE001  # a broken subsystem check must not break the heartbeat
                     ok = "error"
                 parts.append(f"subsystem_{i}={ok}")
 
@@ -261,10 +261,10 @@ class Heartbeat:
                 from core.health_monitor import get_health_monitor
                 hm = get_health_monitor()
                 hm.record_heartbeat("process." + (self.logger.name or "unknown"))
-            except Exception:
+            except Exception:  # noqa: BLE001  # heartbeat reporting is best-effort
                 pass
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # the heartbeat loop must never die
             self.logger.debug("Heartbeat error: %s", exc)
 
     def start(self) -> None:
@@ -308,7 +308,7 @@ class _EventBusHandler(logging.Handler):
                 from core.api.eventbus import event_bus
 
                 self._event_bus = event_bus
-            except Exception:
+            except Exception:  # noqa: BLE001  # event bus is optional; logging must never block
                 pass
         return self._event_bus
 
@@ -337,7 +337,7 @@ class _EventBusHandler(logging.Handler):
             # No running loop — best-effort sync publish (should not happen
             # in normal asyncio apps but keeps the handler safe everywhere).
             pass
-        except Exception:
+        except Exception:  # noqa: BLE001  # a logging handler must never raise
             self.handleError(record)
 
 
@@ -355,7 +355,7 @@ def _stop_queue_listener(listener: Optional[logging.handlers.QueueListener]) -> 
     if listener is not None:
         try:
             listener.stop()
-        except Exception:
+        except Exception:  # noqa: BLE001  # shutdown must never raise
             pass
 
 

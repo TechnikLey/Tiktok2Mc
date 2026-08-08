@@ -45,7 +45,7 @@ async def status():
             tiktok_live_last_event=tracker.get("tiktok_live_last_event"),
             tiktok_live_source=tracker.get("tiktok_live_source", ""),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get status")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -70,6 +70,6 @@ async def health_extended():
             "uptime_seconds": _get_service().get_uptime(),
             "subsystems": global_health.summary(),
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get extended health")
         raise HTTPException(status_code=500, detail=str(e))

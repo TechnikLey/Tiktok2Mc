@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from core.api.services import ApiService
 from core.paths import get_root_dir, get_versions_dir, get_servers_dir
+from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ def _sync_datapack_to_instance(instance_id: str) -> Path | None:
 
         log.info("[DATAPACK] Synced '%s' datapack to instance '%s'", dp_name, instance_id)
         return instance_dp
-    except Exception as exc:
+    except OSError as exc:
         log.warning("[DATAPACK] Failed to sync datapack to instance '%s': %s", instance_id, exc)
         return None
 
@@ -149,7 +150,7 @@ def _fetch_json(url: str, timeout: int = 30) -> dict | list:
         req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
         log.warning("Failed to fetch %s: %s", url, e)
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}")
 
@@ -159,7 +160,7 @@ def _read_meta(version_dir: Path) -> dict[str, Any]:
     if meta_file.exists():
         try:
             return json.loads(meta_file.read_text("utf-8"))
-        except Exception:
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             return {}
     return {}
 
@@ -168,7 +169,7 @@ def _write_meta(version_dir: Path, meta: dict[str, Any]) -> None:
     meta_file = version_dir / ".meta.json"
     try:
         meta_file.write_text(json.dumps(meta), encoding="utf-8")
-    except Exception as e:
+    except (OSError, TypeError) as e:
         log.warning("Failed to write meta for %s: %s", version_dir, e)
 
 
@@ -204,7 +205,7 @@ def _get_active_version() -> str | None:
     try:
         cfg = svc.read_config()
         return cfg.get("mc_version")
-    except Exception:
+    except Exception:  # noqa: BLE001  # best-effort; caller falls back to None
         return None
 
 
@@ -217,7 +218,7 @@ def _get_server_status(instance_id: str = "default") -> str:
         if proc is None:
             return "unknown"
         return proc.state.value
-    except Exception:
+    except Exception:  # noqa: BLE001  # status reporting is best-effort
         return "stopped"
 
 
@@ -247,7 +248,7 @@ def _load_instances(svc: ApiService | None = None) -> dict[str, dict[str, Any]]:
         if not isinstance(instances, dict) or not instances:
             return dict(DEFAULT_INSTANCES)
         return instances
-    except Exception:
+    except Exception:  # noqa: BLE001  # config read failures fall back to defaults
         return dict(DEFAULT_INSTANCES)
 
 
@@ -444,7 +445,7 @@ async def create_instance(body: CreateInstanceRequest):
     try:
         shutil.copy2(source_jar, target_jar)
         log.info("Copied %s -> %s for instance '%s'", source_jar, target_jar, inst_id)
-    except Exception as e:
+    except OSError as e:
         log.exception("Failed to copy server.jar for instance '%s'", inst_id)
         raise HTTPException(status_code=500, detail=f"Failed to copy server.jar: {e}")
 
@@ -453,14 +454,14 @@ async def create_instance(body: CreateInstanceRequest):
     try:
         _set_server_property(props_file, "server-port", str(body.port))
         _set_server_property(props_file, "enable-rcon", "true")
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to write server.properties for instance '%s': %s", inst_id, e)
 
     # Accept EULA
     eula_file = instance_dir / "eula.txt"
     try:
         eula_file.write_text("eula=true\n", encoding="utf-8")
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to write eula.txt for instance '%s': %s", inst_id, e)
 
     # Sync datapack from default server to the new instance
@@ -493,7 +494,7 @@ def _set_server_property(file_path: Path, key: str, value: str) -> None:
         if not found:
             lines.append(f"{key}={value}")
         file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to set property %s: %s", key, e)
 
 
@@ -574,7 +575,7 @@ async def delete_instance(instance_id: str):
         try:
             shutil.rmtree(instance_dir)
             log.info("Deleted instance directory: %s", instance_dir)
-        except Exception as e:
+        except OSError as e:
             log.warning("Failed to delete instance directory %s: %s", instance_dir, e)
 
     return {"status": "ok", "message": f"Server instance '{instance_id}' deleted"}
@@ -602,7 +603,7 @@ async def open_instance_folder(instance_id: str):
         else:
             subprocess.Popen(["xdg-open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             opened = True
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to open folder %s: %s", target_path, e)
 
     return {"path": str(target_path), "opened": opened}
@@ -711,7 +712,7 @@ async def download_version(body: DownloadRequest):
             download_exc = f"Network error downloading build {build_num}: {e.reason}"
             log.warning("Download attempt %d/3 failed: %s", attempt + 1, download_exc)
             await asyncio.sleep(1)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # any download failure is retried, then surfaced
             download_exc = f"Unexpected error downloading build {build_num}: {e}"
             log.exception("Download attempt %d/3 failed", attempt + 1)
             await asyncio.sleep(1)
@@ -721,7 +722,7 @@ async def download_version(body: DownloadRequest):
         if target_jar.exists():
             try:
                 target_jar.unlink()
-            except Exception:
+            except OSError:
                 pass
         raise HTTPException(status_code=500, detail=download_exc)
 
@@ -762,7 +763,7 @@ async def switch_version(body: SwitchRequest):
     try:
         cfg = svc.read_config()
         current_version = cfg.get("mc_version", "")
-    except Exception:
+    except Exception:  # noqa: BLE001  # best-effort; defaults to no backup
         current_version = ""
 
     if target_jar.exists() and current_version and current_version != version:
@@ -773,7 +774,7 @@ async def switch_version(body: SwitchRequest):
             try:
                 shutil.copy2(target_jar, backup_jar)
                 log.info("Backed up existing jar to %s", backup_jar)
-            except Exception as e:
+            except OSError as e:
                 log.warning("Could not backup existing jar: %s", e)
 
     # Copy new jar into place (skip if source and target are the same file)
@@ -781,7 +782,7 @@ async def switch_version(body: SwitchRequest):
         try:
             shutil.copy2(source_jar, target_jar)
             log.info("Switched active server.jar to %s", target_jar)
-        except Exception as e:
+        except OSError as e:
             log.exception("Failed to copy jar")
             raise HTTPException(status_code=500, detail=f"Failed to activate version: {e}")
     else:
@@ -792,7 +793,7 @@ async def switch_version(body: SwitchRequest):
         cfg = svc.read_config()
         cfg["mc_version"] = version
         svc.write_config(cfg, backup=True)
-    except Exception as e:
+    except (OSError, ValueError, YAMLError) as e:
         log.exception("Failed to update config")
         raise HTTPException(status_code=500, detail=f"Version switched but config update failed: {e}")
 
@@ -807,7 +808,7 @@ async def switch_version(body: SwitchRequest):
             await supervisor.stop("Minecraft Server")
             await supervisor.start("Minecraft Server")
             restart_initiated = True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # version switch succeeds even if auto-restart fails
         log.warning("Failed to auto-restart server after version switch: %s", e)
 
     is_safe = version in SAFE_VERSIONS
@@ -851,7 +852,7 @@ async def upload_custom_jar(
                 f.write(chunk)
         log.info("Saved custom jar to %s (%s bytes)", target_jar, target_jar.stat().st_size)
         _write_meta(target_dir, {"origin": "custom", "originalName": file.filename})
-    except Exception as e:
+    except OSError as e:
         log.exception("Failed to save custom jar")
         raise HTTPException(status_code=500, detail=f"Failed to save jar: {e}")
     finally:
@@ -876,7 +877,7 @@ async def remove_version(version: str):
     try:
         shutil.rmtree(target_dir)
         log.info("Removed version directory: %s", target_dir)
-    except Exception as e:
+    except OSError as e:
         log.exception("Failed to remove version")
         raise HTTPException(status_code=500, detail=f"Failed to remove version: {e}")
 

@@ -76,7 +76,7 @@ def fetch_checksum(url: str) -> str | None:
         except urllib.error.HTTPError as exc:
             if exc.code != 404:
                 log.debug("Checksum fetch failed for %s: %s", url + suffix, exc)
-        except Exception as exc:
+        except urllib.error.URLError as exc:
             log.debug("Checksum fetch failed for %s: %s", url + suffix, exc)
     return None
 

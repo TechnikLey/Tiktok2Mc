@@ -63,7 +63,7 @@ class SpotifyClient:
                 self.access_token = secure_storage.decrypt(cfg.get("access_token")) or None
                 self.refresh_token = secure_storage.decrypt(cfg.get("refresh_token")) or None
                 self.expires_at = cfg.get("token_expires_at", 0)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # token load is best-effort; plugin starts without auth
                 log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
@@ -74,7 +74,7 @@ class SpotifyClient:
                 cfg["refresh_token"] = secure_storage.encrypt(self.refresh_token) or ""
                 cfg["token_expires_at"] = int(self.expires_at) if self.expires_at else 0
                 save_yaml(self.config_path, cfg)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # token persistence is best-effort
                 log.info(f"[SPOTIFY] Failed to save tokens: {e}")
 
     @property
@@ -138,7 +138,7 @@ class SpotifyClient:
             self.expires_at = time.time() + token_data["expires_in"]
             self._save_tokens()
             return True
-        except Exception as e:
+        except requests.RequestException as e:
             log.info(f"[SPOTIFY] Token refresh error: {e}")
             return False
 
@@ -172,7 +172,7 @@ class SpotifyClient:
                 return None
             log.info(f"[SPOTIFY] API error {resp.status_code}: {resp.text[:200]}")
             return None
-        except Exception as e:
+        except requests.RequestException as e:
             log.info(f"[SPOTIFY] Request error: {e}")
             return None
 
@@ -250,7 +250,7 @@ class SpotifyClient:
                     return resp.json()
             log.info(f"[SPOTIFY] Search API error {resp.status_code}: {resp.text[:200]}")
             return None
-        except Exception as e:
+        except requests.RequestException as e:
             log.info(f"[SPOTIFY] Search error: {e}")
             return None
 
@@ -350,7 +350,7 @@ class SpotifyControlPlugin(BasePlugin):
         try:
             if self._client.is_authenticated:
                 self._notify_overlay()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # tick polling must never kill the plugin thread
             log.info(f"[SPOTIFY-POLL] Error: {e}")
 
     # -- command handlers ---------------------------------------------------

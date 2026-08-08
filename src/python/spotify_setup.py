@@ -162,10 +162,10 @@ def _exchange_code(code: str, client_id: str, client_secret: str, redirect_uri: 
         log.error("Token exchange failed: %s %s", e.code, e.reason)
         try:
             log.error(e.read().decode("utf-8"))
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             pass
         return None
-    except Exception as e:
+    except OSError as e:
         log.error("Token exchange failed: %s", e)
         return None
 
@@ -187,7 +187,7 @@ def _refresh_token(refresh_token: str, client_id: str, client_secret: str) -> di
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.read().decode("utf-8")
-    except Exception as e:
+    except OSError as e:
         log.error("Token refresh failed: %s", e)
         return None
 
@@ -322,6 +322,6 @@ if __name__ == "__main__":
             main()
     except KeyboardInterrupt:
         log.info("Spotify setup interrupted by user.")
-    except Exception:
+    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("spotify_setup")
         sys.exit(1)

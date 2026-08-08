@@ -109,7 +109,7 @@ class HookAPI:
         try:
             from core.overlay_utils import send_overlay_text as _send_overlay
             return _send_overlay(title, subtitle, duration, overlay_name)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # hook boundary: overlay failure must never crash trigger dispatch
             log.error(f"[HOOK] send_overlay_text failed: {e}")
             return False
 

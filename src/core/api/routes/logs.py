@@ -78,7 +78,7 @@ async def list_crash_reports():
                     "size": stat.st_size,
                 }
             )
-        except Exception:
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             continue
 
     return {"reports": reports}
@@ -99,6 +99,6 @@ async def get_crash_report(filename: str):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return data
-    except Exception as exc:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
         log.warning("Failed to read crash report %s: %s", safe_name, exc)
         raise HTTPException(status_code=500, detail="Failed to read crash report")

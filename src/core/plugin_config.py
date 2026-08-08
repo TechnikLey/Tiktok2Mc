@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.error import YAMLError
 
 from core.yaml_utils import load_yaml, save_yaml, deep_update_rt
 
@@ -97,7 +98,7 @@ def load_plugin_manifest(plugin_dir: Path) -> Optional[dict]:
     try:
         with manifest_path.open("r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception as exc:
+    except (json.JSONDecodeError, OSError) as exc:
         log.warning("Failed to load manifest %s: %s", manifest_path, exc)
         return None
 
@@ -185,7 +186,7 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
     if config_path.exists():
         try:
             data = load_yaml(config_path)
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             log.warning("Failed to load plugin config %s: %s", config_path, exc)
             data = {}
     else:
@@ -399,7 +400,7 @@ def load_all_plugin_configs() -> dict[str, dict]:
             continue
         try:
             result[name] = load_plugin_config(child)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # one broken plugin must not break config loading
             log.warning("Failed to load config for plugin '%s': %s", name, exc)
             result[name] = {}
 

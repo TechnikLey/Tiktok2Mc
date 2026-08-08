@@ -74,7 +74,7 @@ class TestMakeMinecraftReadinessCheck:
         )
 
         check = make_minecraft_readiness_check(instance_dir)
-        with patch("mcrcon.MCRcon") as MockMCRcon:
+        with patch("core.minecraft_readiness.MCRcon") as MockMCRcon:
             mock_conn = MagicMock()
             MockMCRcon.return_value = mock_conn
             result = await check()
@@ -92,7 +92,7 @@ class TestMakeMinecraftReadinessCheck:
         )
 
         check = make_minecraft_readiness_check(instance_dir)
-        with patch("mcrcon.MCRcon", side_effect=Exception("conn fail")):
+        with patch("core.minecraft_readiness.MCRcon", side_effect=OSError("conn fail")):
             result = await check()
         assert result is False
 

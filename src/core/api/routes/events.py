@@ -80,6 +80,6 @@ async def inject_event(body: dict):
         return {"status": "ok", "event": event_type}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to inject event")
         raise HTTPException(status_code=500, detail=str(e))

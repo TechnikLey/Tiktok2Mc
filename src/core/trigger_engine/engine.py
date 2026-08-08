@@ -182,7 +182,7 @@ class TriggerEngine:
                 error_detail=str(exc),
                 start_time=start,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # never raise: convert to structured TriggerResult
             result = TriggerResult.exception_result(
                 trigger_name=trigger_name,
                 payload=payload,
@@ -246,7 +246,7 @@ class TriggerEngine:
                 error_detail=str(exc),
                 start_time=start,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # never raise: convert to structured TriggerResult
             result = TriggerResult.exception_result(
                 trigger_name="comment",
                 payload=payload,

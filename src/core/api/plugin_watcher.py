@@ -39,7 +39,7 @@ def _get_plugin_dirs(plugins_dir: Path) -> dict[str, Path]:
             name = raw.get("name", "")
             if name and isinstance(name, str):
                 result[name] = child
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             continue
     return result
 
@@ -74,7 +74,7 @@ class PluginWatcher:
             if rel_dir.is_dir():
                 return rel_dir
             return None
-        except Exception:
+        except (ImportError, OSError):
             return None
 
     def start(self) -> None:
@@ -133,7 +133,7 @@ class PluginWatcher:
                     )
                     registry.register(registration)
                     log.info("Auto-registered new plugin: '%s'", name)
-                except Exception as exc:
+                except (json.JSONDecodeError, OSError, ValueError) as exc:
                     log.warning("Failed to auto-register plugin '%s': %s", name, exc)
 
             # Plugins in registry but gone from disk → auto-unregister
@@ -146,7 +146,7 @@ class PluginWatcher:
 
             self._known = current_names
 
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             log.debug("Plugin watcher sync error: %s", exc)
 
 

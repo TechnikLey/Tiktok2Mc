@@ -8,6 +8,7 @@ from core.paths import get_root_dir
 import logging
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.error import YAMLError
 from core.yaml_utils import load_yaml
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 from core.health_monitor import get_health_monitor, HealthState
@@ -69,7 +70,7 @@ try:
     if CONFIG_FILE.exists():
         cfg = load_yaml(CONFIG_FILE)
         MC_VERSION = cfg.get("mc_version", "1.21.11")
-except Exception:
+except (OSError, ValueError, YAMLError):
     pass
 
 if not SERVER_JAR.exists():
@@ -121,7 +122,7 @@ if not CONFIGSERVERAPI_FILE.exists():
         with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
             yaml_obj.dump(default_cfg, f)
         log.info("Default MinecraftServerAPI config created.")
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to write default config: %s", e)
 
 # === Load configuration ===
@@ -150,7 +151,7 @@ try:
         MC_VERSION = cfg.get("mc_version", "1.21.11")
     else:
         log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
-except Exception as e:
+except (OSError, ValueError, YAMLError) as e:
     log.warning("Failed to load config: %s — using defaults.", e)
 
 # === Port override from CLI ===
@@ -170,7 +171,7 @@ if CONFIGSERVERAPI_FILE.exists():
         yaml_obj.width = 120
         with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
             cfg_api = yaml_obj.load(f) or CommentedMap()
-    except Exception:
+    except (OSError, ValueError, YAMLError):
         cfg_api = CommentedMap()
 
     webhook = cfg_api.setdefault("webhooks", {})
@@ -182,7 +183,7 @@ if CONFIGSERVERAPI_FILE.exists():
     try:
         with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
             yaml_obj.dump(cfg_api, f)
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to write MinecraftServerAPI config: %s", e)
 
 # === Enable / disable MinecraftServerAPI plugin ===
@@ -195,7 +196,7 @@ if not MINECRAFTSERVERAPI_ENABLED:
         try:
             plugin_file.rename(disabled_file)
             log.info(f"{plugin_name} has been disabled.")
-        except Exception as e:
+        except OSError as e:
             log.warning(f"Failed to disable {plugin_name}: {e}")
     elif disabled_file.exists():
         log.info(f"{plugin_name} is already disabled.")
@@ -206,7 +207,7 @@ else:
         try:
             disabled_file.rename(plugin_file)
             log.info(f"{plugin_name} has been re-enabled.")
-        except Exception as e:
+        except OSError as e:
             log.warning(f"Failed to re-enable {plugin_name}: {e}")
     elif plugin_file.exists():
         log.info("No plugin disable requested.")
@@ -238,7 +239,7 @@ if not RCON_ENABLED and not IGNORE_RCON_FILE.exists() and _is_interactive():
                     with IGNORE_RCON_FILE.open("w", encoding="utf-8") as f:
                         f.write("ignore RCON warning")
                     log.info("RCON warning will be ignored in the future.")
-                except Exception as e:
+                except OSError as e:
                     log.warning("Could not write ignore file: %s", e)
                 break
             elif choice == "break":
@@ -258,7 +259,7 @@ if not EULA_FILE.exists():
         with EULA_FILE.open("w", encoding="utf-8") as f:
             f.write("eula=true\n")
         log.info("EULA accepted automatically.")
-    except Exception as e:
+    except OSError as e:
         log.warning("Could not write eula.txt: %s", e)
 
 # === Update server.properties ===
@@ -283,7 +284,7 @@ def set_server_property(file_path: Path, key, value):
 
         with file_path.open("w", encoding="utf-8") as f:
             f.write("\n".join(lines))
-    except Exception as e:
+    except OSError as e:
         log.warning("Failed to set server property %s: %s", key, e)
 
 
@@ -331,7 +332,7 @@ except FileNotFoundError:
 except KeyboardInterrupt:
     log.info("\nServer was stopped manually.")
     health.set_state("mc_server", HealthState.STOPPED)
-except Exception as e:
+except Exception as e:  # noqa: BLE001  # top-level boundary: report via crash manager and exit
     log.error("Failed to start Minecraft server: %s", e)
     crash_mgr.report_exception(MC_0003, exc=e, context_info={"detail": str(e)})
     handle_unhandled_exception("server")

@@ -1,3 +1,5 @@
+import json
+import urllib.request
 from core.hook_api import HookAPI
 import logging
 log = logging.getLogger(__name__)
@@ -8,8 +10,6 @@ PLUGIN_NAME = "spotify-control"
 
 def _command(api, command, **kwargs):
     try:
-        import json
-        import urllib.request
         body = json.dumps({"command": command, "args": kwargs}).encode()
         req = urllib.request.Request(
             f"{API_BASE}/plugins/{PLUGIN_NAME}/command",
@@ -19,7 +19,7 @@ def _command(api, command, **kwargs):
         )
         urllib.request.urlopen(req, timeout=5)
         return True
-    except Exception as e:
+    except OSError as e:
         log.info(f"[SPOTIFY-HOOK] Command '{command}' failed: {e}")
         return False
 
@@ -35,8 +35,6 @@ def _cmd_post(api, user, command, action_name):
 
 def _cmd_current(api, user):
     try:
-        import json
-        import urllib.request
         resp = urllib.request.urlopen(
             f"{API_BASE}/plugins/{PLUGIN_NAME}/state", timeout=5
         )
@@ -57,7 +55,7 @@ def _cmd_current(api, user):
                 subtitle="No active track",
                 duration=3
             )
-    except Exception as e:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
         log.info(f"[SPOTIFY-HOOK] Failed to get state: {e}")
         api.send_overlay_text(
             title="Spotify",

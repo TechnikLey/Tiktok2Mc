@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from mcrcon import MCRcon
+from mcrcon import MCRcon, MCRconException
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class RconService:
         if self._conn:
             try:
                 await asyncio.to_thread(self._conn.disconnect)
-            except Exception:
+            except (MCRconException, OSError):
                 pass
             self._conn = None
         try:
@@ -50,7 +50,7 @@ class RconService:
             self._connected = True
             log.info("[RCON] Connected to %s:%s", self._host, self._port)
             return True
-        except Exception as e:
+        except (MCRconException, OSError, TimeoutError) as e:
             self._conn = None
             self._connected = False
             log.warning("[RCON] Connection failed: %s", e)
@@ -61,7 +61,7 @@ class RconService:
             if self._conn:
                 try:
                     await asyncio.to_thread(self._conn.disconnect)
-                except Exception:
+                except (MCRconException, OSError):
                     pass
                 self._conn = None
             self._connected = False
@@ -74,10 +74,10 @@ class RconService:
             try:
                 resp = await asyncio.to_thread(self._conn.command, cmd)
                 return resp or ""
-            except Exception as e:
+            except (MCRconException, OSError) as e:
                 self._connected = False
                 self._conn = None
-                raise ConnectionError(f"RCON command failed: {e}")
+                raise ConnectionError(f"RCON command failed: {e}") from e
 
     @property
     def connected(self) -> bool:

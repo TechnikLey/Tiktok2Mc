@@ -25,6 +25,11 @@ for _mod in _heavy:
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
 
+# Core modules import MCRconException by name and use it in `except` clauses;
+# the mock needs a real exception class for those clauses to stay valid.
+if "mcrcon" in sys.modules:
+    sys.modules["mcrcon"].MCRconException = type("MCRconException", (Exception,), {})
+
 from core.yaml_utils import save_yaml
 
 MINIMAL_CONFIG = {

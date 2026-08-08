@@ -142,7 +142,7 @@ class PluginLauncher:
             if rel_dir.is_dir():
                 return rel_dir
             return None
-        except Exception:
+        except (ImportError, OSError):
             return None
 
     def _discover_from_manifests(self) -> list[PluginManifest]:
@@ -169,7 +169,7 @@ class PluginLauncher:
                 with manifest_file.open("r", encoding="utf-8") as fh:
                     raw = json.load(fh)
                 manifest = PluginManifest(**raw)
-            except (json.JSONDecodeError, Exception) as exc:
+            except (json.JSONDecodeError, ValueError) as exc:
                 log.warning(
                     "Skipping invalid manifest %s: %s",
                     manifest_file, exc,
@@ -246,7 +246,7 @@ class PluginLauncher:
             with urllib.request.urlopen(req, timeout=_TIMEOUT):
                 log.debug("Registered plugin: %s", plugin.name)
                 return True
-        except Exception as exc:
+        except (urllib.error.URLError, OSError) as exc:
             log.warning("Failed to register plugin '%s': %s", plugin.name, exc)
             return False
 
@@ -271,7 +271,7 @@ class PluginLauncher:
                 result.append(
                     AppConfig.from_dict(_api_to_legacy_dict(entry))
                 )
-            except Exception as exc:
+            except (ValueError, TypeError) as exc:
                 log.warning(
                     "Skipping invalid API entry %s: %s",
                     entry.get("name", "<unknown>"), exc,

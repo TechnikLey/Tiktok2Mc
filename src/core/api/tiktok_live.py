@@ -93,7 +93,7 @@ class TikTokLiveTracker:
                 msg = await q.get()
                 try:
                     self._handle(msg)
-                except Exception:
+                except Exception:  # noqa: BLE001  # one bad event must not kill the consumer loop
                     log.debug("[TIKTOK-LIVE] Error handling event", exc_info=True)
                 finally:
                     q.task_done()

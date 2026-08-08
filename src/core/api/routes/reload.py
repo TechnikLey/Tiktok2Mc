@@ -18,6 +18,7 @@ from core.api.services import ApiService
 from core.api.services.rcon import get_rcon_service
 from core.overlay import get_overlay_manager
 from core.paths import get_runtime_dir
+from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ def _write_signal(name: str, payload: dict | None = None) -> bool:
         else:
             signal_file.write_text("reload", encoding="utf-8")
         return True
-    except Exception as exc:
+    except (OSError, TypeError) as exc:
         log.warning("Failed to write reload signal %s: %s", name, exc)
         return False
 
@@ -86,13 +87,13 @@ async def reload_runtime(body: ReloadRequest):
                     password=rcon_cfg.get("password", ""),
                 )
                 log.info("[RELOAD] RCON service configuration updated")
-            except Exception as exc:
+            except (OSError, ValueError, YAMLError) as exc:
                 log.warning("[RELOAD] Failed to update RCON config: %s", exc)
         if body.overlay:
             try:
                 get_overlay_manager().reload()
                 log.info("[RELOAD] Overlay settings reloaded")
-            except Exception as exc:
+            except (OSError, ValueError, YAMLError) as exc:
                 log.warning("[RELOAD] Failed to reload overlay settings: %s", exc)
 
     if body.actions:

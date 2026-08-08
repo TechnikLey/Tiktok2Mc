@@ -16,6 +16,8 @@ import os
 import time
 from typing import Any
 
+from ruamel.yaml.error import YAMLError
+
 import core.paths
 from core.trigger_engine import EngineConfig, TriggerEngine
 from core.trigger_engine.models import TriggerResult
@@ -45,7 +47,7 @@ def _resolve_bridge_port() -> int:
             cfg = load_yaml(config_path)
             port = cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)
             return int(port)
-    except Exception:
+    except (OSError, ValueError, YAMLError):  # best-effort: fall back to default port
         pass
 
     return 29188

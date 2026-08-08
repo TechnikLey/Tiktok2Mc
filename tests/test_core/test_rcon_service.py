@@ -4,7 +4,9 @@ from unittest.mock import MagicMock, patch
 
 @pytest.fixture(autouse=True)
 def _mock_mcrcon():
-    with patch.dict("sys.modules", {"mcrcon": MagicMock()}):
+    mcrcon_mock = MagicMock()
+    mcrcon_mock.MCRconException = type("MCRconException", (Exception,), {})
+    with patch.dict("sys.modules", {"mcrcon": mcrcon_mock}):
         yield
 
 
@@ -47,7 +49,7 @@ class TestRconServiceConnect:
 
     @pytest.mark.asyncio
     async def test_connect_failure(self, rcon):
-        with patch("core.api.services.rcon.MCRcon", side_effect=Exception("conn failed")):
+        with patch("core.api.services.rcon.MCRcon", side_effect=OSError("conn failed")):
             result = await rcon.connect()
         assert result is False
         assert rcon.connected is False
@@ -82,7 +84,7 @@ class TestRconServiceDisconnect:
     @pytest.mark.asyncio
     async def test_disconnect_handles_error(self, rcon):
         mock_conn = MagicMock()
-        mock_conn.disconnect.side_effect = Exception("disconnect error")
+        mock_conn.disconnect.side_effect = OSError("disconnect error")
         with patch("core.api.services.rcon.MCRcon", return_value=mock_conn):
             await rcon.connect()
         await rcon.disconnect()
@@ -108,7 +110,7 @@ class TestRconServiceCommand:
     @pytest.mark.asyncio
     async def test_command_failure(self, rcon):
         mock_conn = MagicMock()
-        mock_conn.command.side_effect = Exception("cmd failed")
+        mock_conn.command.side_effect = OSError("cmd failed")
         with patch("core.api.services.rcon.MCRcon", return_value=mock_conn):
             await rcon.connect()
         with pytest.raises(ConnectionError, match="RCON command failed"):

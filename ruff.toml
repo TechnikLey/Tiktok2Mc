@@ -1,0 +1,26 @@
+[lint]
+
+# Error-boundary architecture: the app isolates failure behind deliberate
+# catch-all handlers (subprocess supervision, plugin/hook execution, worker
+# loops, GUI/pywebview lifecycle, atexit cleanup, logging). Those files are
+# exempted per-file below; every other `except Exception` / `except: pass`
+# in the codebase must be narrowed to specific exceptions or carry an
+# inline `# noqa` with a justification. See AGENTS.md §7.1.
+[lint.per-file-ignores]
+"src/python/main.py" = ["BLE001", "S110"]  # bridge: event/worker loops, entry point (AGENTS.md: minimize changes)
+"src/python/start.py" = ["BLE001", "S110"]  # supervisor: subprocess spawning, atexit cleanup, entry point
+"src/python/gui.py" = ["BLE001", "S110"]  # pywebview lifecycle, poll threads, atexit cleanup
+"src/python/overlay.py" = ["BLE001", "S110"]  # overlay process lifecycle, shutdown signal handling
+"src/python/update.py" = ["BLE001", "S110"]  # updater: best-effort fallbacks during install
+"src/python/server.py" = ["BLE001", "S110"]  # MC server manager: config fallbacks + subprocess management
+"src/core/lifecycle.py" = ["BLE001", "S110"]  # lifecycle supervisor: shutdown/kill/cleanup paths
+"src/core/logger.py" = ["BLE001", "S110"]  # logging/crash reporting must never crash
+"src/core/java_utils.py" = ["BLE001", "S110"]  # java detection/install: many fallback probes
+"src/core/port_scanner.py" = ["BLE001", "S110"]  # port probing is inherently exception-prone
+"src/core/api/routes/*.py" = ["BLE001", "S110"]  # route handlers convert exceptions to HTTP error responses
+"src/core/api/updater.py" = ["BLE001", "S110"]  # updater service: install transaction with rollback
+"src/plugins/spotify/main.py" = ["BLE001", "S110"]  # spotify plugin subprocess: resilience
+"build.py" = ["BLE001", "S110"]  # build tool: keep going across artifacts, report per-target
+"tests/conftest.py" = ["BLE001", "S110"]  # fixture singleton reset (module/attr may be absent)
+"tests/test_core/test_health_monitor.py" = ["BLE001", "S110"]
+"tests/test_core/test_plugin_overlay_stores.py" = ["BLE001", "S110"]

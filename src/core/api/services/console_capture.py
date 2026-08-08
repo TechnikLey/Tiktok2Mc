@@ -45,7 +45,7 @@ class ConsoleCapture:
                 await self._tail()
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception:  # noqa: BLE001  # capture loop must survive individual failures and restart
                 log.exception("ConsoleCapture error for '%s', restarting in 5s", self.instance_id)
                 await asyncio.sleep(5)
 

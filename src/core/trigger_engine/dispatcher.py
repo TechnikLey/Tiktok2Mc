@@ -56,7 +56,7 @@ class BridgeDispatcher:
             req = urllib.request.Request(url, method="HEAD")
             urllib.request.urlopen(req, timeout=self._config.bridge_timeout)
             return True
-        except Exception:
+        except urllib.error.URLError:
             return False
 
     def _post(self, url: str, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -81,7 +81,7 @@ class BridgeDispatcher:
             try:
                 detail = json.loads(exc.read().decode("utf-8"))
                 return detail
-            except Exception:
+            except json.JSONDecodeError:
                 return {"status": "error", "message": f"HTTP {exc.code}: {exc.reason}"}
         except urllib.error.URLError as exc:
             log.warning("Bridge unreachable at %s: %s", url, exc.reason)

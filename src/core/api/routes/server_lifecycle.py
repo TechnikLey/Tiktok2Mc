@@ -60,7 +60,7 @@ async def _run_java_install() -> None:
             ok, message = await asyncio.to_thread(install_java_linux)
         _JAVA_INSTALL.update(message=message, done=True, ok=ok)
         log.info("Java install finished ok=%s: %s", ok, message)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # background install: any crash is surfaced via install state
         log.exception("Java installation crashed")
         _JAVA_INSTALL.update(message=f"Java installation crashed: {exc}", done=True, ok=False)
     finally:
@@ -252,7 +252,7 @@ async def server_instance_start(instance_id: str):
     try:
         from core.api.routes.servers import _sync_datapack_to_instance
         _sync_datapack_to_instance(instance_id)
-    except Exception:
+    except Exception:  # noqa: BLE001  # best-effort sync; server starts with whatever is on disk
         log.warning("[DATAPACK] Failed to sync datapack for '%s' — server will use whatever is on disk", instance_id)
 
     try:
@@ -266,7 +266,7 @@ async def server_instance_start(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Server '{instance_id}' failed to start")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to start server '%s'", instance_id)
         raise HTTPException(status_code=500, detail=f"Failed to start: {e}")
 
@@ -292,7 +292,7 @@ async def server_instance_stop(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Server '{instance_id}' failed to stop")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to stop server '%s'", instance_id)
         raise HTTPException(status_code=500, detail=f"Failed to stop: {e}")
 
@@ -309,7 +309,7 @@ async def server_instance_restart(instance_id: str):
         try:
             await supervisor.stop(pname)
             await supervisor.start(pname)
-        except Exception:
+        except Exception:  # noqa: BLE001  # background restart failures are only logged
             log.exception("Background restart failed for '%s'", instance_id)
 
     asyncio.create_task(_bg_restart())

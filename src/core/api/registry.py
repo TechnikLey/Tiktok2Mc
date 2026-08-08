@@ -47,7 +47,7 @@ class PluginRegistry:
                 get_backup_manager().create_backup(
                     self._file, category="plugin_registry"
                 )
-            except Exception as exc:
+            except OSError as exc:
                 log.warning("Failed to create startup registry backup: %s", exc)
 
     # ------------------------------------------------------------------
@@ -136,9 +136,9 @@ class PluginRegistry:
                 try:
                     plugin = PluginRegistration(**item)
                     self._plugins[plugin.name] = plugin
-                except Exception as exc:
+                except (ValueError, TypeError) as exc:
                     log.warning("Skipping invalid registry entry: %s", exc)
-        except Exception as exc:
+        except (json.JSONDecodeError, OSError) as exc:
             log.warning("Failed to load plugin registry: %s", exc)
 
     def _save(self) -> None:
@@ -150,7 +150,7 @@ class PluginRegistry:
                 fh.flush()
                 os.fsync(fh.fileno())
             self._atomic_replace(tmp, self._file)
-        except Exception as exc:
+        except (OSError, TypeError) as exc:
             log.error("Failed to save plugin registry: %s", exc)
 
     @staticmethod

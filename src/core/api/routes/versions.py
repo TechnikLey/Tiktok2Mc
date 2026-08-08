@@ -61,7 +61,7 @@ def _fetch_json(url: str, timeout: int = 15) -> dict | list:
         req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
         log.warning("Failed to fetch %s: %s", url, e)
         raise HTTPException(status_code=502, detail=f"Failed to fetch PaperMC versions: {e}")
 

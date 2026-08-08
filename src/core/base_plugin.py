@@ -109,7 +109,7 @@ class BasePlugin:
             hm = get_health_monitor()
             hm.register(f"plugin.{self.PLUGIN_NAME}", HealthState.STARTING)
             self._health = hm
-        except Exception:
+        except Exception:  # noqa: BLE001  # health registration is best-effort; plugin must still start
             self._health = None
 
     # -- properties --------------------------------------------------------
@@ -152,7 +152,7 @@ class BasePlugin:
                         "width": max(data.get("width", 600), 200),
                         "height": max(data.get("height", 300), 100),
                     }
-            except Exception as e:
+            except (json.JSONDecodeError, OSError, ValueError) as e:
                 log.warning("[%s] Failed to load window state: %s", self.PLUGIN_NAME, e)
         return {"width": 600, "height": 300}
 
@@ -160,7 +160,7 @@ class BasePlugin:
         try:
             with self._state_file.open("w", encoding="utf-8") as f:
                 json.dump({"width": width, "height": height}, f)
-        except Exception as e:
+        except (OSError, TypeError) as e:
             log.warning("[%s] Failed to save window state: %s", self.PLUGIN_NAME, e)
 
     # -- API helpers --------------------------------------------------------
@@ -176,7 +176,7 @@ class BasePlugin:
             )
             urllib.request.urlopen(req, timeout=5)
             return True
-        except Exception as e:
+        except (OSError, TypeError) as e:
             log.warning("[%s] API POST %s failed: %s", self.PLUGIN_NAME, path, e)
             return False
 
@@ -186,7 +186,7 @@ class BasePlugin:
             req = urllib.request.Request(_api_url(path))
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode())
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             log.warning("[%s] API GET %s failed: %s", self.PLUGIN_NAME, path, e)
             return None
 
@@ -225,7 +225,7 @@ class BasePlugin:
                 if handler:
                     try:
                         handler(args)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001  # handler is user code — must never kill the polling loop
                         log.exception("[%s] Handler '%s' failed: %s", self.PLUGIN_NAME, cmd, e)
                         if self._health:
                             self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"handler '{cmd}' failed: {e}")
@@ -248,7 +248,7 @@ class BasePlugin:
         while self._running:
             try:
                 self.on_tick()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # on_tick is user code — must never kill the tick loop
                 log.exception("[%s] Tick failed: %s", self.PLUGIN_NAME, e)
                 if self._health:
                     self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"on_tick failed: {e}")
@@ -260,7 +260,7 @@ class BasePlugin:
                         f"/plugins/{self.PLUGIN_NAME}/commands?wait=0",
                         timeout=5,
                     )
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     pass
                 # Report heartbeat to health monitor
                 if self._health:

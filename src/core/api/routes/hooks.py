@@ -15,6 +15,7 @@ from core.hook_registry import get_hook_registry, HookRegistration
 from core.hook_manifest import load_hook_manifest, discover_hooks_dirs, read_hook_version
 from core.plugin_config import save_plugin_config
 from core.yaml_utils import load_yaml
+from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ async def get_hook_config(name: str):
     if config_path.exists():
         try:
             config = load_yaml(config_path) or {}
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             raise HTTPException(status_code=500, detail=f"Failed to load config: {exc}")
     else:
         config = {}
@@ -232,7 +233,7 @@ async def update_hook_config(name: str, body: dict):
     new_config = body.get("config", {})
     try:
         save_plugin_config(hook_dir, new_config, backup=True)
-    except Exception as exc:
+    except (OSError, ValueError, YAMLError) as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save config: {exc}")
 
     return {"status": "saved", "name": name}

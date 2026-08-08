@@ -3,6 +3,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from mcrcon import MCRcon, MCRconException
+
 log = logging.getLogger(__name__)
 
 
@@ -19,7 +21,7 @@ def _read_server_properties(instance_dir: Path) -> dict[str, str]:
             if "=" in line:
                 key, val = line.split("=", 1)
                 props[key.strip()] = val.strip()
-    except Exception as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         log.debug("Could not read server.properties for readiness check: %s", exc)
     return props
 
@@ -40,8 +42,6 @@ def make_minecraft_readiness_check(instance_dir: Path) -> Callable[[], Awaitable
         # Primary: RCON readiness (server accepting commands)
         if rcon_enabled and rcon_password:
             try:
-                from mcrcon import MCRcon
-
                 def _try_rcon():
                     conn = MCRcon("localhost", rcon_password, port=rcon_port)
                     conn.connect()
@@ -50,7 +50,7 @@ def make_minecraft_readiness_check(instance_dir: Path) -> Callable[[], Awaitable
                     return True
 
                 return await asyncio.wait_for(asyncio.to_thread(_try_rcon), timeout=3.0)
-            except Exception:
+            except (MCRconException, OSError, TimeoutError):  # fall back to log-scan
                 pass
 
         # Fallback: log file parsing for "Done (x.xxs)!"
@@ -59,7 +59,7 @@ def make_minecraft_readiness_check(instance_dir: Path) -> Callable[[], Awaitable
                 text = await asyncio.to_thread(log_path.read_text, "utf-8", "replace")
                 if "Done (" in text and "! For help, type" in text:
                     return True
-            except Exception:
+            except (OSError, UnicodeDecodeError):  # fall back to "not ready"
                 pass
 
         return False

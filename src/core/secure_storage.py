@@ -20,7 +20,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 try:
-    from cryptography.fernet import Fernet
+    from cryptography.fernet import Fernet, InvalidToken
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
@@ -64,7 +64,7 @@ def _load_or_create_key() -> bytes:
     # Restrict permissions: owner read/write only (best-effort)
     try:
         os.chmod(key_file, 0o600)
-    except Exception:
+    except OSError:
         pass
     return key
 
@@ -105,7 +105,7 @@ class SecureStorage:
         if self._fernet is not None:
             try:
                 return self._fernet.decrypt(value.encode("utf-8")).decode("utf-8")
-            except Exception:
+            except (InvalidToken, ValueError):  # fall through to obfuscation fallback
                 pass
         # Try fallback
         if hasattr(self, "_key") and self._key is not None:
@@ -114,7 +114,7 @@ class SecureStorage:
                 key = self._key
                 data = bytes(b ^ key[i % len(key)] for i, b in enumerate(obf))
                 return data.decode("utf-8")
-            except Exception:
+            except ValueError:  # fall back to plaintext (backward compatibility)
                 pass
         # Final fallback: assume plaintext (backward compatibility)
         return value

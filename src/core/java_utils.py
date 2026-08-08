@@ -27,6 +27,8 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ruamel.yaml.error import YAMLError
+
 log = logging.getLogger(__name__)
 
 MIN_JAVA_VERSION = 17
@@ -95,7 +97,7 @@ def java_major_version(java_path: Path) -> int | None:
         if parts[0] == "1" and len(parts) > 1:
             return int(parts[1])
         return int(parts[0])
-    except Exception as exc:
+    except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
         log.debug("Could not determine Java version for %s: %s", java_path, exc)
         return None
 
@@ -112,7 +114,7 @@ def java_version_string(java_path: Path) -> str:
         output = (result.stderr or result.stdout).strip()
         match = re.search(r'version "([^"]+)"', output)
         return match.group(1) if match else output
-    except Exception as exc:
+    except (OSError, subprocess.TimeoutExpired) as exc:
         log.debug("Could not read Java version for %s: %s", java_path, exc)
         return ""
 
@@ -221,7 +223,7 @@ def detect_java(root_dir: Path, config_path: Path | None = None) -> JavaStatus:
                     f"(needs Java {MIN_JAVA_VERSION}+)."
                 )
                 log.warning("%s", custom_note)
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             log.warning("Failed to read custom Java path from config: %s", exc)
 
     # 2. Bundled runtime
@@ -334,14 +336,14 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
 
     try:
         java_dir.mkdir(parents=True, exist_ok=True)
-    except Exception as exc:
+    except OSError as exc:
         return False, f"Cannot create Java directory {java_dir}: {exc}"
 
     zip_path = java_dir / "java_download.zip"
     try:
         log.info("Downloading OpenJDK 21 JRE for Windows...")
         _download_file(_JDK21_URL, zip_path)
-    except Exception as exc:
+    except OSError as exc:
         log.warning("Java download failed: %s", exc)
         zip_path.unlink(missing_ok=True)
         return (
@@ -364,7 +366,7 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
                 shutil.rmtree(sub, ignore_errors=True)
                 break
         zip_path.unlink(missing_ok=True)
-    except Exception as exc:
+    except (OSError, zipfile.BadZipFile) as exc:
         log.warning("Java extraction failed: %s", exc)
         zip_path.unlink(missing_ok=True)
         return False, f"Could not extract the downloaded Java runtime: {exc}"
@@ -417,7 +419,7 @@ def install_java_linux() -> tuple[bool, str]:
         return False, f"Java installation timed out. Run manually: {INSTALL_HINTS[pm]}"
     except FileNotFoundError:
         return False, f"Privileged installer not found. Run manually: {INSTALL_HINTS[pm]}"
-    except Exception as exc:
+    except OSError as exc:
         return False, f"Java installation failed ({exc}). Run manually: {INSTALL_HINTS[pm]}"
 
     if result.returncode != 0:

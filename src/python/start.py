@@ -49,7 +49,7 @@ multiprocessing.freeze_support()
 try:
     import uvicorn
     from core.api import create_app
-except Exception as _exc:  # pragma: no cover
+except Exception as _exc:  # pragma: no cover  # noqa: BLE001  # pre-import is best-effort
     import logging as _logging
     _pre_log = _logging.getLogger("start.preimport")
     _pre_log.warning("Failed to pre-import uvicorn/core.api: %s", _exc)
@@ -138,7 +138,7 @@ update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
 # -----------------------------
 try:
     cfg = load_config(CONFIG_FILE)
-except Exception as e:
+except (FileNotFoundError, ValueError, RuntimeError) as e:
     log.error("Failed to load config: %s", e)
     _input_confirm_exit("Press Enter to exit...")
 
@@ -327,14 +327,14 @@ def start_UPDATE_EXE_PATH():
     max_logs = cfg.get("update", {}).get("max_update_logs", 20)
     try:
         max_logs = int(max_logs)
-    except Exception:
+    except (TypeError, ValueError):
         max_logs = 20
     if max_logs >= 0:
         logs = sorted(log_dir.glob("updater_*.log"), key=lambda f: f.stat().st_mtime, reverse=True)
         for old_log in logs[max_logs:]:
             try:
                 old_log.unlink()
-            except Exception as e:
+            except OSError as e:
                 log.warning("Failed to delete old log %s: %s", old_log, e)
 
     while proc.poll() is None:
@@ -360,7 +360,7 @@ def start_UPDATE_EXE_PATH():
                         log.info("Please restart the application.")
                         time.sleep(2)
                         return "kill"
-        except Exception:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             pass
 
         time.sleep(1)
@@ -424,7 +424,7 @@ def _stop_all_atexit():
         if loop.is_running():
             return
         loop.run_until_complete(supervisor.stop_all())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # atexit cleanup is best-effort
         log.debug("atexit cleanup skipped: %s", exc)
 
 
@@ -456,7 +456,7 @@ def _gui_already_running() -> bool:
                 return False
             else:
                 return True
-    except Exception:
+    except Exception:  # noqa: BLE001  # lock check is best-effort; false is safe
         return False
 
 
@@ -605,7 +605,7 @@ async def _check_plugin_updates() -> None:
             with urllib.request.urlopen(f"{_API_BASE_URL}/plugins/updates", timeout=5) as resp:
                 if resp.status == 200:
                     return json.loads(resp.read().decode("utf-8"))
-        except Exception:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return None
         return None
 
@@ -634,7 +634,7 @@ async def _fetch_plugin_path(plugin_name: str) -> str:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     return data.get("path", "")
-        except Exception:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return ""
         return ""
 
@@ -655,7 +655,7 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
             )
             with urllib.request.urlopen(req, timeout=5):
                 pass
-        except Exception:
+        except Exception:  # noqa: BLE001  # re-raise; surfaced to the health-loop caller
             raise
 
     await asyncio.to_thread(_put)
@@ -673,7 +673,7 @@ async def _restart_server_process() -> None:
         await supervisor.stop("Minecraft Server")
         await supervisor.start("Minecraft Server")
         log.info("Minecraft Server restarted")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # background restart failures are only logged
         log.exception("Failed to restart Minecraft Server: %s", exc)
 
 
@@ -831,7 +831,7 @@ async def _plugin_health_check_loop() -> None:
             try:
                 await _mark_plugin_dead(proc.name)
                 log.info("Plugin '%s' marked as dead in registry", proc.name)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # health reporting is best-effort
                 log.warning("Failed to update health for plugin '%s': %s", proc.name, exc)
 
             if _AUTO_RESTART_PLUGINS:
@@ -839,7 +839,7 @@ async def _plugin_health_check_loop() -> None:
                 signal_file = RUNTIME_DIR / f"plugin_start_{proc.name}"
                 try:
                     signal_file.write_text(proc.name, encoding="utf-8")
-                except Exception as exc:
+                except OSError as exc:
                     log.warning("Failed to write restart signal for '%s': %s", proc.name, exc)
 
 
@@ -930,7 +930,7 @@ async def main() -> None:
     try:
         plugin_registry: list[AppConfig] = await asyncio.to_thread(_launcher.get_plugins)
         _register_plugins(plugin_registry)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # non-fatal; reported via crash manager
         crash_mgr.report_error(
             LIFECYCLE_0001,
             detail=f"Plugin discovery failed: {exc}",
@@ -1020,7 +1020,7 @@ if __name__ == "__main__":
         # This is normal network behavior and must not crash the supervisor.
         log.warning("[NET] Connection reset by remote host: %s", exc)
         _health_mon.set_state("start_process", HealthState.STOPPED)
-    except Exception:
+    except Exception:  # noqa: BLE001  # top-level boundary: report via crash manager and exit
         crash_mgr.report_exception(
             CORE_0001,
             exc=sys.exc_info()[1],
@@ -1039,5 +1039,5 @@ if __name__ == "__main__":
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(supervisor.stop_all())
                 loop.close()
-            except Exception:
+            except Exception:  # noqa: BLE001  # best-effort final cleanup
                 pass

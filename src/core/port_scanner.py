@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ruamel.yaml.error import YAMLError
+
 log = logging.getLogger(__name__)
 
 RUNTIME_FILE = "ports_resolved.json"
@@ -170,7 +172,7 @@ def write_runtime_file(
             json.dumps(resolved, indent=2), encoding="utf-8"
         )
         log.debug("Wrote resolved ports to %s", path)
-    except Exception as exc:
+    except OSError as exc:
         log.warning("Failed to write port runtime file: %s", exc)
 
 
@@ -180,7 +182,7 @@ def clear_runtime_file(runtime_dir: Path) -> None:
     try:
         if path.exists():
             path.unlink()
-    except Exception as exc:
+    except OSError as exc:
         log.warning("Failed to clear port runtime file: %s", exc)
 
 
@@ -213,7 +215,7 @@ def get_resolved_port(
                 val = data.get(key)
                 if val is not None:
                     return int(val)
-        except Exception:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             pass
 
     return default
@@ -241,7 +243,7 @@ def persist_to_config(
 
     try:
         cfg = load_yaml(config_path)
-    except Exception as exc:
+    except (OSError, ValueError, YAMLError) as exc:
         log.warning("Cannot load config for port persistence: %s", exc)
         return
 
@@ -267,5 +269,5 @@ def persist_to_config(
         try:
             save_yaml(config_path, cfg, backup=True)
             log.info("Persisted resolved ports to %s", config_path)
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             log.warning("Failed to persist resolved ports: %s", exc)

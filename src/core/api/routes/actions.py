@@ -62,7 +62,7 @@ async def get_actions():
         gifts = _load_gifts()
         triggers = _get_service().parse(gifts=gifts)
         return ActionsResponse(triggers=triggers)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -83,7 +83,7 @@ async def update_actions(body: ActionsUpdateRequest):
         return ActionsResponse(triggers=_get_service().parse(gifts=gifts))
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -93,7 +93,7 @@ async def get_actions_raw():
         content = _get_service().read_raw()
         diagnostics = _get_service().validate(content)
         return RawActionsResponse(content=content, diagnostics=diagnostics)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -110,7 +110,7 @@ async def update_actions_raw(body: RawActionsUpdateRequest):
         _get_service().write_raw(body.content, backup=True)
         diagnostics = _get_service().validate(body.content)
         return RawActionsResponse(content=body.content, diagnostics=diagnostics)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -119,7 +119,7 @@ async def validate_actions():
     try:
         diagnostics = _get_service().validate()
         return {"diagnostics": diagnostics}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -128,7 +128,7 @@ async def validate_actions_content(body: RawActionsUpdateRequest):
     try:
         diagnostics = _get_service().validate(body.content)
         return {"diagnostics": diagnostics}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -144,7 +144,7 @@ def _load_gifts() -> list[dict]:
         return []
     try:
         return json.loads(gifts_file.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
         log.error("Failed to load gifts.json: %s", e)
         return []
 
@@ -159,7 +159,7 @@ async def get_gifts():
             g["image_url"] = image_map.get(normalized, "")
         gifts.sort(key=lambda g: (g.get("coins", 0), g.get("name", "")))
         return {"gifts": gifts}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -197,7 +197,7 @@ async def get_registered_scripts():
                     log.info(f"[SCRIPTS] Lazy-loaded {len(HOOK_ACTIONS)} hook(s) from {hooks_dir}")
                 else:
                     log.warning(f"[SCRIPTS] No hooks directory found among: {candidates}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # script listing must survive lazy-load failures
                 log.warning(f"[SCRIPTS] Could not lazy-load hooks: {e}")
 
         scripts = [
@@ -205,6 +205,6 @@ async def get_registered_scripts():
             for name in sorted(HOOK_ACTIONS.keys())
         ]
         return {"scripts": scripts}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.error(f"Failed to get registered scripts: {e}")
         raise HTTPException(status_code=500, detail=str(e))

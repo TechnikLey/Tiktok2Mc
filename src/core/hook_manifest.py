@@ -50,7 +50,7 @@ def load_hook_manifest(hook_dir: Path) -> Optional[HookManifest]:
             log.warning("Invalid hook manifest (missing name): %s", manifest_path)
             return None
         return manifest
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log.warning("Failed to load hook manifest %s: %s", manifest_path, exc)
         return None
 

@@ -18,7 +18,7 @@ class DeathManager:
             try:
                 data = json.loads(self._stats_path.read_text(encoding="utf-8"))
                 self._count = data.get("deaths", 0)
-            except Exception:
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 pass
 
     def save(self):
@@ -28,7 +28,7 @@ class DeathManager:
                 json.dumps({"deaths": self._count}, indent=4),
                 encoding="utf-8",
             )
-        except Exception:
+        except (OSError, TypeError):
             pass
 
     def add(self, amount=1):

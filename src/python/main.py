@@ -170,7 +170,7 @@ def _validate_dup_cmd_config():
     """
     try:
         text = CONFIG_FILE.read_text(encoding="utf-8")
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         return
     lines = text.split("\n")
     found = False
@@ -360,7 +360,7 @@ def load_config():
         config = load_yaml(CONFIG_FILE)
         _apply_config(config)
         return True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # malformed user config must not crash the bridge
         log.error(f"Config error: {e}")
         return False
 
@@ -379,7 +379,7 @@ def generate_datapack():
 
     try:
         ctx.datapack_root.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
+    except OSError as e:
         log.error(f"[BUILD] Cannot create datapack root directory {ctx.datapack_root}: {e}")
         return
 
@@ -400,7 +400,7 @@ def generate_datapack():
         if full_dp_path.exists():
             shutil.rmtree(full_dp_path)
         functions_path.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
+    except OSError as e:
         log.error(f"Failed to create datapack directory: {e}")
         return
 
@@ -503,7 +503,7 @@ def generate_datapack():
         zip_path = Path(ctx.datapack_root) / ctx.datapack_name
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # datapack build errors are logged; bridge keeps running
         log.exception("Datapack build failed: %s", e)
 
 # ================================
@@ -557,7 +557,7 @@ async def rcon_worker():
                             asyncio.to_thread(ctx.rcon_connection.connect),
                             timeout=3.0
                         )
-                    except Exception as e:
+                    except (OSError, TimeoutError, ConnectionError) as e:
                         ctx.rcon_connection = None
                         raise ConnectionError(f"Server unreachable: {e}")
 
@@ -566,7 +566,7 @@ async def rcon_worker():
                     if inner_pause > 0:
                         await asyncio.sleep(inner_pause)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # background worker must keep running; commands re-queued
             log.info(f"[RCON OFFLINE] {e}")
             ctx.rcon_connection = None
             get_crash_manager().report_exception(MC_0004, exc=e, context_info={"source": "rcon_worker"})
@@ -577,7 +577,7 @@ async def rcon_worker():
                 ctx.rcon_queue_retries[retry_key] = retries
                 try:
                     await ctx.rcon_queue.put((commands, source_user))
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001  # best-effort re-queue with reporting
                     log.info(f"RCON Queue Error: {e}")
                     get_crash_manager().report_exception(MC_0005, exc=e, context_info={"retries": retries})
             else:
@@ -612,7 +612,7 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
                 try:
                     ctx.hook_api.set_depth(chain_depth)
                     HOOK_ACTIONS[action](source_user, action, {})
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001  # third-party hook action must not crash the bridge
                     log.warning(f"[HOOK] Error in action '{action}': {e}")
                     get_crash_manager().report_exception(HOOK_0006, exc=e, context_info={"action": action, "trigger": trigger_name})
             elif action:
@@ -648,7 +648,7 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
         if cmds:
             try:
                 asyncio.create_task(execute_shell_commands(cmds))
-            except Exception as e:
+            except RuntimeError as e:
                 log.warning(f"[SHELL] Error scheduling shell commands for '{name}': {e}")
 
     if not commands_to_send:
@@ -680,12 +680,12 @@ async def trigger_worker():
                 chain_depth = 0
             try:
                 await execute_global_command(trigger, source_user, chain_depth)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # a failing trigger must not kill the worker
                 log.info(f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}")
                 get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"trigger": trigger, "user": str(source_user)})
             finally:
                 ctx.trigger_queue.task_done()
-        except Exception as e_outer:
+        except Exception as e_outer:  # noqa: BLE001  # worker loop must never die
             log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             get_crash_manager().report_exception(TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"})
             await asyncio.sleep(0.1)  
@@ -706,7 +706,7 @@ def _publish_event(event_type: str, event_data: dict) -> None:
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
         get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type, "target": "eventbus_api"})
 
@@ -715,7 +715,7 @@ def _publish_event(event_type: str, event_data: dict) -> None:
 def handle_minecraft_events():
     try:
         data = request.json
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # malformed webhook JSON returns 400
         log.error(f"Webhook invalid JSON: {e}")
         return {"status": "invalid json"}, 400
 
@@ -759,7 +759,7 @@ def _publish_event(event_type: str, event_data: dict) -> None:
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log.info("Failed to publish event '%s' to EventBus: %s", event_type, exc)
         get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type, "target": "eventbus_api_webhook"})
 
@@ -775,7 +775,7 @@ def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) 
         req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
         urllib.request.urlopen(req, timeout=3)
         log.debug("Routed '%s' to plugin '%s'", cmd_text, plugin_name)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log.info("Failed to route comment to plugin '%s': %s", plugin_name, exc)
 
 
@@ -791,7 +791,7 @@ def _fetch_comment_handlers() -> dict[str, str]:
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data.get("handlers") or {}
-    except Exception as exc:
+    except (OSError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         log.info("No comment handlers from API (plugins may not be registered yet): %s", exc)
         return {}
 
@@ -804,7 +804,7 @@ def _dispatch_comment_http(cmd_url, username, cmd_text):
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
         req = urllib.request.Request(url, method="POST")
         urllib.request.urlopen(req, timeout=5)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         log.info(f"[COMMENT CMD] HTTP dispatch failed: {e}")
         get_crash_manager().report_exception(TIKTOK_0005, exc=e, context_info={"source": "_dispatch_comment_http", "url": cmd_url})
 
@@ -819,7 +819,7 @@ def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
         req = urllib.request.Request(url, method="POST")
         with urllib.request.urlopen(req, timeout=10) as resp:
             return json.loads(resp.read())
-    except Exception as e:
+    except (OSError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as e:
         log.info(f"[COMMENT CMD] Conditional HTTP dispatch failed: {e}")
         return None
 
@@ -835,7 +835,7 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
             asyncio.run_coroutine_threadsafe(
                 event_bus.publish(f"tiktok.{event_type}", data), ctx.main_loop
             )
-        except Exception as exc:
+        except (RuntimeError, ValueError) as exc:
             get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"event_type": event_type})
 
 
@@ -853,7 +853,7 @@ def _publish_tiktok_status(connected: bool):
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         log.info("Failed to publish TikTok live status to EventBus: %s", exc)
         get_crash_manager().report_exception(TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_live_status"})
 
@@ -868,7 +868,7 @@ async def _tiktok_status_heartbeat():
     while True:
         try:
             _publish_tiktok_status(bool(ctx.tiktok_live))
-        except Exception:
+        except Exception:  # noqa: BLE001  # heartbeat must never die
             pass
         await asyncio.sleep(30)
 
@@ -959,7 +959,7 @@ async def _event_bridge_worker():
                     data={k: v for k, v in data.items() if k not in ("type", "user")},
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # worker must never die
             log.info(f"[EVENT-BRIDGE] Error handling event: {e}")
             get_crash_manager().report_exception(TIKTOK_0004, exc=e, context_info={"source": "_event_bridge_worker"})
         finally:
@@ -978,7 +978,7 @@ def _process_follow(username: str, persist: bool = True):
         try:
             with open(ctx.follow_tracking_file, "a", encoding="utf-8") as f:
                 f.write(user_lower + "\n")
-        except Exception as e:
+        except OSError as e:
             log.info(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
     if "follow" in ctx.valid_functions:
         ctx.main_loop.call_soon_threadsafe(ctx.trigger_queue.put_nowait, ("follow", username))
@@ -1178,7 +1178,7 @@ def handle_test_comment():
 
         return {"status": "ok", "message": f"Comment '{comment_text}' from '{username}' processed."}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.info(f"[TEST COMMENT] Error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
@@ -1238,14 +1238,14 @@ def handle_custom_trigger():
         if cmds:
             try:
                 asyncio.run_coroutine_threadsafe(execute_shell_commands(cmds), ctx.main_loop)
-            except Exception as e:
+            except (RuntimeError, ValueError) as e:
                 return {"status": "error", "message": str(e)}, 500
             log.info(f"[CUSTOM TRIGGER] Shell action for '{raw_trigger}' executed ({len(cmds)} command(s))")
             return {"status": "ok", "trigger": raw_trigger, "user": user}, 200
 
         return {"status": "error", "message": f"Trigger '{sanitized}' does not exist or is not valid."}, 400
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         return {"status": "error", "message": str(e)}, 500
 # =========================================
 
@@ -1253,7 +1253,7 @@ def handle_custom_trigger():
 def run_signal_server():
     try:
         app.run(host=ctx.server_host, port=ctx.mcserver_api_port, threaded=True, debug=False, use_reloader=False)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # best-effort webhook server thread; failure must not take down the bridge
         log.error("Bridge webhook server failed to start on %s:%s: %s", ctx.server_host, ctx.mcserver_api_port, exc)
 
 # ==========================================
@@ -1337,7 +1337,7 @@ def create_client(user):
                 except asyncio.QueueFull:
                     log.info(f"[GIFT] Queue full, gift '{gift_name}' dropped")
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # TikTok event handler must not crash the client
             log.exception("ERROR IN ON_GIFT EVENT")
             get_crash_manager().report_exception(TIKTOK_0003, exc=exc, context_info={"source": "on_gift"})
 
@@ -1373,7 +1373,7 @@ def create_client(user):
                 delta = total_since_start
                 _publish_tiktok_event("like", username or "unknown", delta=delta, total=event.total)
                 ctx._last_like_event = now
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # TikTok event handler must not crash the client
             log.info(f"[EVENT ERROR] Error in like handling: {e}")
             get_crash_manager().report_exception(TIKTOK_0003, exc=e, context_info={"source": "on_like"})
 
@@ -1563,11 +1563,11 @@ async def reload_config():
         if old_user != ctx.tiktok_user and ctx.tiktok_client is not None:
             try:
                 ctx.tiktok_client.stop()
-            except Exception:
+            except Exception:  # noqa: BLE001  # best-effort stop
                 pass
 
         log.info("[RELOAD] Config reloaded successfully")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # runtime reload is best-effort; old config stays active
         log.error("[RELOAD] Config reload failed: %s", e)
 
 
@@ -1607,7 +1607,7 @@ async def reload_actions(send_minecraft_reload: bool = False):
                 )
 
         log.info("[RELOAD] Actions reloaded successfully")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # runtime reload is best-effort; previous state stays active
         log.error("[RELOAD] Actions reload failed: %s", e)
 
 
@@ -1617,7 +1617,7 @@ def _read_signal_options(path: Path) -> dict:
         text = path.read_text(encoding="utf-8").strip()
         if text.startswith("{"):
             return json.loads(text)
-    except Exception:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         pass
     return {"send_minecraft_reload": True}
 
@@ -1630,17 +1630,17 @@ async def _reload_signal_watcher():
             if RELOAD_CONFIG_SIGNAL.exists():
                 try:
                     RELOAD_CONFIG_SIGNAL.unlink()
-                except Exception:
+                except OSError:
                     pass
                 await reload_config()
             if RELOAD_ACTIONS_SIGNAL.exists():
                 options = _read_signal_options(RELOAD_ACTIONS_SIGNAL)
                 try:
                     RELOAD_ACTIONS_SIGNAL.unlink()
-                except Exception:
+                except OSError:
                     pass
                 await reload_actions(send_minecraft_reload=options.get("send_minecraft_reload", True))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # watcher must never die
             log.error("[RELOAD] Signal watcher error: %s", e)
 
 
@@ -1709,7 +1709,7 @@ async def run_bot():
     for sig in (RELOAD_CONFIG_SIGNAL, RELOAD_ACTIONS_SIGNAL):
         try:
             sig.unlink(missing_ok=True)
-        except Exception:
+        except OSError:
             pass
 
     threading.Thread(target=run_signal_server, daemon=True).start()
@@ -1746,7 +1746,7 @@ async def run_bot():
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
             await asyncio.to_thread(client.run)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # TikTok client connection errors are reported; reconnect loop continues
             log.exception("CRITICAL ERROR IN TIKTOK CLIENT")
 
             error_str = str(e)
@@ -1767,7 +1767,7 @@ async def run_bot():
             _publish_tiktok_status(False)
             try:
                 client.stop()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # best-effort stop
                 log.info(f"[TIKTOK] Error stopping client: {e}")
             await asyncio.sleep(2)
 
@@ -1790,7 +1790,7 @@ if __name__ == "__main__":
         # disconnect). This is normal network behavior, not a fatal crash.
         log.warning("[NET] Connection reset by remote host: %s", exc)
         health.set_state("tiktok_bridge", HealthState.STOPPED)
-    except Exception:
+    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("main")
         health.set_state("tiktok_bridge", HealthState.FAILED)
         sys.exit(1)

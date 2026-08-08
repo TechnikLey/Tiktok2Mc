@@ -33,7 +33,7 @@ async def restart_system():
         asyncio.create_task(supervisor.restart())
         log.info("Restart requested via API")
         return {"status": "restart_requested"}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to request restart")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -48,7 +48,7 @@ async def shutdown_now():
         try:
             supervisor = get_supervisor()
             await supervisor.shutdown()
-        except Exception:
+        except Exception:  # noqa: BLE001  # shutdown must never block the forced exit
             log.exception("Supervisor shutdown failed, exiting directly")
         finally:
             os._exit(0)

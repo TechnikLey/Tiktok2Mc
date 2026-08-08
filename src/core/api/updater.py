@@ -54,7 +54,7 @@ def _parse_remote_version(url: str) -> str | None:
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             body = resp.read().decode("utf-8").strip()
-    except Exception as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         log.debug("Failed to fetch %s: %s", url, exc)
         return None
 
@@ -102,7 +102,7 @@ def _download_update(url: str, target: Path) -> bool:
             with target.open("wb") as fh:
                 shutil.copyfileobj(resp, fh)
         return True
-    except Exception as exc:
+    except OSError as exc:
         log.error("Download failed from %s: %s", url, exc)
         return False
 
@@ -141,7 +141,7 @@ def check_tool_update(current_version: str) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
             release = json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         result["error"] = str(exc)
         return result
 
@@ -159,7 +159,7 @@ def check_tool_update(current_version: str) -> dict[str, Any]:
         result["update_available"] = (
             version_parse.parse(latest) > version_parse.parse(current_version)
         )
-    except Exception as exc:
+    except version_parse.InvalidVersion as exc:
         result["error"] = f"Version comparison failed: {exc}"
 
     return result
@@ -209,7 +209,7 @@ class PluginUpdateChecker:
                         version_parse.parse(latest_version)
                         > version_parse.parse(current_version)
                     )
-                except Exception as exc:
+                except version_parse.InvalidVersion as exc:
                     error = f"Version comparison failed: {exc}"
 
             status = {
@@ -267,7 +267,7 @@ class PluginUpdateChecker:
                 req = urllib.request.Request(update_url, headers=headers)
                 with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
                     release = json.loads(resp.read().decode("utf-8"))
-            except Exception as exc:
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 log.error(
                     "Failed to fetch release info for '%s': %s",
                     name, exc,
@@ -333,7 +333,7 @@ class PluginUpdateChecker:
                                 ):
                                     expected_hash = candidate
                                     break
-                except Exception as exc:
+                except (OSError, UnicodeDecodeError) as exc:
                     log.debug("Could not fetch checksum asset for '%s': %s", name, exc)
         else:
             expected_hash = fetch_checksum(download_url)
@@ -350,7 +350,7 @@ class PluginUpdateChecker:
         try:
             with zipfile.ZipFile(archive_path, "r") as zf:
                 zf.extractall(tmp_dir)
-        except Exception as exc:
+        except (OSError, zipfile.BadZipFile) as exc:
             log.error("Extraction failed for '%s': %s", name, exc)
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return False
@@ -394,7 +394,7 @@ class PluginUpdateChecker:
                             json.dump(
                                 manifest, fh, indent=2, ensure_ascii=False
                             )
-                except Exception as exc:
+                except (json.JSONDecodeError, OSError, TypeError) as exc:
                     log.warning(
                         "Could not update version in manifest: %s",
                         exc,
@@ -402,7 +402,7 @@ class PluginUpdateChecker:
 
             return True
 
-        except Exception as exc:
+        except OSError as exc:
             log.error(
                 "Failed to install update for '%s': %s", name, exc
             )

@@ -76,7 +76,7 @@ def _get_memory_stats() -> dict[str, Any]:
         }
     except ImportError:
         return {}
-    except Exception:
+    except Exception:  # noqa: BLE001  # diagnostics are best-effort, must never raise
         return {}
 
 
@@ -97,7 +97,7 @@ def _get_queue_stats(crash_manager: Any = None) -> dict[str, Any]:
             }
         else:
             stats["bridge"] = "not loaded in this process"
-    except Exception:
+    except Exception:  # noqa: BLE001  # diagnostics are best-effort, must never raise
         stats["bridge"] = "not available"
     return stats
 

@@ -24,6 +24,7 @@ if _src not in sys.path:
 from core.paths import get_base_dir
 from core.api.server import DEFAULT_PORT
 from core.yaml_utils import load_yaml
+from ruamel.yaml.error import YAMLError
 from core.logger import initialize_logging, install_global_exception_hook, start_heartbeat, handle_unhandled_exception
 from core.health_monitor import get_health_monitor, HealthState
 from core.crash_manager import get_crash_manager
@@ -60,7 +61,7 @@ def _api_ready(timeout: float = 20.0) -> bool:
             with urllib.request.urlopen(f"{API_URL}/api/v1/health", timeout=1) as resp:
                 if resp.status == 200:
                     return True
-        except Exception:
+        except Exception:  # noqa: BLE001  # readiness polling must keep retrying on any error
             pass
         time.sleep(0.5)
     return False
@@ -71,7 +72,7 @@ def _load_overlay_names() -> list[str]:
     config_path = (BASE_DIR.parent / "config" / "config.yaml").resolve()
     try:
         cfg = load_yaml(config_path)
-    except Exception as exc:
+    except (OSError, ValueError, YAMLError) as exc:
         log.warning("Failed to load global config: %s", exc)
         return ["default"]
 
@@ -109,7 +110,7 @@ def main() -> None:
                 try:
                     shutdown_signal.unlink(missing_ok=True)
                     shutdown_now_signal.unlink(missing_ok=True)
-                except Exception:
+                except OSError:
                     pass
                 sys.exit(0)
             time.sleep(1)
@@ -120,7 +121,7 @@ def main() -> None:
     except ImportError as exc:
         log.error("pywebview not installed: %s", exc)
         sys.exit(1)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend failure
         hint = _linux_install_hint()
         log.error("GUI backend failed to load: %s", exc)
         if hint:
@@ -147,7 +148,7 @@ def main() -> None:
             webview.start(gui='qt')
         else:
             webview.start()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend error
         hint = _linux_install_hint()
         log.error("GUI backend error: %s", exc)
         if hint:
@@ -168,7 +169,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("Overlay interrupted by user.")
         health.set_state("overlay", HealthState.STOPPED)
-    except Exception:
+    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("overlay")
         health.set_state("overlay", HealthState.FAILED)
         sys.exit(1)

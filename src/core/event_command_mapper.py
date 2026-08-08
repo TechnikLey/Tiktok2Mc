@@ -30,6 +30,7 @@ from typing import Any
 from core.paths import get_root_dir
 from core.yaml_utils import load_yaml, save_yaml
 from core.health_monitor import get_health_monitor, HealthState
+from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class EventCommandMapper:
         try:
             cfg = load_yaml(path)
             return dict(cfg.get("event_commands", {}))
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             log.warning("[ECM] Failed to load event_commands config: %s", exc)
             return {}
 
@@ -136,7 +137,7 @@ class EventCommandMapper:
                     "[ECM] Dispatched %s → %s/%s (args=%s)",
                     event_type, target, command, args,
                 )
-            except Exception as exc:
+            except (TypeError, ValueError, KeyError) as exc:
                 self._history.append({
                     "timestamp": time.time(),
                     "event": event_type,
@@ -153,7 +154,7 @@ class EventCommandMapper:
                 try:
                     self._health.record_error("event_command_mapper", f"Dispatch failed: {event_type} -> {target}/{command}: {exc}")
                     self._health.set_state("event_command_mapper", HealthState.DEGRADED)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110  # best-effort health reporting
                     pass
 
     # ------------------------------------------------------------------

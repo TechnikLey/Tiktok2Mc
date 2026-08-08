@@ -76,7 +76,7 @@ def _api_ready(timeout: float = 1.0) -> bool:
     try:
         with urllib.request.urlopen(f"{API_URL}/api/v1/health", timeout=timeout) as resp:
             return resp.status == 200
-    except Exception:
+    except OSError:
         return False
 
 
@@ -107,7 +107,7 @@ class LauncherAPI:
         if _window is not None:
             try:
                 _window.destroy()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # webview teardown errors are best-effort
                 log.warning("Failed to destroy window: %s", e)
         return "closing"
 
@@ -117,13 +117,13 @@ class LauncherAPI:
         downloads = Path.home() / "Downloads"
         try:
             downloads.mkdir(parents=True, exist_ok=True)
-        except Exception:
+        except OSError:
             downloads = Path.home()
         path = downloads / filename
         try:
             path.write_text(content, encoding="utf-8")
             return str(path)
-        except Exception as e:
+        except OSError as e:
             log.warning("Failed to save file: %s", e)
             return f"error:{e}"
 
@@ -150,7 +150,7 @@ class LauncherAPI:
                     _full_system_proc = subprocess.Popen([str(START_EXE)], stdout=lf, stderr=lf, stdin=subprocess.DEVNULL)
             log.info("Full system process started (PID %s)", _full_system_proc.pid if _full_system_proc else "?")
             return "started"
-        except Exception as e:
+        except OSError as e:
             log.error("Failed to start full system: %s", e)
             return f"error:{e}"
 
@@ -176,7 +176,7 @@ class LauncherAPI:
                             _full_system_proc = None
                             return "stopped"
                         time.sleep(0.25)
-        except Exception:
+        except OSError:
             pass
 
         # Force kill if still running.
@@ -192,7 +192,7 @@ class LauncherAPI:
                 _full_system_proc.terminate()
             _full_system_proc = None
             return "stopped"
-        except Exception as e:
+        except OSError as e:
             log.warning("Failed to terminate system process: %s", e)
             return "error"
 
@@ -233,7 +233,7 @@ def _cleanup_processes():
                     return
                 time.sleep(0.25)
             log.warning("Cleanup: process did not exit within 5s after API shutdown request.")
-        except Exception as exc:
+        except OSError as exc:
             log.warning("Cleanup: API shutdown request failed: %s", exc)
     else:
         log.info("Cleanup: API not reachable, skipping shutdown request.")
@@ -250,7 +250,7 @@ def _cleanup_processes():
         else:
             _full_system_proc.terminate()
         log.info("Cleanup: process force-killed.")
-    except Exception as exc:
+    except OSError as exc:
         log.warning("Cleanup: force-kill failed: %s", exc)
 
 
@@ -263,7 +263,7 @@ def _acquire_lock() -> None:
         GUI_LOCKFILE.parent.mkdir(parents=True, exist_ok=True)
         GUI_LOCKFILE.write_text(str(os.getpid()))
         atexit.register(_release_lock)
-    except Exception as exc:
+    except (OSError, TypeError) as exc:
         log.warning("Could not acquire GUI lockfile: %s", exc)
 
 
@@ -273,7 +273,7 @@ def _release_lock() -> None:
             pid = int(GUI_LOCKFILE.read_text().strip())
             if pid == os.getpid():
                 GUI_LOCKFILE.unlink()
-    except Exception:
+    except (OSError, ValueError):
         pass
 
 
@@ -300,7 +300,7 @@ def _gui_already_running() -> bool:
                 return False
             else:
                 return True
-    except Exception:
+    except Exception:  # noqa: BLE001  # lock check is best-effort; false is safe
         return False
 
 
@@ -350,7 +350,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         except EOFError:
             pass
         sys.exit(1)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend failure
         hint = _linux_install_hint()
         log.error("GUI backend failed to load: %s", exc)
         if hint:
@@ -391,10 +391,10 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
                                     try:
                                         _window.load_url(GUI_URL)
                                         log.info("API came online — switched to dashboard.")
-                                    except Exception as nav_err:
+                                    except Exception as nav_err:  # noqa: BLE001  # best-effort navigation
                                         log.warning("Navigation to dashboard failed: %s", nav_err)
                         break
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001  # poll loop must never die
                     log.debug("Poll error: %s", exc)
         t = get_crash_manager().supervised_thread(target=_poll_api, name="gui-api-poll", daemon=True)
         t.start()
@@ -409,7 +409,7 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
             webview.start(gui='qt', debug=False)
         else:
             webview.start(debug=False)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # process exits with hints on any GUI backend error
         hint = _linux_install_hint()
         log.error("GUI backend error: %s", exc)
         if hint:
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("GUI interrupted by user.")
         health.set_state("gui", HealthState.STOPPED)
-    except Exception:
+    except Exception:  # noqa: BLE001  # top-level boundary: report and exit non-zero
         handle_unhandled_exception("gui")
         health.set_state("gui", HealthState.FAILED)
         sys.exit(1)

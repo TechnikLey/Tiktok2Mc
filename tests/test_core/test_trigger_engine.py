@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.error
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -391,7 +392,7 @@ class TestBridgeDispatcher:
     def test_check_connectivity_failure(self):
         dispatcher = BridgeDispatcher(EngineConfig(bridge_host="localhost", bridge_port=12345, bridge_timeout=0.1))
         with patch("core.trigger_engine.dispatcher.urllib.request.urlopen") as mock_urlopen:
-            mock_urlopen.side_effect = Exception("fail")
+            mock_urlopen.side_effect = urllib.error.URLError("fail")
             assert dispatcher.check_connectivity() is False
 
 

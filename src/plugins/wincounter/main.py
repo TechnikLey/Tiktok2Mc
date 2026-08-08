@@ -21,7 +21,7 @@ class WinManager:
                 self.wins = data.get("wins", 0)
                 self.needed = data.get("needed", 10)
                 self.record_low = data.get("record_low", 0)
-            except Exception:
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError):
                 pass
 
     def save(self):
@@ -35,7 +35,7 @@ class WinManager:
                 }, indent=4),
                 encoding="utf-8",
             )
-        except Exception:
+        except (OSError, TypeError):
             pass
 
     def add(self, amount=1):

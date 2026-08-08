@@ -128,7 +128,7 @@ class BackupManager:
                         "Backup skipped — content unchanged: %s", source
                     )
                     return None
-            except Exception:
+            except OSError:
                 pass
 
         # ── time coalescing ──────────────────────────────────────────
@@ -220,7 +220,7 @@ class BackupManager:
             try:
                 f.unlink()
                 removed += 1
-            except Exception as exc:
+            except OSError as exc:
                 log.warning("Failed to remove old backup %s: %s", f, exc)
         if removed:
             log.info(

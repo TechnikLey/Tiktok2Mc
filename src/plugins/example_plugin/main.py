@@ -212,7 +212,7 @@ class ExamplePlugin(BasePlugin):
             payload["data"] = data
         try:
             self.api_post("/events", payload)
-        except Exception as e:
+        except (OSError, TypeError) as e:
             log.warning("[%s] Event publish failed: %s", self.PLUGIN_NAME, e)
 
     # ═══════════════════════════════════════════════════════════════
@@ -383,7 +383,7 @@ class ExamplePlugin(BasePlugin):
          called, the API pushes the new JSON state to ALL
          connected overlay clients — no polling required.
 
-         Stream URL: /api/v1/plugins/{PLUGIN_NAME}/stream
+         Stream URL: /api/v1/plugins/{self.PLUGIN_NAME}/stream
          ===================================================== -->
     <script>
         // Cache DOM references

@@ -167,7 +167,7 @@ def _update_process_health(proc_name: str, state: ProcessState) -> None:
             hm.set_state(f"process.{proc_name}", hstate)
             if state == ProcessState.RUNNING:
                 hm.record_heartbeat(f"process.{proc_name}")
-    except Exception:
+    except Exception:  # noqa: BLE001  # health reporting is best-effort
         pass
 
 
@@ -310,12 +310,12 @@ class ProcessSupervisor:
                 }
                 hs = _state_map.get(value, HealthState.UNKNOWN)
                 _health.set_state("supervisor", hs)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # health reporting is best-effort
                 log.debug("[SUPERVISOR] Health monitor update failed: %s", exc)
             for listener in self._state_listeners:
                 try:
                     listener(value)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001  # listener is user code — must not break state machine
                     log.warning("State listener failed: %s", exc)
 
     def add_state_listener(self, callback: Callable[[SupervisorState], None]) -> None:
@@ -392,7 +392,7 @@ class ProcessSupervisor:
         try:
             _health = get_health_monitor()
             _health.register(f"process.{name}", HealthState.STOPPED)
-        except Exception:
+        except Exception:  # noqa: BLE001  # health registration is best-effort
             pass
         return proc
 
@@ -447,7 +447,7 @@ class ProcessSupervisor:
                         text=True,
                     )
                     return proc.session_name in res.stdout
-            except Exception:
+            except Exception:  # noqa: BLE001  # unknown session state is conservatively treated as alive
                 return True
         return True
 
@@ -483,7 +483,7 @@ class ProcessSupervisor:
                         if await proc.readiness_check():
                             ready = True
                             break
-                    except Exception:
+                    except Exception:  # noqa: BLE001  # a failing readiness probe must not abort the loop
                         pass
                     # If the child already exited (e.g. missing server.jar),
                     # do not keep polling until the full readiness timeout.
@@ -520,7 +520,7 @@ class ProcessSupervisor:
                 proc.state = ProcessState.FAILED
                 _update_process_health(name, ProcessState.FAILED)
             return False
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # any unexpected start error marks the process FAILED
             log.exception("[SUPERVISOR] Failed to start %s: %s", name, exc)
             proc.state = ProcessState.FAILED
             _update_process_health(name, ProcessState.FAILED)
@@ -594,7 +594,7 @@ class ProcessSupervisor:
         if proc.proc and proc.post_spawn:
             try:
                 proc.post_spawn(proc.proc)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # post_spawn is a hook — failure must not abort startup
                 log.warning("[SUPERVISOR] post_spawn failed for %s: %s", proc.name, exc)
 
         # Brief wait to catch immediate startup failures.
@@ -678,7 +678,7 @@ class ProcessSupervisor:
             proc.session_name = None
             log.info("[SUPERVISOR] %s stopped", name)
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # any unexpected stop error marks the process FAILED
             log.exception("[SUPERVISOR] Failed to stop %s: %s", name, exc)
             proc.state = ProcessState.FAILED
             _update_process_health(name, ProcessState.FAILED)
@@ -711,7 +711,7 @@ class ProcessSupervisor:
                     )
                 if proc.session_name in self._linux_sessions:
                     self._linux_sessions.remove(proc.session_name)
-            except Exception as exc:
+            except OSError as exc:
                 log.warning("[SUPERVISOR] Session stop failed for %s: %s", proc.name, exc)
             return
 
@@ -735,7 +735,7 @@ class ProcessSupervisor:
                     return
                 except subprocess.TimeoutExpired:
                     pass
-            except Exception as exc:
+            except (OSError, subprocess.TimeoutExpired) as exc:
                 log.warning("[SUPERVISOR] taskkill failed for %s: %s", proc.name, exc)
 
             # Force kill tree
@@ -749,7 +749,7 @@ class ProcessSupervisor:
                     timeout=force_timeout,
                 )
                 await asyncio.to_thread(proc.proc.wait, timeout=force_timeout)
-            except Exception as exc:
+            except (OSError, subprocess.TimeoutExpired) as exc:
                 log.warning("[SUPERVISOR] Force kill failed for %s: %s", proc.name, exc)
         else:
             try:
@@ -760,9 +760,9 @@ class ProcessSupervisor:
                 try:
                     proc.proc.kill()
                     await asyncio.to_thread(proc.proc.wait, timeout=force_timeout)
-                except Exception as exc:
+                except (OSError, subprocess.TimeoutExpired) as exc:
                     log.warning("[SUPERVISOR] Kill failed for %s: %s", proc.name, exc)
-            except Exception as exc:
+            except OSError as exc:
                 log.warning("[SUPERVISOR] Terminate failed for %s: %s", proc.name, exc)
 
     async def stop_all(
@@ -822,7 +822,7 @@ class ProcessSupervisor:
         if self._api_server is not None:
             try:
                 self._api_server.should_exit = True
-            except Exception as exc:
+            except (AttributeError, OSError) as exc:
                 log.warning("[SUPERVISOR] Error setting should_exit: %s", exc)
 
         self._api_server_task.cancel()
@@ -841,7 +841,7 @@ class ProcessSupervisor:
             if not freed:
                 log.warning("[SUPERVISOR] API port %s:%s still in use", host, port)
                 return False
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # port wait is defensive; failure should not crash shutdown
             log.warning("[SUPERVISOR] Could not parse API URL: %s", exc)
 
         log.info("[SUPERVISOR] API server stopped")
@@ -935,7 +935,7 @@ class ProcessSupervisor:
         try:
             from core.api.eventbus import event_bus
             await event_bus.publish("server.started", {})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # restart must succeed even if event publishing fails
             log.debug("[SUPERVISOR] Could not publish restart completion event: %s", exc)
 
         self.state = SupervisorState.RUNNING
@@ -1021,13 +1021,13 @@ class ProcessSupervisor:
             status_file = self._runtime_dir / "shutdown_status"
             data = {"remaining": remaining, "state": state}
             status_file.write_text(json.dumps(data), encoding="utf-8")
-        except Exception:
+        except (OSError, TypeError):
             pass
 
     def clear_shutdown_status(self) -> None:
         try:
             (self._runtime_dir / "shutdown_status").unlink(missing_ok=True)
-        except Exception:
+        except OSError:
             pass
 
 

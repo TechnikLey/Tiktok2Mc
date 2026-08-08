@@ -14,13 +14,14 @@
 #   python check_deps.py --pip-only      # Only check/install Python packages
 # ==========================================
 
-import sys
+import argparse
+import importlib.util
 import os
 import shutil
 import subprocess
-import argparse
-import importlib.util
+import sys
 from pathlib import Path
+
 
 # ---- Colors ----
 class C:
@@ -111,14 +112,14 @@ PYTHON_PACKAGES = [
 def _get_version(cmd, flag="--version"):
     """Get version string from a command. Returns (major, minor) or None."""
     try:
-        result = subprocess.run([cmd, flag], capture_output=True, text=True, timeout=5)
+        result = subprocess.run([cmd, flag], capture_output=True, text=True, timeout=5, check=False)
         output = (result.stdout + result.stderr).strip()
         # Extract first digits like "20.19.1" or "v20.19.1"
         import re
         m = re.search(r"(\d+)\.(\d+)", output)
         if m:
             return int(m.group(1)), int(m.group(2))
-    except Exception:
+    except (OSError, subprocess.TimeoutExpired):
         pass
     return None
 
@@ -206,6 +207,7 @@ def install_pip_package(pip_name):
     result = subprocess.run(
         [sys.executable, "-m", "pip", "install", pip_name],
         capture_output=True, text=True, timeout=120,
+        check=False,
     )
     if result.returncode == 0:
         last_line = (result.stdout + result.stderr).strip().splitlines()[-1:] or [""]
@@ -226,6 +228,7 @@ def pip_install_requirements(req_path):
     result = subprocess.run(
         [sys.executable, "-m", "pip", "install", "-r", str(req_path)],
         capture_output=True, text=True, timeout=300,
+        check=False,
     )
     if result.returncode == 0:
         last_line = (result.stdout + result.stderr).strip().splitlines()[-1:] or [""]
@@ -247,7 +250,7 @@ def install_system_tool(name, pkg_names, pm_name, pm_prefix):
     cmd = pm_prefix + pkg.split()
     cprint(f"  > {' '.join(cmd)}", C.GRAY)
     try:
-        result = subprocess.run(cmd, text=True, timeout=120)
+        result = subprocess.run(cmd, text=True, timeout=120, check=False)
     except FileNotFoundError:
         cprint(f"  ! Package manager '{pm_name}' not found — install {name} manually", C.RED)
         return False
@@ -312,7 +315,7 @@ def _install_node_nodesource():
         return False
 
     for cmd in cmds:
-        result = subprocess.run(cmd, text=True, timeout=120)
+        result = subprocess.run(cmd, text=True, timeout=120, check=False)
         if result.returncode != 0:
             cprint(f"  ! NodeSource setup failed at: {' '.join(cmd[:3])}...", C.RED)
             return False
@@ -397,10 +400,10 @@ def main():
             if not available and not optional:
                 if auto_install and pm_name:
                     # Special handling: outdated node -> use NodeSource
-                    if name == "node" and version_info and "need >=" in version_info:
-                        if _install_node_nodesource():
-                            installed_count += 1
-                            continue
+                    if (name == "node" and version_info and "need >=" in version_info
+                            and _install_node_nodesource()):
+                        installed_count += 1
+                        continue
                     if install_system_tool(name, pkg_names, pm_name, pm_prefix):
                         installed_count += 1
                     else:
@@ -459,7 +462,7 @@ def main():
             cprint(f"  {len(missing_system)} system tools missing", C.RED)
             for name, _ in missing_system:
                 cprint(f"    - {name}", C.RED)
-            cprint(f"\n  Run with --install to auto-install everything.", C.YELLOW)
+            cprint("\n  Run with --install to auto-install everything.", C.YELLOW)
             sys.exit(1)
         else:
             cprint("  All dependencies satisfied.", C.GREEN)

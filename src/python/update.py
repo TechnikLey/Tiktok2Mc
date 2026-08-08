@@ -204,7 +204,7 @@ def migrate_config_if_needed() -> bool:
             shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
             log.info(f"No config found. Created new config from template.")
             return True
-        except Exception as e:
+        except OSError as e:
             log.error(f"Failed to copy template: {e}")
             return False
 
@@ -248,7 +248,7 @@ def migrate_config_if_needed() -> bool:
             log.info(f"Backup created at: {bak}")
         else:
             log.info("Backup skipped (identical content or too recent)")
-    except Exception as e:
+    except OSError as e:
         log.error(f"Migration aborted. Could not create backup: {e}")
         return False
 
@@ -263,7 +263,7 @@ def migrate_config_if_needed() -> bool:
             yaml_obj.dump(template_data, f)
         log.info(f"[SUCCESS] Config migrated successfully to {raw_default}.")
         return True
-    except Exception as e:
+    except (OSError, YAMLError) as e:
         log.error(f"[FAIL] Error writing migrated config: {e}")
         return False
 
@@ -320,7 +320,7 @@ def load_yaml_with_debug(path, yaml_obj, label):
 
         log.error(f"[FAIL] Details: {e}")
         return None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # best-effort config load; caller falls back to defaults
         log.error(f"[FAIL] Unexpected error while loading {label}: {path}")
         log.error(f"[FAIL] Details: {e}")
         return None
@@ -423,7 +423,7 @@ def run_update():
                             ):
                                 expected_hash = candidate
                                 break
-                except Exception as exc:
+                except requests.exceptions.RequestException as exc:
                     log.debug("Could not fetch checksum asset: %s", exc)
                 break
         if not expected_hash:
@@ -492,7 +492,7 @@ def run_update():
     signal_file = BASE_DIR / "update_signal.tmp"
     try:
         signal_file.write_text("kill")
-    except Exception as e:
+    except OSError as e:
         log.warning(f"Could not write signal file: {e}")
 
     # Also set API-based kill signal
@@ -502,7 +502,7 @@ def run_update():
             json={"signal": "kill"},
             timeout=5,
         )
-    except Exception:
+    except requests.exceptions.RequestException:
         pass  # fallback to file-based signaling
 
     # Wait for start script to consume the signal (file deleted) or timeout
@@ -517,7 +517,7 @@ def run_update():
             )
             if resp.status_code == 200 and resp.json().get("signal") is None:
                 break  # acknowledged via API
-        except Exception:
+        except requests.exceptions.RequestException:
             pass
         time.sleep(1)
 
@@ -568,7 +568,7 @@ def run_update():
                     try:
                         os.chmod(fpath, 0o755)
                         log.info(f"[PERM] Set executable: {fpath}")
-                    except Exception as e:
+                    except OSError as e:
                         log.info(f"[PERM] Failed to set executable for {fpath}: {e}")
 
     save_versions(zip_v["tool"], zip_v["updater"])
@@ -580,7 +580,7 @@ def run_update():
     try:
         if (BASE_DIR / "update_signal.tmp").exists():
             (BASE_DIR / "update_signal.tmp").unlink()
-    except Exception as e:
+    except OSError as e:
         log.warning(f"Could not remove signal file: {e}")
 
     # Also clear API signal
@@ -589,7 +589,7 @@ def run_update():
             f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
             timeout=5,
         )
-    except Exception:
+    except requests.exceptions.RequestException:
         pass  # API server may already be gone
 
     log.info("\nUpdate complete.")
@@ -605,7 +605,7 @@ if __name__ == "__main__":
         run_update()
     except KeyboardInterrupt:
         log.info("Update interrupted by user.")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # top-level boundary: report via crash manager and exit
         crash_mgr.report_exception(UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"})
         handle_unhandled_exception("update")
         sys.exit(1)

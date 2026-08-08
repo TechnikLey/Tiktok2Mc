@@ -12,6 +12,7 @@ from core.plugin_config import (
     validate_plugin_config,
 )
 from core.api.models import ConfigResponse
+from ruamel.yaml.error import YAMLError
 
 router = APIRouter(tags=["Plugin Config"])
 
@@ -37,7 +38,7 @@ async def get_plugin_config(name: str):
     try:
         cfg = load_plugin_config(plugin_dir)
         return {"name": name, "config": cfg}
-    except Exception as e:
+    except (OSError, ValueError, YAMLError) as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -62,7 +63,7 @@ async def update_plugin_config(name: str, body: dict[str, Any]):
     try:
         save_plugin_config(plugin_dir, body, backup=backup)
         return {"name": name, "config": body}
-    except Exception as e:
+    except (OSError, ValueError, YAMLError) as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -107,5 +108,5 @@ async def get_plugin_schema(name: str):
                         break
 
         return {"name": name, "schema": schema}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))

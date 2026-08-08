@@ -23,6 +23,7 @@ from typing import Any
 from core.theme import load_plugin_theme, theme_css
 from core.yaml_utils import load_yaml
 from core.paths import get_config_file
+from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -155,7 +156,7 @@ class OverlayConfig:
         cfg_path = get_config_file()
         try:
             global_cfg = load_yaml(cfg_path) if cfg_path.exists() else {}
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             log.warning("Failed to load global config for overlay: %s", exc)
             global_cfg = {}
 
@@ -317,7 +318,7 @@ class OverlayManager:
             )
             client.mark_success()
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # dispatch must never throw to trigger engine
             log.error("[OVERLAY] Dispatch to %s failed: %s", client.name, exc)
             client.mark_failure()
         return False

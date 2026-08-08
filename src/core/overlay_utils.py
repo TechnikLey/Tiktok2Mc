@@ -1,10 +1,13 @@
 import time
 import threading
 import json
+import urllib.error
 import urllib.request
 import logging
 from pathlib import Path
 from typing import Any
+
+from ruamel.yaml.error import YAMLError
 
 from core.yaml_utils import load_yaml
 from core.paths import get_config_file
@@ -24,7 +27,7 @@ def _load_overlay_config() -> dict[str, Any]:
     cfg_path = get_config_file()
     try:
         global_cfg = load_yaml(cfg_path) if cfg_path.exists() else {}
-    except Exception as exc:
+    except (OSError, ValueError, YAMLError) as exc:
         log.warning("Failed to load global config for overlay: %s", exc)
         global_cfg = {}
     return global_cfg.get("overlay", {})
@@ -133,7 +136,7 @@ class OverlayManager:
             else:
                 log.error("[OVERLAY] Command to %s failed: HTTP %s", client.name, e.code)
             client.mark_failure()
-        except Exception as e:
+        except (urllib.error.URLError, OSError, TypeError) as e:
             log.error("[OVERLAY] Command to %s failed: %s", client.name, e)
             client.mark_failure()
         return False

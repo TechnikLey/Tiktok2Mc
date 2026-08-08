@@ -55,7 +55,7 @@ class PluginHealthMonitor:
                 self._check_health()
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception:  # noqa: BLE001  # health monitor loop must never die
                 log.exception("Health monitor check failed")
 
     def _check_health(self) -> None:

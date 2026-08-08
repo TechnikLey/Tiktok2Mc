@@ -317,7 +317,7 @@ class ActionsService:
         try:
             from core.hook_api import HOOK_ACTIONS
             return set(HOOK_ACTIONS.keys())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # script validation must not fail because hooks are unavailable
             log.warning(f"Failed to get registered scripts: {e}")
             return set()
 

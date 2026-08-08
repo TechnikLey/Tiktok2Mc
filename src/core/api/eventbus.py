@@ -79,7 +79,7 @@ class EventBus:
                 log.warning("Event queue full, dropping %s event", event_type)
                 try:
                     get_health_monitor().record_error("eventbus", f"{CORE_0006.code}: Queue full, dropping {event_type}")
-                except Exception:
+                except Exception:  # noqa: BLE001, S110  # best-effort health reporting
                     pass
 
 

@@ -150,7 +150,7 @@ class HealthMonitor:
         for listener in self._state_listeners:
             try:
                 listener(component, old_state, new_state)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # one broken listener must not break health updates
                 log.warning("[HEALTH] State listener failed for '%s': %s", component, exc)
         return True
 

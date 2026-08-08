@@ -4,6 +4,8 @@ import sys
 import logging
 from typing import Any
 
+from ruamel.yaml.error import YAMLError
+
 from core.yaml_utils import load_yaml
 
 log = logging.getLogger(__name__)
@@ -75,7 +77,7 @@ def load_config(config: str | Path) -> dict:
         raise
     except ValueError as e:
         raise ValueError(f"YAML error in {path}: {e}")
-    except Exception as e:
+    except (OSError, YAMLError) as e:
         raise RuntimeError(f"Error loading {path}: {e}")
 
     return data

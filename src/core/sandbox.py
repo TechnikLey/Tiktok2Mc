@@ -103,7 +103,7 @@ class PluginSandbox:
                 proc.pid,
                 self.max_memory_mb or 512,
             )
-        except Exception as exc:
+        except (OSError, TypeError, AttributeError) as exc:
             log.debug("Failed to apply Windows job object: %s", exc)
 
     # -----------------------------------------------------------------
@@ -135,7 +135,7 @@ class PluginSandbox:
             )
         try:
             os.nice(10)
-        except Exception:
+        except (OSError, AttributeError):  # best-effort priority lowering (os.nice absent on Windows)
             pass
 
     # -----------------------------------------------------------------

@@ -19,6 +19,7 @@ from core.hook_registry import get_hook_registry, HookRegistration
 from core.plugin_config import load_plugin_config, save_plugin_config
 from core.crash_manager import get_crash_manager
 from core.error_codes import HOOK_0001, HOOK_0002, HOOK_0003, HOOK_0004, HOOK_0005, HOOK_0007
+from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +116,7 @@ def _discover_hook_dirs() -> list[dict]:
                     try:
                         with hook_json.open("r", encoding="utf-8") as f:
                             json.load(f)
-                    except Exception as exc:
+                    except (json.JSONDecodeError, OSError) as exc:
                         error = str(exc)
                 if not error:
                     error = "hook.json is missing or invalid"
@@ -191,7 +192,7 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
             manifest_path.write_text(json.dumps(fake_manifest), encoding="utf-8")
             cfg = load_plugin_config(hook_dir, apply_defaults=True)
             return cfg
-        except Exception as exc:
+        except (TypeError, OSError, ValueError, YAMLError) as exc:
             log.warning("[HOOK] Failed to load config for '%s': %s", manifest.name, exc)
         finally:
             if manifest_path.exists():
@@ -202,7 +203,7 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
         from core.yaml_utils import load_yaml
         try:
             return load_yaml(config_path) or {}
-        except Exception as exc:
+        except (OSError, ValueError, YAMLError) as exc:
             log.warning("[HOOK] Failed to load config.yaml for '%s': %s", manifest.name, exc)
     return {}
 
@@ -257,7 +258,7 @@ def _load_single_hook(
         log.warning("[HOOK] Syntax error in %s: %s", manifest.name, e)
         get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
         return False
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # hook module code runs here — must never crash the loader
         log.warning("[HOOK] Failed to load %s: %s", manifest.name, e)
         get_crash_manager().report_exception(HOOK_0004, exc=e, context_info={"hook": manifest.name})
         return False
@@ -267,7 +268,7 @@ def _load_single_hook(
             module.register(api)
             log.info("[HOOK] Loaded: %s v%s", manifest.name, manifest.version)
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # hook code runs here — must never crash the loader
             log.warning("[HOOK] register() failed in %s: %s", manifest.name, e)
             get_crash_manager().report_exception(HOOK_0005, exc=e, context_info={"hook": manifest.name})
             return False
@@ -314,7 +315,7 @@ def load_event_hooks(
                             try:
                                 with hook_json.open("r", encoding="utf-8") as f:
                                     json.load(f)
-                            except Exception as exc:
+                            except (json.JSONDecodeError, OSError) as exc:
                                 error = str(exc)
                         if not error:
                             error = "hook.json is missing or invalid"

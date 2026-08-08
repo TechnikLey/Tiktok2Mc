@@ -51,7 +51,7 @@ def _write_plugin_signal(plugin_name: str, action: str) -> bool:
     try:
         signal_file.write_text(plugin_name, encoding="utf-8")
         return True
-    except Exception as exc:
+    except OSError as exc:
         log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
         return False
 
@@ -64,7 +64,7 @@ def _clean_plugin_signals(plugin_name: str) -> None:
         try:
             if p.exists():
                 p.unlink()
-        except Exception as exc:
+        except OSError as exc:
             log.warning("Failed to clean signal %s: %s", p, exc)
 
 
@@ -114,7 +114,7 @@ async def register_plugin(body: PluginRegisterRequest):
         raise
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to register plugin")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -143,7 +143,7 @@ async def list_plugins():
                         try:
                             with manifest_path.open("r", encoding="utf-8") as fh:
                                 json.load(fh)
-                        except Exception as exc:
+                        except (json.JSONDecodeError, OSError) as exc:
                             plugin.error = str(exc)
 
         # Scan filesystem for unregistered plugins (broken manifests)
@@ -165,7 +165,7 @@ async def list_plugins():
                     with manifest_file.open("r", encoding="utf-8") as fh:
                         raw = json.load(fh)
                     name = raw.get("name", child.name)
-                except Exception as exc:
+                except (json.JSONDecodeError, OSError) as exc:
                     error = str(exc)
                 if any(p.name == name for p in plugins):
                     continue
@@ -183,7 +183,7 @@ async def list_plugins():
         return PluginListResponse(
             total=len(plugins), enabled=enabled, plugins=plugins
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to list plugins")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -208,7 +208,7 @@ async def check_plugin_updates():
             total=len(results),
             updates_available=updates_available,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to check plugin updates")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -257,7 +257,7 @@ async def install_plugin_updates():
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to install plugin updates")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -278,7 +278,7 @@ async def discover_plugins():
     try:
         plugins_dir = str(core.paths.get_root_dir() / "src" / "plugins")
         discovered = discover_plugins_from_manifests(plugins_dir)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to discover plugins")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -286,7 +286,7 @@ async def discover_plugins():
     try:
         registry = get_registry()
         registry_plugins = {p.name: p for p in registry.list()}
-    except Exception:
+    except Exception:  # noqa: BLE001  # discovery still returns manifests if registry is unavailable
         registry_plugins = {}
 
     for entry in discovered:
@@ -347,7 +347,7 @@ async def enable_plugin(name: str):
         return result
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to enable plugin '%s': %s", name, e)
         raise HTTPException(status_code=500, detail=f"Failed to enable plugin '{name}': {e}")
 
@@ -383,7 +383,7 @@ async def disable_plugin(name: str):
         return result
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to disable plugin '%s': %s", name, e)
         raise HTTPException(status_code=500, detail=f"Failed to disable plugin '{name}': {e}")
 
@@ -402,7 +402,7 @@ async def get_plugin(name: str):
         return plugin
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get plugin")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -449,7 +449,7 @@ async def update_plugin(name: str, body: PluginUpdateRequest):
         return result
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to update plugin")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -474,7 +474,7 @@ async def restart_plugin(name: str):
         return {"status": "restart_requested", "name": name}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to restart plugin '%s'", name)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -499,7 +499,7 @@ async def unregister_plugin(name: str):
         return {"status": "unregistered", "name": name}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to unregister plugin")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -524,7 +524,7 @@ async def set_comment_handler(name: str, body: CommentHandler):
         return {"status": "updated", "plugin": name, "handler": body.model_dump()}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to set comment handler")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -547,7 +547,7 @@ async def remove_comment_handler(name: str):
         return {"status": "removed", "plugin": name}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to remove comment handler")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -563,7 +563,7 @@ async def list_comment_handlers():
             if ch and ch.enabled:
                 handlers[ch.prefix] = plugin.name
         return {"handlers": handlers}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to list comment handlers")
         raise HTTPException(status_code=500, detail=str(e))
 

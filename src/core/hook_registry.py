@@ -218,9 +218,9 @@ class HookRegistry:
                 try:
                     hook = HookRegistration.from_dict(item)
                     self._hooks[hook.name] = hook
-                except Exception as exc:
+                except (ValueError, TypeError) as exc:
                     log.warning("Skipping invalid hook registry entry: %s", exc)
-        except Exception as exc:
+        except (json.JSONDecodeError, OSError) as exc:
             log.warning("Failed to load hook registry: %s", exc)
 
     def _save(self) -> None:
@@ -232,14 +232,14 @@ class HookRegistry:
                     get_backup_manager().create_backup(
                         self._file, category="hook_registry"
                     )
-                except Exception as exc:
+                except OSError as exc:
                     log.warning("Failed to create hook registry backup: %s", exc)
 
             with tmp.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
                 fh.flush()
             tmp.replace(self._file)
-        except Exception as exc:
+        except (OSError, TypeError) as exc:
             log.error("Failed to save hook registry: %s", exc)
 
 

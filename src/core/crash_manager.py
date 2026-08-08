@@ -321,7 +321,7 @@ class CrashManager:
         def _wrapped() -> None:
             try:
                 target()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001  # supervision must capture any exception from wrapped target
                 self.report_exception(
                     error_code=CORE_0002,
                     exc=exc,
@@ -339,7 +339,7 @@ class CrashManager:
             return await coro
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # supervision must capture any exception from wrapped coroutine
             self.report_exception(
                 error_code=CORE_0001,
                 exc=exc,

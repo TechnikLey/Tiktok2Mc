@@ -64,7 +64,7 @@ def _discover_hooks_at_startup() -> None:
             )
         else:
             log.info("[HOOK] Auto-discovered %d hook(s) at startup", len(discovered))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # hook discovery must never block API startup
         log.warning("[HOOK] Auto-discovery at startup failed: %s", exc)
 
 
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
             port=rcon_cfg.get("port", 25575),
             password=rcon_cfg.get("password", ""),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001  # RCON is optional; console auto-configures on first request
         log.warning("Could not read RCON config — console will auto-configure on first request")
 
     await event_bus.publish("server.started", {"version": API_VERSION})
@@ -173,7 +173,7 @@ def create_app(
                 try:
                     await send({"type": "http.response.start", "status": 499, "headers": []})
                     await send({"type": "http.response.body", "body": b""})
-                except Exception:
+                except Exception:  # noqa: BLE001, S110  # client already gone; nothing more to do
                     pass
 
     app.add_middleware(CancelledErrorMiddleware)

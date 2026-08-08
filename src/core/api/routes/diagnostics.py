@@ -29,7 +29,7 @@ async def get_diagnostics():
     try:
         report = generate_diagnostics_report(_crash_manager)
         return report
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to generate diagnostics report")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -41,7 +41,7 @@ async def get_diagnostics_markdown():
         md = generate_diagnostics_markdown(_crash_manager)
         from fastapi.responses import PlainTextResponse
         return PlainTextResponse(md, media_type="text/markdown")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to generate diagnostics markdown")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -52,7 +52,7 @@ async def get_health_summary():
     try:
         health = get_health_monitor()
         return health.summary()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get health summary")
         raise HTTPException(status_code=500, detail=str(e))
 

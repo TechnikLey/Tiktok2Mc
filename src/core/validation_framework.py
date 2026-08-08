@@ -158,7 +158,7 @@ async def run_with_timeout(coro, timeout: float, label: str = "operation") -> Ti
         )
         return TimeoutResult(success=False, timed_out=True, elapsed=elapsed,
                              error=f"Timed out after {elapsed:.1f}s (limit {timeout:.1f}s)")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # framework purpose: capture any failure from wrapped op
         elapsed = time.time() - start
         return TimeoutResult(success=False, elapsed=elapsed, error=str(exc))
 
@@ -172,7 +172,7 @@ def run_with_timeout_sync(func, timeout: float, label: str = "operation") -> Tim
     def _target():
         try:
             result_container.append(func())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  # framework purpose: capture any failure from wrapped op
             error_container[0] = e
 
     t = threading.Thread(target=_target, daemon=True)
@@ -231,7 +231,7 @@ def validate_directory(path: Path, name: str, create: bool = False) -> Validatio
                 passed=True,
                 message=f"Created {path}",
             )
-        except Exception as exc:
+        except OSError as exc:
             return ValidationResult(
                 name=f"Directory '{name}' exists",
                 passed=False,
