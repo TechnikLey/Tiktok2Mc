@@ -224,10 +224,7 @@ async def server_instance_start(instance_id: str):
             )
 
         port = inst_data.get("port", 25565)
-        try:
-            cmd = _build_server_cmd(instance_dir, port)
-        except HTTPException:
-            raise
+        cmd = _build_server_cmd(instance_dir, port)
 
         try:
             proc = supervisor.register(

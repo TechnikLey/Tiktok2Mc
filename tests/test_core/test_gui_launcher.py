@@ -25,7 +25,7 @@ sys.modules["core.logger"].install_global_exception_hook = MagicMock()
 sys.modules["core.logger"].start_heartbeat = MagicMock(return_value=MagicMock())
 sys.modules["core.logger"].handle_unhandled_exception = MagicMock()
 
-from python.gui import (
+from python.gui import (  # noqa: E402
     LauncherAPI,
     _api_ready,
 )

@@ -322,7 +322,7 @@ try:
     health.set_state("mc_server", HealthState.RUNNING)
     proc = subprocess.run(
         [str(JAVA_EXE), f"-Xms{Xms}", f"-Xmx{Xmx}", "-jar", str(SERVER_JAR), "nogui"],
-        cwd=str(INSTANCE_DIR),
+        cwd=str(INSTANCE_DIR), check=False,
     )
     if proc.returncode != 0:
         log.warning("Minecraft server exited with code %s", proc.returncode)

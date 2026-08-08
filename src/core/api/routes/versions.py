@@ -37,7 +37,7 @@ def _is_supported_version(version: str) -> bool:
 
 def _flatten_versions(nested: dict) -> list[str]:
     result = []
-    for group, versions in nested.items():
+    for versions in nested.values():
         if isinstance(versions, list):
             result.extend(versions)
     return result

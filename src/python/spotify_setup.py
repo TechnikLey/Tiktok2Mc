@@ -25,15 +25,15 @@ _src = Path(__file__).resolve().parent.parent
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from core.logger import (
+from core.logger import (  # noqa: E402
     handle_unhandled_exception,
     initialize_logging,
     install_global_exception_hook,
 )
-from core.paths import get_root_dir
-from core.secure_storage import secure_storage
-from core.utils import load_config
-from core.yaml_utils import save_yaml
+from core.paths import get_root_dir  # noqa: E402
+from core.secure_storage import secure_storage  # noqa: E402
+from core.utils import load_config  # noqa: E402
+from core.yaml_utils import save_yaml  # noqa: E402
 
 log = initialize_logging(__name__)
 

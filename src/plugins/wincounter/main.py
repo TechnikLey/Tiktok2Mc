@@ -48,8 +48,7 @@ class WinManager:
 
     def remove(self, amount=1):
         self.wins -= amount
-        if self.wins < self.record_low:
-            self.record_low = self.wins
+        self.record_low = min(self.record_low, self.wins)
         self.save()
 
     def get_data(self):

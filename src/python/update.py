@@ -147,7 +147,8 @@ CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
 # Helper functions
 # =========================
 def extract_version(text):
-    if not text: return "0.0.0"
+    if not text:
+        return "0.0.0"
     m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", str(text))
     return m.group(1) if m else "0.0.0"
 
@@ -160,8 +161,10 @@ def get_versions(path):
             for line in f:
                 if ":" in line:
                     k, val = map(str.strip, line.split(":", 1))
-                    if "toolversion" in k.lower(): v["tool"] = extract_version(val)
-                    elif "updaterversion" in k.lower(): v["updater"] = extract_version(val)
+                    if "toolversion" in k.lower():
+                        v["tool"] = extract_version(val)
+                    elif "updaterversion" in k.lower():
+                        v["updater"] = extract_version(val)
     else:
         log.error(f"Version file not found: {path}")
         wait_for_key()
@@ -283,7 +286,7 @@ def _inject_values_strictly(template, user_source, path=""):
         return
     # 2. ITERATE: Only if user_source is guaranteed to be a dict
     for key in template:
-        current_path = f"{path}.{key}" if path else key 
+        current_path = f"{path}.{key}" if path else key
         # Check if user actually has this key
         if key in user_source:
             user_value = user_source[key]
@@ -386,7 +389,8 @@ def run_update():
                 choice = input(f"[!] Beta version {online_tag} available. Install? (y/N): ").lower()
             except EOFError:
                 choice = "n"
-            if choice != 'y': sys.exit(5)
+            if choice != 'y':
+                sys.exit(5)
 
         # Download & extract
         log.info("[>>] Downloading package...")
@@ -401,7 +405,8 @@ def run_update():
             log.error("[FAIL] No matching release asset found for this platform.")
             sys.exit(5)
 
-        if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
         archive_path = TEMP_DIR / archive_name
         download_with_progress(asset["url"], archive_path)
@@ -469,7 +474,7 @@ def run_update():
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
         log.info(f"[UPDATE] New updater found ({zip_v['updater']}).")
         new_up_src = extracted_root_path / "core" / f"update{SUFFIX}"
-        
+
         if new_up_src.exists():
             new_up_dest = BASE_DIR / f"update_new{SUFFIX}"
             shutil.copy2(new_up_src, new_up_dest)
@@ -542,22 +547,28 @@ def run_update():
             rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
         ) and not any(
             f.startswith(rel_path_str + "/") for f in WHITELIST_DIR_FILES
-        ): continue
+        ):
+            continue
 
         for file in files:
-            if rel_path_str == "." and file not in WHITELIST_FILES: continue
+            if rel_path_str == "." and file not in WHITELIST_FILES:
+                continue
             # For subdirectories not covered by WHITELIST_DIRS, only copy whitelisted files
             if rel_path_str != ".":
                 dir_whitelisted = any(
                     rel_path_str == d or rel_path_str.startswith(d + "/") for d in WHITELIST_DIRS
                 )
-                if not dir_whitelisted and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES: continue
-            if file.lower() == f"update{SUFFIX}".lower(): continue
-            if file.lower() == "config.yaml": continue
-            
+                if not dir_whitelisted and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES:
+                    continue
+            if file.lower() == f"update{SUFFIX}".lower():
+                continue
+            if file.lower() == "config.yaml":
+                continue
+
             src = root / file
             dst = BASE_DIR / rel_path / file
-            if rel_path_str.split("/")[0] == "server" and dst.exists(): continue
+            if rel_path_str.split("/")[0] == "server" and dst.exists():
+                continue
 
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
@@ -576,9 +587,10 @@ def run_update():
                         log.info(f"[PERM] Failed to set executable for {fpath}: {e}")
 
     save_versions(zip_v["tool"], zip_v["updater"])
-    if TEMP_DIR.exists(): shutil.rmtree(TEMP_DIR, ignore_errors=True)
+    if TEMP_DIR.exists():
+        shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
-    if CONFIG_UPDATE_ENABLE: 
+    if CONFIG_UPDATE_ENABLE:
         migrate_config_if_needed()
 
     try:

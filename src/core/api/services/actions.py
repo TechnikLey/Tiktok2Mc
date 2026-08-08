@@ -323,7 +323,7 @@ class ActionsService:
 
     def validate_triggers(self, triggers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Validate trigger configuration and return diagnostics.
-        
+
         Checks:
         - Script commands must reference registered scripts only
         - Overlay actions must not have invalid data
@@ -353,7 +353,7 @@ class ActionsService:
         for ti, trigger in enumerate(triggers):
             for ci, cmd in enumerate(trigger.get("commands", [])):
                 cmd_type = cmd.get("type", "vanilla")
-                
+
                 # Validate script commands
                 if cmd_type == "script":
                     script_name = cmd.get("command", "").strip()
@@ -371,7 +371,7 @@ class ActionsService:
                             "severity": "WARNING",
                             "code": "UNREGISTERED_SCRIPT"
                         })
-                
+
                 # Validate overlay actions
                 elif cmd_type in ("overlay", "named_overlay"):
                     title = cmd.get("title", "").strip()

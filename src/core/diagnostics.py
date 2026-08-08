@@ -215,5 +215,5 @@ def generate_diagnostics_markdown(crash_manager: Any | None = None, extra: dict[
 
 
 def _timestamp_iso() -> str:
-    from datetime import datetime
-    return datetime.now().isoformat()
+    from datetime import UTC, datetime
+    return datetime.now(tz=UTC).isoformat()

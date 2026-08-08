@@ -14,12 +14,12 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "Severity",
-    "Diagnostic",
-    "print_diagnostics",
-    "validate_text",
-    "validate_file",
     "COMMAND_PREFIX_CHARS",
+    "Diagnostic",
+    "Severity",
+    "print_diagnostics",
+    "validate_file",
+    "validate_text",
 ]
 
 
@@ -178,8 +178,7 @@ def validate_text(text: str) -> list[Diagnostic]:
 
         # Determine where the code part starts in the raw line.
         base_offset = raw_line.find(line_no_comment)
-        if base_offset < 0:
-            base_offset = 0
+        base_offset = max(base_offset, 0)
 
         # ------------------------------------------------------------------
         # A. Missing colon

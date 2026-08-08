@@ -486,8 +486,7 @@ def generate_datapack():
                         else:
                             base_cmd = body.replace("{user}", "@a")
                             times = 1
-                        if times < 1:
-                            times = 1
+                        times = max(times, 1)
 
                         overlay_body = body[:multi_match.start()] if multi_match else body
                         if kind == "overlay":
@@ -530,7 +529,7 @@ def generate_datapack():
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
 
     except Exception as e:  # datapack build errors are logged; bridge keeps running
-        log.exception("Datapack build failed: %s", e)
+        log.exception("Datapack build failed")
 
 # ================================
 # RCON WORKER
@@ -557,8 +556,8 @@ async def rcon_worker():
 
             q_size = ctx.rcon_queue.qsize()
             wait_time = ctx.throttle_time
-            inner_pause = 0.01 
-            
+            inner_pause = 0.01
+
             # Dynamic throttling based on queue depth
             if q_size > 100:
                 wait_time, inner_pause = 0.01, 0.001
@@ -572,7 +571,7 @@ async def rcon_worker():
                     now = time.time()
                     if now - ctx.last_rcon_attempt < 5:
                         raise ConnectionError("Reconnect cooldown active")
-                    
+
                     ctx.last_rcon_attempt = now
                     try:
                         ctx.rcon_connection = await asyncio.wait_for(
@@ -619,7 +618,7 @@ async def rcon_worker():
 async def execute_global_command(trigger_name: str, source_user: str | dict, chain_depth: int = 0):
     """Resolves a trigger name into RCON commands and enqueues them."""
     name = sanitize_filename(trigger_name)
-    
+
     if name not in ctx.valid_functions:
         return
 
@@ -642,7 +641,7 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
                     log.warning(f"[HOOK] Error in action '{action}': {e}")
                     get_crash_manager().report_exception(HOOK_0006, exc=e, context_info={"action": action, "trigger": trigger_name})
             elif action:
-                log.warning(f"[HOOK] Unknown script action: '{action}'") 
+                log.warning(f"[HOOK] Unknown script action: '{action}'")
 
     # --- 0. OVERLAY TEXT ---
 
@@ -687,7 +686,7 @@ async def execute_global_command(trigger_name: str, source_user: str | dict, cha
         except asyncio.QueueFull:
             log.info(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
     ctx.main_loop.call_soon_threadsafe(_enqueue)
-    if ctx.rcon_queue.qsize() < 10: 
+    if ctx.rcon_queue.qsize() < 10:
         log.info(f"[ACTION] Trigger: {name} | Commands: {len(commands_to_send)} (for {source_user}) enqueued.")
 
 # ================================
@@ -714,7 +713,7 @@ async def trigger_worker():
         except Exception as e_outer:  # worker loop must never die
             log.info(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             get_crash_manager().report_exception(TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"})
-            await asyncio.sleep(0.1)  
+            await asyncio.sleep(0.1)
 
 
 
@@ -1516,7 +1515,7 @@ def update_daily_revenue():
     value recorded at the start of that day.
     """
     file_path = BASE_DIR.parent / "data" / "revenue_log.jsonl"
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    today = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
 
     with ctx.gift_lock:
         if ctx.gift_current_log_date != today:
@@ -1680,7 +1679,7 @@ async def run_bot():
     ctx.main_loop = asyncio.get_running_loop()
     health = get_health_monitor()
     health.set_state("tiktok_bridge", HealthState.RUNNING)
-    
+
     if not load_config():
         log.info("Error in load_config")
         health.set_state("tiktok_bridge", HealthState.FAILED)

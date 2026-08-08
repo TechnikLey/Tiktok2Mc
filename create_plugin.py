@@ -23,7 +23,7 @@ _src = Path(__file__).resolve().parent / "src"
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from core.version import TOOL_VERSION as VERSION
+from core.version import TOOL_VERSION as VERSION  # noqa: E402
 
 PLUGINS_DIR = Path("src/plugins")
 

@@ -20,7 +20,7 @@ _src = str(Path(__file__).resolve().parent.parent / "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.mca_spec import export_spec
+from core.mca_spec import export_spec  # noqa: E402
 
 
 def main() -> None:

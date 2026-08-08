@@ -19,19 +19,19 @@ _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from ruamel.yaml.error import YAMLError
+from ruamel.yaml.error import YAMLError  # noqa: E402
 
-from core.api.server import DEFAULT_PORT
-from core.crash_manager import get_crash_manager
-from core.health_monitor import HealthState, get_health_monitor
-from core.logger import (
+from core.api.server import DEFAULT_PORT  # noqa: E402
+from core.crash_manager import get_crash_manager  # noqa: E402
+from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
+from core.logger import (  # noqa: E402
     handle_unhandled_exception,
     initialize_logging,
     install_global_exception_hook,
     start_heartbeat,
 )
-from core.paths import get_base_dir
-from core.yaml_utils import load_yaml
+from core.paths import get_base_dir  # noqa: E402
+from core.yaml_utils import load_yaml  # noqa: E402
 
 log = initialize_logging(__name__)
 

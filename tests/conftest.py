@@ -31,7 +31,7 @@ for _mod in _heavy:
 if "mcrcon" in sys.modules:
     sys.modules["mcrcon"].MCRconException = type("MCRconException", (Exception,), {})
 
-from core.yaml_utils import save_yaml
+from core.yaml_utils import save_yaml  # noqa: E402
 
 MINIMAL_CONFIG = {
     "config_version": "1.0",
@@ -67,7 +67,7 @@ logger = logging.getLogger("test_isolation")
 # Write guard
 # ---------------------------------------------------------------------------
 
-from tests.guard import WriteGuard
+from tests.guard import WriteGuard  # noqa: E402
 
 _WRITE_GUARD = WriteGuard(
     allowed_roots={

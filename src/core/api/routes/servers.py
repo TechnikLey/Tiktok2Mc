@@ -30,7 +30,7 @@ _MIN_SUPPORTED_MINOR = 13
 
 def _flatten_versions(nested: dict) -> list[str]:
     result = []
-    for group, versions in nested.items():
+    for versions in nested.values():
         if isinstance(versions, list):
             result.extend(versions)
     return result
@@ -597,10 +597,14 @@ async def open_instance_folder(instance_id: str):
             os.startfile(str(target_path))
             opened = True
         elif system == "Darwin":
-            subprocess.Popen(["open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            await asyncio.to_thread(
+                subprocess.Popen, ["open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
             opened = True
         else:
-            subprocess.Popen(["xdg-open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            await asyncio.to_thread(
+                subprocess.Popen, ["xdg-open", str(target_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
             opened = True
     except OSError as e:
         log.warning("Failed to open folder %s: %s", target_path, e)

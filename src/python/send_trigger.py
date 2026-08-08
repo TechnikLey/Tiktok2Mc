@@ -35,7 +35,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("send_trigger")
 
-from core.trigger_engine import EngineConfig, TriggerEngine
+from core.trigger_engine import EngineConfig, TriggerEngine  # noqa: E402
 
 
 def _build_parser() -> argparse.ArgumentParser:

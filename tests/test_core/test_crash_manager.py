@@ -308,7 +308,7 @@ class TestCrashManagerInstallation:
         crash_mgr.install_asyncio(loop)
         captured = []
 
-        def fake_original(l, ctx):
+        def fake_original(_loop, ctx):
             captured.append(ctx)
 
         loop.set_exception_handler(fake_original)
@@ -321,7 +321,7 @@ class TestCrashManagerInstallation:
         crash_mgr.install_asyncio(loop)
         captured = []
 
-        def fake_original(l, ctx):
+        def fake_original(_loop, ctx):
             captured.append(ctx)
 
         loop.set_exception_handler(fake_original)

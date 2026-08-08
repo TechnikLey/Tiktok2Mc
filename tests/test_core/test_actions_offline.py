@@ -14,7 +14,7 @@ _src = Path(__file__).resolve().parent.parent.parent / "src"
 if str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
-from core.api.services.actions import ActionsService
+from core.api.services.actions import ActionsService  # noqa: E402
 
 
 class TestActionsServiceOffline:

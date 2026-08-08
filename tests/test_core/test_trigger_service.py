@@ -43,13 +43,13 @@ class TestTriggerService:
     def test_debounce_allows_after_delay(self):
         svc = TriggerService()
         svc._last_execution = time.time() - 10
-        ok, msg = svc.can_execute()
+        ok, _msg = svc.can_execute()
         assert ok is True
 
     def test_debounce_message_on_block(self):
         svc = TriggerService()
         svc._last_execution = time.time()
-        ok, msg = svc.can_execute()
+        _ok, msg = svc.can_execute()
         assert "wait" in msg.lower()
         assert "s before" in msg.lower()
 

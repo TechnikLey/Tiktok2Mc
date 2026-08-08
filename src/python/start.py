@@ -36,7 +36,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,28 +51,28 @@ except Exception as _exc:  # pragma: no cover  # pre-import is best-effort
     _pre_log = _logging.getLogger("start.preimport")
     _pre_log.warning("Failed to pre-import uvicorn/core.api: %s", _exc)
 
-from core.api.eventbus import event_bus
-from core.api.launcher import PluginLauncher
-from core.api.models import API_VERSION
-from core.api.server import DEFAULT_PORT
-from core.crash_manager import CrashManager
-from core.diagnostics import generate_diagnostics_report
-from core.error_codes import CORE_0001, LIFECYCLE_0001
-from core.health_monitor import HealthState, get_health_monitor
-from core.lifecycle import (
+from core.api.eventbus import event_bus  # noqa: E402
+from core.api.launcher import PluginLauncher  # noqa: E402
+from core.api.models import API_VERSION  # noqa: E402
+from core.api.server import DEFAULT_PORT  # noqa: E402
+from core.crash_manager import CrashManager  # noqa: E402
+from core.diagnostics import generate_diagnostics_report  # noqa: E402
+from core.error_codes import CORE_0001, LIFECYCLE_0001  # noqa: E402
+from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
+from core.lifecycle import (  # noqa: E402
     ProcessState,
     SupervisorState,
     get_supervisor,
     shutdown_cancel_event,
 )
-from core.logger import (
+from core.logger import (  # noqa: E402
     initialize_logging,
     install_global_exception_hook,
     start_heartbeat,
 )
-from core.models import AppConfig
-from core.paths import get_base_dir, get_root_dir
-from core.port_scanner import (
+from core.models import AppConfig  # noqa: E402
+from core.paths import get_base_dir, get_root_dir  # noqa: E402
+from core.port_scanner import (  # noqa: E402
     PortPolicy,
     build_resolved_map,
     persist_to_config,
@@ -80,9 +80,9 @@ from core.port_scanner import (
     scan_bind_ports,
     write_runtime_file,
 )
-from core.sandbox import PluginSandbox
-from core.utils import load_config
-from core.validation_framework import (
+from core.sandbox import PluginSandbox  # noqa: E402
+from core.utils import load_config  # noqa: E402
+from core.validation_framework import (  # noqa: E402
     run_startup_validation,
     validate_runtime,
     validate_shutdown,
@@ -223,7 +223,7 @@ if not IS_WINDOWS:
             if choice == "1":
                 if tmux_cmd:
                     log.info("\n=> %s", tmux_cmd)
-                    ret = subprocess.run(shlex.split(tmux_cmd)).returncode
+                    ret = subprocess.run(shlex.split(tmux_cmd), check=False).returncode
                     if ret == 0:
                         TMUX_PATH = shutil.which("tmux")
                         if TMUX_PATH:
@@ -244,7 +244,7 @@ if not IS_WINDOWS:
             elif choice == "2":
                 if screen_cmd:
                     log.info("\n=> %s", screen_cmd)
-                    ret = subprocess.run(shlex.split(screen_cmd)).returncode
+                    ret = subprocess.run(shlex.split(screen_cmd), check=False).returncode
                     if ret == 0:
                         SCREEN_PATH = shutil.which("screen")
                         if SCREEN_PATH:
@@ -323,7 +323,7 @@ def start_UPDATE_EXE_PATH():
     else:
         log.info("Starting updater. This may take a few minutes. Please do not close or interrupt the program...")
         log_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M")
         log_file = log_dir / f"updater_{timestamp}.log"
         with open(log_file, "a", encoding="utf-8") as lf:
             proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, start_new_session=True)
@@ -649,19 +649,16 @@ async def _fetch_plugin_path(plugin_name: str) -> str:
 async def _mark_plugin_dead(plugin_name: str) -> None:
     """Update the plugin registry to mark a plugin as dead/non-enabled."""
     def _put():
-        try:
-            encoded = urllib.parse.quote(plugin_name, safe="")
-            data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
-            req = urllib.request.Request(
-                f"{_API_BASE_URL}/plugins/{encoded}",
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="PUT",
-            )
-            with urllib.request.urlopen(req, timeout=5):
-                pass
-        except Exception:  # re-raise; surfaced to the health-loop caller
-            raise
+        encoded = urllib.parse.quote(plugin_name, safe="")
+        data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{_API_BASE_URL}/plugins/{encoded}",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="PUT",
+        )
+        with urllib.request.urlopen(req, timeout=5):
+            pass
 
     await asyncio.to_thread(_put)
 
@@ -679,7 +676,7 @@ async def _restart_server_process() -> None:
         await supervisor.start("Minecraft Server")
         log.info("Minecraft Server restarted")
     except Exception as exc:  # background restart failures are only logged
-        log.exception("Failed to restart Minecraft Server: %s", exc)
+        log.exception("Failed to restart Minecraft Server")
 
 
 async def check_and_run() -> None:

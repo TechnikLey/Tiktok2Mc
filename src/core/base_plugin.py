@@ -225,7 +225,7 @@ class BasePlugin:
                     try:
                         handler(args)
                     except Exception as e:  # handler is user code — must never kill the polling loop
-                        log.exception("[%s] Handler '%s' failed: %s", self.PLUGIN_NAME, cmd, e)
+                        log.exception("[%s] Handler '%s' failed", self.PLUGIN_NAME, cmd)
                         if self._health:
                             self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"handler '{cmd}' failed: {e}")
                 else:
@@ -248,7 +248,7 @@ class BasePlugin:
             try:
                 self.on_tick()
             except Exception as e:  # on_tick is user code — must never kill the tick loop
-                log.exception("[%s] Tick failed: %s", self.PLUGIN_NAME, e)
+                log.exception("[%s] Tick failed", self.PLUGIN_NAME)
                 if self._health:
                     self._health.record_error(f"plugin.{self.PLUGIN_NAME}", f"on_tick failed: {e}")
             heartbeat_counter += 1
@@ -309,7 +309,7 @@ class BasePlugin:
         html = self.get_overlay_html()
         self.register_overlay(html)
 
-        tick_thread, poll_thread = self._start_threads()
+        tick_thread, _poll_thread = self._start_threads()
 
         if not self.gui_hidden:
             try:

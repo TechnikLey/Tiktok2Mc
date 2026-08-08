@@ -106,11 +106,10 @@ class PluginRegistry:
                 return None
             changed = False
             for key, value in updates.items():
-                if value is _UNSET:
-                    if hasattr(plugin, key):
-                        if getattr(plugin, key) is not None:
-                            setattr(plugin, key, None)
-                            changed = True
+                if value is _UNSET and hasattr(plugin, key):
+                    if getattr(plugin, key) is not None:
+                        setattr(plugin, key, None)
+                        changed = True
                     continue
                 if value is not None and hasattr(plugin, key):
                     old = getattr(plugin, key)
@@ -167,11 +166,7 @@ class PluginRegistry:
         except PermissionError:
             if sys.platform != "win32" or not dst.exists():
                 raise
-        try:
-            dst.unlink()
-        except PermissionError:
-            # Another process still holds the file open; give up cleanly.
-            raise
+        dst.unlink()
         src.replace(dst)
 
 

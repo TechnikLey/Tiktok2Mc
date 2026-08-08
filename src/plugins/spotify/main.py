@@ -143,10 +143,7 @@ class SpotifyClient:
     def _ensure_token(self):
         if not self.access_token:
             return False
-        if time.time() >= self.expires_at - 60:
-            if not self.refresh_access_token():
-                return False
-        return True
+        return time.time() < self.expires_at - 60 or self.refresh_access_token()
 
     def _headers(self):
         return {"Authorization": f"Bearer {self.access_token}"}

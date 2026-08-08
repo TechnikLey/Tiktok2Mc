@@ -60,14 +60,13 @@ def _check_imports(path: Path) -> list[str]:
                 top = full_name.split(".")[0]
                 if top not in ALLOWED_IMPORTS:
                     disallowed.append(full_name)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                full_module = node.module
-                if full_module in ALLOWED_HOOK_MODULES:
-                    continue
-                top = full_module.split(".")[0]
-                if top not in ALLOWED_IMPORTS:
-                    disallowed.append(full_module)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            full_module = node.module
+            if full_module in ALLOWED_HOOK_MODULES:
+                continue
+            top = full_module.split(".")[0]
+            if top not in ALLOWED_IMPORTS:
+                disallowed.append(full_module)
     return disallowed
 
 
@@ -342,24 +341,23 @@ def load_event_hooks(
                                 "_error": error,
                             })
                         continue
-                    if m:
+                    if m and not any(h["name"] == m.name for h in discovered):
                         # Already caught by discover_hooks_dirs, but ensure we don't
                         # double-count
-                        if not any(h["name"] == m.name for h in discovered):
-                            version = read_hook_version(child)
-                            discovered.append({
-                                "name": m.name,
-                                "version": version,
-                                "display_name": m.display_name,
-                                "description": m.description,
-                                "author": m.author,
-                                "capabilities": m.capabilities,
-                                "plugin": "",
-                                "update_url": m.update_url,
-                                "source": str(child.resolve()),
-                                "source_type": "main",
-                                "_manifest": m,
-                            })
+                        version = read_hook_version(child)
+                        discovered.append({
+                            "name": m.name,
+                            "version": version,
+                            "display_name": m.display_name,
+                            "description": m.description,
+                            "author": m.author,
+                            "capabilities": m.capabilities,
+                            "plugin": "",
+                            "update_url": m.update_url,
+                            "source": str(child.resolve()),
+                            "source_type": "main",
+                            "_manifest": m,
+                        })
 
     # Sync registry: add new hooks, update versions
     hook_infos = []

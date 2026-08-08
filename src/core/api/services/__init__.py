@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -24,7 +24,7 @@ class ApiService:
     """
 
     def __init__(self) -> None:
-        self._start_time: datetime = datetime.now()
+        self._start_time: datetime = datetime.now(tz=UTC)
 
         # Config path with fallback:
         # 1. Standard location (used in builds):   root/config/config.yaml
@@ -40,7 +40,7 @@ class ApiService:
     # ------------------------------------------------------------------
 
     def get_uptime(self) -> float:
-        return (datetime.now() - self._start_time).total_seconds()
+        return (datetime.now(tz=UTC) - self._start_time).total_seconds()
 
     # ------------------------------------------------------------------
     # Config

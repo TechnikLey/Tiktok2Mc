@@ -11,6 +11,7 @@ Covers the full update flow that the compiled update.exe performs:
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -168,7 +169,7 @@ class TestMigrateConfigIfNeeded:
             assert data["server_host"] == "127.0.0.1"
 
     def test_returns_false_when_default_missing(self, tmp_path):
-        with self._import_migrate(tmp_path) as (migrate, default_config, user_config):
+        with self._import_migrate(tmp_path) as (migrate, _default_config, _user_config):
             result = migrate()
             assert result is False
 
@@ -192,16 +193,16 @@ class TestMigrateConfigIfNeeded:
 class TestUpdateWhitelist:
     """Tests the whitelist path filtering used during file copy."""
 
-    WHITELIST_DIRS = {
+    WHITELIST_DIRS: ClassVar[set[str]] = {
         "core", "scripts", "config",
         "plugins/deathcounter",
         "plugins/timer", "plugins/wincounter", "plugins/spotify",
     }
-    WHITELIST_DIR_FILES = {
+    WHITELIST_DIR_FILES: ClassVar[set[str]] = {
         "hooks/random/main.py",
         "hooks/example_hook/main.py",
     }
-    WHITELIST_FILES = {
+    WHITELIST_FILES: ClassVar[set[str]] = {
         "version.txt", "README.md", "LICENSE",
         "start.exe",
     }
@@ -326,7 +327,8 @@ class TestExtractVersion:
     def test_standard_semver(self):
         import re
         def extract_version(text):
-            if not text: return "0.0.0"
+            if not text:
+                return "0.0.0"
             m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", str(text))
             return m.group(1) if m else "0.0.0"
 
@@ -394,9 +396,11 @@ class TestRunUpdateOrchestration:
 
     def test_up_to_date_skips_update(self, tmp_path):
         """When local version >= remote version, should exit with code 5."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, temp_dir):
-            with patch("python.update.requests.get") as mock_get, \
-                 patch("python.update.sys.exit", side_effect=SystemExit) as mock_exit:
+        with (
+            self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir),
+            patch("python.update.requests.get") as mock_get,
+            patch("python.update.sys.exit", side_effect=SystemExit) as mock_exit,
+        ):
                 mock_response = MagicMock()
                 mock_response.status_code = 200
                 mock_response.json.return_value = {
@@ -411,7 +415,7 @@ class TestRunUpdateOrchestration:
 
     def test_new_version_downloads_and_installs(self, tmp_path):
         """Simulate a complete update: download -> extract -> copy."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, temp_dir):
+        with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
             def fake_populate(path):
                 (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
                 (path / "README.md").write_text("new readme")
@@ -450,7 +454,7 @@ class TestRunUpdateOrchestration:
 
     def test_kill_signal_written_before_copy(self, tmp_path):
         """The updater writes update_signal.tmp BEFORE copying files."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, temp_dir):
+        with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
             def fake_populate(path):
                 (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
 
@@ -487,7 +491,7 @@ class TestRunUpdateOrchestration:
 
     def test_dual_signaling_file_and_api(self, tmp_path):
         """Update writes both file-based and API-based kill signals."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, temp_dir):
+        with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
             def fake_populate(path):
                 (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
 
@@ -523,7 +527,7 @@ class TestRunUpdateOrchestration:
 
     def test_signal_wait_polling_loop(self, tmp_path):
         """After sending kill signal, updater polls until signal is consumed or timeout."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, temp_dir):
+        with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
             def fake_populate(path):
                 (path / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n")
 
@@ -558,7 +562,7 @@ class TestRunUpdateOrchestration:
     def test_updater_self_update_triggers_resume(self, tmp_path):
         """When a new updater version is detected, the old updater should
         copy the new updater and exit (to be resumed via --resume)."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, temp_dir):
+        with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
             def fake_populate(path):
                 (path / "version.txt").write_text(
                     "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"

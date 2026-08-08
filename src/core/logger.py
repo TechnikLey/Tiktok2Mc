@@ -32,9 +32,9 @@ import time
 import traceback
 from collections import deque
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 # Optional psutil for memory diagnostics
 try:
@@ -92,7 +92,7 @@ _circular_handler: _CircularBufferHandler | None = None
 class CrashReporter:
     """Generates structured JSON crash reports and tracks recurrence."""
 
-    _history: dict[str, dict[str, Any]] = {}
+    _history: ClassVar[dict[str, dict[str, Any]]] = {}
     _history_lock = threading.Lock()
 
     def __init__(self, module_name: str, log_dir: Path) -> None:
@@ -117,7 +117,7 @@ class CrashReporter:
         return None
 
     def _generate_filename(self) -> Path:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S_%f")
         return self.crash_dir / f"crash_{timestamp}_{self.module_name}.json"
 
     def _track_recurrence(self, signature: str) -> bool:
@@ -160,7 +160,7 @@ class CrashReporter:
         stack = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
         payload: dict[str, Any] = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(tz=UTC).isoformat(),
             "module": self.module_name,
             "python_version": sys.version,
             "platform": platform.platform(),

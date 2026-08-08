@@ -116,9 +116,10 @@ class TestRestart:
         supervisor._api_base_url = ""
         supervisor.state = SupervisorState.RUNNING
 
-        with patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop:
-            with patch.object(supervisor, "start_all", new=AsyncMock()) as mock_start:
-                await supervisor.restart()
+        with patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop, patch.object(
+            supervisor, "start_all", new=AsyncMock()
+        ) as mock_start:
+            await supervisor.restart()
 
         mock_stop.assert_awaited_once_with(
             keep_shell=True, graceful_timeout=5.0, force_timeout=5.0
@@ -137,9 +138,10 @@ class TestShutdownFromCountdown:
     @pytest.mark.asyncio
     async def test_shutdown_allowed_from_countdown(self, supervisor):
         supervisor.state = SupervisorState.COUNTDOWN
-        with patch.object(supervisor, "stop_all", new=AsyncMock()):
-            with patch.object(supervisor, "stop_api_server", new=AsyncMock()):
-                await supervisor.shutdown()
+        with patch.object(supervisor, "stop_all", new=AsyncMock()) as mock_stop, patch.object(
+            supervisor, "stop_api_server", new=AsyncMock()
+        ) as mock_api:
+            await supervisor.shutdown()
         assert supervisor.state == SupervisorState.COMPLETE
 
 

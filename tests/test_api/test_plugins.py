@@ -1,8 +1,10 @@
+from typing import ClassVar
+
 import pytest
 
 
 class TestPluginEndpoints:
-    PLUGIN = {
+    PLUGIN: ClassVar[dict] = {
         "name": "test-plugin",
         "path": "/tmp/test-plugin.exe",
         "version": "1.0.0",

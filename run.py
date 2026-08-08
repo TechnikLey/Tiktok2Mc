@@ -23,10 +23,10 @@ _src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-import uvicorn
+import uvicorn  # noqa: E402
 
-from core.api import create_app
-from core.api.server import DEFAULT_PORT
+from core.api import create_app  # noqa: E402
+from core.api.server import DEFAULT_PORT  # noqa: E402
 
 log = logging.getLogger(__name__)
 

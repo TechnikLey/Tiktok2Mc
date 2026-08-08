@@ -87,6 +87,7 @@ def java_major_version(java_path: Path) -> int | None:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         output = result.stderr or result.stdout
         # Lines look like: openjdk version "17.0.8"  or  java version "1.8.0_xxx"
@@ -110,6 +111,7 @@ def java_version_string(java_path: Path) -> str:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         output = (result.stderr or result.stdout).strip()
         match = re.search(r'version "([^"]+)"', output)
@@ -298,9 +300,9 @@ def ensure_java(
         return status
 
     if platform.system() == "Windows":
-        ok, message = install_java_windows(root_dir)
+        _ok, message = install_java_windows(root_dir)
     elif platform.system() == "Linux":
-        ok, message = install_java_linux()
+        _ok, message = install_java_linux()
     else:
         return status
 
@@ -318,9 +320,8 @@ def ensure_java(
 
 def _download_file(url: str, dest: Path, timeout: int = 120) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        with dest.open("wb") as out:
-            shutil.copyfileobj(resp, out, length=1024 * 256)
+    with urllib.request.urlopen(req, timeout=timeout) as resp, dest.open("wb") as out:
+        shutil.copyfileobj(resp, out, length=1024 * 256)
 
 
 def install_java_windows(root_dir: Path) -> tuple[bool, str]:
@@ -348,8 +349,8 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
         zip_path.unlink(missing_ok=True)
         return (
             False,
-            f"Could not download Java automatically (network error): {exc}. "
-            "Check your internet connection and try again.",
+            (f"Could not download Java automatically (network error): {exc}. "
+            "Check your internet connection and try again."),
         )
 
     try:
@@ -407,14 +408,14 @@ def install_java_linux() -> tuple[bool, str]:
     else:
         return (
             False,
-            f"Automatic installation is not possible (no pkexec/sudo). "
-            f"Run the following in a terminal:\n  {INSTALL_HINTS[pm]}",
+            (f"Automatic installation is not possible (no pkexec/sudo). "
+            f"Run the following in a terminal:\n  {INSTALL_HINTS[pm]}"),
         )
 
     cmd = prefix + install_args + [pkg]
     log.info("Installing Java via %s: %s", how, " ".join(cmd))
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
     except subprocess.TimeoutExpired:
         return False, f"Java installation timed out. Run manually: {INSTALL_HINTS[pm]}"
     except FileNotFoundError:
@@ -426,8 +427,8 @@ def install_java_linux() -> tuple[bool, str]:
         stderr = (result.stderr or result.stdout or "").strip()[:400]
         return (
             False,
-            f"Java installation failed ({pm} exit {result.returncode}). "
-            f"{stderr}\nRun the following in a terminal:\n  {INSTALL_HINTS[pm]}",
+            (f"Java installation failed ({pm} exit {result.returncode}). "
+            f"{stderr}\nRun the following in a terminal:\n  {INSTALL_HINTS[pm]}"),
         )
 
     java_path = _system_java_path()
@@ -437,6 +438,6 @@ def install_java_linux() -> tuple[bool, str]:
 
     return (
         False,
-        f"Package manager reported success but Java is still not usable. "
-        f"Run manually: {INSTALL_HINTS[pm]}",
+        (f"Package manager reported success but Java is still not usable. "
+        f"Run manually: {INSTALL_HINTS[pm]}"),
     )

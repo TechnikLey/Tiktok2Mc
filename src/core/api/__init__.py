@@ -6,13 +6,13 @@ from .server import create_app
 from .services import ApiService
 
 __all__ = [
-    "create_app",
     "ApiService",
     "EventBus",
-    "event_bus",
-    "PluginRegistry",
-    "get_registry",
     "PluginAPIClient",
-    "register_plugin",
     "PluginLauncher",
+    "PluginRegistry",
+    "create_app",
+    "event_bus",
+    "get_registry",
+    "register_plugin",
 ]

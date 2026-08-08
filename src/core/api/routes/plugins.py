@@ -44,7 +44,7 @@ def _runtime_dir() -> Path:
 
 def _write_plugin_signal(plugin_name: str, action: str) -> bool:
     """Write a signal file that start.py watches for plugin lifecycle events.
-    
+
     Returns ``True`` if the signal was written successfully.
     """
     signal_file = _runtime_dir() / f"plugin_{action}_{plugin_name}"
@@ -348,7 +348,7 @@ async def enable_plugin(name: str):
     except HTTPException:
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
-        log.exception("Failed to enable plugin '%s': %s", name, e)
+        log.exception("Failed to enable plugin '%s'", name)
         raise HTTPException(status_code=500, detail=f"Failed to enable plugin '{name}': {e}")
 
 
@@ -384,7 +384,7 @@ async def disable_plugin(name: str):
     except HTTPException:
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
-        log.exception("Failed to disable plugin '%s': %s", name, e)
+        log.exception("Failed to disable plugin '%s'", name)
         raise HTTPException(status_code=500, detail=f"Failed to disable plugin '{name}': {e}")
 
 

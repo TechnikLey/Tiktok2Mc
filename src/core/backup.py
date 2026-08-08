@@ -1,14 +1,14 @@
 """Centralized backup manager — single source of truth for all backups.
- 
+
  All backups are stored under ``data/backups/``, organized by category::
- 
+
      data/backups/
      ├── config/                 # Main config.yaml backups
      ├── plugin_registry/        # api_plugin_registry.json backups
      ├── migration/              # Pre-migration safety snapshots
      └── plugins/
          └── <plugin_name>/      # Per-plugin config.yaml backups
- 
+
  Features
  --------
  * **Content deduplication** — SHA-256 hash comparison skips identical backups.
@@ -18,14 +18,14 @@
  * **Timestamp-based naming** — lexicographically sortable, human-readable
    filenames (``config.v20260529_143021_123456.yaml.bak``).
  """
- 
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import shutil
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def _read_hash(path: Path) -> str:
 
 def _timestamp_tag() -> str:
     """Return a sortable, human-readable timestamp tag."""
-    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    return datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S_%f")
 
 
 class BackupManager:

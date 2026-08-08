@@ -281,11 +281,14 @@ class PluginUpdateChecker:
             target_asset = None
             for asset in assets:
                 aname = asset.get("name", "")
-                if "plugin" in aname.lower() and aname.endswith(".zip"):
+                if (
+                    "plugin" in aname.lower()
+                    and aname.endswith(".zip")
+                    and name.lower() in aname.lower()
+                ):
                     # Prefer asset that contains the plugin name
-                    if name.lower() in aname.lower():
-                        target_asset = asset
-                        break
+                    target_asset = asset
+                    break
             if not target_asset and assets:
                 # Fallback: first zip asset
                 target_asset = next(

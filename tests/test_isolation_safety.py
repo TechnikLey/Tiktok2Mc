@@ -39,9 +39,8 @@ class TestWriteGuardIsActive:
 
     def test_guard_blocks_open_for_write(self):
         blocked = Path(__file__).resolve().parent.parent / "src" / "guard_test_open.txt"
-        with pytest.raises(PermissionError, match="TEST GUARD"):
-            with open(blocked, "w") as fh:
-                fh.write("must fail")
+        with pytest.raises(PermissionError, match="TEST GUARD"), open(blocked, "w") as fh:
+            fh.write("must fail")
 
     def test_guard_blocks_os_makedirs(self):
         import os

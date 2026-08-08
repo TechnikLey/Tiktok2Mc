@@ -515,12 +515,12 @@ class ProcessSupervisor:
                 proc.state = ProcessState.STOPPED
                 _update_process_health(name, ProcessState.STOPPED)
             else:
-                log.exception("[SUPERVISOR] Failed to start %s: %s", name, exc)
+                log.exception("[SUPERVISOR] Failed to start %s", name)
                 proc.state = ProcessState.FAILED
                 _update_process_health(name, ProcessState.FAILED)
             return False
-        except Exception as exc:  # any unexpected start error marks the process FAILED
-            log.exception("[SUPERVISOR] Failed to start %s: %s", name, exc)
+        except Exception:  # any unexpected start error marks the process FAILED
+            log.exception("[SUPERVISOR] Failed to start %s", name)
             proc.state = ProcessState.FAILED
             _update_process_health(name, ProcessState.FAILED)
             return False
@@ -545,7 +545,7 @@ class ProcessSupervisor:
             }
             flags = subprocess.CREATE_NO_WINDOW if proc.hidden else subprocess.CREATE_NEW_CONSOLE
             kwargs["creationflags"] = flags
-            proc.proc = subprocess.Popen(cmd, **kwargs)
+            proc.proc = await asyncio.to_thread(subprocess.Popen, cmd, **kwargs)
         elif self._session_tool == "tmux":
             session_name = _sanitize_session_name(f"mc-{proc.name}")
             await asyncio.to_thread(
@@ -554,7 +554,8 @@ class ProcessSupervisor:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            subprocess.Popen(
+            await asyncio.to_thread(
+                subprocess.Popen,
                 ["tmux", "new-session", "-d", "-s", session_name]
                 + _build_display_env_tmux()
                 + cmd,
@@ -572,7 +573,8 @@ class ProcessSupervisor:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            subprocess.Popen(
+            await asyncio.to_thread(
+                subprocess.Popen,
                 ["screen", "-dmS", session_name]
                 + _build_display_env_screen()
                 + cmd,
@@ -587,8 +589,11 @@ class ProcessSupervisor:
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"{_sanitize_session_name(proc.name)}.log"
             kwargs = {"cwd": cwd, "env": env, "stdin": subprocess.DEVNULL}
-            with open(log_file, "w", encoding="utf-8") as lf:
-                proc.proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, **kwargs)
+            def _spawn_with_log() -> subprocess.Popen | None:
+                with open(log_file, "w", encoding="utf-8") as lf:
+                    return subprocess.Popen(cmd, stdout=lf, stderr=lf, **kwargs)
+
+            proc.proc = await asyncio.to_thread(_spawn_with_log)
 
         if proc.proc and proc.post_spawn:
             try:
@@ -663,9 +668,8 @@ class ProcessSupervisor:
             return False
 
         with self._lock:
-            if proc.state in (ProcessState.STOPPED, ProcessState.STOPPING, ProcessState.FAILED):
-                if proc.state == ProcessState.STOPPED:
-                    return True
+            if proc.state == ProcessState.STOPPED:
+                return True
             proc.state = ProcessState.STOPPING
         _update_process_health(name, ProcessState.STOPPING)
 
@@ -678,7 +682,7 @@ class ProcessSupervisor:
             log.info("[SUPERVISOR] %s stopped", name)
             return True
         except Exception as exc:  # any unexpected stop error marks the process FAILED
-            log.exception("[SUPERVISOR] Failed to stop %s: %s", name, exc)
+            log.exception("[SUPERVISOR] Failed to stop %s", name)
             proc.state = ProcessState.FAILED
             _update_process_health(name, ProcessState.FAILED)
             return False
@@ -923,12 +927,13 @@ class ProcessSupervisor:
         await self.start_all()
 
         # Confirm the API server is still reachable.
-        if self._api_base_url:
-            if not await _wait_for_api_ready(self._api_base_url, timeout=15.0):
-                log.warning(
-                    "[SUPERVISOR] API server was not reachable after restart; "
-                    "children are running but the dashboard may need a manual reload."
-                )
+        if self._api_base_url and not await _wait_for_api_ready(
+            self._api_base_url, timeout=15.0
+        ):
+            log.warning(
+                "[SUPERVISOR] API server was not reachable after restart; "
+                "children are running but the dashboard may need a manual reload."
+            )
 
         # Notify listeners (including the GUI via SSE) that the backend is back.
         try:

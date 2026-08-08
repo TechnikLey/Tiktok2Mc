@@ -100,7 +100,7 @@ _src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.version import TOOL_VERSION, UPDATER_VERSION
+from core.version import TOOL_VERSION, UPDATER_VERSION  # noqa: E402
 
 # ── MCA spec sources and paths
 MCA_SPEC_SOURCES = [
@@ -135,7 +135,7 @@ def _sha256_file(filepath: Path) -> str:
 
 def _generate_mca_spec(force: bool = False) -> bool:
     """Generate MCA language spec JSON from Python sources.
-    
+
     Returns True if the spec was generated (or was already current).
     Raises RuntimeError on failure.
     """
@@ -161,7 +161,7 @@ def _generate_mca_spec(force: bool = False) -> bool:
     cprint("Generating MCA language specification...", Color.CYAN)
     result = subprocess.run(
         [sys.executable, str(script)],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True, text=True, timeout=30, check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -182,7 +182,7 @@ def _generate_mca_spec(force: bool = False) -> bool:
 
 def _validate_mca_spec() -> None:
     """Validate that the generated mca-spec.json is correct.
-    
+
     Raises RuntimeError if validation fails.
     """
     spec_path = Path(__file__).resolve().parent / MCA_SPEC_OUTPUT
@@ -214,7 +214,7 @@ def _validate_mca_spec() -> None:
 
 def _run_python_tests() -> None:
     """Run the full Python test suite via pytest.
-    
+
     Raises RuntimeError if any test fails.
     """
     try:
@@ -255,7 +255,7 @@ def _run_python_tests() -> None:
 
 def _run_mca_tests() -> None:
     """Run the MCA language server test suite.
-    
+
     Raises RuntimeError if any test fails.
     """
     if not shutil.which("node"):
@@ -274,7 +274,7 @@ def _run_mca_tests() -> None:
     cprint("Running MCA language server tests...", Color.CYAN)
     result = subprocess.run(
         ["node", str(test_runner)],
-        capture_output=True, text=True, timeout=60,
+        capture_output=True, text=True, timeout=60, check=False,
     )
     # Print test output regardless of pass/fail
     for line in result.stdout.strip().split("\n"):
@@ -314,7 +314,7 @@ def _find_vsce() -> str:
 
 def _package_vsix(extension_dir: Path) -> Path:
     """Package the VSIX extension.
-    
+
     Returns the path to the generated .vsix file.
     Raises RuntimeError on failure.
     """
@@ -328,7 +328,7 @@ def _package_vsix(extension_dir: Path) -> Path:
     npm_result = subprocess.run(
         [npm_path, "install"],
         capture_output=True, text=True, timeout=120,
-        cwd=str(extension_dir),
+        cwd=str(extension_dir), check=False,
     )
     if npm_result.returncode != 0:
         raise RuntimeError(
@@ -341,7 +341,7 @@ def _package_vsix(extension_dir: Path) -> Path:
     result = subprocess.run(
         shlex.split(vsce_cmd, posix=(sys.platform != "win32")) + ["package", "--allow-missing-repository"],
         capture_output=True, text=True, timeout=120,
-        cwd=str(extension_dir),
+        cwd=str(extension_dir), check=False,
     )
     for line in result.stdout.strip().split("\n"):
         cprint(f"  {line}", Color.GRAY)
@@ -673,9 +673,11 @@ def cmd_app(args):
                 if isinstance(node, ast.Import):
                     if any(a.name == module or a.name.startswith(prefix) for a in node.names):
                         return True
-                elif isinstance(node, ast.ImportFrom) and node.module:
-                    if node.module == module or node.module.startswith(prefix):
-                        return True
+                elif (
+                    isinstance(node, ast.ImportFrom) and node.module
+                    and (node.module == module or node.module.startswith(prefix))
+                ):
+                    return True
             return False
 
         def _needs_qt(source: Path, deps: set[str]) -> bool:
@@ -935,10 +937,10 @@ def cmd_app(args):
 
             # Normal build: check cache first
             need_build = True
-            if (hash_file.exists() and dep_hash_file.exists() and cache_exe.exists()):
-                if (hash_file.read_text().strip() == current_hash and
-                    dep_hash_file.read_text().strip() == combined_hash):
-                    need_build = False
+            if (hash_file.exists() and dep_hash_file.exists() and cache_exe.exists()
+                    and hash_file.read_text().strip() == current_hash
+                    and dep_hash_file.read_text().strip() == combined_hash):
+                need_build = False
 
             target_dir = OUT_DIR if not item["dest"] else OUT_DIR / item["dest"]
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -1052,9 +1054,8 @@ def cmd_app(args):
                     qt_tasks.append(task)
                 else:
                     plain_tasks.append(task)
-            if qt_tasks:
-                if not _build_linux_qt_bundle(qt_tasks):
-                    raise RuntimeError("Linux shared PyQt6 runtime build failed.")
+            if qt_tasks and not _build_linux_qt_bundle(qt_tasks):
+                raise RuntimeError("Linux shared PyQt6 runtime build failed.")
         else:
             plain_tasks = list(all_build_tasks)
 
@@ -1406,7 +1407,7 @@ def _run_dep_check():
     cprint("Running dependency check + install...", Color.CYAN)
     result = subprocess.run(
         [sys.executable, str(check_script), "--install"],
-        timeout=300,
+        timeout=300, check=False,
     )
     if result.returncode != 0:
         cprint("\nBuild aborted: missing dependencies.", Color.RED)

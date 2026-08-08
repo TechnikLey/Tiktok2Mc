@@ -9,22 +9,30 @@
 # ── Enforced rules ─────────────────────────────────────────────────────
 #   F                pyflakes (unused imports, redefinitions, undefined names)
 #   I001             import sorting
-#   ISC001           implicit string concatenation
+#   ISC001/004       implicit string concatenation
 #   UP006/7/8/9/17/24/29/31/34/35/37/41/45   type & annotation modernization
 #   PYI034           `__new__` returns `Self`
 #   RUF100           stale # noqa directives
-#   RUF010/15/19/23  explicit conversion flags, next(), key checks, slots order
-#   SIM103/114       return the condition directly, identical branches
+#   RUF010/12/15/19/22/23/59  explicit conversion flags, ClassVar, next(), key checks, slots order
+#   SIM102/103/114/117  nested-if, return the condition, identical branches
 #   C401/408/413     set/dict/list constructor simplification
 #   PIE790/FURB188/PLC0206   pass removal, removeprefix, iterate .items()
 #   TRY004/B008/B017/PLW1509  TypeError, Annotated defaults, no blind asserts
-#   E714             test for object identity uses `is not`
+#   TRY203/401       remove try/except around return, exception group notes
+#   E402/701/714     module-level import order, ternary, identity via `is not`
+#   E741             ambiguous variable names
+#   W291/292/293     trailing whitespace, blank-line whitespace
+#   PERF102/PLR1730  dict comprehension from list, unnecessary enumerate
+#   PLW0602          global statement without reassignment
+#   PLW1510          subprocess.run without explicit check=
+#   DTZ005/ASYNC220/230  timezone-aware datetime, blocking calls in async
 #   BLE001 / S110    broad-except and try-except-pass policy — enforced
 #                    via per-file-ignores below (error-boundary architecture)
 select = [
     "F",
     "I001",
     "ISC001",
+    "ISC004",
     "UP006",
     "UP007",
     "UP008",
@@ -41,11 +49,16 @@ select = [
     "PYI034",
     "RUF100",
     "RUF010",
+    "RUF012",
     "RUF015",
     "RUF019",
+    "RUF022",
     "RUF023",
+    "RUF059",
+    "SIM102",
     "SIM103",
     "SIM114",
+    "SIM117",
     "C401",
     "C408",
     "C413",
@@ -53,24 +66,31 @@ select = [
     "FURB188",
     "PLC0206",
     "TRY004",
+    "TRY203",
+    "TRY401",
     "B008",
     "B017",
     "PLW1509",
+    "PLW1510",
+    "PLR1730",
+    "PLW0602",
+    "E402",
+    "E701",
     "E714",
+    "E741",
+    "W291",
+    "W292",
+    "W293",
+    "PERF102",
+    "DTZ005",
+    "ASYNC220",
+    "ASYNC230",
     "BLE001",
     "S110",
 ]
 
 # ── Deferred rules (fix findings first, then add to `select`) ─────────
-#   ruff-specific:    RUF012, RUF022, RUF059
-#   style/code-smell: SIM102, SIM117, ISC004, PERF102, PLR1730, PLW0602
-#   datetime/asyncio: DTZ005, ASYNC220, ASYNC230  (real async refactors:
-#                     console tail-loop, log-file spawn — deferred)
-#   refactor:         TRY203, TRY401
-#   subprocess:       PLW1510  (subprocess.run without explicit check=)
-#   pycodestyle:      E501 (line length) is intentionally not enforced;
-#                     remaining E/W findings (E402, E701, E741, W29x) are
-#                     cleanup candidates for a later step.
+#   E501 (line length) is intentionally not enforced.
 
 # F841: unused local variables — kept off because several sites are
 # deliberate side-effect calls (overlay singleton init in overlay.py,

@@ -24,7 +24,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from core.validator import validate_text
+from core.validator import validate_text  # noqa: E402
 
 # ── Test case generators ────────────────────────────────────────────────
 
@@ -196,8 +196,8 @@ def generate_test_case(rng: random.Random) -> str:
             lines.append(generate_valid_line(rng))
 
     # Maybe add duplicate
-    if rng.random() < 0.3 and len([l for l in lines if ":" in l and not l.strip().startswith("#")]) >= 2:
-        valid_lines = [l for l in lines if ":" in l and not l.strip().startswith("#")]
+    if rng.random() < 0.3 and len([line for line in lines if ":" in line and not line.strip().startswith("#")]) >= 2:
+        valid_lines = [line for line in lines if ":" in line and not line.strip().startswith("#")]
         dup = rng.choice(valid_lines)
         dup_name = dup.split(":")[0].strip()
         lines.append(f"{dup_name}:/another_command")
@@ -242,7 +242,7 @@ def run_js_validator(text: str) -> list[dict[str, Any]]:
 
     result = subprocess.run(
         ["node", str(js_runner), escaped],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True, text=True, timeout=30, check=False,
         cwd=str(js_runner.parent),
     )
 
@@ -373,8 +373,8 @@ def main():
             total_cases += 1
             lines = text.split("\n")
             print(f"\n=== Mismatch #{total_mismatches} (case {idx}) ===")
-            for li, l in enumerate(lines):
-                print(f"  {li:3d}: {l}")
+            for li, line in enumerate(lines):
+                print(f"  {li:3d}: {line}")
             print(f"  Python: {len(py_diags)} diag(s), JS: {len(js_diags)} diag(s)")
             for m in mismatches:
                 print(m)

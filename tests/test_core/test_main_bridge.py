@@ -118,9 +118,8 @@ class TestDupCmdConfig:
         f.write_text(content)
         from src.python.main import _check_dup_cmd_config
         with patch("src.python.main.CONFIG_FILE", f), \
-             patch("builtins.input", return_value=""):
-            with pytest.raises(SystemExit):
-                _check_dup_cmd_config()
+             patch("builtins.input", return_value=""), pytest.raises(SystemExit):
+            _check_dup_cmd_config()
 
     def test_no_duplicates_ok(self, tmp_path: Path):
         content = (
@@ -224,7 +223,7 @@ class TestUpdateDailyRevenue:
         from src.python.main import ctx, update_daily_revenue
 
         log_file = tmp_path / "data" / "revenue_log.jsonl"
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
         monkeypatch.setattr(ctx, "gift_value_usd", 12.34)
         monkeypatch.setattr(ctx, "gift_day_start_value", 0)
         monkeypatch.setattr(ctx, "gift_current_log_date", today)
@@ -244,7 +243,7 @@ class TestUpdateDailyRevenue:
 
         log_file = tmp_path / "data" / "revenue_log.jsonl"
         log_file.parent.mkdir(parents=True, exist_ok=True)
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
         log_file.write_text(json.dumps({"date": today, "estimated_revenue_usd": 5.0}) + "\n", encoding="utf-8")
 
         monkeypatch.setattr(ctx, "gift_value_usd", 20.0)

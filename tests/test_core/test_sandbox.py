@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+from typing import ClassVar
 
 from core.sandbox import PluginSandbox
 
@@ -53,7 +54,7 @@ class TestPluginSandbox:
             RLIMIT_NOFILE = 2
             RLIMIT_NPROC = 3
             RLIM_INFINITY = -1
-            _calls = []
+            _calls: ClassVar[list] = []
 
             @staticmethod
             def setrlimit(resource, limits):

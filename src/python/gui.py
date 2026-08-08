@@ -21,16 +21,16 @@ _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.api.server import DEFAULT_PORT
-from core.crash_manager import get_crash_manager
-from core.health_monitor import HealthState, get_health_monitor
-from core.logger import (
+from core.api.server import DEFAULT_PORT  # noqa: E402
+from core.crash_manager import get_crash_manager  # noqa: E402
+from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
+from core.logger import (  # noqa: E402
     handle_unhandled_exception,
     initialize_logging,
     install_global_exception_hook,
     start_heartbeat,
 )
-from core.paths import get_base_dir, get_root_dir
+from core.paths import get_base_dir, get_root_dir  # noqa: E402
 
 log = initialize_logging(__name__)
 
@@ -105,7 +105,6 @@ class LauncherAPI:
 
     def close_app(self) -> str:
         """Destroy the GUI window immediately so the process exits."""
-        global _window
         if _window is not None:
             try:
                 _window.destroy()
@@ -131,7 +130,7 @@ class LauncherAPI:
     # ---- Server control ----
     def start_system(self) -> str:
         """Start the full system (start.exe)."""
-        global _full_system_proc, _api_proc
+        global _full_system_proc
         if _full_system_proc is not None:
             return "already_running"
 
@@ -208,7 +207,6 @@ class LauncherAPI:
 
 def _cleanup_processes():
     """Terminate any spawned processes on GUI exit."""
-    global _full_system_proc
     if _full_system_proc is None or _full_system_proc.poll() is not None:
         log.debug("Cleanup: no managed process to stop, skipping.")
         return

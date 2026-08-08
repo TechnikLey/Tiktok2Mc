@@ -1316,7 +1316,7 @@ HEARTBEAT_0002 = ErrorCode(
 _CODE_MAP: dict[str, ErrorCode] = {}
 
 def _build_map() -> None:
-    for _name, _obj in globals().items():
+    for _obj in globals().values():
         if isinstance(_obj, ErrorCode):
             _CODE_MAP[_obj.code] = _obj
 

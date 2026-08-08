@@ -62,10 +62,11 @@ class ConsoleCapture:
         # so rotation is detected by checking if the path still exists.
         inode = self._get_inode()
 
-        with open(self._log_path, "r", encoding="utf-8", errors="replace") as f:
-            f.seek(0, 2)  # start at end, only new lines
+        f = await asyncio.to_thread(open, self._log_path, "r", encoding="utf-8", errors="replace")
+        try:
+            await asyncio.to_thread(f.seek, 0, 2)  # start at end, only new lines
             while self._running:
-                line = f.readline()
+                line = await asyncio.to_thread(f.readline)
                 if line:
                     line = line.rstrip("\n\r")
                     if line:
@@ -79,6 +80,8 @@ class ConsoleCapture:
                         log.info("Log file rotated for '%s', reopening", self.instance_id)
                         break
                     await asyncio.sleep(0.1)
+        finally:
+            await asyncio.to_thread(f.close)
 
     def _get_inode(self) -> int:
         try:
