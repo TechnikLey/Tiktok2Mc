@@ -977,23 +977,14 @@ async def _runtime_validation_loop() -> None:
 def _log_diagnostics_report() -> None:
     """Generate and log a diagnostics report."""
     report = generate_diagnostics_report(crash_mgr)
+    if "error" in report:
+        log.warning("[DIAGNOSTICS] %s", report["error"])
+        return
     log.info(
-        "[DIAGNOSTICS] Health: %d/%d running, %d degraded, %d failed",
-        report["health"]["running"],
-        report["health"]["total_components"],
-        report["health"]["degraded"],
-        report["health"]["failed"],
+        "[DIAGNOSTICS] Crash count: %d, History size: %d",
+        report.get("crash_count", 0),
+        report.get("stats", {}).get("history_size", 0),
     )
-    if report["health"]["failed_components"]:
-        log.warning(
-            "[DIAGNOSTICS] Failed components: %s",
-            ", ".join(report["health"]["failed_components"]),
-        )
-    if report["health"]["degraded_components"]:
-        log.warning(
-            "[DIAGNOSTICS] Degraded components: %s",
-            ", ".join(report["health"]["degraded_components"]),
-        )
 
 
 # -----------------------------

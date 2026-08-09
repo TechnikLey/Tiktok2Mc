@@ -248,6 +248,39 @@ async def _wait_for_api_ready(
     return False
 
 
+async def _wait_for_sse_ready(
+    base_url: str,
+    timeout: float = 10.0,
+    interval: float = 0.5,
+) -> bool:
+    """Poll the SSE log stream endpoint to verify the event bus is operational.
+
+    This ensures the EventBus and log streaming are functional before
+    declaring the restart complete. Uses a lightweight HEAD request to
+    avoid establishing a full SSE connection.
+    """
+    deadline = time.time() + timeout
+    sse_url = base_url.rstrip("/") + "/logs/stream"
+
+    while time.time() < deadline:
+        if await asyncio.to_thread(_sse_ready_check, sse_url):
+            return True
+        await asyncio.sleep(interval)
+    log.warning("[SUPERVISOR] SSE endpoint not ready after %.1fs", timeout)
+    return False
+
+
+def _sse_ready_check(sse_url: str) -> bool:
+    """Synchronous SSE HEAD check helper for asyncio.to_thread."""
+    try:
+        req = urllib.request.Request(sse_url, method="HEAD")
+        req.add_header("Accept", "text/event-stream")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError):
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Supervisor
 # ---------------------------------------------------------------------------
@@ -960,14 +993,16 @@ class ProcessSupervisor:
         # Start backend children again.
         await self.start_all()
 
-        # Confirm the API server is still reachable.
-        if self._api_base_url and not await _wait_for_api_ready(
-            self._api_base_url, timeout=15.0
-        ):
-            log.warning(
-                "[SUPERVISOR] API server was not reachable after restart; "
-                "children are running but the dashboard may need a manual reload."
-            )
+        # Confirm the API server is fully operational (health + event bus + SSE).
+        if self._api_base_url:
+            if not await _wait_for_api_ready(self._api_base_url, timeout=15.0):
+                log.warning(
+                    "[SUPERVISOR] API server was not reachable after restart; "
+                    "children are running but the dashboard may need a manual reload."
+                )
+            else:
+                # Additional check: verify event bus / SSE endpoint responds
+                await _wait_for_sse_ready(self._api_base_url, timeout=10.0)
 
         # Notify listeners (including the GUI via SSE) that the backend is back.
         try:
