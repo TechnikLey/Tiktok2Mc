@@ -6573,4 +6573,7 @@ async function init() {
     _closePollIntervalId = setInterval(_pollCloseRequest, 200);
   }
 }
-init();
+function hideAppLoading() {
+  document.getElementById('app-loading')?.classList.add('app-loading--hidden');
+}
+init().finally(hideAppLoading);

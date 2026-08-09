@@ -351,6 +351,16 @@ describe('showWizard / hideWizard', () => {
   });
 });
 
+/* ─── hideAppLoading ─── */
+describe('hideAppLoading', () => {
+  it('hides the startup loading indicator', () => {
+    const loading = document.getElementById('app-loading');
+    loading.classList.remove('app-loading--hidden');
+    hideAppLoading();
+    expect(loading.classList.contains('app-loading--hidden')).toBe(true);
+  });
+});
+
 
 
 /* ─── updateRestartBanner ─── */
