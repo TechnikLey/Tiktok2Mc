@@ -4635,7 +4635,7 @@ class ReactionEditor {
     this.activeCategory = 'all';
 
     // Wizard state
-    this.wizardStep = 0; // 0=event, 1=plugin+command, 2=args+confirm
+    this.wizardStep = 0; // 0=event, 1=plugin, 2=command, 3=args+confirm
     this.wizardEditing = null; // null = creating, {event, idx} = editing
     this.wizardDraft = { event: '', plugin: '', command: '', args: {} };
 
@@ -4986,7 +4986,7 @@ class ReactionEditor {
     this.wizardStep = 0;
     this.wizardDraft = { event: t.event, plugin: t.plugin, command: t.command, args: JSON.parse(JSON.stringify(t.args || {})) };
     this._openWizard();
-    this.wizardStep = 2; // skip to confirmation since template is complete
+    this.wizardStep = 3; // skip to confirmation since template is complete
     this._renderWizard();
   }
 
@@ -5110,7 +5110,7 @@ class ReactionEditor {
     const nextBtn = document.getElementById('reaction-wizard-next');
 
     titleEl.textContent = this.wizardEditing ? 'Edit Reaction' : 'Create Reaction';
-    stepsEl.innerHTML = [0, 1, 2].map(i => {
+    stepsEl.innerHTML = [0, 1, 2, 3].map(i => {
       let cls = '';
       if (i === this.wizardStep) cls = 'active';
       else if (i < this.wizardStep) cls = 'done';
@@ -5119,12 +5119,14 @@ class ReactionEditor {
 
     backBtn.style.visibility = this.wizardStep === 0 ? 'hidden' : 'visible';
     backBtn.textContent = 'Back';
-    nextBtn.textContent = this.wizardStep === 2 ? (this.wizardEditing ? 'Save Changes' : 'Create Reaction') : 'Next';
+    nextBtn.textContent = this.wizardStep === 3 ? (this.wizardEditing ? 'Save Changes' : 'Create Reaction') : 'Next';
     nextBtn.disabled = false;
 
     if (this.wizardStep === 0) {
       bodyEl.innerHTML = this._renderStepEvent();
     } else if (this.wizardStep === 1) {
+      bodyEl.innerHTML = this._renderStepPlugin();
+    } else if (this.wizardStep === 2) {
       bodyEl.innerHTML = this._renderStepCommand();
     } else {
       bodyEl.innerHTML = this._renderStepConfirm();
@@ -5187,13 +5189,11 @@ class ReactionEditor {
     return html;
   }
 
-  _renderStepCommand() {
-    let html = `<h3>Step 2: Choose what happens</h3>
-    <p class="muted-desc">Select the plugin and the command that should run when <strong>${escapeHtml((this.eventCatalog[this.wizardDraft.event]?.name) || this.wizardDraft.event)}</strong> occurs.</p>`;
+  _renderStepPlugin() {
+    let html = `<h3>Step 2: Choose the plugin</h3>
+    <p class="muted-desc">Select the plugin that should run a command when <strong>${escapeHtml((this.eventCatalog[this.wizardDraft.event]?.name) || this.wizardDraft.event)}</strong> occurs.</p>`;
 
-    // Plugin selection
-    html += `<div style="margin-bottom:1rem;"><strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">1. Pick a Plugin</strong></div>`;
-    html += `<div class="plugin-grid" style="margin-bottom:1.5rem;">`;
+    html += `<div class="plugin-grid">`;
     for (const [key, info] of Object.entries(this.pluginCatalog)) {
       const selected = this.wizardDraft.plugin === key ? 'selected' : '';
       html += `<div class="plugin-option ${selected}" onclick="reactionEditor.selectPlugin('${escapeHtml(key)}')">
@@ -5204,22 +5204,28 @@ class ReactionEditor {
     }
     html += `</div>`;
 
-    // Command selection
-    if (this.wizardDraft.plugin) {
-      const commands = this.commandCatalog[this.wizardDraft.plugin] || {};
-      html += `<div style="margin-bottom:1rem;"><strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">2. Pick a Command</strong></div>`;
-      html += `<div class="command-grid">`;
-      for (const [key, info] of Object.entries(commands)) {
-        const selected = this.wizardDraft.command === key ? 'selected' : '';
-        html += `<div class="command-option ${selected}" onclick="reactionEditor.selectCommand('${escapeHtml(key)}')">
-          <h4>${escapeHtml(info.name)}</h4>
-          <p>${escapeHtml(info.desc)}</p>
-        </div>`;
-      }
-      html += `</div>`;
-    } else {
-      html += `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);border:1px dashed var(--border);border-radius:8px;">Select a plugin above to see available commands.</div>`;
+    return html;
+  }
+
+  _renderStepCommand() {
+    let html = `<h3>Step 3: Choose the command</h3>
+    <p class="muted-desc">Select the command that should run on <strong>${escapeHtml((this.pluginCatalog[this.wizardDraft.plugin]?.name) || this.wizardDraft.plugin)}</strong>.</p>`;
+
+    const commands = this.commandCatalog[this.wizardDraft.plugin] || {};
+    if (!this.wizardDraft.plugin || Object.keys(commands).length === 0) {
+      html += `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);border:1px dashed var(--border);border-radius:8px;">No commands available for this plugin.</div>`;
+      return html;
     }
+
+    html += `<div class="command-grid">`;
+    for (const [key, info] of Object.entries(commands)) {
+      const selected = this.wizardDraft.command === key ? 'selected' : '';
+      html += `<div class="command-option ${selected}" onclick="reactionEditor.selectCommand('${escapeHtml(key)}')">
+        <h4>${escapeHtml(info.name)}</h4>
+        <p>${escapeHtml(info.desc)}</p>
+      </div>`;
+    }
+    html += `</div>`;
 
     return html;
   }
@@ -5229,7 +5235,7 @@ class ReactionEditor {
     const plInfo = this.pluginCatalog[this.wizardDraft.plugin] || { name: this.wizardDraft.plugin, icon: '🔌' };
     const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[this.wizardDraft.command] || { name: this.wizardDraft.command, desc: '' };
 
-    let html = `<h3>Step 3: Review and fine-tune</h3>
+    let html = `<h3>Step 4: Review and fine-tune</h3>
     <p class="muted-desc">Make sure everything looks right. Some commands let you set extra options below.</p>`;
 
     html += `<div class="reaction-preview">
@@ -5312,12 +5318,17 @@ class ReactionEditor {
         return;
       }
     } else if (this.wizardStep === 1) {
-      if (!this.wizardDraft.plugin || !this.wizardDraft.command) {
-        showToast('Please select a plugin and a command.', 'error');
+      if (!this.wizardDraft.plugin) {
+        showToast('Please select a plugin.', 'error');
         return;
       }
     } else if (this.wizardStep === 2) {
-      this._collectArgs();
+      if (!this.wizardDraft.command) {
+        showToast('Please select a command.', 'error');
+        return;
+      }
+    } else if (this.wizardStep === 3) {
+      if (!this._collectArgs()) return;
       this._commitWizard();
       return;
     }
@@ -5333,12 +5344,22 @@ class ReactionEditor {
       if (!el) continue;
       const spec = schema[key];
       if (spec.type === 'number') {
-        const v = parseFloat(el.value);
-        this.wizardDraft.args[key] = isNaN(v) ? (spec.default || 0) : v;
+        let v = parseFloat(el.value);
+        if (isNaN(v)) v = spec.default !== undefined ? spec.default : 0;
+        if (spec.min !== undefined && v < spec.min) {
+          showToast(`"${spec.label || key}" must be at least ${spec.min}.`, 'error');
+          return false;
+        }
+        if (spec.max !== undefined && v > spec.max) {
+          showToast(`"${spec.label || key}" must be at most ${spec.max}.`, 'error');
+          return false;
+        }
+        this.wizardDraft.args[key] = v;
       } else {
         this.wizardDraft.args[key] = el.value;
       }
     }
+    return true;
   }
 
   _commitWizard() {
