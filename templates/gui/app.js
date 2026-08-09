@@ -6386,7 +6386,6 @@ class EventTester {
     const btn = document.getElementById('btn-tiktok-toggle');
     if (!label || !btn) return;
     const tiktok = currentConfig.tiktok || {};
-    const hasUser = tiktok.user && tiktok.user !== 'your_tiktok_username';
     let text, labelCls;
     if (_tiktokConnectDisabled) {
       text = 'OFF';
