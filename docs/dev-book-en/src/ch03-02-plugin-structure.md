@@ -42,6 +42,9 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
 | `config_schema` | Schema for the configuration (see [Configuration](./ch03-03-configuration.md)) |
 | `comment_handler` | Object with `prefix` (string) and `enabled` (boolean). Declares that the plugin reacts to TikTok comments with a specific prefix (e.g., `"$"`). See [Receiving Events](./ch03-05-events-and-subscriptions.md). |
 | `update_url` | URL for auto-updates, e.g., `"https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"`. If empty string, no update check. |
+| `icon` | Emoji shown in the GUI (Reactions tab). Defaults to `"🔌"`. |
+| `emitted_events` | List of events this plugin publishes to the EventBus. Each entry: `key` (event id, e.g. `"my-plugin.thing"`), `name`, `desc`, `category` (`tiktok`/`minecraft`/`timer`/`server`/`custom`), `icon`. These appear as trigger options in the GUI "Create Reaction" wizard. |
+| `accepted_commands` | Object of commands this plugin accepts via the command queue. Each command: `name`, `desc`, `args` (object of argument schemas with `type`, `label`, `default`, `min`, `max`, `options`, `placeholder`, `hint`). These appear as action options in the GUI "Create Reaction" wizard. |
 
 > [!NOTE]
 > The internal fields `ics` (boolean, default `true`) and `level` (integer 1–4, default `4`) are set automatically. You usually do not need to specify them in the `plugin.json`.
@@ -62,6 +65,25 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
   "capabilities": ["my-plugin:counter"],
   "depends_on": [],
   "update_url": "https://api.github.com/repos/YourName/Tiktok2Mc/releases/latest",
+  "icon": "⚡",
+  "emitted_events": [
+    {
+      "key": "my-plugin.thing",
+      "name": "Thing Happened",
+      "desc": "Fires when the plugin's thing happens",
+      "category": "custom",
+      "icon": "✨"
+    }
+  ],
+  "accepted_commands": {
+    "do_thing": {
+      "name": "Do Thing",
+      "desc": "Triggers the thing",
+      "args": {
+        "count": { "type": "number", "label": "How many", "default": 1, "min": 1 }
+      }
+    }
+  },
   "config_schema": {
     "version": 1,
     "fields": [
@@ -77,6 +99,9 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
   }
 }
 ```
+
+> [!NOTE]
+> The `emitted_events` and `accepted_commands` fields power the **Reactions tab** in the dashboard. The GUI fetches them via `GET /api/v1/reactions/catalog`, which merges every plugin's declarations with the built-in core events (TikTok, Minecraft, Server). A new plugin shows up in the "Create Reaction" wizard automatically — no GUI code changes required.
 
 ## main.py — The Entry Point
 

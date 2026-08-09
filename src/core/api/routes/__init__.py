@@ -13,6 +13,7 @@ from .plugin_config import router as plugin_config_router
 from .plugin_overlay import router as plugin_overlay_router
 from .plugins import router as plugins_router
 from .rcon import router as rcon_router
+from .reactions import router as reactions_router
 from .reload import router as reload_router
 from .server_lifecycle import router as server_lifecycle_router
 from .servers import router as servers_router
@@ -39,6 +40,7 @@ api_router.include_router(plugin_overlay_router)
 api_router.include_router(hooks_router)
 api_router.include_router(event_commands_router)
 api_router.include_router(rcon_router)
+api_router.include_router(reactions_router)
 api_router.include_router(versions_router)
 api_router.include_router(triggers_router)
 api_router.include_router(logs_router)

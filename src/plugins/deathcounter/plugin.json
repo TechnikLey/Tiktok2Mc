@@ -13,6 +13,15 @@
     "death-counter:events"
   ],
   "depends_on": [],
+  "icon": "💀",
+  "emitted_events": [
+    { "key": "death.milestone", "name": "Death Milestone Reached", "desc": "When the death count reaches a configured milestone", "category": "custom", "icon": "💀" }
+  ],
+  "accepted_commands": {
+    "player_death": { "name": "Count Death", "desc": "Increase the death counter", "args": {} },
+    "add_death": { "name": "Add Deaths", "desc": "Add deaths to the counter", "args": { "amount": { "type": "number", "label": "How many deaths", "default": 1, "min": 1 } } },
+    "reset": { "name": "Reset Counter", "desc": "Reset the death counter to zero", "args": {} }
+  },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {
     "version": 1,

@@ -80,6 +80,46 @@ class StatusDetail(BaseModel):
     )
 
 
+# ── Reaction Catalog ─────────────────────────────────────────────────
+
+
+class ReactionEvent(BaseModel):
+    """An event a plugin publishes to the EventBus — a reaction trigger."""
+
+    key: str = Field(..., description="Event identifier, e.g. 'timer.zero'")
+    name: str = Field("", description="Human-readable name shown in the GUI")
+    desc: str = Field("", description="Short description shown in the GUI")
+    category: str = Field(
+        "custom", description="Group filter: tiktok, minecraft, timer, server, custom"
+    )
+    icon: str = Field("⚡", description="Emoji icon shown in the GUI")
+
+
+class ReactionCommandArg(BaseModel):
+    """Schema for a single argument of a plugin reaction command."""
+
+    type: str = Field("string", description="string, number, or select")
+    label: str = Field("", description="Human-readable label for the GUI")
+    default: Any = Field(None, description="Default value used when the arg is missing")
+    min: int | None = Field(None, description="Minimum value (for number)")
+    max: int | None = Field(None, description="Maximum value (for number)")
+    options: list[str] = Field(
+        default_factory=list, description="Allowed values (for select)"
+    )
+    placeholder: str = Field("", description="Input placeholder for the GUI")
+    hint: str = Field("", description="Help text shown under the input")
+
+
+class ReactionCommand(BaseModel):
+    """A command a plugin accepts via the command queue — a reaction action."""
+
+    name: str = Field(..., description="Human-readable name shown in the GUI")
+    desc: str = Field("", description="Short description shown in the GUI")
+    args: dict[str, ReactionCommandArg] = Field(
+        default_factory=dict, description="Argument schemas keyed by argument name"
+    )
+
+
 # ── Plugin Manifest ──────────────────────────────────────────────────
 
 
@@ -132,6 +172,15 @@ class PluginManifest(BaseModel):
     )
     comment_handler: Optional["CommentHandler"] = Field(
         None, description="Comment prefix + commands this plugin handles (declarative)"
+    )
+    icon: str = Field("🔌", description="Display icon (emoji) shown in the GUI")
+    emitted_events: list[ReactionEvent] = Field(
+        default_factory=list,
+        description="Events this plugin publishes to the EventBus; shown as reaction triggers in the GUI",
+    )
+    accepted_commands: dict[str, ReactionCommand] = Field(
+        default_factory=dict,
+        description="Commands this plugin accepts via the command queue; shown as reaction actions in the GUI",
     )
 
 
@@ -322,6 +371,15 @@ class EventCommandsResponse(BaseModel):
 
 class EventCommandsUpdateRequest(BaseModel):
     event_commands: dict[str, list[dict[str, Any]]]
+
+
+class ReactionCatalogResponse(BaseModel):
+    """Merged reaction catalog served to the GUI reactions wizard."""
+
+    events: dict[str, dict[str, Any]]
+    plugins: dict[str, dict[str, Any]]
+    commands: dict[str, dict[str, Any]]
+    templates: list[dict[str, Any]]
 
 
 # ── Actions (actions.mca) models ───────────────────────────────────

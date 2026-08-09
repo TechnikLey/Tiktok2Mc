@@ -4639,7 +4639,11 @@ class ReactionEditor {
     this.wizardEditing = null; // null = creating, {event, idx} = editing
     this.wizardDraft = { event: '', plugin: '', command: '', args: {} };
 
-    // Human-readable catalogs
+    // Human-readable catalogs.
+    // These are offline fallbacks only: the authoritative catalog is served
+    // by GET /api/v1/reactions/catalog, assembled from each plugin's own
+    // plugin.json (emitted_events / accepted_commands). loadCatalog() merges
+    // the server data over these defaults at runtime.
     this.eventCatalog = {
       // TikTok
       'tiktok.follow': { name: 'New Follower', desc: 'When someone follows your TikTok account', category: 'tiktok', icon: '👤' },
@@ -4750,6 +4754,7 @@ class ReactionEditor {
 
   async load() {
     try {
+      await this.loadCatalog();
       const res = await fetchJSON('/event-commands');
       this.data = JSON.parse(JSON.stringify(res.event_commands || {}));
       this.original = JSON.parse(JSON.stringify(this.data));
@@ -4760,6 +4765,35 @@ class ReactionEditor {
       this.renderList();
     } catch (e) {
       showToast('Failed to load reactions: ' + e.message, 'error');
+    }
+  }
+
+  async loadCatalog() {
+    try {
+      const res = await fetchJSON('/reactions/catalog');
+      if (!res || typeof res !== 'object') return;
+      if (res.events && typeof res.events === 'object') {
+        for (const [key, info] of Object.entries(res.events)) {
+          this.eventCatalog[key] = info;
+        }
+      }
+      if (res.plugins && typeof res.plugins === 'object') {
+        for (const [key, info] of Object.entries(res.plugins)) {
+          this.pluginCatalog[key] = { ...(this.pluginCatalog[key] || {}), ...info };
+        }
+      }
+      if (res.commands && typeof res.commands === 'object') {
+        for (const [key, cmds] of Object.entries(res.commands)) {
+          if (cmds && typeof cmds === 'object') {
+            this.commandCatalog[key] = { ...(this.commandCatalog[key] || {}), ...cmds };
+          }
+        }
+      }
+      if (Array.isArray(res.templates) && res.templates.length) {
+        this.templates = res.templates;
+      }
+    } catch (e) {
+      console.warn('Failed to load reaction catalog, using built-in defaults:', e);
     }
   }
 
@@ -5092,10 +5126,11 @@ class ReactionEditor {
       minecraft: { label: 'Minecraft Events', items: [] },
       timer: { label: 'Timer Events', items: [] },
       server: { label: 'Server Events', items: [] },
+      custom: { label: 'Plugin & Custom Events', items: [] },
     };
     for (const [key, info] of Object.entries(this.eventCatalog)) {
-      const g = groups[info.category];
-      if (g) g.items.push({ key, ...info });
+      const g = groups[info.category] || groups.custom;
+      g.items.push({ key, ...info });
     }
 
     let html = `<h3>Step 1: Choose what triggers the reaction</h3>

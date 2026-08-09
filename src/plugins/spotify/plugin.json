@@ -13,6 +13,25 @@
     "spotify:queue"
   ],
   "depends_on": [],
+  "icon": "🎵",
+  "emitted_events": [
+    { "key": "spotify.track_changed", "name": "Track Changed", "desc": "When the currently playing Spotify track changes", "category": "custom", "icon": "🎵" },
+    { "key": "spotify.play", "name": "Playback Started", "desc": "When Spotify playback starts", "category": "custom", "icon": "▶️" },
+    { "key": "spotify.pause", "name": "Playback Paused", "desc": "When Spotify playback is paused", "category": "custom", "icon": "⏸️" }
+  ],
+  "accepted_commands": {
+    "play": { "name": "Play Music", "desc": "Start or resume playback", "args": {} },
+    "pause": { "name": "Pause Music", "desc": "Pause the current track", "args": {} },
+    "next": { "name": "Next Track", "desc": "Skip to the next song", "args": {} },
+    "previous": { "name": "Previous Track", "desc": "Go back to the previous song", "args": {} },
+    "volume": { "name": "Set Volume", "desc": "Change playback volume", "args": { "level": { "type": "number", "label": "Volume level (0–100)", "default": 50, "min": 0, "max": 100 } } },
+    "volume_up": { "name": "Volume Up", "desc": "Increase the volume", "args": {} },
+    "volume_down": { "name": "Volume Down", "desc": "Decrease the volume", "args": {} },
+    "shuffle": { "name": "Toggle Shuffle", "desc": "Turn shuffle on or off", "args": {} },
+    "repeat": { "name": "Toggle Repeat", "desc": "Turn repeat on or off", "args": {} },
+    "save": { "name": "Save Track", "desc": "Save the currently playing song to your library", "args": {} },
+    "playtrack": { "name": "Play Specific Track", "desc": "Search for and play a song", "args": { "query": { "type": "string", "label": "Song name or URL", "default": "", "placeholder": "Never Gonna Give You Up" } } }
+  },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "comment_handler": {
     "prefix": "$",

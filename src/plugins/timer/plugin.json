@@ -15,6 +15,24 @@
     "timer:events"
   ],
   "depends_on": [],
+  "icon": "⏱️",
+  "emitted_events": [
+    { "key": "timer.started", "name": "Timer Starts", "desc": "When the countdown timer starts", "category": "timer", "icon": "▶️" },
+    { "key": "timer.paused", "name": "Timer Pauses", "desc": "When the countdown timer is paused", "category": "timer", "icon": "⏸️" },
+    { "key": "timer.resumed", "name": "Timer Resumes", "desc": "When the countdown timer resumes", "category": "timer", "icon": "▶️" },
+    { "key": "timer.reset", "name": "Timer Resets", "desc": "When the countdown timer is reset", "category": "timer", "icon": "🔄" },
+    { "key": "timer.tick", "name": "Timer Ticks", "desc": "Every second while the timer is running", "category": "timer", "icon": "⏱️" },
+    { "key": "timer.zero", "name": "Timer Hits Zero", "desc": "When the countdown reaches zero", "category": "timer", "icon": "⏰" },
+    { "key": "timer.milestone", "name": "Timer Milestone", "desc": "When the timer passes a configured milestone", "category": "timer", "icon": "🎯" }
+  ],
+  "accepted_commands": {
+    "start": { "name": "Start Timer", "desc": "Begin the countdown from the current time", "args": {} },
+    "pause": { "name": "Pause Timer", "desc": "Pause the countdown", "args": {} },
+    "resume": { "name": "Resume Timer", "desc": "Continue a paused countdown", "args": {} },
+    "reset": { "name": "Reset Timer", "desc": "Reset the timer to its starting value", "args": {} },
+    "add_time": { "name": "Add Time", "desc": "Add seconds to the current timer", "args": { "seconds": { "type": "number", "label": "Seconds to add", "default": 10, "min": 1 } } },
+    "set_time": { "name": "Set Time", "desc": "Set the timer to a specific number of seconds", "args": { "seconds": { "type": "number", "label": "Seconds to set", "default": 60, "min": 0 } } }
+  },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {
     "version": 1,
