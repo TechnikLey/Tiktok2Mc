@@ -57,6 +57,64 @@ describe('ReactionEditor catalog', () => {
   });
 });
 
+describe('ReactionEditor arg collection', () => {
+  function argInput(value) {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = 'arg_amount';
+    input.value = value;
+    document.body.appendChild(input);
+    return input;
+  }
+
+  function setup(amountArg) {
+    reactionEditor.wizardDraft = { event: 'tiktok.gift', plugin: 'win-counter', command: 'remove_win', args: {} };
+    reactionEditor.commandCatalog = {
+      'win-counter': {
+        remove_win: {
+          name: 'Remove Win',
+          args: { amount: { type: 'number', label: 'How many to remove', default: 1, min: 1, ...amountArg } },
+        },
+      },
+    };
+  }
+
+  it('accepts a number when max is null in the schema', () => {
+    setup({ max: null });
+    const input = argInput('1');
+    try {
+      const result = reactionEditor._collectArgs();
+      expect(result).toBe(true);
+      expect(reactionEditor.wizardDraft.args.amount).toBe(1);
+    } finally {
+      input.remove();
+    }
+  });
+
+  it('rejects a number above a real max', () => {
+    setup({ max: 5 });
+    const input = argInput('7');
+    try {
+      const result = reactionEditor._collectArgs();
+      expect(result).toBe(false);
+    } finally {
+      input.remove();
+    }
+  });
+
+  it('accepts a number above no max', () => {
+    setup({});
+    const input = argInput('999');
+    try {
+      const result = reactionEditor._collectArgs();
+      expect(result).toBe(true);
+      expect(reactionEditor.wizardDraft.args.amount).toBe(999);
+    } finally {
+      input.remove();
+    }
+  });
+});
+
 describe('ReactionEditor wizard step 1 categories', () => {
   it('groups plugin events under their declared category', () => {
     reactionEditor.eventCatalog = {
@@ -82,5 +140,57 @@ describe('ReactionEditor wizard step 1 categories', () => {
     expect(reactionEditor._categoryLabel('timer')).toBe('Timer');
     expect(reactionEditor._categoryLabel('spotify-control')).toBe('Spotify Control');
     expect(reactionEditor._categoryLabel('custom')).toBe('Custom Events');
+  });
+});
+
+describe('ReactionEditor disabled-plugin rendering', () => {
+  function render(data, plugins) {
+    window.currentPlugins = plugins;
+    reactionEditor.data = data;
+    reactionEditor.eventCatalog = {
+      'tiktok.gift': { name: 'Gift Received', desc: 'Gift', category: 'tiktok', icon: '🎁' },
+    };
+    reactionEditor.pluginCatalog = {
+      timer: { name: 'Timer', icon: '⏱️' },
+    };
+    reactionEditor.commandCatalog = {
+      timer: { add_time: { name: 'Add Time', desc: 'Add time', args: {} } },
+    };
+    reactionEditor.activeCategory = 'all';
+    reactionEditor.searchQuery = '';
+    reactionEditor.renderList();
+    return document.getElementById('reaction-content').firstElementChild;
+  }
+
+  it('greys out the card, disables Test and shows a notice when the plugin is disabled', () => {
+    const card = render(
+      { 'tiktok.gift': [{ target: 'timer', command: 'add_time', args: { seconds: 30 } }] },
+      [{ name: 'timer', enabled: false }]
+    );
+    expect(card.classList.contains('reaction-card--disabled')).toBe(true);
+    expect(card.textContent).toContain('is disabled');
+    expect(card.textContent).toContain('will not trigger');
+    const testBtn = card.querySelector('.reaction-btn-test');
+    expect(testBtn.disabled).toBe(true);
+  });
+
+  it('keeps the card active and Test enabled when the plugin is enabled', () => {
+    const card = render(
+      { 'tiktok.gift': [{ target: 'timer', command: 'add_time', args: { seconds: 30 } }] },
+      [{ name: 'timer', enabled: true }]
+    );
+    expect(card.classList.contains('reaction-card--disabled')).toBe(false);
+    expect(card.textContent).not.toContain('is disabled');
+    const testBtn = card.querySelector('.reaction-btn-test');
+    expect(testBtn.disabled).toBe(false);
+  });
+
+  it('keeps the card active when the plugin is unknown', () => {
+    const card = render(
+      { 'tiktok.gift': [{ target: 'timer', command: 'add_time', args: {} }] },
+      []
+    );
+    expect(card.classList.contains('reaction-card--disabled')).toBe(false);
+    expect(card.querySelector('.reaction-btn-test').disabled).toBe(false);
   });
 });

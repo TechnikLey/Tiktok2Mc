@@ -4757,6 +4757,7 @@ class ReactionEditor {
 
   async open() {
     this.el.classList.remove('hidden');
+    await loadPlugins();
     await this.load();
   }
 
@@ -4939,19 +4940,26 @@ class ReactionEditor {
         const action = actions[idx];
         const pluginInfo = this.pluginCatalog[action.target] || { name: action.target, icon: '🔌' };
         const cmdInfo = (this.commandCatalog[action.target] || {})[action.command] || { name: action.command };
+        const plugin = currentPlugins.find(p => p.name === action.target);
+        const pluginDisabled = !!plugin && !plugin.enabled;
+        const disabledClass = pluginDisabled ? ' reaction-card--disabled' : '';
+        const disabledNotice = pluginDisabled
+          ? `<div class="reaction-disabled-notice">⚠️ Plugin <strong>${escapeHtml(pluginInfo.name)}</strong> is disabled. This reaction will not trigger until you enable the plugin in the <strong>Plugins</strong> section.</div>`
+          : '';
 
-        html += `<div class="reaction-card">
+        html += `<div class="reaction-card${disabledClass}">
           <div class="reaction-card-header">
             <div class="reaction-meta">
               <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
               <span style="font-size:0.75rem;color:var(--text-secondary);">Event: ${escapeHtml(info.name)}</span>
             </div>
             <div class="reaction-card-actions">
-              <button class="reaction-btn-sm reaction-btn-test" onclick="reactionEditor.testReaction('${escapeHtml(event)}', ${idx})">Test</button>
+              <button class="reaction-btn-sm reaction-btn-test" onclick="reactionEditor.testReaction('${escapeHtml(event)}', ${idx})"${pluginDisabled ? ' disabled' : ''}>Test</button>
               <button class="reaction-btn-sm reaction-btn-edit" onclick="reactionEditor.startEdit('${escapeHtml(event)}', ${idx})">Edit</button>
               <button class="reaction-btn-sm reaction-btn-delete" onclick="reactionEditor.confirmDelete('${escapeHtml(event)}', ${idx})">Delete</button>
             </div>
           </div>
+          ${disabledNotice}
           <div class="reaction-card-body">
             <div class="reaction-flow">
               <div class="reaction-when">
@@ -5061,6 +5069,11 @@ class ReactionEditor {
   async testReaction(event, idx) {
     const action = this.data[event]?.[idx];
     if (!action) return;
+    const plugin = currentPlugins.find(p => p.name === action.target);
+    if (plugin && !plugin.enabled) {
+      showToast(`Plugin "${action.target}" is disabled. Enable it before testing this reaction.`, 'error');
+      return;
+    }
     try {
       // Publish to EventBus so the event-command mapper dispatches the reaction
       await postJSON('/events', { type: event, data: { test: true, source: 'reaction_test' } });
@@ -5281,7 +5294,7 @@ class ReactionEditor {
         html += `<div class="form-group">`;
         html += `<label for="${id}">${escapeHtml(spec.label || argKey)}</label>`;
         if (spec.type === 'number') {
-          html += `<input type="number" id="${id}" value="${escapeHtml(String(currentVal))}" ${spec.min !== undefined ? `min="${spec.min}"` : ''} ${spec.max !== undefined ? `max="${spec.max}"` : ''}>`;
+          html += `<input type="number" id="${id}" value="${escapeHtml(String(currentVal))}" ${spec.min !== undefined && spec.min !== null ? `min="${spec.min}"` : ''} ${spec.max !== undefined && spec.max !== null ? `max="${spec.max}"` : ''}>`;
         } else if (spec.type === 'select') {
           html += `<select id="${id}">${(spec.options || []).map(o => `<option value="${escapeHtml(o)}" ${o === currentVal ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select>`;
         } else {
@@ -5368,11 +5381,11 @@ class ReactionEditor {
       if (spec.type === 'number') {
         let v = parseFloat(el.value);
         if (isNaN(v)) v = spec.default !== undefined ? spec.default : 0;
-        if (spec.min !== undefined && v < spec.min) {
+        if (spec.min !== undefined && spec.min !== null && v < spec.min) {
           showToast(`"${spec.label || key}" must be at least ${spec.min}.`, 'error');
           return false;
         }
-        if (spec.max !== undefined && v > spec.max) {
+        if (spec.max !== undefined && spec.max !== null && v > spec.max) {
           showToast(`"${spec.label || key}" must be at most ${spec.max}.`, 'error');
           return false;
         }
