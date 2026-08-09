@@ -158,6 +158,7 @@ class BotContext:
         # TikTok state
         self.disable_tiktok_connect = False
         self.tiktok_client = None
+        self.tiktok_client_loop = None
         self.tiktok_live = False
 
         # Event bridge subscriptions (reloaded at runtime)
@@ -1092,7 +1093,11 @@ def _publish_tiktok_status(connected: bool):
     body = json.dumps(
         {
             "type": "tiktok.live_status",
-            "data": {"connected": bool(connected), "source": "tiktok_bridge"},
+            "data": {
+                "connected": bool(connected),
+                "disabled": bool(ctx.disable_tiktok_connect),
+                "source": "tiktok_bridge",
+            },
         }
     ).encode("utf-8")
     try:
@@ -1108,6 +1113,25 @@ def _publish_tiktok_status(connected: bool):
         get_crash_manager().report_exception(
             TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_live_status"}
         )
+
+
+def _stop_tiktok_client():
+    """Disconnect an active TikTok client on its own event loop (best effort).
+
+    Called from the webhook server thread; the disconnect is scheduled onto the
+    client's dedicated asyncio loop so the reconnect loop unblocks promptly.
+    """
+    client = ctx.tiktok_client
+    loop = ctx.tiktok_client_loop
+    if client is None or loop is None:
+        return
+    try:
+        if not client.connected:
+            return
+        future = asyncio.run_coroutine_threadsafe(client.disconnect(), loop)
+        future.result(timeout=5)
+    except Exception as e:  # best-effort stop
+        log.warning(f"[TIKTOK] Error stopping client: {e}")
 
 
 async def _tiktok_status_heartbeat():
@@ -1673,6 +1697,9 @@ def handle_custom_trigger():
             log.info(
                 f"[CUSTOM TRIGGER] TikTok connect toggled: {not new_state} -> {new_state}"
             )
+            if new_state:
+                _stop_tiktok_client()
+            _publish_tiktok_status(bool(ctx.tiktok_live))
             return {
                 "status": "ok",
                 "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}",
@@ -2275,6 +2302,10 @@ async def run_bot():
         task = asyncio.create_task(coro, name=name)
         crash_mgr.observe_task(task, component="tiktok_bridge")
 
+    # Report initial state (incl. disabled flag) so the GUI syncs without waiting
+    # for the first connect/disconnect event or the 30s heartbeat.
+    _publish_tiktok_status(False)
+
     while True:
         with ctx.tiktok_lock:
             _disabled = ctx.disable_tiktok_connect
@@ -2294,9 +2325,14 @@ async def run_bot():
         client = create_client(ctx.tiktok_user)
         ctx.tiktok_client = client
 
+        # Run the client on its own dedicated event loop so the webhook server
+        # thread can disconnect it later via run_coroutine_threadsafe.
+        client_loop = asyncio.new_event_loop()
+        ctx.tiktok_client_loop = client_loop
+
         try:
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
-            await asyncio.to_thread(client.run)
+            await asyncio.to_thread(client_loop.run_until_complete, client.connect())
 
         except Exception as e:  # TikTok client connection errors are reported; reconnect loop continues
             log.exception("CRITICAL ERROR IN TIKTOK CLIENT")
@@ -2323,12 +2359,13 @@ async def run_bot():
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
+            ctx.tiktok_client_loop = None
             ctx.tiktok_live = False
             _publish_tiktok_status(False)
             try:
-                client.stop()
-            except Exception as e:  # best-effort stop
-                log.warning(f"[TIKTOK] Error stopping client: {e}")
+                client_loop.close()
+            except Exception as e:  # best-effort loop close
+                log.warning(f"[TIKTOK] Error closing client loop: {e}")
             await asyncio.sleep(2)
 
 

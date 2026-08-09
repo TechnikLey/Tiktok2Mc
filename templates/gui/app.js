@@ -58,6 +58,7 @@ let _closePollIntervalId = null;
 let _uptimeIntervalId = null;
 let _lastTiktokEventTime = 0;
 let _tiktokLiveState = null; // null = unknown, true = live, false = not live
+let _tiktokConnectDisabled = false; // bridge DISABLE_TIKTOK_CONNECT flag
 
 /* ─── Server Manager Placeholder Data ─── */
 let _serverManagerCache = null;
@@ -661,6 +662,7 @@ function _updateTiktokStatusDisplay() {
     pill.textContent = 'Checking';
     pill.className = 'tiktok-status connecting';
   }
+  eventTester._updateTiktokStateUI();
 }
 
 function getPluginStatus(p) {
@@ -5765,6 +5767,9 @@ function connectLogStream() {
         liveLog.add(payload.msg || type, payload.level || 'info', payload.plugin || 'plugin');
       } else if (type === 'tiktok.live_status') {
         _tiktokLiveState = payload.connected === true;
+        if (typeof payload.disabled === 'boolean') {
+          _tiktokConnectDisabled = payload.disabled;
+        }
         _updateTiktokStatusDisplay();
       } else if (type.startsWith('tiktok.')) {
         // Test triggers (trigger tester / external simulations) must never
@@ -6248,7 +6253,6 @@ class EventTester {
     this._historyEl = document.getElementById('trigger-history');
     this._gifts = [];
     this._selectedGift = null;
-    this._tiktokConnected = false;
     this._giftSelectLoaded = false;
   }
 
@@ -6334,9 +6338,14 @@ class EventTester {
       this._showError('Please wait before toggling again.');
       return;
     }
+    const turningOff = !_tiktokConnectDisabled;
     const confirmed = await showConfirmDialog(
-      'Toggle TikTok Connection',
-      'Toggle the TikTok live-stream connection?',
+      turningOff && _tiktokLiveState === true
+        ? 'Disconnect TikTok Stream'
+        : 'Toggle TikTok Connection',
+      turningOff && _tiktokLiveState === true
+        ? 'Turning the TikTok connection OFF will disconnect the live stream immediately. Continue?'
+        : `Turn the TikTok connection ${turningOff ? 'OFF' : 'ON'}?`,
       'Toggle',
       'btn-danger'
     );
@@ -6347,7 +6356,7 @@ class EventTester {
     try {
       const result = await postJSON('/triggers/tiktok-connection', {});
       if (result.status === 'ok' || result.status === 'success') {
-        this._tiktokConnected = result.connected;
+        _tiktokConnectDisabled = !result.connected;
         this._updateTiktokStateUI();
         this._setStatus('success', 'Toggled');
         showToast(`TikTok connection is now ${result.connected ? 'ON' : 'OFF'}.`, 'success');
@@ -6376,17 +6385,20 @@ class EventTester {
     const label = document.getElementById('tiktok-connection-state');
     const btn = document.getElementById('btn-tiktok-toggle');
     if (!label || !btn) return;
-    if (this._tiktokConnected) {
-      label.textContent = 'ON';
-      label.className = 'tiktok-state-label tiktok-state-on';
-      btn.textContent = 'Disconnect';
-      btn.className = 'btn btn--danger';
+    const tiktok = currentConfig.tiktok || {};
+    const hasUser = tiktok.user && tiktok.user !== 'your_tiktok_username';
+    let text, labelCls;
+    if (_tiktokConnectDisabled) {
+      text = 'OFF';
+      labelCls = 'tiktok-state-label tiktok-state-off';
     } else {
-      label.textContent = 'OFF';
-      label.className = 'tiktok-state-label tiktok-state-off';
-      btn.textContent = 'Connect';
-      btn.className = 'btn btn--primary';
+      text = 'ON';
+      labelCls = 'tiktok-state-label tiktok-state-on';
     }
+    label.textContent = text;
+    label.className = labelCls;
+    btn.textContent = 'Toggle Connection';
+    btn.className = 'btn btn--secondary';
   }
 
   _setStatus(state, text) {

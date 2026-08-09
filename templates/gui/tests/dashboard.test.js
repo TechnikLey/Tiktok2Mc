@@ -617,3 +617,107 @@ describe('TikTok live status', () => {
     expect(document.getElementById('tiktok-status-value').textContent).toBe('Connected');
   });
 });
+
+/* ─── EventTester TikTok connection state ─── */
+describe('EventTester TikTok connection state', () => {
+  beforeEach(() => {
+    _tiktokConnectDisabled = false;
+    _tiktokLiveState = null;
+    _lastTiktokEventTime = 0;
+    eventTester._cooldown = false;
+    // Reset fetch to default mock to avoid cross-test pollution
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({}),
+    });
+  });
+
+  function seedTesterDom(user) {
+    currentConfig = { tiktok: { user: user || '' } };
+    const label = document.getElementById('tiktok-connection-state');
+    const btn = document.getElementById('btn-tiktok-toggle');
+    if (label) label.className = 'tiktok-state-label';
+    if (btn) { btn.className = 'btn btn--secondary'; btn.textContent = 'Toggle Connection'; }
+    _tiktokLiveState = null;
+    _tiktokConnectDisabled = false;
+  }
+
+  it('shows ON when the connection is enabled', () => {
+    seedTesterDom('testuser');
+    eventTester._updateTiktokStateUI();
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('ON');
+    expect(document.getElementById('btn-tiktok-toggle').textContent).toBe('Toggle Connection');
+  });
+
+  it('shows OFF when the connection is disabled', () => {
+    seedTesterDom('testuser');
+    _tiktokConnectDisabled = true;
+    eventTester._updateTiktokStateUI();
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('OFF');
+  });
+
+  it('shows OFF when disabled even if the bridge reports live', () => {
+    seedTesterDom('testuser');
+    _tiktokLiveState = true;
+    _tiktokConnectDisabled = true;
+    eventTester._updateTiktokStateUI();
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('OFF');
+  });
+
+  it('shows Not configured when no TikTok user is set', () => {
+    seedTesterDom('');
+    _tiktokLiveState = true;
+    eventTester._updateTiktokStateUI();
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('Not configured');
+  });
+
+  it('status display keeps the EventTester label in sync via live_status', () => {
+    seedTesterDom('testuser');
+    connectLogStream();
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.live_status', data: { connected: true, disabled: false, source: 'tiktok_bridge' } }) });
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('ON');
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'tiktok.live_status', data: { connected: false, disabled: true, source: 'tiktok_bridge' } }) });
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('OFF');
+  });
+
+  it('warns before turning the connection OFF while live', async () => {
+    seedTesterDom('testuser');
+    _tiktokLiveState = true;
+    let posted = false;
+    globalThis.fetch = async () => {
+      posted = true;
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ status: 'ok', connected: false }) };
+    };
+    const promise = eventTester.toggleTiktok();
+    await Promise.resolve();
+    expect(document.getElementById('confirm-title').textContent).toBe('Disconnect TikTok Stream');
+    document.getElementById('btn-confirm-cancel').click();
+    await promise;
+    expect(posted).toBe(false);
+    expect(_tiktokConnectDisabled).toBe(false);
+  });
+
+  it('turns the connection OFF after confirming the warning', async () => {
+    seedTesterDom('testuser');
+    _tiktokLiveState = true;
+    globalThis.fetch = async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({ status: 'ok', connected: false }) });
+    const promise = eventTester.toggleTiktok();
+    await Promise.resolve();
+    document.getElementById('btn-confirm-ok').click();
+    await promise;
+    expect(_tiktokConnectDisabled).toBe(true);
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('OFF');
+  });
+
+  it('shows a plain toggle dialog when turning OFF while not connected', async () => {
+    seedTesterDom('testuser');
+    _tiktokLiveState = false;
+    const promise = eventTester.toggleTiktok();
+    await Promise.resolve();
+    expect(document.getElementById('confirm-title').textContent).toBe('Toggle TikTok Connection');
+    document.getElementById('btn-confirm-cancel').click();
+    await promise;
+  });
+});
