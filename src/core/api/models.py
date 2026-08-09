@@ -84,14 +84,15 @@ class StatusDetail(BaseModel):
 
 
 class ReactionEvent(BaseModel):
-    """An event a plugin publishes to the EventBus — a reaction trigger."""
+    """An event a plugin publishes to the EventBus — a reaction trigger.
+
+    The GUI groups plugin events by the plugin's own name (the category
+    is derived server-side, plugins never declare a category themselves).
+    """
 
     key: str = Field(..., description="Event identifier, e.g. 'timer.zero'")
     name: str = Field("", description="Human-readable name shown in the GUI")
     desc: str = Field("", description="Short description shown in the GUI")
-    category: str = Field(
-        "custom", description="Group filter: tiktok, minecraft, timer, server, custom"
-    )
     icon: str = Field("⚡", description="Emoji icon shown in the GUI")
 
 

@@ -43,7 +43,7 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
 | `comment_handler` | Object with `prefix` (string) and `enabled` (boolean). Declares that the plugin reacts to TikTok comments with a specific prefix (e.g., `"$"`). See [Receiving Events](./ch03-05-events-and-subscriptions.md). |
 | `update_url` | URL for auto-updates, e.g., `"https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"`. If empty string, no update check. |
 | `icon` | Emoji shown in the GUI (Reactions tab). Defaults to `"🔌"`. |
-| `emitted_events` | List of events this plugin publishes to the EventBus. Each entry: `key` (event id, e.g. `"my-plugin.thing"`), `name`, `desc`, `category` (`tiktok`/`minecraft`/`timer`/`server`/`custom`), `icon`. These appear as trigger options in the GUI "Create Reaction" wizard. |
+| `emitted_events` | List of events this plugin publishes to the EventBus. Each entry: `key` (event id, e.g. `"my-plugin.thing"`), `name`, `desc`, `icon`. These appear as trigger options in the GUI "Create Reaction" wizard, automatically grouped under the plugin's own name. |
 | `accepted_commands` | Object of commands this plugin accepts via the command queue. Each command: `name`, `desc`, `args` (object of argument schemas with `type`, `label`, `default`, `min`, `max`, `options`, `placeholder`, `hint`). These appear as action options in the GUI "Create Reaction" wizard. |
 
 > [!NOTE]
@@ -71,7 +71,6 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
       "key": "my-plugin.thing",
       "name": "Thing Happened",
       "desc": "Fires when the plugin's thing happens",
-      "category": "custom",
       "icon": "✨"
     }
   ],
@@ -101,7 +100,7 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
 ```
 
 > [!NOTE]
-> The `emitted_events` and `accepted_commands` fields power the **Reactions tab** in the dashboard. The GUI fetches them via `GET /api/v1/reactions/catalog`, which merges every plugin's declarations with the built-in core events (TikTok, Minecraft, Server). A new plugin shows up in the "Create Reaction" wizard automatically — no GUI code changes required.
+> The `emitted_events` and `accepted_commands` fields power the **Reactions tab** in the dashboard. The GUI fetches them via `GET /api/v1/reactions/catalog`, which merges every plugin's declarations with the built-in core events (TikTok, Minecraft, Server). Plugin events are grouped under the plugin's own name in the "Create Reaction" wizard — a new plugin shows up automatically, no GUI code changes required.
 
 ## main.py — The Entry Point
 

@@ -4829,14 +4829,36 @@ class ReactionEditor {
 
   /* ─── Sidebar / Filters ─── */
 
+  _humanizeCategory(cat) {
+    return cat
+      .split(/[-_]/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  _categoryLabel(cat) {
+    return this.categoryLabels[cat] || this._humanizeCategory(cat);
+  }
+
   renderSidebar() {
-    const categories = ['all', 'tiktok', 'minecraft', 'timer', 'server', 'custom'];
+    // Derive categories from the events that actually have reactions, so
+    // plugin-defined categories appear automatically.
+    const counts = new Map();
+    for (const event of Object.keys(this.data)) {
+      const actions = this.data[event] || [];
+      if (!actions.length) continue;
+      const info = this.eventCatalog[event];
+      const cat = (info && info.category) || 'custom';
+      counts.set(cat, (counts.get(cat) || 0) + actions.length);
+    }
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    const categories = ['all', ...[...counts.keys()].sort()];
     let html = '';
     for (const cat of categories) {
-      const count = this._countInCategory(cat);
+      const count = cat === 'all' ? total : counts.get(cat);
       const active = this.activeCategory === cat ? 'active' : '';
       html += `<div class="sidebar-filter ${active}" onclick="reactionEditor.setCategory('${cat}')">
-        <span>${escapeHtml(this.categoryLabels[cat])}</span>
+        <span>${escapeHtml(this._categoryLabel(cat))}</span>
         <span class="badge">${count}</span>
       </div>`;
     }
@@ -4847,19 +4869,6 @@ class ReactionEditor {
     this.activeCategory = cat;
     this.renderSidebar();
     this.renderList();
-  }
-
-  _countInCategory(cat) {
-    if (cat === 'all') {
-      return Object.keys(this.data).reduce((sum, k) => sum + (this.data[k]?.length || 0), 0);
-    }
-    let count = 0;
-    for (const event of Object.keys(this.data)) {
-      const info = this.eventCatalog[event];
-      if (cat === 'custom' && (!info || info.category === 'custom')) count += (this.data[event]?.length || 0);
-      else if (info && info.category === cat) count += (this.data[event]?.length || 0);
-    }
-    return count;
   }
 
   /* ─── List Rendering ─── */
@@ -5121,17 +5130,31 @@ class ReactionEditor {
   }
 
   _renderStepEvent() {
-    const groups = {
-      tiktok: { label: 'TikTok Events', items: [] },
-      minecraft: { label: 'Minecraft Events', items: [] },
-      timer: { label: 'Timer Events', items: [] },
-      server: { label: 'Server Events', items: [] },
-      custom: { label: 'Plugin & Custom Events', items: [] },
+    const standardLabels = {
+      tiktok: 'TikTok Events',
+      minecraft: 'Minecraft Events',
+      timer: 'Timer Events',
+      server: 'Server Events',
     };
-    for (const [key, info] of Object.entries(this.eventCatalog)) {
-      const g = groups[info.category] || groups.custom;
-      g.items.push({ key, ...info });
+    // Standard groups first, then any extra categories used by plugins.
+    const groups = [];
+    for (const cat of ['tiktok', 'minecraft', 'timer', 'server']) {
+      groups.push({ cat, label: standardLabels[cat], items: [] });
     }
+    const extraGroups = new Map();
+    for (const [key, info] of Object.entries(this.eventCatalog)) {
+      const cat = info.category || 'custom';
+      const group = groups.find(g => g.cat === cat);
+      if (group) {
+        group.items.push({ key, ...info });
+      } else {
+        if (!extraGroups.has(cat)) {
+          extraGroups.set(cat, { cat, label: this._humanizeCategory(cat), items: [] });
+        }
+        extraGroups.get(cat).items.push({ key, ...info });
+      }
+    }
+    for (const g of extraGroups.values()) groups.push(g);
 
     let html = `<h3>Step 1: Choose what triggers the reaction</h3>
     <p class="muted-desc">Pick the event that should cause something to happen. You can also type a custom event name for advanced use.</p>`;

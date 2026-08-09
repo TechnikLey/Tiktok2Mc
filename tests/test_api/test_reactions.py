@@ -29,7 +29,6 @@ class TestReactionCatalogEndpoint:
                     "key": "demo.thing",
                     "name": "Thing Happened",
                     "desc": "A thing happened",
-                    "category": "custom",
                     "icon": "✨",
                 }
             ],
@@ -55,6 +54,7 @@ class TestReactionCatalogEndpoint:
         body = resp.json()
         assert "demo.thing" in body["events"]
         assert body["events"]["demo.thing"]["name"] == "Thing Happened"
+        assert body["events"]["demo.thing"]["category"] == "demo"
         assert "demo" in body["plugins"]
         assert body["plugins"]["demo"]["icon"] == "⚡"
         assert "demo" in body["commands"]
@@ -75,7 +75,6 @@ class TestReactionCatalogEndpoint:
                     "key": "tiktok.gift",
                     "name": "Custom Gift",
                     "desc": "Overridden gift event",
-                    "category": "custom",
                     "icon": "🎁",
                 }
             ],
@@ -86,6 +85,8 @@ class TestReactionCatalogEndpoint:
         assert resp.status_code == 200
         body = resp.json()
         assert body["events"]["tiktok.gift"]["name"] == "Custom Gift"
+        # Overridden core event is re-categorized under the plugin's name.
+        assert body["events"]["tiktok.gift"]["category"] == "tweaker"
 
     def test_catalog_templates_present(self, client):
         resp = client.get("/api/v1/reactions/catalog")

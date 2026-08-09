@@ -15,12 +15,36 @@
   "depends_on": [],
   "icon": "💀",
   "emitted_events": [
-    { "key": "death.milestone", "name": "Death Milestone Reached", "desc": "When the death count reaches a configured milestone", "category": "custom", "icon": "💀" }
+    {
+      "key": "death.milestone",
+      "name": "Death Milestone Reached",
+      "desc": "When the death count reaches a configured milestone",
+      "icon": "💀"
+    }
   ],
   "accepted_commands": {
-    "player_death": { "name": "Count Death", "desc": "Increase the death counter", "args": {} },
-    "add_death": { "name": "Add Deaths", "desc": "Add deaths to the counter", "args": { "amount": { "type": "number", "label": "How many deaths", "default": 1, "min": 1 } } },
-    "reset": { "name": "Reset Counter", "desc": "Reset the death counter to zero", "args": {} }
+    "player_death": {
+      "name": "Count Death",
+      "desc": "Increase the death counter",
+      "args": {}
+    },
+    "add_death": {
+      "name": "Add Deaths",
+      "desc": "Add deaths to the counter",
+      "args": {
+        "amount": {
+          "type": "number",
+          "label": "How many deaths",
+          "default": 1,
+          "min": 1
+        }
+      }
+    },
+    "reset": {
+      "name": "Reset Counter",
+      "desc": "Reset the death counter to zero",
+      "args": {}
+    }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {
@@ -41,10 +65,14 @@
       {
         "key": "signal_on",
         "type": "array",
-        "default": ["milestone"],
+        "default": [
+          "milestone"
+        ],
         "item_schema": {
           "type": "select",
-          "options": ["milestone"]
+          "options": [
+            "milestone"
+          ]
         },
         "label": "Signal On",
         "help": "Events published to the EventBus via POST /api/v1/events",

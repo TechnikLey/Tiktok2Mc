@@ -15,12 +15,44 @@
   "depends_on": [],
   "icon": "🏆",
   "emitted_events": [
-    { "key": "win.milestone", "name": "Win Milestone Reached", "desc": "When the win count reaches a configured milestone", "category": "custom", "icon": "🏆" },
-    { "key": "win.record_low", "name": "New Record Low", "desc": "When the win count drops to a new record low", "category": "custom", "icon": "📉" }
+    {
+      "key": "win.milestone",
+      "name": "Win Milestone Reached",
+      "desc": "When the win count reaches a configured milestone",
+      "icon": "🏆"
+    },
+    {
+      "key": "win.record_low",
+      "name": "New Record Low",
+      "desc": "When the win count drops to a new record low",
+      "icon": "📉"
+    }
   ],
   "accepted_commands": {
-    "add_win": { "name": "Add Win", "desc": "Increase the win count", "args": { "amount": { "type": "number", "label": "How many wins", "default": 1, "min": 1 } } },
-    "remove_win": { "name": "Remove Win", "desc": "Decrease the win count", "args": { "amount": { "type": "number", "label": "How many to remove", "default": 1, "min": 1 } } }
+    "add_win": {
+      "name": "Add Win",
+      "desc": "Increase the win count",
+      "args": {
+        "amount": {
+          "type": "number",
+          "label": "How many wins",
+          "default": 1,
+          "min": 1
+        }
+      }
+    },
+    "remove_win": {
+      "name": "Remove Win",
+      "desc": "Decrease the win count",
+      "args": {
+        "amount": {
+          "type": "number",
+          "label": "How many to remove",
+          "default": 1,
+          "min": 1
+        }
+      }
+    }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
   "config_schema": {
@@ -47,10 +79,16 @@
       {
         "key": "signal_on",
         "type": "array",
-        "default": ["milestone", "record_low"],
+        "default": [
+          "milestone",
+          "record_low"
+        ],
         "item_schema": {
           "type": "select",
-          "options": ["milestone", "record_low"]
+          "options": [
+            "milestone",
+            "record_low"
+          ]
         },
         "label": "Signal On",
         "help": "Events published to the EventBus via POST /api/v1/events",

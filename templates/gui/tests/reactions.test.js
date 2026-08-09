@@ -56,3 +56,24 @@ describe('ReactionEditor catalog', () => {
     await expect(reactionEditor.loadCatalog()).resolves.toBeUndefined();
   });
 });
+
+describe('ReactionEditor wizard step 1 categories', () => {
+  it('groups plugin events under their declared category', () => {
+    reactionEditor.eventCatalog = {
+      'tiktok.follow': { name: 'New Follower', desc: 'Follow', category: 'tiktok', icon: '👤' },
+      'music.track': { name: 'Track', desc: 'A track', category: 'music', icon: '🎵' },
+      'win.milestone': { name: 'Milestone', desc: 'A win', category: 'win', icon: '🏆' },
+    };
+    const html = reactionEditor._renderStepEvent();
+    expect(html).toContain('TikTok Events');
+    expect(html).toContain('>Music</strong>');
+    expect(html).toContain('>Win</strong>');
+    expect(html).not.toContain('Plugin &amp; Custom Events');
+  });
+
+  it('humanizes hyphenated categories', () => {
+    expect(reactionEditor._humanizeCategory('death-counter')).toBe('Death Counter');
+    expect(reactionEditor._categoryLabel('custom')).toBe('Custom Events');
+    expect(reactionEditor._categoryLabel('music')).toBe('Music');
+  });
+});

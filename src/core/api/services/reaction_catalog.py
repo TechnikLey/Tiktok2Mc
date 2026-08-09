@@ -153,7 +153,10 @@ def build_reaction_catalog() -> dict[str, Any]:
             "icon": manifest.icon,
         }
         for ev in manifest.emitted_events:
-            events[ev.key] = ev.model_dump()
+            data = ev.model_dump()
+            # Plugin events are grouped under the plugin's own name.
+            data["category"] = manifest.name
+            events[ev.key] = data
         if manifest.accepted_commands:
             commands[manifest.name] = {
                 key: cmd.model_dump() for key, cmd in manifest.accepted_commands.items()
