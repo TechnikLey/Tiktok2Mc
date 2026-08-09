@@ -939,6 +939,10 @@ function _versionBadgeLabel(version) {
 }
 
 async function serverManagerPromptSwitch(version) {
+  if (_serverManagerCache?.current_version === version) {
+    showToast('Version ' + version + ' is already the active version.', 'info');
+    return;
+  }
   const installed = _serverManagerCache?.installed || [];
   const found = installed.find(v => v.version === version);
   const isSafe = found ? found.type === 'safe' : (_serverManagerCache?.safe_versions || []).includes(version);
@@ -1199,6 +1203,7 @@ function openServerSwitchModal() {
 
   const installed = _serverManagerCache?.installed || [];
   const safeVersions = _serverManagerCache?.safe_versions || [];
+  const currentVersion = _serverManagerCache?.current_version;
 
   if (!installed.length) {
     list.innerHTML = '<p class="text-muted">No versions installed. <a href="#" onclick="closeServerSwitchModal();openServerDownloadModal();return false;">Download one first</a>.</p>';
@@ -1207,18 +1212,35 @@ function openServerSwitchModal() {
     for (const v of installed) {
       const badgeClass = 'server-status-badge--' + (v.type === 'safe' ? 'safe' : v.type === 'custom' ? 'custom' : 'unsafe');
       const badgeLabel = v.type.toUpperCase();
-      html += '<div class="version-card" style="cursor:pointer;" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">' +
-        '<div class="version-card-info">' +
-          '<div class="version-card-version">' +
-            '<strong>' + escapeHtml(v.version) + '</strong>' +
-            '<span class="server-status-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+      const isCurrent = currentVersion && v.version === currentVersion;
+      if (isCurrent) {
+        html += '<div class="version-card version-card--active">' +
+          '<div class="version-card-info">' +
+            '<div class="version-card-version">' +
+              '<strong>' + escapeHtml(v.version) + '</strong>' +
+              '<span class="server-status-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+              '<span class="server-status-badge server-status-badge--active">CURRENT</span>' +
+            '</div>' +
+            '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code></div>' +
           '</div>' +
-          '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code></div>' +
-        '</div>' +
-        '<div class="version-card-actions">' +
-          '<span class="text-muted" style="font-size:var(--text-xs);">Click to switch</span>' +
-        '</div>' +
-      '</div>';
+          '<div class="version-card-actions">' +
+            '<span class="text-muted" style="font-size:var(--text-xs);">Active version</span>' +
+          '</div>' +
+        '</div>';
+      } else {
+        html += '<div class="version-card" style="cursor:pointer;" onclick="serverManagerPromptSwitch(\'' + escapeHtml(v.version) + '\')">' +
+          '<div class="version-card-info">' +
+            '<div class="version-card-version">' +
+              '<strong>' + escapeHtml(v.version) + '</strong>' +
+              '<span class="server-status-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+            '</div>' +
+            '<div class="version-card-path"><code>' + escapeHtml(v.path) + '</code></div>' +
+          '</div>' +
+          '<div class="version-card-actions">' +
+            '<span class="text-muted" style="font-size:var(--text-xs);">Click to switch</span>' +
+          '</div>' +
+        '</div>';
+      }
     }
     list.innerHTML = html;
   }

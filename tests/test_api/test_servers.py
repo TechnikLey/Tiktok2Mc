@@ -7,6 +7,13 @@ class TestServersList:
         default = next(i for i in body["instances"] if i["id"] == "default")
         assert default["hasJar"] is False
 
+    def test_current_version_is_reported(self, client, project_dir):
+        resp = client.get("/api/v1/servers")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "current_version" in body
+        assert body["current_version"] == "1.21.11"
+
     def test_instance_reports_jar_after_installation(self, client, project_dir):
         jar_dir = project_dir / "server" / "default"
         jar_dir.mkdir(parents=True, exist_ok=True)

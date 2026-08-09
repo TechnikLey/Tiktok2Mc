@@ -309,6 +309,7 @@ class ServersListResponse(BaseModel):
     instances: list[InstanceInfo]
     installed: list[ServerVersionInfo]
     safe_versions: list[str]
+    current_version: str
 
 
 class DownloadRequest(BaseModel):
@@ -368,6 +369,12 @@ class UpdateInstanceRequest(BaseModel):
 async def list_servers():
     installed = _list_installed_versions()
 
+    try:
+        cfg = _get_service().read_config()
+        current_version = cfg.get("mc_version", "1.21.11")
+    except Exception:
+        current_version = "1.21.11"
+
     raw_instances = _load_instances()
     instances: list[InstanceInfo] = []
     for inst_id, inst_data in raw_instances.items():
@@ -391,6 +398,7 @@ async def list_servers():
         instances=instances,
         installed=[ServerVersionInfo(**v) for v in installed],
         safe_versions=sorted(SAFE_VERSIONS),
+        current_version=current_version,
     )
 
 

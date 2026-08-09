@@ -2756,6 +2756,10 @@ input[type="color"] {
   background: var(--color-danger-subtle);
   color: var(--color-danger);
 }
+.server-status-badge--active {
+  background: var(--color-success);
+  color: var(--color-bg);
+}
 
 /* View section header (version count inline) */
 .view-section-header {

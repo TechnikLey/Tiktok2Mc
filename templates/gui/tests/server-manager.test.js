@@ -46,6 +46,53 @@ describe('renderServerCard', () => {
   });
 });
 
+describe('openServerSwitchModal', () => {
+  beforeEach(() => {
+    window._serverManagerCache = {
+      instances: [],
+      installed: [
+        { version: '1.21.11', type: 'safe', path: 'versions/1.21.11' },
+        { version: '1.20.4', type: 'unsafe', path: 'versions/1.20.4' },
+      ],
+      safe_versions: ['1.21.11'],
+      current_version: '1.21.11',
+    };
+  });
+
+  function switchList() {
+    return document.getElementById('server-switch-list');
+  }
+
+  it('marks the current version as active and not clickable', () => {
+    openServerSwitchModal();
+    const list = switchList();
+    const cards = list.querySelectorAll('.version-card');
+    expect(cards.length).toBe(2);
+
+    const current = list.querySelector('.version-card--active');
+    expect(current).not.toBeNull();
+    expect(current.textContent).toContain('CURRENT');
+    expect(current.textContent).toContain('Active version');
+    expect(current.getAttribute('onclick')).toBeNull();
+
+    const switchable = Array.from(cards).filter(c => !c.classList.contains('version-card--active'));
+    expect(switchable.length).toBe(1);
+    expect(switchable[0].getAttribute('onclick')).toContain('serverManagerPromptSwitch');
+    expect(switchable[0].textContent).toContain('Click to switch');
+  });
+
+  it('renders all cards clickable when no current version is known', () => {
+    window._serverManagerCache.current_version = null;
+    openServerSwitchModal();
+    const cards = switchList().querySelectorAll('.version-card');
+    expect(cards.length).toBe(2);
+    expect(switchList().querySelector('.version-card--active')).toBeNull();
+    Array.from(cards).forEach(c => {
+      expect(c.getAttribute('onclick')).toContain('serverManagerPromptSwitch');
+    });
+  });
+});
+
 describe('renderJavaStatusBanner', () => {
   function bannerEl() {
     return document.getElementById('java-status-banner');
