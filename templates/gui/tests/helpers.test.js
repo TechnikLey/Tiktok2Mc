@@ -166,6 +166,54 @@ describe('isAnyEditorDirty', () => {
   });
 });
 
+/* ─── unsaved changes guard on navigation ─── */
+describe('unsaved changes guard on navigation', () => {
+  function resetDirty() {
+    editor.original = JSON.parse(JSON.stringify(editor.data));
+    pluginEditor.original = JSON.parse(JSON.stringify(pluginEditor.config));
+    actionsEditor.isDirty = false;
+    reactionEditor._dirty = false;
+    _pendingNavigation = null;
+    document.getElementById('unsaved-changes-modal').classList.add('hidden');
+    switchViewNow('status');
+  }
+
+  it('navigates immediately when no editor is dirty', () => {
+    resetDirty();
+    switchView('plugins');
+    expect(document.getElementById('view-plugins').classList.contains('active')).toBe(true);
+    expect(document.getElementById('unsaved-changes-modal').classList.contains('hidden')).toBe(true);
+  });
+
+  it('shows the unsaved modal and defers navigation when dirty', () => {
+    resetDirty();
+    actionsEditor.isDirty = true;
+    switchView('plugins');
+    expect(document.getElementById('unsaved-changes-modal').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('view-plugins').classList.contains('active')).toBe(false);
+  });
+
+  it('discard navigates and clears dirty state', () => {
+    resetDirty();
+    actionsEditor.isDirty = true;
+    switchView('plugins');
+    document.getElementById('btn-unsaved-exit-no-save').click();
+    expect(document.getElementById('unsaved-changes-modal').classList.contains('hidden')).toBe(true);
+    expect(document.getElementById('view-plugins').classList.contains('active')).toBe(true);
+    expect(actionsEditor.isDirty).toBe(false);
+  });
+
+  it('cancel aborts the navigation', () => {
+    resetDirty();
+    editor.data = { someKey: 'changed' };
+    editor.original = { someKey: 'original' };
+    switchView('plugins');
+    document.getElementById('btn-unsaved-cancel').click();
+    expect(document.getElementById('view-plugins').classList.contains('active')).toBe(false);
+    expect(editor.isDirty()).toBe(true);
+  });
+});
+
 /* ─── getMeta ─── */
 describe('getMeta', () => {
   it('returns field metadata for known paths', () => {

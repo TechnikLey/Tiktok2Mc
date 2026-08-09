@@ -5460,6 +5460,7 @@ const actionsEditor = new ActionsEditor();
 
 /* ─── Unsaved changes warning on window close ─── */
 let _closeInProgress = false;
+let _pendingNavigation = null;
 
 // Fallback for browser testing (no pywebview API)
 if (typeof pywebview === 'undefined' || !pywebview.api) {
@@ -5495,6 +5496,8 @@ async function _handleCloseRequest() {
     return;
   }
   _closeInProgress = true;
+  document.getElementById('btn-unsaved-save-exit').textContent = 'Save and Exit';
+  document.getElementById('btn-unsaved-exit-no-save').textContent = 'Exit Without Saving';
   document.getElementById('unsaved-changes-modal').classList.remove('hidden');
 }
 
@@ -5544,13 +5547,39 @@ async function _saveAllEditors() {
   }
 }
 
+function _discardAllEditors() {
+  if (actionsEditor.isDirty) {
+    actionsEditor.isDirty = false;
+    actionsEditor._updateSaveButton();
+  }
+  if (reactionEditor.isDirty()) {
+    reactionEditor._dirty = false;
+    reactionEditor._updateSaveButton();
+  }
+  if (editor.isDirty()) {
+    editor.data = JSON.parse(JSON.stringify(editor.original));
+    currentConfig = JSON.parse(JSON.stringify(editor.original));
+    editor._updateSaveButton();
+  }
+  if (pluginEditor.isDirty()) {
+    pluginEditor.config = JSON.parse(JSON.stringify(pluginEditor.original));
+    pluginEditor._updateSaveButton();
+  }
+}
+
 document.getElementById('btn-unsaved-save-exit').addEventListener('click', async () => {
-  _closeInProgress = true;
   document.getElementById('unsaved-changes-modal').classList.add('hidden');
+  const navigate = _pendingNavigation;
+  _pendingNavigation = null;
   try {
     await _saveAllEditors();
-    await pywebview.api.approve_close();
-    window.close();
+    if (navigate) {
+      navigate();
+    } else {
+      _closeInProgress = true;
+      await pywebview.api.approve_close();
+      window.close();
+    }
   } catch (e) {
     showToast('Save failed before exit: ' + e.message, 'error');
     _closeInProgress = false;
@@ -5558,14 +5587,22 @@ document.getElementById('btn-unsaved-save-exit').addEventListener('click', async
 });
 
 document.getElementById('btn-unsaved-exit-no-save').addEventListener('click', async () => {
-  _closeInProgress = true;
   document.getElementById('unsaved-changes-modal').classList.add('hidden');
-  await pywebview.api.approve_close();
-  window.close();
+  const navigate = _pendingNavigation;
+  _pendingNavigation = null;
+  if (navigate) {
+    _discardAllEditors();
+    navigate();
+  } else {
+    _closeInProgress = true;
+    await pywebview.api.approve_close();
+    window.close();
+  }
 });
 
 document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
   document.getElementById('unsaved-changes-modal').classList.add('hidden');
+  _pendingNavigation = null;
   _closeInProgress = false;
 });
 
@@ -6104,7 +6141,22 @@ function _initEditorVisibilityObserver() {
 }
 
 /* ─── Sidebar Navigation ─── */
+function _switchWithUnsavedGuard(action) {
+  if (isAnyEditorDirty()) {
+    _pendingNavigation = action;
+    document.getElementById('btn-unsaved-save-exit').textContent = 'Save Changes';
+    document.getElementById('btn-unsaved-exit-no-save').textContent = 'Discard Changes';
+    document.getElementById('unsaved-changes-modal').classList.remove('hidden');
+  } else {
+    action();
+  }
+}
+
 function switchView(viewId) {
+  _switchWithUnsavedGuard(() => switchViewNow(viewId));
+}
+
+function switchViewNow(viewId) {
   _hideAllEditors();
   // Close inline plugin config if open
   const pluginInline = document.getElementById('plugins-config-section');
@@ -6148,6 +6200,10 @@ function switchView(viewId) {
 
 /* For nav items that open an editor (Actions/Reactions/Settings) */
 function switchToEditor(viewId, openFn) {
+  _switchWithUnsavedGuard(() => switchToEditorNow(viewId, openFn));
+}
+
+function switchToEditorNow(viewId, openFn) {
   _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navItem = document.querySelector(`.nav-item[data-view="${viewId}"]`);
