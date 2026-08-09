@@ -4710,7 +4710,6 @@ class ReactionEditor {
       all: 'All Reactions',
       tiktok: 'TikTok Events',
       minecraft: 'Minecraft Events',
-      timer: 'Timer Events',
       server: 'Server Events',
       custom: 'Custom Events',
     };
@@ -4837,7 +4836,10 @@ class ReactionEditor {
   }
 
   _categoryLabel(cat) {
-    return this.categoryLabels[cat] || this._humanizeCategory(cat);
+    if (this.categoryLabels[cat]) return this.categoryLabels[cat];
+    const plugin = this.pluginCatalog[cat];
+    if (plugin && plugin.name) return plugin.name;
+    return this._humanizeCategory(cat);
   }
 
   renderSidebar() {
@@ -5133,12 +5135,11 @@ class ReactionEditor {
     const standardLabels = {
       tiktok: 'TikTok Events',
       minecraft: 'Minecraft Events',
-      timer: 'Timer Events',
       server: 'Server Events',
     };
-    // Standard groups first, then any extra categories used by plugins.
+    // Standard groups first, then one group per plugin (named after the plugin).
     const groups = [];
-    for (const cat of ['tiktok', 'minecraft', 'timer', 'server']) {
+    for (const cat of ['tiktok', 'minecraft', 'server']) {
       groups.push({ cat, label: standardLabels[cat], items: [] });
     }
     const extraGroups = new Map();
@@ -5149,7 +5150,8 @@ class ReactionEditor {
         group.items.push({ key, ...info });
       } else {
         if (!extraGroups.has(cat)) {
-          extraGroups.set(cat, { cat, label: this._humanizeCategory(cat), items: [] });
+          const label = this.pluginCatalog[cat]?.name || this._humanizeCategory(cat);
+          extraGroups.set(cat, { cat, label, items: [] });
         }
         extraGroups.get(cat).items.push({ key, ...info });
       }

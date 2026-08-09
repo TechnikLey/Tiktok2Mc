@@ -63,17 +63,24 @@ describe('ReactionEditor wizard step 1 categories', () => {
       'tiktok.follow': { name: 'New Follower', desc: 'Follow', category: 'tiktok', icon: '👤' },
       'music.track': { name: 'Track', desc: 'A track', category: 'music', icon: '🎵' },
       'win.milestone': { name: 'Milestone', desc: 'A win', category: 'win', icon: '🏆' },
+      'timer.zero': { name: 'Timer Zero', desc: 'Zero', category: 'timer', icon: '⏰' },
     };
     const html = reactionEditor._renderStepEvent();
     expect(html).toContain('TikTok Events');
     expect(html).toContain('>Music</strong>');
     expect(html).toContain('>Win</strong>');
+    expect(html).toContain('>Timer</strong>');
+    expect(html).not.toContain('Timer Events');
     expect(html).not.toContain('Plugin &amp; Custom Events');
   });
 
-  it('humanizes hyphenated categories', () => {
-    expect(reactionEditor._humanizeCategory('death-counter')).toBe('Death Counter');
+  it('labels plugin categories with the plugin display name', () => {
+    reactionEditor.pluginCatalog = {
+      timer: { name: 'Timer', icon: '⏱️' },
+      'spotify-control': { name: 'Spotify Control', icon: '🎵' },
+    };
+    expect(reactionEditor._categoryLabel('timer')).toBe('Timer');
+    expect(reactionEditor._categoryLabel('spotify-control')).toBe('Spotify Control');
     expect(reactionEditor._categoryLabel('custom')).toBe('Custom Events');
-    expect(reactionEditor._categoryLabel('music')).toBe('Music');
   });
 });
