@@ -4972,12 +4972,33 @@ class ReactionEditor {
                 <span>${escapeHtml(cmdInfo.name)}</span>
               </div>
             </div>
-            ${Object.keys(action.args || {}).length ? `<div class="reaction-meta" style="margin-top:0.5rem;font-size:0.78rem;">Options: ${escapeHtml(JSON.stringify(action.args))}</div>` : ''}
+            ${this._renderReactionArgs(action, cmdInfo)}
           </div>
         </div>`;
       }
     }
     this.content.innerHTML = html;
+  }
+
+  _renderReactionArgs(action, cmdInfo) {
+    const args = action.args || {};
+    const keys = Object.keys(args);
+    if (!keys.length) return '';
+    const schema = (cmdInfo && cmdInfo.args) || {};
+    const chips = keys.map(key => {
+      const spec = schema[key] || {};
+      const label = spec.label || key;
+      let value = args[key];
+      if (spec.type === 'select' && Array.isArray(spec.options)) {
+        const opt = spec.options.find(o => String(o) === String(value));
+        if (opt !== undefined) value = opt;
+      }
+      return `<span class="reaction-arg-chip">
+        <span class="reaction-arg-key">${escapeHtml(label)}</span>
+        <span class="reaction-arg-value">${escapeHtml(String(value))}</span>
+      </span>`;
+    }).join('');
+    return `<div class="reaction-args">${chips}</div>`;
   }
 
   renderEmptyState() {

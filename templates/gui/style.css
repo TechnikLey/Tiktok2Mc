@@ -2071,6 +2071,31 @@ input[type="color"] {
 }
 .reaction-card-body { padding: var(--space-4) var(--space-5); }
 .reaction-flow { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.reaction-args {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.reaction-arg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-elevated);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+.reaction-arg-key {
+  color: var(--color-text-muted);
+}
+.reaction-arg-value {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  font-family: var(--font-mono);
+}
 .reaction-when {
   display: flex;
   align-items: center;

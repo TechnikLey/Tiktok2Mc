@@ -194,3 +194,41 @@ describe('ReactionEditor disabled-plugin rendering', () => {
     expect(card.querySelector('.reaction-btn-test').disabled).toBe(false);
   });
 });
+
+describe('ReactionEditor arg chip rendering', () => {
+  it('renders no args block when the reaction has none', () => {
+    const html = reactionEditor._renderReactionArgs({ args: {} }, { args: {} });
+    expect(html).toBe('');
+  });
+
+  it('renders each argument as a label/value chip', () => {
+    const html = reactionEditor._renderReactionArgs(
+      { args: { level: 50, query: 'hello' } },
+      { args: {
+        level: { type: 'number', label: 'Volume level' },
+        query: { type: 'string', label: 'Song name' },
+      } }
+    );
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const chips = wrapper.querySelectorAll('.reaction-arg-chip');
+    expect(chips.length).toBe(2);
+    expect(chips[0].querySelector('.reaction-arg-key').textContent).toBe('Volume level');
+    expect(chips[0].querySelector('.reaction-arg-value').textContent).toBe('50');
+    expect(chips[1].querySelector('.reaction-arg-key').textContent).toBe('Song name');
+    expect(chips[1].querySelector('.reaction-arg-value').textContent).toBe('hello');
+    expect(html).not.toContain('Options:');
+    expect(html).not.toContain('{');
+  });
+
+  it('falls back to the raw key when the schema has no label', () => {
+    const html = reactionEditor._renderReactionArgs(
+      { args: { amount: 3 } },
+      { args: {} }
+    );
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    expect(wrapper.querySelector('.reaction-arg-key').textContent).toBe('amount');
+    expect(wrapper.querySelector('.reaction-arg-value').textContent).toBe('3');
+  });
+});
