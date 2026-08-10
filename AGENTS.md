@@ -28,7 +28,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 | `defaults/` | Templates copied to `config/`+`data/` on first run: `config.yaml`, `actions.mca`, `gifts.json`, `event_commands.yaml`, server configs |
 | `tests/` | pytest: `test_core/`, `test_api/`, `conftest.py` (WriteGuard + heavy-dep mocks), `workspace/` (only writable area) |
 | `docs/dev-book-{en,de}/src/` | mdBook docs — keep both languages in sync |
-| `tools/` | `diff_test_mca.py` (Python↔JS diff), `generate_mca_spec.py` |
+| `tools/` | `diff_test_mca.py` (Python↔JS diff), `generate_mca_spec.py`, `update_test/` (updater E2E harness, see `README.md`) |
 
 **Priority files (read first):** `src/core/paths.py` (dev/release layout) · `src/core/version.py` (all versions) · `src/core/api/server.py` (app factory/lifecycle) · `src/core/api/services/__init__.py` (`ApiService`, config read/write) · `src/core/validator.py` + `src/core/api/services/actions.py` (`.mca` source of truth) · `src/core/error_codes.py` · `src/core/trigger_engine/engine.py` · `src/core/base_plugin.py`
 
@@ -59,7 +59,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 - **Runtime signals:** `core/runtime/` files (e.g. reload signals) are IPC, not config — don't hardcode content.
 
 ## 7. Testing & Validation
-Three layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS LSP + parity diff). CI (`.github/workflows/`) runs pytest + build; static analysis tools are local-only.
+Four layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS LSP + parity diff), updater E2E (`tools/update_test/`). CI (`.github/workflows/`) runs pytest + build; static analysis tools are local-only.
 
 ### 7.1 Python — pytest, pyright, ruff
 - **pytest** — test framework/runner. Config `pytest.ini`: asyncio auto-mode, markers `integration`/`unit`/`validator`, 40 s timeout. `tests/conftest.py` installs a **WriteGuard** — writes outside `tests/workspace/` raise `PermissionError`; never point tests at real `config/`/`data/`.
@@ -91,14 +91,20 @@ Three layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS 
   - Commands: `python tools/diff_test_mca.py --count 500` (optional `--seed S`); npm script `diff-test` inside `mca-language-server/`
   - When: after any `.mca` handling change (Python `validator.py`/`services/actions.py`, JS `server/`, spec generation).
 
-### 7.4 Build validation & dev tools
+### 7.4 Updater E2E test harness
+- **Purpose:** `tools/update_test/` runs the **compiled** updater (`update.exe`/`update.bin`) against a local GitHub-compatible mock server, exercising the real `src/python/update.py` path: version check, asset selection, download, checksum, extraction, self-update, whitelisted copy, config migration, exit codes. Only the HTTP source is simulated (via `TIKTOK2MC_UPDATE_SOURCE`); everything else is the real binary.
+  - Commands: `python build.py app --only update` (build first) → `python tools/update_test/run_update_test.py --list` / `success` / `all` (add `--build --clean` for a from-scratch run). Port `29185` must be free.
+  - When: after any change to `src/python/update.py` or the release asset naming/checksums; also update scenarios/`mock_github.py` in `tools/update_test/` if behavior changed.
+  - Note: Windows Defender may flag the freshly built unsigned `update.exe` (`Behavior:Win32/DefenseEvasion.A!ml`) — heuristic false positive, see `tools/update_test/README.md`; do not work around it in code.
+
+### 7.5 Build validation & dev tools
 - `python build.py test` — runs the MCA LSP test suite; `--all` also runs full pytest. `python build.py --check` runs `check_deps.py` first.
 - `python build.py spec` — regenerates `mca-language-server/mca-spec.json` (generated file — never hand-edit).
 - `python check_deps.py` — verifies Python packages + system tools (node/npm); `--install` installs everything, `--system-only` checks tools only.
 - **Utility tools:** `rg` (ripgrep) for fast code search, `fd` for fast file search, `jq` for JSON parsing/inspection (configs, manifests, API output). Not part of `check_deps.py`.
 - **CI:** `test.yml` runs `pytest tests/` (+ a warnings pass) on push/PR to `main`; `build.yml` runs `python build.py --installer` on version tags (Windows + Linux) and creates the GitHub release; `mdbook.yml` builds the docs.
 
-### 7.5 Test style & validation priority
+### 7.6 Test style & validation priority
 - One `test_<module>.py` per module in `tests/test_core/` or `tests/test_api/`.
 - **Validation priority:** relevant pytest file → vitest (only if GUI touched) → LSP + diff test (only for `.mca` changes). Static analysis (ruff/pyright/eslint) before larger changes; `ruff format --check .` before committing.
 
@@ -118,6 +124,7 @@ pytest tests/test_core/test_x.py -m unit
 cd templates/gui && npm test          # GUI tests (vitest, jsdom)
 node mca-language-server/server/test/run.js    # MCA LSP tests
 python tools/diff_test_mca.py --count 500      # Python↔JS parity
+python tools/update_test/run_update_test.py all --build --clean   # updater E2E harness
 python build.py test                  # MCA tests (--all adds pytest)
 
 # Validation
@@ -157,3 +164,4 @@ Change checklists:
 - **API change:** Pydantic model (`api/models.py`) → route (`routes/`) → register in `routes/__init__.py` → tests in `tests/test_api/`.
 - **`.mca` change:** mirror in Python + JS + `mca_spec.py`; verify with `tools/diff_test_mca.py`.
 - **Config change:** don't remove/rename `defaults/config.yaml` keys silently; `EXPECTED_CONFIG_VERSION` bumps need `auto_update_config` migration.
+- **Updater change:** update scenarios/`mock_github.py` in `tools/update_test/` if behavior changed; verify with `python tools/update_test/run_update_test.py all --build --clean`.

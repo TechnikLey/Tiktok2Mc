@@ -53,6 +53,18 @@ python build.py --use-cache all   # Funktioniert mit app, all, ci
 >
 > Fehlende Dateien: Erst einen vollen Build starten (`python build.py app`). Veraltete Dateien: Hashes stimmen nicht — beim nächsten vollen Build wird automatisch neu gebaut.
 
+### Updater-End-to-End-Test
+
+`tools/update_test/` führt den **kompilierten** Updater gegen einen lokalen Mock-Server der GitHub-Releases-API aus, sodass der echte Updater-Codepfad (Versionscheck, Asset-Auswahl, Download, Checksumme, Entpacken, Self-Update, Whitelist-Kopien, Config-Migration, Exit-Codes) ohne Netzwerk und ohne laufende Instanz getestet wird:
+
+```bash
+python build.py app --only update                    # Updater-Binary bauen
+python tools/update_test/run_update_test.py --list   # Szenarien anzeigen
+python tools/update_test/run_update_test.py all --build --clean   # alle Szenarien ausführen
+```
+
+Der Harness simuliert nur die HTTP-Quelle (via `TIKTOK2MC_UPDATE_SOURCE`); alles andere läuft mit dem echten Binary. `src/`, `config/` und `data/` werden nie angefasst. Port `29185` muss frei sein. Details — inklusive des bekannten Windows-Defender-False-Positive bei frisch gebautem, unsigniertem `update.exe` — stehen in `tools/update_test/README.md`.
+
 ### Python-Pakete (requirements.txt)
 
 | Paket | Benötigt für |
