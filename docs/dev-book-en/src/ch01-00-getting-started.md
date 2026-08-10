@@ -60,7 +60,7 @@ python build.py --use-cache all   # Works with app, all, ci
 ```bash
 python build.py app --only update                    # build the updater binary
 python tools/update_test/run_update_test.py --list   # show scenarios
-python tools/update_test/run_update_test.py all --build --clean   # run all scenarios
+python tools/update_test/run_update_test.py all --clean   # run all scenarios
 ```
 
 The harness only simulates the HTTP source (via `TIKTOK2MC_UPDATE_SOURCE`); everything else runs the real binary. It never touches `src/`, `config/` or `data/`. Port `29185` must be free. Details — including the known Windows Defender false positive on freshly built unsigned `update.exe` — are in `tools/update_test/README.md`.

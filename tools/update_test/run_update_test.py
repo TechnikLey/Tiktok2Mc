@@ -17,7 +17,7 @@ Usage::
     python tools/update_test/run_update_test.py --list
     python tools/update_test/run_update_test.py --scenario success
     python tools/update_test/run_update_test.py all
-    python tools/update_test/run_update_test.py all --build --clean
+    python tools/update_test/run_update_test.py all --clean
 
 See ``tools/update_test/README.md`` for details and the known Windows
 Defender false positive on freshly built unsigned PyInstaller binaries.
@@ -206,10 +206,13 @@ class FileSignalConsumer(threading.Thread):
     def __init__(self, install: Path) -> None:
         super().__init__(daemon=True, name="signal-consumer")
         self._signal = install / "update_signal.tmp"
-        self._stop = threading.Event()
+        # NOTE: must not be named ``_stop`` — that would shadow
+        # ``threading.Thread._stop()`` and ``join()`` would call the
+        # ``threading.Event`` instance instead of the method.
+        self._stop_event = threading.Event()
 
     def run(self) -> None:
-        while not self._stop.wait(0.2):
+        while not self._stop_event.wait(0.2):
             try:
                 if self._signal.exists():
                     self._signal.unlink()
@@ -217,7 +220,7 @@ class FileSignalConsumer(threading.Thread):
                 pass
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stop_event.set()
         self.join(timeout=2.0)
 
 
@@ -468,14 +471,16 @@ class Harness:
                     ["tasklist", "/FI", f"IMAGENAME eq {name}", "/NH"],
                     capture_output=True,
                     text=True,
+                    errors="replace",  # tasklist output is not always cp1252-clean
                     timeout=15,
                     check=False,
                 )
-                return name.lower() in r.stdout.lower()
+                return (r.stdout or "").lower().find(name.lower()) != -1
             r = subprocess.run(
                 ["pgrep", "-x", name],
                 capture_output=True,
                 text=True,
+                errors="replace",
                 timeout=15,
                 check=False,
             )
@@ -910,16 +915,6 @@ def _run_scenario(h: Harness, name: str) -> bool:
         api.stop()
 
 
-def _build_updater() -> bool:
-    print(f"{C}Building update{SUFFIX} via build.py...{X}")
-    r = subprocess.run(
-        [sys.executable, str(_ROOT / "build.py"), "app", "--only", "update"],
-        cwd=_ROOT,
-        check=False,
-    )
-    return r.returncode == 0
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -929,11 +924,6 @@ def main(argv: list[str] | None = None) -> int:
         "scenario", nargs="?", default=None, help="scenario name or 'all'"
     )
     parser.add_argument("--list", action="store_true", help="list available scenarios")
-    parser.add_argument(
-        "--build",
-        action="store_true",
-        help="build the compiled updater first (python build.py app --only update)",
-    )
     parser.add_argument(
         "--updater",
         default=None,
@@ -968,14 +958,9 @@ def main(argv: list[str] | None = None) -> int:
     updater = (
         args.updater or (_ROOT / "build" / "release" / f"update{SUFFIX}")
     ).resolve()
-    if args.build and not _build_updater():
-        print(f"{R}Build failed.{X}")
-        return 2
     if not updater.exists():
         print(f"{R}Compiled updater not found: {updater}{X}")
-        print(
-            f"{Y}Build it first:  python build.py app --only update   (or pass --build){X}"
-        )
+        print(f"{Y}Build it first:  python build.py app --only update{X}")
         return 2
 
     new_tool = (args.new_tool or TOOL_VERSION.lstrip("v")).strip()

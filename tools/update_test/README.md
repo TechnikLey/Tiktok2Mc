@@ -14,7 +14,7 @@ self-update, whitelisted file copy, config migration and exit codes.
 
 ## Requirements
 
-* A compiled updater: `python build.py app --only update` (or `--build`).
+* A compiled updater: `python build.py app --only update`.
 * The control-plane port `29185` must be free — the harness binds it to
   simulate the app's kill-signal endpoint and refuses to start if a real
   Tiktok2Mc instance is running.
@@ -25,8 +25,13 @@ self-update, whitelisted file copy, config migration and exit codes.
 python tools/update_test/run_update_test.py --list            # scenarios
 python tools/update_test/run_update_test.py success           # one scenario
 python tools/update_test/run_update_test.py all               # all scenarios
-python tools/update_test/run_update_test.py all --build --clean
+python tools/update_test/run_update_test.py all --clean
 ```
+
+Build the updater separately first (`python build.py app --only update`);
+the harness no longer builds it itself, because running a freshly built
+unsigned `update.exe` immediately (as `--build` did) reliably triggered
+the Windows Defender heuristic false positive (see below).
 
 `--clean` removes the scratch directory afterwards; without it the scratch
 dir is kept (with `logs/<scenario>.log`) so you can inspect the updater's

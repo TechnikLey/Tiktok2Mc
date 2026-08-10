@@ -93,7 +93,7 @@ Four layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS L
 
 ### 7.4 Updater E2E test harness
 - **Purpose:** `tools/update_test/` runs the **compiled** updater (`update.exe`/`update.bin`) against a local GitHub-compatible mock server, exercising the real `src/python/update.py` path: version check, asset selection, download, checksum, extraction, self-update, whitelisted copy, config migration, exit codes. Only the HTTP source is simulated (via `TIKTOK2MC_UPDATE_SOURCE`); everything else is the real binary.
-  - Commands: `python build.py app --only update` (build first) → `python tools/update_test/run_update_test.py --list` / `success` / `all` (add `--build --clean` for a from-scratch run). Port `29185` must be free.
+  - Commands: `python build.py app --only update` (build first — the harness never builds itself) → `python tools/update_test/run_update_test.py --list` / `success` / `all` (add `--clean` for a from-scratch run). Port `29185` must be free.
   - When: after any change to `src/python/update.py` or the release asset naming/checksums; also update scenarios/`mock_github.py` in `tools/update_test/` if behavior changed.
   - Note: Windows Defender may flag the freshly built unsigned `update.exe` (`Behavior:Win32/DefenseEvasion.A!ml`) — heuristic false positive, see `tools/update_test/README.md`; do not work around it in code.
 
@@ -124,7 +124,7 @@ pytest tests/test_core/test_x.py -m unit
 cd templates/gui && npm test          # GUI tests (vitest, jsdom)
 node mca-language-server/server/test/run.js    # MCA LSP tests
 python tools/diff_test_mca.py --count 500      # Python↔JS parity
-python tools/update_test/run_update_test.py all --build --clean   # updater E2E harness
+python tools/update_test/run_update_test.py all --clean   # updater E2E harness
 python build.py test                  # MCA tests (--all adds pytest)
 
 # Validation
@@ -164,4 +164,4 @@ Change checklists:
 - **API change:** Pydantic model (`api/models.py`) → route (`routes/`) → register in `routes/__init__.py` → tests in `tests/test_api/`.
 - **`.mca` change:** mirror in Python + JS + `mca_spec.py`; verify with `tools/diff_test_mca.py`.
 - **Config change:** don't remove/rename `defaults/config.yaml` keys silently; `EXPECTED_CONFIG_VERSION` bumps need `auto_update_config` migration.
-- **Updater change:** update scenarios/`mock_github.py` in `tools/update_test/` if behavior changed; verify with `python tools/update_test/run_update_test.py all --build --clean`.
+- **Updater change:** update scenarios/`mock_github.py` in `tools/update_test/` if behavior changed; verify with `python tools/update_test/run_update_test.py all --clean` (build `update.exe` first via `python build.py app --only update`).
