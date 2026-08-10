@@ -355,6 +355,19 @@ class ToolUpdateCheckResponse(BaseModel):
     error: str | None = None
 
 
+class UpdateResultResponse(BaseModel):
+    """Response for ``GET /api/v1/updates/result``.
+
+    Describes how the last tool-updater run ended (exit code + message).
+    """
+
+    exit_code: int | None = None
+    ok: bool = True
+    message: str | None = None
+    source: str = "startup"
+    timestamp: float | None = None
+
+
 class ConfigResponse(BaseModel):
     path: str
     config: dict[str, Any]

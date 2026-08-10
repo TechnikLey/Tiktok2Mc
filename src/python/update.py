@@ -46,6 +46,21 @@ if sys.stdout.encoding != "utf-8":
 SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 
 # ---------------------------------------------------------------------------
+# Exit codes — one code per failure class so ``start.py`` and the dashboard
+# can report precisely *why* an update did not happen. ``5`` is deliberately
+# kept as the benign "nothing to do" code (start.py treats it as "continue").
+# ---------------------------------------------------------------------------
+EXIT_OK = 0
+EXIT_UNEXPECTED = 1
+EXIT_NO_UPDATE = 5
+EXIT_API_ERROR = 10
+EXIT_NO_ASSET = 11
+EXIT_MISSING_CHECKSUM = 12
+EXIT_CHECKSUM_MISMATCH = 13
+EXIT_DOWNLOAD_FAILED = 14
+EXIT_INSTALL_FAILED = 15
+
+# ---------------------------------------------------------------------------
 # Sentinel globals — set by _init() when run as script, or patched by tests.
 # ---------------------------------------------------------------------------
 BASE_DIR = None
@@ -411,13 +426,13 @@ def run_update():
                 else:
                     log.error("[FAIL] API error: 403 Forbidden")
                 wait_for_key()
-                sys.exit(5)
+                sys.exit(EXIT_API_ERROR)
             response.raise_for_status()
             release = response.json()
         except requests.exceptions.RequestException as e:
             log.error(f"[FAIL] API error: {e}")
             wait_for_key()
-            sys.exit(5)
+            sys.exit(EXIT_API_ERROR)
 
         online_tag = release["tag_name"]
         online_tool_v = extract_version(online_tag)
@@ -425,11 +440,11 @@ def run_update():
         if not (version.parse(online_tool_v) > version.parse(local["tool"])):
             log.info(f"Tool is up to date ({local['tool']}).")
             wait_for_key()
-            sys.exit(5)
+            sys.exit(EXIT_NO_UPDATE)
 
         if "beta" in online_tag.lower():
             if AUTO_MODE:
-                sys.exit(5)  # skip beta in auto mode
+                sys.exit(EXIT_NO_UPDATE)  # skip beta in auto mode
             try:
                 choice = input(
                     f"[!] Beta version {online_tag} available. Install? (y/N): "
@@ -437,7 +452,7 @@ def run_update():
             except EOFError:
                 choice = "n"
             if choice != "y":
-                sys.exit(5)
+                sys.exit(EXIT_NO_UPDATE)
 
         # Download & extract
         log.info("[>>] Downloading package...")
@@ -464,13 +479,20 @@ def run_update():
 
         if not asset:
             log.error("[FAIL] No matching release asset found for this platform.")
-            sys.exit(5)
+            sys.exit(EXIT_NO_ASSET)
 
         if TEMP_DIR.exists():
             shutil.rmtree(TEMP_DIR, ignore_errors=True)
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
         archive_path = TEMP_DIR / archive_name
-        download_with_progress(asset["url"], archive_path)
+        try:
+            download_with_progress(asset["url"], archive_path)
+        except requests.exceptions.RequestException as e:
+            log.error(f"[FAIL] Download failed: {e}")
+            if TEMP_DIR.exists():
+                shutil.rmtree(TEMP_DIR, ignore_errors=True)
+            wait_for_key()
+            sys.exit(EXIT_DOWNLOAD_FAILED)
 
         # ── Integrity verification ──────────────────────────────────
         expected_hash = None
@@ -502,7 +524,7 @@ def run_update():
             )
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
-            sys.exit(5)
+            sys.exit(EXIT_MISSING_CHECKSUM)
 
         if not verify_checksum(archive_path, expected_hash):
             log.error(
@@ -510,7 +532,7 @@ def run_update():
             )
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
-            sys.exit(5)
+            sys.exit(EXIT_CHECKSUM_MISMATCH)
         # ─────────────────────────────────────────────────────────────
 
         def safe_extract_zip(zip_path: Path, dest: Path) -> None:
@@ -580,7 +602,7 @@ def run_update():
                     str(new_up_dest),
                     [str(new_up_dest), "--resume", str(extracted_root_path)],
                 )
-            sys.exit(0)
+            sys.exit(EXIT_OK)
 
     log.info(
         f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update..."
@@ -672,7 +694,12 @@ def run_update():
                 continue
 
             dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
+            try:
+                shutil.copy2(src, dst)
+            except OSError as exc:
+                log.error(f"[FAIL] Could not install file {dst}: {exc}")
+                wait_for_key()
+                sys.exit(EXIT_INSTALL_FAILED)
 
     # Set executable permissions for all files without extension and with .bin extension (Linux/Mac only)
     if sys.platform != "win32":
@@ -687,7 +714,12 @@ def run_update():
                     except OSError as e:
                         log.info(f"[PERM] Failed to set executable for {fpath}: {e}")
 
-    save_versions(zip_v["tool"], zip_v["updater"])
+    try:
+        save_versions(zip_v["tool"], zip_v["updater"])
+    except OSError as exc:
+        log.error(f"[FAIL] Could not write version.txt: {exc}")
+        wait_for_key()
+        sys.exit(EXIT_INSTALL_FAILED)
     if TEMP_DIR.exists():
         shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
@@ -712,7 +744,7 @@ def run_update():
     log.info("\nUpdate complete.")
     wait_for_key()
 
-    sys.exit(0)
+    sys.exit(EXIT_OK)
 
 
 if __name__ == "__main__":
@@ -728,4 +760,4 @@ if __name__ == "__main__":
             UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"}
         )
         handle_unhandled_exception("update")
-        sys.exit(1)
+        sys.exit(EXIT_UNEXPECTED)

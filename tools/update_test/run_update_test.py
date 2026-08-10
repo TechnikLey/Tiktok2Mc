@@ -628,13 +628,13 @@ def scenario_missing_asset(h: Harness) -> bool:
     finally:
         server.stop()
     h.save_output("missing_asset", r.output)
-    h.expect(r.returncode == 5, f"exit {r.returncode} (expected 5)\n{r.output}")
+    h.expect(r.returncode == 11, f"exit {r.returncode} (expected 11)\n{r.output}")
     h.expect(
         "no matching release asset" in r.output.lower(),
         "expected asset-not-found message",
     )
     h.assert_unchanged(install)
-    print(f"{G}  OK: missing asset aborts update, exit 5{X}")
+    print(f"{G}  OK: missing asset aborts update, exit 11{X}")
     return True
 
 
@@ -650,10 +650,10 @@ def scenario_missing_checksum(h: Harness) -> bool:
     finally:
         server.stop()
     h.save_output("missing_checksum", r.output)
-    h.expect(r.returncode == 5, f"exit {r.returncode} (expected 5)\n{r.output}")
+    h.expect(r.returncode == 12, f"exit {r.returncode} (expected 12)\n{r.output}")
     h.expect("checksum" in r.output.lower(), "expected checksum message")
     h.assert_unchanged(install)
-    print(f"{G}  OK: missing checksum aborts update, exit 5{X}")
+    print(f"{G}  OK: missing checksum aborts update, exit 12{X}")
     return True
 
 
@@ -668,7 +668,7 @@ def scenario_bad_checksum(h: Harness) -> bool:
     finally:
         server.stop()
     h.save_output("bad_checksum", r.output)
-    h.expect(r.returncode == 5, f"exit {r.returncode} (expected 5)\n{r.output}")
+    h.expect(r.returncode == 13, f"exit {r.returncode} (expected 13)\n{r.output}")
     h.expect("checksum" in r.output.lower(), "expected checksum message")
     h.assert_unchanged(install)
     print(f"{G}  OK: bad checksum aborts update, install untouched{X}")
@@ -705,10 +705,10 @@ def scenario_api_error(h: Harness) -> bool:
     finally:
         server.stop()
     h.save_output("api_error", r.output)
-    h.expect(r.returncode == 5, f"exit {r.returncode} (expected 5)\n{r.output}")
+    h.expect(r.returncode == 10, f"exit {r.returncode} (expected 10)\n{r.output}")
     h.expect("API error" in r.output, "expected API error message")
     h.assert_unchanged(install)
-    print(f"{G}  OK: API error handled, exit 5{X}")
+    print(f"{G}  OK: API error handled, exit 10{X}")
     return True
 
 
@@ -725,9 +725,9 @@ def scenario_download_error(h: Harness) -> bool:
     finally:
         server.stop()
     h.save_output("download_error", r.output)
-    h.expect(r.returncode != 0, f"exit {r.returncode} (expected error)\n{r.output}")
+    h.expect(r.returncode == 14, f"exit {r.returncode} (expected 14)\n{r.output}")
     h.assert_unchanged(install)
-    print(f"{G}  OK: download failure aborts update (exit {r.returncode}){X}")
+    print(f"{G}  OK: download failure aborts update, exit 14{X}")
     return True
 
 
@@ -805,7 +805,7 @@ def scenario_locked_file(h: Harness) -> bool:
     finally:
         kernel32.CloseHandle(handle)
         server.stop()
-    h.expect(r.returncode != 0, f"exit {r.returncode} (expected failure)\n{r.output}")
+    h.expect(r.returncode == 15, f"exit {r.returncode} (expected 15)\n{r.output}")
     h.expect(
         (install / "core" / f"app{SUFFIX}").read_text(encoding="utf-8") == "old app",
         "locked app.exe was overwritten despite the lock",
@@ -825,7 +825,8 @@ def scenario_retry_after_failure(h: Harness) -> bool:
     finally:
         server.stop()
     h.expect(
-        r1.returncode == 5, f"first run exit {r1.returncode} (expected 5)\n{r1.output}"
+        r1.returncode == 13,
+        f"first run exit {r1.returncode} (expected 13)\n{r1.output}",
     )
     h.assert_unchanged(install)
     h.write_checksum(archive, name)

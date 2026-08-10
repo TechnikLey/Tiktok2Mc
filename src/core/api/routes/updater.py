@@ -10,8 +10,12 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from core.api.models import API_VERSION, ToolUpdateCheckResponse
-from core.api.updater import check_tool_update
+from core.api.models import (
+    API_VERSION,
+    ToolUpdateCheckResponse,
+    UpdateResultResponse,
+)
+from core.api.updater import check_tool_update, get_last_update_result
 
 log = logging.getLogger(__name__)
 
@@ -58,3 +62,12 @@ async def tool_update_check():
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to check tool updates")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/updates/result", response_model=UpdateResultResponse)
+async def tool_update_result():
+    """Return the last tool-update result recorded by ``start.py``."""
+    result = get_last_update_result()
+    if result is None:
+        return UpdateResultResponse()
+    return UpdateResultResponse(**result)

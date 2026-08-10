@@ -52,6 +52,26 @@ API_URL = os.environ.get("TIKTOK2MC_UPDATE_SOURCE") or API_URL
 Production never sets this variable, so the default GitHub URL is used
 unchanged. See `tests/test_core/test_update_e2e.py::TestUpdateSourceOverride`.
 
+## Exit codes
+
+`src/python/update.py` exits with one of these codes; `src/python/start.py`
+records them via `set_last_update_result()` so the dashboard can show the
+failure reason (`GET /api/v1/updates/result`).
+
+| Code | Meaning |
+|------|---------|
+| `0`  | Update installed successfully |
+| `1`  | Unexpected error (crash / bad startup config) |
+| `5`  | No update needed (also beta declined / auto-skip) — benign |
+| `10` | API / network error while checking for updates |
+| `11` | No release asset for this platform |
+| `12` | Checksum file is missing |
+| `13` | Checksum verification failed |
+| `14` | Download failed |
+| `15` | Install failed (locked / read-only file) |
+
+The harness scenarios assert these codes (see `run_update_test.py`).
+
 ## Known Windows Defender false positive
 
 Windows Defender may flag a freshly built, unsigned `update.exe` as

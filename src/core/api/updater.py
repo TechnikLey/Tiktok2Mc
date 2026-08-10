@@ -167,6 +167,37 @@ def check_tool_update(current_version: str) -> dict[str, Any]:
     return result
 
 
+# ── Last tool-update result (in-memory) ──────────────────────────────
+# ``start.py`` records how the updater process exited here before the
+# API is reachable; the GUI reads it afterwards via ``/updates/result``.
+
+
+_last_update_result: dict[str, Any] | None = None
+
+
+def set_last_update_result(
+    exit_code: int | None,
+    *,
+    ok: bool,
+    message: str | None = None,
+    source: str = "startup",
+) -> None:
+    """Record the outcome of the most recent tool-update run."""
+    global _last_update_result
+    _last_update_result = {
+        "exit_code": exit_code,
+        "ok": ok,
+        "message": message,
+        "source": source,
+        "timestamp": time.time(),
+    }
+
+
+def get_last_update_result() -> dict[str, Any] | None:
+    """Return the last recorded tool-update result, or ``None``."""
+    return _last_update_result
+
+
 class PluginUpdateChecker:
     """Check and report plugin update status.
 

@@ -158,6 +158,49 @@ class TestToolUpdateCheck:
         assert result["update_available"] is False
 
 
+class TestToolUpdateResult:
+    def test_returns_200_with_empty_structure(self, client, monkeypatch):
+        import core.api.updater as updater
+
+        monkeypatch.setattr(updater, "_last_update_result", None)
+        resp = client.get("/api/v1/updates/result")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["exit_code"] is None
+        assert body["ok"] is True
+        assert body["message"] is None
+
+    def test_returns_recorded_result(self, client, monkeypatch):
+        import core.api.updater as updater
+
+        updater.set_last_update_result(
+            13, ok=False, message="Checksum verification failed."
+        )
+        try:
+            resp = client.get("/api/v1/updates/result")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["exit_code"] == 13
+            assert body["ok"] is False
+            assert body["message"] == "Checksum verification failed."
+            assert body["timestamp"] is not None
+        finally:
+            monkeypatch.setattr(updater, "_last_update_result", None)
+
+    def test_set_and_get_roundtrip(self, monkeypatch):
+        import core.api.updater as updater
+
+        updater.set_last_update_result(5, ok=True, message="No update needed.")
+        try:
+            stored = updater.get_last_update_result()
+            assert stored is not None
+            assert stored["exit_code"] == 5
+            assert stored["ok"] is True
+            assert stored["message"] == "No update needed."
+        finally:
+            monkeypatch.setattr(updater, "_last_update_result", None)
+
+
 class _FakeResponse:
     def __init__(self, data: bytes):
         self._data = data

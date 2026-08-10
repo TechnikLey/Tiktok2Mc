@@ -5610,6 +5610,7 @@ document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
 
 /* ─── Update Checker ─── */
 let _updateData = null;
+let _lastResultToastCode = null;
 
 async function checkAllUpdates() {
   const summary = document.getElementById('updates-summary');
@@ -5618,12 +5619,19 @@ async function checkAllUpdates() {
   if (detail) detail.classList.add('hidden');
 
   try {
-    const [toolData, pluginData] = await Promise.all([
+    const [toolData, pluginData, lastResult] = await Promise.all([
       fetchJSON('/updates/check').catch(() => null),
       fetchJSON('/plugins/updates').catch(() => null),
+      fetchJSON('/updates/result').catch(() => null),
     ]);
 
-    _updateData = { tool: toolData, plugins: pluginData };
+    _updateData = { tool: toolData, plugins: pluginData, lastResult };
+    if (lastResult && lastResult.exit_code !== null && lastResult.ok === false) {
+      if (_lastResultToastCode !== lastResult.exit_code) {
+        _lastResultToastCode = lastResult.exit_code;
+        showToast('Last update failed: ' + (lastResult.message || 'exit code ' + lastResult.exit_code), 'error');
+      }
+    }
     _renderUpdateResults();
   } catch (e) {
     if (summary) summary.innerHTML = '<span class="log-err">Update check failed.</span>';
@@ -5645,6 +5653,16 @@ function _renderUpdateResults() {
   let html = '<div class="update-actions">' +
     '<button class="btn btn--primary" onclick="checkAllUpdates()">Check for Updates</button>' +
     '</div>';
+
+  const lastResult = _updateData?.lastResult;
+  if (lastResult && lastResult.exit_code !== null && lastResult.ok === false) {
+    html +=
+      '<div class="update-status update-status--err">' +
+      '<span class="update-status__icon">✕</span>' +
+      '<div><span class="update-status__text">Last update failed</span>' +
+      '<span class="update-status__version">' + escapeHtml(lastResult.message || ('Exit code ' + lastResult.exit_code)) + '</span>' +
+      '</div></div>';
+  }
 
   if (!toolAvail && !pluginAvail) {
     html +=

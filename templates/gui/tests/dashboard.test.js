@@ -502,6 +502,7 @@ describe('updatePasswordMeter', () => {
 /* ─── checkAllUpdates ─── */
 describe('checkAllUpdates', () => {
   beforeEach(() => {
+    _lastResultToastCode = null;
     const summary = document.getElementById('updates-summary');
     if (summary) {
       summary.innerHTML = '<span class="text-muted">No update information available.</span>';
@@ -509,15 +510,34 @@ describe('checkAllUpdates', () => {
   });
 
   it('shows all up to date when no updates', async () => {
-    globalThis.fetch = async (url) => ({
-      ok: true, status: 200, statusText: 'OK',
-      json: async () => (url.includes('updates/check')
-        ? { current_version: '1.0.0', update_available: false }
-        : { updates_available: 0, plugins: [] }),
-    });
+    globalThis.fetch = async (url) => {
+      let body;
+      if (url.includes('updates/check')) body = { current_version: '1.0.0', update_available: false };
+      else if (url.includes('updates/result')) body = { exit_code: 5, ok: true, message: 'No update needed.' };
+      else body = { updates_available: 0, plugins: [] };
+      return { ok: true, status: 200, statusText: 'OK', json: async () => body };
+    };
     await checkAllUpdates();
     const summary = document.getElementById('updates-summary');
     expect(summary.innerHTML).toContain('All up to date');
+  });
+
+  it('shows error banner when the last update failed', async () => {
+    globalThis.fetch = async (url) => {
+      let body;
+      if (url.includes('updates/check')) body = { current_version: '1.0.0', update_available: false };
+      else if (url.includes('updates/result')) body = { exit_code: 13, ok: false, message: 'Checksum verification failed.' };
+      else body = { updates_available: 0, plugins: [] };
+      return { ok: true, status: 200, statusText: 'OK', json: async () => body };
+    };
+    const container = document.getElementById('toast-container');
+    container.innerHTML = '';
+    await checkAllUpdates();
+    const summary = document.getElementById('updates-summary');
+    expect(summary.innerHTML).toContain('Last update failed');
+    expect(summary.innerHTML).toContain('Checksum verification failed.');
+    expect(container.children.length).toBe(1);
+    expect(container.lastChild.className).toBe('toast error');
   });
 });
 

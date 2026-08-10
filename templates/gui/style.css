@@ -1806,6 +1806,10 @@ input[type="color"] {
   background: var(--color-warning-subtle);
   border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
+.update-status--err {
+  background: var(--color-danger-subtle);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+}
 .update-status__icon {
   width: 36px;
   height: 36px;
@@ -1819,6 +1823,7 @@ input[type="color"] {
 }
 .update-status--ok .update-status__icon { background: var(--color-success); color: #fff; }
 .update-status--avail .update-status__icon { background: var(--color-warning); color: #fff; }
+.update-status--err .update-status__icon { background: var(--color-danger); color: #fff; }
 .update-status__text {
   font-weight: var(--weight-semibold);
   font-size: var(--text-base);
@@ -1826,6 +1831,7 @@ input[type="color"] {
 }
 .update-status--ok .update-status__text { color: var(--color-success); }
 .update-status--avail .update-status__text { color: var(--color-warning); }
+.update-status--err .update-status__text { color: var(--color-danger); }
 .update-status__version {
   display: block;
   font-size: var(--text-sm);

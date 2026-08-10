@@ -56,6 +56,7 @@ from core.api.eventbus import event_bus  # noqa: E402
 from core.api.launcher import PluginLauncher  # noqa: E402
 from core.api.models import API_VERSION  # noqa: E402
 from core.api.server import DEFAULT_PORT  # noqa: E402
+from core.api.updater import set_last_update_result  # noqa: E402
 from core.crash_manager import CrashManager  # noqa: E402
 from core.diagnostics import generate_diagnostics_report  # noqa: E402
 from core.error_codes import CORE_0001, LIFECYCLE_0001  # noqa: E402
@@ -334,6 +335,18 @@ _SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # -----------------------------
 # Updater
 # -----------------------------
+_UPDATE_EXIT_MESSAGES = {
+    1: "Unexpected error while updating.",
+    5: "No update needed.",
+    10: "Could not reach the update server.",
+    11: "No update file found for this platform.",
+    12: "Checksum file is missing.",
+    13: "Checksum verification failed — file may be corrupted.",
+    14: "Download failed.",
+    15: "Could not install the update (files locked or read-only?).",
+}
+
+
 def replace_updater_if_exists() -> None:
     if update_new.exists():
         log.info("[..] New updater found. Installing...")
@@ -430,13 +443,20 @@ if UPDATE_ENABLED:
             break
 
         if result == "kill":
+            set_last_update_result(
+                None,
+                ok=True,
+                message="Restart required to complete the update.",
+            )
             sys.exit(0)
 
         if result == 5:
+            set_last_update_result(5, ok=True, message="No update needed.")
             log.info("Continuing...")
             break
 
         elif result == 0:
+            set_last_update_result(0, ok=True, message="Update installed successfully.")
             log.info("\nUpdate has been installed. Restarting automatically...")
             _executable = sys.executable
             _args = [_executable] + sys.argv[1:]
@@ -457,6 +477,13 @@ if UPDATE_ENABLED:
             sys.exit(0)
 
         else:
+            set_last_update_result(
+                result,
+                ok=False,
+                message=_UPDATE_EXIT_MESSAGES.get(
+                    result, f"Updater failed with exit code {result}."
+                ),
+            )
             log.error("Updater failed with exit code %s. Aborting update.", result)
             break
 else:
