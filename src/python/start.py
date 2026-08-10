@@ -38,7 +38,7 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 multiprocessing.freeze_support()
 
@@ -106,7 +106,7 @@ def _safe_input(prompt: str = "") -> str:
         return ""
 
 
-def _input_confirm_exit(prompt: str = "") -> None:
+def _input_confirm_exit(prompt: str = "") -> NoReturn:
     """Call input() and exit; handle EOFError gracefully."""
     try:
         input(prompt)
@@ -920,8 +920,6 @@ async def _plugin_health_check_loop() -> None:
             continue
 
         for proc in supervisor.list_processes():
-            if proc.shell:
-                continue
             if proc.state != ProcessState.RUNNING:
                 continue
             # Direct Popen children are polled; tmux/screen children are checked
@@ -1004,13 +1002,11 @@ async def _runtime_validation_loop() -> None:
 def _log_diagnostics_report() -> None:
     """Generate and log a diagnostics report."""
     report = generate_diagnostics_report(crash_mgr)
-    if "error" in report:
-        log.warning("[DIAGNOSTICS] %s", report["error"])
-        return
+    cm_stats = report.get("crash_manager") or {}
     log.info(
         "[DIAGNOSTICS] Crash count: %d, History size: %d",
-        report.get("crash_count", 0),
-        report.get("stats", {}).get("history_size", 0),
+        cm_stats.get("crash_count", 0),
+        cm_stats.get("history_size", 0),
     )
 
 
@@ -1153,12 +1149,10 @@ if __name__ == "__main__":
         # This is normal network behavior and must not crash the supervisor.
         log.warning("[NET] Connection reset by remote host: %s", exc)
         _health_mon.set_state("start_process", HealthState.STOPPED)
-    except Exception:  # top-level boundary: report via crash manager and exit
+    except Exception as exc:  # top-level boundary: report via crash manager and exit
         crash_mgr.report_exception(
             CORE_0001,
-            exc=sys.exc_info()[1],
-            exc_type=sys.exc_info()[0],
-            exc_tb=sys.exc_info()[2],
+            exc=exc,
             context_info={"source": "start.main"},
         )
         _health_mon.set_state("start_process", HealthState.FAILED)
