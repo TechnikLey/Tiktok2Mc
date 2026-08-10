@@ -686,11 +686,11 @@ describe('EventTester TikTok connection state', () => {
     expect(document.getElementById('tiktok-connection-state').textContent).toBe('OFF');
   });
 
-  it('shows Not configured when no TikTok user is set', () => {
+  it('shows ON even without a configured TikTok user (label reflects toggle state only)', () => {
     seedTesterDom('');
     _tiktokLiveState = true;
     eventTester._updateTiktokStateUI();
-    expect(document.getElementById('tiktok-connection-state').textContent).toBe('Not configured');
+    expect(document.getElementById('tiktok-connection-state').textContent).toBe('ON');
   });
 
   it('status display keeps the EventTester label in sync via live_status', () => {
