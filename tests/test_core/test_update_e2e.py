@@ -830,3 +830,80 @@ class TestUpdatePlatformPaths:
         base = tmp_path
         temp_dir = (base / "_update_tmp").resolve()
         assert str(temp_dir).endswith("_update_tmp")
+
+
+# =========================================================================
+# Update source override (TIKTOK2MC_UPDATE_SOURCE)
+# =========================================================================
+
+
+class TestUpdateSourceOverride:
+    """Tests the test-only update source override in update.py._init()."""
+
+    _GLOBALS = (
+        "BASE_DIR",
+        "TEMP_DIR",
+        "VERSION_FILE",
+        "DEFAULT_CONFIG_FILE",
+        "CONFIG_FILE",
+        "START_FILE",
+        "AUTO_MODE",
+        "cfg",
+        "CONFIG_UPDATE_ENABLE",
+        "GITHUB_TOKEN",
+        "HEADERS_API",
+        "HEADERS_ASSET",
+        "API_URL",
+    )
+
+    def _run_init(self, monkeypatch, tmp_path: Path) -> None:
+        import python.update
+
+        base = tmp_path / "base"
+        (base / "config").mkdir(parents=True)
+        (base / "config" / "config.yaml").write_text(
+            "auto_update_config: true\nshow_sudo_warning: false\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(python.update, "get_base_dir", lambda: base)
+        monkeypatch.setattr(
+            python.update,
+            "load_config",
+            lambda _path: {"auto_update_config": True},
+        )
+        monkeypatch.setattr(sys, "argv", ["update.py", "--auto"])
+        python.update._init()
+
+    def test_env_override_sets_api_url(self, monkeypatch, tmp_path):
+        import python.update
+
+        snap = {n: getattr(python.update, n, None) for n in self._GLOBALS}
+        try:
+            monkeypatch.setenv(
+                "TIKTOK2MC_UPDATE_SOURCE",
+                "http://127.0.0.1:9999/repos/x/y/releases/latest",
+            )
+            self._run_init(monkeypatch, tmp_path)
+            assert (
+                python.update.API_URL
+                == "http://127.0.0.1:9999/repos/x/y/releases/latest"
+            )
+        finally:
+            for n, v in snap.items():
+                setattr(python.update, n, v)
+            monkeypatch.delenv("TIKTOK2MC_UPDATE_SOURCE", raising=False)
+
+    def test_no_env_keeps_default_api_url(self, monkeypatch, tmp_path):
+        import python.update
+
+        snap = {n: getattr(python.update, n, None) for n in self._GLOBALS}
+        try:
+            monkeypatch.delenv("TIKTOK2MC_UPDATE_SOURCE", raising=False)
+            default = python.update.API_URL
+            self._run_init(monkeypatch, tmp_path)
+            assert python.update.API_URL == default
+            assert python.update.API_URL.startswith("https://api.github.com/")
+        finally:
+            for n, v in snap.items():
+                setattr(python.update, n, v)
+            monkeypatch.delenv("TIKTOK2MC_UPDATE_SOURCE", raising=False)

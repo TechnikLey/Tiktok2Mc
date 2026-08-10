@@ -91,7 +91,8 @@ def _init():
         CONFIG_UPDATE_ENABLE, \
         GITHUB_TOKEN, \
         HEADERS_API, \
-        HEADERS_ASSET
+        HEADERS_ASSET, \
+        API_URL
     BASE_DIR = get_base_dir()
     TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
     VERSION_FILE = (BASE_DIR / "version.txt").resolve()
@@ -130,6 +131,11 @@ def _init():
     if GITHUB_TOKEN:
         HEADERS_API["Authorization"] = f"token {GITHUB_TOKEN}"
         HEADERS_ASSET["Authorization"] = f"token {GITHUB_TOKEN}"
+
+    # Test-only hook: point the updater at a GitHub-compatible local mock
+    # server (see tools/update_test/). Production never sets this variable,
+    # so the default hardcoded GitHub URL is used unchanged.
+    API_URL = os.environ.get("TIKTOK2MC_UPDATE_SOURCE") or API_URL
 
 
 # Directories and individual files that may be overwritten by an update
