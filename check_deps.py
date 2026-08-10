@@ -87,6 +87,7 @@ PYTHON_PACKAGES = [
     ("webview", "pywebview", "core", False),
     ("flask", "Flask", "core", False),
     ("fastapi", "fastapi", "core", False),
+    ("starlette", "starlette", "core", False),
     ("uvicorn", "uvicorn", "core", False),
     ("pydantic", "pydantic", "core", False),
     ("requests", "requests", "core", False),
@@ -108,6 +109,7 @@ PYTHON_PACKAGES = [
     # Testing
     ("pytest", "pytest", "testing", True),
     ("pytest_timeout", "pytest-timeout", "testing", True),
+    ("pytest_asyncio", "pytest-asyncio", "testing", True),
 ]
 
 # ---- System tools ----
