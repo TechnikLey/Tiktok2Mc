@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -89,7 +90,7 @@ class PluginAPIClient:
 
     def unregister(self, name: str) -> bool:
         req = urllib.request.Request(
-            self._url(f"plugins/{urllib.request.quote(name, safe='')}"),
+            self._url(f"plugins/{urllib.parse.quote(name, safe='')}"),
             method="DELETE",
         )
         try:
@@ -106,7 +107,7 @@ class PluginAPIClient:
 
     def get(self, name: str) -> dict[str, Any] | None:
         req = urllib.request.Request(
-            self._url(f"plugins/{urllib.request.quote(name, safe='')}"),
+            self._url(f"plugins/{urllib.parse.quote(name, safe='')}"),
             method="GET",
         )
         try:
@@ -126,7 +127,7 @@ class PluginAPIClient:
     def update(self, name: str, body: dict[str, Any]) -> dict[str, Any] | None:
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
-            self._url(f"plugins/{urllib.request.quote(name, safe='')}"),
+            self._url(f"plugins/{urllib.parse.quote(name, safe='')}"),
             data=data,
             headers={"Content-Type": "application/json"},
             method="PUT",

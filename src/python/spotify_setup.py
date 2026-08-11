@@ -13,6 +13,7 @@
 
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -149,7 +150,7 @@ def _run_callback_server(port: int) -> str | None:
 
 def _exchange_code(
     code: str, client_id: str, client_secret: str, redirect_uri: str
-) -> dict[str, Any] | None:
+) -> str | None:
     payload = urllib.parse.urlencode(
         {
             "grant_type": "authorization_code",
@@ -183,7 +184,7 @@ def _exchange_code(
 
 def _refresh_token(
     refresh_token: str, client_id: str, client_secret: str
-) -> dict[str, Any] | None:
+) -> str | None:
     payload = urllib.parse.urlencode(
         {
             "grant_type": "refresh_token",

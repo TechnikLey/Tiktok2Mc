@@ -287,6 +287,7 @@ def migrate_config_if_needed() -> bool:
         log.warning("Version keys are invalid (%s). Forcing migration...", e)
         default_ver, user_ver = version.parse("1.0"), version.parse("0.0")
         raw_default = "1.0"
+        raw_user = "0.0"
 
     if user_ver >= default_ver:
         log.info(f"Config is up to date ({raw_user}).")
