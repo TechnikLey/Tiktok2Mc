@@ -788,17 +788,17 @@ async function installJava() {
   let lastMsg = '';
   try {
     const res = await postJSON('/server/java/install');
-    showToast(res.message || 'Java installation started', 'info');
+    showToast(res.message || I18N.t('servers.javaStarted'), 'info');
   } catch (e) {
-    showToast('Java install failed: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Install Java'; }
+    showToast(I18N.t('servers.javaInstallFailed', { msg: e.message }), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
     return;
   }
   const iv = setInterval(async () => {
     try {
       const data = await fetchJSON('/server/java/status');
       const inst = data && data.install;
-      if (!inst) { clearInterval(iv); if (btn) { btn.disabled = false; btn.textContent = 'Install Java'; } return; }
+      if (!inst) { clearInterval(iv); if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); } return; }
       if (inst.message && inst.message !== lastMsg) {
         lastMsg = inst.message;
         showToast(inst.message, 'info');
@@ -1081,10 +1081,10 @@ async function serverCardAction(instanceId, action) {
   try {
     const endpoint = '/server/' + instanceId + '/' + action;
     const res = await postJSON(endpoint);
-    showToast(res.message || 'Server ' + action + 'ing', 'info');
+    showToast(res.message || I18N.t('servers.actionInProgress', { action }), 'info');
     loadServerManager();
   } catch (e) {
-    showToast('Failed to ' + action + ' server: ' + e.message, 'error');
+    showToast(I18N.t('servers.actionFailed', { action, msg: e.message }), 'error');
   } finally {
     _serverActionInProgress = false;
     updateServerLifecycleUI();
@@ -1098,16 +1098,19 @@ async function openServerFolder(instanceId) {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST', headers: _withApiKey({}) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Failed to open folder');
-    if (!data.opened) showToast('Folder path: ' + data.path, 'info');
+    if (!data.opened) showToast(I18N.t('servers.folderPath', { path: data.path }), 'info');
   } catch (e) {
-    showToast('Open folder failed: ' + e.message, 'error');
+    showToast(I18N.t('servers.openFolderFailed', { msg: e.message }), 'error');
   }
 }
 
 async function deleteServerInstance(instanceId) {
   const inst = (_serverManagerCache?.instances || []).find(i => i.id === instanceId);
   const name = inst ? inst.name : instanceId;
-  const confirmed = await showConfirmDialog('Delete Server?', 'Delete server "' + name + '" and all its files? This cannot be undone.', 'Delete', 'btn-danger', 'text-danger');
+  const confirmed = await showConfirmDialog(
+    I18N.t('servers.deleteTitle'),
+    I18N.t('servers.deleteConfirm', { name }),
+    I18N.t('common.delete'), 'btn-danger', 'text-danger');
   if (!confirmed) return;
   try {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId), { method: 'DELETE', headers: _withApiKey({}) });
@@ -1115,10 +1118,10 @@ async function deleteServerInstance(instanceId) {
       const data = await res.json();
       throw new Error(data.detail || 'Failed to delete');
     }
-    showToast('Server "' + name + '" deleted', 'success');
+    showToast(I18N.t('servers.deleted', { name }), 'success');
     await loadServerManager();
   } catch (e) {
-    showToast('Delete failed: ' + e.message, 'error');
+    showToast(I18N.t('servers.deleteFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -1162,10 +1165,10 @@ async function confirmServerCreate() {
   closeServerCreateModal();
   try {
     const res = await postJSON('/servers/instances', { name, version, port });
-    showToast(res.message || 'Server created', 'success');
+    showToast(res.message || I18N.t('servers.created'), 'success');
     await loadServerManager();
   } catch (e) {
-    showToast('Failed to create server: ' + e.message, 'error');
+    showToast(I18N.t('servers.createFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -1182,9 +1185,9 @@ function validateServerCreateForm() {
 
   let error = '';
   if (name && instances.some(i => i.name.toLowerCase() === name.toLowerCase())) {
-    error = 'A server with this name already exists.';
+    error = I18N.t('servers.createFailed', { msg: 'A server with this name already exists.' });
   } else if (!isNaN(port) && instances.some(i => i.port === port)) {
-    error = 'Port ' + port + ' is already in use by another server.';
+    error = I18N.t('servers.createFailed', { msg: 'Port ' + port + ' is already in use by another server.' });
   }
 
   if (errorEl) {
@@ -1292,20 +1295,20 @@ async function confirmServerDownload() {
   const version = select?.value;
   if (!version) return;
   closeServerDownloadModal();
-  showToast('Downloading PaperMC ' + version + '...', 'info');
+  showToast(I18N.t('servers.downloading', { version }), 'info');
   try {
     const res = await postJSON('/servers/download', { version });
     if (res.status === 'already_installed') {
       showToast(
-        'Version ' + version + ' is already installed. Use "Switch Version" to activate it.',
+        I18N.t('servers.versionAlreadyActive', { version }),
         'info'
       );
     } else {
-      showToast(res.message || 'Downloaded ' + version, 'success');
+      showToast(res.message || I18N.t('servers.downloaded', { version }), 'success');
     }
     await loadServerManager();
   } catch (e) {
-    showToast('Download failed: ' + e.message, 'error');
+    showToast(I18N.t('servers.downloadFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -1344,7 +1347,7 @@ async function confirmServerCustom() {
   if (!name || !file) return;
 
   closeServerCustomModal();
-  showToast(`Importing custom jar as '${name}'...`, 'info');
+  showToast(I18N.t('servers.importing', { name }), 'info');
 
   const formData = new FormData();
   formData.append('file', file);
@@ -1358,10 +1361,10 @@ async function confirmServerCustom() {
     });
     if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
     const data = await res.json();
-    showToast(data.message || `Imported ${name}`, 'success');
+    showToast(data.message || I18N.t('servers.imported', { name }), 'success');
     await loadServerManager();
   } catch (e) {
-    showToast('Import failed: ' + e.message, 'error');
+    showToast(I18N.t('servers.importFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -1685,10 +1688,10 @@ async function promptEnablePlugin(name, displayName) {
   try {
     await postJSON(`/plugins/${name}/enable`, {});
     await loadPlugins();
-    showToast(`Plugin "${displayName || name}" enabled.`, 'success');
+    showToast(I18N.t('plugins.enabledToast', { name: displayName || name }), 'success');
     log(`Plugin ${name} enabled`);
   } catch (e) {
-    const msg = 'Failed to enable "' + (displayName || name) + '": ' + e.message;
+    const msg = I18N.t('plugins.enableFailed', { name: displayName || name, msg: e.message });
     showToast(msg, 'error');
     log(msg, 'err');
   }
@@ -1696,19 +1699,19 @@ async function promptEnablePlugin(name, displayName) {
 
 async function promptDisablePlugin(name, displayName) {
   const confirmed = await showConfirmDialog(
-    'Disable Plugin',
-    `Do you want to disable "${displayName || name}"?`,
-    'Disable',
+    I18N.t('plugins.disableTitle'),
+    I18N.t('plugins.disableConfirm', { name: displayName || name }),
+    I18N.t('common.disable'),
     'btn-danger'
   );
   if (!confirmed) return;
   try {
     await postJSON(`/plugins/${name}/disable`, {});
     await loadPlugins();
-    showToast(`Plugin "${displayName || name}" disabled.`, 'info');
+    showToast(I18N.t('plugins.disabledToast', { name: displayName || name }), 'info');
     log(`Plugin ${name} disabled`);
   } catch (e) {
-    const msg = 'Failed to disable "' + (displayName || name) + '": ' + e.message;
+    const msg = I18N.t('plugins.disableFailed', { name: displayName || name, msg: e.message });
     showToast(msg, 'error');
     log(msg, 'err');
   }
@@ -1723,10 +1726,10 @@ async function restartPlugin(name, displayName) {
     await new Promise(r => setTimeout(r, 800));
     await postJSON(`/plugins/${name}/enable`, {});
     await loadPlugins();
-    showToast(`Plugin "${displayName || name}" restarted.`, 'success');
+    showToast(I18N.t('plugins.restartedToast', { name: displayName || name }), 'success');
     log(`Plugin ${name} restarted successfully.`);
   } catch (e) {
-    const msg = 'Failed to restart "' + (displayName || name) + '": ' + e.message;
+    const msg = I18N.t('plugins.restartFailed', { name: displayName || name, msg: e.message });
     showToast(msg, 'error');
     log(msg, 'err');
   }
@@ -1754,9 +1757,9 @@ async function refreshHooks() {
   try {
     await postJSON('/hooks/discover', {});
     await loadHooks();
-    showToast('Hooks refreshed.', 'success');
+    showToast(I18N.t('plugins.refreshed'), 'success');
   } catch (e) {
-    showToast('Failed to refresh hooks: ' + e.message, 'error');
+    showToast(I18N.t('hooks.refreshFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -1795,19 +1798,19 @@ function renderHookManager() {
 
 async function promptEnableHook(name, displayName) {
   const confirmed = await showConfirmDialog(
-    'Enable Hook',
-    `Do you want to enable "${displayName || name}"?`,
-    'Enable',
+    I18N.t('hooks.enableTitle'),
+    I18N.t('hooks.enableConfirm', { name: displayName || name }),
+    I18N.t('common.enable'),
     'btn-primary'
   );
   if (!confirmed) return;
   try {
     await postJSON(`/hooks/${name}/enable`, {});
-    showToast(`Hook "${displayName || name}" enabled. Restart required to take effect.`, 'success');
+    showToast(I18N.t('hooks.enabledToast', { name: displayName || name }), 'success');
     log(`Hook ${name} enabled (restart required)`);
     await loadHooks();
   } catch (e) {
-    const msg = 'Failed to enable "' + (displayName || name) + '": ' + e.message;
+    const msg = I18N.t('hooks.enableFailed', { name: displayName || name, msg: e.message });
     showToast(msg, 'error');
     log(msg, 'err');
   }
@@ -1815,19 +1818,19 @@ async function promptEnableHook(name, displayName) {
 
 async function promptDisableHook(name, displayName) {
   const confirmed = await showConfirmDialog(
-    'Disable Hook',
-    `Do you want to disable "${displayName || name}"?`,
-    'Disable',
+    I18N.t('hooks.disableTitle'),
+    I18N.t('hooks.disableConfirm', { name: displayName || name }),
+    I18N.t('common.disable'),
     'btn-danger'
   );
   if (!confirmed) return;
   try {
     await postJSON(`/hooks/${name}/disable`, {});
-    showToast(`Hook "${displayName || name}" disabled. Restart required to take effect.`, 'info');
+    showToast(I18N.t('hooks.disabledToast', { name: displayName || name }), 'info');
     log(`Hook ${name} disabled (restart required)`);
     await loadHooks();
   } catch (e) {
-    const msg = 'Failed to disable "' + (displayName || name) + '": ' + e.message;
+    const msg = I18N.t('hooks.disableFailed', { name: displayName || name, msg: e.message });
     showToast(msg, 'error');
     log(msg, 'err');
   }
@@ -2320,9 +2323,9 @@ class HookConfigEditor {
     try {
       this.config = JSON.parse(raw);
       this.errors.clear();
-      this.showToast('JSON is valid.', 'info');
+      this.showToast(I18N.t('editor.jsonValid'), 'info');
     } catch (e) {
-      this.showToast('Invalid JSON: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.jsonInvalid', { msg: e.message }), 'error');
     }
   }
 
@@ -2434,12 +2437,12 @@ class HookConfigEditor {
     this.collect();
     if (!this.validate()) {
       this.render();
-      this.showToast('Please fix the highlighted errors before saving.', 'error');
+      this.showToast(I18N.t('editor.fixErrors'), 'error');
       return;
     }
     const diff = this.computeDiff();
     if (!diff.length) {
-      this.showToast('No changes to save.', 'info');
+      this.showToast(I18N.t('editor.noChanges'), 'info');
       return;
     }
     const body = document.getElementById('hook-review-body');
@@ -2461,9 +2464,9 @@ class HookConfigEditor {
       this._updateSaveButton();
       this.closeInline();
       await loadHooks();
-      this.showToast('Hook configuration saved successfully.', 'success');
+      this.showToast(I18N.t('hooks.configSaved'), 'success');
     } catch (e) {
-      this.showToast('Save failed: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.saveFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -2771,10 +2774,10 @@ async function wizardSave() {
     }
     hideWizard();
     await loadConfig();
-    showToast('Setup complete — settings applied.', 'success');
+    showToast(I18N.t('wizard.setupComplete'), 'success');
   } catch (e) {
     log('Failed to save setup: ' + e.message, 'err');
-    showToast('Failed to save: ' + e.message, 'error');
+    showToast(I18N.t('wizard.saveFailed', { msg: e.message }), 'error');
   } finally { nextBtn.disabled = false; nextBtn.textContent = 'Save'; }
 }
 function _showRestartOverlay() {
@@ -2782,7 +2785,7 @@ function _showRestartOverlay() {
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
   const card = document.querySelector('#restart-dialog .wizard-card');
   if (card) {
-    card.innerHTML = '<h2 style="border:none;padding:0;">Restarting...</h2><p class="muted">Please wait while the backend services restart.</p>';
+    card.innerHTML = '<h2 style="border:none;padding:0;">' + I18N.t('wizard.restarting') + '</h2><p class="muted">' + I18N.t('wizard.restartWait') + '</p>';
   }
   document.getElementById('restart-dialog').classList.remove('hidden');
 }
@@ -2801,13 +2804,13 @@ async function triggerRestart() {
     } else {
       _restartPending = false;
       updateRestartBanner();
-      showToast('Restart signal failed. Please restart manually.', 'error');
+      showToast(I18N.t('wizard.restartSignalFailed'), 'error');
       document.getElementById('restart-dialog').classList.add('hidden');
     }
   } catch (e) {
     _restartPending = false;
     updateRestartBanner();
-    showToast('Restart signal failed. Please restart manually.', 'error');
+    showToast(I18N.t('wizard.restartSignalFailed'), 'error');
     document.getElementById('restart-dialog').classList.add('hidden');
   }
 }
@@ -3775,9 +3778,9 @@ class ConfigEditor {
         try { result[currentKey] = JSON.parse(currentLines.join('\n')); } catch (e) { result[currentKey] = currentLines.join('\n').trim(); }
       }
       this.unknownKeys = result;
-      this.showToast('Unrecognized settings updated from YAML.', 'info');
+      this.showToast(I18N.t('editor.unrecognizedUpdated'), 'info');
     } catch (e) {
-      this.showToast('Failed to parse YAML: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.yamlParseFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -3958,13 +3961,13 @@ class ConfigEditor {
     this.collect();
     if (!this.validate()) {
       this.render(); // Show errors
-      this.showToast('Please fix the highlighted errors before saving.', 'error');
+      this.showToast(I18N.t('editor.fixErrors'), 'error');
       return;
     }
     this.mergeUnknownKeys();
     const diff = this.computeDiff();
     if (!diff.length) {
-      this.showToast('No changes to save.', 'info');
+      this.showToast(I18N.t('editor.noChanges'), 'info');
       return;
     }
     const body = document.getElementById('review-body');
@@ -3995,9 +3998,9 @@ class ConfigEditor {
       if (rconPasswordSet) {
         await postJSON('/server/restart', {});
       }
-      this.showToast('Configuration saved and applied.', 'success');
+      this.showToast(I18N.t('editor.savedSuccess'), 'success');
     } catch (e) {
-      this.showToast('Save failed: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.saveFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -4608,9 +4611,9 @@ class PluginConfigEditor {
     try {
       this.config = JSON.parse(raw);
       this.errors.clear();
-      this.showToast('JSON is valid.', 'info');
+      this.showToast(I18N.t('editor.jsonValid'), 'info');
     } catch (e) {
-      this.showToast('Invalid JSON: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.jsonInvalid', { msg: e.message }), 'error');
     }
   }
 
@@ -4649,7 +4652,7 @@ class PluginConfigEditor {
     this.errors.clear();
     if (!this.hasSchema) {
       try { JSON.stringify(this.config); return true; }
-      catch (e) { this.showToast('Invalid configuration: ' + e.message, 'error'); return false; }
+      catch (e) { this.showToast(I18N.t('editor.invalidConfig', { msg: e.message }), 'error'); return false; }
     }
 
     let ok = true;
@@ -4740,12 +4743,12 @@ class PluginConfigEditor {
     this.collect();
     if (!this.validate()) {
       this.render();
-      this.showToast('Please fix the highlighted errors before saving.', 'error');
+      this.showToast(I18N.t('editor.fixErrors'), 'error');
       return;
     }
     const diff = this.computeDiff();
     if (!diff.length) {
-      this.showToast('No changes to save.', 'info');
+      this.showToast(I18N.t('editor.noChanges'), 'info');
       return;
     }
     const body = document.getElementById('plugin-review-body');
@@ -4767,7 +4770,7 @@ class PluginConfigEditor {
       this._updateSaveButton();
       this.close();
       await loadPlugins();
-      this.showToast('Plugin configuration saved successfully.', 'success');
+      this.showToast(I18N.t('editor.savedSuccess'), 'success');
       // Only prompt to restart if the plugin is currently enabled
       // Disabled plugins should not trigger restart/reload prompts
       const plugin = currentPlugins.find(p => p.name === this.pluginName);
@@ -4775,9 +4778,10 @@ class PluginConfigEditor {
         const display = this.displayName || this.pluginName;
         setTimeout(async () => {
           const confirmed = await showConfirmDialog(
-            'Restart Plugin?',
-            `Plugin "${display}" configuration updated.\n\nChanges may require the plugin to reload.\n\nRestart plugin now?`,
-            'Restart Now'
+            I18N.t('plugins.restartTitle', { instance: display }),
+            I18N.t('plugins.restartConfirm'),
+            I18N.t('servers.restart'),
+            'btn-danger'
           );
           if (confirmed) {
             restartPlugin(this.pluginName, display);
@@ -4785,7 +4789,7 @@ class PluginConfigEditor {
         }, 300);
       }
     } catch (e) {
-      this.showToast('Save failed: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.saveFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -5034,7 +5038,7 @@ class ReactionEditor {
       this.renderSidebar();
       this.renderList();
     } catch (e) {
-      showToast('Failed to load reactions: ' + e.message, 'error');
+      showToast(I18N.t('reactions.loadFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -5317,7 +5321,7 @@ class ReactionEditor {
     for (const [event, actions] of Object.entries(this.data)) {
       for (const action of actions) {
         if (!action.target || !action.command) {
-          showToast(`Incomplete reaction for "${event}". Please edit and fix it before saving.`, 'error');
+          showToast(I18N.t('reactions.incomplete', { event }), 'error');
           return;
         }
       }
@@ -5328,9 +5332,9 @@ class ReactionEditor {
       this._dirty = false;
       this._updateSaveButton();
       this._updateDashboardSummary();
-      showToast('Reactions saved successfully.', 'success');
+      showToast(I18N.t('reactions.saved'), 'success');
     } catch (e) {
-      showToast('Save failed: ' + e.message, 'error');
+      showToast(I18N.t('reactions.saveFailed', { msg: e.message }), 'error');
       throw e;
     }
   }
@@ -5340,7 +5344,7 @@ class ReactionEditor {
     if (!action) return;
     const plugin = currentPlugins.find(p => p.name === action.target);
     if (plugin && !plugin.enabled) {
-      showToast(`Plugin "${action.target}" is disabled. Enable it before testing this reaction.`, 'error');
+      showToast(I18N.t('reactions.pluginDisabled', { plugin: action.target }), 'error');
       return;
     }
     try {
@@ -5355,9 +5359,10 @@ class ReactionEditor {
           user: 'TestUser',
         }).catch(() => {}); // fire-and-forget, bridge may not be running
       }
-      showToast(`Test event "${event}" sent via EventBus.${tiktokPrefix ? ' Also sent to bridge.' : ''}`, 'info');
+      const extra = tiktokPrefix ? I18N.t('reactions.testSentBridge') : '';
+      showToast(I18N.t('reactions.testSent', { event, extra }), 'info');
     } catch (e) {
-      showToast('Test failed: ' + e.message, 'error');
+      showToast(I18N.t('reactions.testFailed', { msg: e.message }), 'error');
     }
   }
 
