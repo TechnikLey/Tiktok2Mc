@@ -10,10 +10,12 @@
 # ==================================================
 
 import asyncio
+import concurrent.futures
 import datetime
 import json
 import logging
 import os
+import queue
 import re
 import shlex
 import shutil
@@ -193,6 +195,38 @@ werkzeug_log = logging.getLogger("werkzeug")
 werkzeug_log.setLevel(logging.WARNING)
 
 _RE_ERR_CODE_200 = re.compile(r"\berr_code\b.*?\b200\b", re.IGNORECASE)
+
+_BACKGROUND_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
+_BACKGROUND_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_background_executor() -> concurrent.futures.ThreadPoolExecutor:
+    """Return the shared executor for fire-and-forget background work.
+
+    Lazily created so no threads spawn unless a background job is actually
+    submitted, and the bridge stays importable in tests.
+    """
+    global _BACKGROUND_EXECUTOR
+    if _BACKGROUND_EXECUTOR is None:
+        with _BACKGROUND_EXECUTOR_LOCK:
+            if _BACKGROUND_EXECUTOR is None:
+                _BACKGROUND_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="bridge-bg"
+                )
+    return _BACKGROUND_EXECUTOR
+
+
+def _run_in_background(fn, *args):
+    """Submit ``fn(*args)`` to the shared background executor (fire-and-forget).
+
+    Keeps blocking network/file work off the asyncio loops and the TikTok
+    client thread.  ``fn`` is responsible for its own error handling.
+    """
+    try:
+        _get_background_executor().submit(fn, *args)
+    except RuntimeError as exc:  # executor shut down during bridge shutdown
+        log.warning("[BACKGROUND] Job dropped, executor unavailable: %s", exc)
+
 
 # ==========================================
 # SETUP & HELPER FUNCTIONS
@@ -506,14 +540,15 @@ def generate_datapack():
     full_dp_path = ctx.datapack_root / ctx.datapack_name
     functions_path = full_dp_path / "data" / ctx.namespace / "function"
 
-    # Reset state
-    ctx.rcon_only_actions = {}
-    ctx.valid_functions = set()
-    collected_vanilla = {}
-    ctx.vanilla_functions = set()
-    ctx.script_actions = {}
-    ctx.overlay_actions = {}
-    ctx.shell_actions_cache = {}
+    # Reset state — build into locals and swap atomically at the end so
+    # readers on the main loop never observe a half-rebuilt snapshot.
+    rcon_only_actions: dict[str, list[str]] = {}
+    valid_functions: set[str] = set()
+    collected_vanilla: dict[str, list[str]] = {}
+    vanilla_functions: set[str] = set()
+    script_actions: dict[str, list[str]] = {}
+    overlay_actions: dict[str, list[tuple[str, str]]] = {}
+    shell_actions_cache: dict[str, list[str]] = {}
 
     # Prepare filesystem
     try:
@@ -595,22 +630,20 @@ def generate_datapack():
                             body[: multi_match.start()] if multi_match else body
                         )
                         if kind == "overlay":
-                            ctx.overlay_actions.setdefault(name, []).append(
+                            overlay_actions.setdefault(name, []).append(
                                 (overlay_name, overlay_body)
                             )
-                            ctx.valid_functions.add(name)
+                            valid_functions.add(name)
                         else:
                             for _ in range(times):
                                 if kind == "script":
-                                    ctx.script_actions.setdefault(name, []).append(
-                                        base_cmd
-                                    )
-                                    ctx.valid_functions.add(name)
+                                    script_actions.setdefault(name, []).append(base_cmd)
+                                    valid_functions.add(name)
                                 elif kind == "rcon":
-                                    ctx.rcon_only_actions.setdefault(name, []).append(
+                                    rcon_only_actions.setdefault(name, []).append(
                                         base_cmd
                                     )
-                                    ctx.valid_functions.add(name)
+                                    valid_functions.add(name)
                                 elif kind == "vanilla_rc":
                                     # dynamic vanilla via RCON: keep {user} literal, route to RCON
                                     rc_cmd = (
@@ -618,16 +651,16 @@ def generate_datapack():
                                         if multi_match
                                         else body
                                     )
-                                    ctx.rcon_only_actions.setdefault(name, []).append(
+                                    rcon_only_actions.setdefault(name, []).append(
                                         rc_cmd
                                     )
-                                    ctx.valid_functions.add(name)
+                                    valid_functions.add(name)
                                 elif kind == "vanilla":
                                     collected_vanilla.setdefault(name, []).append(
                                         base_cmd
                                     )
-                                    ctx.valid_functions.add(name)
-                                    ctx.vanilla_functions.add(name)
+                                    valid_functions.add(name)
+                                    vanilla_functions.add(name)
                                 elif kind == "shell":
                                     # shell commands keep the raw body (do not replace {user})
                                     shell_cmd = (
@@ -635,10 +668,10 @@ def generate_datapack():
                                         if multi_match
                                         else body
                                     )
-                                    ctx.shell_actions_cache.setdefault(name, []).append(
+                                    shell_actions_cache.setdefault(name, []).append(
                                         shell_cmd
                                     )
-                                    ctx.valid_functions.add(name)
+                                    valid_functions.add(name)
 
         # === Write datapack files (vanilla commands only) ===
         for name, commands in collected_vanilla.items():
@@ -659,6 +692,14 @@ def generate_datapack():
         # Create ZIP archive
         zip_path = Path(ctx.datapack_root) / ctx.datapack_name
         shutil.make_archive(str(zip_path), "zip", full_dp_path)
+
+        # Publish the new snapshot atomically.
+        ctx.rcon_only_actions = rcon_only_actions
+        ctx.valid_functions = valid_functions
+        ctx.vanilla_functions = vanilla_functions
+        ctx.script_actions = script_actions
+        ctx.overlay_actions = overlay_actions
+        ctx.shell_actions_cache = shell_actions_cache
 
     except Exception as e:  # datapack build errors are logged; bridge keeps running
         log.exception("Datapack build failed")
@@ -802,7 +843,12 @@ async def execute_global_command(
             if action in HOOK_ACTIONS:
                 try:
                     ctx.hook_api.set_depth(chain_depth)
-                    HOOK_ACTIONS[action](source_user, action, {})
+                    # Hook actions are sync callables that may block (plugin
+                    # I/O); run them on the executor so script triggers never
+                    # stall the main loop.
+                    await asyncio.to_thread(
+                        HOOK_ACTIONS[action], source_user, action, {}
+                    )
                 except (
                     Exception
                 ) as e:  # third-party hook action must not crash the bridge
@@ -1089,7 +1135,12 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
 
 
 def _publish_tiktok_status(connected: bool):
-    """Report the TikTok live connection state to the API EventBus (GUI)."""
+    """Report the TikTok live connection state to the API EventBus (GUI).
+
+    Runs the HTTP POST in the shared background executor so callers on any
+    asyncio loop (heartbeat) or the TikTok client thread never block on the
+    network call.
+    """
     body = json.dumps(
         {
             "type": "tiktok.live_status",
@@ -1100,6 +1151,10 @@ def _publish_tiktok_status(connected: bool):
             },
         }
     ).encode("utf-8")
+    _run_in_background(_post_tiktok_status, body)
+
+
+def _post_tiktok_status(body: bytes) -> None:
     try:
         req = urllib.request.Request(
             f"{API_BASE}/events",
@@ -1244,6 +1299,21 @@ async def _event_bridge_worker():
             q.task_done()
 
 
+def _append_follow_tracking(user_lower: str):
+    try:
+        with open(ctx.follow_tracking_file, "a", encoding="utf-8") as f:
+            f.write(user_lower + "\n")
+    except OSError as e:
+        log.warning(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
+
+
+def _touch_runtime_shutdown():
+    try:
+        ctx.runtime_path_shutdown.touch(exist_ok=True)
+    except OSError as e:
+        log.warning(f"[LIVE] Could not write shutdown signal: {e}")
+
+
 def _process_follow(username: str, persist: bool = True):
     """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user."""
     user_lower = username.lower()
@@ -1253,11 +1323,9 @@ def _process_follow(username: str, persist: bool = True):
             return
         ctx._followed_cache.add(user_lower)
     if persist:
-        try:
-            with open(ctx.follow_tracking_file, "a", encoding="utf-8") as f:
-                f.write(user_lower + "\n")
-        except OSError as e:
-            log.warning(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
+        # File append runs on the background executor; dedup already happened
+        # above, so an async write can never produce a duplicate trigger.
+        _run_in_background(_append_follow_tracking, user_lower)
     if "follow" in ctx.valid_functions:
         enqueue_threadsafe(("follow", username), label="follow")
 
@@ -1591,6 +1659,94 @@ def _process_comment_command(
                 suppress = True
 
     return suppress
+
+
+# ==========================================
+# Comment worker thread
+# ==========================================
+# Comment command processing may block on HTTP requests (conditional
+# handlers) and mutates shared cooldown state. Running it on a dedicated
+# worker keeps the TikTok event loop responsive; the cooldown dicts stay
+# guarded by ctx.comment_cmd_lock so the /test_comment Flask endpoint can
+# still call _process_comment_command synchronously.
+_comment_queue: queue.Queue = queue.Queue()
+_comment_worker_started = False
+_comment_worker_lock = threading.Lock()
+
+
+def _comment_worker_main():
+    while True:
+        item = _comment_queue.get()
+        try:
+            _handle_comment_event(*item)
+        except Exception as e:  # worker must never die; log and keep draining
+            log.error(f"[COMMENT] Worker error: {e}")
+            get_crash_manager().report_exception(
+                TIKTOK_0003, exc=e, context_info={"source": "comment_worker"}
+            )
+        finally:
+            _comment_queue.task_done()
+
+
+def _start_comment_worker():
+    global _comment_worker_started
+    with _comment_worker_lock:
+        if _comment_worker_started:
+            return
+        threading.Thread(
+            target=_comment_worker_main, name="comment-worker", daemon=True
+        ).start()
+        _comment_worker_started = True
+
+
+def _handle_comment_event(
+    username,
+    comment_text,
+    is_moderator,
+    is_super_fan,
+    in_fanclub,
+):
+    """Full comment handling, run on the dedicated comment worker thread."""
+    log.info(f"[COMMENT] {username}: {comment_text}")
+    log.info(f"  Superfan: {is_super_fan}")
+    log.info(f"  Fanclub-Mitglied: {in_fanclub}")
+    log.info(f"  Moderator: {is_moderator}")
+
+    if ctx.comment_cmd_all_prefixes:
+        matched_prefix = None
+        for p in sorted(ctx.comment_cmd_all_prefixes, key=len, reverse=True):
+            if comment_text.startswith(p):
+                matched_prefix = p
+                break
+        if matched_prefix:
+            cmd_part = comment_text[len(matched_prefix) :].strip()
+            if cmd_part:
+                group_enabled = any(
+                    g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups
+                )
+                if not ctx.comment_cmd_enable:
+                    log.info(
+                        f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally"
+                    )
+                elif not group_enabled:
+                    log.info(
+                        f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled"
+                    )
+
+    suppress_comment_trigger = _process_comment_command(
+        username,
+        comment_text,
+        is_moderator,
+        is_super_fan,
+        in_fanclub,
+        log_prefix="[COMMENT CMD]",
+    )
+
+    if "comment" in ctx.valid_functions and not suppress_comment_trigger:
+        enqueue_threadsafe(
+            ("comment", {"user": username, "comment": comment_text}),
+            label="comment",
+        )
 
 
 # ==========================================
@@ -1959,46 +2115,12 @@ def create_client(user):
 
         is_moderator = bool(getattr(event.user, "is_moderator", None))
 
-        log.info(f"[COMMENT] {username}: {comment_text}")
-        log.info(f"  Superfan: {is_super_fan}")
-        log.info(f"  Fanclub-Mitglied: {in_fanclub}")
-        log.info(f"  Moderator: {is_moderator}")
-
-        if ctx.comment_cmd_all_prefixes:
-            matched_prefix = None
-            for p in sorted(ctx.comment_cmd_all_prefixes, key=len, reverse=True):
-                if comment_text.startswith(p):
-                    matched_prefix = p
-                    break
-            if matched_prefix:
-                cmd_part = comment_text[len(matched_prefix) :].strip()
-                if cmd_part:
-                    group_enabled = any(
-                        g["prefix"] == matched_prefix for g in ctx.comment_cmd_groups
-                    )
-                    if not ctx.comment_cmd_enable:
-                        log.info(
-                            f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but comment_commands is disabled globally"
-                        )
-                    elif not group_enabled:
-                        log.info(
-                            f"[COMMENT CMD] {username} typed '{cmd_part}' (prefix '{matched_prefix}') but that command group is disabled"
-                        )
-
-        suppress_comment_trigger = _process_comment_command(
-            username,
-            comment_text,
-            is_moderator,
-            is_super_fan,
-            in_fanclub,
-            log_prefix="[COMMENT CMD]",
+        # Heavy comment handling (logging, prefix matching, cooldowns, HTTP
+        # conditional handlers) runs on a dedicated worker thread.
+        _start_comment_worker()
+        _comment_queue.put(
+            (username, comment_text, is_moderator, is_super_fan, in_fanclub)
         )
-
-        if "comment" in ctx.valid_functions and not suppress_comment_trigger:
-            enqueue_threadsafe(
-                ("comment", {"user": username, "comment": comment_text}),
-                label="comment",
-            )
 
     # =========================
     # Share events
@@ -2015,11 +2137,14 @@ def create_client(user):
     # =========================
     @client.on(LiveEndEvent)
     def on_live_end(_):
-        update_daily_revenue()
         log.info(f"Live ended for @{user}.")
         ctx.tiktok_live = False
         _publish_tiktok_status(False)
-        ctx.runtime_path_shutdown.touch(exist_ok=True)
+        # Revenue persistence and the shutdown signal are plain file I/O —
+        # run them on the background executor so live-end never blocks the
+        # TikTok client thread.
+        _run_in_background(update_daily_revenue)
+        _run_in_background(_touch_runtime_shutdown)
 
     # =========================
     # Live disconnect events
@@ -2119,8 +2244,10 @@ async def reload_config():
                 valid_functions=ctx.valid_functions,
             )
 
-        ctx.comment_handler_map = _fetch_comment_handlers()
-        ctx.event_subscriptions = _load_event_subscriptions()
+        # Network/file fetches run in a thread so the reload never blocks the
+        # main loop; both helpers are pure reads (no ctx mutation).
+        ctx.comment_handler_map = await asyncio.to_thread(_fetch_comment_handlers)
+        ctx.event_subscriptions = await asyncio.to_thread(_load_event_subscriptions)
 
         # Force the RCON worker to reconnect with the new settings.
         ctx.rcon_connection = None
@@ -2146,7 +2273,10 @@ async def reload_actions(send_minecraft_reload: bool = False):
         "[RELOAD] Actions reload requested (send /reload: %s)", send_minecraft_reload
     )
     try:
-        diags = validate_file(ACTIONS_FILE, raise_on_error=False)
+        # File validation and the datapack rebuild run in a thread; the
+        # rebuild publishes its result atomically (see generate_datapack),
+        # so the main loop stays responsive during a reload.
+        diags = await asyncio.to_thread(validate_file, ACTIONS_FILE, False)
         if any(d.severity == Severity.ERROR for d in diags):
             log.error("[RELOAD] actions.mca contains errors; reload aborted")
             print_diagnostics(diags)
@@ -2154,7 +2284,7 @@ async def reload_actions(send_minecraft_reload: bool = False):
             get_health_monitor().set_state("tiktok_bridge", HealthState.DEGRADED)
             return
 
-        generate_datapack()
+        await asyncio.to_thread(generate_datapack)
         ctx.actions_valid = True
         get_health_monitor().set_state("tiktok_bridge", HealthState.RUNNING)
         ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)

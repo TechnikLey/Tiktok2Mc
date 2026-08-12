@@ -212,6 +212,194 @@ class TestGenerateDatapackShell:
             generate_datapack()
         assert ctx.shell_actions_cache.get("12345") == ["echo hi", "echo hi", "echo hi"]
 
+    def test_keeps_previous_snapshot_when_build_fails(self, tmp_path: Path):
+        from src.python.main import ctx, generate_datapack
+
+        actions_file = tmp_path / "actions.mca"
+        actions_file.write_text("12345:&echo hi\n", encoding="utf-8")
+        dp_root = tmp_path / "datapacks"
+        dp_root.mkdir(parents=True, exist_ok=True)
+        with (
+            patch.object(ctx, "datapack_root", dp_root),
+            patch("src.python.main.ACTIONS_FILE", actions_file),
+        ):
+            generate_datapack()
+        assert "12345" in ctx.valid_functions
+
+        # A rebuild whose datapack root cannot be created must leave the
+        # previously published snapshot intact.
+        blocked_root = tmp_path / "blocked"
+        blocked_root.write_text("not a directory", encoding="utf-8")
+        with (
+            patch.object(ctx, "datapack_root", blocked_root),
+            patch("src.python.main.ACTIONS_FILE", actions_file),
+        ):
+            generate_datapack()
+        assert "12345" in ctx.valid_functions
+        assert ctx.shell_actions_cache.get("12345") == ["echo hi"]
+
+
+# =========================================================================
+# Runtime reload offloads blocking work to worker threads
+# =========================================================================
+
+
+class TestReloadOffloadsToThread:
+    @pytest.mark.asyncio
+    async def test_reload_actions_runs_build_in_thread(self, monkeypatch):
+        from src.python import main as main_mod
+
+        seen = {}
+        main_thread = threading.get_ident()
+
+        def fake_validate_file(*_args, **_kwargs):
+            seen["validate"] = threading.get_ident()
+
+        def fake_generate_datapack():
+            seen["build"] = threading.get_ident()
+            main_mod.ctx.valid_functions = {"offloaded"}
+
+        def fake_health():
+            return MagicMock()
+
+        monkeypatch.setattr(main_mod, "validate_file", fake_validate_file)
+        monkeypatch.setattr(main_mod, "generate_datapack", fake_generate_datapack)
+        monkeypatch.setattr(main_mod, "get_health_monitor", fake_health)
+
+        await main_mod.reload_actions()
+
+        assert seen.get("validate") != main_thread
+        assert seen.get("build") != main_thread
+
+    @pytest.mark.asyncio
+    async def test_reload_config_fetches_handlers_in_thread(self, monkeypatch):
+        from src.python import main as main_mod
+
+        seen = {}
+        main_thread = threading.get_ident()
+
+        def fake_fetch_comment_handlers():
+            seen["handlers"] = threading.get_ident()
+            return {}
+
+        def fake_load_event_subscriptions():
+            seen["subscriptions"] = threading.get_ident()
+            return {}
+
+        monkeypatch.setattr(
+            main_mod, "_fetch_comment_handlers", fake_fetch_comment_handlers
+        )
+        monkeypatch.setattr(
+            main_mod, "_load_event_subscriptions", fake_load_event_subscriptions
+        )
+
+        await main_mod.reload_config()
+
+        assert seen.get("handlers") != main_thread
+        assert seen.get("subscriptions") != main_thread
+
+
+# =========================================================================
+# Comment worker thread
+# =========================================================================
+
+
+class TestCommentWorker:
+    @pytest.mark.asyncio
+    async def test_comment_processing_runs_on_worker_thread(self, monkeypatch):
+        from src.python import main as main_mod
+
+        # Drain any leftovers from earlier tests.
+        while not main_mod._comment_queue.empty():
+            main_mod._comment_queue.get()
+
+        main_thread = threading.get_ident()
+        seen = {}
+        enqueued = []
+        monkeypatch.setattr(main_mod.ctx, "valid_functions", {"comment"})
+
+        def fake_process_comment_command(*_args, **_kwargs):
+            seen["thread"] = threading.get_ident()
+            return False
+
+        def fake_enqueue_threadsafe(item, **kwargs):
+            enqueued.append(item)
+
+        monkeypatch.setattr(
+            main_mod, "_process_comment_command", fake_process_comment_command
+        )
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue_threadsafe)
+
+        main_mod._start_comment_worker()
+        main_mod._comment_queue.put(("tester", "!hi", False, False, False))
+        main_mod._comment_queue.join()
+
+        assert seen.get("thread") not in (None, main_thread)
+        assert enqueued == [("comment", {"user": "tester", "comment": "!hi"})]
+
+
+# =========================================================================
+# Follow persistence offload
+# =========================================================================
+
+
+class TestProcessFollowOffload:
+    def test_follow_persistence_offloaded_to_background(self, tmp_path, monkeypatch):
+        from src.python import main as main_mod
+
+        tracking_file = tmp_path / "follows.txt"
+        monkeypatch.setattr(main_mod.ctx, "follow_tracking_file", tracking_file)
+        monkeypatch.setattr(main_mod.ctx, "follow_lock", threading.Lock())
+        monkeypatch.setattr(main_mod.ctx, "_followed_cache", set())
+        monkeypatch.setattr(main_mod.ctx, "valid_functions", set())
+
+        submitted = {}
+
+        def fake_run_in_background(fn, *args):
+            submitted["fn"] = fn
+            submitted["args"] = args
+
+        monkeypatch.setattr(main_mod, "_run_in_background", fake_run_in_background)
+
+        main_mod._process_follow("TestUser")
+
+        assert submitted.get("fn") is main_mod._append_follow_tracking
+        assert submitted.get("args") == ("testuser",)
+        submitted["fn"](*submitted["args"])
+        assert "testuser" in tracking_file.read_text(encoding="utf-8")
+
+
+class TestHookActionOffload:
+    def test_hook_action_runs_in_thread(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import ctx, execute_global_command
+
+        def fake_action(source_user, action, extra):
+            pass
+
+        monkeypatch.setattr(ctx, "valid_functions", {"myhook"})
+        monkeypatch.setattr(ctx, "script_actions", {"myhook": ["myaction"]})
+        monkeypatch.setattr(ctx, "overlay_actions", {})
+        monkeypatch.setattr(ctx, "vanilla_functions", set())
+        monkeypatch.setattr(ctx, "rcon_only_actions", {})
+        monkeypatch.setattr(ctx, "shell_actions_cache", {})
+        monkeypatch.setattr(ctx, "hook_api", MagicMock())
+        monkeypatch.setattr(main_mod, "HOOK_ACTIONS", {"myaction": fake_action})
+
+        calls = []
+
+        async def fake_to_thread(fn, *args):
+            calls.append((fn, args))
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        asyncio.run(execute_global_command("myhook", "viewer"))
+
+        assert len(calls) == 1
+        assert calls[0][0] is fake_action
+        assert calls[0][1] == ("viewer", "myaction", {})
+
 
 # =========================================================================
 # Runtime reload signal watcher
