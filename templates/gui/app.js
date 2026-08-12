@@ -637,6 +637,10 @@ async function loadStatus() {
           '<span class="status-card__value" id="tiktok-status-value">Checking...</span>' +
         '</div>' +
       '</div>';
+
+    // Render Live Statistics
+    renderLiveStats(data);
+
     // Explicit live-state from the API (reported by the bridge). This is
     // authoritative and survives quiet streams / test triggers.
     if (typeof data.tiktok_live === 'boolean') {
@@ -647,6 +651,63 @@ async function loadStatus() {
     const el = document.getElementById('system-info');
     if (el) el.innerHTML = '<span class="log-err">Failed to load status: ' + escapeHtml(e.message) + '</span>';
   }
+}
+
+function renderLiveStats(data) {
+  const grid = document.getElementById('live-stats-grid');
+  if (!grid) return;
+
+  const stats = [];
+
+  // RCON Queue Size
+  if (data.rcon_queue_size !== undefined && data.rcon_queue_size !== null) {
+    const cls = data.rcon_queue_size > 100 ? 'danger' : data.rcon_queue_size > 50 ? 'warning' : 'success';
+    stats.push({
+      label: I18N.t('status.rconQueue'),
+      value: data.rcon_queue_size,
+      class: cls,
+    });
+  }
+
+  // Trigger Queue Size
+  if (data.trigger_queue_size !== undefined && data.trigger_queue_size !== null) {
+    const cls = data.trigger_queue_size > 100 ? 'danger' : data.trigger_queue_size > 50 ? 'warning' : 'success';
+    stats.push({
+      label: I18N.t('status.triggerQueue'),
+      value: data.trigger_queue_size,
+      class: cls,
+    });
+  }
+
+  // Events per Minute
+  if (data.events_per_minute !== undefined && data.events_per_minute !== null) {
+    stats.push({
+      label: I18N.t('status.eventsPerMinute'),
+      value: data.events_per_minute,
+      class: 'info',
+    });
+  }
+
+  // Gift Value Today
+  if (data.gift_value_usd_today !== undefined && data.gift_value_usd_today !== null) {
+    stats.push({
+      label: I18N.t('status.giftValueToday'),
+      value: '$' + data.gift_value_usd_today.toFixed(2),
+      class: 'success',
+    });
+  }
+
+  if (stats.length === 0) {
+    grid.innerHTML = '<div class="text-muted" style="grid-column: 1 / -1; text-align: center; padding: var(--space-4);">' + I18N.t('status.noLiveData') + '</div>';
+    return;
+  }
+
+  grid.innerHTML = stats.map(s =>
+    '<div class="status-card">' +
+      '<span class="status-card__label">' + escapeHtml(s.label) + '</span>' +
+      '<span class="status-card__value ' + s.class + '">' + escapeHtml(String(s.value)) + '</span>' +
+    '</div>'
+  ).join('');
 }
 
 function _updateTiktokStatusDisplay() {

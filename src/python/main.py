@@ -1029,6 +1029,37 @@ def handle_health():
     }, 200
 
 
+@app.route("/metrics", methods=["GET"])
+def handle_metrics():
+    import time
+    now = time.time()
+    # Calculate events per minute (rolling window)
+    # We track event counts in the last 60 seconds
+    if not hasattr(handle_metrics, "_event_timestamps"):
+        handle_metrics._event_timestamps = []
+    # Clean old timestamps (older than 60 seconds)
+    cutoff = now - 60
+    handle_metrics._event_timestamps = [ts for ts in handle_metrics._event_timestamps if ts > cutoff]
+    events_per_minute = len(handle_metrics._event_timestamps)
+
+    return {
+        "rcon_queue_size": ctx.rcon_queue.qsize() if ctx.rcon_queue else 0,
+        "trigger_queue_size": ctx.trigger_queue.qsize() if ctx.trigger_queue else 0,
+        "events_per_minute": events_per_minute,
+        "tiktok_connected": ctx.tiktok_client is not None and ctx.tiktok_live,
+        "gift_value_usd_today": getattr(ctx, "gift_value_usd", 0),
+        "gift_day_start_value": getattr(ctx, "gift_day_start_value", 0),
+    }, 200
+
+
+def _record_metrics_event():
+    """Call this to record an event for metrics tracking."""
+    import time
+    if not hasattr(handle_metrics, "_event_timestamps"):
+        handle_metrics._event_timestamps = []
+    handle_metrics._event_timestamps.append(time.time())
+
+
 @app.route("/webhook", methods=["POST"])
 def handle_minecraft_events():
     try:
@@ -1159,6 +1190,7 @@ def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
 
 def _publish_tiktok_event(event_type: str, user: str, **extra):
     """Publish a TikTok event to the EventBus for plugins to consume."""
+    _record_metrics_event()
     if ctx.main_loop is not None:
         data = {"type": event_type, "user": user, **extra}
         try:

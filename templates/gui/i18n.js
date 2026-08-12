@@ -143,6 +143,12 @@
     'status.checking': 'Checking...',
     'status.checkingPill': 'Checking',
     'status.failedLoad': 'Failed to load status: {msg}',
+    'status.liveStats': 'Live Statistics',
+    'status.rconQueue': 'RCON Queue',
+    'status.triggerQueue': 'Trigger Queue',
+    'status.eventsPerMinute': 'Events/Min',
+    'status.giftValueToday': 'Gift Value Today',
+    'status.noLiveData': 'No live data available (bridge not connected)',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',
@@ -820,6 +826,12 @@
     'status.checking': 'Prüfe...',
     'status.checkingPill': 'Prüfe',
     'status.failedLoad': 'Status konnte nicht geladen werden: {msg}',
+    'status.liveStats': 'Live-Statistiken',
+    'status.rconQueue': 'RCON-Warteschlange',
+    'status.triggerQueue': 'Trigger-Warteschlange',
+    'status.eventsPerMinute': 'Events/Min',
+    'status.giftValueToday': 'Geschenk-Wert heute',
+    'status.noLiveData': 'Keine Live-Daten verfügbar (Bridge nicht verbunden)',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',

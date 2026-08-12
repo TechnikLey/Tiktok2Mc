@@ -10,6 +10,7 @@ from core.api.models import (
 )
 from core.api.registry import get_registry
 from core.api.services import ApiService
+from core.api.services.bridge_metrics import get_bridge_metrics_service
 from core.api.tiktok_live import get_tiktok_live_tracker
 from core.health_monitor import get_health_monitor as get_global_health_monitor
 
@@ -42,6 +43,14 @@ async def status():
         plugins = get_registry().list()
         enabled = sum(1 for p in plugins if p.enabled)
         tracker = get_tiktok_live_tracker().snapshot()
+
+        # Fetch bridge metrics (non-blocking, best effort)
+        bridge_metrics = {}
+        try:
+            bridge_metrics = await get_bridge_metrics_service().get_metrics()
+        except Exception as e:
+            log.debug("Failed to fetch bridge metrics: %s", e)
+
         return StatusDetail(
             server="running",
             plugins_active=enabled,
@@ -52,6 +61,10 @@ async def status():
             tiktok_live_last_update=tracker.get("tiktok_live_last_update"),
             tiktok_live_last_event=tracker.get("tiktok_live_last_event"),
             tiktok_live_source=tracker.get("tiktok_live_source", ""),
+            rcon_queue_size=bridge_metrics.get("rcon_queue_size"),
+            trigger_queue_size=bridge_metrics.get("trigger_queue_size"),
+            events_per_minute=bridge_metrics.get("events_per_minute"),
+            gift_value_usd_today=bridge_metrics.get("gift_value_usd_today"),
         )
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get status")

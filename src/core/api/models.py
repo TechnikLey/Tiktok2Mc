@@ -80,6 +80,19 @@ class StatusDetail(BaseModel):
     tiktok_live_source: str = Field(
         "", description="Source of the last live-status report"
     )
+    # Bridge metrics
+    rcon_queue_size: int | None = Field(
+        None, description="Current size of the RCON command queue"
+    )
+    trigger_queue_size: int | None = Field(
+        None, description="Current size of the trigger queue"
+    )
+    events_per_minute: int | None = Field(
+        None, description="Events processed per minute (rolling 60s window)"
+    )
+    gift_value_usd_today: float | None = Field(
+        None, description="Total gift value in USD today"
+    )
 
 
 # ── Reaction Catalog ─────────────────────────────────────────────────

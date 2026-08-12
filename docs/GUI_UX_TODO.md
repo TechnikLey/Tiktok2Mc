@@ -18,7 +18,7 @@
 | **P2** | Mittel | UX-Feinschliff / Verbesserung |
 | **P3** | Niedrig | Nice-to-have, später |
 
-**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: i18n → Accessibility → Overlay-Vorschau → Kontext-Hilfe), danach Feinschliff (P2: Status-View → Tastenkürzel → Undo → Mobile/LAN), zum Schluss P3-Ideen.
+**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → Accessibility → Overlay-Vorschau → Kontext-Hilfe), danach Feinschliff (P2: Status-View → Tastenkürzel → Undo → Mobile/LAN), zum Schluss P3-Ideen.
 
 ---
 
@@ -26,37 +26,38 @@
 
 ### 1. Lokalisierung (i18n)
 
-- [ ] **Status:** Offen
-- [ ] **Problem:** Die komplette GUI ist auf Englisch (`<html lang="en">` in `index.html`, kein
+- [x] **Status:** **ERLEDIGT** (im Code implementiert)
+- [x] **Problem:** Die komplette GUI war auf Englisch (`<html lang="en">` in `index.html`, kein
       i18n-Mechanismus, alle Strings hart im HTML/JS). Die Zielgruppe ist überwiegend deutsch,
       die Doku wird zweisprachig gepflegt (`docs/dev-book-{en,de}/`).
-- [ ] **Ziel:** Sprachumschaltung (mind. DE/EN), persistiert in `localStorage`, Standard aus
+- [x] **Ziel:** Sprachumschaltung (mind. DE/EN), persistiert in `localStorage`, Standard aus
       System-/Browser-Sprache ableitbar.
-- [ ] **Umsetzungsvorschlag:**
-  - Kleines i18n-Modul (z. B. `templates/gui/i18n.js`) mit Dictionary `{de, en}` und
-    `t(key, params)`-Funktion; HTML-Text über `data-i18n`-Attribute oder JS-Render-Funktionen.
-  - Sprachwahl in den Settings oder als Umschalter in der Sidebar.
-  - Kein Framework nötig (Projekt ist Vanilla-JS, siehe `AGENTS.md` §5).
-- [ ] **Abnahmekriterien:** Alle Views, Modals, Editor-Strings, Wizard und Fehlermeldungen
-      sind übersetzbar; Umschaltung wirkt sofort; Wahl bleibt nach Reload erhalten.
-- [ ] **Betroffene Dateien:** `index.html`, `launcher.html`, `app.js`, `actions-editor.js`,
-      `templates/gui/tests/*`
+- [x] **Umsetzung:** `templates/gui/i18n.js` mit Dictionary `{de, en}`, `t(key, params)`,
+    `apply(document)`, `setLang(lang)`, `init()`. HTML nutzt `data-i18n`, `data-i18n-placeholder`,
+    `data-i18n-title`, `data-i18n-aria-label`. Sprachumschalter in Sidebar-Footer.
+- [x] **Abnahmekriterien:** Alle Views, Modals, Editor-Strings, Wizard und Fehlermeldungen
+      sind übersetzbar; Umschaltung wirkt sofort; Wahl bleibt nach Reload erhalten; Tests in
+      `templates/gui/tests/i18n.test.js`.
+- [x] **Betroffene Dateien:** `i18n.js`, `index.html`, `launcher.html`, `app.js`, `actions-editor.js`,
+      `style.css` (Language-Switcher), `design-system.css`
 
 ---
 
 ### 2. Accessibility (Barrierefreiheit & Tastaturbedienung)
 
-- [ ] **Status:** Offen
-- [ ] **Problem:** Keine `aria-*`-Attribute, keine Tastaturnavigation: Modals sind nicht per
-      `Esc` schließbar, kein Fokus-Management/Fokus-Trap in Overlays, Screenreader erhalten
-      keine sinnvollen Labels. `keydown`-Handler existieren nur in Tag-Inputs.
+- [ ] **Status:** Offen (teilweise: `aria-label` via i18n implementiert)
+- [ ] **Problem:** Keine `aria-*`-Attribute (außer `aria-label` via i18n), keine Tastaturnavigation:
+      Modals sind nicht per `Esc` schließbar, kein Fokus-Management/Fokus-Trap in Overlays,
+      Screenreader erhalten keine sinnvollen Labels. `keydown`-Handler existieren nur in
+      Tag-Inputs.
 - [ ] **Ziel:** Grundlegende WCAG-Konformität (AA) für die Kernflüsse.
 - [ ] **Umsetzungsvorschlag:**
   - `Esc` schließt das oberste Modal; Fokus-Trap innerhalb offener Modals; Fokus beim Öffnen
     ins Modal, beim Schließen zurück zum Auslöser.
   - `aria-label`/`aria-labelledby` für Icons ohne Text (Sidebar-Icons, Theme-Toggle, Buttons),
     `role="dialog"` + `aria-modal` für Overlays, `aria-live` für Toasts/Log.
-  - `lang` je View dynamisch an die gewählte Sprache anpassen (verknüpft mit Punkt 1).
+  - `lang` je View dynamisch an die gewählte Sprache anpassen (verknüpft mit Punkt 1 —
+    bereits via `I18N.apply()` implementiert).
 - [ ] **Abnahmekriterien:** Vollständige Bedienung ohne Maus möglich; Modals per `Esc` +
       Tab-Fokus sicher bedienbar; Lighthouse/axe-Check ohne kritische Fehler.
 - [ ] **Betroffene Dateien:** `index.html`, `design-system.css` (Fokus-Styles), `app.js`,
@@ -68,8 +69,8 @@
 
 - [ ] **Status:** Offen
 - [ ] **Problem:** Der Overlay-Bereich (`view-overlays`, Rendering in `app.js` ab ca. Zeile
-      1357) zeigt nur Copy-URLs. Es gibt keine Möglichkeit, das Overlay zu sehen oder einen
-      Sample-Trigger auszulösen.
+      1371, `renderOverlayUrls()`) zeigt nur Copy-URLs. Es gibt keine Möglichkeit, das Overlay
+      zu sehen oder einen Sample-Trigger auszulösen.
 - [ ] **Ziel:** Overlays direkt im Dashboard ansehen und testen.
 - [ ] **Umsetzungsvorschlag:**
   - Eingebettete Vorschau (z. B. `<iframe>` mit Chromakey-Parameter) je Overlay.
@@ -78,8 +79,8 @@
   - Optional: Live-Vorschau aktivieren/deaktivieren pro Overlay.
 - [ ] **Abnahmekriterien:** Jedes aufgelistete Overlay ist als Vorschau sichtbar; Test-Trigger
       rendert sichtbar im Overlay.
-- [ ] **Betroffene Dateien:** `index.html`, `app.js`, ggf. `src/core/api/routes/` (falls neuer
-      Test-Endpunkt nötig) + Tests
+- [ ] **Betroffene Dateien:** `index.html`, `app.js` (`renderOverlayUrls()`), ggf.
+      `src/core/api/routes/` (falls neuer Test-Endpunkt nötig) + Tests
 
 ---
 
@@ -106,16 +107,18 @@
 
 ### 5. Status-View ausbauen (Live-Statistiken)
 
-- [ ] **Status:** Offen
-- [ ] **Problem:** `view-status` zeigt nur „System Status" + „Plugin Health". Für Streamer fehlen
+- [x] **Status:** **ERLEDIGT**
+- [x] **Problem:** `view-status` zeigte nur „System Status" + „Plugin Health". Für Streamer fehlten
       die spannenden Live-Zahlen.
-- [ ] **Ziel:** Kompaktes Live-Dashboard auf der Status-Seite.
-- [ ] **Umsetzungsvorschlag:** Kacheln mit Likes/Follower/Gifts heute, aktueller TikTok-Status,
-      RCON-Queue-Länge, Event-Durchsatz (Events/min) über den bestehenden SSE-Stream
-      (`/api/v1/ws`) + Revenue-Backend (siehe `feat: revenue viewer`, Commit `58a8fed`).
-- [ ] **Abnahmekriterien:** Zahlen aktualisieren sich live ohne Reload; leere Zustände sauber
-      dargestellt.
-- [ ] **Betroffene Dateien:** `index.html`, `app.js`, `style.css`, ggf. `src/core/api/services/`
+- [x] **Ziel:** Kompaktes Live-Dashboard auf der Status-Seite.
+- [x] **Umsetzung:**
+  - Neuer `/metrics` Endpoint im Bridge Flask App (`src/python/main.py`) liefert: RCON-Queue-Größe, Trigger-Queue-Größe, Events/Min (rolling 60s), Geschenk-Wert heute.
+  - `BridgeMetricsService` (`src/core/api/services/bridge_metrics.py`) holt Metriken vom Bridge.
+  - `/status` Endpoint erweitert um `rcon_queue_size`, `trigger_queue_size`, `events_per_minute`, `gift_value_usd_today`.
+  - GUI zeigt neue Sektion "Live Statistics" mit farblich kodierten Karten (grün/gelb/rot für Queue-Größen).
+  - i18n Keys für DE/EN hinzugefügt.
+- [x] **Abnahmekriterien:** Zahlen aktualisieren sich live ohne Reload; leere Zustände sauber dargestellt; Tests grün.
+- [x] **Betroffene Dateien:** `src/python/main.py`, `src/core/api/services/bridge_metrics.py`, `src/core/api/routes/health.py`, `src/core/api/models.py`, `templates/gui/index.html`, `templates/gui/app.js`, `templates/gui/i18n.js`
 
 ---
 
@@ -133,28 +136,30 @@
 
 ### 7. Undo nach dem Speichern / Backup-Wiederherstellung
 
-- [ ] **Status:** Offen
+- [ ] **Status:** Offen (Backend: `BackupManager` in `src/core/backup.py` implementiert, API nutzt `backup=true`, aber kein GUI)
 - [ ] **Problem:** Editoren haben Review-vor-Speichern, aber nach dem Speichern kein Undo.
-      Backups existieren bereits unter `data/backups/` (`AGENTS.md` §3), haben aber kein GUI.
+      Backups existieren bereits unter `data/backups/` (`AGENTS.md` §3, `src/core/backup.py`),
+      haben aber kein GUI. API-Routen für `list_backups`/`restore_backup` fehlen.
 - [ ] **Ziel:** Nutzer können Änderungen an `config.yaml` / `actions.mca` / Plugin-/Hook-Config
       zurückrollen.
 - [ ] **Umsetzungsvorschlag:**
   - Backups-View, die `data/backups/` auflistet (Zeitstempel, Quelle, Größe) und Wiederherstellen
-    erlaubt.
+    erlaubt (neue API-Endpunkte nötig: `GET /api/v1/backups`, `POST /api/v1/backups/restore`).
   - Optional: Undo-Last-Save innerhalb einer Editor-Session (In-Memory-Stack).
 - [ ] **Abnahmekriterien:** Backup kann aus der GUI heraus wiederhergestellt werden; Warnung vor
       Überschreiben.
 - [ ] **Betroffene Dateien:** `index.html`, `app.js`, `src/core/api/routes/` + `services/`,
-      Tests
+      `src/core/backup.py`, Tests
 
 ---
 
 ### 8. Mobile / LAN-Nutzung prüfen
 
-- [ ] **Status:** Offen
+- [ ] **Status:** Teilweise implementiert (responsive CSS vorhanden, aber unvollständig getestet)
 - [ ] **Problem:** Mit `feat: enable LAN dashboard access` (Commit `e11d6b3`) kann das Dashboard
-      aus dem LAN (z. B. Handy) geöffnet werden. Responsive CSS existiert nur teilweise
-      (`style.css` `@media (max-width: 960px)` Zeile ~1599, `768px` Zeile ~2401/3008).
+      aus dem LAN (z. B. Handy) geöffnet werden. Responsive CSS existiert teilweise
+      (`style.css` `@media (max-width: 960px)` Zeile ~1633, `768px` Zeile ~2435/3042).
+      Sidebar wird zu horizontaler Leiste, Tabellen werden zu Cards, Editor-Layouts stacken.
 - [ ] **Ziel:** Dashboard auch auf kleineren Bildschirmen gut bedienbar (Sidebar, Tabellen,
       Editoren, Server-Manager-Modals).
 - [ ] **Umsetzungsvorschlag:** Gezieltes Mobile-Review (mind. 375 px und 768 px breite), Seitenleiste
@@ -180,4 +185,7 @@
 
 ## Erledigt
 
-(Noch nichts abgeschlossen — dieser Bereich wächst beim Abarbeiten.)
+- **Lokalisierung (i18n)** — `templates/gui/i18n.js` implementiert mit DE/EN, `localStorage`-Persistenz, `data-i18n`-Attribute im HTML, Sprachumschalter in Sidebar, Tests in `templates/gui/tests/i18n.test.js`. (P1)
+- **Status-View Live-Statistiken** — Bridge `/metrics` Endpoint, `BridgeMetricsService`, erweiterter `/status` Response, GUI "Live Statistics" Sektion mit RCON/Trigger Queue, Events/Min, Gift Value Today. i18n DE/EN. Tests grün. (P2)
+
+---
