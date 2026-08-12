@@ -2,7 +2,12 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from core.api.models import API_VERSION, HealthResponse, StatusDetail
+from core.api.models import (
+    API_VERSION,
+    TOOL_VERSION,
+    HealthResponse,
+    StatusDetail,
+)
 from core.api.registry import get_registry
 from core.api.services import ApiService
 from core.api.tiktok_live import get_tiktok_live_tracker
@@ -23,7 +28,12 @@ def _get_service() -> ApiService:
 
 @router.get("/health", response_model=HealthResponse)
 async def health():
-    return HealthResponse(status="ok", version=API_VERSION, api_version=API_VERSION)
+    return HealthResponse(
+        status="ok",
+        version=API_VERSION,
+        api_version=API_VERSION,
+        tool_version=TOOL_VERSION,
+    )
 
 
 @router.get("/status", response_model=StatusDetail)
@@ -60,6 +70,7 @@ async def health_extended():
             "status": "ok",
             "version": API_VERSION,
             "api_version": API_VERSION,
+            "tool_version": TOOL_VERSION,
             "plugins": {
                 "active": enabled,
                 "total": len(plugins),

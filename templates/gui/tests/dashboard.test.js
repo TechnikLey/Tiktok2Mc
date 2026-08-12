@@ -92,11 +92,11 @@ describe('loadHealth', () => {
   it('sets online pill on success', async () => {
     globalThis.fetch = async () => ({
       ok: true, status: 200, statusText: 'OK',
-      json: async () => ({ api_version: '1.0.0' }),
+      json: async () => ({ api_version: '1.0.0', tool_version: 'v1.0.0' }),
     });
     const pill = document.getElementById('status-pill');
     await loadHealth();
-    expect(pill.textContent).toContain('1.0.0');
+    expect(pill.textContent).toContain('v1.0.0');
     expect(pill.className).toBe('online');
   });
 

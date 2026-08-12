@@ -74,13 +74,6 @@ CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resol
 # === Determine server.jar path (instance-based ONLY) ===
 # NO version-based paths. NO legacy paths. NO fallback paths.
 SERVER_JAR = (INSTANCE_DIR / "server.jar").resolve()
-MC_VERSION = "1.21.11"
-try:
-    if CONFIG_FILE.exists():
-        cfg = load_yaml(CONFIG_FILE)
-        MC_VERSION = cfg.get("mc_version", "1.21.11")
-except (OSError, ValueError, YAMLError):
-    pass
 
 if not SERVER_JAR.exists():
     log.error("server.jar not found at %s", SERVER_JAR)

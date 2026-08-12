@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from core.version import (
     API_VERSION,  # noqa: F401  # re-export: importers use core.api.models.API_VERSION
+    TOOL_VERSION,  # noqa: F401  # re-export: importers use core.api.models.TOOL_VERSION
 )
 
 # ── Plugin Config Schema ──────────────────────────────────────────────
@@ -55,6 +56,7 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     api_version: str
+    tool_version: str
 
 
 class StatusDetail(BaseModel):

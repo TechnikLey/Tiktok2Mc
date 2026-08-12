@@ -534,7 +534,7 @@ async function loadHealth() {
   try {
     const data = await fetchJSON('/health');
     const pill = document.getElementById('status-pill');
-    pill.textContent = 'API v' + data.api_version;
+    pill.textContent = data.tool_version || ('API v' + data.api_version);
     pill.className = 'online';
   } catch (e) {
     const pill = document.getElementById('status-pill');

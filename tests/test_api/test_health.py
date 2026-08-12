@@ -1,11 +1,14 @@
 class TestHealthEndpoints:
     def test_health_returns_ok(self, client):
+        from core.version import TOOL_VERSION
+
         resp = client.get("/api/v1/health")
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "ok"
         assert body["version"] == "1.0.0"
         assert body["api_version"] == "1.0.0"
+        assert body["tool_version"] == TOOL_VERSION
 
     def test_status_returns_running(self, client):
         resp = client.get("/api/v1/status")
