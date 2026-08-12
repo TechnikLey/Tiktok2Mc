@@ -119,15 +119,17 @@ _TOOL_API_URL = f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest"
 def check_tool_update(current_version: str) -> dict[str, Any]:
     """Check the main GitHub repo for a newer tool release.
 
-    ``current_version`` should be a semver string like ``"1.0.0"``.
-    GitHub tags (``v1.0.0``) are stripped of the leading ``v`` for
-    comparison.
+    ``current_version`` is the local tool version, either a plain semver
+    string like ``"1.0.0"`` or with a leading ``v`` (``"v1.0.0"``, matching
+    ``core.version.TOOL_VERSION``).  GitHub tags (``v1.0.0``) are stripped
+    of the leading ``v`` before comparison.
 
     Returns a dict with keys matching ``ToolUpdateCheckResponse``.
     """
+    current = current_version.lstrip("v")
 
     result: dict[str, Any] = {
-        "current_version": current_version,
+        "current_version": current,
         "latest_version": None,
         "update_available": False,
         "release_url": "",

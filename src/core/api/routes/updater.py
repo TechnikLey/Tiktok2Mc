@@ -11,11 +11,11 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from core.api.models import (
-    API_VERSION,
     ToolUpdateCheckResponse,
     UpdateResultResponse,
 )
 from core.api.updater import check_tool_update, get_last_update_result
+from core.version import TOOL_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -54,10 +54,11 @@ async def tool_update_check():
     """Check the main repo for a newer tool release.
 
     Queries ``TechnikLey/Tiktok2Mc`` via the GitHub Releases API
-    and compares the latest tag with the current ``API_VERSION``.
+    and compares the latest tag with the current ``TOOL_VERSION``
+    (the tag and the tool version are the same release number).
     """
     try:
-        result = check_tool_update(API_VERSION)
+        result = check_tool_update(TOOL_VERSION)
         return ToolUpdateCheckResponse(**result)
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to check tool updates")

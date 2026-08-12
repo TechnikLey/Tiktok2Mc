@@ -14,12 +14,12 @@ class TestToolUpdateCheck:
         assert "release_url" in body
         assert "published_at" in body
 
-    def test_current_version_matches_api_version(self, client):
-        from core.api.models import API_VERSION
+    def test_current_version_matches_tool_version(self, client):
+        from core.version import TOOL_VERSION
 
         resp = client.get("/api/v1/updates/check")
         assert resp.status_code == 200
-        assert resp.json()["current_version"] == API_VERSION
+        assert resp.json()["current_version"] == TOOL_VERSION.lstrip("v")
 
     def test_handles_github_unreachable_gracefully(self, client, monkeypatch):
         import urllib.request
@@ -58,12 +58,14 @@ class TestToolUpdateCheck:
     def test_no_update_when_same_version(self, client, monkeypatch):
         import urllib.request
 
-        from core.api.models import API_VERSION
+        from core.version import TOOL_VERSION
+
+        same = TOOL_VERSION.lstrip("v")
 
         def fake_urlopen(req, **_kw):
             data = {
-                "tag_name": f"v{API_VERSION}",
-                "html_url": f"https://github.com/TechnikLey/Tiktok2Mc/releases/tag/v{API_VERSION}",
+                "tag_name": f"v{same}",
+                "html_url": f"https://github.com/TechnikLey/Tiktok2Mc/releases/tag/v{same}",
                 "published_at": "2026-05-28T00:00:00Z",
             }
             return _FakeResponse(json.dumps(data).encode("utf-8"))
@@ -73,7 +75,27 @@ class TestToolUpdateCheck:
         assert resp.status_code == 200
         body = resp.json()
         assert body["update_available"] is False
-        assert body["latest_version"] == API_VERSION
+        assert body["latest_version"] == same
+        assert body["current_version"] == same
+
+    def test_check_tool_update_accepts_v_prefix(self, monkeypatch):
+        import urllib.request
+
+        from core.api.updater import check_tool_update
+
+        def fake_urlopen(req, **_kw):
+            data = {
+                "tag_name": "v1.2.3",
+                "html_url": "https://github.com/TechnikLey/Tiktok2Mc/releases/tag/v1.2.3",
+                "published_at": "2026-07-01T00:00:00Z",
+            }
+            return _FakeResponse(json.dumps(data).encode("utf-8"))
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        result = check_tool_update("v1.0.0")
+        assert result["current_version"] == "1.0.0"
+        assert result["update_available"] is True
+        assert result["latest_version"] == "1.2.3"
 
     def test_no_update_when_older_release(self, client, monkeypatch):
         import urllib.request
