@@ -41,7 +41,7 @@ async function _parseErrorDetail(res) {
 async function _throwResError(res) {
   const detail = await _parseErrorDetail(res);
   if (res.status === 401) {
-    showToast('Authentication required. Reopen the dashboard with ?key=YOUR_KEY (matches config.yaml: api_key).', 'error');
+    showToast(I18N.t('dialog.missingKey'), 'error');
   }
   throw new Error(res.status + ' ' + res.statusText + (detail ? ': ' + detail : ''));
 }
@@ -111,7 +111,7 @@ function startLocalShutdownCountdown() {
   const cancelBtn = document.getElementById('btn-shutdown-cancel');
 
   overlay.classList.remove('hidden');
-  display.textContent = _shutdownCountdownValue + ' seconds';
+  display.textContent = _shutdownCountdownValue + ' ' + I18N.t('dialog.seconds');
   shutdownNowBtn.disabled = false;
   cancelBtn.disabled = false;
 
@@ -121,13 +121,13 @@ function startLocalShutdownCountdown() {
     if (_shutdownCountdownValue <= 0) {
       clearInterval(_shutdownCountdownInterval);
       _shutdownCountdownInterval = null;
-      display.textContent = 'Shutting down...';
+      display.textContent = I18N.t('dialog.shuttingDown');
       shutdownNowBtn.disabled = true;
       cancelBtn.disabled = true;
       _closeWindowForShutdown();
       return;
     }
-    display.textContent = _shutdownCountdownValue + ' seconds';
+  display.textContent = _shutdownCountdownValue + ' ' + I18N.t('dialog.seconds');
   }, 1000);
 }
 
@@ -136,7 +136,7 @@ document.getElementById('btn-shutdown-now').addEventListener('click', () => {
     clearInterval(_shutdownCountdownInterval);
     _shutdownCountdownInterval = null;
   }
-  document.getElementById('shutdown-countdown-display').textContent = 'Shutting down...';
+  document.getElementById('shutdown-countdown-display').textContent = I18N.t('dialog.shuttingDown');
   document.getElementById('btn-shutdown-now').disabled = true;
   document.getElementById('btn-shutdown-cancel').disabled = true;
   _closeWindowForShutdown();
@@ -180,7 +180,7 @@ document.getElementById('server-custom-name')?.addEventListener('input', validat
 document.getElementById('server-custom-file')?.addEventListener('change', validateServerCustomForm);
 
 /* ─── Dialogs ─── */
-function showConfirmDialog(title, message, okText = 'Confirm', okClass = 'btn-primary', messageClass = '') {
+function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), okClass = 'btn-primary', messageClass = '') {
   return new Promise((resolve) => {
     const dlg = document.getElementById('confirm-dialog');
     const titleEl = document.getElementById('confirm-title');
@@ -321,20 +321,20 @@ class LiveLog {
     this.paused = !this.paused;
     const btn = document.getElementById('log-pause-btn');
     if (btn) {
-      btn.textContent = this.paused ? 'Resume' : 'Pause';
+      btn.textContent = this.paused ? I18N.t('common.resume') : I18N.t('common.pause');
       btn.classList.toggle('btn--primary', this.paused);
       btn.classList.toggle('btn--secondary', !this.paused);
     }
     if (this.status) {
-      this.status.textContent = this.paused ? 'Log stream paused' : 'Log stream connected';
+      this.status.textContent = this.paused ? I18N.t('log.paused') : I18N.t('log.connected');
     }
   }
 
   setConnected(connected) {
     if (this.status) {
       this.status.textContent = this.paused
-        ? 'Log stream paused'
-        : (connected ? 'Log stream connected' : 'Log stream disconnected — retrying...');
+        ? I18N.t('log.paused')
+        : (connected ? I18N.t('log.connected') : I18N.t('log.streamDisconnected'));
     }
   }
 
@@ -352,9 +352,9 @@ class LiveLog {
     if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.download_file) {
       pywebview.api.download_file(content, filename).then(path => {
         if (path && !path.startsWith('error:')) {
-          showToast('Log exported successfully.\n' + path, 'success');
+          showToast(I18N.t('log.exportedPath', { path }), 'success');
         } else {
-          showToast('Export failed.', 'error');
+          showToast(I18N.t('log.exportFailed'), 'error');
         }
       });
       return;
@@ -369,7 +369,7 @@ class LiveLog {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Log exported successfully.', 'success');
+    showToast(I18N.t('log.exported'), 'success');
   }
 
   add(message, level = 'info', source = '') {
@@ -491,7 +491,7 @@ class CrashReports {
       this.detailContent.innerHTML = this._renderDetail(data);
       this.detailView.classList.remove('hidden');
     } catch (e) {
-      showToast('Failed to open crash report.', 'error');
+      showToast(I18N.t('log.crashOpenFailed'), 'error');
     }
   }
 
@@ -806,9 +806,9 @@ async function installJava() {
       if (inst.done) {
         clearInterval(iv);
         if (data.ok) {
-          showToast('Java is now available' + (data.version ? ' (' + data.version + ')' : '') + '.', 'success');
+          showToast(I18N.t('servers.javaNowAvailable') + (data.version ? ' (' + data.version + ')' : '') + '.', 'success');
         } else {
-          showToast('Java installation failed. See the details above.', 'error');
+          showToast(I18N.t('servers.javaFailedDetails'), 'error');
         }
         loadJavaStatus();
         loadServerManager();
@@ -964,7 +964,7 @@ function _versionBadgeLabel(version) {
 
 async function serverManagerPromptSwitch(version) {
   if (_serverManagerCache?.current_version === version) {
-    showToast('Version ' + version + ' is already the active version.', 'info');
+    showToast(I18N.t('servers.versionAlreadyActive', { version }), 'info');
     return;
   }
   const installed = _serverManagerCache?.installed || [];
@@ -972,38 +972,49 @@ async function serverManagerPromptSwitch(version) {
   const isSafe = found ? found.type === 'safe' : (_serverManagerCache?.safe_versions || []).includes(version);
   if (!isSafe) {
     const confirmed = await showConfirmDialog(
-      'Switch to Untested Version?',
-      'Version ' + version + ' is not marked as SAFE. It may break plugins, corrupt worlds, or cause crashes. Are you sure you want to switch?',
-      'Switch Anyway',
+      I18N.t('servers.switchUntestedTitle'),
+      I18N.t('servers.switchUntested', { version }),
+      I18N.t('servers.switchAnyway'),
       'btn-danger',
       'text-danger'
     );
     if (!confirmed) return;
   } else {
-    const confirmed = await showConfirmDialog('Switch Version?', 'Switch active server to ' + version + '?', 'Switch', 'btn-primary');
+    const confirmed = await showConfirmDialog(
+      I18N.t('servers.switchTitle'),
+      I18N.t('servers.switchConfirm', { version }),
+      I18N.t('common.switch'),
+      'btn-primary'
+    );
     if (!confirmed) return;
   }
   try {
     closeServerSwitchModal();
     const res = await postJSON('/servers/switch', { version });
-    showToast(res.message || 'Switched to ' + version, 'success');
+    showToast(res.message || I18N.t('servers.switched', { version }), 'success');
     await loadServerManager();
   } catch (e) {
-    showToast('Switch failed: ' + e.message, 'error');
+    showToast(I18N.t('servers.switchFailed', { msg: e.message }), 'error');
   }
 }
 
 async function serverManagerPromptRemove(version) {
-  const confirmed = await showConfirmDialog('Remove Version?', 'Delete version ' + version + ' and its server.jar? This cannot be undone.', 'Remove', 'btn-danger', 'text-danger');
+  const confirmed = await showConfirmDialog(
+    I18N.t('servers.removeTitle'),
+    I18N.t('servers.removeConfirm', { version }),
+    I18N.t('servers.removeVersion'),
+    'btn-danger',
+    'text-danger'
+  );
   if (!confirmed) return;
   try {
     const res = await fetch(API + '/servers/' + encodeURIComponent(version), { method: 'DELETE', headers: _withApiKey({}) });
     if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
     const data = await res.json();
-    showToast(data.message || 'Removed ' + version, 'success');
+    showToast(data.message || I18N.t('servers.removed', { version }), 'success');
     await loadServerManager();
   } catch (e) {
-    showToast('Remove failed: ' + e.message, 'error');
+    showToast(I18N.t('servers.removeFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -6496,8 +6507,23 @@ function toggleTheme() {
 
 function _updateThemeLabel(theme) {
   const label = document.getElementById('theme-label');
-  if (label) label.textContent = theme === 'dark' ? 'Light' : 'Dark';
+  if (!label) return;
+  label.textContent = I18N.t(theme === 'dark' ? 'nav.themeLight' : 'nav.themeDark');
 }
+
+/* ─── Language Switcher ─── */
+function _syncLangButtons() {
+  const lang = I18N.lang();
+  document.querySelectorAll('.lang-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+}
+
+document.addEventListener('i18n:changed', () => {
+  _syncLangButtons();
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+  _updateThemeLabel(theme);
+});
 
 /* ─── Event Tester ─── */
 class EventTester {
@@ -6806,6 +6832,7 @@ const eventTester = new EventTester();
 /* ─── Init ─── */
 async function init() {
   _initTheme();
+  _syncLangButtons();
   _initEditorVisibilityObserver();
   _initSidebarReveal();
   await loadHealth();

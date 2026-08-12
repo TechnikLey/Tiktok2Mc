@@ -8,6 +8,7 @@ import { defineConfig } from "eslint/config";
 const appGlobals = {
   pywebview: "writable",
   ActionsEditor: "writable",
+  I18N: "writable",
   fetchJSON: "writable",
   postJSON: "writable",
   putJSON: "writable",
@@ -23,6 +24,7 @@ export default defineConfig([
     plugins: { js },
     extends: ["js/recommended"],
     languageOptions: { globals: globals.browser },
+    rules: { "no-empty": ["error", { allowEmptyCatch: true }] },
   },
   {
     // ESM files: the config itself, the vitest config, and vitest tests.

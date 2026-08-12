@@ -55,7 +55,7 @@ class ActionsEditor {
 
   async close() {
     if (this.isDirty) {
-      const confirmed = await showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger');
+      const confirmed = await showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger');
       if (!confirmed) return;
       this.isDirty = false;
       this._updateSaveButton();
@@ -81,7 +81,7 @@ class ActionsEditor {
       this._updateSaveButton();
       this.renderTable();
     } catch (e) {
-      showToast('Failed to load actions: ' + e.message, 'error');
+      showToast(I18N.t('actions.loadFailed', { msg: e.message }), 'error');
     }
     this._populateScriptDropdowns();
   }
@@ -92,7 +92,7 @@ class ActionsEditor {
       this.gifts = data.gifts || [];
       this.gifts.sort((a, b) => (a.coins || 0) - (b.coins || 0) || (a.name || '').localeCompare(b.name || ''));
     } catch (e) {
-      showToast('Failed to load gifts: ' + e.message, 'error');
+      showToast(I18N.t('actions.loadGiftsFailed', { msg: e.message }), 'error');
       this.gifts = [];
     }
   }
@@ -104,23 +104,23 @@ class ActionsEditor {
   renderTable() {
     if (!this.tableBody) return;
     if (!this.triggers.length) {
-      this.tableBody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:2rem;">No triggers defined. Click "Add Event" to create one.</td></tr>';
+      this.tableBody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;padding:2rem;">' + I18N.t('actions.noTriggers') + '</td></tr>';
       this.detailPanel.classList.add('hidden');
       return;
     }
 
     this.tableBody.innerHTML = this.triggers.map((t, i) => {
-      const typeLabel = t.type || 'Custom';
+      const typeLabel = t.type || I18N.t('actions.customOption');
       const cmdSummary = (t.commands || []).length
         ? t.commands.map(c => {
             const prefix = { vanilla: '/', rcon: '!', script: '$', overlay: '>>', named_overlay: `@${c.overlay_name}>>`, shell: '&' }[c.type] || '/';
             return prefix + (c.command || '').substring(0, 30);
           }).join('; ')
-        : 'No commands';
+        : I18N.t('actions.noCommands');
       return `<tr class="actions-row ${i === this.selectedIndex ? 'selected' : ''} ${t.enabled ? '' : 'disabled'}" data-index="${i}" onclick="actionsEditor.selectTrigger(${i})">
         <td><span class="trigger-type-badge trigger-type-${(t.type || 'custom').toLowerCase()}">${escapeHtml(typeLabel)}</span></td>
         <td>${escapeHtml(t.name)}</td>
-        <td>${t.enabled ? '<span class="status-enabled" style="font-size:0.8rem;">Enabled</span>' : '<span class="status-disabled" style="font-size:0.8rem;">Disabled</span>'}</td>
+        <td>${t.enabled ? '<span class="status-enabled" style="font-size:0.8rem;">' + I18N.t('actions.enabled') + '</span>' : '<span class="status-disabled" style="font-size:0.8rem;">' + I18N.t('actions.disabled') + '</span>'}</td>
         <td style="font-size:0.85rem;color:var(--text-secondary);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(cmdSummary)}</td>
       </tr>`;
     }).join('');
@@ -151,18 +151,18 @@ class ActionsEditor {
     let html = `<div class="detail-header">
       <h3>${escapeHtml(t.name)}</h3>
       <div style="display:flex;align-items:center;gap:0.75rem;">
-        <button class="detail-delete-btn" onclick="actionsEditor.confirmDeleteTrigger(${index})" title="Delete trigger">Delete</button>
+        <button class="detail-delete-btn" onclick="actionsEditor.confirmDeleteTrigger(${index})" title="${I18N.t('actions.deleteTrigger')}">${I18N.t('actions.delete')}</button>
         <label class="detail-toggle">
           <input type="checkbox" class="toggle" ${t.enabled ? 'checked' : ''} onchange="actionsEditor.toggleEnabled(${index})">
-          <span>Enabled</span>
+          <span>${I18N.t('actions.enabled')}</span>
         </label>
       </div>
     </div>`;
 
-    html += `<div class="detail-commands"><h4>Commands</h4>`;
+    html += `<div class="detail-commands"><h4>${I18N.t('actions.commands')}</h4>`;
 
     (t.commands || []).forEach((cmd, ci) => {
-      const typeLabels = { vanilla: 'Minecraft Command', rcon: 'Server Command (RCON)', script: 'Script', overlay: 'Overlay', named_overlay: 'Named Overlay', shell: 'Shell' };
+      const typeLabels = { vanilla: I18N.t('actions.typeVanilla'), rcon: I18N.t('actions.typeRcon'), script: I18N.t('actions.typeScript'), overlay: I18N.t('actions.typeOverlay'), named_overlay: I18N.t('actions.typeNamedOverlay'), shell: I18N.t('actions.typeShell') };
       const typeOpts = ['vanilla', 'rcon', 'script', 'overlay', 'named_overlay', 'shell'].map(ot =>
         `<option value="${ot}" ${ot === cmd.type ? 'selected' : ''}>${typeLabels[ot] || ot}</option>`
       ).join('');
@@ -179,7 +179,7 @@ class ActionsEditor {
         html += `<div class="cmd-input-container" style="flex:1;position:relative;display:flex;align-items:center;">
           <input class="cmd-input cmd-script-search" type="text" style="width:100%;"
             value="${escapeHtml(currentScript)}" 
-            placeholder="Search or select script..."
+            placeholder="${I18N.t('actions.searchScripts')}"
             data-trigger-idx="${index}"
             data-cmd-idx="${ci}"
             onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)"
@@ -191,8 +191,8 @@ class ActionsEditor {
         </div>`;
       } else {
         // For vanilla, rcon, shell: show command input
-        const placeholders = { 'vanilla': 'command', 'rcon': 'command', 'shell': 'shell command' };
-        const placeholder = placeholders[cmd.type] || 'command';
+        const placeholders = { 'vanilla': I18N.t('actions.command'), 'rcon': I18N.t('actions.command'), 'shell': I18N.t('actions.shellCommand') };
+        const placeholder = placeholders[cmd.type] || I18N.t('actions.command');
         html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
       }
 
@@ -200,16 +200,16 @@ class ActionsEditor {
         html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
       }
 
-      html += `<button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="Remove command">&times;</button>
+      html += `<button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="${I18N.t('actions.removeCommand')}">&times;</button>
         </div>`;
 
       if (cmd.type === 'overlay' || cmd.type === 'named_overlay') {
         html += `<div class="cmd-overlay-fields">
-          <input type="text" value="${escapeHtml(cmd.title || '')}" placeholder="Title" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'title', this.value)">
-          <input type="text" value="${escapeHtml(cmd.subtitle || '')}" placeholder="Subtitle" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'subtitle', this.value)">
-          <input type="number" min="1" max="30" value="${cmd.duration || 3}" placeholder="Duration (s)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'duration', parseInt(this.value) || 3)" style="width:90px;">`;
+          <input type="text" value="${escapeHtml(cmd.title || '')}" placeholder="${I18N.t('actions.titleField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'title', this.value)">
+          <input type="text" value="${escapeHtml(cmd.subtitle || '')}" placeholder="${I18N.t('actions.subtitleField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'subtitle', this.value)">
+          <input type="number" min="1" max="30" value="${cmd.duration || 3}" placeholder="${I18N.t('actions.durationField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'duration', parseInt(this.value) || 3)" style="width:90px;">`;
         if (cmd.type === 'named_overlay') {
-          html += `<input type="text" value="${escapeHtml(cmd.overlay_name || 'default')}" placeholder="Overlay name" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'overlay_name', this.value)" style="width:120px;">`;
+          html += `<input type="text" value="${escapeHtml(cmd.overlay_name || 'default')}" placeholder="${I18N.t('actions.overlayNameField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'overlay_name', this.value)" style="width:120px;">`;
         }
         html += `</div>`;
       }
@@ -218,7 +218,7 @@ class ActionsEditor {
     });
 
     html += `</div>`;
-    html += `<button class="btn btn-secondary" onclick="actionsEditor.addCmd(${index})" style="margin-top:0.5rem;font-size:0.85rem;">+ Add Command</button>`;
+    html += `<button class="btn btn-secondary" onclick="actionsEditor.addCmd(${index})" style="margin-top:0.5rem;font-size:0.85rem;">${I18N.t('actions.addCommand')}</button>`;
 
     this.detailPanel.innerHTML = html;
 
@@ -253,7 +253,7 @@ class ActionsEditor {
 
     // Render filtered list
     if (filtered.length === 0) {
-      listContainer.innerHTML = '<div style="padding:0.5rem;color:var(--text-secondary);font-size:0.85rem;">No scripts match</div>';
+      listContainer.innerHTML = '<div style="padding:0.5rem;color:var(--text-secondary);font-size:0.85rem;">' + I18N.t('actions.noScripts') + '</div>';
     } else {
       listContainer.innerHTML = filtered.map(script => `
         <div class="cmd-script-option" data-script-name="${escapeHtml(script.name)}"
@@ -310,11 +310,11 @@ class ActionsEditor {
   async confirmDeleteTrigger(index) {
     if (index < 0 || index >= this.triggers.length) return;
     const trigger = this.triggers[index];
-    const name = trigger.name || 'unnamed';
+    const name = trigger.name || I18N.t('actions.unnamed');
     const confirmed = await showConfirmDialog(
-      'Delete Trigger',
-      `Are you sure you want to delete the trigger "${name}"?`,
-      'Delete',
+      I18N.t('actions.deleteTitle'),
+      I18N.t('actions.deleteConfirm', { name }),
+      I18N.t('actions.delete'),
       'btn-danger'
     );
     if (!confirmed) return;
@@ -352,11 +352,11 @@ class ActionsEditor {
         (other.name || '').replace(/^'|'$/g, '').toLowerCase() === normalized
       );
       if (duplicate) {
-        showToast(`Trigger "${t.name}" already exists and is enabled.`, 'warning');
+        showToast(I18N.t('actions.duplicateToast', { name: t.name }), 'warning');
         const deleteDuplicate = await showConfirmDialog(
-          'Duplicate Trigger',
-          `An enabled trigger named "${t.name}" already exists. Delete this duplicate, or leave it disabled?`,
-          'Delete Duplicate',
+          I18N.t('actions.duplicateTitle'),
+          I18N.t('actions.duplicateMessage', { name: t.name }),
+          I18N.t('actions.deleteDuplicate'),
           'btn-danger'
         );
         if (deleteDuplicate) {
@@ -442,16 +442,16 @@ class ActionsEditor {
     let html = '';
     for (const ev of known) html += `<option value="${ev}">${ev.charAt(0).toUpperCase() + ev.slice(1)}</option>`;
     if (customLikes.length) {
-      html += `<optgroup label="Custom Likes">`;
+      html += `<optgroup label="${I18N.t('actions.customLikes')}">`;
       for (const ev of customLikes) html += `<option value="${ev}">${ev}</option>`;
       html += `</optgroup>`;
     }
     if (others.length) {
-      html += `<optgroup label="Custom Events">`;
+      html += `<optgroup label="${I18N.t('actions.customEvents')}">`;
       for (const ev of others) html += `<option value="${ev}">${ev}</option>`;
       html += `</optgroup>`;
     }
-    html += `<option value="__custom__">Custom</option>`;
+    html += `<option value="__custom__">${I18N.t('actions.customOption')}</option>`;
     select.innerHTML = html;
     select.onchange = () => {
       const isCustom = select.value === '__custom__';
@@ -492,7 +492,7 @@ class ActionsEditor {
       : this.gifts;
 
     if (!filtered.length) {
-      this.addGiftList.innerHTML = '<div class="gift-empty">No gifts match your search.</div>';
+      this.addGiftList.innerHTML = '<div class="gift-empty">' + I18N.t('triggers.noGifts') + '</div>';
       return;
     }
 
@@ -547,7 +547,7 @@ class ActionsEditor {
       eventName = customInput?.value?.trim() || '';
     }
     if (!eventName) {
-      this._showAddError('Please select or enter an event name.');
+      this._showAddError(I18N.t('actions.selectEventError'));
       return;
     }
     this._addTrigger(eventName, 'Event');
@@ -561,7 +561,7 @@ class ActionsEditor {
       return existing === normalized;
     });
     if (exists) {
-      this._showAddError(`A trigger named "${name.trim()}" already exists.`);
+      this._showAddError(I18N.t('actions.triggerExists', { name: name.trim() }));
       return;
     }
     this._hideAddError();
@@ -600,7 +600,7 @@ class ActionsEditor {
       for (const t of this.triggers) {
         for (const cmd of (t.commands || [])) {
           if (!cmd.command.trim()) {
-            showToast('All commands must have a value.', 'error');
+            showToast(I18N.t('actions.allCommandsValue'), 'error');
             return;
           }
         }
@@ -613,20 +613,20 @@ class ActionsEditor {
       this._updateSaveButton();
       await this.load();
     } catch (e) {
-      showToast('Failed to save: ' + e.message, 'error');
+      showToast(I18N.t('actions.saveFailed', { msg: e.message }), 'error');
     }
   }
 
   async _askAndReloadActions() {
     let sendReload = false;
     if (currentConfig && currentConfig.rcon && currentConfig.rcon.enabled) {
-      sendReload = confirm('Actions saved. Send /reload to the Minecraft server now?');
+      sendReload = confirm(I18N.t('actions.reloadConfirm'));
     }
     await postJSON('/reload', { config: false, actions: true, send_minecraft_reload: sendReload });
     if (sendReload) {
-      showToast('Actions saved and /reload sent to Minecraft.', 'success');
+      showToast(I18N.t('actions.savedReload'), 'success');
     } else {
-      showToast('Actions saved. Run /reload in Minecraft or restart the server to apply.', 'info');
+      showToast(I18N.t('actions.savedRunReload'), 'info');
     }
   }
 

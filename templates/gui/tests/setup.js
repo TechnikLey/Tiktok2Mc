@@ -98,9 +98,11 @@ function toGlobalScope(code) {
 }
 
 // Load and transform JS files
+const i18nJs = readFileSync(join(__dirname, '..', 'i18n.js'), 'utf-8');
 const actionsEditorJs = readFileSync(join(__dirname, '..', 'actions-editor.js'), 'utf-8');
 const appJs = readFileSync(join(__dirname, '..', 'app.js'), 'utf-8');
 
-// Evaluate in global scope
+// Evaluate in global scope (i18n first: app.js/actions-editor.js use I18N)
+(0, eval)(toGlobalScope(i18nJs));
 (0, eval)(toGlobalScope(actionsEditorJs));
 (0, eval)(toGlobalScope(appJs));

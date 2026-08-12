@@ -255,6 +255,40 @@ body {
 .theme-toggle svg { display: none; }
 [data-theme="light"] .theme-toggle .theme-icon-dark { display: inline-block; }
 [data-theme="dark"] .theme-toggle .theme-icon-light { display: inline-block; }
+.sidebar-lang-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+}
+.sidebar-lang-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+}
+.lang-switch {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+.lang-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.lang-btn:hover { color: var(--color-text); }
+.lang-btn.active { background: var(--color-primary); color: var(--color-primary-fg, #fff); }
+.sidebar.icons .sidebar-lang-row, .sidebar.hide .sidebar-lang-row { display: none; }
 #status-pill {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
