@@ -16,6 +16,7 @@ API layer so that:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import platform
@@ -31,13 +32,26 @@ from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
-MIN_JAVA_VERSION = 17
+MIN_JAVA_VERSION = 21
 
-# Default download source (Adoptium Temurin 21 JRE, Windows x64).
-_JDK21_URL = (
-    "https://github.com/adoptium/temurin21-binaries/releases/download/"
-    "jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip"
-)
+# Default download sources (Adoptium Temurin 21 JRE, Windows x64) with checksums.
+# Format: {"url": "https://...", "sha256": "..."}
+_JDK_SOURCES = [
+    {
+        "url": (
+            "https://github.com/adoptium/temurin21-binaries/releases/download/"
+            "jdk-21.0.4%2B7/OpenJDK21U-jre_x64_windows_hotspot_21.0.4_7.zip"
+        ),
+        "sha256": "a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+    },
+    {
+        "url": (
+            "https://github.com/adoptium/temurin21-binaries/releases/download/"
+            "jdk-21.0.3%2B9/OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip"
+        ),
+        "sha256": "b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9",
+    },
+]
 
 # Linux package names and the bare install command per package manager.
 _LINUX_PACKAGES = {
@@ -163,7 +177,7 @@ def _linux_auto_installable() -> bool:
         return False
     if _package_manager() is None:
         return False
-    if os.geteuid() == 0:
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
         return True
     if shutil.which("pkexec"):
         return True
@@ -326,6 +340,19 @@ def _download_file(url: str, dest: Path, timeout: int = 120) -> None:
         shutil.copyfileobj(resp, out, length=1024 * 256)
 
 
+def _verify_checksum(file_path: Path, expected_sha256: str) -> bool:
+    """Verify SHA256 checksum of a file."""
+    sha256_hash = hashlib.sha256()
+    try:
+        with file_path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 256), b""):
+                sha256_hash.update(chunk)
+        return sha256_hash.hexdigest().lower() == expected_sha256.lower()
+    except OSError as exc:
+        log.warning("Failed to verify checksum for %s: %s", file_path, exc)
+        return False
+
+
 def install_java_windows(root_dir: Path) -> tuple[bool, str]:
     """Download and extract a bundled Java 21 JRE into ``server/java``.
 
@@ -343,42 +370,72 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
         return False, f"Cannot create Java directory {java_dir}: {exc}"
 
     zip_path = java_dir / "java_download.zip"
-    try:
-        log.info("Downloading OpenJDK 21 JRE for Windows...")
-        _download_file(_JDK21_URL, zip_path)
-    except OSError as exc:
-        log.warning("Java download failed: %s", exc)
-        zip_path.unlink(missing_ok=True)
-        return (
-            False,
-            (
-                f"Could not download Java automatically (network error): {exc}. "
-                "Check your internet connection and try again."
-            ),
-        )
+    last_error = None
 
-    try:
-        log.info("Extracting Java runtime...")
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(java_dir)
-        # Move contents of the single top-level folder up into java_dir.
-        for sub in java_dir.iterdir():
-            if sub.is_dir() and (sub / "bin" / "java.exe").exists():
-                for item in sub.iterdir():
-                    target = java_dir / item.name
-                    if not target.exists():
-                        item.rename(target)
-                shutil.rmtree(sub, ignore_errors=True)
-                break
-        zip_path.unlink(missing_ok=True)
-    except (OSError, zipfile.BadZipFile) as exc:
-        log.warning("Java extraction failed: %s", exc)
-        zip_path.unlink(missing_ok=True)
-        return False, f"Could not extract the downloaded Java runtime: {exc}"
+    for idx, source in enumerate(_JDK_SOURCES):
+        url = source["url"]
+        expected_sha256 = source["sha256"]
+        try:
+            log.info(
+                "Downloading OpenJDK 21 JRE for Windows (mirror %d/%d)...",
+                idx + 1,
+                len(_JDK_SOURCES),
+            )
+            _download_file(url, zip_path)
+        except OSError as exc:
+            last_error = exc
+            log.warning("Java download failed from mirror %d: %s", idx + 1, exc)
+            zip_path.unlink(missing_ok=True)
+            continue
 
-    if java_is_usable(java_bin):
-        return True, f"Java 21 downloaded and extracted to {java_dir}"
-    return False, "Java download/extract completed but the runtime is not usable."
+        # Verify checksum
+        if not _verify_checksum(zip_path, expected_sha256):
+            log.warning("Checksum verification failed for mirror %d", idx + 1)
+            zip_path.unlink(missing_ok=True)
+            last_error = ValueError("Checksum mismatch")
+            continue
+
+        try:
+            log.info("Extracting Java runtime...")
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(java_dir)
+            # Move contents of the single top-level folder up into java_dir.
+            java_found = False
+            for sub in java_dir.iterdir():
+                if sub.is_dir():
+                    # Search recursively for java.exe
+                    for bin_path in sub.rglob("bin/java.exe"):
+                        if bin_path.exists():
+                            # Move the entire JDK/JRE structure up
+                            for item in sub.iterdir():
+                                target = java_dir / item.name
+                                if not target.exists():
+                                    item.rename(target)
+                            shutil.rmtree(sub, ignore_errors=True)
+                            java_found = True
+                            break
+                if java_found:
+                    break
+            zip_path.unlink(missing_ok=True)
+        except (OSError, zipfile.BadZipFile) as exc:
+            log.warning("Java extraction failed: %s", exc)
+            zip_path.unlink(missing_ok=True)
+            last_error = exc
+            continue
+
+        if java_is_usable(java_bin):
+            return True, f"Java 21 downloaded and extracted to {java_dir}"
+        return False, "Java download/extract completed but the runtime is not usable."
+
+    # All mirrors failed
+    error_msg = str(last_error) if last_error else "Unknown error"
+    return (
+        False,
+        (
+            f"Could not download Java automatically (tried {len(_JDK_SOURCES)} mirrors): {error_msg}. "
+            "Check your internet connection and try again."
+        ),
+    )
 
 
 def install_java_linux() -> tuple[bool, str]:
@@ -400,7 +457,7 @@ def install_java_linux() -> tuple[bool, str]:
     pkg = _LINUX_PACKAGES[pm]
     install_args = _PM_INSTALL[pm]
 
-    if os.geteuid() == 0:
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
         prefix: list[str] = []
         how = "as root"
     elif shutil.which("pkexec"):

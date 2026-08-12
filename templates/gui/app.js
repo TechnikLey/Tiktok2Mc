@@ -846,31 +846,113 @@ function renderJavaStatusBanner(data) {
 async function installJava() {
   const btn = document.getElementById('java-install-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Installing…'; }
+  
+  // Create a progress overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'java-install-overlay';
+  overlay.innerHTML = `
+    <div class="java-install-progress">
+      <h3>Installing Java</h3>
+      <div class="progress-bar"><div class="progress-fill" id="java-progress-fill" style="width: 0%"></div></div>
+      <div class="progress-text" id="java-progress-text">Starting...</div>
+      <button class="btn btn--secondary btn--sm" id="java-cancel-btn">Cancel</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  
+  const progressFill = document.getElementById('java-progress-fill');
+  const progressText = document.getElementById('java-progress-text');
+  const cancelBtn = document.getElementById('java-cancel-btn');
+  
+  let cancelled = false;
+  cancelBtn.addEventListener('click', () => {
+    cancelled = true;
+    progressText.textContent = 'Cancelling...';
+    cancelBtn.disabled = true;
+  });
+  
+  let installId = null;
   let lastMsg = '';
+  const startTime = Date.now();
+  const MAX_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  
   try {
     const res = await postJSON('/server/java/install');
+    if (res.status === 'in_progress') {
+      showToast(res.message, 'info');
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
+      overlay.remove();
+      return;
+    }
+    if (res.status === 'already_installed') {
+      showToast(res.message, 'info');
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
+      overlay.remove();
+      loadJavaStatus();
+      loadServerManager();
+      return;
+    }
+    installId = res.install_id;
     showToast(res.message || I18N.t('servers.javaStarted'), 'info');
   } catch (e) {
     showToast(I18N.t('servers.javaInstallFailed', { msg: e.message }), 'error');
     if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
+    overlay.remove();
     return;
   }
+  
   const iv = setInterval(async () => {
+    if (cancelled) {
+      clearInterval(iv);
+      overlay.remove();
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
+      showToast('Java installation cancelled', 'info');
+      return;
+    }
+    
+    // Check timeout
+    if (Date.now() - startTime > MAX_TIMEOUT) {
+      clearInterval(iv);
+      overlay.remove();
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
+      showToast('Java installation timed out after 5 minutes', 'error');
+      return;
+    }
+    
     try {
-      const data = await fetchJSON('/server/java/status');
+      const data = await fetchJSON('/server/java/status?install_id=' + encodeURIComponent(installId));
       const inst = data && data.install;
-      if (!inst) { clearInterval(iv); if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); } return; }
+      if (!inst) { 
+        clearInterval(iv); 
+        overlay.remove();
+        if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); } 
+        return; 
+      }
+      
+      // Update progress UI
       if (inst.message && inst.message !== lastMsg) {
         lastMsg = inst.message;
+        progressText.textContent = inst.message;
         showToast(inst.message, 'info');
       }
+      
+      // Animate progress bar (indeterminate while installing)
+      if (inst.installing && !inst.done) {
+        const elapsed = Math.min((Date.now() - startTime) / MAX_TIMEOUT, 0.9);
+        progressFill.style.width = (elapsed * 100) + '%';
+      }
+      
       if (inst.done) {
         clearInterval(iv);
+        overlay.remove();
         if (data.ok) {
+          progressFill.style.width = '100%';
+          progressText.textContent = 'Installation complete!';
           showToast(I18N.t('servers.javaNowAvailable') + (data.version ? ' (' + data.version + ')' : '') + '.', 'success');
         } else {
           showToast(I18N.t('servers.javaFailedDetails'), 'error');
         }
+        if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
         loadJavaStatus();
         loadServerManager();
       }

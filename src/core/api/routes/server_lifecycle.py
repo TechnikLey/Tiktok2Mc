@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import time
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -25,7 +26,12 @@ IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
 # Background Java installation state, polled by the GUI.
-_JAVA_INSTALL = {"installing": False, "message": "", "done": False, "ok": False}
+# Uses a dict keyed by install_id to avoid race conditions between concurrent requests.
+_JAVA_INSTALL: dict[str, dict] = {}
+
+
+def _new_install_id() -> str:
+    return uuid.uuid4().hex[:8]
 
 
 def _proc_name(instance_id: str) -> str:
@@ -34,10 +40,10 @@ def _proc_name(instance_id: str) -> str:
     return f"{SERVER_PROCESS_NAME}:{instance_id}"
 
 
-def _java_status_payload() -> dict:
+def _java_status_payload(install_id: str | None = None) -> dict:
     """Structured Java status for the GUI (detection + install progress)."""
     status = detect_java(get_root_dir(), get_config_file())
-    return {
+    payload = {
         "ok": status.ok,
         "path": status.path or None,
         "version": status.version or None,
@@ -46,31 +52,36 @@ def _java_status_payload() -> dict:
         "hints": status.hints,
         "autoInstallable": status.auto_installable,
         "minJavaVersion": MIN_JAVA_VERSION,
-        "install": dict(_JAVA_INSTALL),
     }
+    if install_id and install_id in _JAVA_INSTALL:
+        payload["install"] = dict(_JAVA_INSTALL[install_id])
+    return payload
 
 
-async def _run_java_install() -> None:
+async def _run_java_install(install_id: str) -> None:
     """Run the platform-appropriate Java installer in the background."""
-    _JAVA_INSTALL.update(
-        installing=True, message="Starting Java installation...", done=False, ok=False
-    )
+    _JAVA_INSTALL[install_id] = {
+        "installing": True,
+        "message": "Starting Java installation...",
+        "done": False,
+        "ok": False,
+    }
     try:
         if IS_WINDOWS:
             ok, message = await asyncio.to_thread(install_java_windows, get_root_dir())
         else:
             ok, message = await asyncio.to_thread(install_java_linux)
-        _JAVA_INSTALL.update(message=message, done=True, ok=ok)
+        _JAVA_INSTALL[install_id].update(message=message, done=True, ok=ok)
         log.info("Java install finished ok=%s: %s", ok, message)
     except (
         Exception
     ) as exc:  # background install: any crash is surfaced via install state
         log.exception("Java installation crashed")
-        _JAVA_INSTALL.update(
+        _JAVA_INSTALL[install_id].update(
             message=f"Java installation crashed: {exc}", done=True, ok=False
         )
     finally:
-        _JAVA_INSTALL["installing"] = False
+        _JAVA_INSTALL[install_id]["installing"] = False
 
 
 def _require_java() -> None:
@@ -164,18 +175,23 @@ def _build_status(proc) -> dict:
 
 
 @router.get("/server/java/status")
-async def java_status():
-    return _java_status_payload()
+async def java_status(install_id: str | None = None):
+    return _java_status_payload(install_id)
 
 
 @router.post("/server/java/install")
 async def java_install():
-    if _JAVA_INSTALL["installing"]:
-        return {
-            "status": "in_progress",
-            "message": _JAVA_INSTALL["message"]
-            or "Java installation is already in progress...",
-        }
+    # Check if any install is currently in progress
+    any_installing = any(v.get("installing") for v in _JAVA_INSTALL.values())
+    if any_installing:
+        # Return the first in-progress install
+        for inst in _JAVA_INSTALL.values():
+            if inst.get("installing"):
+                return {
+                    "status": "in_progress",
+                    "message": inst.get("message")
+                    or "Java installation is already in progress...",
+                }
 
     status = detect_java(get_root_dir(), get_config_file())
     if status.ok:
@@ -193,8 +209,13 @@ async def java_install():
             ),
         )
 
-    asyncio.create_task(_run_java_install())
-    return {"status": "started", "message": "Java installation started..."}
+    install_id = _new_install_id()
+    asyncio.create_task(_run_java_install(install_id))
+    return {
+        "status": "started",
+        "message": "Java installation started...",
+        "install_id": install_id,
+    }
 
 
 # ── Per-instance endpoints ─────────────────────────────────────────
