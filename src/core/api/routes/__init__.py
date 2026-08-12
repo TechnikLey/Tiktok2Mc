@@ -15,6 +15,7 @@ from .plugins import router as plugins_router
 from .rcon import router as rcon_router
 from .reactions import router as reactions_router
 from .reload import router as reload_router
+from .revenue import router as revenue_router
 from .server_lifecycle import router as server_lifecycle_router
 from .servers import router as servers_router
 from .system import router as system_router
@@ -41,6 +42,7 @@ api_router.include_router(hooks_router)
 api_router.include_router(event_commands_router)
 api_router.include_router(rcon_router)
 api_router.include_router(reactions_router)
+api_router.include_router(revenue_router)
 api_router.include_router(versions_router)
 api_router.include_router(triggers_router)
 api_router.include_router(logs_router)

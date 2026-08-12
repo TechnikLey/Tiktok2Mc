@@ -1362,6 +1362,218 @@ function renderOverlayUrls() {
   }
 }
 
+/* ─── Revenue View ─── */
+
+let _revenueData = { entries: [], file: {} };
+
+function _revenueRound2(value) {
+  return Math.round(value * 100) / 100;
+}
+
+async function loadRevenueView() {
+  try {
+    const data = await fetchJSON('/revenue');
+    _revenueData = data && Array.isArray(data.entries) ? data : { entries: [], file: {} };
+    renderRevenueView();
+  } catch (e) {
+    log('Revenue load failed: ' + e.message, 'err');
+    const chart = document.getElementById('revenue-chart');
+    const wrap = document.getElementById('revenue-table-wrap');
+    if (chart) chart.innerHTML = '<p class="text-muted">Failed to load revenue data.</p>';
+    if (wrap) wrap.innerHTML = '';
+  }
+}
+
+function _revenueISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function revenueSetPeriod(days) {
+  const from = document.getElementById('revenue-from');
+  const to = document.getElementById('revenue-to');
+  if (days > 0) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - (days - 1));
+    from.value = _revenueISODate(start);
+    to.value = _revenueISODate(end);
+  } else {
+    from.value = '';
+    to.value = '';
+  }
+  document.querySelectorAll('.revenue-period').forEach(el => {
+    el.classList.toggle('active', Number(el.dataset.days) === days);
+  });
+  revenueApplyFilters();
+}
+
+function revenueClearFilters() {
+  document.getElementById('revenue-from').value = '';
+  document.getElementById('revenue-to').value = '';
+  document.querySelectorAll('.revenue-period').forEach(el => el.classList.remove('active'));
+  revenueApplyFilters();
+}
+
+function revenueApplyFilters() {
+  renderRevenueView();
+}
+
+function filterRevenueEntries(entries, from, to) {
+  return (entries || []).filter(e => {
+    if (from && e.date < from) return false;
+    if (to && e.date > to) return false;
+    return true;
+  }).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
+function computeRevenueStats(entries) {
+  const values = (entries || []).map(e => e.estimated_revenue_usd);
+  const count = values.length;
+  if (!count) {
+    return {
+      count: 0,
+      totalUsd: 0,
+      averageUsd: 0,
+      best: null,
+      worst: null,
+      lastChangeUsd: null,
+      last7Usd: 0,
+      prev7Usd: 0,
+      delta7Usd: 0,
+    };
+  }
+  let best = null;
+  let worst = null;
+  for (const e of entries) {
+    if (!best || e.estimated_revenue_usd > best.value) best = { date: e.date, value: e.estimated_revenue_usd };
+    if (!worst || e.estimated_revenue_usd < worst.value) worst = { date: e.date, value: e.estimated_revenue_usd };
+  }
+  const total = values.reduce((s, v) => s + v, 0);
+  const last = values[count - 1];
+  const prev = values[count - 2];
+  const last7 = values.slice(-7).reduce((s, v) => s + v, 0);
+  const prev7 = values.slice(-14, -7).reduce((s, v) => s + v, 0);
+  return {
+    count,
+    totalUsd: _revenueRound2(total),
+    averageUsd: _revenueRound2(total / count),
+    best,
+    worst,
+    lastChangeUsd: count >= 2 ? _revenueRound2(last - prev) : null,
+    last7Usd: _revenueRound2(last7),
+    prev7Usd: _revenueRound2(prev7),
+    delta7Usd: _revenueRound2(last7 - prev7),
+  };
+}
+
+function formatCurrency(value) {
+  const v = Number(value) || 0;
+  const neg = v < 0;
+  const abs = Math.abs(v);
+  const parts = abs.toFixed(2).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (neg ? '-' : '') + '$' + parts.join('.');
+}
+
+function formatCurrencyDelta(value) {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  const sign = value > 0 ? '+' : '';
+  return sign + formatCurrency(value);
+}
+
+function renderRevenueSummary(entries) {
+  const el = document.getElementById('revenue-summary');
+  if (!el) return;
+  const stats = computeRevenueStats(entries);
+  const cards = [
+    { label: 'Total (filtered)', value: formatCurrency(stats.totalUsd) },
+    { label: 'Days with revenue', value: String(stats.count) },
+    { label: 'Average / day', value: formatCurrency(stats.averageUsd) },
+    {
+      label: 'Best day',
+      value: stats.best
+        ? formatCurrency(stats.best.value) + ' <span class="text-muted">' + escapeHtml(stats.best.date) + '</span>'
+        : '—',
+    },
+    {
+      label: 'Worst day',
+      value: stats.worst
+        ? formatCurrency(stats.worst.value) + ' <span class="text-muted">' + escapeHtml(stats.worst.date) + '</span>'
+        : '—',
+    },
+    { label: 'Last 7 days', value: formatCurrency(stats.last7Usd) },
+    {
+      label: 'Last 7 vs prev 7',
+      value: formatCurrencyDelta(stats.delta7Usd),
+      delta: stats.delta7Usd,
+    },
+  ];
+  el.innerHTML = cards.map(c =>
+    '<div class="status-card">' +
+      '<span class="status-card__label">' + escapeHtml(c.label) + '</span>' +
+      '<span class="status-card__value' + (c.delta == null ? '' : (c.delta >= 0 ? ' success' : ' danger')) + '">' + c.value + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function renderRevenueChart(entries) {
+  const el = document.getElementById('revenue-chart');
+  if (!el) return;
+  if (!entries.length) {
+    el.innerHTML = '<p class="text-muted">No revenue data available yet.</p>';
+    return;
+  }
+  const max = Math.max(...entries.map(e => e.estimated_revenue_usd), 0.01);
+  const labelEvery = Math.ceil(entries.length / 12);
+  el.innerHTML = entries.map((e, i) => {
+    const h = Math.max(4, Math.round((e.estimated_revenue_usd / max) * 100));
+    const label = i % labelEvery === 0 || i === entries.length - 1 ? e.date.slice(5) : '';
+    return '<div class="revenue-bar" title="' + escapeHtml(e.date) + ': ' + formatCurrency(e.estimated_revenue_usd) + '">' +
+      '<div class="revenue-bar-fill" style="height:' + h + '%"></div>' +
+      '<span class="revenue-bar-label">' + escapeHtml(label) + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function renderRevenueTable(entries) {
+  const wrap = document.getElementById('revenue-table-wrap');
+  if (!wrap) return;
+  if (!entries.length) {
+    wrap.innerHTML = '<p class="text-muted">No revenue data available yet.</p>';
+    return;
+  }
+  let html = '<table class="plugin-table"><thead><tr><th>Date</th><th>Revenue</th><th>Change</th></tr></thead><tbody>';
+  let prev = null;
+  for (const e of entries) {
+    const delta = prev != null ? e.estimated_revenue_usd - prev : null;
+    const deltaHtml = delta == null
+      ? '—'
+      : '<span class="revenue-delta ' + (delta >= 0 ? 'revenue-delta--up' : 'revenue-delta--down') + '">' + formatCurrencyDelta(delta) + '</span>';
+    html += '<tr>' +
+      '<td data-label="Date">' + escapeHtml(e.date) + '</td>' +
+      '<td data-label="Revenue">' + formatCurrency(e.estimated_revenue_usd) + '</td>' +
+      '<td data-label="Change">' + deltaHtml + '</td>' +
+    '</tr>';
+    prev = e.estimated_revenue_usd;
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function renderRevenueView() {
+  const fromEl = document.getElementById('revenue-from');
+  const toEl = document.getElementById('revenue-to');
+  const from = fromEl ? fromEl.value : '';
+  const to = toEl ? toEl.value : '';
+  const entries = filterRevenueEntries(_revenueData.entries, from, to);
+  renderRevenueSummary(entries);
+  renderRevenueChart(entries);
+  renderRevenueTable(entries);
+}
+
 function renderPluginManager() {
   const tableDiv = document.getElementById('plugin-manager-table');
   if (!tableDiv) return;
@@ -6218,6 +6430,9 @@ function switchViewNow(viewId) {
   }
   if (viewId === 'log') {
     crashReports.load();
+  }
+  if (viewId === 'revenue') {
+    loadRevenueView();
   }
 }
 

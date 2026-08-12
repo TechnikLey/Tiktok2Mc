@@ -458,6 +458,89 @@ tr:last-child td { border-bottom: none; }
 .status-card__value.success { color: var(--color-success); }
 .status-card__value.danger { color: var(--color-danger); }
 
+/* ─── Revenue View ─── */
+.revenue-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.revenue-filter-group {
+  display: inline-flex;
+  gap: var(--space-1);
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+}
+.revenue-period {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+.revenue-period:hover {
+  color: var(--color-text);
+}
+.revenue-period.active {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+.revenue-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.revenue-filter-label input[type="date"] {
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+.revenue-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 200px;
+  padding: var(--space-3);
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+.revenue-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 14px;
+  height: 100%;
+}
+.revenue-bar-fill {
+  width: 100%;
+  max-width: 28px;
+  min-height: 4px;
+  background: var(--color-accent);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: height var(--transition-fast);
+}
+.revenue-bar-label {
+  margin-top: var(--space-1);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.revenue-delta--up { color: var(--color-success); }
+.revenue-delta--down { color: var(--color-danger); }
+
 /* ─── Log View ─── */
 .log-stats {
   display: flex;

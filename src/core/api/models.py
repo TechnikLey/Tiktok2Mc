@@ -482,3 +482,39 @@ class TriggerHistoryEntry(BaseModel):
 
 class TriggerHistoryResponse(BaseModel):
     history: list[TriggerHistoryEntry]
+
+
+# ── Revenue (daily gift revenue log) models ─────────────────────────
+
+
+class RevenueEntry(BaseModel):
+    date: str
+    estimated_revenue_usd: float
+
+
+class RevenueSummary(BaseModel):
+    count: int
+    total_usd: float
+    average_usd: float
+    min_usd: float
+    max_usd: float
+    min_day: str | None = None
+    max_day: str | None = None
+    days_with_revenue: int
+    last_change_usd: float | None = None
+    last_change_day: str | None = None
+    last7_usd: float
+    prev7_usd: float
+    last7_delta_usd: float
+
+
+class RevenueFileInfo(BaseModel):
+    exists: bool
+    path: str
+    size: int | None = None
+    modified: float | None = None
+
+
+class RevenueResponse(BaseModel):
+    entries: list[RevenueEntry]
+    file: RevenueFileInfo

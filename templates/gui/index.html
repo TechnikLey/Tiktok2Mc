@@ -62,6 +62,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
                     <span class="nav-label">Server Manager</span>
                 </a>
+                <a class="nav-item" data-view="revenue" onclick="switchView('revenue')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" fill="currentColor"/></svg>
+                    <span class="nav-label">Revenue</span>
+                </a>
                 <a class="nav-item" data-view="triggers" onclick="switchView('triggers')">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
                     <span class="nav-label">Event Tester</span>
@@ -325,6 +329,46 @@
                     <div id="server-versions-list">
                         <p class="text-muted">Loading versions...</p>
                     </div>
+                </section>
+            </div>
+
+            <!-- ─── Revenue ─── -->
+            <div class="view" id="view-revenue">
+                <div class="view-header">
+                    <h2>Revenue</h2>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary btn--sm" onclick="loadRevenueView()" title="Refresh revenue data">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="status-grid" id="revenue-summary"></div>
+
+                <section class="view-section">
+                    <div class="revenue-filters">
+                        <div class="revenue-filter-group">
+                            <span class="revenue-period" data-days="0" onclick="revenueSetPeriod(0)">All</span>
+                            <span class="revenue-period" data-days="7" onclick="revenueSetPeriod(7)">7 days</span>
+                            <span class="revenue-period" data-days="30" onclick="revenueSetPeriod(30)">30 days</span>
+                            <span class="revenue-period" data-days="90" onclick="revenueSetPeriod(90)">90 days</span>
+                        </div>
+                        <label class="revenue-filter-label">From
+                            <input type="date" id="revenue-from" onchange="revenueApplyFilters()">
+                        </label>
+                        <label class="revenue-filter-label">To
+                            <input type="date" id="revenue-to" onchange="revenueApplyFilters()">
+                        </label>
+                        <button class="btn btn--secondary btn--sm" onclick="revenueClearFilters()">Clear</button>
+                    </div>
+                </section>
+
+                <section class="view-section">
+                    <h3>Daily Revenue</h3>
+                    <div id="revenue-chart" class="revenue-chart"></div>
+                </section>
+
+                <section class="view-section">
+                    <h3>History</h3>
+                    <div id="revenue-table-wrap"></div>
                 </section>
             </div>
 
