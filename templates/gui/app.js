@@ -5,6 +5,25 @@ let currentHooks = [];
 let wizardStep = 0;
 let wizardData = {};
 
+/* ─── API key (LAN dashboard access) ───
+ * When the server is exposed beyond localhost (server_host: 0.0.0.0) with
+ * an api_key configured, requests from other devices need it.  Provide it
+ * by opening the dashboard as /gui/?key=YOUR_KEY; it is remembered in
+ * localStorage and attached to every request (and the SSE stream).
+ */
+let _apiKey = (typeof localStorage !== 'undefined' && localStorage.getItem('tiktok2mc_api_key')) || '';
+const _urlKey = new URLSearchParams(window.location.search).get('key');
+if (_urlKey) {
+  _apiKey = _urlKey;
+  try { localStorage.setItem('tiktok2mc_api_key', _apiKey); } catch (_) {}
+  const cleanUrl = window.location.href.replace(/([?&])key=[^&]*/, '$1').replace(/[?&]$/, '');
+  window.history.replaceState({}, document.title, cleanUrl);
+}
+function _withApiKey(headers) {
+  if (!_apiKey) return headers;
+  return Object.assign({}, headers, { 'X-API-Key': _apiKey });
+}
+
 /* ─── API helpers ─── */
 async function _parseErrorDetail(res) {
   try {
@@ -21,17 +40,20 @@ async function _parseErrorDetail(res) {
 }
 async function _throwResError(res) {
   const detail = await _parseErrorDetail(res);
+  if (res.status === 401) {
+    showToast('Authentication required. Reopen the dashboard with ?key=YOUR_KEY (matches config.yaml: api_key).', 'error');
+  }
   throw new Error(res.status + ' ' + res.statusText + (detail ? ': ' + detail : ''));
 }
 async function fetchJSON(path) {
-  const res = await fetch(API + path);
+  const res = await fetch(API + path, { headers: _withApiKey({}) });
   if (!res.ok) await _throwResError(res);
   return res.json();
 }
 async function postJSON(path, body) {
   const res = await fetch(API + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: _withApiKey({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
   if (!res.ok) await _throwResError(res);
@@ -40,7 +62,7 @@ async function postJSON(path, body) {
 async function putJSON(path, body) {
   const res = await fetch(API + path, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: _withApiKey({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
   if (!res.ok) await _throwResError(res);
@@ -235,7 +257,7 @@ class LiveLog {
     if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
 
     try {
-      this._sse = new EventSource(API + '/logs/stream');
+      this._sse = new EventSource(API + '/logs/stream' + (_apiKey ? '?key=' + encodeURIComponent(_apiKey) : ''));
       this._sse.onopen = () => this.setConnected(true);
       this._sse.onmessage = (e) => {
         if (!e.data || e.data.startsWith(':')) return;
@@ -975,7 +997,7 @@ async function serverManagerPromptRemove(version) {
   const confirmed = await showConfirmDialog('Remove Version?', 'Delete version ' + version + ' and its server.jar? This cannot be undone.', 'Remove', 'btn-danger', 'text-danger');
   if (!confirmed) return;
   try {
-    const res = await fetch(API + '/servers/' + encodeURIComponent(version), { method: 'DELETE' });
+    const res = await fetch(API + '/servers/' + encodeURIComponent(version), { method: 'DELETE', headers: _withApiKey({}) });
     if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
     const data = await res.json();
     showToast(data.message || 'Removed ' + version, 'success');
@@ -1062,7 +1084,7 @@ async function serverCardAction(instanceId, action) {
 
 async function openServerFolder(instanceId) {
   try {
-    const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST' });
+    const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST', headers: _withApiKey({}) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Failed to open folder');
     if (!data.opened) showToast('Folder path: ' + data.path, 'info');
@@ -1077,7 +1099,7 @@ async function deleteServerInstance(instanceId) {
   const confirmed = await showConfirmDialog('Delete Server?', 'Delete server "' + name + '" and all its files? This cannot be undone.', 'Delete', 'btn-danger', 'text-danger');
   if (!confirmed) return;
   try {
-    const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId), { method: 'DELETE' });
+    const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId), { method: 'DELETE', headers: _withApiKey({}) });
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.detail || 'Failed to delete');
@@ -1321,6 +1343,7 @@ async function confirmServerCustom() {
     const res = await fetch(API + '/servers/custom', {
       method: 'POST',
       body: formData,
+      headers: _withApiKey({}),
     });
     if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
     const data = await res.json();
@@ -5965,7 +5988,7 @@ function connectLogStream() {
     clearTimeout(_sseReconnectTimer);
     _sseReconnectTimer = null;
   }
-  const ep = '/api/v1/events/stream';
+  const ep = '/api/v1/events/stream' + (_apiKey ? '?key=' + encodeURIComponent(_apiKey) : '');
   _sseSource = new EventSource(ep);
   _sseSource.onopen = () => {
     // Reset backoff on successful connection.
@@ -6205,7 +6228,7 @@ const consoleTerminal = {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const res = await fetch(API + '/rcon/connect', { method: 'POST', signal: controller.signal });
+      const res = await fetch(API + '/rcon/connect', { method: 'POST', signal: controller.signal, headers: _withApiKey({}) });
       if (!res.ok) throw new Error((await res.json()).detail || 'Connection failed');
       this._connected = true;
       status.textContent = 'Connected';
@@ -6235,7 +6258,7 @@ const consoleTerminal = {
     const status = document.getElementById('console-status');
     btn.disabled = true;
     try {
-      await fetch(API + '/rcon/disconnect', { method: 'POST' });
+      await fetch(API + '/rcon/disconnect', { method: 'POST', headers: _withApiKey({}) });
     } catch (_) {}
     this._connected = false;
     status.textContent = 'Disconnected';
@@ -6252,7 +6275,7 @@ const consoleTerminal = {
     try {
       const res = await fetch(API + '/rcon/command', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _withApiKey({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ command: cmd })
       });
       if (!res.ok) throw new Error((await res.json()).detail || 'Command failed');

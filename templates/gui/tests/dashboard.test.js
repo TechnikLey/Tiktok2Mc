@@ -47,6 +47,63 @@ describe('API helpers', () => {
     });
     await expect(fetchJSON('/health')).rejects.toThrow('500');
   });
+
+  it('_withApiKey attaches X-API-Key when a key is set', () => {
+    const prev = _apiKey;
+    _apiKey = 'secret';
+    try {
+      expect(_withApiKey({ 'Content-Type': 'application/json' })).toEqual({
+        'Content-Type': 'application/json',
+        'X-API-Key': 'secret',
+      });
+    } finally {
+      _apiKey = prev;
+    }
+  });
+
+  it('_withApiKey leaves headers unchanged when no key', () => {
+    const prev = _apiKey;
+    _apiKey = '';
+    try {
+      expect(_withApiKey({ 'Content-Type': 'application/json' })).toEqual({
+        'Content-Type': 'application/json',
+      });
+    } finally {
+      _apiKey = prev;
+    }
+  });
+
+  it('fetchJSON sends X-API-Key when configured', async () => {
+    const prev = _apiKey;
+    let sentHeaders;
+    globalThis.fetch = async (url, opts) => {
+      sentHeaders = opts.headers;
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({}) };
+    };
+    _apiKey = 'secret';
+    try {
+      await fetchJSON('/health');
+    } finally {
+      _apiKey = prev;
+    }
+    expect(sentHeaders['X-API-Key']).toBe('secret');
+  });
+
+  it('postJSON sends X-API-Key when configured', async () => {
+    const prev = _apiKey;
+    let sentHeaders;
+    globalThis.fetch = async (url, opts) => {
+      sentHeaders = opts.headers;
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({}) };
+    };
+    _apiKey = 'secret';
+    try {
+      await postJSON('/plugins/test/enable', {});
+    } finally {
+      _apiKey = prev;
+    }
+    expect(sentHeaders['X-API-Key']).toBe('secret');
+  });
 });
 
 /* ─── log / showToast ─── */

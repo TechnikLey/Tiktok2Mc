@@ -1,12 +1,15 @@
 import asyncio
 import logging
 import secrets
+from collections.abc import Iterable
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from core.overlay import set_event_loop
@@ -28,6 +31,84 @@ log = logging.getLogger(__name__)
 DEFAULT_PORT = 29185
 
 _LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _same_host_origin(origin: str, host: str) -> bool:
+    """Return ``True`` when an Origin's netloc matches the request Host."""
+    if not origin or not host:
+        return False
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    return parsed.netloc == host
+
+
+class SameHostCORSMiddleware:
+    """Reflect an Origin only when it belongs to the server's own host.
+
+    The desktop GUI (pywebview) and any LAN browser that opens the
+    dashboard at ``http://<server-host>:<port>`` send an ``Origin`` whose
+    host matches the request's ``Host`` header — those are allowed and the
+    origin is echoed.  Foreign origins (malicious websites, DNS rebinding)
+    never match, so the API stays unreadable from arbitrary pages.
+    """
+
+    def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
+        self.app = app
+        self.extra_origins = frozenset(extra_origins)
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+        origin = headers.get("origin")
+        if origin is None or not (
+            origin in self.extra_origins
+            or _same_host_origin(origin, headers.get("host", ""))
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        origin_bytes = origin.encode()
+        if scope["method"] == "OPTIONS":
+            allow_headers = headers.get("access-control-request-headers", "")
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [
+                        (b"access-control-allow-origin", origin_bytes),
+                        (b"access-control-allow-credentials", b"true"),
+                        (
+                            b"access-control-allow-methods",
+                            b"GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                        ),
+                        (b"access-control-allow-headers", allow_headers.encode()),
+                        (b"access-control-max-age", b"600"),
+                        (b"vary", b"origin"),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": b""})
+            return
+
+        async def send_with_cors(message):
+            if message["type"] == "http.response.start":
+                message = dict(message)
+                message["headers"] = [
+                    *message.get("headers", []),
+                    (b"access-control-allow-origin", origin_bytes),
+                    (b"access-control-allow-credentials", b"true"),
+                    (b"vary", b"origin"),
+                ]
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
 
 
 def _discover_hooks_at_startup() -> None:
@@ -78,7 +159,7 @@ async def lifespan(app: FastAPI):
 
     log.info("API server v%s starting up ...", API_VERSION)
     log.info(
-        "CORS origin restricted to localhost — "
+        "CORS reflects same-host origins (local GUI + LAN dashboard); "
         'use create_app(cors_origins=["*"]) to open for development'
     )
     set_event_loop(asyncio.get_running_loop())
@@ -134,11 +215,14 @@ def create_app(
     version:
         API version string.
     cors_origins:
-        List of allowed origins for CORS.  Defaults to ``["*"]``.
+        Optional explicit list of allowed origins for CORS.  When omitted,
+        the ``SameHostCORSMiddleware`` reflects any origin whose host
+        matches the request (local GUI and LAN dashboard).  Pass ``["*"]``
+        only for development.
     api_key:
         Optional API key for authentication.  When set, all non-localhost
-        requests must include the ``X-API-Key`` header.  Empty means
-        authentication is disabled.
+        requests must include the ``X-API-Key`` header (or ``?key=`` query
+        parameter for SSE).  Empty means authentication is disabled.
 
     Returns
     -------
@@ -151,17 +235,16 @@ def create_app(
         lifespan=lifespan,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins
-        or [
-            "http://127.0.0.1",
-            "http://localhost",
-        ],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    if cors_origins is not None:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        app.add_middleware(SameHostCORSMiddleware)
 
     class CancelledErrorMiddleware:
         """Suppress CancelledError spam when clients disconnect or the server shuts down."""
@@ -194,10 +277,20 @@ def create_app(
 
         @app.middleware("http")
         async def check_api_key(request: Request, call_next):
+            # CORS preflights carry no API key by design; the actual request
+            # (which does send it) is still checked below.
+            if request.method == "OPTIONS":
+                return await call_next(request)
+
             client_host = request.client.host if request.client else ""
 
             if client_host not in _LOCALHOSTS:
+                # Header is preferred; the ?key= query parameter exists so
+                # EventSource (SSE) clients can authenticate — they cannot
+                # set custom headers.
                 req_key = request.headers.get("X-API-Key", "")
+                if not req_key:
+                    req_key = request.query_params.get("key", "")
                 if not secrets.compare_digest(req_key, api_key):
                     return JSONResponse(
                         {
