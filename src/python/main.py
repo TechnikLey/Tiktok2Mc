@@ -17,6 +17,7 @@ import logging
 import os
 import queue
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
@@ -48,7 +49,6 @@ from core.crash_manager import get_crash_manager
 from core.error_codes import (
     HOOK_0006,
     MC_0004,
-    MC_0005,
     MC_0006,
     TIKTOK_0001,
     TIKTOK_0002,
@@ -190,6 +190,37 @@ class BotContext:
 ctx = BotContext()
 
 app = Flask(__name__)
+
+_LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _webhook_request_authorized() -> bool:
+    """Gate bridge webhook endpoints behind the configured API key.
+
+    Mirrors the control plane (core/api/server.py): when an api_key is
+    configured, all non-localhost requests must present it in the
+    ``X-API-Key`` header.  Localhost stays exempt so local plugins and
+    desktop-app integrations keep working without a key.  When no key is
+    configured, authentication is disabled entirely.
+    """
+    remote = request.remote_addr or ""
+    if remote in _LOCALHOSTS:
+        return True
+    api_key = (ctx.config or {}).get("api_key", "")
+    if not api_key:
+        return True
+    return secrets.compare_digest(request.headers.get("X-API-Key", ""), api_key)
+
+
+def _bridge_auth_check():
+    if not _webhook_request_authorized():
+        return {
+            "status": "error",
+            "message": "Unauthorized. Provide X-API-Key header.",
+        }, 401
+
+
+app.before_request(_bridge_auth_check)
 
 werkzeug_log = logging.getLogger("werkzeug")
 werkzeug_log.setLevel(logging.WARNING)
@@ -710,6 +741,18 @@ def generate_datapack():
 # ================================
 
 
+def _requeue_rcon(commands, source_user) -> None:
+    """Re-queue a failed RCON command without ever blocking the worker.
+
+    ``await asyncio.Queue.put`` is a deadlock hazard here: the worker is the
+    only consumer of the bounded ``rcon_queue``, so a full queue would leave
+    the worker stuck in ``put`` with nobody left to drain it.  Producers
+    already drop on full (``enqueue_threadsafe``), so the worker must do the
+    same via the guarded ``put_nowait``.
+    """
+    _put_nowait_guarded(ctx.rcon_queue, (commands, source_user), "rcon_requeue")
+
+
 async def rcon_worker():
     """Background worker that dequeues RCON commands and sends them to the Minecraft server."""
     log.info("[RCON-QUEUE] Worker started.")
@@ -722,7 +765,7 @@ async def rcon_worker():
                 retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
                 if retries <= ctx.max_rcon_retries:
                     ctx.rcon_queue_retries[retry_key] = retries
-                    await ctx.rcon_queue.put((commands, source_user))
+                    _requeue_rcon(commands, source_user)
                 else:
                     log.info(
                         f"[RCON] Dropping commands after queue inactive for {retries} attempts: {commands}"
@@ -798,13 +841,7 @@ async def rcon_worker():
                 retries = ctx.rcon_queue_retries.get(retry_key, 0) + 1
                 if retries <= ctx.max_rcon_retries:
                     ctx.rcon_queue_retries[retry_key] = retries
-                    try:
-                        await ctx.rcon_queue.put((commands, source_user))
-                    except Exception as e:  # best-effort re-queue with reporting
-                        log.error(f"RCON Queue Error: {e}")
-                        get_crash_manager().report_exception(
-                            MC_0005, exc=e, context_info={"retries": retries}
-                        )
+                    _requeue_rcon(commands, source_user)
                 else:
                     log.error(
                         f"[RCON] Dropping commands after {retries} failed attempts: {commands}"

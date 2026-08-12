@@ -9,6 +9,7 @@ import datetime
 import json
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -845,6 +846,33 @@ class TestRconWorkerRetryBudget:
         assert ctx.rcon_queue_retries == {}
 
 
+class TestRequeueRcon:
+    def test_requeues_when_queue_has_space(self, monkeypatch):
+        from src.python.main import _requeue_rcon, ctx
+
+        q = asyncio.Queue(maxsize=2)
+        q.put_nowait(("a", "u"))
+        monkeypatch.setattr(ctx, "rcon_queue", q)
+
+        _requeue_rcon(["b"], "u")
+
+        assert q.qsize() == 2
+
+    def test_drops_without_blocking_when_queue_full(self, monkeypatch):
+        from src.python.main import _requeue_rcon, ctx
+
+        q = asyncio.Queue(maxsize=1)
+        q.put_nowait(("a", "u"))
+        monkeypatch.setattr(ctx, "rcon_queue", q)
+
+        # The worker is the only consumer of the bounded queue: a blocking
+        # put here would deadlock it permanently. put_nowait must return
+        # immediately and simply drop the item.
+        _requeue_rcon(["b"], "u")
+
+        assert q.qsize() == 1
+
+
 class TestUpdateDailyRevenue:
     def test_writes_daily_revenue(self, tmp_path, monkeypatch):
         from src.python.main import ctx, update_daily_revenue
@@ -888,3 +916,84 @@ class TestUpdateDailyRevenue:
         assert len(lines) == 1
         data = json.loads(lines[0])
         assert data["estimated_revenue_usd"] == 20.0
+
+
+# =========================================================================
+# Webhook endpoint auth (X-API-Key on non-localhost requests)
+# =========================================================================
+
+
+class TestWebhookAuth:
+    def _make_request(self, remote_addr, api_key_header=None):
+        class _Headers:
+            def get(self, name, default=""):
+                if name == "X-API-Key":
+                    return api_key_header if api_key_header is not None else ""
+                return default
+
+        req = SimpleNamespace(remote_addr=remote_addr, headers=_Headers())
+        return req
+
+    def test_localhost_bypasses_auth(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": "secret"})
+        monkeypatch.setattr(main_mod, "request", self._make_request("127.0.0.1"))
+
+        assert main_mod._webhook_request_authorized() is True
+
+    def test_non_localhost_accepts_matching_key(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": "secret"})
+        monkeypatch.setattr(
+            main_mod, "request", self._make_request("192.168.1.50", "secret")
+        )
+
+        assert main_mod._webhook_request_authorized() is True
+
+    def test_non_localhost_rejects_wrong_key(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": "secret"})
+        monkeypatch.setattr(
+            main_mod, "request", self._make_request("192.168.1.50", "wrong")
+        )
+
+        assert main_mod._webhook_request_authorized() is False
+
+    def test_non_localhost_rejects_missing_key(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": "secret"})
+        monkeypatch.setattr(main_mod, "request", self._make_request("192.168.1.50"))
+
+        assert main_mod._webhook_request_authorized() is False
+
+    def test_no_key_configured_allows_non_localhost(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": ""})
+        monkeypatch.setattr(main_mod, "request", self._make_request("192.168.1.50"))
+
+        assert main_mod._webhook_request_authorized() is True
+
+    def test_before_request_guard_returns_401_when_unauthorized(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": "secret"})
+        monkeypatch.setattr(main_mod, "request", self._make_request("10.0.0.9"))
+
+        resp = main_mod._bridge_auth_check()
+        assert resp is not None
+        body, code = resp
+        assert code == 401
+        assert "X-API-Key" in body["message"]
+
+    def test_before_request_guard_allows_localhost(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": "secret"})
+        monkeypatch.setattr(main_mod, "request", self._make_request("127.0.0.1"))
+
+        assert main_mod._bridge_auth_check() is None
