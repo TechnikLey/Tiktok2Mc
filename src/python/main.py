@@ -1032,6 +1032,7 @@ def handle_health():
 @app.route("/metrics", methods=["GET"])
 def handle_metrics():
     import time
+
     now = time.time()
     # Calculate events per minute (rolling window)
     # We track event counts in the last 60 seconds
@@ -1039,7 +1040,9 @@ def handle_metrics():
         handle_metrics._event_timestamps = []
     # Clean old timestamps (older than 60 seconds)
     cutoff = now - 60
-    handle_metrics._event_timestamps = [ts for ts in handle_metrics._event_timestamps if ts > cutoff]
+    handle_metrics._event_timestamps = [
+        ts for ts in handle_metrics._event_timestamps if ts > cutoff
+    ]
     events_per_minute = len(handle_metrics._event_timestamps)
 
     return {
@@ -1047,7 +1050,8 @@ def handle_metrics():
         "trigger_queue_size": ctx.trigger_queue.qsize() if ctx.trigger_queue else 0,
         "events_per_minute": events_per_minute,
         "tiktok_connected": ctx.tiktok_client is not None and ctx.tiktok_live,
-        "gift_value_usd_today": getattr(ctx, "gift_value_usd", 0),
+        "gift_value_usd_today": getattr(ctx, "gift_value_usd", 0)
+        - getattr(ctx, "gift_day_start_value", 0),
         "gift_day_start_value": getattr(ctx, "gift_day_start_value", 0),
     }, 200
 
@@ -1055,6 +1059,7 @@ def handle_metrics():
 def _record_metrics_event():
     """Call this to record an event for metrics tracking."""
     import time
+
     if not hasattr(handle_metrics, "_event_timestamps"):
         handle_metrics._event_timestamps = []
     handle_metrics._event_timestamps.append(time.time())

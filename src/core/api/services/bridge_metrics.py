@@ -1,9 +1,11 @@
 """Bridge metrics service — fetches live metrics from the TikTok bridge."""
 
+import json
 import logging
 import urllib.request
-import json
 from typing import Any
+
+from ruamel.yaml.error import YAMLError
 
 import core.paths
 from core.yaml_utils import load_yaml
@@ -25,16 +27,22 @@ class BridgeMetricsService:
             config_path = core.paths.get_config_file()
             if config_path.exists():
                 cfg = load_yaml(config_path)
-                host = cfg.get("minecraft_server_api", {}).get("web_server_host", "127.0.0.1")
-                port = cfg.get("minecraft_server_api", {}).get("web_server_port", 29188)
-                return f"http://{host}:{port}/metrics"
-        except Exception:
-            pass
+                if cfg is not None:
+                    host = cfg.get("minecraft_server_api", {}).get(
+                        "web_server_host", "127.0.0.1"
+                    )
+                    port = cfg.get("minecraft_server_api", {}).get(
+                        "web_server_port", 29188
+                    )
+                    return f"http://{host}:{port}/metrics"
+        except (OSError, ValueError, YAMLError) as exc:
+            log.debug("Failed to read bridge metrics URL from config: %s", exc)
         return "http://127.0.0.1:29188/metrics"
 
     async def get_metrics(self, use_cache: bool = True) -> dict[str, Any]:
         """Fetch metrics from the bridge."""
         import time
+
         now = time.time()
 
         if use_cache and self._cache and (now - self._cache_time) < self._cache_ttl:
@@ -48,8 +56,8 @@ class BridgeMetricsService:
                 self._cache = data
                 self._cache_time = now
                 return data
-        except Exception as e:
-            log.debug("Failed to fetch bridge metrics from %s: %s", url, e)
+        except (OSError, ValueError) as exc:
+            log.debug("Failed to fetch bridge metrics from %s: %s", url, exc)
             return {}
 
 

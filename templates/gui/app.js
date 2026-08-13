@@ -822,7 +822,7 @@ function renderJavaStatusBanner(data) {
     return;
   }
   const reason = (data && data.reason) || 'No Java runtime was found on this system.';
-  const minVer = (data && data.minJavaVersion) || 17;
+  const minVer = (data && data.minJavaVersion) || 21;
   const hints = (data && data.hints) || [];
   const installMsg = data && data.install && data.install.message ? '<br><em>' + escapeHtml(data.install.message) + '</em>' : '';
   const hintBlock = hints.length
@@ -845,17 +845,17 @@ function renderJavaStatusBanner(data) {
 
 async function installJava() {
   const btn = document.getElementById('java-install-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Installing…'; }
+  if (btn) { btn.disabled = true; btn.textContent = I18N.t('servers.javaInstallingTitle') + '…'; }
   
   // Create a progress overlay
   const overlay = document.createElement('div');
   overlay.className = 'java-install-overlay';
   overlay.innerHTML = `
     <div class="java-install-progress">
-      <h3>Installing Java</h3>
+      <h3>${escapeHtml(I18N.t('servers.javaInstallingTitle'))}</h3>
       <div class="progress-bar"><div class="progress-fill" id="java-progress-fill" style="width: 0%"></div></div>
-      <div class="progress-text" id="java-progress-text">Starting...</div>
-      <button class="btn btn--secondary btn--sm" id="java-cancel-btn">Cancel</button>
+      <div class="progress-text" id="java-progress-text">${escapeHtml(I18N.t('servers.javaStarting'))}</div>
+      <button class="btn btn--secondary btn--sm" id="java-cancel-btn">${escapeHtml(I18N.t('common.cancel'))}</button>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -867,7 +867,7 @@ async function installJava() {
   let cancelled = false;
   cancelBtn.addEventListener('click', () => {
     cancelled = true;
-    progressText.textContent = 'Cancelling...';
+    progressText.textContent = I18N.t('servers.javaCancelling');
     cancelBtn.disabled = true;
   });
   
@@ -906,7 +906,7 @@ async function installJava() {
       clearInterval(iv);
       overlay.remove();
       if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
-      showToast('Java installation cancelled', 'info');
+      showToast(I18N.t('servers.javaCancelled'), 'info');
       return;
     }
     
@@ -915,7 +915,7 @@ async function installJava() {
       clearInterval(iv);
       overlay.remove();
       if (btn) { btn.disabled = false; btn.textContent = I18N.t('servers.installJava'); }
-      showToast('Java installation timed out after 5 minutes', 'error');
+      showToast(I18N.t('servers.javaTimedOut'), 'error');
       return;
     }
     
@@ -945,9 +945,9 @@ async function installJava() {
       if (inst.done) {
         clearInterval(iv);
         overlay.remove();
-        if (data.ok) {
+        if (inst.ok) {
           progressFill.style.width = '100%';
-          progressText.textContent = 'Installation complete!';
+          progressText.textContent = I18N.t('servers.javaComplete');
           showToast(I18N.t('servers.javaNowAvailable') + (data.version ? ' (' + data.version + ')' : '') + '.', 'success');
         } else {
           showToast(I18N.t('servers.javaFailedDetails'), 'error');

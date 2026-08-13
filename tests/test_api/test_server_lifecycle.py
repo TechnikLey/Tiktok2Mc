@@ -30,9 +30,10 @@ class TestJavaStatusEndpoint:
         assert "minJavaVersion" in body
         # "install" key only present when install_id is provided and install in progress
         assert "install" not in body  # no install_id provided
-    
+
     def test_status_with_install_id(self, client):
         import uuid
+
         install_id = uuid.uuid4().hex[:8]
         resp = client.get(f"/api/v1/server/java/status?install_id={install_id}")
         assert resp.status_code == 200
@@ -53,7 +54,12 @@ class TestJavaStatusEndpoint:
             server_lifecycle, "detect_java", lambda *a, **k: _status(False)
         )
         install_id = "test123"
-        server_lifecycle._JAVA_INSTALL[install_id] = {"installing": True, "message": "test", "done": False, "ok": False}
+        server_lifecycle._JAVA_INSTALL[install_id] = {
+            "installing": True,
+            "message": "test",
+            "done": False,
+            "ok": False,
+        }
         try:
             resp = client.post("/api/v1/server/java/install")
             assert resp.status_code == 200

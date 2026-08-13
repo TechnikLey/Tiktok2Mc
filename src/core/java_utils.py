@@ -34,22 +34,32 @@ log = logging.getLogger(__name__)
 
 MIN_JAVA_VERSION = 21
 
-# Default download sources (Adoptium Temurin 21 JRE, Windows x64) with checksums.
+# Default download sources (Adoptium Temurin 21 JRE, Windows x64) with real
+# SHA256 checksums from the Adoptium API (api.adoptium.net). The newest GA
+# release is tried first, older ones are kept as fallback mirrors. If a URL is
+# updated, the checksum MUST be refreshed too - a mismatch aborts that mirror.
 # Format: {"url": "https://...", "sha256": "..."}
 _JDK_SOURCES = [
     {
         "url": (
             "https://github.com/adoptium/temurin21-binaries/releases/download/"
+            "jdk-21.0.12%2B8/OpenJDK21U-jre_x64_windows_hotspot_21.0.12_8.zip"
+        ),
+        "sha256": "b8aa18fef5edb69bee8618f99677d66d0873d22cb40d974c15ac9ffcdecf73ba",
+    },
+    {
+        "url": (
+            "https://github.com/adoptium/temurin21-binaries/releases/download/"
             "jdk-21.0.4%2B7/OpenJDK21U-jre_x64_windows_hotspot_21.0.4_7.zip"
         ),
-        "sha256": "a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+        "sha256": "b58f6117d26a138da4cb962b974efc4be4b88b65093366146965d16ad3c45e75",
     },
     {
         "url": (
             "https://github.com/adoptium/temurin21-binaries/releases/download/"
             "jdk-21.0.3%2B9/OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip"
         ),
-        "sha256": "b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9",
+        "sha256": "f79eaa741cb9ec4d20c7fd57a0fc52c715da183bc68eb19f4778b816b89ef003",
     },
 ]
 
@@ -171,13 +181,29 @@ def _system_java_path() -> Path | None:
     return Path(found).resolve()
 
 
+def _java_home_path() -> Path | None:
+    """Return the java executable from ``JAVA_HOME``/``JDK_HOME``, or None.
+
+    Many installs (Eclipse Temurin, Microsoft OpenJDK) set ``JAVA_HOME`` even
+    when ``java`` is not on PATH, and some PATH entries (e.g. the Oracle
+    ``javapath`` shim after an uninstall) are broken and produce no output.
+    Checking the env vars catches both cases.
+    """
+    home = os.environ.get("JAVA_HOME") or os.environ.get("JDK_HOME")
+    if not home:
+        return None
+    exe = "java.exe" if platform.system() == "Windows" else "java"
+    candidate = Path(home) / "bin" / exe
+    return candidate if candidate.is_file() else None
+
+
 def _linux_auto_installable() -> bool:
     """Whether a privileged install can be attempted on this Linux box."""
     if platform.system() != "Linux":
         return False
     if _package_manager() is None:
         return False
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
+    if getattr(os, "geteuid", lambda: -1)() == 0:
         return True
     if shutil.which("pkexec"):
         return True
@@ -210,11 +236,26 @@ def detect_java(root_dir: Path, config_path: Path | None = None) -> JavaStatus:
     Detection order mirrors the original launcher:
       1. custom ``java.path`` from the config file
       2. bundled runtime under ``server/java/bin/``
-      3. ``java`` on the system PATH
+      3. ``JAVA_HOME`` / ``JDK_HOME``
+      4. ``java`` on the system PATH
+
+    When a candidate exists but is unusable (broken shim, too old) the scan
+    continues to the next source instead of stopping, so the user gets a
+    complete picture in the failure reason.
     """
     hints = install_hints()
     auto = platform.system() == "Windows" or _linux_auto_installable()
-    custom_note = ""
+    notes: list[str] = []
+
+    def _usable(source: str, java_path: Path) -> JavaStatus:
+        return JavaStatus(
+            ok=True,
+            path=str(java_path.resolve()),
+            version=java_version_string(java_path),
+            source=source,
+            hints=hints,
+            auto_installable=False,
+        )
 
     # 1. Custom path from config
     if config_path and Path(config_path).exists():
@@ -226,71 +267,58 @@ def detect_java(root_dir: Path, config_path: Path | None = None) -> JavaStatus:
             if custom:
                 custom_path = Path(custom)
                 if java_is_usable(custom_path):
-                    return JavaStatus(
-                        ok=True,
-                        path=str(custom_path.resolve()),
-                        version=java_version_string(custom_path),
-                        source="config",
-                        hints=hints,
-                        auto_installable=False,
-                    )
-                custom_note = (
+                    return _usable("config", custom_path)
+                notes.append(
                     f"Custom Java path from config is not usable: {custom} "
                     f"(needs Java {MIN_JAVA_VERSION}+)."
                 )
-                log.warning("%s", custom_note)
+                log.warning("%s", notes[-1])
         except (OSError, ValueError, YAMLError) as exc:
             log.warning("Failed to read custom Java path from config: %s", exc)
 
     # 2. Bundled runtime
     bundled = bundled_java_path(root_dir)
     if java_is_usable(bundled):
-        return JavaStatus(
-            ok=True,
-            path=str(bundled),
-            version=java_version_string(bundled),
-            source="bundled",
-            hints=hints,
-            auto_installable=False,
-        )
+        return _usable("bundled", bundled)
 
-    # 3. System PATH
+    # 3. JAVA_HOME / JDK_HOME
+    java_home = _java_home_path()
+    if java_home is not None:
+        if java_is_usable(java_home):
+            return _usable("system", java_home)
+        major = java_major_version(java_home)
+        if major is None:
+            notes.append(
+                f"JAVA_HOME points to {java_home}, but it does not report a version."
+            )
+        else:
+            notes.append(
+                f"Found Java {major} at JAVA_HOME ({java_home}), but it is too old "
+                f"(need {MIN_JAVA_VERSION}+)."
+            )
+
+    # 4. System PATH
     system_path = _system_java_path()
     if system_path is not None:
         major = java_major_version(system_path)
         if major is not None and major >= MIN_JAVA_VERSION:
-            return JavaStatus(
-                ok=True,
-                path=str(system_path),
-                version=java_version_string(system_path),
-                source="system",
-                hints=hints,
-                auto_installable=False,
-            )
+            return _usable("system", system_path)
         if major is None:
-            reason = (
-                f"Found Java at {system_path} but could not determine its version "
-                f"(the 'java' command did not report one). A runtime with Java "
-                f"{MIN_JAVA_VERSION}+ is required."
+            notes.append(
+                f"The 'java' command on PATH ({system_path}) did not report a version."
             )
         else:
-            reason = (
-                f"Found Java at {system_path} but it is too old "
-                f"(version {major}, need {MIN_JAVA_VERSION}+)."
+            notes.append(
+                f"Found Java {major} on PATH ({system_path}), but it is too old "
+                f"(need {MIN_JAVA_VERSION}+)."
             )
-        return JavaStatus(
-            ok=False,
-            reason=reason,
-            hints=hints,
-            auto_installable=auto,
-        )
 
-    if custom_note:
-        reason = custom_note + " No other usable Java runtime was found."
+    if notes:
+        reason = " ".join(notes)
     else:
         reason = (
             "No Java installation was found on this system "
-            "(checked the bundled runtime and PATH)."
+            "(checked the bundled runtime, JAVA_HOME and PATH)."
         )
     return JavaStatus(
         ok=False,
@@ -457,7 +485,7 @@ def install_java_linux() -> tuple[bool, str]:
     pkg = _LINUX_PACKAGES[pm]
     install_args = _PM_INSTALL[pm]
 
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
+    if getattr(os, "geteuid", lambda: -1)() == 0:
         prefix: list[str] = []
         how = "as root"
     elif shutil.which("pkexec"):
