@@ -288,7 +288,17 @@ body {
 }
 .lang-btn:hover { color: var(--color-text); }
 .lang-btn.active { background: var(--color-primary); color: var(--color-primary-fg, #fff); }
-.sidebar.icons .sidebar-lang-row, .sidebar.hide .sidebar-lang-row { display: none; }
+.sidebar.hide .sidebar-lang-row { display: none; }
+.sidebar.icons .sidebar-lang-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: auto;
+}
+.sidebar.icons .sidebar-lang-label { display: none; }
+.sidebar.icons .lang-switch { flex-direction: column; }
 #status-pill {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);

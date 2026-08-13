@@ -231,7 +231,7 @@ class ActionsEditor {
       const data = await fetchJSON('/actions/scripts');
       this.availableScripts = data.scripts || [];
     } catch (e) {
-      console.error('Failed to load scripts:', e);
+      console.error(I18N.t('actions.loadScriptsFailed', { msg: e.message }));
       this.availableScripts = [];
     }
   }

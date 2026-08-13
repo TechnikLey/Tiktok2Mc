@@ -461,7 +461,7 @@ class CrashReports {
       this.reports = data.reports || [];
       this.renderList();
     } catch (e) {
-      if (this.container) this.container.innerHTML = '<p class="muted">Failed to load crash reports.</p>';
+      if (this.container) this.container.innerHTML = '<p class="muted">' + I18N.t('log.crashLoadFailed') + '</p>';
     }
   }
 
@@ -476,7 +476,7 @@ class CrashReports {
     this.container.innerHTML = this.reports.map(r => `
       <div class="crash-report-item" onclick="crashReports.open('${escapeHtml(r.filename)}')">
         <div class="crash-report-meta">
-          <span class="crash-report-time">${escapeHtml(r.timestamp || 'Unknown')}</span>
+          <span class="crash-report-time">${escapeHtml(r.timestamp || I18N.t('common.unknown'))}</span>
           <span class="crash-report-module">${escapeHtml(r.module || 'unknown')}</span>
         </div>
         <div class="crash-report-type">${escapeHtml(r.exception_type || 'Exception')}</div>
@@ -500,7 +500,7 @@ class CrashReports {
   }
 
   _renderDetail(data) {
-    const ts = escapeHtml(data.timestamp || 'Unknown');
+    const ts = escapeHtml(data.timestamp || I18N.t('common.unknown'));
     const mod = escapeHtml(data.module || 'unknown');
     const excType = escapeHtml(data.exception_type || 'Exception');
     const excMsg = escapeHtml(data.exception_message || '');
@@ -560,7 +560,7 @@ async function loadHealth() {
     pill.className = 'online';
   } catch (e) {
     const pill = document.getElementById('status-pill');
-    pill.textContent = 'Offline';
+    pill.textContent = I18N.t('common.offline');
     pill.className = 'offline';
     log('API unreachable: ' + e.message, 'err');
   }
@@ -617,24 +617,24 @@ async function loadStatus() {
     el.innerHTML =
       '<div class="status-grid">' +
         '<div class="status-card">' +
-          '<span class="status-card__label">Server</span>' +
+          '<span class="status-card__label">' + I18N.t('status.server') + '</span>' +
           '<span class="status-card__value">' + escapeHtml(data.server) + '</span>' +
         '</div>' +
         '<div class="status-card">' +
-          '<span class="status-card__label">Plugins Active</span>' +
+          '<span class="status-card__label">' + I18N.t('status.pluginsActive') + '</span>' +
           '<span class="status-card__value">' + data.plugins_active + ' / ' + data.plugins_total + '</span>' +
         '</div>' +
         '<div class="status-card">' +
-          '<span class="status-card__label">Configuration</span>' +
-          '<span class="status-card__value' + (data.config_loaded ? ' success' : ' danger') + '">' + (data.config_loaded ? 'Loaded' : 'Not loaded') + '</span>' +
+          '<span class="status-card__label">' + I18N.t('status.configuration') + '</span>' +
+          '<span class="status-card__value' + (data.config_loaded ? ' success' : ' danger') + '">' + (data.config_loaded ? I18N.t('status.loaded') : I18N.t('status.notLoaded')) + '</span>' +
         '</div>' +
         '<div class="status-card">' +
-          '<span class="status-card__label">Uptime</span>' +
+          '<span class="status-card__label">' + I18N.t('status.uptime') + '</span>' +
           '<span class="status-card__value" id="uptime-value">' + formatUptime(data.uptime_seconds) + '</span>' +
         '</div>' +
         '<div class="status-card">' +
-          '<span class="status-card__label">TikTok Stream</span>' +
-          '<span class="status-card__value" id="tiktok-status-value">Checking...</span>' +
+          '<span class="status-card__label">' + I18N.t('status.tiktokStream') + '</span>' +
+          '<span class="status-card__value" id="tiktok-status-value">' + I18N.t('status.checking') + '</span>' +
         '</div>' +
       '</div>';
 
@@ -649,7 +649,7 @@ async function loadStatus() {
     _updateTiktokStatusDisplay();
   } catch (e) {
     const el = document.getElementById('system-info');
-    if (el) el.innerHTML = '<span class="log-err">Failed to load status: ' + escapeHtml(e.message) + '</span>';
+    if (el) el.innerHTML = '<span class="log-err">' + I18N.t('status.failedLoad', { msg: escapeHtml(e.message) }) + '</span>';
   }
 }
 
@@ -717,9 +717,9 @@ function _updateTiktokStatusDisplay() {
   const tiktok = currentConfig.tiktok || {};
   const hasUser = tiktok.user && tiktok.user !== 'your_tiktok_username';
   if (!hasUser) {
-    el.textContent = 'Not configured';
+    el.textContent = I18N.t('status.notConfigured');
     el.className = 'status-card__value danger';
-    pill.textContent = 'No User';
+    pill.textContent = I18N.t('status.noUser');
     pill.className = 'tiktok-status offline';
     return;
   }
@@ -730,28 +730,28 @@ function _updateTiktokStatusDisplay() {
     // connection. Never active when an explicit "not live" was received.
     || (_tiktokLiveState === null && _lastTiktokEventTime && (now - _lastTiktokEventTime < 60000));
   if (isLive) {
-    el.textContent = 'Connected';
+    el.textContent = I18N.t('status.connected');
     el.className = 'status-card__value success';
-    pill.textContent = 'Live';
+    pill.textContent = I18N.t('status.live');
     pill.className = 'tiktok-status online';
   } else if (_tiktokLiveState === false) {
-    el.textContent = 'Configured';
+    el.textContent = I18N.t('status.configured');
     el.className = 'status-card__value';
-    pill.textContent = 'Not Live';
+    pill.textContent = I18N.t('status.notLive');
     pill.className = 'tiktok-status offline';
   } else {
-    el.textContent = 'Checking...';
+    el.textContent = I18N.t('status.checking');
     el.className = 'status-card__value';
-    pill.textContent = 'Checking';
+    pill.textContent = I18N.t('status.checkingPill');
     pill.className = 'tiktok-status connecting';
   }
   eventTester._updateTiktokStateUI();
 }
 
 function getPluginStatus(p) {
-  if (p.error) return { label: 'Error', cls: 'status-error' };
-  if (!p.enabled) return { label: 'Disabled', cls: 'status-disabled' };
-  return { label: 'Enabled', cls: 'status-enabled' };
+  if (p.error) return { label: I18N.t('common.error'), cls: 'status-error' };
+  if (!p.enabled) return { label: I18N.t('plugins.disabled'), cls: 'status-disabled' };
+  return { label: I18N.t('plugins.enabled'), cls: 'status-enabled' };
 }
 
 async function loadPlugins() {
@@ -792,7 +792,7 @@ async function loadServerManager() {
     log('Server Manager load failed: ' + e.message, 'err');
     ['server-instances', 'server-versions-list'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.innerHTML = '<p class="text-muted">Failed to load server data.</p>';
+      if (el) el.innerHTML = '<p class="text-muted">' + I18N.t('servers.failedLoad') + '</p>';
     });
   }
 }
@@ -807,8 +807,7 @@ async function loadJavaStatus() {
     const el = document.getElementById('java-status-banner');
     if (el) {
       el.classList.remove('hidden');
-      el.innerHTML = '<div class="server-card-warning"><strong>Java check failed</strong> — could not query the Java status: ' +
-        escapeHtml(e.message) + '</div>';
+      el.innerHTML = I18N.t('servers.javaCheckFailed', { msg: escapeHtml(e.message) });
     }
   }
 }
@@ -968,14 +967,14 @@ function renderServerManager() {
   if (!instancesEl || !versionsList) return;
 
   if (!_serverManagerCache) {
-    instancesEl.innerHTML = '<div class="text-muted server-loading">Loading server instances...</div>';
-    versionsList.innerHTML = '<p class="text-muted">Loading versions...</p>';
+    instancesEl.innerHTML = '<div class="text-muted server-loading">' + I18N.t('servers.loadingInstances') + '</div>';
+    versionsList.innerHTML = '<p class="text-muted">' + I18N.t('servers.loadingVersions') + '</p>';
     return;
   }
 
   const instances = _serverManagerCache.instances || [];
   if (!instances.length) {
-    instancesEl.innerHTML = '<div class="text-muted server-loading">No server instances configured. Add one to get started.</div>';
+    instancesEl.innerHTML = '<div class="text-muted server-loading">' + I18N.t('servers.noInstances') + '</div>';
   } else {
     instancesEl.innerHTML = instances.map(inst => renderServerCard(inst)).join('');
   }
@@ -986,19 +985,15 @@ function renderServerManager() {
 function renderServerCard(inst) {
   const notInstalled = !inst.hasJar;
   const state = notInstalled ? 'not-installed' : (inst.status || 'stopped');
-  const stateLabel = notInstalled ? 'Not installed' : state.charAt(0).toUpperCase() + state.slice(1);
+  const stateLabel = notInstalled ? I18N.t('servers.notInstalled') : state.charAt(0).toUpperCase() + state.slice(1);
   const dotClass = 'server-status-dot--' + state;
   const instId = escapeHtml(inst.id);
-  const versionDisplay = notInstalled ? 'Not installed' : escapeHtml(inst.version);
+  const versionDisplay = notInstalled ? I18N.t('servers.notInstalled') : escapeHtml(inst.version);
   const versionBadge = notInstalled
-    ? '<span class="server-status-badge server-status-badge--missing">MISSING</span>'
+    ? '<span class="server-status-badge server-status-badge--missing">' + I18N.t('servers.missing') + '</span>'
     : `<span class="server-status-badge ${_versionBadgeClass(inst.version)}">${_versionBadgeLabel(inst.version)}</span>`;
   const notInstalledBanner = notInstalled
-    ? `<div class="server-card-warning">
-         <strong>server.jar missing</strong> — this instance has no server.jar in its folder.
-         Download a version (<strong>Download Version</strong>), add a custom jar (<strong>Add Custom Version</strong>),
-         or <strong>Switch Version</strong> to make it runnable.
-       </div>`
+    ? '<div class="server-card-warning">' + I18N.t('servers.jarMissing') + '</div>'
     : '';
   return `<div class="server-card" data-instance-id="${instId}" ${notInstalled ? 'data-instance-not-installed="1"' : ''}>
     <div class="server-card-top">
@@ -1057,7 +1052,7 @@ function renderVersionLibrary(versionsList) {
   if (countEl) countEl.textContent = versions.length + ' version' + (versions.length !== 1 ? 's' : '');
 
   if (!versions.length) {
-    versionsList.innerHTML = '<p class="text-muted">No versions installed yet. Use <strong>Download</strong> or <strong>Add Custom</strong> to install one.</p>';
+    versionsList.innerHTML = '<p class="text-muted">' + I18N.t('servers.noVersions') + '</p>';
     return;
   }
 
@@ -1096,11 +1091,11 @@ function _versionBadgeClass(version) {
 }
 
 function _versionBadgeLabel(version) {
-  if (!_serverManagerCache) return 'UNSAFE';
+  if (!_serverManagerCache) return I18N.t('servers.unsafe');
   const found = (_serverManagerCache.installed || []).find(v => v.version === version);
   if (!found) {
-    if ((_serverManagerCache.safe_versions || []).includes(version)) return 'SAFE';
-    return 'UNSAFE';
+    if ((_serverManagerCache.safe_versions || []).includes(version)) return I18N.t('servers.safe');
+    return I18N.t('servers.unsafe');
   }
   return found.type.toUpperCase();
 }
@@ -1216,7 +1211,13 @@ async function updateServerLifecycleUI() {
 async function serverCardAction(instanceId, action) {
   if (_serverActionInProgress) return;
   if (action === 'restart') {
-    const confirmed = await showConfirmDialog('Restart ' + instanceId + '?', 'This will kick all players on this server. Are you sure?', 'Restart', 'btn-danger', 'text-danger');
+    const confirmed = await showConfirmDialog(
+      I18N.t('servers.restartTitle', { instance: instanceId }),
+      I18N.t('servers.restartConfirm'),
+      I18N.t('common.restart'),
+      'btn-danger',
+      'text-danger'
+    );
     if (!confirmed) return;
   }
   _serverActionInProgress = true;
@@ -1240,7 +1241,7 @@ async function openServerFolder(instanceId) {
   try {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST', headers: _withApiKey({}) });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to open folder');
+    if (!res.ok) throw new Error(data.detail || I18N.t('servers.openFolderFailedTitle'));
     if (!data.opened) showToast(I18N.t('servers.folderPath', { path: data.path }), 'info');
   } catch (e) {
     showToast(I18N.t('servers.openFolderFailed', { msg: e.message }), 'error');
@@ -1259,7 +1260,7 @@ async function deleteServerInstance(instanceId) {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId), { method: 'DELETE', headers: _withApiKey({}) });
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.detail || 'Failed to delete');
+      throw new Error(data.detail || I18N.t('servers.deleteFailedTitle'));
     }
     showToast(I18N.t('servers.deleted', { name }), 'success');
     await loadServerManager();
@@ -1286,7 +1287,7 @@ async function openServerCreateModal() {
 
   const installed = _serverManagerCache?.installed || [];
   if (!installed.length) {
-    versionSelect.innerHTML = '<option value="">No installed versions — download one first</option>';
+    versionSelect.innerHTML = '<option value="">' + I18N.t('servers.noInstalledVersions') + '</option>';
   } else {
     versionSelect.innerHTML = installed.map(v =>
       `<option value="${escapeHtml(v.version)}">${escapeHtml(v.version)} (${v.type.toUpperCase()})</option>`
@@ -1328,9 +1329,9 @@ function validateServerCreateForm() {
 
   let error = '';
   if (name && instances.some(i => i.name.toLowerCase() === name.toLowerCase())) {
-    error = I18N.t('servers.createFailed', { msg: 'A server with this name already exists.' });
+    error = I18N.t('servers.createFailed', { msg: I18N.t('servers.nameExists') });
   } else if (!isNaN(port) && instances.some(i => i.port === port)) {
-    error = I18N.t('servers.createFailed', { msg: 'Port ' + port + ' is already in use by another server.' });
+    error = I18N.t('servers.createFailed', { msg: I18N.t('servers.portInUse', { port }) });
   }
 
   if (errorEl) {
@@ -1350,7 +1351,7 @@ async function openServerDownloadModal() {
   const errorEl = document.getElementById('server-download-error');
   if (!modal || !select) return;
 
-  select.innerHTML = '<option value="">Loading versions...</option>';
+  select.innerHTML = '<option value="">' + I18N.t('servers.loadingVersions') + '</option>';
   confirmBtn.disabled = true;
   errorEl.classList.add('hidden');
   modal.classList.remove('hidden');
@@ -1360,13 +1361,13 @@ async function openServerDownloadModal() {
     _serverDownloadVersions = data.versions || [];
     const safeSet = new Set(data.safe_versions || ['1.21.11']);
     select.innerHTML = _serverDownloadVersions.map(v => {
-      const label = v.version + (safeSet.has(v.version) ? ' (SAFE)' : ' (untested)');
+      const label = v.version + (safeSet.has(v.version) ? I18N.t('servers.safeTag') : I18N.t('servers.untestedTag'));
       return `<option value="${escapeHtml(v.version)}">${escapeHtml(label)}</option>`;
     }).join('');
     confirmBtn.disabled = false;
   } catch (e) {
-    select.innerHTML = '<option value="">Failed to load versions</option>';
-    errorEl.textContent = 'Could not fetch PaperMC versions: ' + e.message;
+    select.innerHTML = '<option value="">' + I18N.t('servers.loadVersionsFailed') + '</option>';
+    errorEl.textContent = I18N.t('servers.paperVersionsFailed', { msg: e.message });
     errorEl.classList.remove('hidden');
   }
 }
@@ -1387,7 +1388,7 @@ function openServerSwitchModal() {
   const currentVersion = _serverManagerCache?.current_version;
 
   if (!installed.length) {
-    list.innerHTML = '<p class="text-muted">No versions installed. <a href="#" onclick="closeServerSwitchModal();openServerDownloadModal();return false;">Download one first</a>.</p>';
+    list.innerHTML = '<p class="text-muted">' + I18N.t('servers.downloadOneFirst') + '</p>';
   } else {
     let html = '';
     for (const v of installed) {
@@ -1559,7 +1560,7 @@ async function loadRevenueView() {
     log('Revenue load failed: ' + e.message, 'err');
     const chart = document.getElementById('revenue-chart');
     const wrap = document.getElementById('revenue-table-wrap');
-    if (chart) chart.innerHTML = '<p class="text-muted">Failed to load revenue data.</p>';
+    if (chart) chart.innerHTML = '<p class="text-muted">' + I18N.t('revenue.failedLoad') + '</p>';
     if (wrap) wrap.innerHTML = '';
   }
 }
@@ -1669,24 +1670,24 @@ function renderRevenueSummary(entries) {
   if (!el) return;
   const stats = computeRevenueStats(entries);
   const cards = [
-    { label: 'Total (filtered)', value: formatCurrency(stats.totalUsd) },
-    { label: 'Days with revenue', value: String(stats.count) },
-    { label: 'Average / day', value: formatCurrency(stats.averageUsd) },
+    { label: I18N.t('revenue.totalFiltered'), value: formatCurrency(stats.totalUsd) },
+    { label: I18N.t('revenue.daysWithRevenue'), value: String(stats.count) },
+    { label: I18N.t('revenue.averagePerDay'), value: formatCurrency(stats.averageUsd) },
     {
-      label: 'Best day',
+      label: I18N.t('revenue.bestDay'),
       value: stats.best
         ? formatCurrency(stats.best.value) + ' <span class="text-muted">' + escapeHtml(stats.best.date) + '</span>'
         : '—',
     },
     {
-      label: 'Worst day',
+      label: I18N.t('revenue.worstDay'),
       value: stats.worst
         ? formatCurrency(stats.worst.value) + ' <span class="text-muted">' + escapeHtml(stats.worst.date) + '</span>'
         : '—',
     },
-    { label: 'Last 7 days', value: formatCurrency(stats.last7Usd) },
+    { label: I18N.t('revenue.last7Days'), value: formatCurrency(stats.last7Usd) },
     {
-      label: 'Last 7 vs prev 7',
+      label: I18N.t('revenue.last7VsPrev7'),
       value: formatCurrencyDelta(stats.delta7Usd),
       delta: stats.delta7Usd,
     },
@@ -1703,7 +1704,7 @@ function renderRevenueChart(entries) {
   const el = document.getElementById('revenue-chart');
   if (!el) return;
   if (!entries.length) {
-    el.innerHTML = '<p class="text-muted">No revenue data available yet.</p>';
+    el.innerHTML = '<p class="text-muted">' + I18N.t('revenue.noData') + '</p>';
     return;
   }
   const max = Math.max(...entries.map(e => e.estimated_revenue_usd), 0.01);
@@ -1722,7 +1723,7 @@ function renderRevenueTable(entries) {
   const wrap = document.getElementById('revenue-table-wrap');
   if (!wrap) return;
   if (!entries.length) {
-    wrap.innerHTML = '<p class="text-muted">No revenue data available yet.</p>';
+    wrap.innerHTML = '<p class="text-muted">' + I18N.t('revenue.noData') + '</p>';
     return;
   }
   let html = '<table class="plugin-table"><thead><tr><th>Date</th><th>Revenue</th><th>Change</th></tr></thead><tbody>';
@@ -1758,7 +1759,7 @@ function renderPluginManager() {
   const tableDiv = document.getElementById('plugin-manager-table');
   if (!tableDiv) return;
   if (!currentPlugins.length) {
-    tableDiv.innerHTML = '<p class="muted">No plugins found.</p>';
+    tableDiv.innerHTML = '<p class="muted">' + I18N.t('plugins.noPlugins') + '</p>';
     return;
   }
   let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>Port</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
@@ -1768,8 +1769,8 @@ function renderPluginManager() {
     const errorTitle = hasError ? ` title="${escapeHtml(p.error)}"` : '';
     const enableDisabled = hasError ? ' disabled' : '';
     const action = p.enabled
-      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">Disable</button>`
-      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Enable</button>`;
+      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.disable')}</button>`
+      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.enable')}</button>`;
     const editDisabled = hasError ? ' disabled' : '';
     html += `<tr${errorTitle}>
       <td data-label="Name">${escapeHtml(p.display_name || p.name)}${hasError ? ' <span class="status-error-indicator" title="' + escapeHtml(p.error) + '">⚠️</span>' : ''}</td>
@@ -1801,9 +1802,9 @@ function closeInlinePluginConfig() {
 
 function copyUrl(btn, url) {
   navigator.clipboard.writeText(url).then(() => {
-    btn.textContent = 'Copied';
+    btn.textContent = I18N.t('common.copied');
     btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    setTimeout(() => { btn.textContent = I18N.t('common.copy'); btn.classList.remove('copied'); }, 1500);
   });
 }
 
@@ -1816,14 +1817,14 @@ function isBuiltinPlugin(name) {
 
 async function promptEnablePlugin(name, displayName) {
   const isBuiltin = isBuiltinPlugin(name);
-  let message = `Do you want to enable "${displayName || name}"?`;
+  let message = I18N.t('plugins.enableConfirm', { name: displayName || name });
   if (!isBuiltin) {
-    message = `WARNING: This plugin is from an external source and could potentially be harmful. Only enable it if you trust the developer.`;
+    message = I18N.t('plugins.enableExternalWarning');
   }
   const confirmed = await showConfirmDialog(
-    'Enable Plugin',
+    I18N.t('plugins.enableTitle'),
     message,
-    'Enable',
+    I18N.t('common.enable'),
     isBuiltin ? 'btn-primary' : 'btn-danger',
     isBuiltin ? '' : 'text-danger'
   );
@@ -1881,9 +1882,9 @@ async function restartPlugin(name, displayName) {
 /* ─── Hook Management ─── */
 
 function getHookStatus(h) {
-  if (h.error) return { label: 'Error', cls: 'status-error' };
-  if (!h.enabled) return { label: 'Disabled', cls: 'status-disabled' };
-  return { label: 'Enabled', cls: 'status-enabled' };
+  if (h.error) return { label: I18N.t('common.error'), cls: 'status-error' };
+  if (!h.enabled) return { label: I18N.t('common.disabled'), cls: 'status-disabled' };
+  return { label: I18N.t('common.enabled'), cls: 'status-enabled' };
 }
 
 async function loadHooks() {
@@ -1910,7 +1911,7 @@ function renderHookManager() {
   const tableDiv = document.getElementById('hook-manager-table');
   if (!tableDiv) return;
   if (!currentHooks.length) {
-    tableDiv.innerHTML = '<p class="muted">No hooks found.</p>';
+    tableDiv.innerHTML = '<p class="muted">' + I18N.t('hooks.noHooks') + '</p>';
     return;
   }
   let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>Plugin</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
@@ -1920,8 +1921,8 @@ function renderHookManager() {
     const errorTitle = hasError ? ` title="${escapeHtml(h.error)}"` : '';
     const enableDisabled = hasError || h.enabled ? ' disabled' : '';
     const action = h.enabled
-      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisableHook('${h.name}', '${escapeHtml(h.display_name || h.name)}')">Disable</button>`
-      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnableHook('${h.name}', '${escapeHtml(h.display_name || h.name)}')">Enable</button>`;
+      ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisableHook('${h.name}', '${escapeHtml(h.display_name || h.name)}')">${I18N.t('common.disable')}</button>`
+      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnableHook('${h.name}', '${escapeHtml(h.display_name || h.name)}')">${I18N.t('common.enable')}</button>`;
     const editDisabled = hasError ? ' disabled' : '';
     const canEdit = h.config_schema;
     html += `<tr${errorTitle}>
@@ -2024,7 +2025,7 @@ class HookConfigEditor {
       this.hasSchema = !!(this.schema && this.schema.fields && this.schema.fields.length);
     } catch (e) {
       log('Failed to load hook config: ' + e.message, 'err');
-      this.showToast('Failed to load config: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.loadFailed', { msg: e.message }), 'error');
       throw e;
     }
   }
@@ -2095,7 +2096,7 @@ class HookConfigEditor {
 
   closeInline() {
     if (this.isDirty()) {
-      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Go back anyway?', 'Go Back', 'btn-danger').then(confirmed => {
+      showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedGoBack'), I18N.t('common.goBack'), 'btn-danger').then(confirmed => {
         if (!confirmed) return;
         this._detachInputListeners();
         this.config = JSON.parse(JSON.stringify(this.original));
@@ -2141,7 +2142,7 @@ class HookConfigEditor {
 
     const onInput = () => {
       const btn = document.getElementById('advanced-confirm-ok');
-      if (btn) btn.disabled = input.value.trim() !== 'I understand the risks';
+      if (btn) btn.disabled = input.value.trim() !== I18N.t('dialog.advancedPhrase');
     };
     input.addEventListener('input', onInput);
 
@@ -2151,7 +2152,7 @@ class HookConfigEditor {
     };
 
     const handleOk = () => {
-      if (input.value.trim() !== 'I understand the risks') return;
+      if (input.value.trim() !== I18N.t('dialog.advancedPhrase')) return;
       cleanup();
       this._advancedMode = true;
       localStorage.setItem('hook_config_advanced_mode', 'true');
@@ -2171,7 +2172,7 @@ class HookConfigEditor {
       btn.textContent = 'Advanced \u2713';
       btn.classList.add('active');
     } else {
-      btn.textContent = 'Advanced';
+      btn.textContent = I18N.t('common.advanced');
       btn.classList.remove('active');
     }
   }
@@ -2371,11 +2372,11 @@ class HookConfigEditor {
 
   buildRawEditor() {
     return `<div class="section-card" id="section_raw">
-      <div class="section-header"><h3>Raw Configuration</h3></div>
+      <div class="section-header"><h3>${I18N.t('hooks.rawConfig')}</h3></div>
       <div class="section-body">
-        <p class="field-desc">This hook does not provide a configuration schema. You can edit the raw JSON below. Invalid JSON will be rejected on save.</p>
+        <p class="field-desc">${I18N.t('hooks.noSchema')}</p>
         <textarea id="hook-raw-json" rows="20" style="font-family:monospace;width:100%;" onchange="hookEditor.parseRawJson()">${escapeHtml(JSON.stringify(this.config, null, 2))}</textarea>
-        <p class="field-desc">Be careful — malformed JSON may break the hook.</p>
+        <p class="field-desc">${I18N.t('hooks.noSchemaCareful')}</p>
       </div>
     </div>`;
   }
@@ -2500,7 +2501,7 @@ class HookConfigEditor {
     this.errors.clear();
     if (!this.hasSchema) {
       try { JSON.stringify(this.config); return true; }
-      catch (e) { this.showToast('Invalid configuration: ' + e.message, 'error'); return false; }
+      catch (e) { this.showToast(I18N.t('hooks.invalidJson'), 'error'); return false; }
     }
     let ok = true;
     for (const field of (this.schema.fields || [])) {
@@ -2702,9 +2703,9 @@ const hookEditor = new HookConfigEditor();
 
 async function promptShutdown() {
   const confirmed = await showConfirmDialog(
-    'Shutdown Application',
-    'Are you sure you want to shut down the application?\nAll running programs and plugins will be stopped.',
-    'Shutdown',
+    I18N.t('dialog.shutdownTitle'),
+    I18N.t('dialog.shutdownMessage'),
+    I18N.t('dialog.shutdown'),
     'btn-danger'
   );
   if (!confirmed) return;
@@ -2735,12 +2736,12 @@ async function loadConfig() {
     const tiktok = currentConfig.tiktok || {};
     const rcon = currentConfig.rcon || {};
     el.innerHTML = `
-      <div class="field-row"><span>TikTok User</span><span>${escapeHtml(tiktok.user || '—')}</span></div>
-      <div class="field-row"><span>Server Host</span><span>${escapeHtml(currentConfig.server_host || '—')}</span></div>
-      <div class="field-row"><span>RCON Enabled</span><span>${rcon.enabled ? 'Yes' : 'No'}</span></div>
-      <div class="field-row"><span>Control Method</span><span>${escapeHtml(currentConfig.control_method || '—')}</span></div>`;
+      <div class="field-row"><span>${I18N.t('wizard.tiktokUserLabel')}</span><span>${escapeHtml(tiktok.user || '—')}</span></div>
+      <div class="field-row"><span>${I18N.t('config.serverHost')}</span><span>${escapeHtml(currentConfig.server_host || '—')}</span></div>
+      <div class="field-row"><span>${I18N.t('config.rconEnabled')}</span><span>${rcon.enabled ? I18N.t('common.yes') : I18N.t('common.no')}</span></div>
+      <div class="field-row"><span>${I18N.t('config.controlMethod')}</span><span>${escapeHtml(currentConfig.control_method || '—')}</span></div>`;
   } catch (e) {
-    el.textContent = 'Failed to load configuration.';
+    el.textContent = I18N.t('editor.loadFailedGeneric');
     log('Config load failed: ' + e.message, 'err');
   }
 }
@@ -2775,11 +2776,11 @@ let _restartPending = false;
 function showRestartDialog(title, message) {
   const card = document.querySelector('#restart-dialog .wizard-card');
   card.innerHTML = `
-    <h2 style="border:none;padding:0;">${escapeHtml(title || 'Restart Required')}</h2>
-    <p class="muted" style="margin-bottom:1.5rem;">${escapeHtml(message || 'Your settings have been saved. The tool must be restarted for changes to take effect.')}</p>
+    <h2 style="border:none;padding:0;">${escapeHtml(title || I18N.t('wizard.restartRequired'))}</h2>
+    <p class="muted" style="margin-bottom:1.5rem;">${escapeHtml(message || I18N.t('wizard.restartMessage'))}</p>
     <div style="display:flex;gap:1rem;justify-content:center;">
-      <button class="btn btn-primary" id="btn-restart-now">Restart Now</button>
-      <button class="btn btn-secondary" id="btn-restart-later">Later</button>
+      <button class="btn btn-primary" id="btn-restart-now">${I18N.t('restart.now')}</button>
+      <button class="btn btn-secondary" id="btn-restart-later">${I18N.t('restart.later')}</button>
     </div>
   `;
   // Re-attach listeners since we replaced the innerHTML
@@ -2811,37 +2812,37 @@ function renderWizardStep() {
   steps.innerHTML = [0, 1, 2].map(i => `<div class="step-dot ${i === wizardStep ? 'active' : i < wizardStep ? 'done' : ''}"></div>`).join('');
   backBtn.disabled = wizardStep === 0;
   backBtn.style.visibility = wizardStep === 0 ? 'hidden' : 'visible';
-  nextBtn.textContent = wizardStep === 2 ? 'Save' : 'Next';
+  nextBtn.textContent = wizardStep === 2 ? I18N.t('wizard.save') : I18N.t('wizard.next');
   if (wizardStep === 0) {
-    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Enter your TikTok username below.</p>
-      <div class="form-group"><label>TikTok Username (without @)</label>
-      <input type="text" id="w-tiktok-user" value="${escapeHtml(wizardData.tiktok_user)}" placeholder="your_tiktok_username">
-      <div class="inline-error" id="err-tiktok-user">Please enter a valid TikTok username.</div>
-      <div class="hint">The username you use when going live on TikTok.</div></div>`;
+    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">${I18N.t('wizard.step0Hint')}</p>
+      <div class="form-group"><label>${I18N.t('wizard.tiktokUser')}</label>
+      <input type="text" id="w-tiktok-user" value="${escapeHtml(wizardData.tiktok_user)}" placeholder="${I18N.t('wizard.tiktokUserPlaceholder')}">
+      <div class="inline-error" id="err-tiktok-user">${I18N.t('wizard.tiktokUserError')}</div>
+      <div class="hint">${I18N.t('wizard.tiktokUserHint')}</div></div>`;
   } else if (wizardStep === 1) {
-    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Set a password for the Minecraft RCON connection.</p>
-      <div class="form-group"><label>RCON Password <span style="color:var(--color-danger);">*</span></label>
-      <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="Password" oninput="updatePasswordMeter()">
-      <div class="inline-error" id="err-rcon-password">Please enter a password.</div>
+    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">${I18N.t('wizard.step1Hint')}</p>
+      <div class="form-group"><label>${I18N.t('wizard.rconPassword')} <span style="color:var(--color-danger);">*</span></label>
+      <input type="password" id="w-rcon-password" value="${escapeHtml(wizardData.rcon_password)}" placeholder="${I18N.t('wizard.passwordPlaceholder')}" oninput="updatePasswordMeter()">
+      <div class="inline-error" id="err-rcon-password">${I18N.t('wizard.passwordError')}</div>
       <div class="strength-meter"><div class="strength-segment"></div><div class="strength-segment"></div><div class="strength-segment"></div></div>
-      <div class="strength-label" id="strength-label">Enter a password to see strength</div>
-      <div class="hint">Choose any password you prefer. Strength meter is for guidance only.</div></div>`;
+      <div class="strength-label" id="strength-label">${I18N.t('wizard.strengthEnter')}</div>
+      <div class="hint">${I18N.t('wizard.strengthHint')}</div></div>`;
     setTimeout(updatePasswordMeter, 0);
   } else {
-    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">Review your settings before saving.</p>
+    content.innerHTML = `<p class="muted" style="margin-bottom:1.5rem;">${I18N.t('wizard.step2Hint')}</p>
       <div style="background:var(--input-bg);padding:1rem;border-radius:8px;margin-bottom:1rem;">
-      <div class="field-row"><span>TikTok User</span><span>${escapeHtml(wizardData.tiktok_user || '—')}</span></div>
-      <div class="field-row"><span>RCON Password</span><span>${wizardData.rcon_password ? '********' : 'Not set'}</span></div></div>
-      <p class="muted" style="font-size:0.85rem;margin:0;">Plugins are disabled by default. You can enable them later from the dashboard.</p>`;
+      <div class="field-row"><span>${I18N.t('wizard.tiktokUserLabel')}</span><span>${escapeHtml(wizardData.tiktok_user || '—')}</span></div>
+      <div class="field-row"><span>${I18N.t('wizard.rconPasswordLabel')}</span><span>${wizardData.rcon_password ? '********' : I18N.t('common.notSet')}</span></div></div>
+      <p class="muted" style="font-size:0.85rem;margin:0;">${I18N.t('wizard.pluginsDisabledHint')}</p>`;
   }
 }
 function validatePassword(pass) {
   const issues = [];
-  if (pass.length < 8) issues.push('At least 8 characters');
-  if (!/[A-Z]/.test(pass)) issues.push('One uppercase letter (A-Z)');
-  if (!/[a-z]/.test(pass)) issues.push('One lowercase letter (a-z)');
-  if (!/[0-9]/.test(pass)) issues.push('One number (0-9)');
-  if (!/[^A-Za-z0-9]/.test(pass)) issues.push('One special character (!@#$ etc.)');
+  if (pass.length < 8) issues.push(I18N.t('pass.minLength'));
+  if (!/[A-Z]/.test(pass)) issues.push(I18N.t('pass.upper'));
+  if (!/[a-z]/.test(pass)) issues.push(I18N.t('pass.lower'));
+  if (!/[0-9]/.test(pass)) issues.push(I18N.t('pass.number'));
+  if (!/[^A-Za-z0-9]/.test(pass)) issues.push(I18N.t('pass.special'));
   return issues;
 }
 function getPasswordStrength(pass) {
@@ -2863,10 +2864,10 @@ function updatePasswordMeter() {
   const label = document.getElementById('strength-label');
   segments.forEach(s => s.className = 'strength-segment');
   if (pass.length > 0) {
-    if (strength === 'weak') { segments[0].classList.add('weak'); label.textContent = 'Weak'; label.style.color = 'var(--danger)'; }
-    else if (strength === 'medium') { segments[0].classList.add('medium'); segments[1].classList.add('medium'); label.textContent = 'Medium'; label.style.color = 'var(--warning)'; }
-    else { segments.forEach(s => s.classList.add('strong')); label.textContent = 'Strong'; label.style.color = 'var(--success)'; }
-  } else { label.textContent = 'Enter a password to see strength'; label.style.color = 'var(--text-secondary)'; }
+    if (strength === 'weak') { segments[0].classList.add('weak'); label.textContent = I18N.t('wizard.weak'); label.style.color = 'var(--danger)'; }
+    else if (strength === 'medium') { segments[0].classList.add('medium'); segments[1].classList.add('medium'); label.textContent = I18N.t('wizard.medium'); label.style.color = 'var(--warning)'; }
+    else { segments.forEach(s => s.classList.add('strong')); label.textContent = I18N.t('wizard.strong'); label.style.color = 'var(--success)'; }
+  } else { label.textContent = I18N.t('wizard.strengthEnter'); label.style.color = 'var(--text-secondary)'; }
 }
 async function wizardNext() {
   document.querySelectorAll('.inline-error').forEach(el => el.classList.remove('visible'));
@@ -2898,7 +2899,7 @@ async function wizardNext() {
 async function wizardSave() {
   const nextBtn = document.getElementById('wizard-next');
   nextBtn.disabled = true;
-  nextBtn.textContent = 'Saving...';
+  nextBtn.textContent = I18N.t('wizard.saving');
   try {
     const cfgData = await fetchJSON('/config');
     const cfg = cfgData.config || {};
@@ -2921,7 +2922,7 @@ async function wizardSave() {
   } catch (e) {
     log('Failed to save setup: ' + e.message, 'err');
     showToast(I18N.t('wizard.saveFailed', { msg: e.message }), 'error');
-  } finally { nextBtn.disabled = false; nextBtn.textContent = 'Save'; }
+  } finally { nextBtn.disabled = false; nextBtn.textContent = I18N.t('wizard.save'); }
 }
 function _showRestartOverlay() {
   _stopDashboardPolling();
@@ -3288,7 +3289,7 @@ class ConfigEditor {
 
     const onInput = () => {
       const btn = document.getElementById('advanced-confirm-ok');
-      if (btn) btn.disabled = input.value.trim() !== 'I understand the risks';
+      if (btn) btn.disabled = input.value.trim() !== I18N.t('dialog.advancedPhrase');
     };
     input.addEventListener('input', onInput);
 
@@ -3298,7 +3299,7 @@ class ConfigEditor {
     };
 
     const handleOk = () => {
-      if (input.value.trim() !== 'I understand the risks') return;
+      if (input.value.trim() !== I18N.t('dialog.advancedPhrase')) return;
       cleanup();
       this._advancedMode = true;
       localStorage.setItem('config_advanced_mode', 'true');
@@ -3315,17 +3316,17 @@ class ConfigEditor {
     const btn = document.getElementById('config-advanced-btn');
     if (!btn) return;
     if (this._advancedMode) {
-      btn.textContent = 'Advanced ✓';
+      btn.textContent = I18N.t('common.advanced') + ' ✓';
       btn.classList.add('active');
     } else {
-      btn.textContent = 'Advanced';
+      btn.textContent = I18N.t('common.advanced');
       btn.classList.remove('active');
     }
   }
 
   close() {
     if (this.isDirty()) {
-      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
+      showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
         if (!confirmed) return;
         this._detachInputListeners();
         this._resetData();
@@ -3727,7 +3728,7 @@ class ConfigEditor {
     if (!commands.length) {
       return `<div class="editor-field full-width" data-path="${path}">
         <div class="field-label">Command Overrides</div>
-        <div class="field-widget"><p class="field-desc">No commands defined in this group yet. Add commands above to configure per-command overrides.</p></div>
+        <div class="field-widget"><p class="field-desc">${I18N.t('config.noCommandOverrides')}</p></div>
       </div>`;
     }
     let html = `<div class="editor-field full-width" data-path="${path}"><div class="field-label">Command Overrides</div><div class="field-widget">`;
@@ -4247,7 +4248,7 @@ class PluginConfigEditor {
       this.hasSchema = !!(this.schema && this.schema.fields && this.schema.fields.length);
     } catch (e) {
       log('Failed to load plugin config: ' + e.message, 'err');
-      this.showToast('Failed to load config: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.loadFailed', { msg: e.message }), 'error');
       throw e;
     }
   }
@@ -4349,7 +4350,7 @@ class PluginConfigEditor {
       return;
     }
     if (this.isDirty()) {
-      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
+      showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
         if (!confirmed) return;
         this._detachInputListeners();
         this.config = JSON.parse(JSON.stringify(this.original));
@@ -4366,7 +4367,7 @@ class PluginConfigEditor {
 
   closeInline() {
     if (this.isDirty()) {
-      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Go back anyway?', 'Go Back', 'btn-danger').then(confirmed => {
+      showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedGoBack'), I18N.t('common.goBack'), 'btn-danger').then(confirmed => {
         if (!confirmed) return;
         this._detachInputListeners();
         this.config = JSON.parse(JSON.stringify(this.original));
@@ -4412,7 +4413,7 @@ class PluginConfigEditor {
 
     const onInput = () => {
       const btn = document.getElementById('advanced-confirm-ok');
-      if (btn) btn.disabled = input.value.trim() !== 'I understand the risks';
+      if (btn) btn.disabled = input.value.trim() !== I18N.t('dialog.advancedPhrase');
     };
     input.addEventListener('input', onInput);
 
@@ -4422,7 +4423,7 @@ class PluginConfigEditor {
     };
 
     const handleOk = () => {
-      if (input.value.trim() !== 'I understand the risks') return;
+      if (input.value.trim() !== I18N.t('dialog.advancedPhrase')) return;
       cleanup();
       this._advancedMode = true;
       localStorage.setItem('plugin_config_advanced_mode', 'true');
@@ -4441,10 +4442,10 @@ class PluginConfigEditor {
     [inlineBtn, overlayBtn].forEach(btn => {
       if (!btn) return;
       if (this._advancedMode) {
-        btn.textContent = 'Advanced ✓';
+        btn.textContent = I18N.t('common.advanced') + ' ✓';
         btn.classList.add('active');
       } else {
-        btn.textContent = 'Advanced';
+        btn.textContent = I18N.t('common.advanced');
         btn.classList.remove('active');
       }
     });
@@ -4946,9 +4947,9 @@ class PluginConfigEditor {
       this._updateSaveButton();
       this.close();
       await loadPlugins();
-      this.showToast('Plugin configuration saved successfully.', 'success');
+      this.showToast(I18N.t('plugins.configSaved'), 'success');
     } catch (e) {
-      this.showToast('Save failed: ' + e.message, 'error');
+      this.showToast(I18N.t('editor.saveFailed', { msg: e.message }), 'error');
     }
   }
 
@@ -5158,7 +5159,7 @@ class ReactionEditor {
 
   close() {
     if (this._dirty) {
-      showConfirmDialog('Unsaved Changes', 'You have unsaved changes. Close anyway?', 'Close', 'btn-danger').then(confirmed => {
+      showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
         if (!confirmed) return;
         this._dirty = false;
         this._updateSaveButton();
@@ -5230,9 +5231,9 @@ class ReactionEditor {
     if (!el) return;
     const count = Object.keys(this.data).reduce((sum, k) => sum + (this.data[k]?.length || 0), 0);
     if (count === 0) {
-      el.innerHTML = '<span style="color:var(--text-secondary);">No reactions set up yet.</span>';
+      el.innerHTML = '<span style="color:var(--text-secondary);">' + I18N.t('reactions.noReactionsSet') + '</span>';
     } else {
-      el.innerHTML = `<span style="color:var(--success);">${count} reaction${count === 1 ? '' : 's'}</span> <span style="color:var(--text-secondary);">configured</span>`;
+      el.innerHTML = `<span style="color:var(--success);">${count === 1 ? I18N.t('reactions.reactionCount', { count }) : I18N.t('reactions.reactionsCount', { count })}</span> <span style="color:var(--text-secondary);">${I18N.t('reactions.configured')}</span>`;
     }
   }
 
@@ -5401,14 +5402,14 @@ class ReactionEditor {
     const isFilter = this.activeCategory !== 'all';
     if (isSearch || isFilter) {
       this.content.innerHTML = `<div class="reaction-empty">
-        <h3>No reactions found</h3>
-        <p>Try a different search term or category filter.</p>
+        <h3>${I18N.t('reactions.noResults')}</h3>
+        <p>${I18N.t('reactions.noResultsDesc')}</p>
       </div>`;
       return;
     }
     let html = `<div class="reaction-empty">
-      <h3>No reactions yet</h3>
-      <p>Reactions let you automatically control plugins when something happens. For example: "When I die in Minecraft, pause my Spotify music." Pick a template below or create your own.</p>
+      <h3>${I18N.t('reactions.noneYet')}</h3>
+      <p>${I18N.t('reactions.emptyDesc')}</p>
       <div class="reaction-templates">`;
     for (const t of this.templates) {
       const ev = this.eventCatalog[t.event] || { name: t.event, icon: '⚡' };
@@ -5541,7 +5542,7 @@ class ReactionEditor {
     this._updateSaveButton();
     this.renderSidebar();
     this.renderList();
-    showToast('Reaction deleted.', 'info');
+    showToast(I18N.t('reactions.deleted'), 'info');
   }
 
   /* ─── Wizard ─── */
@@ -5561,7 +5562,7 @@ class ReactionEditor {
     const backBtn = document.getElementById('reaction-wizard-back');
     const nextBtn = document.getElementById('reaction-wizard-next');
 
-    titleEl.textContent = this.wizardEditing ? 'Edit Reaction' : 'Create Reaction';
+    titleEl.textContent = this.wizardEditing ? I18N.t('reactions.wizardEdit') : I18N.t('reactions.wizardCreate');
     stepsEl.innerHTML = [0, 1, 2, 3].map(i => {
       let cls = '';
       if (i === this.wizardStep) cls = 'active';
@@ -5570,8 +5571,8 @@ class ReactionEditor {
     }).join('');
 
     backBtn.style.visibility = this.wizardStep === 0 ? 'hidden' : 'visible';
-    backBtn.textContent = 'Back';
-    nextBtn.textContent = this.wizardStep === 3 ? (this.wizardEditing ? 'Save Changes' : 'Create Reaction') : 'Next';
+    backBtn.textContent = I18N.t('wizard.back');
+    nextBtn.textContent = this.wizardStep === 3 ? (this.wizardEditing ? I18N.t('reactions.saveChanges') : I18N.t('reactions.wizardCreate')) : I18N.t('wizard.next');
     nextBtn.disabled = false;
 
     if (this.wizardStep === 0) {
@@ -5612,8 +5613,8 @@ class ReactionEditor {
     }
     for (const g of extraGroups.values()) groups.push(g);
 
-    let html = `<h3>Step 1: Choose what triggers the reaction</h3>
-    <p class="muted-desc">Pick the event that should cause something to happen. You can also type a custom event name for advanced use.</p>`;
+    let html = `<h3>${I18N.t('reactions.step1Title')}</h3>
+    <p class="muted-desc">${I18N.t('reactions.step1Desc')}</p>`;
 
     for (const g of Object.values(groups)) {
       if (!g.items.length) continue;
@@ -5633,8 +5634,8 @@ class ReactionEditor {
     // Custom event input
     const customVal = this.wizardDraft.event && !this.eventCatalog[this.wizardDraft.event] ? escapeHtml(this.wizardDraft.event) : '';
     html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
-      <strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">Advanced</strong>
-      <p class="muted-desc">Use a custom event name if you are integrating with external tools or custom plugins.</p>
+      <strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">${I18N.t('common.advanced')}</strong>
+      <p class="muted-desc">${I18N.t('reactions.customEventHint')}</p>
       <input type="text" id="custom-event-input" value="${customVal}" placeholder="custom.event.name" style="width:100%;padding:0.6rem 0.8rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.9rem;" oninput="reactionEditor.onCustomEventInput(this.value)" onchange="reactionEditor.selectEvent(this.value, true)">
     </div>`;
 
@@ -5642,8 +5643,8 @@ class ReactionEditor {
   }
 
   _renderStepPlugin() {
-    let html = `<h3>Step 2: Choose the plugin</h3>
-    <p class="muted-desc">Select the plugin that should run a command when <strong>${escapeHtml((this.eventCatalog[this.wizardDraft.event]?.name) || this.wizardDraft.event)}</strong> occurs.</p>`;
+    let html = `<h3>${I18N.t('reactions.step2Title')}</h3>
+    <p class="muted-desc">${I18N.t('reactions.step2Desc', { name: escapeHtml((this.eventCatalog[this.wizardDraft.event]?.name) || this.wizardDraft.event) })}</p>`;
 
     html += `<div class="plugin-grid">`;
     for (const [key, info] of Object.entries(this.pluginCatalog)) {
@@ -5660,12 +5661,12 @@ class ReactionEditor {
   }
 
   _renderStepCommand() {
-    let html = `<h3>Step 3: Choose the command</h3>
-    <p class="muted-desc">Select the command that should run on <strong>${escapeHtml((this.pluginCatalog[this.wizardDraft.plugin]?.name) || this.wizardDraft.plugin)}</strong>.</p>`;
+    let html = `<h3>${I18N.t('reactions.step3Title')}</h3>
+    <p class="muted-desc">${I18N.t('reactions.step3Desc', { name: escapeHtml((this.pluginCatalog[this.wizardDraft.plugin]?.name) || this.wizardDraft.plugin) })}</p>`;
 
     const commands = this.commandCatalog[this.wizardDraft.plugin] || {};
     if (!this.wizardDraft.plugin || Object.keys(commands).length === 0) {
-      html += `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);border:1px dashed var(--border);border-radius:8px;">No commands available for this plugin.</div>`;
+      html += `<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);border:1px dashed var(--border);border-radius:8px;">${I18N.t('reactions.noCommandsAvailable')}</div>`;
       return html;
     }
 
@@ -5766,17 +5767,17 @@ class ReactionEditor {
   wizardNext() {
     if (this.wizardStep === 0) {
       if (!this.wizardDraft.event) {
-        showToast('Please select an event first.', 'error');
+        showToast(I18N.t('reactions.selectEvent'), 'error');
         return;
       }
     } else if (this.wizardStep === 1) {
       if (!this.wizardDraft.plugin) {
-        showToast('Please select a plugin.', 'error');
+        showToast(I18N.t('reactions.selectPlugin'), 'error');
         return;
       }
     } else if (this.wizardStep === 2) {
       if (!this.wizardDraft.command) {
-        showToast('Please select a command.', 'error');
+        showToast(I18N.t('reactions.selectCommand'), 'error');
         return;
       }
     } else if (this.wizardStep === 3) {
@@ -5799,11 +5800,11 @@ class ReactionEditor {
         let v = parseFloat(el.value);
         if (isNaN(v)) v = spec.default !== undefined ? spec.default : 0;
         if (spec.min !== undefined && spec.min !== null && v < spec.min) {
-          showToast(`"${spec.label || key}" must be at least ${spec.min}.`, 'error');
+          showToast(I18N.t('reactions.minError', { label: spec.label || key, min: spec.min }), 'error');
           return false;
         }
         if (spec.max !== undefined && spec.max !== null && v > spec.max) {
-          showToast(`"${spec.label || key}" must be at most ${spec.max}.`, 'error');
+          showToast(I18N.t('reactions.maxError', { label: spec.label || key, max: spec.max }), 'error');
           return false;
         }
         this.wizardDraft.args[key] = v;
@@ -5817,7 +5818,7 @@ class ReactionEditor {
   _commitWizard() {
     const { event, plugin, command, args } = this.wizardDraft;
     if (!event || !plugin || !command) {
-      showToast('Incomplete reaction. Please fill all steps.', 'error');
+      showToast(I18N.t('reactions.incompleteSteps'), 'error');
       return;
     }
 
@@ -5892,8 +5893,8 @@ async function _handleCloseRequest() {
     return;
   }
   _closeInProgress = true;
-  document.getElementById('btn-unsaved-save-exit').textContent = 'Save and Exit';
-  document.getElementById('btn-unsaved-exit-no-save').textContent = 'Exit Without Saving';
+  document.getElementById('btn-unsaved-save-exit').textContent = I18N.t('dialog.saveExit');
+  document.getElementById('btn-unsaved-exit-no-save').textContent = I18N.t('dialog.exitNoSave');
   document.getElementById('unsaved-changes-modal').classList.remove('hidden');
 }
 
@@ -5939,7 +5940,7 @@ async function _saveAllEditors() {
   }
   if (pluginChanged) {
     await postJSON(`/plugins/${encodeURIComponent(pluginEditor.pluginName)}/restart`, {});
-    showToast('Changes applied and plugin restart requested.', 'success');
+    showToast(I18N.t('plugins.changesAppliedRestart'), 'success');
   }
 }
 
@@ -5977,7 +5978,7 @@ document.getElementById('btn-unsaved-save-exit').addEventListener('click', async
       window.close();
     }
   } catch (e) {
-    showToast('Save failed before exit: ' + e.message, 'error');
+    showToast(I18N.t('plugins.saveFailedExit', { msg: e.message }), 'error');
     _closeInProgress = false;
   }
 });
@@ -6009,7 +6010,7 @@ let _lastResultToastCode = null;
 async function checkAllUpdates() {
   const summary = document.getElementById('updates-summary');
   const detail = document.getElementById('updates-detail');
-  if (summary) summary.innerHTML = '<span class="text-muted">Checking for updates...</span>';
+  if (summary) summary.innerHTML = '<span class="text-muted">' + I18N.t('updates.checking') + '</span>';
   if (detail) detail.classList.add('hidden');
 
   try {
@@ -6023,12 +6024,12 @@ async function checkAllUpdates() {
     if (lastResult && lastResult.exit_code !== null && lastResult.ok === false) {
       if (_lastResultToastCode !== lastResult.exit_code) {
         _lastResultToastCode = lastResult.exit_code;
-        showToast('Last update failed: ' + (lastResult.message || 'exit code ' + lastResult.exit_code), 'error');
+        showToast(I18N.t('updates.lastFailedMsg', { msg: lastResult.message || I18N.t('updates.exitCode', { code: lastResult.exit_code }) }), 'error');
       }
     }
     _renderUpdateResults();
   } catch (e) {
-    if (summary) summary.innerHTML = '<span class="log-err">Update check failed.</span>';
+    if (summary) summary.innerHTML = '<span class="log-err">' + I18N.t('updates.checkFailed') + '</span>';
     log('Update check failed: ' + e.message, 'err');
   }
 }
@@ -6045,7 +6046,7 @@ function _renderUpdateResults() {
   const total = (toolAvail ? 1 : 0) + (pluginAvail ? plugins.updates_available : 0);
 
   let html = '<div class="update-actions">' +
-    '<button class="btn btn--primary" onclick="checkAllUpdates()">Check for Updates</button>' +
+    '<button class="btn btn--primary" onclick="checkAllUpdates()">' + I18N.t('updates.check') + '</button>' +
     '</div>';
 
   const lastResult = _updateData?.lastResult;
@@ -6053,8 +6054,8 @@ function _renderUpdateResults() {
     html +=
       '<div class="update-status update-status--err">' +
       '<span class="update-status__icon">✕</span>' +
-      '<div><span class="update-status__text">Last update failed</span>' +
-      '<span class="update-status__version">' + escapeHtml(lastResult.message || ('Exit code ' + lastResult.exit_code)) + '</span>' +
+      '<div><span class="update-status__text">' + I18N.t('updates.lastFailed') + '</span>' +
+      '<span class="update-status__version">' + escapeHtml(lastResult.message || I18N.t('updates.exitCode', { code: lastResult.exit_code })) + '</span>' +
       '</div></div>';
   }
 
@@ -6062,7 +6063,7 @@ function _renderUpdateResults() {
     html +=
       '<div class="update-status update-status--ok">' +
       '<span class="update-status__icon">✓</span>' +
-      '<div><span class="update-status__text">All up to date</span>' +
+      '<div><span class="update-status__text">' + I18N.t('updates.allUpToDate') + '</span>' +
       (tool ? '<span class="update-status__version">v' + tool.current_version + '</span>' : '') +
       '</div></div>';
     summary.innerHTML = html;
@@ -6073,10 +6074,10 @@ function _renderUpdateResults() {
   html +=
     '<div class="update-status update-status--avail">' +
     '<span class="update-status__icon">!</span>' +
-    '<div><span class="update-status__text">' + total + ' update(s) available</span>' +
+    '<div><span class="update-status__text">' + I18N.t('updates.available', { count: total }) + '</span>' +
     (tool ? '<span class="update-status__version">v' + tool.current_version + '</span>' : '') +
     '</div></div>' +
-    '<button class="btn btn--primary" style="width:100%;" onclick="applyUpdates()">Apply Updates (Restart)</button>';
+    '<button class="btn btn--primary" style="width:100%;" onclick="applyUpdates()">' + I18N.t('updates.applyRestart') + '</button>';
 
   summary.innerHTML = html;
 
@@ -6088,7 +6089,7 @@ function _renderUpdateResults() {
       '<strong>TikTok2Mc</strong>' +
       '<span class="update-item__version">' + tool.current_version + ' → <strong>' + tool.latest_version + '</strong></span>' +
       '</div>' +
-      (tool.release_url ? '<a href="' + escapeHtml(tool.release_url) + '" target="_blank" class="btn btn--secondary btn--sm">View Release</a>' : '') +
+      (tool.release_url ? '<a href="' + escapeHtml(tool.release_url) + '" target="_blank" class="btn btn--secondary btn--sm">' + I18N.t('updates.viewRelease') + '</a>' : '') +
       '</div>';
   }
   if (pluginAvail && plugins.plugins) {
@@ -6109,28 +6110,28 @@ function _renderUpdateResults() {
 }
 
 async function applyUpdates() {
-  log('Installing plugin updates...', 'info');
+  log(I18N.t('updates.installing'), 'info');
   let result = null;
   try {
     result = await postJSON('/plugins/updates/install', {});
     if (result.installed > 0) {
-      log(result.installed + ' plugin update(s) installed successfully.', 'info');
+      log(I18N.t('updates.installedOk', { count: result.installed }), 'info');
     }
     if (result.failed > 0) {
-      log(result.failed + ' plugin update(s) failed.', 'err');
+      log(I18N.t('updates.installedFailed', { count: result.failed }), 'err');
       for (const r of result.results) {
-        if (!r.success) showToast('Update failed: ' + (r.display_name || r.name) + ' — ' + (r.error || 'unknown error'), 'error');
+        if (!r.success) showToast(I18N.t('updates.installFailed', { name: r.display_name || r.name, msg: r.error || I18N.t('common.unknownError') }), 'error');
       }
     }
   } catch (e) {
     log('Plugin update install failed: ' + e.message, 'err');
-    showToast('Plugin update install failed: ' + e.message, 'error');
+    showToast(I18N.t('updates.installFailedGeneric', { msg: e.message }), 'error');
   }
   showRestartDialog(
-    'Apply Updates',
+    I18N.t('updates.applyTitle'),
     result && result.installed > 0
-      ? result.installed + ' plugin update(s) installed. Restart to complete and apply tool updates.'
-      : 'Restart to apply tool updates.'
+      ? I18N.t('updates.installedRestart', { count: result.installed })
+      : I18N.t('updates.restartToApply')
   );
 }
 
@@ -6273,9 +6274,9 @@ function updateEcmDiagnostics(payload) {
   if (summary && payload.total_reactions !== undefined) {
     const count = payload.total_reactions;
     if (count === 0) {
-      summary.innerHTML = '<span style="color:var(--text-secondary);">No reactions set up yet.</span>';
+      summary.innerHTML = '<span style="color:var(--text-secondary);">' + I18N.t('reactions.noReactionsSet') + '</span>';
     } else {
-      summary.innerHTML = `<span style="color:var(--success);">${count} reaction${count === 1 ? '' : 's'}</span> <span style="color:var(--text-secondary);">configured</span>`;
+      summary.innerHTML = `<span style="color:var(--success);">${count === 1 ? I18N.t('reactions.reactionCount', { count }) : I18N.t('reactions.reactionsCount', { count })}</span> <span style="color:var(--text-secondary);">${I18N.t('reactions.configured')}</span>`;
     }
   }
 }
@@ -6345,9 +6346,9 @@ function refreshConsoleInstanceSelector() {
   _consoleLastRefresh = now;
   const instances = _serverManagerCache?.instances || [];
   const current = sel.value;
-  sel.innerHTML = '<option value="">Select server...</option>' +
+  sel.innerHTML = '<option value="">' + I18N.t('reactions.selectServer') + '</option>' +
     instances.map(inst =>
-      `<option value="${escapeHtml(inst.id)}" ${inst.id === current ? 'selected' : ''}>${escapeHtml(inst.name)} (${inst.hasJar ? escapeHtml(inst.version) : 'Not installed'})</option>`
+      `<option value="${escapeHtml(inst.id)}" ${inst.id === current ? 'selected' : ''}>${escapeHtml(inst.name)} (${inst.hasJar ? escapeHtml(inst.version) : I18N.t('servers.notInstalled')})</option>`
     ).join('');
   if (!current && instances.length === 1) {
     sel.value = instances[0].id;
@@ -6367,7 +6368,7 @@ const consoleTerminal = {
     }
     const output = document.getElementById('console-output');
     output.innerHTML = '';
-    this._print('Switched to ' + (instanceId ? 'server: ' + instanceId : 'all servers') + '. Click Connect for RCON.', 'system');
+    this._print(I18N.t('console.switched', { target: instanceId ? I18N.t('console.serverPrefix', { id: instanceId }) : I18N.t('console.allServers') }), 'system');
   },
 
   async toggleConnection() {
@@ -6383,27 +6384,27 @@ const consoleTerminal = {
     const input = document.getElementById('console-input');
     const status = document.getElementById('console-status');
     btn.disabled = true;
-    btn.textContent = 'Connecting...';
+    btn.textContent = I18N.t('console.connecting');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(API + '/rcon/connect', { method: 'POST', signal: controller.signal, headers: _withApiKey({}) });
-      if (!res.ok) throw new Error((await res.json()).detail || 'Connection failed');
+      if (!res.ok) throw new Error((await res.json()).detail || I18N.t('console.commandFailed'));
       this._connected = true;
-      status.textContent = 'Connected';
+      status.textContent = I18N.t('console.connected');
       status.className = 'console-status connected';
-      btn.textContent = 'Disconnect';
+      btn.textContent = I18N.t('console.disconnect');
       input.disabled = false;
       input.focus();
-      this._print('Connected to RCON. Type a command and press Enter.', 'system');
+      this._print(I18N.t('console.connectedMsg'), 'system');
     } catch (e) {
       if (e.name === 'AbortError') {
-        this._print('Connection timed out after 10 seconds.', 'error');
+        this._print(I18N.t('console.timeout'), 'error');
       } else {
-        this._print('Connection failed: ' + e.message, 'error');
+        this._print(I18N.t('console.failed', { msg: e.message }), 'error');
       }
-      btn.textContent = 'Connect';
-      status.textContent = 'Disconnected';
+      btn.textContent = I18N.t('console.connect');
+      status.textContent = I18N.t('console.disconnected');
       status.className = 'console-status offline';
     } finally {
       clearTimeout(timeoutId);
@@ -6420,11 +6421,11 @@ const consoleTerminal = {
       await fetch(API + '/rcon/disconnect', { method: 'POST', headers: _withApiKey({}) });
     } catch (_) {}
     this._connected = false;
-    status.textContent = 'Disconnected';
+    status.textContent = I18N.t('console.disconnected');
     status.className = 'console-status offline';
-    btn.textContent = 'Connect';
+    btn.textContent = I18N.t('console.connect');
     input.disabled = true;
-    this._print('Disconnected from RCON.', 'system');
+    this._print(I18N.t('console.disconnectedMsg'), 'system');
     btn.disabled = false;
   },
 
@@ -6437,21 +6438,21 @@ const consoleTerminal = {
         headers: _withApiKey({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ command: cmd })
       });
-      if (!res.ok) throw new Error((await res.json()).detail || 'Command failed');
+      if (!res.ok) throw new Error((await res.json()).detail || I18N.t('console.commandFailed'));
       const data = await res.json();
       if (data.response) {
         this._print(data.response, 'output');
       }
     } catch (e) {
-      this._print('Error: ' + e.message, 'error');
+      this._print(I18N.t('console.error', { msg: e.message }), 'error');
       if (e.message.includes('Not connected') || e.message.includes('RCON not connected')) {
         this._connected = false;
         const status = document.getElementById('console-status');
         const btn = document.getElementById('btn-console-connect');
         const input = document.getElementById('console-input');
-        status.textContent = 'Disconnected';
+        status.textContent = I18N.t('console.disconnected');
         status.className = 'console-status offline';
-        btn.textContent = 'Connect';
+        btn.textContent = I18N.t('console.connect');
         input.disabled = true;
       }
     }
@@ -6473,7 +6474,7 @@ const consoleTerminal = {
   clear() {
     const output = document.getElementById('console-output');
     output.innerHTML = '';
-    this._print('Console cleared.', 'system');
+    this._print(I18N.t('console.cleared'), 'system');
   }
 };
 
@@ -6561,8 +6562,8 @@ function _initEditorVisibilityObserver() {
 function _switchWithUnsavedGuard(action) {
   if (isAnyEditorDirty()) {
     _pendingNavigation = action;
-    document.getElementById('btn-unsaved-save-exit').textContent = 'Save Changes';
-    document.getElementById('btn-unsaved-exit-no-save').textContent = 'Discard Changes';
+    document.getElementById('btn-unsaved-save-exit').textContent = I18N.t('dialog.saveChanges');
+    document.getElementById('btn-unsaved-exit-no-save').textContent = I18N.t('dialog.discardChanges');
     document.getElementById('unsaved-changes-modal').classList.remove('hidden');
   } else {
     action();
@@ -6707,7 +6708,7 @@ class EventTester {
       this._giftSelectLoaded = true;
       this._renderGiftSelect(this._gifts);
     } catch (e) {
-      showToast('Failed to load gifts: ' + e.message, 'error');
+      showToast(I18N.t('triggers.giftsLoadFailed', { msg: e.message }), 'error');
       this._gifts = [];
     }
   }
@@ -6716,7 +6717,7 @@ class EventTester {
     const container = document.getElementById('gift-select');
     if (!container) return;
     if (!gifts.length) {
-      container.innerHTML = '<div class="gift-empty">No gifts match your search.</div>';
+      container.innerHTML = '<div class="gift-empty">' + I18N.t('triggers.noGifts') + '</div>';
       return;
     }
     const selectedId = this._selectedGift ? String(this._selectedGift.id) : '';
@@ -6727,7 +6728,7 @@ class EventTester {
         <img src="${imgPath}" alt="${escapeHtml(g.name)}" class="gift-item-img" loading="lazy" onerror="this.style.display='none'">
         <div class="gift-item-info">
           <div class="gift-item-name">${escapeHtml(g.name)}</div>
-          <div class="gift-item-meta">ID: ${g.id} &middot; ${g.coins} coins</div>
+          <div class="gift-item-meta">ID: ${g.id} &middot; ${g.coins} ${I18N.t('common.coins')}</div>
         </div>
       </div>`;
     }).join('');
@@ -6765,48 +6766,48 @@ class EventTester {
 
   async toggleTiktok() {
     if (this._cooldown) {
-      this._showError('Please wait before toggling again.');
+      this._showError(I18N.t('triggers.pleaseWait'));
       return;
     }
     const turningOff = !_tiktokConnectDisabled;
     const confirmed = await showConfirmDialog(
       turningOff && _tiktokLiveState === true
-        ? 'Disconnect TikTok Stream'
-        : 'Toggle TikTok Connection',
+        ? I18N.t('triggers.disconnectTitle')
+        : I18N.t('triggers.toggleTitle'),
       turningOff && _tiktokLiveState === true
-        ? 'Turning the TikTok connection OFF will disconnect the live stream immediately. Continue?'
-        : `Turn the TikTok connection ${turningOff ? 'OFF' : 'ON'}?`,
-      'Toggle',
+        ? I18N.t('triggers.disconnectWarning')
+        : I18N.t('triggers.turnWarning', { state: turningOff ? I18N.t('triggers.off') : I18N.t('triggers.on') }),
+      I18N.t('triggers.toggle'),
       'btn-danger'
     );
     if (!confirmed) return;
 
     this._cooldown = true;
-    this._setStatus('running', 'Toggling...');
+    this._setStatus('running', I18N.t('triggers.toggling'));
     try {
       const result = await postJSON('/triggers/tiktok-connection', {});
       if (result.status === 'ok' || result.status === 'success') {
         _tiktokConnectDisabled = !result.connected;
         this._updateTiktokStateUI();
-        this._setStatus('success', 'Toggled');
-        showToast(`TikTok connection is now ${result.connected ? 'ON' : 'OFF'}.`, 'success');
+        this._setStatus('success', I18N.t('triggers.toggled'));
+        showToast(I18N.t('triggers.connectionNow', { state: result.connected ? I18N.t('triggers.on') : I18N.t('triggers.off') }), 'success');
         log(`[TEST] TikTok connection toggled: ${result.connected ? 'ON' : 'OFF'}`, 'info');
       } else {
-        this._setStatus('error', 'Failed');
-        this._showError(result.message || 'Toggle failed.');
+        this._setStatus('error', I18N.t('triggers.failed'));
+        this._showError(result.message || I18N.t('triggers.toggleFailedTitle'));
         log(`[TEST ERROR] TikTok toggle: ${result.message}`, 'error');
       }
       this._addHistory('system', 'tiktok-toggle', 'System', result.status, result.message || '');
     } catch (e) {
-      this._setStatus('error', 'Failed');
+      this._setStatus('error', I18N.t('triggers.failed'));
       this._showError(e.message);
-      showToast('Toggle failed: ' + e.message, 'error');
+      showToast(I18N.t('triggers.toggleFailed', { msg: e.message }), 'error');
       log(`[TEST ERROR] ${e.message}`, 'error');
       this._addHistory('system', 'tiktok-toggle', 'System', 'error', e.message);
     } finally {
       setTimeout(() => {
         this._cooldown = false;
-        this._setStatus('offline', 'Ready');
+        this._setStatus('offline', I18N.t('triggers.ready'));
       }, 1500);
     }
   }
@@ -6818,15 +6819,15 @@ class EventTester {
     const tiktok = currentConfig.tiktok || {};
     let text, labelCls;
     if (_tiktokConnectDisabled) {
-      text = 'OFF';
+      text = I18N.t('triggers.off');
       labelCls = 'tiktok-state-label tiktok-state-off';
     } else {
-      text = 'ON';
+      text = I18N.t('triggers.on');
       labelCls = 'tiktok-state-label tiktok-state-on';
     }
     label.textContent = text;
     label.className = labelCls;
-    btn.textContent = 'Toggle Connection';
+    btn.textContent = I18N.t('triggers.toggleConnection');
     btn.className = 'btn btn--secondary';
   }
 
@@ -6845,7 +6846,7 @@ class EventTester {
 
   async sendTrigger() {
     if (this._cooldown) {
-      this._showError('Please wait before triggering again.');
+      this._showError(I18N.t('triggers.pleaseWaitTrigger'));
       return;
     }
 
@@ -6858,12 +6859,12 @@ class EventTester {
       const customInput = document.getElementById('trigger-custom-name');
       triggerName = customInput ? customInput.value.trim() : '';
       if (!triggerName) {
-        this._showError('Please enter a custom trigger name.');
+        this._showError(I18N.t('triggers.customRequired'));
         return;
       }
     } else if (type === 'gift') {
       if (!this._selectedGift || !this._selectedGift.id) {
-        this._showError('Please select a gift.');
+        this._showError(I18N.t('triggers.selectGiftRequired'));
         return;
       }
       giftId = String(this._selectedGift.id);
@@ -6874,24 +6875,28 @@ class EventTester {
     const user = userInput ? (userInput.value.trim() || 'TestUser') : 'TestUser';
 
     const confirmed = await showConfirmDialog(
-      'Confirm Test Trigger',
-      `Send TEST ${type === 'comment' ? 'comment' : 'trigger'} "${triggerName}" as user "${user}"?`,
-      'Send',
+      I18N.t('triggers.confirmTitle'),
+      I18N.t('triggers.confirmMessage', {
+        kind: type === 'comment' ? I18N.t('triggers.kindComment') : I18N.t('triggers.kindTrigger'),
+        trigger: triggerName,
+        user,
+      }),
+      I18N.t('common.send'),
       'btn-danger',
       'text-danger'
     );
     if (!confirmed) return;
 
     this._cooldown = true;
-    this._setStatus('running', 'Sending...');
+    this._setStatus('running', I18N.t('triggers.sending'));
 
     try {
       let result;
       if (type === 'comment') {
         const text = document.getElementById('comment-text').value.trim();
         if (!text) {
-          this._showError('Comment text is required.');
-          this._setStatus('error', 'Error');
+          this._showError(I18N.t('triggers.commentRequired'));
+          this._setStatus('error', I18N.t('common.error'));
           this._cooldown = false;
           return;
         }
@@ -6908,26 +6913,26 @@ class EventTester {
       }
 
       if (result.status === 'ok' || result.status === 'success') {
-        this._setStatus('success', 'Sent');
-        showToast('Test event sent successfully.', 'success');
+        this._setStatus('success', I18N.t('triggers.sent'));
+        showToast(I18N.t('triggers.testSent'), 'success');
         log(`[TEST] ${type}: ${triggerName} (${user})`, 'info');
       } else {
-        this._setStatus('error', 'Failed');
-        this._showError(result.message || 'Trigger failed.');
-        showToast('Trigger failed: ' + (result.message || 'Unknown'), 'error');
+        this._setStatus('error', I18N.t('triggers.failed'));
+        this._showError(result.message || I18N.t('triggers.triggerFailedTitle'));
+        showToast(I18N.t('triggers.triggerFailed', { msg: result.message || I18N.t('common.unknown') }), 'error');
         log(`[TEST ERROR] ${type}: ${result.message}`, 'error');
       }
       this._addHistory(type, triggerName, user, result.status, result.message || '');
     } catch (e) {
-      this._setStatus('error', 'Failed');
+      this._setStatus('error', I18N.t('triggers.failed'));
       this._showError(e.message);
-      showToast('Trigger failed: ' + e.message, 'error');
+      showToast(I18N.t('triggers.triggerFailed', { msg: e.message }), 'error');
       log(`[TEST ERROR] ${e.message}`, 'error');
       this._addHistory(type, triggerName, user, 'error', e.message);
     } finally {
       setTimeout(() => {
         this._cooldown = false;
-        this._setStatus('offline', 'Ready');
+        this._setStatus('offline', I18N.t('triggers.ready'));
       }, 1500);
     }
   }
@@ -6949,7 +6954,7 @@ class EventTester {
   _renderHistory() {
     if (!this._historyEl) return;
     if (!this._history.length) {
-      this._historyEl.innerHTML = '<p class="text-muted">No events triggered yet this session.</p>';
+      this._historyEl.innerHTML = '<p class="text-muted">' + I18N.t('triggers.noEvents') + '</p>';
       return;
     }
     this._historyEl.innerHTML = this._history.map(h => {
