@@ -2,15 +2,22 @@
 
 This guide explains how to use TikTok2Mc. No programming knowledge is required.
 
+You want to know more about the Tool or you aim to designe Plugins than see the dev-doku.
+- [English Dev-Doku](./dev-book-en/src/ch01-00-getting-started.md)
+- [Geramn Dev-Doku](./dev-book-de/src/ch01-00-getting-started.md)
+
 The recommended way to configure and control TikTok2Mc is the **Dashboard** (GUI) at `http://127.0.0.1:29185/` (or the desktop application). Everything can be done there — no file editing needed:
+
+> [!NOTE]
+> The Dashboard provides also more help and validation that reduces the chance of misconfiguration.
+> The manual Configuration files are still available for advanced users who prefer to edit them directly.
+> But keep in mind that you may break the tool if you make a mistake in the files.
 
 - **Dashboard (GUI)** — The web interface is the primary way to configure and control the tool. It is the only place to enable plugins and to run the setup wizard.
 - **Configuration Files** — `config.yaml` and other files can also be edited directly with any text editor. This is optional and only needed for advanced tweaks.
 - **Mixed** — Use both. Changes from the GUI and files are synchronized automatically.
 
 You cannot open the setup wizard from the Dashboard later; it only appears on first launch (or while the TikTok username and RCON password are still set to defaults). If you miss it, the same settings are available in **Settings → Connection**.
-
-If you are setting the tool up for the first time, start with the [Quick Start](../README.md#quick-start) in the README.
 
 ---
 
@@ -69,22 +76,14 @@ All main settings are in `config/config.yaml`. Open this file with any text edit
 ### Minimum required changes
 
 1. **Your TikTok username** — under `tiktok.user`. Enter your username without the `@` symbol.
+> [!IMPORTANT]
+> Do not Enter your Display Name here tiktok can you only identify you trought your username.
 2. **Your RCON password** — under `rcon.password`. Change this from the default to something secure. This password connects the tool to your Minecraft server. The tool will ask you to set one on first start if left empty.
 3. **Which features are enabled** — each section has `enabled: true` or `enabled: false`. Everything starts turned off. Turn on only what you need.
 
-### Other useful settings
-
-- **Java RAM** — under `java.xms` and `java.xmx`. Default is 4 GB each. If your computer has less than 12 GB RAM, lower both to `2G` or `1G`.
-- **Console visibility** — under `console.log_level`. Controls which windows you see when the tool starts. Level 1 (Silent) is the default.
-- **Auto-shutdown** — under `shutdown`. The tool can automatically shut down after your stream ends.
-- **Comment commands** — under `comment_commands`. Let viewers send commands via TikTok chat.
-- **Follow tracking** — under `tiktok.follow_tracking`. Prevents viewers from repeatedly triggering the follow action. Choose `all_time` (never repeats) or `per_stream` (resets each stream).
-- **Auto-update config** — under `auto_update_config`. When enabled, new configuration options from updates are merged into your existing config automatically. Your settings are preserved.
-- **API key** — under `api_key`. Optional. If you expose the Dashboard to the internet (not recommended for most users), set an API key here to require authentication. Requests from the same computer (localhost) are always allowed without a key. When set, external requests must include the `X-API-Key` header.
-
 ### Plugin-specific config files
 
-Each plugin (Timer, Death Counter, Win Counter, Spotify Control) has its own `config.yaml` inside its plugin directory (e.g., `plugins/timer/config.yaml`). You can edit these files to change plugin-specific behavior like colors, timers, and milestones.
+Each plugin (e.g. Timer, Spotify Control) has its own `config.yaml` inside its plugin directory (e.g., `plugins/timer/config.yaml`). You can edit these files to change plugin-specific behavior like colors, timers, and milestones.
 
 > [!TIP]
 > The Dashboard (web interface) provides a visual editor for all settings. You don't need to edit files by hand unless you prefer to.
@@ -106,8 +105,16 @@ Saving immediately applies the settings (a reload and server restart happen behi
 ---
 
 ## Actions and Triggers
+Edit Actions trought the GUI or the actions.mca file.
+
+![Actions Editor](../images/Actions_Editor.png)
 
 The file `data/actions.mca` controls what happens in Minecraft when TikTok events occur.
+
+> [!NOTE]
+> The `actions.mca` fiele are only read at system startup so if you edit thies file the changes are arplied at the next start from the tool
+> It is also recommended to installe the language server because it provide Intellesense an mark errors
+> Errors are also detektet then the tools Starts if an error occure the System wont Start.
 
 ### How it works
 
@@ -216,17 +223,35 @@ To prevent infinite loops, chained triggers are limited to a depth of 3 — if a
 
 ### Commenting out lines
 
-Lines starting with `#` are ignored. Use this to temporarily disable an action:
+Lines starting with `#` are treated as comments and are ignored.
 
+```text
+# This is a comment
 ```
-#follow:/say Thanks for the follow!
+
+Lines starting with `##` are also ignored, but are specifically used to **deactivate an action**:
+
+```text
+##follow:/say Thanks for the follow!
 ```
+
+From the parser's perspective, there is technically no difference between `#` and `##` — both are ignored. The distinction exists for the GUI.
+
+The GUI cannot reliably determine whether a commented-out line was originally a trigger or simply a regular comment. Therefore, `##` provides an explicit way to mark a disabled action.
+
+* `#` → regular comment
+* `##` → disabled action/trigger, identifiable by the GUI
+
+This allows the GUI to distinguish between ordinary comments and intentionally deactivated triggers or actions without changing how the parser handles comments.
+
+If you are not using the GUI, you can use `#` or `##` for either purpose, since both are treated the same by the parser. However, keeping regular comments and disabled actions separate is cleaner and allows the GUI to identify them correctly.
+Additionally, some plugins or hooks may rely on this distinction, treating `#` as a regular comment and `##` as a disabled trigger. Using them incorrectly could therefore cause unexpected behavior or compatibility issues.
 
 ### Gift IDs
 
-A full list of gift IDs and names is available in `defaults/gifts.json`. The Dashboard also includes a gift picker with search.
+A full list of gift IDs and names is available in `core/gifts.json`. The Dashboard also includes a gift picker with search.
 
-![Actions Editor](../images/Actions_Editor.png)
+![Gift Selector](../images/Gift_Picker.png)
 
 ---
 
@@ -464,6 +489,7 @@ For chroma key (green screen) support, add `&chroma=true` to the overlay URL:
 ## The Dashboard
 
 The Dashboard is a web interface available at `http://127.0.0.1:29185/` that lets you manage everything visually. No file editing required.
+Its also avaliabe as a Desktop App.
 
 ### What you can do in the Dashboard
 
@@ -475,10 +501,6 @@ The Dashboard is a web interface available at `http://127.0.0.1:29185/` that let
 - **Live Theme Editor** — adjust overlay colors and preview changes in real time without saving.
 - **Check for Updates** — click "Check for Updates" in the Updates card.
 - **API Documentation** — visit `http://127.0.0.1:29185/docs` for interactive API reference.
-
-### Review before saving
-
-The Configuration Editor shows a diff view before saving changes, so you can review what will be modified.
 
 ---
 
@@ -530,52 +552,14 @@ When you update, new configuration options are automatically merged into your ex
 **To disable auto-updates:**
 Set `update.enabled: false` in `config.yaml`.
 
+> [!WARNING]
+> Set thies to false can couse the tool do multifunction or crash.
+> Only set thies to false if you want to rename/add your own settings or if you want to see the tool crash...
+
 **To check for updates manually:**
 Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in the Updates card, or visit `http://127.0.0.1:29185/api/v1/updates/check` directly.
 
 ---
-
-## Troubleshooting
-
-### "Address already in use" error
-
-Another program is using one of the ports the tool needs. Common causes:
-- Another Minecraft server running on port 25565
-- Another instance of the tool already running
-
-**Fix:** Close the other program, or change the port in `config.yaml`. By default, the tool will try to find the next free port automatically.
-
-### TikTok connection fails
-
-- You must be **live on TikTok** for the connection to work.
-- Check your username in `config.yaml` — no `@` symbol.
-- The tool retries automatically. Wait a few moments.
-
-### Minecraft server won't start
-
-- **Windows:** Java is included automatically. If it still fails, try restarting your computer.
-- **Linux:** The tool will detect Java or help you install it. Make sure you run it with `sudo` — the tool requires root privileges on Linux (set `show_sudo_warning: false` to skip this check).
-
-### Plugin not showing in OBS
-
-- Make sure the plugin is enabled (toggle it on in the Dashboard's Plugins page).
-- Check that the URL is correct (see the plugin table above).
-- Make sure the tool is running.
-- The overlay URLs now all go through the main API at port 29185 — do not use the old direct port URLs.
-
-### Config file looks wrong after update
-
-The updater creates a backup in `data/backups/migration/` before migrating. If something went wrong:
-1. Close the tool.
-2. Locate the most recent backup in `data/backups/migration/` and copy it to `config/config.yaml`.
-3. Restart the tool.
-
-### Security warnings in the console
-
-- **RCON password warning** — Change the default password from the default in `config.yaml`. The tool will prompt you to set one on first start.
-- **Network exposure warning** — Only appears if `server_host` is set to `0.0.0.0`. For most users, `127.0.0.1` is correct and safe.
-
-These are just warnings. The tool will still run.
 
 ### Error codes in logs
 
@@ -595,7 +579,7 @@ The Dashboard has a **Live Plugin Health** card that shows the status of all com
 
 **Q: Do I need to be live on TikTok for the tool to work?**
 
-A: Yes. The tool connects to your active TikTok Live stream. It will keep retrying automatically until you go live.
+A: No. The tool also work without Tiktok you can trigger actions manuell or with automation scrips it is up to you.
 
 **Q: Can I test actions without going live?**
 
@@ -604,6 +588,7 @@ A: Yes. Use the included test tool (`test/test_trigger.exe` on Windows or `test/
 **Q: How do I know if the tool is working?**
 
 A: The console window shows live output. If you see "Connected to TikTok" and the Minecraft server starts without errors, everything is running.
+You can also use Test Triggers (see abouve) or look in the Live Logs Tab in the GUI if you see no errors the tool should run Propertlie
 
 **Q: How often is the tool updated?**
 
@@ -631,7 +616,7 @@ A: Yes. The overlays are web pages. You can open them in any browser or add them
 
 **Q: How do I find gift IDs?**
 
-A: The Dashboard includes a **gift picker** that searches gifts by name or ID with image URLs and coin cost. You can also open `defaults/gifts.json` directly.
+A: The Dashboard includes a **gift picker** that searches gifts by name or ID with image URLs and coin cost. You can also open `core/gifts.json` directly.
 
 **Q: Can I use the tool with Twitch or YouTube?**
 
@@ -639,7 +624,7 @@ A: The tool is designed for TikTok Live. The license restricts commercial use on
 
 **Q: My server is lagging. What can I do?**
 
-A: Lower the RAM allocation in `config.yaml` under `java.xms` and `java.xmx`. Also avoid using `comment` or `join` triggers with complex commands on busy streams.
+A: Push the RAM allocation in `config.yaml` under `java.xms` and `java.xmx`. Also avoid using `comment` or `join` triggers with complex commands on busy streams.
 
 **Q: Can viewers spam commands?**
 
