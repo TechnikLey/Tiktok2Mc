@@ -10,6 +10,7 @@ const appGlobals = {
   ActionsEditor: "writable",
   I18N: "writable",
   Help: "writable",
+  Shortcuts: "writable",
   fetchJSON: "writable",
   postJSON: "writable",
   putJSON: "writable",
@@ -17,6 +18,15 @@ const appGlobals = {
   showConfirmDialog: "writable",
   escapeHtml: "writable",
   currentConfig: "writable",
+  editor: "writable",
+  pluginEditor: "writable",
+  hookEditor: "writable",
+  reactionEditor: "writable",
+  actionsEditor: "writable",
+  closeServerCreateModal: "writable",
+  closeServerDownloadModal: "writable",
+  closeServerSwitchModal: "writable",
+  closeServerCustomModal: "writable",
 };
 
 export default defineConfig([
@@ -46,7 +56,7 @@ export default defineConfig([
     // from inline HTML handlers and other scripts), so unused-var and
     // redeclaration analysis cannot apply here. Cross-file globals are
     // declared explicitly above. Empty catch blocks swallow errors on purpose.
-    files: ["app.js", "actions-editor.js", "help.js"],
+    files: ["app.js", "actions-editor.js", "help.js", "shortcuts.js"],
     languageOptions: {
       sourceType: "script",
       globals: { ...globals.browser, ...appGlobals },

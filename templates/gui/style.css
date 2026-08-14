@@ -1539,6 +1539,25 @@ input[type="color"] {
 .help-modal-body ul { margin: 0 0 var(--space-2) 0; padding-left: var(--space-5); }
 .help-modal-body li { margin-bottom: var(--space-1); font-size: var(--text-base); }
 .help-modal-body code { background: var(--color-input); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0 0.25rem; font-family: var(--font-mono); font-size: 0.85em; }
+.help-modal-body kbd { background: var(--color-input); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0 0.3rem; font-family: var(--font-mono); font-size: 0.85em; box-shadow: 0 1px 0 var(--color-border); }
+
+/* ─── Keyboard shortcut hint next to save buttons ─── */
+.kbd-hint {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-input);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.sidebar-footer .btn-help { margin-top: var(--space-2); }
 
 /* ─── Backups view ─── */
 .backup-category + .backup-category { margin-top: var(--space-2); }

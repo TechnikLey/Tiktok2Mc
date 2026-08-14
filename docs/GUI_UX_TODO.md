@@ -18,7 +18,7 @@
 | **P2** | Mittel | UX-Feinschliff / Verbesserung |
 | **P3** | Niedrig | Nice-to-have, später |
 
-**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ → Overlay-Vorschau → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → Tastenkürzel → ~~Undo~~ ✅ → Mobile/LAN), zum Schluss P3-Ideen.
+**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ → Overlay-Vorschau → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → ~~Tastenkürzel~~ ✅ → ~~Undo~~ ✅ → Mobile/LAN), zum Schluss P3-Ideen.
 
 ---
 
@@ -131,13 +131,31 @@
 
 ### 6. Tastenkürzel
 
-- [ ] **Status:** Offen
-- [ ] **Problem:** Keine Tastenkürzel außer den impliziten Browser-Standards.
-- [ ] **Ziel:** Schnelle Bedienung: `Ctrl+S` speichert im aktiven Editor, `/` fokussiert die
+- [x] **Status:** **ERLEDIGT** (2026-08-14)
+- [x] **Problem:** Keine Tastenkürzel außer den impliziten Browser-Standards.
+- [x] **Ziel:** Schnelle Bedienung: `Ctrl+S` speichert im aktiven Editor, `/` fokussiert die
       Suche, `Esc` schließt Modals (verknüpft mit Punkt 2).
-- [ ] **Abnahmekriterien:** Kürzel im Dashboard + in den Editoren dokumentiert (z. B. in einem
+- [x] **Umsetzung:**
+  - Neues Modul `templates/gui/shortcuts.js` (Kürzel-Runtime): `Ctrl+S` speichert den
+    aktiven Editor (Konfig-, Plugin-, Hook-, Reaktions- und Actions-Editor inkl. Inline-Sektionen;
+    übersprungen, solange ein Overlay offen ist), `/` fokussiert das Suchfeld der aktiven Ansicht
+    bzw. des offenen Editors, `Esc` schließt das oberste Modal (Topmost-Reihenfolge; `Esc` wirkt
+    auch in Eingabefeldern), `?` öffnet das Kürzel-Hilfethema. Kürzel werden beim Tippen in
+    Eingabefeldern ignoriert (außer `Ctrl+S`/`Esc`), `unsaved-changes-modal` wird bewusst nicht
+    per `Esc` geschlossen.
+  - `app.js`: `showConfirmDialog` bestätigt per `Esc` mit `false` (Listener wird bei Cleanup entfernt).
+  - `index.html`: „?"-Help-Button in der Sidebar-Footer, `<span class="kbd-hint">Ctrl+S</span>`
+    an allen Save-Buttons, `shortcuts.js` in den Script-Tags.
+  - `help.js`: neues Topic `shortcuts` (Globale Kürzel + Eingabe-Sicherheit) sowie Kürzel-Hinweis-
+    Abschnitte in den Topics `plugins`, `hooks`, `actions`, `reactions`, `settings`.
+  - `style.css`: Styles für `.help-modal-body kbd`, `.kbd-hint` und den Sidebar-Footer-Button.
+  - `eslint.config.js` (appGlobals + classic files), `tests/setup.js` (lädt `shortcuts.js`),
+    neue GUI-Tests in `tests/shortcuts.test.js` (19 Tests: Bindings, `/`-Fokus, `Ctrl+S`,
+    `Esc`-Schließen inkl. Confirm-Dialog, Typing-Safety).
+- [x] **Abnahmekriterien:** Kürzel im Dashboard + in den Editoren dokumentiert (z. B. in einem
       „?"-Menü); funktionieren ohne Konflikt mit Eingabefeldern.
-- [ ] **Betroffene Dateien:** `app.js`, `actions-editor.js`, `index.html`
+- [x] **Betroffene Dateien:** `shortcuts.js` (neu), `app.js`, `help.js`, `index.html`, `style.css`,
+      `eslint.config.js`, `tests/setup.js`, `tests/shortcuts.test.js` (neu)
 
 ---
 
@@ -206,5 +224,6 @@
 - **Lokalisierung (i18n)** — `templates/gui/i18n.js` implementiert mit DE/EN, `localStorage`-Persistenz, `data-i18n`-Attribute im HTML, Sprachumschalter in Sidebar, Tests in `templates/gui/tests/i18n.test.js`. (P1)
 - **Status-View Live-Statistiken** — Bridge `/metrics` Endpoint, `BridgeMetricsService`, erweiterter `/status` Response, GUI "Live Statistics" Sektion mit RCON/Trigger Queue, Events/Min, Gift Value Today. i18n DE/EN. Tests grün. (P2)
 - **Undo nach dem Speichern / Backup-Wiederherstellung** — Neue Backups-API (`GET /api/v1/backups`, `POST /api/v1/backups/restore`, `POST /api/v1/backups/create`) mit `BackupService`, neue GUI-View „Backups" mit Liste, Wiederherstellen-Dialog und „Backup Now", i18n DE/EN, Help-Topic. Backend- + GUI-Tests grün. (P2)
+- **Tastenkürzel** — Neues `templates/gui/shortcuts.js` (`Ctrl+S` speichert im aktiven Editor, `/` fokussiert die Suche, `Esc` schließt das oberste Modal, `?` öffnet das Kürzel-Hilfethema; Eingabe-Safety), `Esc`-Bestätigen im Confirm-Dialog (`showConfirmDialog`), Kürzel-Doku in `help.js` + `kbd`-Hints an den Save-Buttons, 19 neue GUI-Tests. GUI-Tests grün. (P2)
 
 ---

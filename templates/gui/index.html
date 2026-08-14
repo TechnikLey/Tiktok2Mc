@@ -98,6 +98,7 @@
                     <svg class="theme-icon-dark" viewBox="0 0 24 24" width="14" height="14"><path d="M9 2c-1.05 0-2.05.16-3 .46 1.69 1.23 2.8 3.24 2.8 5.54 0 3.87-3.13 7-7 7-.57 0-1.13-.07-1.67-.2C2.72 18.84 6.5 22 11 22c5.52 0 10-4.48 10-10S16.52 2 11 2z" fill="currentColor"/></svg>
                     <span id="theme-label" data-i18n="nav.themeDark">Dark</span>
                 </button>
+                <button class="btn-help" onclick="Help.openHelp('shortcuts')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
             </div>
         </aside>
         <div class="sidebar-reveal" data-i18n-title="nav.showSidebar" title="Show sidebar"></div>
@@ -165,7 +166,7 @@
                                 </div>
                                 <div class="header-actions">
                                     <button class="btn btn-advanced" id="plugins-config-advanced-btn" onclick="pluginEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
-                                    <button class="btn btn--primary btn-save-disabled" id="plugins-config-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                                    <button class="btn btn--primary btn-save-disabled" id="plugins-config-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
                                 </div>
                             </div>
                             <div class="editor-content" id="plugins-config-content"></div>
@@ -203,7 +204,7 @@
                                 </div>
                                 <div class="header-actions">
                                     <button class="btn btn-advanced" id="hooks-config-advanced-btn" onclick="hookEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
-                                    <button class="btn btn--primary btn-save-disabled" id="hooks-config-save" onclick="hookEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                                    <button class="btn btn--primary btn-save-disabled" id="hooks-config-save" onclick="hookEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
                                     <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                                 </div>
                             </div>
@@ -551,7 +552,7 @@
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-advanced" id="config-advanced-btn" onclick="editor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
-                        <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                        <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
                         <button class="btn-help" onclick="Help.openHelp('settings')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                 </div>
@@ -566,7 +567,7 @@
         <div class="actions-topbar">
           <h2 data-i18n="actions.title">Actions Editor</h2>
           <div class="header-actions">
-            <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled data-i18n="editor.saveChanges">Save Changes</button>
+            <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
             <button class="btn-help" onclick="Help.openHelp('actions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
           </div>
         </div>
@@ -659,7 +660,7 @@
             </div>
             <div class="header-actions">
               <button class="btn btn--primary" id="reaction-add" onclick="reactionEditor.startCreate()" data-i18n="reactions.create">+ Create Reaction</button>
-              <button class="btn btn--primary btn-save-disabled" id="reaction-save" onclick="reactionEditor.save()" disabled data-i18n="reactions.saveChanges">Save Changes</button>
+              <button class="btn btn--primary btn-save-disabled" id="reaction-save" onclick="reactionEditor.save()" disabled data-i18n="reactions.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
               <button class="btn-help" onclick="Help.openHelp('reactions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
             </div>
           </div>
@@ -712,7 +713,7 @@
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-advanced" id="plugin-editor-advanced-btn" onclick="pluginEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
-                        <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                        <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
                         <button class="btn-help" onclick="Help.openHelp('plugins')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                 </div>
@@ -920,10 +921,11 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="./help.js?v=1"></script>
+    <script src="./help.js?v=2"></script>
     <script src="./i18n.js?v=1"></script>
+    <script src="./shortcuts.js?v=1"></script>
     <script src="./actions-editor.js?v=3"></script>
-    <script src="./app.js?v=6"></script>
+    <script src="./app.js?v=7"></script>
 </div>
 </body>
 </html>

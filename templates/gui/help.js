@@ -92,6 +92,17 @@
             ],
           },
         },
+        {
+          h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
+          body: {
+            en: [
+              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+            ],
+            de: [
+              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+            ],
+          },
+        },
       ],
     },
 
@@ -119,6 +130,17 @@
             ],
             de: [
               'Aktiviere oder deaktiviere einen Hook über seinen Schalter. Änderungen werden erst nach einem Neustart wirksam. Über „Konfiguration" bearbeitest du Schema-basierte Einstellungen oder rohes JSON.',
+            ],
+          },
+        },
+        {
+          h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
+          body: {
+            en: [
+              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+            ],
+            de: [
+              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
             ],
           },
         },
@@ -191,6 +213,17 @@
             ],
           },
         },
+        {
+          h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
+          body: {
+            en: [
+              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+            ],
+            de: [
+              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+            ],
+          },
+        },
       ],
     },
 
@@ -221,6 +254,17 @@
             ],
           },
         },
+        {
+          h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
+          body: {
+            en: [
+              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+            ],
+            de: [
+              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+            ],
+          },
+        },
       ],
     },
 
@@ -248,6 +292,17 @@
             ],
             de: [
               'Expertenoptionen sind hinter dem „Erweitert"-Button verborgen. Zum Freischalten musst du einen Bestätigungssatz eingeben, weil eine falsche Konfiguration das System beschädigen kann.',
+            ],
+          },
+        },
+        {
+          h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
+          body: {
+            en: [
+              'Ctrl+S saves the current changes, / focuses the search box and ? opens the shortcut reference.',
+            ],
+            de: [
+              'Ctrl+S speichert die aktuellen Änderungen, / fokussiert das Suchfeld und ? öffnet die Kürzel-Übersicht.',
             ],
           },
         },
@@ -440,6 +495,48 @@
             ],
             de: [
               'Mit „Jetzt sichern" erstellst du jederzeit einen Schnappschuss von Konfiguration, Aktionen und Plugin-Registry — zum Beispiel vor einer größeren Änderung. Einträge mit „Nicht wiederherstellbar" dienen nur als Referenz und können nicht direkt wiederhergestellt werden.',
+            ],
+          },
+        },
+      ],
+    },
+
+    shortcuts: {
+      title: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
+      sections: [
+        {
+          h: { en: 'Global Shortcuts', de: 'Globale Kürzel' },
+          body: {
+            en: [
+              'The dashboard supports keyboard shortcuts for the most common actions. They work in every view and in the editors.',
+            ],
+            de: [
+              'Das Dashboard unterstützt Tastenkürzel für die häufigsten Aktionen. Sie funktionieren in jeder Ansicht und in den Editoren.',
+            ],
+          },
+          list: {
+            en: [
+              '<kbd>Ctrl</kbd> + <kbd>S</kbd> — Save the current changes in the active editor',
+              '<kbd>/</kbd> — Focus the search field of the current view',
+              '<kbd>Esc</kbd> — Close the topmost dialog / overlay',
+              '<kbd>?</kbd> — Open this shortcut reference',
+            ],
+            de: [
+              '<kbd>Ctrl</kbd> + <kbd>S</kbd> — Aktuelle Änderungen im aktiven Editor speichern',
+              '<kbd>/</kbd> — Suchfeld der aktuellen Ansicht fokussieren',
+              '<kbd>Esc</kbd> — Obersten Dialog / Overlay schließen',
+              '<kbd>?</kbd> — Diese Kürzel-Übersicht öffnen',
+            ],
+          },
+        },
+        {
+          h: { en: 'Typing Safety', de: 'Eingabe-Sicherheit' },
+          body: {
+            en: [
+              'Except for Ctrl+S and Esc, shortcuts are ignored while you are typing in an input field, so they never interfere with entering text or commands.',
+            ],
+            de: [
+              'Außer für Ctrl+S und Esc werden Kürzel ignoriert, solange du in ein Eingabefeld tippst — so stören sie nie bei der Texteingabe oder bei Befehlen.',
             ],
           },
         },

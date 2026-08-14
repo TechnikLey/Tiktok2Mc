@@ -199,8 +199,16 @@ function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), ok
 
     const cleanup = () => {
       dlg.classList.add('hidden');
+      document.removeEventListener('keydown', onKey);
       okBtn.replaceWith(okBtn.cloneNode(true));
       cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+    };
+
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      cleanup();
+      resolve(false);
     };
 
     const newOk = okBtn.cloneNode(true);
@@ -212,6 +220,7 @@ function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), ok
     newCancel.addEventListener('click', () => { cleanup(); resolve(false); });
 
     dlg.classList.remove('hidden');
+    document.addEventListener('keydown', onKey);
   });
 }
 

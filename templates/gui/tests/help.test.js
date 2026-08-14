@@ -39,6 +39,7 @@ describe('Help', () => {
     expect(Help.topics).toContain('triggers');
     expect(Help.topics).toContain('backups');
     expect(Help.topics).toContain('updates');
+    expect(Help.topics).toContain('shortcuts');
   });
 
   it('renders every main view with a help button in the header', () => {
