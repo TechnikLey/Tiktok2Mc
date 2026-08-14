@@ -163,6 +163,19 @@
             ],
           },
         },
+        {
+          h: { en: 'Preview & Test', de: 'Vorschau & Test' },
+          body: {
+            en: [
+              'Every overlay has a live preview right in the dashboard. Click "Test" to send a sample message to the overlay — it appears in the preview and in your OBS browser source instantly.',
+              'The preview uses a transparent background so it blends into the dashboard; the URL you copy for OBS uses the chroma-key background so it can be filtered out in your streaming software.',
+            ],
+            de: [
+              'Jedes Overlay hat eine Live-Vorschau direkt im Dashboard. Klicke „Testen", um eine Beispielnachricht an das Overlay zu senden — sie erscheint sofort in der Vorschau und in deiner OBS-Browser-Quelle.',
+              'Die Vorschau verwendet einen transparenten Hintergrund, damit sie ins Dashboard passt; die kopierte URL für OBS nutzt den Chroma-Key-Hintergrund, damit er in deiner Streaming-Software herausgefiltert werden kann.',
+            ],
+          },
+        },
       ],
     },
 

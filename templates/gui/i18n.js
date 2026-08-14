@@ -293,6 +293,13 @@
     'overlays.urls': 'Overlay URLs',
     'overlays.builtin': 'Built-in Overlay',
     'overlays.plugins': 'Plugin Overlays',
+    'overlays.preview': 'Overlay Preview',
+    'overlays.test': 'Test',
+    'overlays.testing': 'Sending…',
+    'overlays.testTitle': 'Test Message',
+    'overlays.testSubtitle': 'This is a sample overlay message.',
+    'overlays.testSent': 'Test message sent to overlay "{name}".',
+    'overlays.testFailed': 'Failed to send test message',
 
     /* ── Updates ── */
     'updates.title': 'Updates',
@@ -1082,6 +1089,13 @@
     'overlays.urls': 'Overlay-URLs',
     'overlays.builtin': 'Eingebautes Overlay',
     'overlays.plugins': 'Plugin-Overlays',
+    'overlays.preview': 'Overlay-Vorschau',
+    'overlays.test': 'Testen',
+    'overlays.testing': 'Sende…',
+    'overlays.testTitle': 'Testnachricht',
+    'overlays.testSubtitle': 'Das ist eine Beispiel-Overlay-Nachricht.',
+    'overlays.testSent': 'Testnachricht an Overlay „{name}“ gesendet.',
+    'overlays.testFailed': 'Testnachricht konnte nicht gesendet werden',
 
     /* ── Updates ── */
     'updates.title': 'Updates',

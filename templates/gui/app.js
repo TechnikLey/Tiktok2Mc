@@ -1525,11 +1525,9 @@ async function confirmServerCustom() {
 }
 
 function renderOverlayUrls() {
-  const containers = [
-    document.getElementById('overlay-urls')
-  ];
-  // Built-in overlay URLs
-  let html = '<h3 style="margin:0 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">Built-in Overlay</h3>';
+  const container = document.getElementById('overlay-urls');
+  if (!container) return;
+  let html = '<h3 class="overlay-section-title">' + I18N.t('overlays.builtin') + '</h3>';
   const base = location.origin + '/api/v1/overlay';
   const overlayNames = ['default'];
   if (currentConfig.overlay && Array.isArray(currentConfig.overlay.overlays)) {
@@ -1538,20 +1536,62 @@ function renderOverlayUrls() {
     }
   }
   for (const name of overlayNames) {
-    const u = `${base}?overlay=${name}&chroma=1`;
-    html += `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
+    const u = `${base}?overlay=${encodeURIComponent(name)}&chroma=1`;
+    const preview = `${base}?overlay=${encodeURIComponent(name)}&chroma=0`;
+    html += `<div class="card overlay-item" data-overlay="${escapeHtml(name)}">
+      <div class="url-row">
+        <span class="overlay-name">${escapeHtml(name)}</span>
+        <code>${u}</code>
+        <button class="btn-copy" onclick="copyUrl(this,'${u}')">${I18N.t('common.copy')}</button>
+        <button class="btn-test" onclick="testOverlay('${encodeURIComponent(name)}', this)">${I18N.t('overlays.test')}</button>
+      </div>
+      <iframe class="overlay-preview" src="${preview}" title="${escapeHtml(I18N.t('overlays.preview'))}" loading="lazy"></iframe>
+    </div>`;
   }
   // Plugin overlay URLs
   const en = currentPlugins.filter(p => p.enabled && p.port > 0);
   if (en.length) {
-    html += '<h3 style="margin:0.8rem 0 0.6rem 0;font-size:0.95rem;color:var(--text-secondary);">Plugin Overlays</h3>';
+    html += '<h3 class="overlay-section-title">' + I18N.t('overlays.plugins') + '</h3>';
     html += en.map(p => {
       const u = `http://localhost:${p.port}`;
-      return `<div class="url-row"><span style="font-size:0.85rem;min-width:100px;">${escapeHtml(p.display_name || p.name)}</span><code>${u}</code><button class="btn-copy" onclick="copyUrl(this,'${u}')">Copy</button></div>`;
+      return `<div class="card overlay-item" data-overlay="${escapeHtml(p.name)}">
+        <div class="url-row">
+          <span class="overlay-name">${escapeHtml(p.display_name || p.name)}</span>
+          <code>${u}</code>
+          <button class="btn-copy" onclick="copyUrl(this,'${u}')">${I18N.t('common.copy')}</button>
+        </div>
+        <iframe class="overlay-preview" src="${u}" title="${escapeHtml(I18N.t('overlays.preview'))}" loading="lazy"></iframe>
+      </div>`;
     }).join('');
   }
-  for (const c of containers) {
-    if (c) c.innerHTML = html;
+  container.innerHTML = html;
+}
+
+async function testOverlay(encodedName, btn) {
+  const overlayName = decodeURIComponent(encodedName);
+  const el = btn;
+  const original = el ? el.textContent : '';
+  if (el) {
+    el.disabled = true;
+    el.textContent = I18N.t('overlays.testing');
+  }
+  try {
+    await postJSON('/overlay/display', {
+      overlay_name: overlayName,
+      title: I18N.t('overlays.testTitle'),
+      subtitle: I18N.t('overlays.testSubtitle'),
+      duration: 3,
+    });
+    showToast(I18N.t('overlays.testSent', { name: overlayName }), 'success');
+    log(`[OVERLAY TEST] ${overlayName}: ${I18N.t('overlays.testTitle')}`, 'info');
+  } catch (e) {
+    showToast(I18N.t('overlays.testFailed') + ': ' + e.message, 'error');
+    log('Overlay test failed: ' + e.message, 'err');
+  } finally {
+    if (el) {
+      el.disabled = false;
+      el.textContent = original;
+    }
   }
 }
 

@@ -18,7 +18,7 @@
 | **P2** | Mittel | UX-Feinschliff / Verbesserung |
 | **P3** | Niedrig | Nice-to-have, später |
 
-**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ → Overlay-Vorschau → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → ~~Tastenkürzel~~ ✅ → ~~Undo~~ ✅ → Mobile/LAN), zum Schluss P3-Ideen.
+**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → Accessibility → ~~Overlay-Vorschau~~ ✅ → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → ~~Tastenkürzel~~ ✅ → ~~Undo~~ ✅ → Mobile/LAN), zum Schluss P3-Ideen.
 
 ---
 
@@ -67,20 +67,28 @@
 
 ### 3. Overlay-Vorschau & Overlay-Test
 
-- [ ] **Status:** Offen
-- [ ] **Problem:** Der Overlay-Bereich (`view-overlays`, Rendering in `app.js` ab ca. Zeile
-      1371, `renderOverlayUrls()`) zeigt nur Copy-URLs. Es gibt keine Möglichkeit, das Overlay
+- [x] **Status:** **ERLEDIGT** (2026-08-14)
+- [x] **Problem:** Der Overlay-Bereich (`view-overlays`, Rendering in `app.js`,
+      `renderOverlayUrls()`) zeigte nur Copy-URLs. Es gab keine Möglichkeit, das Overlay
       zu sehen oder einen Sample-Trigger auszulösen.
-- [ ] **Ziel:** Overlays direkt im Dashboard ansehen und testen.
-- [ ] **Umsetzungsvorschlag:**
-  - Eingebettete Vorschau (z. B. `<iframe>` mit Chromakey-Parameter) je Overlay.
-  - „Test"-Button, der über den bestehenden Event-Tester / `POST` einen Beispieldatensatz
-    (z. B. Fake-Gift/Follow) ans Overlay schickt.
-  - Optional: Live-Vorschau aktivieren/deaktivieren pro Overlay.
-- [ ] **Abnahmekriterien:** Jedes aufgelistete Overlay ist als Vorschau sichtbar; Test-Trigger
+- [x] **Ziel:** Overlays direkt im Dashboard ansehen und testen.
+- [x] **Umsetzung:**
+  - Jedes Overlay (Built-in: `default` + alle `overlay.overlays[].name`; Plugin-Overlays)
+    erhält eine `.card.overlay-item` mit Namen, Copy-URL und `<iframe class="overlay-preview">`
+    (transparenter Hintergrund, `chroma=0`). Die kopierte OBS-URL behält `chroma=1`.
+  - „Test"-Button (nur für Built-in-Overlays) ruft `testOverlay(name, btn)` → `POST
+    /api/v1/overlay/display` mit Beispiel-Titel/-Untertitel (`overlays.testTitle/testSubtitle`)
+    und `duration: 3`; die Nachricht erscheint sofort im Preview-Iframe und in OBS.
+    Buttons werden während des Sendens deaktiviert; Erfolg/Fehler per Toast.
+  - Abschnitts-Überschriften nutzen jetzt die vorhandenen i18n-Keys
+    `overlays.builtin`/`overlays.plugins` statt hartkodierter englischer Texte; neue Keys
+    `overlays.preview/test/testing/testTitle/testSubtitle/testSent/testFailed` (DE/EN).
+  - `help.js`-Topic `overlays` um Abschnitt „Preview & Test" / „Vorschau & Test" erweitert.
+  - `style.css`: `.overlay-item`, `.overlay-preview`, `.btn-test`, `.overlay-section-title`.
+- [x] **Abnahmekriterien:** Jedes aufgelistete Overlay ist als Vorschau sichtbar; Test-Trigger
       rendert sichtbar im Overlay.
-- [ ] **Betroffene Dateien:** `index.html`, `app.js` (`renderOverlayUrls()`), ggf.
-      `src/core/api/routes/` (falls neuer Test-Endpunkt nötig) + Tests
+- [x] **Betroffene Dateien:** `app.js` (`renderOverlayUrls()`, `testOverlay()` neu),
+      `i18n.js`, `help.js`, `style.css`, `tests/overlays.test.js` (neu, 9 Tests)
 
 ---
 
@@ -225,5 +233,6 @@
 - **Status-View Live-Statistiken** — Bridge `/metrics` Endpoint, `BridgeMetricsService`, erweiterter `/status` Response, GUI "Live Statistics" Sektion mit RCON/Trigger Queue, Events/Min, Gift Value Today. i18n DE/EN. Tests grün. (P2)
 - **Undo nach dem Speichern / Backup-Wiederherstellung** — Neue Backups-API (`GET /api/v1/backups`, `POST /api/v1/backups/restore`, `POST /api/v1/backups/create`) mit `BackupService`, neue GUI-View „Backups" mit Liste, Wiederherstellen-Dialog und „Backup Now", i18n DE/EN, Help-Topic. Backend- + GUI-Tests grün. (P2)
 - **Tastenkürzel** — Neues `templates/gui/shortcuts.js` (`Ctrl+S` speichert im aktiven Editor, `/` fokussiert die Suche, `Esc` schließt das oberste Modal, `?` öffnet das Kürzel-Hilfethema; Eingabe-Safety), `Esc`-Bestätigen im Confirm-Dialog (`showConfirmDialog`), Kürzel-Doku in `help.js` + `kbd`-Hints an den Save-Buttons, 19 neue GUI-Tests. GUI-Tests grün. (P2)
+- **Overlay-Vorschau & Overlay-Test** — `renderOverlayUrls()` rendert pro Overlay eine Card mit Live-`<iframe>`-Vorschau (`chroma=0`) und „Test"-Button, der `POST /api/v1/overlay/display` mit Beispielnachricht sendet (Toast-Feedback, Button-Deaktivierung); i18n DE/EN (inkl. Abschnitts-Überschriften `overlays.builtin/plugins`), Help-Topic „Vorschau & Test", 9 neue GUI-Tests. GUI-Tests grün. (P1)
 
 ---
