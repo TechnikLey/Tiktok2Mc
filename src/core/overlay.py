@@ -45,7 +45,7 @@ HTML_TEMPLATE = """
 <head>
     <style>
 {{ theme_style }}
-        body {{
+        body {
             margin: 0; padding: 0; overflow: hidden;
             {{ chroma_background }}
             display: flex;
@@ -56,15 +56,15 @@ HTML_TEMPLATE = """
             font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8), 1px -1px 3px rgba(0,0,0,0.8), -1px 1px 3px rgba(0,0,0,0.8);
             -webkit-font-smoothing: antialiased;
-        }}
-        #container {{
+        }
+        #container {
             text-align: center;
             opacity: 0;
             transition: opacity {{ fade_in }}ms ease-in-out;
-        }}
-        h1 {{ font-size: 70px; margin: 0; color: var(--text); font-weight: 700; }}
-        p {{ font-size: 30px; margin: 0; color: var(--text); font-weight: 400; }}
-        .show {{ opacity: 1 !important; }}
+        }
+        h1 { font-size: 70px; margin: 0; color: var(--text); font-weight: 700; }
+        p { font-size: 30px; margin: 0; color: var(--text); font-weight: 400; }
+        .show { opacity: 1 !important; }
     </style>
 </head>
 <body>

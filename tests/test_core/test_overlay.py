@@ -93,6 +93,21 @@ class TestOverlayManager:
         assert html.count("<script>") == 1
         assert "--background: /stylescriptalert(1)/script;" in html
 
+    def test_render_html_emits_valid_css(self, tmp_path, monkeypatch):
+        """Regression: CSS braces must not survive as literal '{{'/'}}'
+        (breaks all rules, so the overlay text renders black-on-black)."""
+        config_file = tmp_path / "config.yaml"
+        save_yaml(config_file, {}, backup=False)
+        monkeypatch.setattr("core.overlay_base.get_config_file", lambda: config_file)
+
+        mgr = OverlayManager()
+        html = mgr.render_html("default", chroma=False)
+        assert "{{" not in html
+        assert "}}" not in html
+        assert "body {" in html
+        assert ".show { opacity: 1 !important; }" in html
+        assert "background-color: transparent;" in html
+
     def test_dispatch_unknown_overlay(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.yaml"
         save_yaml(config_file, {}, backup=False)
