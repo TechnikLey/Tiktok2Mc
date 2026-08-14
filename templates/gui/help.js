@@ -407,9 +407,45 @@
         },
       ],
     },
+    backups: {
+      title: { en: 'Backups', de: 'Backups' },
+      sections: [
+        {
+          h: { en: 'Automatic Backups', de: 'Automatische Backups' },
+          body: {
+            en: [
+              'A backup is created automatically whenever you save your configuration, your actions (actions.mca), plugin settings or the plugin registry. All backups are stored under data/backups/ and the newest ones are kept automatically (older copies are cleaned up).',
+            ],
+            de: [
+              'Bei jedem Speichern deiner Konfiguration, deiner Aktionen (actions.mca), von Plugin-Einstellungen oder der Plugin-Registry wird automatisch ein Backup erstellt. Alle Backups liegen unter data/backups/, die neuesten werden automatisch vorgehalten (ältere Kopien werden bereinigt).',
+            ],
+          },
+        },
+        {
+          h: { en: 'Restore', de: 'Wiederherstellen' },
+          body: {
+            en: [
+              'Each backup can be restored with the "Restore" button. A confirmation dialog warns you that the current file will be overwritten. A safety backup of the current state is created first, so the restore itself can be undone.',
+            ],
+            de: [
+              'Jedes Backup lässt sich über die Schaltfläche „Wiederherstellen" zurückspielen. Ein Bestätigungsdialog weist darauf hin, dass die aktuelle Datei überschrieben wird. Vorher wird ein Sicherheits-Backup des aktuellen Stands erstellt, sodass auch die Wiederherstellung selbst rückgängig gemacht werden kann.',
+            ],
+          },
+        },
+        {
+          h: { en: 'Backup Now', de: 'Jetzt sichern' },
+          body: {
+            en: [
+              'Use "Backup Now" to create a snapshot of your config, actions and plugin registry on demand — for example before a larger change. Entries marked "Not restorable" are kept as reference only and cannot be restored directly.',
+            ],
+            de: [
+              'Mit „Jetzt sichern" erstellst du jederzeit einen Schnappschuss von Konfiguration, Aktionen und Plugin-Registry — zum Beispiel vor einer größeren Änderung. Einträge mit „Nicht wiederherstellbar" dienen nur als Referenz und können nicht direkt wiederhergestellt werden.',
+            ],
+          },
+        },
+      ],
+    },
   };
-
-  /* ── Error message normalization ── */
   const _err = {
     operationFailed: { en: 'The operation failed.', de: 'Die Aktion ist fehlgeschlagen.' },
     seeLog: { en: 'Check the Live Log for more details.', de: 'Weitere Details findest du im Live-Log.' },

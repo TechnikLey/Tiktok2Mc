@@ -1758,6 +1758,101 @@ function renderRevenueView() {
   renderRevenueTable(entries);
 }
 
+/* ─── Backups ─── */
+let _backupsData = { categories: [], total: 0 };
+
+async function loadBackups() {
+  try {
+    const data = await fetchJSON('/backups');
+    _backupsData = data && Array.isArray(data.categories) ? data : { categories: [], total: 0 };
+    renderBackups();
+  } catch (e) {
+    log('Backups load failed: ' + e.message, 'err');
+    const root = document.getElementById('backups-root');
+    if (root) root.innerHTML = '<p class="text-muted">' + I18N.t('backups.failedLoad') + '</p>';
+  }
+}
+
+function _formatBytes(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + ' B';
+  if (v < 1048576) return (v / 1024).toFixed(1) + ' KB';
+  return (v / 1048576).toFixed(1) + ' MB';
+}
+
+function _backupCategoryLabel(category) {
+  if (category === 'config') return I18N.t('backups.catConfig');
+  if (category === 'actions') return I18N.t('backups.catActions');
+  if (category === 'plugin_registry') return I18N.t('backups.catPluginRegistry');
+  if (category === 'migration') return I18N.t('backups.catMigration');
+  if (category.startsWith('plugins/')) return I18N.t('backups.catPlugin') + ': ' + escapeHtml(category.slice('plugins/'.length));
+  return escapeHtml(category);
+}
+
+function renderBackups() {
+  const root = document.getElementById('backups-root');
+  if (!root) return;
+  if (!_backupsData.categories.length) {
+    root.innerHTML = '<p class="text-muted">' + I18N.t('backups.empty') + '</p>';
+    return;
+  }
+  const colWhen = I18N.t('backups.colWhen');
+  const colFile = I18N.t('backups.colFile');
+  const colSize = I18N.t('backups.colSize');
+  const colAction = I18N.t('backups.colAction');
+  const html = _backupsData.categories.map(cat => {
+    const rows = cat.entries.map(e => {
+      const restoreBtn = e.restorable
+        ? `<button class="btn btn--secondary btn--sm" onclick="restoreBackup('${e.category}', '${e.filename}')">${I18N.t('backups.restore')}</button>`
+        : '<span class="text-muted">' + I18N.t('backups.notRestorable') + '</span>';
+      return '<tr>' +
+        '<td data-label="' + colWhen + '">' + escapeHtml(e.label || '—') + '</td>' +
+        '<td class="backup-filename" data-label="' + colFile + '">' + escapeHtml(e.filename) + '</td>' +
+        '<td data-label="' + colSize + '">' + _formatBytes(e.size) + '</td>' +
+        '<td class="backup-actions" data-label="' + colAction + '">' + restoreBtn + '</td>' +
+        '</tr>';
+    }).join('');
+    return '<section class="view-section backup-category">' +
+      '<h3>' + _backupCategoryLabel(cat.category) + ' <span class="backup-count">' + cat.count + '</span></h3>' +
+      '<div class="backup-table-wrap">' +
+      '<table class="backup-table"><thead><tr>' +
+      '<th>' + colWhen + '</th>' +
+      '<th>' + colFile + '</th>' +
+      '<th>' + colSize + '</th>' +
+      '<th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '</div></section>';
+  }).join('');
+  root.innerHTML = html;
+}
+
+function restoreBackup(category, filename) {
+  showConfirmDialog(
+    I18N.t('backups.restoreTitle'),
+    I18N.t('backups.restoreWarning', { filename }),
+    I18N.t('backups.restore'),
+    'btn-danger'
+  ).then(confirmed => {
+    if (!confirmed) return;
+    postJSON('/backups/restore', { category, filename })
+      .then(() => {
+        showToast(I18N.t('backups.restored'), 'success');
+        loadBackups();
+      })
+      .catch(e => showToast(e.message, 'error'));
+  });
+}
+
+async function createBackupsNow() {
+  try {
+    const res = await postJSON('/backups/create', { targets: ['config', 'actions', 'plugin_registry'] });
+    const count = res.created ? res.created.length : 0;
+    showToast(count > 0 ? I18N.t('backups.created', { count }) : I18N.t('backups.upToDate'), count > 0 ? 'success' : 'info');
+    loadBackups();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
 function renderPluginManager() {
   const tableDiv = document.getElementById('plugin-manager-table');
   if (!tableDiv) return;
@@ -6619,6 +6714,9 @@ function switchViewNow(viewId) {
   }
   if (viewId === 'revenue') {
     loadRevenueView();
+  }
+  if (viewId === 'backups') {
+    loadBackups();
   }
 }
 

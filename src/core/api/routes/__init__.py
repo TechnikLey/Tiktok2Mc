@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .actions import router as actions_router
+from .backups import router as backups_router
 from .config import router as config_router
 from .diagnostics import router as diagnostics_router
 from .event_commands import router as event_commands_router
@@ -36,6 +37,7 @@ api_router.include_router(updater_router)
 api_router.include_router(system_router)
 api_router.include_router(reload_router)
 api_router.include_router(actions_router)
+api_router.include_router(backups_router)
 api_router.include_router(overlay_router)
 api_router.include_router(plugin_overlay_router)
 api_router.include_router(hooks_router)

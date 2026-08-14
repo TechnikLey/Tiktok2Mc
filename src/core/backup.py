@@ -89,6 +89,11 @@ class BackupManager:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def backup_root(self) -> Path:
+        """Return the directory under which all backups are stored."""
+        return self._backup_root
+
     def create_backup(
         self,
         source_path: Path,

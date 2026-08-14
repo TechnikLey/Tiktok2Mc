@@ -37,6 +37,7 @@ describe('Help', () => {
     expect(Help.topics).toContain('servers');
     expect(Help.topics).toContain('revenue');
     expect(Help.topics).toContain('triggers');
+    expect(Help.topics).toContain('backups');
     expect(Help.topics).toContain('updates');
   });
 

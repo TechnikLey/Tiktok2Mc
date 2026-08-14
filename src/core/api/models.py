@@ -533,3 +533,75 @@ class RevenueFileInfo(BaseModel):
 class RevenueResponse(BaseModel):
     entries: list[RevenueEntry]
     file: RevenueFileInfo
+
+
+# ── Backup models ────────────────────────────────────────────────────
+
+
+class BackupEntry(BaseModel):
+    """A single backup file inside a category."""
+
+    category: str = Field("", description="Backup category, e.g. 'config'")
+    filename: str = Field(
+        ...,
+        description="Backup file name, e.g. 'config.v20260529_143021_123456.yaml.bak'",
+    )
+    label: str = Field("", description="Human-readable creation timestamp")
+    size: int = Field(0, description="File size in bytes")
+    modified: float | None = Field(None, description="Last-modified Unix timestamp")
+    created: float | None = Field(
+        None, description="Creation Unix timestamp parsed from the file name"
+    )
+    restorable: bool = Field(
+        True, description="Whether a restore target is known for this backup"
+    )
+
+
+class BackupCategory(BaseModel):
+    """A group of backups (config, actions, plugins/<name>, ...)."""
+
+    category: str = Field(..., description="Category identifier")
+    label: str = Field("", description="Human-readable category label")
+    count: int = Field(0, description="Number of entries")
+    entries: list[BackupEntry] = Field(default_factory=list)
+
+
+class BackupListResponse(BaseModel):
+    """Response for ``GET /api/v1/backups``."""
+
+    root: str = Field("", description="Absolute path of the backup root directory")
+    categories: list[BackupCategory] = Field(default_factory=list)
+    total: int = Field(0, description="Total number of backup files")
+
+
+class BackupRestoreRequest(BaseModel):
+    """Request body for ``POST /api/v1/backups/restore``."""
+
+    category: str = Field(..., description="Category of the backup to restore")
+    filename: str = Field(..., description="File name of the backup to restore")
+
+
+class BackupRestoreResponse(BaseModel):
+    status: str
+    category: str = ""
+    filename: str = ""
+    target: str = Field("", description="Absolute path of the restored target file")
+
+
+class BackupCreateRequest(BaseModel):
+    """Request body for ``POST /api/v1/backups/create``."""
+
+    targets: list[str] = Field(
+        default_factory=lambda: ["config", "actions"],
+        description="Which targets to back up now: config, actions, plugin_registry",
+    )
+
+
+class BackupCreateResponse(BaseModel):
+    created: list[dict[str, str]] = Field(
+        default_factory=list, description="Created backups: [{target, category, path}]"
+    )
+    skipped: list[str] = Field(
+        default_factory=list,
+        description="Targets with no new backup (unchanged / missing)",
+    )

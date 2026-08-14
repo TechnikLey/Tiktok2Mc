@@ -18,7 +18,7 @@
 | **P2** | Mittel | UX-Feinschliff / Verbesserung |
 | **P3** | Niedrig | Nice-to-have, später |
 
-**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ → Overlay-Vorschau → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → Tastenkürzel → Undo → Mobile/LAN), zum Schluss P3-Ideen.
+**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ → Overlay-Vorschau → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → Tastenkürzel → ~~Undo~~ ✅ → Mobile/LAN), zum Schluss P3-Ideen.
 
 ---
 
@@ -143,20 +143,31 @@
 
 ### 7. Undo nach dem Speichern / Backup-Wiederherstellung
 
-- [ ] **Status:** Offen (Backend: `BackupManager` in `src/core/backup.py` implementiert, API nutzt `backup=true`, aber kein GUI)
-- [ ] **Problem:** Editoren haben Review-vor-Speichern, aber nach dem Speichern kein Undo.
+- [x] **Status:** **ERLEDIGT** (2026-08-14)
+- [x] **Problem:** Editoren haben Review-vor-Speichern, aber nach dem Speichern kein Undo.
       Backups existieren bereits unter `data/backups/` (`AGENTS.md` §3, `src/core/backup.py`),
-      haben aber kein GUI. API-Routen für `list_backups`/`restore_backup` fehlen.
-- [ ] **Ziel:** Nutzer können Änderungen an `config.yaml` / `actions.mca` / Plugin-/Hook-Config
+      haben aber kein GUI. API-Routen für `list_backups`/`restore_backup` fehlten.
+- [x] **Ziel:** Nutzer können Änderungen an `config.yaml` / `actions.mca` / Plugin-/Hook-Config
       zurückrollen.
-- [ ] **Umsetzungsvorschlag:**
-  - Backups-View, die `data/backups/` auflistet (Zeitstempel, Quelle, Größe) und Wiederherstellen
-    erlaubt (neue API-Endpunkte nötig: `GET /api/v1/backups`, `POST /api/v1/backups/restore`).
-  - Optional: Undo-Last-Save innerhalb einer Editor-Session (In-Memory-Stack).
-- [ ] **Abnahmekriterien:** Backup kann aus der GUI heraus wiederhergestellt werden; Warnung vor
-      Überschreiben.
-- [ ] **Betroffene Dateien:** `index.html`, `app.js`, `src/core/api/routes/` + `services/`,
-      `src/core/backup.py`, Tests
+- [x] **Umsetzung:**
+  - Neue API-Endpunkte: `GET /api/v1/backups` (listet Kategorien + Einträge mit Zeitstempel,
+    Dateiname, Größe, `restorable`), `POST /api/v1/backups/restore` (mit Sicherheits-Backup des
+    aktuellen Ziels vorher), `POST /api/v1/backups/create` (Manuelles Snapshot von config/actions/
+    plugin_registry). `BackupService` in `src/core/api/services/backups.py` (Pfadauflösung via
+    `core.paths` zur Laufzeit), Router in `src/core/api/routes/backups.py`, Modelle in
+    `src/core/api/models.py`.
+  - Neue GUI-View „Backups" (Nav-Item + `view-backups`): Kategorien-Gruppierung mit Zähl-Badge,
+    Tabelle (Zeit/Datei/Größe/Aktion), „Wiederherstellen"-Button mit Bestätigungsdialog
+    (Warnung vor Überschreiben, Sicherheits-Backup wird zuerst erstellt), „Backup Now"-Button,
+    Refresh. „?"-Hilfe-Button mit `backups`-Topic in `help.js`. i18n DE/EN.
+- [x] **Abnahmekriterien:** Backup kann aus der GUI heraus wiederhergestellt werden; Warnung vor
+      Überschreiben; manuelles Backup erstellbar; alle Tests grün (Backend
+      `tests/test_api/test_backups.py`, GUI `tests/backups.test.js`).
+- [x] **Betroffene Dateien:** `index.html`, `app.js`, `i18n.js`, `help.js`, `style.css`,
+      `tests/backups.test.js` (neu), `src/core/api/routes/backups.py` (neu),
+      `src/core/api/routes/__init__.py`, `src/core/api/services/backups.py` (neu),
+      `src/core/api/models.py`, `src/core/backup.py` (`backup_root`), `tests/conftest.py`,
+      `tests/test_api/test_backups.py` (neu)
 
 ---
 
@@ -194,5 +205,6 @@
 
 - **Lokalisierung (i18n)** — `templates/gui/i18n.js` implementiert mit DE/EN, `localStorage`-Persistenz, `data-i18n`-Attribute im HTML, Sprachumschalter in Sidebar, Tests in `templates/gui/tests/i18n.test.js`. (P1)
 - **Status-View Live-Statistiken** — Bridge `/metrics` Endpoint, `BridgeMetricsService`, erweiterter `/status` Response, GUI "Live Statistics" Sektion mit RCON/Trigger Queue, Events/Min, Gift Value Today. i18n DE/EN. Tests grün. (P2)
+- **Undo nach dem Speichern / Backup-Wiederherstellung** — Neue Backups-API (`GET /api/v1/backups`, `POST /api/v1/backups/restore`, `POST /api/v1/backups/create`) mit `BackupService`, neue GUI-View „Backups" mit Liste, Wiederherstellen-Dialog und „Backup Now", i18n DE/EN, Help-Topic. Backend- + GUI-Tests grün. (P2)
 
 ---

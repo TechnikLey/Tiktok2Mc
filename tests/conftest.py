@@ -231,6 +231,7 @@ def _patch_paths(project_dir):
         "core.api.routes.rcon",
         "core.api.routes.versions",
         "core.api.routes.actions",
+        "core.api.routes.backups",
     ):
         if mod_name in sys.modules:
             mod = sys.modules[mod_name]
