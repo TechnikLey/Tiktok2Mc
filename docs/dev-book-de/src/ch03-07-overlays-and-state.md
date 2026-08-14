@@ -6,14 +6,14 @@ Plugins können Overlay-Inhalte für OBS oder das pywebview-Fenster bereitstelle
 
 ```
 Plugin-Prozess           API-Server                    Browser / OBS
-     │                       │                              │
-     │── POST /overlay-html ─→│                              │
-     │                       │── GET /plugins/{name}/overlay →│
-     │                       │    (statisches HTML)          │
-     │                       │                              │
-     │── POST /state ───────→│                              │
-     │                       │── SSE: data: {...} ──────────→│
-     │                       │    (EventSource-Stream)       │
+     │                        │                                │
+     │── POST /overlay-html ─→│                                │
+     │                        │── GET /plugins/{name}/overlay →│
+     │                        │    (statisches HTML)           │
+     │                        │                                │
+     │── POST /state ───────→ │                                │
+     │                        │── SSE: data: {...} ──────────→ │
+     │                        │    (EventSource-Stream)        │
 ```
 
 ## Statisches Overlay-HTML

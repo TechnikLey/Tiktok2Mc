@@ -6,12 +6,12 @@ Dieses Kapitel erklärt die Architektur und die wichtigsten Komponenten, die du 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Supervisor (start.py)                  │
-│  Startet und überwacht alle Komponenten                  │
+│                    Supervisor (start.py)                │
+│  Startet und überwacht alle Komponenten                 │
 └─────────────────────────────────────────────────────────┘
          │                   │                   │
          ▼                   ▼                   ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐
 │  API-Server      │  │  Bridge (main.py)│  │  Minecraft      │
 │  (FastAPI)       │  │  TikTok-Client   │  │  Server         │
 │  Port 29185      │  │  EventBus        │  │  (RCON)         │
@@ -21,13 +21,13 @@ Dieses Kapitel erklärt die Architektur und die wichtigsten Komponenten, die du 
 │  Event-Command-  │  │  Trigger-Worker  │  │                 │
 │  Mapper          │  │                  │  │                 │
 └────────┬─────────┘  └────────┬─────────┘  └────────┬────────┘
-         │                     │                      │
-         │   HTTP (POST/GET)   │   asyncio.Queue      │   RCON
-         ▼                     ▼                      ▼
+         │                     │                     │
+         │   HTTP (POST/GET)   │   asyncio.Queue     │   RCON
+         ▼                     ▼                     ▼
 ┌──────────────────────────────────────────────────────────┐
-│  Plugins (Subprozesse)                                    │
-│  python src/plugins/*/main.py                             │
-│  Kommunizieren per HTTP mit API-Server                    │
+│  Plugins (Subprozesse)                                   │
+│  python src/plugins/*/main.py                            │
+│  Kommunizieren per HTTP mit API-Server                   │
 └──────────────────────────────────────────────────────────┘
 ```
 
