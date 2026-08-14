@@ -3176,6 +3176,37 @@ const SECTION_META = {
   plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' },
 };
 
+const SECTION_META_DE = {
+  tiktok: { title: 'TikTok Live', desc: 'Verbinde das Tool mit deinem TikTok-Live-Stream. Lege deinen Benutzernamen und das Verbindungsverhalten fest.' },
+  rcon: { title: 'Remote Console (RCON)', desc: 'RCON erlaubt dem Tool, Befehle an deinen Minecraft-Server zu senden. Lasse diese Option aktiviert.' },
+  api: { title: 'API-Server', desc: 'Konfiguration des zentralen API-Servers, der das Dashboard und die interne Kommunikation antreibt.' },
+  java: { title: 'Minecraft-Server', desc: 'Steuert, wie viel RAM der Minecraft-Server verwendet und auf welchem Port er läuft.' },
+  mc_version: { title: 'Minecraft-Version', desc: 'Die Minecraft-Version, auf der der Server läuft. Wird für versionsabhängige Funktionen verwendet.' },
+  comment_commands: { title: 'Chat-Befehle', desc: 'Lass Zuschauer Befehle über den TikTok-Chat senden. Du kannst mehrere Gruppen mit unterschiedlichen Präfixen, Rollen und Regeln erstellen.' },
+  random_triggers: { title: 'Zufalls-Trigger-Filter', desc: 'Steuert, welche Trigger für die $random-Aktion in data/actions.mca ausgewählt werden können.' },
+  console: { title: 'Konsolen-Sichtbarkeit', desc: 'Steuert, welche Fenster und Prozesse beim Start des Tools angezeigt werden.' },
+  minecraft_server_api: { title: 'Minecraft-Server-API', desc: 'Übernimmt die Kommunikation zwischen dem Tool und dem Minecraft-Server. Erforderlich für die Spieler-Tod-/Wiederbelebungs-Erkennung.' },
+  gui: { title: 'Dashboard', desc: 'Die grafische Benutzeroberfläche wird vom zentralen API-Server bereitgestellt und in einem Fenster angezeigt.' },
+  overlay: { title: 'Overlay-Text', desc: 'Overlay-Subsystem zur Anzeige von Textnachrichten im Stream.' },
+  theme: { title: 'Overlay-Farben', desc: 'Passe die Farben für Overlays an. Alle Werte sind CSS-Hex-Codes wie #ff0000.' },
+  update: { title: 'Auto-Updater', desc: 'Überprüft beim Start auf neue Versionen und installiert sie automatisch. Dringend empfohlen.' },
+  shutdown: { title: 'Auto-Herunterfahren', desc: 'Fährt das Tool automatisch herunter, nachdem dein Live-Stream endet.' },
+  server_host: { title: 'Server-Adresse', desc: 'Steuert, an welchen Netzwerkschnittstellen das Tool lauscht.' },
+  control_method: { title: 'Steuerungsmethode', desc: 'Wie das Tool mit deiner Streaming-Software kommuniziert.' },
+  auto_update_config: { title: 'Auto-Konfigurations-Update', desc: 'Fügt beim Tool-Update automatisch neue Optionen hinzu, ohne deine Werte zu überschreiben.' },
+  show_sudo_warning: { title: 'Sudo-Warnung', desc: 'Nur Linux. Warnt, wenn du ohne sudo läufst, was Berechtigungsprobleme verursachen kann.' },
+  port_policy: { title: 'Port-Richtlinie', desc: 'Steuert, was passiert, wenn ein benötigter Port bereits belegt ist. Kann automatisch zum nächsten freien Port wechseln.' },
+  api_key: { title: 'API-Schlüssel', desc: 'Optionaler API-Schlüssel für die Authentifizierung, wenn der Server über localhost hinaus erreichbar ist.' },
+  plugin_sandbox: { title: 'Plugin-Sandbox', desc: 'Beschränkt Ressourcen von Plugin-Subprozessen, um die Auswirkungen fehlerhafter oder kompromittierter Plugins zu begrenzen.' },
+};
+
+const CATEGORY_LABELS_DE = {
+  'Connection': 'Verbindung',
+  'Minecraft': 'Minecraft',
+  'System': 'System',
+  'Chat & Commands': 'Chat & Befehle',
+};
+
 const HELP_TEXT = {
   'auto_update_config': 'When enabled (recommended), new configuration options introduced by updates are automatically merged into your existing config.yaml. Your existing values are preserved.',
   'show_sudo_warning': 'On Linux, running without sudo can cause update and permission issues. Set to false only if you have configured your system to handle permissions properly without sudo.',
@@ -3245,6 +3276,77 @@ const HELP_TEXT = {
   'plugin_sandbox.max_files': 'Maximum open file descriptors per plugin (Linux only).',
   'plugin_sandbox.max_processes': 'Maximum child processes per plugin (Linux only).',
   'plugin_sandbox.priority_class': 'Windows process priority for plugin subprocesses. below_normal reduces impact on the main tool.'
+};
+
+const HELP_TEXT_DE = {
+  'auto_update_config': 'Wenn aktiviert (empfohlen), werden neue Konfigurationsoptionen, die durch Updates eingeführt werden, automatisch in deine bestehende config.yaml eingefügt. Deine vorhandenen Werte bleiben erhalten.',
+  'show_sudo_warning': 'Unter Linux kann das Ausführen ohne sudo Update- und Berechtigungsprobleme verursachen. Setze dies nur auf false, wenn dein System die Berechtigungen auch ohne sudo korrekt handhabt.',
+  'server_host': 'Steuert, an welchen Netzwerkschnittstellen die Server lauschen. „127.0.0.1" bedeutet nur lokaler Zugriff (Standard, sicher). „0.0.0.0" erlaubt Zugriff von anderen Geräten in deinem Netzwerk. Der zentrale API-Server läuft immer auf Port 29185.',
+  'control_method': 'Wie das Tool mit deiner Streaming-Software kommuniziert. DCS (Direct Control System) wird für OBS Studio, vMix und Streamlabs Desktop empfohlen. ICS (Interface Control System) ist für TikTok Live Studio und Twitch Studio erforderlich.',
+  'shutdown.enabled': 'Wenn aktiviert, fährt sich das Tool automatisch herunter, nachdem dein Live-Stream endet.',
+  'shutdown.delay_seconds': 'Sekunden bis zum Herunterfahren. Ein Countdown gibt dir Zeit zum Abbrechen, indem du „stop" in die Konsole tippst.',
+  'java.xms': 'Anfängliche RAM-Zuweisung für den Minecraft-Server. „G" = Gigabyte. Es wird empfohlen, für xms und xmx den gleichen Wert zu verwenden. Standard ist 4G. Reduziere auf 2G oder 1G, wenn dein System weniger als 8 GB RAM hat. Zu wenig RAM kann zu Verzögerungen oder Abstürzen führen.',
+  'java.xmx': 'Maximale RAM-Zuweisung. Sollte für stabile Leistung xms entsprechen. „G" = Gigabyte.',
+  'java.port': 'Minecraft-Server-Port. Standard: 25565. Nur ändern, wenn du ihn in server.properties geändert hast.',
+  'rcon.enabled': 'RCON erlaubt dem Tool, Befehle an deinen Minecraft-Server zu senden. WICHTIG: Lasse dies aktiviert — Deaktivieren bricht die meisten Funktionen.',
+  'rcon.password': 'Lege ein sicheres Passwort fest. Das Tool fragt dich beim ersten Start danach, wenn dieses Feld leer bleibt.',
+  'rcon.port': 'RCON-Port. Standard: 25575. Nur ändern, wenn du ihn in server.properties geändert hast.',
+  'tiktok.user': 'Dein TikTok-Benutzername — ohne das @-Zeichen. Dies ist erforderlich, damit sich das Tool mit deinem Live-Stream verbinden kann.',
+  'tiktok.reconnect_delay_seconds': 'Sekunden, die vor dem erneuten Verbindungsversuch nach einem Verbindungsverlust gewartet werden.',
+  'tiktok.autosave_interval_seconds': 'Wie oft (in Sekunden) die Geschenk-Umsatzlog-Datei auf der Festplatte gespeichert wird. Die Log-Datei liegt unter data/gift_revenue_log.jsonl.',
+  'tiktok.follow_tracking.mode': 'all_time verfolgt Follower über ALLE Streams hinweg. Sobald ein Nutzer erfasst wurde, werden zukünftige Follows auch nach einem Neustart ignoriert. per_stream setzt die Liste bei jedem Start des Tools zurück.',
+  'tiktok.follow_tracking.file': 'Pfad zur Datei, die die verfolgten Followernamen speichert. Standard: data/followed_users.txt.',
+  'comment_commands.enabled': 'Hauptschalter — setze auf true, damit Zuschauer Befehle über den Chat senden können. Jede Gruppe unten verarbeitet passende Kommentare unabhängig.',
+  'comment_commands.cooldown': 'Globaler Cooldown über ALLE Gruppen. Bei 10 muss ein Zuschauer, der $skip ausführt, 10 Sekunden warten, bevor IRGENDEIN Befehl funktioniert. Setze auf 0 zum Deaktivieren.',
+  'comment_commands.user_cooldown': 'Globaler Benutzer-Cooldown — wie der globale Cooldown, aber pro Benutzer. Bei 30 muss ein Zuschauer 30 Sekunden warten, bevor SEIN NÄCHSTER Befehl in einer Gruppe funktioniert. Setze auf 0 zum Deaktivieren.',
+  'comment_commands.groups': 'Definiere eine oder mehrere Befehlgruppen. Jede Gruppe hat ihr eigenes Präfix, Rollenanforderungen, Erlaubt/Verweigert-Regeln, Ziel und Cooldowns.',
+  'comment_commands.groups[].enabled': 'Schaltet diese Befehlgruppe ein oder aus.',
+  'comment_commands.groups[].prefix': 'Das Zeichen, das diese Gruppe auslöst. Zum Beispiel: # für Minecraft-Befehle oder $ für Spotify.',
+  'comment_commands.groups[].allowed_roles': 'Wer darf Befehle dieser Gruppe verwenden? Optionen: all, moderator, superfan, fanclub. Sei vorsichtig mit „all" — jeder im Chat kann diese Befehle verwenden.',
+  'comment_commands.groups[].mode': 'deny-all bedeutet, dass NUR die aufgelisteten Befehle funktionieren. allow-all bedeutet, dass ALLE Befehle funktionieren AUSSER den aufgelisteten. deny-all ist für öffentlichen Zugriff sicherer.',
+  'comment_commands.groups[].commands': 'Liste der Basis-Befehlsnamen, die je nach Modus oben erlaubt oder blockiert werden.',
+  'comment_commands.groups[].commands_config': 'Befehlsübergreifende Überschreibungen für Punktekosten, Cooldown, Rollen, URL und Handler. Nur nötig, wenn du besondere Einstellungen für bestimmte Befehle willst.',
+  'comment_commands.groups[].handler': 'rcon sendet Befehle an deinen Minecraft-Server. http sendet sie an eine Web-URL.',
+  'comment_commands.groups[].cooldown': 'Sekunden zwischen IRGENDEINEM Befehl in dieser Gruppe. Setze auf 0 zum Deaktivieren.',
+  'comment_commands.groups[].user_cooldown': 'Sekunden, die der GLEICHE Zuschauer warten muss, bevor er seinen nächsten Befehl in dieser Gruppe ausführen kann. Setze auf 0 zum Deaktivieren.',
+  'comment_commands.groups[].trigger_comment_event': 'Soll bei Verwendung eines Befehls zusätzlich der „comment"-Trigger in actions.mca ausgelöst werden? Standard: true.',
+  'comment_commands.groups[].url': 'HTTP-Endpunkt, der den Befehl empfängt. Du kannst Platzhalter verwenden: {user} = Zuschauername, {text} = Befehlstext.',
+  'comment_commands.groups[].commands_config[].points_cost': 'Punktkosten — der Zuschauer benötigt so viele Kanalpunkte, um diesen Befehl zu verwenden. Setze auf 0, um ihn kostenlos zu machen.',
+  'comment_commands.groups[].commands_config[].cooldown': 'Cooldown pro Befehl in Sekunden. Überschreibt den Gruppen-Cooldown.',
+  'comment_commands.groups[].commands_config[].conditional': 'Wenn true: Punkte und Cooldowns gelten nur, wenn der Befehl erfolgreich ist. Bei Misserfolg wird nichts abgezogen und kein Cooldown gesetzt.',
+  'comment_commands.groups[].commands_config[].url': 'Direkte URL für diesen spezifischen Befehl. Umgeht die Gruppen-URL.',
+  'comment_commands.groups[].commands_config[].handler': 'Überschreibe den Handler für diesen Befehl: rcon oder http.',
+  'comment_commands.groups[].commands_config[].roles': 'Rollenüberschreibung pro Befehl. Ersetzt die Gruppen-allowed_roles nur für diesen Befehl.',
+  'random_triggers.mode': 'deny-all bedeutet, dass NUR Trigger in der Liste für $random infrage kommen. allow-all bedeutet, dass ALLE Trigger infrage kommen AUSSER den aufgelisteten.',
+  'random_triggers.triggers': 'Liste der Triggernamen. Welche verwendet werden, hängt vom Modus ab. Trigger, die „$random" enthalten, werden automatisch ausgeschlossen, um Endlosrekursion zu verhindern.',
+  'console.log_level': 'Sichtbarkeitsstufe: 0 = Alles ausblenden, 1 = Still (Konsole ausblenden, GUI behalten), 2 = Standard (empfohlen), 3 = Erweitert, 4 = Debug, 5 = Override (nur zum Debuggen).',
+  'console.visible': 'Konsolen-Hauptfenster beim Start des Tools anzeigen oder ausblenden.',
+  'console.allow_close': 'Wenn true, fährt die Eingabe von „exit" in der Konsole alles sauber herunter. Wenn false, beendet sich der Launcher sofort nach dem Start der Programme.',
+  'minecraft_server_api.enabled': 'Erforderlich für die Spieler-Tod-/Wiederbelebungs-Erkennung und das Laden von Datapacks. Lasse dies aktiviert, es sei denn, du weißt, dass du diese Funktionen nicht benötigst.',
+  'minecraft_server_api.api_port': 'Port für die interne Minecraft-API-Brücke. Standard: 29187.',
+  'minecraft_server_api.web_server_port': 'Port für den Webhook-Server, der Minecraft-Ereignisse empfängt. Standard: 29188.',
+  'gui.enabled': 'Startet das grafische Dashboard beim Programmstart. Wenn deaktiviert, kannst du es trotzdem manuell öffnen.',
+  'update.enabled': 'Überprüft beim Start auf neue Versionen und installiert sie automatisch. Es wird dringend empfohlen, dies aktiviert zu lassen.',
+  'update.max_update_logs': 'Maximale Anzahl der Update-Logdateien, die in logs/update_logs/ aufbewahrt werden. 0 = nach jedem Update alle löschen. -1 = für immer behalten.',
+  'overlay.enabled': 'Aktiviere das eingebaute Text-Overlay-Subsystem. Wenn deaktiviert, werden Overlay-Fenster nicht geöffnet und Overlay-Aktionen in actions.mca übersprungen.',
+  'overlay.display_mode': 'overwrite ersetzt die aktuelle Nachricht sofort. queue reiht Nachrichten auf und zeigt sie nacheinander an.',
+  'overlay.fade_in': 'Einblenddauer in Millisekunden. 0 für sofortiges Erscheinen.',
+  'overlay.fade_out': 'Ausblenddauer in Millisekunden. 0 für sofortiges Verschwinden.',
+  'overlay.max_fails': 'Aufeinanderfolgende fehlgeschlagene Zustellungen, bevor der Schutzschalter auslöst und weitere Nachrichten blockiert.',
+  'overlay.cooldown': 'Sekunden nach max_fails, bevor neue Nachrichten wieder zugelassen werden.',
+  'overlay.overlays': 'Benannte Overlay-Slots. Jeder Slot kann eine eigene OBS-Browser-Source-URL haben. „default" ist erforderlich und wird verwendet, wenn kein bestimmtes Overlay angefordert wird.',
+  'overlay.theme.background': 'Hintergrundfarbe des Overlay-Fensters. Wird auch als Chroma-Key-Farbe verwendet.',
+  'overlay.theme.text': 'Textfarbe, die im Overlay angezeigt wird.',
+  'port_policy.auto_resolve': 'Wenn aktiviert, wird automatisch der nächste freie Port gefunden, falls der Standardport bereits belegt ist. Wenn deaktiviert, wird ein Fehler protokolliert und beendet.',
+  'port_policy.session_only': 'Wenn aktiviert, werden aufgelöste Ports nur für die aktuelle Sitzung verwendet. Wenn deaktiviert, werden aufgelöste Ports dauerhaft in der Konfiguration gespeichert.',
+  'port_policy.max_offset': 'Wie viele Ports versucht werden, bevor aufgegeben wird. -1 bedeutet unbegrenzt.',
+  'api_key': 'Optionaler API-Schlüssel für die Authentifizierung. Wenn gesetzt, müssen alle Nicht-Localhost-Anfragen den X-API-Key-Header enthalten. Lasse leer, um die Authentifizierung zu deaktivieren.',
+  'plugin_sandbox.enabled': 'Sandboxing aktivieren, um Ressourcen von Plugin-Subprozessen einzuschränken.',
+  'plugin_sandbox.max_memory_mb': 'Maximaler RAM pro Plugin-Prozess in Megabyte.',
+  'plugin_sandbox.max_cpu_time': 'Maximale CPU-Sekunden pro Plugin (nur Linux).',
+  'plugin_sandbox.max_files': 'Maximale offene Dateideskriptoren pro Plugin (nur Linux).',
+  'plugin_sandbox.max_processes': 'Maximale Kindprozesse pro Plugin (nur Linux).',
+  'plugin_sandbox.priority_class': 'Windows-Prozesspriorität für Plugin-Subprozesse. below_normal reduziert die Auswirkungen auf das Haupt-Tool.'
 };
 
 const FIELD_META = {
@@ -3319,10 +3421,35 @@ function getMeta(path) {
   return FIELD_META[p] || { basic: false, type: 'text' };
 }
 
+function _normalizeEditorPath(path) {
+  return path
+    .replace(/\.groups\[\d+\]/, '.groups[]')
+    .replace(/\.triggers\[\d+\]/, '.triggers[]')
+    .replace(/\.overlays\[\d+\]/, '.overlays[]')
+    .replace(/\.commands_config\.\w+/, '.commands_config[]');
+}
+
+function _editorLangIsDe() {
+  return window.I18N && I18N.lang && I18N.lang() === 'de';
+}
+
 function getHelp(path) {
-  if (HELP_TEXT[path]) return HELP_TEXT[path];
-  const p = path.replace(/\.groups\[\d+\]/, '.groups[]').replace(/\.triggers\[\d+\]/, '.triggers[]').replace(/\.overlays\[\d+\]/, '.overlays[]').replace(/\.commands_config\.\w+/, '.commands_config[]');
-  return HELP_TEXT[p] || '';
+  const p = HELP_TEXT[path] ? path : _normalizeEditorPath(path);
+  const en = HELP_TEXT[p];
+  if (!en) return '';
+  if (_editorLangIsDe() && HELP_TEXT_DE[p]) return HELP_TEXT_DE[p];
+  return en;
+}
+
+function sectionMeta(key) {
+  const en = SECTION_META[key] || null;
+  if (!_editorLangIsDe() || !en) return en;
+  return SECTION_META_DE[key] || en;
+}
+
+function categoryLabel(cat) {
+  if (_editorLangIsDe() && CATEGORY_LABELS_DE[cat]) return CATEGORY_LABELS_DE[cat];
+  return cat;
 }
 
 /* ─── Editor Class ─── */
@@ -3521,14 +3648,14 @@ class ConfigEditor {
   }
 
   renderSidebar() {
-    let html = '<div class="sidebar-header">Navigation</div>';
+    let html = `<div class="sidebar-header">${I18N.t('editor.navigation')}</div>`;
     for (const [cat, keys] of Object.entries(CATEGORIES)) {
       const visibleKeys = keys.filter(k => k in this.data);
       if (!visibleKeys.length) continue;
       html += '<div class="sidebar-group">';
-      html += `<div class="sidebar-group-title">${escapeHtml(cat)}</div>`;
+      html += `<div class="sidebar-group-title">${escapeHtml(categoryLabel(cat))}</div>`;
       for (const key of visibleKeys) {
-        const meta = SECTION_META[key] || { title: toTitle(key) };
+        const meta = sectionMeta(key) || { title: toTitle(key) };
         const hasErr = this.sectionHasError(key);
         const isActive = this.activeSection === key;
         html += `<a class="sidebar-item ${hasErr ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="editor.scrollTo('section_${key}')">${escapeHtml(meta.title)}${hasErr ? '<span class="badge">!</span>' : ''}</a>`;
@@ -3537,9 +3664,9 @@ class ConfigEditor {
     }
     if (Object.keys(this.unknownKeys).length) {
       html += '<div class="sidebar-group">';
-      html += '<div class="sidebar-group-title">Other</div>';
+      html += `<div class="sidebar-group-title">${I18N.t('editor.other')}</div>`;
       const isActive = this.activeSection === '_unknown';
-      html += `<a class="sidebar-item ${this.sectionHasError('_unknown') ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="editor.scrollTo('section_unknown')">Unrecognized Settings</a>`;
+      html += `<a class="sidebar-item ${this.sectionHasError('_unknown') ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="editor.scrollTo('section_unknown')">${I18N.t('editor.unrecognized')}</a>`;
       html += '</div>';
     }
     this.sidebar.innerHTML = html;
@@ -3571,13 +3698,13 @@ class ConfigEditor {
       html += this.buildUnknownSection();
     }
     if (!html) {
-      html = `<div class="search-empty"><h3>No results</h3><p>No settings match your search.</p></div>`;
+      html = `<div class="search-empty"><h3>${I18N.t('editor.noResults')}</h3><p>${I18N.t('editor.noResultsDesc')}</p></div>`;
     }
     this.content.innerHTML = html;
   }
 
   sectionMatchesSearch(key) {
-    const meta = SECTION_META[key] || {};
+    const meta = sectionMeta(key) || {};
     if ((meta.title || key).toLowerCase().includes(this.searchQuery)) return true;
     if ((meta.desc || '').toLowerCase().includes(this.searchQuery)) return true;
     // Check fields
@@ -3593,7 +3720,7 @@ class ConfigEditor {
   }
 
   buildSection(key, value) {
-    const meta = SECTION_META[key] || { title: toTitle(key), desc: '' };
+    const meta = sectionMeta(key) || { title: toTitle(key), desc: '' };
     let body;
     if (key === 'theme') {
       body = this.buildThemeEditor(key, value);
@@ -3675,7 +3802,7 @@ class ConfigEditor {
       </div>
       <div class="field-widget">
         <div class="locked-overlay">
-          <span class="locked-text">Advanced setting — <a href="#" onclick="event.preventDefault();editor._unlockAdvanced()">unlock advanced features</a> to edit</span>
+          <span class="locked-text">${I18N.t('editor.advancedLocked', { unlock: 'editor._unlockAdvanced' })}</span>
         </div>
         ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
       </div>
@@ -3719,7 +3846,7 @@ class ConfigEditor {
     const isAdvanced = meta.basic === false;
     const fieldCls = isAdvanced ? 'editor-field editor-field--has-advanced' : 'editor-field';
     return `<div class="${fieldCls}" data-path="${path}">
-      <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}${isAdvanced ? '<span class="advanced-badge" title="Advanced setting">!</span>' : ''}</div>
+      <div class="field-label">${escapeHtml(label)}${isReq ? '<span class="required">*</span>' : ''}${isAdvanced ? `<span class="advanced-badge" title="${I18N.t('editor.advancedSetting')}">!</span>` : ''}</div>
       <div class="field-widget">
         ${inputHtml}
         ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
@@ -6822,6 +6949,10 @@ document.addEventListener('i18n:changed', () => {
   _syncLangButtons();
   const theme = document.documentElement.getAttribute('data-theme') || 'dark';
   _updateThemeLabel(theme);
+  const cfgEditor = document.getElementById('config-editor');
+  if (cfgEditor && !cfgEditor.classList.contains('hidden') && typeof editor !== 'undefined') {
+    editor.render();
+  }
 });
 
 /* ─── Event Tester ─── */
