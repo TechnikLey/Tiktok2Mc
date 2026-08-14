@@ -60,6 +60,12 @@ EXIT_CHECKSUM_MISMATCH = 13
 EXIT_DOWNLOAD_FAILED = 14
 EXIT_INSTALL_FAILED = 15
 
+# API request hardening: a transient DNS/network/HTTP blip must not abort
+# an update run. Retry the version check a few times with backoff before
+# giving up (403 rate-limit is handled immediately and never retried).
+_MAX_API_ATTEMPTS = 3
+_API_RETRY_DELAY_SECONDS = 2
+
 # ---------------------------------------------------------------------------
 # Sentinel globals — set by _init() when run as script, or patched by tests.
 # ---------------------------------------------------------------------------
@@ -415,23 +421,41 @@ def run_update():
     # If no resume, then normal API check and download
     if not extracted_root:
         log.info("[..] Checking for new version via GitHub...")
-        try:
-            response = requests.get(API_URL, headers=HEADERS_API, timeout=10)
-            if response.status_code == 403:
-                if "rate limit" in response.text.lower():
-                    log.error("[FAIL] GitHub API rate limit exceeded.")
-                    log.info("To increase the limit, set a GitHub token:")
-                    log.info("  - Environment variable: set GITHUB_TOKEN=your_token")
-                    log.info("  - Or in config.yaml: github_token: your_token")
-                    log.info("Create a token at: https://github.com/settings/tokens")
-                else:
-                    log.error("[FAIL] API error: 403 Forbidden")
-                wait_for_key()
-                sys.exit(EXIT_API_ERROR)
-            response.raise_for_status()
-            release = response.json()
-        except requests.exceptions.RequestException as e:
-            log.error(f"[FAIL] API error: {e}")
+        release = None
+        api_error: requests.exceptions.RequestException | None = None
+        for attempt in range(1, _MAX_API_ATTEMPTS + 1):
+            try:
+                response = requests.get(API_URL, headers=HEADERS_API, timeout=10)
+                if response.status_code == 403:
+                    if "rate limit" in response.text.lower():
+                        log.error("[FAIL] GitHub API rate limit exceeded.")
+                        log.info("To increase the limit, set a GitHub token:")
+                        log.info(
+                            "  - Environment variable: set GITHUB_TOKEN=your_token"
+                        )
+                        log.info("  - Or in config.yaml: github_token: your_token")
+                        log.info(
+                            "Create a token at: https://github.com/settings/tokens"
+                        )
+                    else:
+                        log.error("[FAIL] API error: 403 Forbidden")
+                    wait_for_key()
+                    sys.exit(EXIT_API_ERROR)
+                response.raise_for_status()
+                release = response.json()
+                break
+            except requests.exceptions.RequestException as e:
+                api_error = e
+                if attempt < _MAX_API_ATTEMPTS:
+                    log.warning(
+                        "[..] Update server unreachable (attempt %d/%d): %s — retrying...",
+                        attempt,
+                        _MAX_API_ATTEMPTS,
+                        e,
+                    )
+                    time.sleep(_API_RETRY_DELAY_SECONDS * attempt)
+        if release is None:
+            log.error(f"[FAIL] API error: {api_error}")
             wait_for_key()
             sys.exit(EXIT_API_ERROR)
 

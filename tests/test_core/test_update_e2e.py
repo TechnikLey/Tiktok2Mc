@@ -450,6 +450,34 @@ class TestRunUpdateOrchestration:
                 run_update()
             mock_exit.assert_called_once_with(5)
 
+    def test_transient_api_error_is_retried(self, tmp_path):
+        """A transient network/DNS failure must not abort the update —
+        the version check should be retried and succeed on the second attempt."""
+        with (
+            self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir),
+            patch("python.update.requests.get") as mock_get,
+            patch("python.update.time.sleep") as mock_sleep,
+            patch("python.update.sys.exit", side_effect=SystemExit) as mock_exit,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {
+                "tag_name": "v0.7.0",
+                "assets": [],
+            }
+            mock_get.side_effect = [
+                requests.exceptions.ConnectionError(
+                    "Failed to resolve 'api.github.com'"
+                ),
+                mock_response,
+            ]
+
+            with pytest.raises(SystemExit):
+                run_update()
+            mock_exit.assert_called_once_with(5)
+            mock_sleep.assert_called_once_with(2)
+            assert mock_get.call_count == 2
+
     def test_new_version_downloads_and_installs(self, tmp_path):
         """Simulate a complete update: download -> extract -> copy."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
