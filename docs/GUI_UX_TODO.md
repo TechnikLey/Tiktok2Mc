@@ -18,7 +18,7 @@
 | **P2** | Mittel | UX-Feinschliff / Verbesserung |
 | **P3** | Niedrig | Nice-to-have, später |
 
-**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → Accessibility → Overlay-Vorschau → Kontext-Hilfe), danach Feinschliff (P2: Status-View → Tastenkürzel → Undo → Mobile/LAN), zum Schluss P3-Ideen.
+**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ → Overlay-Vorschau → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → Tastenkürzel → Undo → Mobile/LAN), zum Schluss P3-Ideen.
 
 ---
 
@@ -86,20 +86,27 @@
 
 ### 4. Kontext-Hilfe in der GUI
 
-- [ ] **Status:** Offen
-- [ ] **Problem:** Keine „?"-Tooltips/Help-Buttons, die auf das mdBook verlinken. Fehlermeldungen
+- [x] **Status:** **ERLEDIGT** (2026-08-14)
+- [x] **Problem:** Keine „?"-Tooltips/Help-Buttons, die auf das mdBook verlinken. Fehlermeldungen
       wirken teils roh (HTTP-Statuscodes statt verständlicher Meldungen mit Handlungsempfehlung).
-- [ ] **Ziel:** Nutzer können pro Bereich schnell zur passenden Doku finden; Fehler sind
-      verständlich.
-- [ ] **Umsetzungsvorschlag:**
-  - Help-Button je View/Sektion, der die passende `docs/dev-book-de/...`-Seite öffnet
-    (Web-Version der mdBook-Doku).
-  - Fehler-Normalisierung im GUI: `_throwResError`/`fetchJSON` sollen Statuscode + Code
-    (z. B. `TIKTOK_0001`, siehe `src/core/error_codes.py`) in lesbare Meldungen + ggf. Fix-Hinweis
-    übersetzen; Fallback auf generische Meldung.
-- [ ] **Abnahmekriterien:** Jeder Hauptbereich hat einen Hilfelink; Fehlermeldungen im UI zeigen
+- [x] **Ziel:** Nutzer können pro Bereich schnell Hilfe finden; Fehler sind verständlich.
+- [x] **Umsetzung:**
+  - Neues `templates/gui/help.js`: eigenständige, zweisprachige (DE/EN) Hilfetexte je Hauptbereich
+    (Status, Plugins, Hooks, Overlays, Actions, Reactions, Settings, Log, Console, Server-Manager,
+    Revenue, Event-Tester, Updates) — **keine** Verweise auf die Dev-Doku
+    (`docs/dev-book-{en,de}/`), Inhalt liegt direkt in der GUI.
+  - „?"-Button (`Help.openHelp(...)`) in jedem View-Header + Editor-Topbar, Hilfe-Modal
+    (`#help-modal`) mit Schließen per Button, Backdrop-Klick und `Esc`; reagiert auf
+    Sprachwechsel (`i18n:changed`).
+  - Fehler-Normalisierung: `Help.formatApiError(status, detail)` übersetzt HTTP-Statuscodes und
+    Backend-Fehlercodes (z. B. `TIKTOK-0001`, `src/core/error_codes.py`) in lesbare Meldungen mit
+    Hinweis (Auth-Hint bei 401, Live-Log-Hinweis bei 5xx); `_throwResError` in `app.js` nutzt sie —
+    rohe Codes/Validierungs-Details werden nicht mehr angezeigt.
+- [x] **Abnahmekriterien:** Jeder Hauptbereich hat einen Hilfelink; Fehlermeldungen im UI zeigen
       keine rohen Codes/Stacks an, sondern verständliche Texte.
-- [ ] **Betroffene Dateien:** `index.html`, `app.js` (Fehler-Handling), `docs/dev-book-{en,de}`
+- [x] **Betroffene Dateien:** `help.js` (neu), `index.html`, `app.js` (Fehler-Handling),
+      `style.css`, `i18n.js`, `tests/help.test.js` (neu), `tests/setup.js`, `tests/dashboard.test.js`,
+      `eslint.config.js`
 
 ---
 

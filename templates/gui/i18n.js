@@ -89,6 +89,8 @@
     'common.discardChanges': 'Discard Changes',
     'common.goBack': 'Go Back',
     'common.closeAnyway': 'Close Anyway',
+    'help.title': 'Help',
+    'help.openTitle': 'Help',
 
     /* ── Navigation / sidebar ── */
     'nav.status': 'Status',
@@ -851,6 +853,8 @@
     'common.discardChanges': 'Änderungen verwerfen',
     'common.goBack': 'Zurückgehen',
     'common.closeAnyway': 'Trotzdem schließen',
+    'help.title': 'Hilfe',
+    'help.openTitle': 'Hilfe',
 
     /* ── Navigation / sidebar ── */
     'nav.status': 'Status',

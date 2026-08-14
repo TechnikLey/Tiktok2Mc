@@ -40,12 +40,20 @@ describe('API helpers', () => {
     expect(calledBody).toBe('{"config":{}}');
   });
 
-  it('fetchJSON throws on non-ok response', async () => {
+  it('fetchJSON throws a friendly message on non-ok response', async () => {
     globalThis.fetch = async () => ({
       ok: false, status: 500, statusText: 'Server Error',
       json: async () => ({}),
     });
-    await expect(fetchJSON('/health')).rejects.toThrow('500');
+    await expect(fetchJSON('/health')).rejects.toThrow(/unexpected error/i);
+  });
+
+  it('fetchJSON translates backend error codes into readable messages', async () => {
+    globalThis.fetch = async () => ({
+      ok: false, status: 400, statusText: 'Bad Request',
+      json: async () => ({ detail: 'TIKTOK-0001 TikTok connection lost' }),
+    });
+    await expect(fetchJSON('/health')).rejects.toThrow(/TikTok connection/i);
   });
 
   it('_withApiKey attaches X-API-Key when a key is set', () => {

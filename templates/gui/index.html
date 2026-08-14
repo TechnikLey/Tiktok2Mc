@@ -113,6 +113,7 @@
             <div class="view active" id="view-status">
                 <div class="view-header">
                     <h2 data-i18n="status.title">Status</h2>
+                    <button class="btn-help" onclick="Help.openHelp('status')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
 
                 <section class="view-section">
@@ -137,6 +138,7 @@
                 <div id="plugin-list-section">
                     <div class="view-header">
                         <h2 data-i18n="plugins.title">Plugins</h2>
+                        <button class="btn-help" onclick="Help.openHelp('plugins')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                     <section class="view-section">
                         <h3 data-i18n="plugins.management">Plugin Management</h3>
@@ -174,6 +176,7 @@
                     <div class="view-header">
                         <h2 data-i18n="hooks.title">Hooks</h2>
                         <button class="btn btn--secondary" onclick="refreshHooks()" style="padding:0.3rem 0.8rem;font-size:0.85rem;">⟳ Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                     <section class="view-section">
                         <h3 data-i18n="hooks.management">Hook Management</h3>
@@ -197,6 +200,7 @@
                                 <div class="header-actions">
                                     <button class="btn btn-advanced" id="hooks-config-advanced-btn" onclick="hookEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
                                     <button class="btn btn--primary btn-save-disabled" id="hooks-config-save" onclick="hookEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                                    <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                                 </div>
                             </div>
                             <div class="editor-content" id="hooks-config-content"></div>
@@ -209,6 +213,7 @@
             <div class="view" id="view-log">
                 <div class="view-header">
                     <h2 data-i18n="log.title">Live Log</h2>
+                    <button class="btn-help" onclick="Help.openHelp('log')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
 
                 <div class="log-toolbar">
@@ -277,6 +282,7 @@
                         <button class="btn btn--sm btn--secondary" id="btn-console-connect" onclick="consoleTerminal.toggleConnection()" data-i18n="console.connect">Connect</button>
                         <button class="btn btn--sm btn--secondary" id="btn-console-clear" onclick="consoleTerminal.clear()" data-i18n="console.clear">Clear</button>
                     </div>
+                    <button class="btn-help" onclick="Help.openHelp('console')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
                 <div id="console-output" class="console-output">
                     <div class="console-line muted" data-i18n="console.prompt">Click "Connect" to open an RCON session.</div>
@@ -291,6 +297,7 @@
             <div class="view" id="view-overlays">
                 <div class="view-header">
                     <h2 data-i18n="overlays.title">Overlays</h2>
+                    <button class="btn-help" onclick="Help.openHelp('overlays')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
                 <section class="view-section">
                     <h3 data-i18n="overlays.urls">Overlay URLs</h3>
@@ -302,6 +309,7 @@
             <div class="view" id="view-updates">
                 <div class="view-header">
                     <h2 data-i18n="updates.title">Updates</h2>
+                    <button class="btn-help" onclick="Help.openHelp('updates')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
 
                 <section class="view-section">
@@ -321,6 +329,7 @@
                         <button class="btn btn--secondary btn--sm" onclick="openServerDownloadModal()" title="Download PaperMC version" data-i18n="servers.downloadVersion">Download Version</button>
                         <button class="btn btn--secondary btn--sm" onclick="openServerCustomModal()" title="Import custom server.jar" data-i18n="servers.addCustom">Add Custom Version</button>
                         <button class="btn btn--secondary btn--sm" onclick="loadServerManager()" data-i18n="common.refresh" data-i18n-title="common.refresh" title="Refresh">Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('servers')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                 </div>
 
@@ -350,6 +359,7 @@
                     <h2 data-i18n="revenue.title">Revenue</h2>
                     <div class="header-actions">
                         <button class="btn btn--secondary btn--sm" onclick="loadRevenueView()" title="Refresh revenue data" data-i18n="common.refresh">Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('revenue')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                 </div>
 
@@ -391,6 +401,7 @@
                     <div class="console-toolbar">
                         <span id="trigger-tester-status" class="console-status offline" data-i18n="triggers.ready">Ready</span>
                     </div>
+                    <button class="btn-help" onclick="Help.openHelp('triggers')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
 
                 <section class="view-section">
@@ -520,6 +531,7 @@
                     <div class="header-actions">
                         <button class="btn btn-advanced" id="config-advanced-btn" onclick="editor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
                         <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                        <button class="btn-help" onclick="Help.openHelp('settings')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                 </div>
                 <div class="editor-content" id="editor-content"></div>
@@ -534,6 +546,7 @@
           <h2 data-i18n="actions.title">Actions Editor</h2>
           <div class="header-actions">
             <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled data-i18n="editor.saveChanges">Save Changes</button>
+            <button class="btn-help" onclick="Help.openHelp('actions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
           </div>
         </div>
 
@@ -626,6 +639,7 @@
             <div class="header-actions">
               <button class="btn btn--primary" id="reaction-add" onclick="reactionEditor.startCreate()" data-i18n="reactions.create">+ Create Reaction</button>
               <button class="btn btn--primary btn-save-disabled" id="reaction-save" onclick="reactionEditor.save()" disabled data-i18n="reactions.saveChanges">Save Changes</button>
+              <button class="btn-help" onclick="Help.openHelp('reactions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
             </div>
           </div>
           <!-- Content -->
@@ -678,6 +692,7 @@
                     <div class="header-actions">
                         <button class="btn btn-advanced" id="plugin-editor-advanced-btn" onclick="pluginEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
                         <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button>
+                        <button class="btn-help" onclick="Help.openHelp('plugins')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                     </div>
                 </div>
                 <div class="editor-content" id="plugin-editor-content"></div>
@@ -870,9 +885,21 @@
       </div>
     </div>
 
+    <!-- Help Modal -->
+    <div id="help-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="wizard-card help-modal-card">
+        <div class="help-modal-header">
+          <h2 id="help-modal-title" data-i18n="help.title">Help</h2>
+          <button class="btn btn--secondary btn--sm" id="help-modal-close" onclick="Help.closeHelp()" data-i18n="common.close">Close</button>
+        </div>
+        <div id="help-modal-body" class="help-modal-body"></div>
+      </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
+    <script src="./help.js?v=1"></script>
     <script src="./i18n.js?v=1"></script>
     <script src="./actions-editor.js?v=3"></script>
     <script src="./app.js?v=6"></script>

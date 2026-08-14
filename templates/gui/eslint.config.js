@@ -9,6 +9,7 @@ const appGlobals = {
   pywebview: "writable",
   ActionsEditor: "writable",
   I18N: "writable",
+  Help: "writable",
   fetchJSON: "writable",
   postJSON: "writable",
   putJSON: "writable",
@@ -45,7 +46,7 @@ export default defineConfig([
     // from inline HTML handlers and other scripts), so unused-var and
     // redeclaration analysis cannot apply here. Cross-file globals are
     // declared explicitly above. Empty catch blocks swallow errors on purpose.
-    files: ["app.js", "actions-editor.js"],
+    files: ["app.js", "actions-editor.js", "help.js"],
     languageOptions: {
       sourceType: "script",
       globals: { ...globals.browser, ...appGlobals },

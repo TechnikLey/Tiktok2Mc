@@ -43,7 +43,10 @@ async function _throwResError(res) {
   if (res.status === 401) {
     showToast(I18N.t('dialog.missingKey'), 'error');
   }
-  throw new Error(res.status + ' ' + res.statusText + (detail ? ': ' + detail : ''));
+  const friendly = typeof Help !== 'undefined'
+    ? Help.formatApiError(res.status, detail)
+    : res.status + ' ' + res.statusText + (detail ? ': ' + detail : '');
+  throw new Error(friendly);
 }
 async function fetchJSON(path) {
   const res = await fetch(API + path, { headers: _withApiKey({}) });
