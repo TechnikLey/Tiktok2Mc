@@ -1,5 +1,3 @@
-
-
 class TestBackupsList:
     def test_list_empty_when_no_backups(self, client):
         resp = client.get("/api/v1/backups")
