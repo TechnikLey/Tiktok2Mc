@@ -123,7 +123,7 @@ class MyPlugin(BasePlugin):
 
 ## Special Field: `enabled`
 
-The `enabled` field in `config.yaml` controls whether the plugin is automatically activated on system startup. It is evaluated by the system, not by the plugin code.
+The `enabled` field in the plugin's `config.yaml` is a framework-managed field that the system injects into every plugin configuration (default `true`). It does **not** control plugin activation: whether a plugin runs is managed via the GUI or `POST /api/v1/plugins/{name}/enable` / `disable` and stored in `data/api_plugin_registry.json`. A plugin does not activate itself through its config.
 
 ## Next Chapter
 

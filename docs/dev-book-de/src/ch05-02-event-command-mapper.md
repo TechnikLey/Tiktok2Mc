@@ -11,7 +11,7 @@ event_commands:
   minecraft.player_death:
     - target: timer
       command: pause
-    - target: spotify
+    - target: spotify-control
       command: pause
   timer.zero:
     - target: win-counter

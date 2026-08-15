@@ -56,8 +56,8 @@ self.push_state()  # reads via thread-safe self.state
 | Method | Description |
 |---------|--------------|
 | `self.register_overlay(html)` | Replaces the overlay HTML at runtime via `POST /plugins/{name}/overlay-html`. |
-| `self.theme_style` | Returns CSS variables (`--background`, `--text`, `--accent`, `--muted`, `--danger`, `--separator`) as a string. |
-| `self.gui_hidden` | `True` if `--gui-hidden` is set or pywebview is not installed. |
+| `self.theme_style` | Returns the plugin theme's CSS variables as a string. Which variables exist depends on the `theme:` section of the plugin configuration (e.g. `--background`, `--text`, `--accent`). |
+| `self.gui_hidden` | `True` if `--gui-hidden` is set. |
 
 ## Communication
 

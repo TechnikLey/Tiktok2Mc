@@ -91,9 +91,8 @@ def register(api: HookAPI):
 
 ## Enable/Disable Hooks
 
-- **Via `config.yaml`**: Set `enabled: false` in the hook directory
 - **Via the GUI**: The API server manages `data/hook_registry.json`
-- **Via the API**: `PUT /api/v1/hooks/<name>/enable` or `.../disable`
+- **Via the API**: `POST /api/v1/hooks/<name>/enable` or `.../disable`
 
 ## Next Chapter
 

@@ -39,14 +39,14 @@ In der `hook.json` unter `config_schema`:
 }
 ```
 
-Unterstützte Feldtypen: `boolean`, `integer`, `string`, `color`, `select`
+Unterstützte Feldtypen: `boolean`, `integer`, `number`, `string`, `color`, `select`, `array`, `object`
 
 ## Automatische Generierung
 
 Fehlt die `config.yaml`, wird sie beim ersten Start automatisch aus dem Schema generiert (mit Default-Werten). Fehlende oder ungültige Felder werden repariert ("Healing").
 
 > [!NOTE]
-> Das Feld `enabled` wird automatisch vom System verwaltet, auch wenn es nicht im Schema definiert ist. Setze `enabled: false` in der `config.yaml`, um den Hook zu deaktivieren.
+> Das Feld `enabled` wird automatisch vom System verwaltet, auch wenn es nicht im Schema definiert ist. Es steuert **nicht** die Aktivierung: Ob ein Hook geladen wird, wird über die GUI bzw. `POST /api/v1/hooks/{name}/enable` / `disable` gesteuert und in `data/hook_registry.json` gespeichert.
 
 ## Zugriff im Hook
 

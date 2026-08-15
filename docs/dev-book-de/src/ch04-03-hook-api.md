@@ -121,19 +121,19 @@ Schreibgeschützter Zugriff auf die globale `config.yaml` (Kopie).
 
 ```python
 glob_cfg = api.config
-rcon_host = glob_cfg.get("rcon", {}).get("host", "localhost")
+rcon_host = glob_cfg.get("server_host", "127.0.0.1")
 ```
 
 ## Fehlercodes für Hooks
 
 | Code | Bedeutung |
 |------|-----------|
-| `HOOK-0001` | Hook-Verzeichnis nicht gefunden |
-| `HOOK-0002` | `hook.json` fehlt oder ungültig |
-| `HOOK-0003` | `main.py` fehlt |
-| `HOOK-0004` | `name` oder `version` fehlt im Manifest |
-| `HOOK-0005` | Disallowed import gefunden |
-| `HOOK-0006` | Unerwarteter Fehler beim Laden |
+| `HOOK-0001` | Hook-Manifest fehlt oder ungültig |
+| `HOOK-0002` | `main.py` des Hooks nicht gefunden |
+| `HOOK-0003` | Nicht erlaubtes Modul importiert |
+| `HOOK-0004` | Hook konnte nicht geladen werden (`main.py` warf Exception) |
+| `HOOK-0005` | Registrierung fehlgeschlagen (`register()` warf Exception) |
+| `HOOK-0006` | Hook-Action fehlgeschlagen (Exception bei Ausführung) |
 | `HOOK-0007` | `register()`-Funktion fehlt |
 
 ## Nächstes Kapitel

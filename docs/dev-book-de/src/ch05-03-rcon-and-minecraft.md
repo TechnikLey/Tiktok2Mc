@@ -36,8 +36,10 @@ def mein_handler(user, trigger, context):
 Die RCON-Verbindung wird in der globalen `config.yaml` konfiguriert:
 
 ```yaml
+# Der RCON-Host ist die server_host-Adresse (Standard: 127.0.0.1)
+server_host: "127.0.0.1"
 rcon:
-  host: "localhost"
+  enabled: true
   port: 25575
   password: "dein-passwort"
 ```

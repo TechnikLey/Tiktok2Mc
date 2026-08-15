@@ -43,7 +43,7 @@ You cannot open the setup wizard from the Dashboard later; it only appears on fi
 
 ### Windows
 
-Download `TikTok2MC-Setup.exe` from the [Releases page](https://github.com/TechnikLey/Tiktok2Mc/releases) and run it. The installer guides you through setup:
+Download `TikTok2MC-<version>-Windows-Setup.exe` from the [Releases page](https://github.com/TechnikLey/Tiktok2Mc/releases) and run it. The installer guides you through setup:
 
 - **Basic** — quick install with default settings
 - **Advanced** — choose which components to install (Plugins, Minecraft Server, Documentation), set GUI mode, Java path, and port
@@ -52,11 +52,11 @@ The installer creates desktop and Start Menu shortcuts. Use Windows Add/Remove P
 
 ### Linux
 
-Download `TikTok2Mc-Linux-Setup.sh` from the Releases page. Open a terminal, navigate to the download folder, and run:
+Download `TikTok2Mc-<version>-Linux-Setup.sh` from the Releases page. Open a terminal, navigate to the download folder, and run:
 
 ```bash
-chmod +x TikTok2Mc-Linux-Setup.sh
-./TikTok2Mc-Linux-Setup.sh
+chmod +x TikTok2Mc-<version>-Linux-Setup.sh
+./TikTok2Mc-<version>-Linux-Setup.sh
 ```
 
 The installer places the tool in `~/.local/share/TikTok2Mc` (no root required for the installation itself) and creates a `tiktok2mc` command and a desktop entry. Note that **running** the tool on Linux requires root privileges (`sudo`) — this is a separate step from the installation. If `~/.local/bin` is not on your `PATH`, the installer shows you how to add it.
@@ -414,7 +414,7 @@ The counter updates in real-time on the overlay. You can configure milestones th
 
 Tracks wins and losses. Configure how many wins are needed for each milestone.
 
-**Settings** (in the Dashboard under Plugins → Win Counter, or in `plugins/win-counter/config.yaml`):
+**Settings** (in the Dashboard under Plugins → Win Counter, or in `plugins/wincounter/config.yaml`):
 - `initial_needed` — wins required for the first milestone
 - `milestone_increment` — additional wins needed for each next milestone
 

@@ -2,7 +2,7 @@
 
 > **This file only contains unfinished work.**
 >
-> Completed work, implemented features, and historical changes belong in `docs/CHANGE_HISTORY.md`.
+> Completed work, implemented features, and historical changes belong in `docs/CHANGELOG.md`.
 
 ---
 

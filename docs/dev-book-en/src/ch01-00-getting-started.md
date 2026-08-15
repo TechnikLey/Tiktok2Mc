@@ -180,7 +180,7 @@ Starts the API server at `http://127.0.0.1:29185`. The plugin watcher automatica
 ## 5. Activate Plugin
 
 ```bash
-curl -X PUT http://127.0.0.1:29185/api/v1/plugins/my-plugin/enable
+curl -X POST http://127.0.0.1:29185/api/v1/plugins/my-plugin/enable
 ```
 
 The supervisor then starts the subprocess: `python src/plugins/my-plugin/main.py`
@@ -190,7 +190,7 @@ Confirmation in the console: The plugin logs that it has started.
 ## 6. Send Test Event
 
 ```bash
-python tests/send_trigger.py --event tiktok.follow --user TestUser
+python src/python/send_trigger.py follow --user TestUser
 ```
 
 The console should display: `TestUser is now following!`
@@ -198,7 +198,7 @@ The console should display: `TestUser is now following!`
 ## 7. Disable Plugin
 
 ```bash
-curl -X PUT http://127.0.0.1:29185/api/v1/plugins/my-plugin/disable
+curl -X POST http://127.0.0.1:29185/api/v1/plugins/my-plugin/disable
 ```
 
 The system terminates the subprocess.

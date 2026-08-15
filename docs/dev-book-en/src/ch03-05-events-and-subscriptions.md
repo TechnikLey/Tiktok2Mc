@@ -23,7 +23,7 @@ In the `plugin.json`:
 }
 ```
 
-Wildcard `"tiktok.*"` subscribes to all TikTok events. Wildcards work for any namespace, e.g., `"timer.*"` or `"*.milestone"`. You can also subscribe to individual events from other plugins, e.g., `"timer.zero"` or `"death-counter.milestone"`. Your own events use the namespace `plugin-name.event` (see below).
+Wildcard `"tiktok.*"` subscribes to all TikTok events. The Event Bridge only delivers TikTok events, so subscriptions use the `tiktok.` namespace (either exact types like `"tiktok.follow"` or the prefix wildcard `"tiktok.*"`). Events from other plugins or the system are **not** delivered via `event_subscriptions` — use the [Event-Command-Mapper](./ch05-02-event-command-mapper.md) (`event_commands.yaml`) for those. Your own published events use the namespace `plugin-name.event`.
 
 ### Register Handler
 
@@ -66,9 +66,7 @@ The Event Bridge delivers standardized dictionaries:
 {
     "event_type": "tiktok.comment",
     "user": "commenter",
-    "data": {
-        "comment": "Hello everyone!"
-    }
+    "data": {}
 }
 
 # tiktok.like
@@ -76,8 +74,8 @@ The Event Bridge delivers standardized dictionaries:
     "event_type": "tiktok.like",
     "user": "fan",
     "data": {
-        "delta": 3,    # Like increment since last event
-        "total": 150   # Total likes (session)
+        "delta": 12,   # Likes since session start (events throttled to ~1/3 s)
+        "total": 162   # Total likes for the session
     }
 }
 
@@ -88,6 +86,9 @@ The Event Bridge delivers standardized dictionaries:
     "data": {}
 }
 ```
+
+> [!NOTE]
+> The comment text is **not** part of the `tiktok.comment` event (`data` is empty). Comment texts are delivered via the [Comment Handler](#comment-handler-comment_handler) (see below).
 
 > [!NOTE]
 > The Event Bridge publishes TikTok events on the EventBus, filters them in the bridge process (`_event_bridge_worker`), and enqueues the command `"tiktok_event"` in the CommandQueue of the API server.
@@ -196,10 +197,18 @@ Plugins can react to TikTok comments with a specific prefix. The declaration is 
 | `prefix` | Character that marks a command (e.g., `$` for `$song`). Default: `"$"`. |
 | `enabled` | Whether the handler is active. Default: `true`. |
 
-When a TikTok comment starts with the prefix (e.g., `$song`), the system forwards the command to the plugin. The plugin receives the event via `event_subscriptions: ["tiktok.comment"]` and can parse the prefix.
+When a TikTok comment starts with the prefix (e.g., `$song`), the system forwards the command text **without the prefix** to the plugin via `POST /plugins/{name}/command`. The plugin registers a handler for the `"comment"` command for this:
+
+```python
+self.register_handler("comment", self._on_comment)
+
+def _on_comment(self, args):
+    text = args.get("text", "")          # e.g. "song"
+    username = args.get("username", "")  # e.g. "fan123"
+```
 
 > [!NOTE]
-> Without the `comment_handler` declaration, the prefix is not registered. The plugin can still receive comments via `tiktok.comment`, but the system does not recognize the command as belonging to this plugin.
+> Without the `comment_handler` declaration, the prefix is not registered and the system does not forward the comment to the plugin. The `tiktok.comment` event only contains the username and an empty `data` — the comment text arrives exclusively through this command.
 
 ## Common Errors
 

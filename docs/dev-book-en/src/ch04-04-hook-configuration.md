@@ -39,14 +39,14 @@ In `hook.json` under `config_schema`:
 }
 ```
 
-Supported field types: `boolean`, `integer`, `string`, `color`, `select`
+Supported field types: `boolean`, `integer`, `number`, `string`, `color`, `select`, `array`, `object`
 
 ## Automatic Generation
 
 If the `config.yaml` is missing, it is automatically generated from the schema on first startup (with default values). Missing or invalid fields are repaired ("Healing").
 
 > [!NOTE]
-> The `enabled` field is managed automatically by the system, even if it is not defined in the schema. Set `enabled: false` in the `config.yaml` to disable the hook.
+> The `enabled` field is managed automatically by the system, even if it is not defined in the schema. It does **not** control activation: whether a hook is loaded is managed via the GUI or `POST /api/v1/hooks/{name}/enable` / `disable` and stored in `data/hook_registry.json`.
 
 ## Access in the Hook
 

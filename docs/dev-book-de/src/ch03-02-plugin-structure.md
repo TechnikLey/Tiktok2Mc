@@ -37,7 +37,7 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 | `min_api_version` | Mindestversion der Plugin-API (aktuell `1.0.0`, siehe `src/core/version.py`). Bei Inkompatibilität wird das Plugin nicht gestartet. |
 | `max_api_version` | Höchste unterstützte API-Version. Fehlt das Feld oder ist es `null`, gibt es keine Obergrenze. |
 | `event_subscriptions` | Liste von Event-Typen, die das Plugin über den EventBus empfangen will. Unterstützt Wildcards wie `"tiktok.*"`. **Ohne dieses Feld werden keine Events zugestellt.** |
-| `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen. Sind Abhängigkeiten nicht aktiv, wird das Plugin nicht gestartet (Fehler `PLUGIN-0005`). |
+| `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen. Sind Abhängigkeiten nicht aktiv oder nicht registriert, schlägt das Aktivieren fehl (HTTP 422). |
 | `capabilities` | Liste von Fähigkeiten, die das Plugin bereitstellt. Wird vom System zur Discovery verwendet, z. B. `["timer:countdown"]`. Andere Plugins können per API nach Plugins mit bestimmten Capabilities suchen. |
 | `config_schema` | Schema für die Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |
 | `comment_handler` | Objekt mit `prefix` (String) und `enabled` (Boolean). Deklariert, dass das Plugin auf TikTok-Kommentare mit einem bestimmten Prefix reagiert (z. B. `"$"`). Siehe [Events empfangen](./ch03-05-events-and-subscriptions.md). |

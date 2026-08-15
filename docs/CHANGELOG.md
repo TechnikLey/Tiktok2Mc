@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Timer, Win Counter, Death Counter** — these plugins no longer depend on each other. You can use any combination without one forcing settings on another.
 - **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
-- **Port count reduced from 12 to 5** — each plugin (Timer, Death Counter, Win Counter, Spotify Controll) previously ran its own web server on a dedicated port. All plugins are now served through the central API server (29185). Only three ports are bound today (API: 29185, webhook: 29188, MC Server API: 29187); RCON (25575) and the Minecraft server (25565) are only connected to.
+- **Port count reduced from 12 to 5** — each plugin (Timer, Death Counter, Win Counter, Spotify Control) previously ran its own web server on a dedicated port. All plugins are now served through the central API server (29185). Only three ports are bound today (API: 29185, webhook: 29188, MC Server API: 29187); RCON (25575) and the Minecraft server (25565) are only connected to.
 - **Smaller Linux installer** — PyQt6 / QtWebEngine is bundled only into binaries that actually use the GUI (gui, overlay, plugins), and those share a single runtime under `core/runtime/` instead of each embedding a full WebEngine copy. `server`, `start`, `app`, `update` and `test_trigger` no longer carry any WebEngine code, cutting the installer size significantly.
 
 ### Removed

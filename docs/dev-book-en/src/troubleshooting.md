@@ -56,14 +56,14 @@ This chapter helps you with common problems during plugin and hook development.
 You can test triggers without a TikTok connection:
 
 ```bash
-# Send a single follow event
-python tests/send_trigger.py --event tiktok.follow --user TestUser
+# Send a single follow trigger
+python src/python/send_trigger.py follow --user TestUser
 
 # Show all available options
-python tests/send_trigger.py --help
+python src/python/send_trigger.py --help
 ```
 
-The script sends a simulated TikTok event via the API to the EventBus. Your plugin must be enabled and declare the corresponding `event_subscription`.
+The script sends the trigger via HTTP to the TikTok bridge's webhook interface (default: port `29188`). The bridge executes the trigger's commands from `actions.mca` (for `comment`, the comment prefix commands). It does **not** publish a `tiktok.*` event on the EventBus — plugins that only work via `event_subscriptions` are therefore not addressed by this script.
 
 Or via the trigger tester interface in the GUI.
 

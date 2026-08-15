@@ -72,14 +72,14 @@ class MeinPlugin(BasePlugin):
 <body>
     <div class="count" id="counter">0</div>
     <script>
-        new EventSource("/api/v1/plugins/mein-plugin/stream");
+        const es = new EventSource("/api/v1/plugins/mein-plugin/stream");
         es.onmessage = (e) => {{
             const d = JSON.parse(e.data);
             document.getElementById("counter").innerText = d.count;
         }};
         es.onerror = () => {{
             es.close();
-            setTimeout(() => {{ new EventSource("/api/v1/plugins/mein-plugin/stream"); }}, 2000);
+            setTimeout(() => {{ window.location.reload(); }}, 2000);
         }};
     </script>
 </body>
@@ -151,8 +151,8 @@ Die Event-Bridge liefert folgendes Dictionary an den `tiktok_event`-Handler:
     "user": "TikTokBenutzername",     # TikTok-Benutzername
     "data": {                         # Event-spezifische Felder
         # Bei gift: gift_name, gift_id, count
-        # Bei comment: comment, comment_id
-        # Bei like: like_count
+        # Bei like: delta (Likes seit Session-Start), total
+        # Bei follow, join, share, comment: leer ({})
     }
 }
 ```

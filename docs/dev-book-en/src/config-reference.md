@@ -7,19 +7,21 @@ This chapter describes the most important configuration options of the system. T
 The global `config/config.yaml` contains system-wide settings:
 
 ```yaml
+# Address under which the bridge reaches RCON (bind address of the servers)
+server_host: "127.0.0.1"
+
 # RCON connection to the Minecraft server
 rcon:
-  host: "localhost"
+  enabled: true
   port: 25575
   password: ""
 
 # TikTok connection
 tiktok:
-  username: ""
+  user: "your_tiktok_name"
 
 # System settings
 api:
-  host: "127.0.0.1"
   port: 29185
 ```
 

@@ -1,4 +1,4 @@
-[Einführung](./introduction.md)
+[Einführung](./Introduction.md)
 
 # Quickstart
 

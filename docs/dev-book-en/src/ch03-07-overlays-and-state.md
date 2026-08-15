@@ -75,7 +75,7 @@ es.onmessage = (e) => {
 es.onerror = () => {
     es.close();
     setTimeout(() => {
-        new EventSource("/api/v1/plugins/my-plugin/stream");
+        window.location.reload();
     }, 2000);
 };
 ```
@@ -135,7 +135,7 @@ def get_overlay_html(self) -> str:
 </html>"""
 ```
 
-Available CSS variables: `--background`, `--text`, `--accent`, `--muted`, `--danger`, `--separator`
+Which CSS variables are available depends on the `theme:` section of the plugin configuration — only the colors defined there are generated as variables (e.g. `--background`, `--text`, `--accent`).
 
 ## GUI Window with pywebview
 

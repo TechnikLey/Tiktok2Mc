@@ -21,7 +21,7 @@ trigger: action1 ; action2 ; action3
 | Hook | `$superjump` | Calls a registered hook handler |
 | Overlay | `>>Title\|Subtitle\|5` | Display text in overlay |
 | Named Overlay | `@gifts>>Title\|Text\|3` | Overlay on a specific channel |
-| Shell | `¬epad.exe` | Execute command on host machine |
+| Shell | `&notepad.exe` | Execute command on host machine |
 
 ### Named Overlay
 

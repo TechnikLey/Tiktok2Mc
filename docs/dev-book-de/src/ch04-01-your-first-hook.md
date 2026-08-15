@@ -104,7 +104,7 @@ execute_global_command("follow", user)
 
 ## Hook testen
 
-1. **Starte TikTok2Mc**: `python start.py`
+1. **Starte TikTok2Mc**: `python src/python/start.py`
    Der Bridge-Prozess lädt automatisch alle Hooks aus `src/hooks/`. In der Konsolenausgabe siehst du:
    ```
    [HOOK] Registered action: superjump
@@ -124,7 +124,7 @@ execute_global_command("follow", user)
 
 ## Hook deaktivieren
 
-Setze in der `config.yaml` des Hooks `enabled: false` oder deaktiviere den Hook über die GUI. Das System lädt deaktivierte Hooks nicht. Die `config.yaml`-Methode ist der empfohlene Weg — das Entfernen aus `src/hooks/` ist nur nötig, wenn der Hook dauerhaft gelöscht werden soll.
+Deaktiviere den Hook über die GUI oder per API (`POST /api/v1/hooks/<name>/disable`). Das System lädt deaktivierte Hooks nicht; der Zustand wird in `data/hook_registry.json` gespeichert. Das Entfernen aus `src/hooks/` ist nur nötig, wenn der Hook dauerhaft gelöscht werden soll.
 
 ## Unterschied zum Plugin
 
@@ -144,7 +144,7 @@ Setze in der `config.yaml` des Hooks `enabled: false` oder deaktiviere den Hook 
 | Hook wird nicht geladen | `register()`-Funktion fehlt | Füge `def register(api):` hinzu |
 | `$superjump` tut nichts | Action-Name in `actions.mca` stimmt nicht mit `register_action()` überein | Prüfe beide Namen auf Tippfehler |
 | Import-Fehler | Nicht erlaubtes Modul importiert (`os`, `sys`, etc.) | Verwende nur die Hook-API |
-| `api.rcon_enqueue()` ohne Wirkung | RCON nicht konfiguriert oder Minecraft nicht verbunden | Prüfe `config.yaml`: `rcon.host`, `rcon.port`, `rcon.password` |
+| `api.rcon_enqueue()` ohne Wirkung | RCON nicht konfiguriert oder Minecraft nicht verbunden | Prüfe `config.yaml` (Abschnitt `rcon`): `password` und `port`; der RCON-Host kommt aus `server_host` |
 | Trigger wird nicht ausgelöst | Trigger-Name nicht in `actions.mca` definiert | Füge `follow: $superjump` in die `actions.mca` ein |
 
 ## Nächste Schritte

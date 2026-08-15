@@ -47,7 +47,7 @@ api.rcon_enqueue([
 
 - **commands**: `list[str]` — sent one after another to the Minecraft server
 - The queue is asynchronous: the function does not block
-- If the queue is full, commands are silently discarded
+- If the queue is full, commands are dropped and a `[HOOK] ... queue full` warning is logged
 
 ## enqueue_trigger(action_name, user="hook")
 
@@ -121,20 +121,20 @@ Read-only access to the global `config.yaml` (copy).
 
 ```python
 glob_cfg = api.config
-rcon_host = glob_cfg.get("rcon", {}).get("host", "localhost")
+rcon_host = glob_cfg.get("server_host", "127.0.0.1")   # RCON host
 ```
 
 ## Error Codes for Hooks
 
 | Code | Meaning |
 |------|-----------|
-| `HOOK-0001` | Hook directory not found |
-| `HOOK-0002` | `hook.json` missing or invalid |
-| `HOOK-0003` | `main.py` missing |
-| `HOOK-0004` | `name` or `version` missing in manifest |
-| `HOOK-0005` | Disallowed import found |
-| `HOOK-0006` | Unexpected error while loading |
-| `HOOK-0007` | `register()` function missing |
+| `HOOK-0001` | Hook manifest missing or invalid |
+| `HOOK-0002` | `main.py` not found |
+| `HOOK-0003` | Hook imports disallowed module |
+| `HOOK-0004` | Hook failed to load |
+| `HOOK-0005` | Hook registration failed |
+| `HOOK-0006` | Hook script action failed |
+| `HOOK-0007` | Hook has no `register()` function |
 
 ## Next Chapter
 

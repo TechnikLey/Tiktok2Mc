@@ -202,7 +202,7 @@
 - [ ] **Status:** Teilweise implementiert (responsive CSS vorhanden, aber unvollständig getestet)
 - [ ] **Problem:** Mit `feat: enable LAN dashboard access` (Commit `e11d6b3`) kann das Dashboard
       aus dem LAN (z. B. Handy) geöffnet werden. Responsive CSS existiert teilweise
-      (`style.css` `@media (max-width: 960px)` Zeile ~1633, `768px` Zeile ~2435/3042).
+      (`style.css` `@media (max-width: 960px)` Zeile 1779, `768px` Zeilen 2581/3218, zusätzlich `640px` Zeile 1609).
       Sidebar wird zu horizontaler Leiste, Tabellen werden zu Cards, Editor-Layouts stacken.
 - [ ] **Ziel:** Dashboard auch auf kleineren Bildschirmen gut bedienbar (Sidebar, Tabellen,
       Editoren, Server-Manager-Modals).

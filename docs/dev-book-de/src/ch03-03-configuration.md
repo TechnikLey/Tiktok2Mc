@@ -123,7 +123,7 @@ class MeinPlugin(BasePlugin):
 
 ## Besonderes Feld: `enabled`
 
-Das Feld `enabled` in der `config.yaml` steuert, ob das Plugin beim Systemstart automatisch aktiviert wird. Es wird vom System ausgewertet, nicht vom Plugin-Code.
+Das Feld `enabled` in der Plugin-`config.yaml` ist ein Framework-Feld, das das System in jede Plugin-Konfiguration injiziert (Standard `true`). Es steuert **nicht** die Aktivierung des Plugins: Ob ein Plugin läuft, wird über die GUI bzw. `POST /api/v1/plugins/{name}/enable` / `disable` gesteuert und in `data/api_plugin_registry.json` gespeichert. Das Plugin aktiviert sich also nicht selbst über seine Config.
 
 ## Nächstes Kapitel
 

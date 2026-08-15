@@ -7,19 +7,21 @@ Dieses Kapitel beschreibt die wichtigsten Konfigurationsmöglichkeiten des Syste
 Die globale `config/config.yaml` enthält systemweite Einstellungen:
 
 ```yaml
+# Adresse, unter der die Bridge RCON erreicht (Bind-Adresse der Server)
+server_host: "127.0.0.1"
+
 # RCON-Verbindung zum Minecraft-Server
 rcon:
-  host: "localhost"
+  enabled: true
   port: 25575
   password: ""
 
 # TikTok-Verbindung
 tiktok:
-  username: ""
+  user: "dein_tiktok_name"
 
 # Systemeinstellungen
 api:
-  host: "127.0.0.1"
   port: 29185
 ```
 
