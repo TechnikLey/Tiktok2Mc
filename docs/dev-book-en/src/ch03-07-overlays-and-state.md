@@ -6,14 +6,14 @@ Plugins can provide overlay content for OBS or the pywebview window. There are t
 
 ```
 Plugin Process           API Server                    Browser / OBS
-     │                       │                              │
-     │── POST /overlay-html ─→│                              │
-     │                       │── GET /plugins/{name}/overlay →│
-     │                       │    (static HTML)              │
-     │                       │                              │
-     │── POST /state ───────→│                              │
-     │                       │── SSE: data: {...} ──────────→│
-     │                       │    (EventSource Stream)       │
+     │                        │                                │
+     │── POST /overlay-html ─→│                                │
+     │                        │── GET /plugins/{name}/overlay →│
+     │                        │    (static HTML)               │
+     │                        │                                │
+     │── POST /state ───────→ │                                │
+     │                        │── SSE: data: {...} ──────────→ │
+     │                        │    (EventSource Stream)        │
 ```
 
 ## Static Overlay HTML
@@ -80,7 +80,7 @@ es.onerror = () => {
 };
 ```
 
-### When to call push_state()?
+### When to Call push_state()?
 
 - After every state change that should be visible in the overlay
 - In `on_tick()` for periodic changes (timer countdown)

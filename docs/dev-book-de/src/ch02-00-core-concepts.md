@@ -62,7 +62,7 @@ Das Projekt hat zwei Python-Quellverzeichnisse mit unterschiedlichen Rollen:
 
 | Verzeichnis | Rolle | Python-Paket |
 |-------------|-------|-------------|
-| `src/core/` | **API-Server, Infrastruktur, geteilte Module** (`BasePlugin`, `EventBus`, `config`, `backup`, `health`, `error_codes`, usw.) | Wird via `PYTHONPATH` oder `pip install -e .` als Paket `core` importierbar |
+| `src/core/` | **API-Server, Infrastruktur, geteilte Module** (`BasePlugin`, `EventBus`, `config`, `backup`, `health`, `error_codes`, usw.) | Kann via `PYTHONPATH` oder `pip install -e .` als Paket `core` importiert werden |
 | `src/python/` | **Startpunkte und Subprozesse** (`start.py` = Supervisor, `main.py` = Bridge, `send_trigger.py`, `spotify_setup.py`, usw.) | Kein eigenes Paket — importiert `core.*` aus dem Schwesterverzeichnis |
 
 **Warum zwei Verzeichnisse?** `src/core/` enthält die gemeinsame Logik, die von allen Komponenten genutzt wird — inklusive Plugins (`from core.base_plugin import BasePlugin`). `src/python/` enthält ausführbare Einstiegspunkte, die als separate Prozesse laufen (Supervisor, Bridge). Beide teilen sich denselben `PYTHONPATH`, daher funktioniert `from core.*` in beiden Verzeichnissen.

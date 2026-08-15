@@ -71,7 +71,7 @@ Jedes Mal, wenn jemand auf TikTok folgt, wird der `$superjump`-Hook ausgelöst.
 ### Wie der `$`-Befehl fließt – vom TikTok-Event zum Handler
 
 ```
-TikTok CommentEvent "follow"
+TikTok FollowEvent "follow"
        │
        ▼
 on_follow() in main.py
@@ -112,7 +112,7 @@ execute_global_command("follow", user)
 
 2. **Sende einen Test-Trigger**:
    ```bash
-   python tests/send_trigger.py --event tiktok.follow --user TestUser
+   python src/python/send_trigger.py follow --user TestUser
    ```
 
 3. **Prüfe die Ausgabe**: In der Konsole sollte erscheinen:

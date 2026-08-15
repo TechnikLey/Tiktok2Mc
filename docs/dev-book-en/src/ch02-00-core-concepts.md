@@ -6,12 +6,12 @@ This chapter explains the architecture and the most important components you nee
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Supervisor (start.py)                  │
-│  Starts and monitors all components                      │
+│                    Supervisor (start.py)                │
+│  Starts and monitors all components                     │
 └─────────────────────────────────────────────────────────┘
          │                   │                   │
          ▼                   ▼                   ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+┌──────────────────┐  ┌──────────────────┐  ┌─────────────────┐
 │  API Server      │  │  Bridge (main.py)│  │  Minecraft      │
 │  (FastAPI)       │  │  TikTok Client   │  │  Server         │
 │  Port 29185      │  │  EventBus        │  │  (RCON)         │
@@ -21,13 +21,13 @@ This chapter explains the architecture and the most important components you nee
 │  Event-Command-  │  │  Trigger Worker  │  │                 │
 │  Mapper          │  │                  │  │                 │
 └────────┬─────────┘  └────────┬─────────┘  └────────┬────────┘
-         │                     │                      │
-         │   HTTP (POST/GET)   │   asyncio.Queue      │   RCON
-         ▼                     ▼                      ▼
+         │                     │                     │
+         │   HTTP (POST/GET)   │   asyncio.Queue     │   RCON
+         ▼                     ▼                     ▼
 ┌──────────────────────────────────────────────────────────┐
-│  Plugins (Subprocesses)                                    │
-│  python src/plugins/*/main.py                             │
-│  Communicate via HTTP with API Server                      │
+│  Plugins (Subprocesses)                                  │
+│  python src/plugins/*/main.py                            │
+│  Communicate via HTTP with API Server                    │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -63,7 +63,7 @@ The project has two Python source directories with different roles:
 | Directory | Role | Python Package |
 |-----------|------|----------------|
 | `src/core/` | **API server, infrastructure, shared modules** (`BasePlugin`, `EventBus`, `config`, `backup`, `health`, `error_codes`, etc.) | Made importable as package `core` via `PYTHONPATH` or `pip install -e .` |
-| `src/python/` | **Entry points and subprocesses** (`start.py` = Supervisor, `main.py` = Bridge, `send_trigger.py`, `spotify_setup.py`, etc.) | No own package — imports `core.*` from the sibling directory |
+| `src/python/` | **Entry points and subprocesses** (`start.py` = Supervisor, `main.py` = Bridge, `send_trigger.py`, `spotify_setup.py`, etc.) | Has no package of its own — imports `core.*` from the sibling directory |
 
 **Why two directories?** `src/core/` contains the shared logic used by all components — including plugins (`from core.base_plugin import BasePlugin`). `src/python/` contains executable entry points that run as separate processes (Supervisor, Bridge). Both share the same `PYTHONPATH`, so `from core.*` works in both directories.
 
@@ -112,4 +112,4 @@ Hook ──────api.enqueue_trigger("name", user)→ Trigger Queue ──
 
 ## Next Chapter
 
-From here on it gets practical. In the [next chapter](./ch03-00-plugins.md) you will develop your first complete plugin.
+From here on, things get practical. In the [next chapter](./ch03-00-plugins.md) you will develop your first complete plugin.
