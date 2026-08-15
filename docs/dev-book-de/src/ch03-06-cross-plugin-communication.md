@@ -22,9 +22,9 @@ class TimerPlugin(BasePlugin):
         self._running = False
 ```
 
-Intern ruft `send_command` die API auf: `POST /api/v1/plugins/timer/command` mit Body `{"command": "pause", "args": {}}`. Der API-Server legt den Befehl in die CommandQueue des Ziel-Plugins.
+Intern ruft `send_command` die API auf: `POST /api/v1/plugins/timer/command` mit Body `{"command": "pause", "args": {}}`. Der API-Server legt den Befehl in die CommandQueue des Ziel-Plugins. Der Aufruf ist **fire-and-forget** (asynchroner HTTP POST) — er gibt `True` bei erfolgreichem Enqueue zurück, nicht das Ergebnis des Handlers im Ziel-Plugin.
 
-**Vorteil**: Einfach, direkt, synchron.
+**Vorteil**: Einfach, direkt, fire-and-forget.
 **Nachteil**: Erzeugt Abhängigkeit — Plugin A muss Plugin B kennen.
 
 ## Ereignisbasierte Kommunikation: EventBus + ECM

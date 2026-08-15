@@ -3,9 +3,10 @@
 > **This file only contains unfinished work.**
 >
 > Completed work, implemented features, and historical changes belong in `docs/CHANGELOG.md`.
+> Open GUI/UX work is tracked in `docs/GUI_UX_TODO.md`.
 
 ---
 
-*All release blockers resolved. No open items remain.*
+*All release blockers resolved. No open items remain in this file.*
 
-*Last updated: 2026-07-06*
+*Ongoing GUI/UX improvements: see `docs/GUI_UX_TODO.md` (Accessibility P1 #2, Mobile/LAN P2 #8).*

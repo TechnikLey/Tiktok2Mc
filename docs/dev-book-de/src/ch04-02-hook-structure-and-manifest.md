@@ -85,7 +85,7 @@ def register(api: HookAPI):
 
 1. **Discovery**: `_discover_hook_dirs()` scannt `src/hooks/*/hook.json`
 2. **Import-Prüfung**: AST-Check auf disallowed imports (siehe [Import-Beschränkungen](./ch04-05-import-restrictions.md))
-3. **Import**: `importlib.import_module(module_name)` lädt die `main.py` des Hooks
+3. **Import**: Der Hook wird über `importlib.util.spec_from_file_location()` + `module_from_spec()` geladen (nicht `importlib.import_module`), was direkte Dateipfad-Importe ohne Paketstruktur erlaubt.
 4. **Register**: `module.register(api)` wird aufgerufen
 5. **Flat vs. Tree**: Bei flachem Layout werden `src/hooks/` durchsucht; bei Tree-Layout auch Unterverzeichnisse
 

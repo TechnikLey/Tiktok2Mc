@@ -1,12 +1,12 @@
 # TikTok2Mc
 
-Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, follow you, or hit like milestones, things happen in your Minecraft world automatically. Configure everything through the Web Dashboard or via simple text files — no programming required.
+Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, follow you, or hit like milestones, things happen in your Minecraft world automatically. Configure everything through the Web Dashboard or via simple text files — **for basic use no programming is required**.
 
 ## Features
 
 - **Gift reactions** — every gift triggers Minecraft commands: spawn mobs, give items, run effects, show overlays
 - **Follow, share & join actions** — react to viewers following, sharing, or joining your stream
-- **Like milestones** — trigger commands at like thresholds (every 100, 1000, 100k likes)
+- **Like milestones** — trigger commands at like thresholds (every 100, 100k likes by default)
 - **Chat commands** — viewers type commands like `#give` or `$skip` in TikTok chat
 - **Stream overlays** — OBS browser-source overlays for timers, counters, and text alerts
 - **Web Dashboard** — manage actions, configuration, plugins, and your server at `http://127.0.0.1:29185`
@@ -31,7 +31,7 @@ The installer is recommended, as it lets you configure the tool and create a des
 **Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it. The installer itself needs no `sudo` — it installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
 
 > [!NOTE]
-> Running the tool on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail. Set `show_sudo_warning: false` in `config.yaml` to skip the check.
+> Running the tool on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail (depends on your desktop environment: some assign a TTY, some don't). Set `show_sudo_warning: false` in `config.yaml` to skip the check. If `~/.local/bin` is not on your `PATH`, the installer will show you how to add it.
 
 ### Installation for advanced users
 You can also clone the repository and build the tool yourself. Keep in mind that a few dependencies must be installed on your system before it can be built — see the [developer documentation](./docs/dev-book-en/src/ch01-00-getting-started.md).
@@ -54,10 +54,15 @@ All overlays are served through the central API at `http://127.0.0.1:29185`:
 | Overlay | URL |
 |---------|-----|
 | Text overlay (default) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default` |
+| Text overlay (chroma key) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default&chroma=true` |
 | Timer | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
 | Death Counter | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
 | Win Counter | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
 | Spotify Control | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
+
+**Real-time updates (SSE streams)** — for browser sources that need live updates without refresh:
+- Core overlay: `http://127.0.0.1:29185/api/v1/overlay/stream`
+- Plugin overlays: `http://127.0.0.1:29185/api/v1/plugins/{name}/stream`
 
 ## Getting help
 

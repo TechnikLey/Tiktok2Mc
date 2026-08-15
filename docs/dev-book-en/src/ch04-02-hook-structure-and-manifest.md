@@ -85,7 +85,7 @@ def register(api: HookAPI):
 
 1. **Discovery**: `_discover_hook_dirs()` scans `src/hooks/*/hook.json`
 2. **Import check**: AST check for disallowed imports (see [Import Restrictions](./ch04-05-import-restrictions.md))
-3. **Import**: `importlib.import_module(module_name)` loads the hook's `main.py`
+3. **Import**: The hook is loaded via `importlib.util.spec_from_file_location()` + `module_from_spec()` (not `importlib.import_module`), allowing direct file-path imports without package structure.
 4. **Register**: `module.register(api)` is called
 5. **Flat vs. Tree**: In flat layout, `src/hooks/` is searched; in tree layout, subdirectories are also searched
 

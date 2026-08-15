@@ -17,7 +17,7 @@ The recommended way to configure and control TikTok2Mc is the **Dashboard** (GUI
 - **Configuration Files** — `config.yaml` and other files can also be edited directly with any text editor. This is optional and only needed for advanced tweaks.
 - **Mixed** — Use both. Changes from the GUI and files are synchronized automatically.
 
-You cannot open the setup wizard from the Dashboard later; it only appears on first launch (or while the TikTok username and RCON password are still set to defaults). If you miss it, the same settings are available in **Settings → Connection**.
+You cannot open the setup wizard from the Dashboard later; it only appears on first launch (or while the TikTok username **or** RCON password are still set to defaults). If you miss it, the same settings are available in **Settings → Connection**.
 
 ---
 
@@ -50,6 +50,9 @@ Download `TikTok2MC-<version>-Windows-Setup.exe` from the [Releases page](https:
 
 The installer creates desktop and Start Menu shortcuts. Use Windows Add/Remove Programs to uninstall.
 
+> [!NOTE]
+> **Development builds** (from `python build.py app`) produce `TikTok2MC-Setup.exe` (unversioned). **Release assets** from GitHub Releases are versioned: `TikTok2MC-v1.0.0-Windows-Setup.exe`. Use the versioned name when downloading from Releases.
+
 ### Linux
 
 Download `TikTok2Mc-<version>-Linux-Setup.sh` from the Releases page. Open a terminal, navigate to the download folder, and run:
@@ -60,6 +63,9 @@ chmod +x TikTok2Mc-<version>-Linux-Setup.sh
 ```
 
 The installer places the tool in `~/.local/share/TikTok2Mc` (no root required for the installation itself) and creates a `tiktok2mc` command and a desktop entry. Note that **running** the tool on Linux requires root privileges (`sudo`) — this is a separate step from the installation. If `~/.local/bin` is not on your `PATH`, the installer shows you how to add it.
+
+> [!NOTE]
+> **Development builds** (from `python build.py app`) produce `TikTok2Mc-Linux-Setup.sh` (unversioned). **Release assets** from GitHub Releases are versioned: `TikTok2Mc-v1.0.0-Linux-Setup.sh`. Use the versioned name when downloading from Releases.
 
 ### Portable version
 
@@ -79,7 +85,7 @@ All main settings are in `config/config.yaml`. Open this file with any text edit
 > [!IMPORTANT]
 > Do not enter your display name here — TikTok can only identify you by your username.
 2. **Your RCON password** — under `rcon.password`. Change this from the default to something secure. This password connects the tool to your Minecraft server. The tool will ask you to set one on first start if left empty.
-3. **Which features are enabled** — each section has `enabled: true` or `enabled: false`. Everything starts turned off. Turn on only what you need.
+3. **Which features are enabled** — each section has `enabled: true` or `enabled: false`. **Core services** (RCON, GUI, Overlay, Update, Minecraft Server API, Shutdown) are enabled by default in `config.yaml`. **Plugins and comment commands** start disabled. Turn on only what you need.
 
 ### Plugin-specific config files
 
@@ -112,9 +118,7 @@ You can edit actions through the GUI or directly in the `actions.mca` file.
 The file `data/actions.mca` controls what happens in Minecraft when TikTok events occur.
 
 > [!NOTE]
-> The `actions.mca` file is only read at startup, so changes take effect the next time the tool starts.
-> It is also recommended to install the language server, as it provides IntelliSense and marks errors.
-> Errors are also detected when the tool starts — if an error occurs, the system will not start.
+> The `actions.mca` file is read at startup and can be reloaded at runtime without a restart. Use the **Actions** page in the Dashboard to edit and save — changes are applied immediately via a hot reload. You can also trigger a reload manually via `POST /api/v1/reload` with `{"actions": true}`. It is also recommended to install the language server, as it provides IntelliSense and marks errors.
 
 ### How it works
 
@@ -140,9 +144,9 @@ Trigger:Command
 |--------|--------------|---------|
 | `/` | Normal Minecraft command | `/give @a minecraft:diamond` |
 | `!` | Server plugin command | `!tnt 5 0.5 2` |
-| `$` | Special action | `$random` |
+| `$` | Hook / Script | `$random` |
 | `>>` | Show text on your stream overlay | `>>New Follower!\|{user}\|5` |
-| `&` | Shell / system command | `&curl -X POST http://localhost:29187/add` |
+| `&` | Shell / system command | `&notepad.exe` (Windows) / `&notify-send "Done!"` (Linux) |
 
 ### Simple examples
 
@@ -249,7 +253,12 @@ Additionally, some plugins or hooks may rely on this distinction, treating `#` a
 
 ### Gift IDs
 
-A full list of gift IDs and names is available in `core/gifts.json`. The Dashboard also includes a gift picker with search.
+A full list of gift IDs and names is available in:
+
+- **Development**: `defaults/gifts.json` (source file in the repository)
+- **Release / Installed**: `core/gifts.json` (copied by the build system)
+
+The Dashboard also includes a gift picker with search.
 
 ![Gift Selector](../images/Gift_Picker.png)
 
@@ -306,6 +315,9 @@ event_commands:
 | spotify-control | `play`, `pause`, `next`, `previous`, `volume`, `volume_up`, `volume_down`, `shuffle`, `repeat`, `save`, `playtrack` |
 | win-counter | `add_win`, `remove_win`, `save_dims` |
 | death-counter | `player_death`, `add_death`, `reset`, `save_dims` |
+
+> [!NOTE]
+> `save_dims` is an internal command used by plugins to persist overlay window dimensions. It is registered by all built-in plugins but not typically invoked manually.
 
 The Event-Command Mapper can also be edited visually in the Dashboard.
 
@@ -379,7 +391,7 @@ Plugins are optional features you can turn on or off.
 3. Some plugins have additional setup (see below).
 
 > [!NOTE]
-> Everything starts disabled. Only turn on what you actually need.
+> Everything starts disabled **except** core services (RCON, GUI, Overlay, Update, Minecraft Server API, Shutdown — these are enabled by default in `config.yaml`). Only plugins and comment commands start disabled. Turn on only what you need.
 
 ### Available plugins
 
@@ -397,8 +409,12 @@ A configurable timer for your stream. Can count down from a set time or count up
 **Settings** (in the Dashboard under Plugins → Timer, or in `plugins/timer/config.yaml`):
 - `direction` — `down` (countdown) or `up` (count up)
 - `start_time` — starting time in seconds
+- `time_step` — seconds added/removed per tick (default: 1)
 - `auto_start` — start automatically when the tool loads
 - `loop` — when counting down, reset to start time instead of pausing at zero
+- `reset_on` — events that trigger auto-reset: `zero`, `manual`, `command`
+- `signal_on` — timer events published to EventBus (e.g., `zero`, `started`, `paused`, `reset`)
+- `milestones` — list of times (seconds) that emit `timer.milestone` events
 - `format` — display format: `mm:ss`, `hh:mm:ss`, or `seconds`
 - `theme` — customize colors (background, text, warning, blink, danger)
 
@@ -563,7 +579,7 @@ Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in 
 
 ### Error codes in logs
 
-If you see a code like `[HOOK-0005]` or `[API-0012]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the error-code reference in the developer docs (`docs/dev-book-en/src/error-codes.md` or `docs/dev-book-de/src/error-codes.md`).
+If you see a code like `[HOOK-0005]` or `[API-0001]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the error-code reference in the developer docs (`docs/dev-book-en/src/error-codes.md` or `docs/dev-book-de/src/error-codes.md`).
 
 ### Health and diagnostics
 
@@ -583,7 +599,12 @@ A: No. The tool also works without TikTok — you can trigger actions manually o
 
 **Q: Can I test actions without going live?**
 
-A: Yes. Use the included test tool (`test/test_trigger.exe` on Windows or `test/test_trigger.bin` on Linux). Enter a trigger name (like `follow` or a gift ID) to simulate it.
+A: Yes. Use the included test tool:
+
+- **Release / Installed**: `test/test_trigger.exe` (Windows) or `test/test_trigger.bin` (Linux)
+- **Development**: `python src/python/send_trigger.py` (e.g., `python src/python/send_trigger.py follow --user TestUser`)
+
+Enter a trigger name (like `follow` or a gift ID) to simulate it.
 
 **Q: How do I know if the tool is working?**
 

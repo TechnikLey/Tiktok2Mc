@@ -78,3 +78,10 @@ Das System erzeugt und verwendet folgende Dateien zur Laufzeit:
 | `data/event_commands.yaml` | Vom Benutzer bearbeitete Event-Commands |
 | `core/runtime/plugin_start_<name>` | Signal-Datei zum Starten eines Plugins |
 | `core/runtime/plugin_stop_<name>` | Signal-Datei zum Stoppen eines Plugins |
+
+## gifts.json Pfad (Entwicklung vs. Release)
+
+- **Entwicklung**: `defaults/gifts.json` (Quelle im Repository)
+- **Release/Installiert**: `core/gifts.json` (wird vom Build-System kopiert)
+
+Der Code liest zuerst `core/gifts.json`, dann fällt er auf `defaults/gifts.json` zurück (siehe `src/core/api/routes/actions.py`).

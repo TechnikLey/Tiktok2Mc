@@ -78,3 +78,10 @@ The system creates and uses the following files at runtime:
 | `data/event_commands.yaml` | User-edited event commands |
 | `core/runtime/plugin_start_<name>` | Signal file to start a plugin |
 | `core/runtime/plugin_stop_<name>` | Signal file to stop a plugin |
+
+## gifts.json Path (Dev vs. Release)
+
+- **Development**: `defaults/gifts.json` (source of truth in the repo)
+- **Release/Installed**: `core/gifts.json` (copied by the build system)
+
+Code reads from `core/gifts.json` first, then falls back to `defaults/gifts.json` (see `src/core/api/routes/actions.py`).

@@ -18,6 +18,7 @@ trigger: action1 ; action2 ; action3
 |-----|----------|--------------|
 | Vanilla | `/effect give @a speed 10 1` | Minecraft command via Datapack function |
 | RCON | `!say Hello` | Command directly via RCON to the server |
+| Vanilla via RCON | `/command !rc say Hello` | Vanilla command sent through RCON (supports `{user}` placeholders) |
 | Hook | `$superjump` | Calls a registered hook handler |
 | Overlay | `>>Title\|Subtitle\|5` | Display text in overlay |
 | Named Overlay | `@gifts>>Title\|Text\|3` | Overlay on a specific channel |

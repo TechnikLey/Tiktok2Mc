@@ -16,6 +16,8 @@ In 5 Minuten erstellst du dein erstes Plugin und siehst, wie es im System lebt.
 > python check_deps.py --install    # ALLES installieren (Python + System-Tools)
 > python check_deps.py --check-only # Nur prüfen, nichts installieren
 > python check_deps.py --requirements  # Zusätzlich requirements.txt ausführen
+> python check_deps.py --system-only   # Nur System-Tools prüfen (keine Python-Pakete)
+> python check_deps.py --pip-only      # Nur Python-Pakete prüfen (keine System-Tools)
 > ```
 >
 > - `--install` erkennt den Paketmanager automatisch (apt/dnf/pacman/zypper/brew/winget/choco) und installiert fehlende System-Tools

@@ -17,6 +17,9 @@ self.api_post("/events", {
 })
 ```
 
+> [!NOTE]
+> Es gibt **kein eingebautes** `minecraft.befehl` → RCON-Mapping in `defaults/event_commands.yaml`. Du musst dieses Mapping selbst konfigurieren, wenn Plugins RCON-Befehle über den Event-Command-Mapper ausführen sollen.
+
 Konfiguriere dazu in der `event_commands.yaml` einen Eintrag, der dieses Event auf einen RCON-Befehl abbildet (siehe [Event-Command-Mapper](./ch05-02-event-command-mapper.md) für Details).
 
 ### In Hooks
@@ -53,6 +56,6 @@ rcon:
 
 ## Einschränkungen
 
-- RCON hat eine begrenzte Befehllänge (maximal 1463 Byte pro Befehl inkl. Protokoll-Overhead).
+- RCON-Befehle haben eine begrenzte Länge (Protokoll-Limit).
 - Sehr viele Befehle hintereinander können zu Verzögerungen führen.
 - Der Minecraft-Server muss RCON aktiviert haben (siehe `server.properties`).
