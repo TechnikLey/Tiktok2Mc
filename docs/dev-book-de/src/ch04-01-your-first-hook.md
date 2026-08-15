@@ -74,7 +74,7 @@ Jedes Mal, wenn jemand auf TikTok folgt, wird der `$superjump`-Hook ausgelöst.
 TikTok CommentEvent "follow"
        │
        ▼
-on_comment() in main.py
+on_follow() in main.py
        │
        ▼ Event in die Trigger-Queue einreihen
        │
