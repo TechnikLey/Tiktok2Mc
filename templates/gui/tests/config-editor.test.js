@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('ConfigEditor', () => {
   beforeEach(() => {
@@ -313,6 +313,37 @@ describe('ConfigEditor', () => {
       expect(container.children.length).toBeGreaterThan(0);
       expect(container.lastChild.textContent).toBe('Test message');
       expect(container.lastChild.className).toBe('toast info');
+    });
+  });
+
+  /* ─── localization ─── */
+  describe('localization', () => {
+    afterEach(() => {
+      I18N.setLang('en');
+    });
+
+    it('renders German section titles, descriptions and help texts', () => {
+      I18N.setLang('de');
+      editor.open({
+        tiktok: { user: 'test_user', reconnect_delay_seconds: 5 },
+        rcon: { enabled: true },
+      });
+      const html = editor.content.innerHTML;
+      const sidebar = editor.sidebar.innerHTML;
+      expect(sidebar).toContain('Verbindung');
+      expect(html).toContain('Verbinde das Tool mit deinem TikTok-Live-Stream');
+      expect(html).toContain('Dein TikTok-Benutzername — ohne das @-Zeichen');
+      expect(html).toContain('RCON erlaubt dem Tool, Befehle an deinen Minecraft-Server zu senden');
+    });
+
+    it('keeps English descriptions and help texts when lang is en', () => {
+      I18N.setLang('en');
+      editor.open({
+        tiktok: { user: 'test_user' },
+      });
+      const html = editor.content.innerHTML;
+      expect(html).toContain('Connect the tool to your TikTok live stream');
+      expect(html).toContain('Your TikTok username');
     });
   });
 });
