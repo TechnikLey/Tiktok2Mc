@@ -4,22 +4,29 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 ## Features
 
-TODO: Add a small list of features no big Table, just a few important bullet points.
+- **Gift reactions** — every gift triggers Minecraft commands: spawn mobs, give items, run effects, show overlays
+- **Follow, share & join actions** — react to viewers following, sharing, or joining your stream
+- **Like milestones** — trigger commands at like thresholds (every 100, 1000, 100k likes)
+- **Chat commands** — viewers type commands like `#give` or `$skip` in TikTok chat
+- **Stream overlays** — OBS browser-source overlays for timers, counters, and text alerts
+- **Web Dashboard** — manage actions, configuration, plugins, and your server at `http://127.0.0.1:29185`
+- **Plugin & hook system** — extend TikTok2Mc with Python plugins and hooks
+- **Auto-updates** — checks for new versions and installs them automatically
 
 ## Requirements
 
 | Component | Requirement |
 |-----------|-------------|
 | **OS** | Windows 10+ or Linux |
-| **RAM** | 4 GB minimum, 8 GB recommended (Minecraft server uses up to 4 GB adjustable) |
+| **RAM** | 4 GB minimum, 8 GB recommended (Minecraft server: up to 4 GB, adjustable) |
 | **Free space** | ~1 GB for the tool, ~500 MB per additional Minecraft version |
-| **TikTok** | You must be live on TikTok for the connection to work |
+| **TikTok** | An active TikTok account — the live connection requires you to be streaming |
 | **Minecraft** | Java Edition (the tool bundles a PaperMC server, or use your own) |
 
 ## Installation
 
 **Windows** — Download `TikTok2MC-<version>-Windows-Setup.exe` from [Releases](https://github.com/TechnikLey/Tiktok2Mc/releases) and run the installer. A portable ZIP is also available — extract anywhere and run.
-The installer is recommended as it lets configure the tool and create a desktop shortcut.
+The installer is recommended, as it lets you configure the tool and create a desktop shortcut.
 
 **Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it. The installer itself needs no `sudo` — it installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
 
@@ -27,10 +34,8 @@ The installer is recommended as it lets configure the tool and create a desktop 
 > Running the tool on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail. Set `show_sudo_warning: false` in `config.yaml` to skip the check.
 
 ### Installation for advanced users
-You can also clone the repository and build the tool yourself.
-Keep in mind that the tool requires a few dependencies to be installed on your system before it can be built. See [Dev documentation](./docs/dev-book-en/src/ch01-00-getting-started.md).
-Please note that the build process is very slow and heavy on resources so on
-Low-end systems it may take a long time to build the tool. If you want to build the tool yourself, make sure you have enough free space, RAM and CPU Power available.
+You can also clone the repository and build the tool yourself. Keep in mind that a few dependencies must be installed on your system before it can be built — see the [developer documentation](./docs/dev-book-en/src/ch01-00-getting-started.md).
+Please note that building is very slow and resource-heavy: on low-end systems it can take a long time. Make sure you have enough free space, RAM, and CPU power available.
 
 ## Quick Start
 
@@ -40,7 +45,7 @@ Low-end systems it may take a long time to build the tool. If you want to build 
 4. **Define actions** — Use the Actions page in the Dashboard, or edit `data/actions.mca` directly. Each line is `trigger:command`. Example: `follow:/give @a minecraft:diamond`.
 5. **Connect** — Open Minecraft Java Edition → Multiplayer → Add Server → `localhost:25565`.
 
-> You must be live on TikTok for the tool to connect. The Dashboard is at `http://127.0.0.1:29185` — most settings can also be edited by hand in `config/config.yaml` and `data/actions.mca`.
+> You must be live on TikTok to receive live events; the tool can also be used with manual triggers. The Dashboard is at `http://127.0.0.1:29185` — most settings can also be edited by hand in `config/config.yaml` and `data/actions.mca`.
 
 ## Overlay URLs (OBS Browser Source)
 

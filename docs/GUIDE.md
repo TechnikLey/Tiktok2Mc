@@ -2,16 +2,16 @@
 
 This guide explains how to use TikTok2Mc. No programming knowledge is required.
 
-You want to know more about the Tool or you aim to designe Plugins than see the dev-doku.
-- [English Dev-Doku](./dev-book-en/src/ch01-00-getting-started.md)
-- [Geramn Dev-Doku](./dev-book-de/src/ch01-00-getting-started.md)
+If you want to learn more about the tool or develop your own plugins, see the developer documentation:
+- [English Developer Docs](./dev-book-en/src/ch01-00-getting-started.md)
+- [German Developer Docs](./dev-book-de/src/ch01-00-getting-started.md)
 
 The recommended way to configure and control TikTok2Mc is the **Dashboard** (GUI) at `http://127.0.0.1:29185/` (or the desktop application). Everything can be done there — no file editing needed:
 
 > [!NOTE]
-> The Dashboard provides also more help and validation that reduces the chance of misconfiguration.
-> The manual Configuration files are still available for advanced users who prefer to edit them directly.
-> But keep in mind that you may break the tool if you make a mistake in the files.
+> The Dashboard also provides additional help and validation, which reduces the chance of misconfiguration.
+> The configuration files are still available for advanced users who prefer to edit them directly.
+> Keep in mind that a mistake in these files can break the tool.
 
 - **Dashboard (GUI)** — The web interface is the primary way to configure and control the tool. It is the only place to enable plugins and to run the setup wizard.
 - **Configuration Files** — `config.yaml` and other files can also be edited directly with any text editor. This is optional and only needed for advanced tweaks.
@@ -77,7 +77,7 @@ All main settings are in `config/config.yaml`. Open this file with any text edit
 
 1. **Your TikTok username** — under `tiktok.user`. Enter your username without the `@` symbol.
 > [!IMPORTANT]
-> Do not Enter your Display Name here tiktok can you only identify you trought your username.
+> Do not enter your display name here — TikTok can only identify you by your username.
 2. **Your RCON password** — under `rcon.password`. Change this from the default to something secure. This password connects the tool to your Minecraft server. The tool will ask you to set one on first start if left empty.
 3. **Which features are enabled** — each section has `enabled: true` or `enabled: false`. Everything starts turned off. Turn on only what you need.
 
@@ -105,16 +105,16 @@ Saving immediately applies the settings (a reload and server restart happen behi
 ---
 
 ## Actions and Triggers
-Edit Actions trought the GUI or the actions.mca file.
+You can edit actions through the GUI or directly in the `actions.mca` file.
 
 ![Actions Editor](../images/Actions_Editor.png)
 
 The file `data/actions.mca` controls what happens in Minecraft when TikTok events occur.
 
 > [!NOTE]
-> The `actions.mca` fiele are only read at system startup so if you edit thies file the changes are arplied at the next start from the tool
-> It is also recommended to installe the language server because it provide Intellesense an mark errors
-> Errors are also detektet then the tools Starts if an error occure the System wont Start.
+> The `actions.mca` file is only read at startup, so changes take effect the next time the tool starts.
+> It is also recommended to install the language server, as it provides IntelliSense and marks errors.
+> Errors are also detected when the tool starts — if an error occurs, the system will not start.
 
 ### How it works
 
@@ -489,7 +489,7 @@ For chroma key (green screen) support, add `&chroma=true` to the overlay URL:
 ## The Dashboard
 
 The Dashboard is a web interface available at `http://127.0.0.1:29185/` that lets you manage everything visually. No file editing required.
-Its also avaliabe as a Desktop App.
+It is also available as a desktop app.
 
 ### What you can do in the Dashboard
 
@@ -553,8 +553,8 @@ When you update, new configuration options are automatically merged into your ex
 Set `update.enabled: false` in `config.yaml`.
 
 > [!WARNING]
-> Set thies to false can couse the tool do multifunction or crash.
-> Only set thies to false if you want to rename/add your own settings or if you want to see the tool crash...
+> Disabling this can cause the tool to malfunction or crash.
+> Only set this to `false` if you want to rename or add your own settings, or if you expect the tool to crash.
 
 **To check for updates manually:**
 Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in the Updates card, or visit `http://127.0.0.1:29185/api/v1/updates/check` directly.
@@ -563,7 +563,7 @@ Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in 
 
 ### Error codes in logs
 
-If you see a code like `[HOOK-0005]` or `[API-0012]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the `docs/dev-book-de/src/error-codes.md` file.
+If you see a code like `[HOOK-0005]` or `[API-0012]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the error-code reference in the developer docs (`docs/dev-book-en/src/error-codes.md` or `docs/dev-book-de/src/error-codes.md`).
 
 ### Health and diagnostics
 
@@ -579,7 +579,7 @@ The Dashboard has a **Live Plugin Health** card that shows the status of all com
 
 **Q: Do I need to be live on TikTok for the tool to work?**
 
-A: No. The tool also work without Tiktok you can trigger actions manuell or with automation scrips it is up to you.
+A: No. The tool also works without TikTok — you can trigger actions manually or with automation scripts. It is up to you.
 
 **Q: Can I test actions without going live?**
 
@@ -588,7 +588,7 @@ A: Yes. Use the included test tool (`test/test_trigger.exe` on Windows or `test/
 **Q: How do I know if the tool is working?**
 
 A: The console window shows live output. If you see "Connected to TikTok" and the Minecraft server starts without errors, everything is running.
-You can also use Test Triggers (see abouve) or look in the Live Logs Tab in the GUI if you see no errors the tool should run Propertlie
+You can also use test triggers (see above) or check the Live Logs tab in the GUI — if you see no errors, the tool should run properly.
 
 **Q: How often is the tool updated?**
 
@@ -624,7 +624,7 @@ A: The tool is designed for TikTok Live. The license restricts commercial use on
 
 **Q: My server is lagging. What can I do?**
 
-A: Push the RAM allocation in `config.yaml` under `java.xms` and `java.xmx`. Also avoid using `comment` or `join` triggers with complex commands on busy streams.
+A: Increase the RAM allocation in `config.yaml` under `java.xms` and `java.xmx`. Also avoid using `comment` or `join` triggers with complex commands on busy streams.
 
 **Q: Can viewers spam commands?**
 
