@@ -9,4 +9,4 @@
 
 *All release blockers resolved. No open items remain in this file.*
 
-*Ongoing GUI/UX improvements: see `docs/GUI_UX_TODO.md` (Accessibility P1 #2, Mobile/LAN P2 #8).*
+*Ongoing GUI/UX improvements: see `docs/GUI_UX_TODO.md` (P3 ideas).*
