@@ -125,6 +125,10 @@
             <div class="view active" id="view-status">
                 <div class="view-header">
                     <h2 data-i18n="status.title">Status</h2>
+                    <div class="density-toggle" role="group" aria-label="Dashboard density" data-i18n-aria-label="status.densityLabel">
+                        <button type="button" class="density-btn" data-density="spacious" onclick="setStatusDensity('spacious')" data-i18n="status.densitySpacious">Spacious</button>
+                        <button type="button" class="density-btn" data-density="compact" onclick="setStatusDensity('compact')" data-i18n="status.densityCompact">Compact</button>
+                    </div>
                     <button class="btn-help" onclick="Help.openHelp('status')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
 
@@ -303,6 +307,7 @@
                     <span class="console-prompt">&gt;</span>
                     <input type="text" id="console-input" class="console-input" data-i18n-placeholder="console.placeholder" placeholder="Enter Minecraft command..." disabled autocomplete="off" spellcheck="false">
                 </div>
+                <div class="console-hint" data-i18n="console.hint">Tab: command autocomplete · ↑/↓: command history</div>
             </div>
 
             <!-- ─── Overlays ─── -->
@@ -346,6 +351,18 @@
                 <section class="view-section">
                     <p class="text-muted" data-i18n="backups.intro">Every time you save a configuration, a backup is created automatically. Restore a backup here to roll back changes.</p>
                     <div id="backups-root"></div>
+                </section>
+
+                <section class="view-section">
+                    <div class="view-section-header">
+                        <h3 data-i18n="backups.bundleTitle">Config Bundle</h3>
+                    </div>
+                    <p class="text-muted" data-i18n="backups.bundleIntro">Export your complete configuration (config, actions, event commands, plugin and hook configs) as a ZIP bundle, or import one to restore it on another device.</p>
+                    <div class="bundle-actions">
+                        <button class="btn btn--secondary" onclick="exportConfigBundle()" data-i18n="backups.bundleExport">Export Bundle</button>
+                        <button class="btn btn--primary" onclick="importConfigBundle()" data-i18n="backups.bundleImport">Import Bundle</button>
+                        <input type="file" id="bundle-file-input" accept=".zip" class="hidden">
+                    </div>
                 </section>
             </div>
 

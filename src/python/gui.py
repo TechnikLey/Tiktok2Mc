@@ -8,6 +8,7 @@ Supports --gui-hidden for headless mode.
 
 import argparse
 import atexit
+import base64
 import os
 import subprocess
 import sys
@@ -126,6 +127,21 @@ class LauncherAPI:
             path.write_text(content, encoding="utf-8")
             return str(path)
         except OSError as e:
+            log.warning("Failed to save file: %s", e)
+            return f"error:{e}"
+
+    def download_file_b64(self, data: str, filename: str) -> str:
+        """Save base64-encoded binary content to Downloads and return the path."""
+        downloads = Path.home() / "Downloads"
+        try:
+            downloads.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            downloads = Path.home()
+        path = downloads / filename
+        try:
+            path.write_bytes(base64.b64decode(data))
+            return str(path)
+        except (OSError, ValueError) as e:
             log.warning("Failed to save file: %s", e)
             return f"error:{e}"
 

@@ -225,6 +225,10 @@ function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), ok
 }
 
 /* ─── Live Log ─── */
+const LOG_FILTER_KEY = 'tiktok2mc_log_filter';
+const LOG_AUTOSCROLL_KEY = 'tiktok2mc_log_autoscroll';
+const LOG_LEVELS = ['all', 'info', 'warning', 'error', 'debug', 'critical'];
+
 class LiveLog {
   constructor() {
     this.view = document.getElementById('log-view');
@@ -239,9 +243,41 @@ class LiveLog {
     this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0, critical: 0 };
     this._sse = null;
     this._reconnectTimer = null;
+    this._restorePrefs();
     this._bindFilters();
+    this._bindAutoscroll();
     this._startSSE();
     this.render();
+  }
+
+  _restorePrefs() {
+    try {
+      const savedFilter = localStorage.getItem(LOG_FILTER_KEY);
+      if (savedFilter && LOG_LEVELS.includes(savedFilter)) this.filter = savedFilter;
+    } catch (_) {}
+    const autoScroll = document.getElementById('log-autoscroll');
+    if (autoScroll) {
+      let saved = null;
+      try { saved = localStorage.getItem(LOG_AUTOSCROLL_KEY); } catch (_) {}
+      if (saved !== null) autoScroll.checked = saved === 'true';
+    }
+    this._applyFilterButtons();
+  }
+
+  _applyFilterButtons() {
+    const buttons = document.getElementById('log-filter-buttons');
+    if (!buttons) return;
+    buttons.querySelectorAll('.log-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-level') === this.filter);
+    });
+  }
+
+  _bindAutoscroll() {
+    const autoScroll = document.getElementById('log-autoscroll');
+    if (!autoScroll) return;
+    autoScroll.addEventListener('change', () => {
+      try { localStorage.setItem(LOG_AUTOSCROLL_KEY, String(autoScroll.checked)); } catch (_) {}
+    });
   }
 
   _normalizeLevel(level) {
@@ -321,6 +357,8 @@ class LiveLog {
 
   setFilter(level) {
     this.filter = level || 'all';
+    try { localStorage.setItem(LOG_FILTER_KEY, this.filter); } catch (_) {}
+    this._applyFilterButtons();
     this.render();
   }
 
@@ -618,6 +656,24 @@ function _updateServerUptimeDisplay() {
     const uptimeEl = card.querySelector('.server-uptime');
     if (uptimeEl) uptimeEl.textContent = formatUptime(total);
   }
+}
+
+const STATUS_DENSITY_KEY = 'tiktok2mc_status_density';
+
+function setStatusDensity(mode) {
+  const target = mode === 'compact' ? 'compact' : 'spacious';
+  const view = document.getElementById('view-status');
+  if (view) view.classList.toggle('density-compact', target === 'compact');
+  document.querySelectorAll('.density-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-density') === target);
+  });
+  try { localStorage.setItem(STATUS_DENSITY_KEY, target); } catch (_) {}
+}
+
+function _initStatusDensity() {
+  let saved = 'spacious';
+  try { saved = localStorage.getItem(STATUS_DENSITY_KEY) || 'spacious'; } catch (_) {}
+  setStatusDensity(saved === 'compact' ? 'compact' : 'spacious');
 }
 
 async function loadStatus() {
@@ -1900,6 +1956,92 @@ async function createBackupsNow() {
     loadBackups();
   } catch (e) {
     showToast(e.message, 'error');
+  }
+}
+
+/* ─── Config Bundle ─── */
+
+function _arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function exportConfigBundle() {
+  try {
+    showToast(I18N.t('backups.bundleExporting'), 'info');
+    const resp = await fetch(API + '/config-bundle', { headers: _withApiKey({}) });
+    if (!resp.ok) await _throwResError(resp);
+    const buf = await resp.arrayBuffer();
+    const filename = 'tiktok2mc-config-bundle.zip';
+
+    if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.download_file_b64) {
+      const path = await pywebview.api.download_file_b64(_arrayBufferToBase64(buf), filename);
+      if (path && !path.startsWith('error:')) {
+        showToast(I18N.t('backups.bundleExportedPath', { path }), 'success');
+      } else {
+        showToast(I18N.t('backups.bundleExportFailed'), 'error');
+      }
+      return;
+    }
+
+    const blob = new Blob([buf], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(I18N.t('backups.bundleExportedPath', { path: filename }), 'success');
+  } catch (e) {
+    showToast(e.message || I18N.t('backups.bundleExportFailed'), 'error');
+  }
+}
+
+function importConfigBundle() {
+  const input = document.getElementById('bundle-file-input');
+  if (!input) return;
+  input.value = '';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    showConfirmDialog(
+      I18N.t('backups.bundleImportTitle'),
+      I18N.t('backups.bundleImportWarning'),
+      I18N.t('backups.bundleImport'),
+      'btn-primary'
+    ).then(confirmed => {
+      if (confirmed) _uploadConfigBundle(file);
+    });
+  };
+  input.click();
+}
+
+async function _uploadConfigBundle(file) {
+  try {
+    showToast(I18N.t('backups.bundleImporting'), 'info');
+    const form = new FormData();
+    form.append('file', file, file.name || 'bundle.zip');
+    const resp = await fetch(API + '/config-bundle/import', {
+      method: 'POST',
+      headers: _withApiKey({}),
+      body: form
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(body.detail || I18N.t('backups.bundleImportFailed', { msg: resp.status }));
+    }
+    showToast(I18N.t('backups.bundleImported', { count: body.count || 0 }), 'success');
+    loadBackups();
+  } catch (e) {
+    showToast(e.message || I18N.t('backups.bundleImportFailed', { msg: '' }), 'error');
   }
 }
 
@@ -6631,10 +6773,88 @@ function refreshConsoleInstanceSelector() {
   }
 }
 
+const CONSOLE_HISTORY_KEY = 'tiktok2mc_console_history';
+const CONSOLE_HISTORY_MAX = 50;
+
 const consoleTerminal = {
-  _history: [],
+  _history: (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CONSOLE_HISTORY_KEY) || '[]');
+      return Array.isArray(saved) ? saved.slice(0, CONSOLE_HISTORY_MAX) : [];
+    } catch (_) { return []; }
+  })(),
   _historyIdx: -1,
   _connected: false,
+  _tabIdx: -1,
+  _tabBase: '',
+  _tabMatches: [],
+
+  _commandCompletions: [
+    'advancement', 'attribute', 'ban', 'ban-ip', 'banlist', 'bossbar', 'clear', 'clone',
+    'connect', 'datapack', 'debug', 'defaultgamemode', 'deop', 'difficulty', 'effect',
+    'enchant', 'execute', 'experience', 'fill', 'fillbiome', 'forceload', 'function',
+    'gamemode', 'gamerule', 'give', 'help', 'item', 'jfr', 'kick', 'kill', 'list',
+    'locate', 'loot', 'me', 'msg', 'op', 'pardon', 'particle', 'playsound', 'publish',
+    'recipe', 'reload', 'remove', 'replaceitem', 'return', 'save-all', 'save-off',
+    'save-on', 'say', 'schedule', 'scoreboard', 'seed', 'setblock', 'setidletimeout',
+    'setworldspawn', 'spawnpoint', 'spectate', 'spreadplayers', 'stopsound', 'summon',
+    'tag', 'team', 'teammsg', 'teleport', 'tell', 'tellraw', 'testfor', 'testforblock',
+    'testforblocks', 'tick', 'time', 'title', 'titleraw', 'toggledownfall', 'tp',
+    'trigger', 'weather', 'whitelist', 'worldborder', 'xp'
+  ],
+
+  _saveHistory() {
+    try {
+      localStorage.setItem(CONSOLE_HISTORY_KEY, JSON.stringify(this._history.slice(-CONSOLE_HISTORY_MAX)));
+    } catch (_) {}
+  },
+
+  _resetTabState() {
+    this._tabIdx = -1;
+    this._tabBase = '';
+    this._tabMatches = [];
+  },
+
+  _completeCurrentToken(input, word) {
+    if (!word) { this._resetTabState(); return false; }
+    const lower = word.toLowerCase();
+    const isCycle = this._tabBase && this._tabMatches.length > 0 &&
+      lower.startsWith(this._tabBase) &&
+      this._tabMatches.some(c => c.toLowerCase() === lower);
+    if (isCycle) {
+      this._tabIdx = (this._tabIdx + 1) % this._tabMatches.length;
+      this._replaceLastToken(input, word, this._tabMatches[this._tabIdx]);
+      return true;
+    }
+    const candidates = this._commandCompletions.filter(c => c.toLowerCase().startsWith(lower));
+    if (candidates.length === 0) { this._resetTabState(); return false; }
+    if (candidates.length === 1) {
+      this._resetTabState();
+      this._replaceLastToken(input, word, candidates[0]);
+      return true;
+    }
+    this._tabBase = lower;
+    this._tabMatches = candidates;
+    this._tabIdx = 0;
+    this._replaceLastToken(input, word, candidates[0]);
+    return true;
+  },
+
+  _replaceLastToken(input, word, replacement) {
+    const start = input.selectionStart ?? input.value.length;
+    const val = input.value;
+    const from = Math.max(val.lastIndexOf(' ', start - 1) + 1, 0);
+    input.value = val.slice(0, from) + replacement + val.slice(start);
+    const cursor = from + replacement.length;
+    input.setSelectionRange(cursor, cursor);
+  },
+
+  _complete(input) {
+    const start = input.selectionStart ?? input.value.length;
+    const before = input.value.slice(0, start);
+    const word = (before.match(/\S+$/) || [''])[0];
+    this._completeCurrentToken(input, word);
+  },
 
   switchInstance(instanceId) {
     _consoleInstanceId = instanceId || '';
@@ -6759,10 +6979,16 @@ document.addEventListener('DOMContentLoaded', () => {
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const cmd = input.value;
-      consoleTerminal._history.push(cmd);
-      consoleTerminal._historyIdx = consoleTerminal._history.length;
+      if (cmd.trim()) {
+        consoleTerminal._history.push(cmd);
+        consoleTerminal._historyIdx = consoleTerminal._history.length;
+        consoleTerminal._saveHistory();
+      }
       input.value = '';
       consoleTerminal.sendCommand(cmd);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      consoleTerminal._complete(input);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (consoleTerminal._historyIdx > 0) {
@@ -6780,6 +7006,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+  input.addEventListener('input', () => consoleTerminal._resetTabState());
 });
 
 /* ─── Sidebar ─── */
@@ -7305,6 +7532,7 @@ async function init() {
   _initEditorVisibilityObserver();
   _initSidebarReveal();
   _initMobileSidebar();
+  _initStatusDensity();
   await loadHealth();
   await loadStatus();
   await loadConfig();

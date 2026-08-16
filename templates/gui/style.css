@@ -572,6 +572,37 @@ tr:last-child td { border-bottom: none; }
 .status-card__value.success { color: var(--color-success); }
 .status-card__value.danger { color: var(--color-danger); }
 
+/* ─── Status density toggle (Spacious / Compact) ─── */
+.density-toggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.density-btn {
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.density-btn:hover { color: var(--color-text); }
+.density-btn.active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: var(--weight-semibold);
+}
+#view-status.density-compact .status-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+#view-status.density-compact .status-card { padding: var(--space-2) var(--space-3); }
+#view-status.density-compact .status-card__value { font-size: var(--text-md); }
+#view-status.density-compact .view-section { margin-bottom: var(--space-2); }
+#view-status.density-compact .plugin-health-grid { gap: var(--space-2); }
+
 /* ─── Revenue View ─── */
 .revenue-filters {
   display: flex;
@@ -1665,6 +1696,14 @@ input[type="color"] {
     font-size: 0.85em;
   }
   .backup-table .backup-actions { text-align: left; }
+
+/* Config bundle actions */
+.bundle-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
 
   /* Modals: top-aligned + scrollable on small screens */
   .wizard-overlay { align-items: flex-start; }
@@ -2914,6 +2953,13 @@ input[type="color"] {
 }
 .console-input:disabled {
   opacity: 0.4;
+}
+
+.console-hint {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
 }
 
 /* ─── Event Tester ─── */

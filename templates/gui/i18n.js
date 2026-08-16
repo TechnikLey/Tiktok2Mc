@@ -170,6 +170,9 @@
     'status.eventsPerMinute': 'Events/Min',
     'status.giftValueToday': 'Gift Value Today',
     'status.noLiveData': 'No live data available (bridge not connected)',
+    'status.densityLabel': 'Dashboard density',
+    'status.densitySpacious': 'Spacious',
+    'status.densityCompact': 'Compact',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',
@@ -288,6 +291,7 @@
     'console.serverPrefix': 'server: {id}',
     'console.notInstalled': 'Not installed',
     'console.input': '> {cmd}',
+    'console.hint': 'Tab: command autocomplete · ↑/↓: command history',
 
     /* ── Overlays ── */
     'overlays.title': 'Overlays',
@@ -346,6 +350,18 @@
     'backups.restored': 'Backup restored.',
     'backups.created': '{count} backup(s) created.',
     'backups.upToDate': 'Nothing to back up — files are already up to date.',
+    'backups.bundleTitle': 'Config Bundle',
+    'backups.bundleIntro': 'Export your complete configuration (config, actions, event commands, plugin and hook configs) as a ZIP bundle, or import one to restore it on another device.',
+    'backups.bundleExport': 'Export Bundle',
+    'backups.bundleImport': 'Import Bundle',
+    'backups.bundleExporting': 'Exporting bundle...',
+    'backups.bundleExportedPath': 'Bundle saved to {path}',
+    'backups.bundleExportFailed': 'Bundle export failed.',
+    'backups.bundleImportTitle': 'Import Config Bundle',
+    'backups.bundleImportWarning': 'Import the selected bundle? Existing config files will be overwritten (safety backups are created first).',
+    'backups.bundleImporting': 'Importing bundle...',
+    'backups.bundleImported': '{count} file(s) applied.',
+    'backups.bundleImportFailed': 'Bundle import failed: {msg}',
     'updates.exitCode': 'Exit code {code}',
 
     /* ── Server Manager ── */
@@ -968,6 +984,9 @@
     'status.eventsPerMinute': 'Events/Min',
     'status.giftValueToday': 'Geschenk-Wert heute',
     'status.noLiveData': 'Keine Live-Daten verfügbar (Bridge nicht verbunden)',
+    'status.densityLabel': 'Dashboard-Dichte',
+    'status.densitySpacious': 'Aufgeräumt',
+    'status.densityCompact': 'Profi',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',
@@ -1086,6 +1105,7 @@
     'console.serverPrefix': 'server: {id}',
     'console.notInstalled': 'Nicht installiert',
     'console.input': '> {cmd}',
+    'console.hint': 'Tab: Befehl-Autovervollständigung · ↑/↓: Verlauf',
 
     /* ── Overlays ── */
     'overlays.title': 'Overlays',
@@ -1145,6 +1165,18 @@
     'backups.restored': 'Backup wiederhergestellt.',
     'backups.created': '{count} Backup(s) erstellt.',
     'backups.upToDate': 'Nichts zu sichern — Dateien sind bereits aktuell.',
+    'backups.bundleTitle': 'Config-Bundle',
+    'backups.bundleIntro': 'Exportiere deine komplette Konfiguration (Config, Aktionen, Event-Befehle, Plugin- und Hook-Konfigs) als ZIP-Bundle oder importiere ein Bundle, um sie auf einem anderen Gerät wiederherzustellen.',
+    'backups.bundleExport': 'Bundle exportieren',
+    'backups.bundleImport': 'Bundle importieren',
+    'backups.bundleExporting': 'Bundle wird exportiert...',
+    'backups.bundleExportedPath': 'Bundle gespeichert unter {path}',
+    'backups.bundleExportFailed': 'Bundle-Export fehlgeschlagen.',
+    'backups.bundleImportTitle': 'Config-Bundle importieren',
+    'backups.bundleImportWarning': 'Das gewählte Bundle importieren? Vorhandene Konfigurationsdateien werden überschrieben (zuvor werden Sicherheits-Backups erstellt).',
+    'backups.bundleImporting': 'Bundle wird importiert...',
+    'backups.bundleImported': '{count} Datei(en) angewendet.',
+    'backups.bundleImportFailed': 'Bundle-Import fehlgeschlagen: {msg}',
 
     /* ── Server Manager ── */
     'servers.title': 'Server-Manager',

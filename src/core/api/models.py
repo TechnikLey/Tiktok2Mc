@@ -605,3 +605,12 @@ class BackupCreateResponse(BaseModel):
         default_factory=list,
         description="Targets with no new backup (unchanged / missing)",
     )
+
+
+class BundleImportResponse(BaseModel):
+    """Response body for ``POST /api/v1/config-bundle/import``."""
+
+    applied: list[str] = Field(
+        default_factory=list, description="Bundle-internal names that were applied"
+    )
+    count: int = Field(0, description="Number of applied files")

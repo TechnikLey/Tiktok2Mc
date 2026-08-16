@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from .actions import router as actions_router
 from .backups import router as backups_router
 from .config import router as config_router
+from .config_bundle import router as config_bundle_router
 from .diagnostics import router as diagnostics_router
 from .event_commands import router as event_commands_router
 from .events import router as events_router
@@ -29,6 +30,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
 api_router.include_router(diagnostics_router)
 api_router.include_router(config_router)
+api_router.include_router(config_bundle_router)
 api_router.include_router(plugins_router)
 api_router.include_router(plugin_config_router)
 api_router.include_router(events_router)

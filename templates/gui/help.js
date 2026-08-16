@@ -368,6 +368,19 @@
             ],
           },
         },
+        {
+          h: { en: 'Autocomplete & History', de: 'Autovervollständigung & Verlauf' },
+          body: {
+            en: [
+              'Tab completes the current command (e.g. \u201Cga\u201D → \u201Cgamemode\u201D). Press Tab repeatedly to cycle through matching commands.',
+              'The ↑/↓ arrow keys navigate the command history from the current session. The last 50 commands are also remembered between restarts.',
+            ],
+            de: [
+              'Tab vervollständigt den aktuellen Befehl (z. B. „ga\u201D → „gamemode\u201D). Mehrfaches Drücken von Tab blättert durch die passenden Befehle.',
+              'Mit den Pfeiltasten ↑/↓ navigierst du durch den Befehlsverlauf der aktuellen Sitzung. Die letzten 50 Befehle werden auch über Neustarts hinweg gespeichert.',
+            ],
+          },
+        },
       ],
     },
 
@@ -508,6 +521,17 @@
             ],
             de: [
               'Mit „Jetzt sichern" erstellst du jederzeit einen Schnappschuss von Konfiguration, Aktionen und Plugin-Registry — zum Beispiel vor einer größeren Änderung. Einträge mit „Nicht wiederherstellbar" dienen nur als Referenz und können nicht direkt wiederhergestellt werden.',
+            ],
+          },
+        },
+        {
+          h: { en: 'Config Bundle', de: 'Config-Bundle' },
+          body: {
+            en: [
+              'The config bundle collects your active configuration into a single ZIP: config.yaml, actions.mca, event_commands.yaml, and the config.yaml of every plugin and hook. "Export Bundle" downloads it; "Import Bundle" restores it on this or another device. During import every file is validated first and a safety backup is created before anything is overwritten. gifts.json is intentionally not part of the bundle.',
+            ],
+            de: [
+              'Das Config-Bundle fasst deine aktive Konfiguration in einer einzigen ZIP zusammen: config.yaml, actions.mca, event_commands.yaml sowie die config.yaml jedes Plugins und Hooks. „Bundle exportieren" lädt es herunter; „Bundle importieren" stellt es auf diesem oder einem anderen Gerät wieder her. Beim Import wird jede Datei zuerst validiert und vor jedem Überschreiben ein Sicherheits-Backup erstellt. gifts.json ist absichtlich nicht Teil des Bundles.',
             ],
           },
         },
