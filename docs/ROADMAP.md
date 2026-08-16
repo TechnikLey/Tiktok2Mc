@@ -18,12 +18,12 @@
 * **Installers** — one-click setup for Windows (NSIS) and Linux (shell installer with desktop entry)
 * **Auto-updates** — the tool checks for updates on startup and installs them automatically
 * **GUI integration tests** — automated tests for the dashboard and editors (`templates/gui/tests/`)
+* **Accessibility (WCAG AA)** — keyboard navigation, modal focus management, screen-reader labels (`docs/GUI_UX_TODO.md` P1 #2)
+* **Mobile / LAN UX** — responsive drawer sidebar and dashboard polish on smaller screens (`docs/GUI_UX_TODO.md` P2 #8)
 * **Windows + Linux support** — runs on both platforms with native installers
 
 ## In Progress
 
-* **Accessibility (WCAG AA)** — keyboard navigation, modal focus management, screen-reader labels (`docs/GUI_UX_TODO.md` P1 #2)
-* **Mobile / LAN UX** — responsive review and polish of the dashboard on smaller screens (`docs/GUI_UX_TODO.md` P2 #8)
 * **Documentation refresh** — keeping the user guide and developer docs in sync with the v1.0.0 GUI
 
 ## Long-Term Ideas

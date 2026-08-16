@@ -18,7 +18,7 @@
 | **P2** | Mittel | UX-Feinschliff / Verbesserung |
 | **P3** | Niedrig | Nice-to-have, später |
 
-**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → Accessibility → ~~Overlay-Vorschau~~ ✅ → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → ~~Tastenkürzel~~ ✅ → ~~Undo~~ ✅ → Mobile/LAN), zum Schluss P3-Ideen.
+**Abarbeitungsreihenfolge:** Strukturelles zuerst (P1: ~~i18n~~ ✅ → ~~Accessibility~~ ✅ → ~~Overlay-Vorschau~~ ✅ → ~~Kontext-Hilfe~~ ✅), danach Feinschliff (P2: Status-View → ~~Tastenkürzel~~ ✅ → ~~Undo~~ ✅ → ~~Mobile/LAN~~ ✅), zum Schluss P3-Ideen.
 
 ---
 
@@ -45,23 +45,42 @@
 
 ### 2. Accessibility (Barrierefreiheit & Tastaturbedienung)
 
-- [ ] **Status:** Offen (teilweise: `aria-label` via i18n implementiert)
-- [ ] **Problem:** Keine `aria-*`-Attribute (außer `aria-label` via i18n), keine Tastaturnavigation:
+- [x] **Status:** **ERLEDIGT** (2026-08-17)
+- [x] **Problem:** Keine `aria-*`-Attribute (außer `aria-label` via i18n), keine Tastaturnavigation:
       Modals sind nicht per `Esc` schließbar, kein Fokus-Management/Fokus-Trap in Overlays,
       Screenreader erhalten keine sinnvollen Labels. `keydown`-Handler existieren nur in
       Tag-Inputs.
-- [ ] **Ziel:** Grundlegende WCAG-Konformität (AA) für die Kernflüsse.
-- [ ] **Umsetzungsvorschlag:**
+- [x] **Ziel:** Grundlegende WCAG-Konformität (AA) für die Kernflüsse.
+- [x] **Umsetzungsvorschlag:**
   - `Esc` schließt das oberste Modal; Fokus-Trap innerhalb offener Modals; Fokus beim Öffnen
     ins Modal, beim Schließen zurück zum Auslöser.
   - `aria-label`/`aria-labelledby` für Icons ohne Text (Sidebar-Icons, Theme-Toggle, Buttons),
     `role="dialog"` + `aria-modal` für Overlays, `aria-live` für Toasts/Log.
   - `lang` je View dynamisch an die gewählte Sprache anpassen (verknüpft mit Punkt 1 —
     bereits via `I18N.apply()` implementiert).
-- [ ] **Abnahmekriterien:** Vollständige Bedienung ohne Maus möglich; Modals per `Esc` +
+- [x] **Umsetzung:**
+  - Neues Modul `templates/gui/accessibility.js` (ModalFocus): MutationObserver auf
+    `.wizard-overlay, .editor-overlay` setzt beim Öffnen `role="dialog"`, `aria-modal="true"`
+    und `aria-labelledby` (aus der ersten h1–h3, id wird bei Bedarf generiert), merkt sich den
+    Auslöser und fokussiert das erste fokussierbare Element (Überspringt Elemente in
+    aufgeklappten `.hidden`-Panels); beim Schließen Fokus-Restore (nur wenn der Auslöser noch
+    verbunden ist); Tab-Trap inkl. Shift+Tab im obersten offenen Overlay.
+  - `index.html`: Nav-Items von `<a>` auf `<button>` umgestellt (jetzt fokussierbar),
+    `aria-label` + `data-i18n-aria-label` für sidebar-toggle/-hide-btn/-reveal/theme-toggle/
+    mobile-menu-btn, `aria-live="polite"` auf dem Toast-Container.
+  - `app.js`: Toasts erhalten `role="status"` (info/success) bzw. `role="alert"`
+    (error/warning); mobile Sidebar-Funktionen (Drawer) — siehe Punkt 8.
+  - `shortcuts.js`: `Esc` schließt zusätzlich den mobilen Drawer.
+  - `style.css`: `:focus-visible`-Outline für Buttons/Inputs/Selects/etc. greift auch dort, wo
+    Komponenten `outline: none` setzen (spezifischere Regel am Dateiende).
+  - `i18n.js`: neuer Key `nav.openSidebar` (DE/EN).
+  - `eslint.config.js` (appGlobals + classic files), `tests/setup.js` (lädt `accessibility.js`),
+    neue GUI-Tests in `tests/accessibility.test.js` (17 Tests: ARIA-Attribute, Fokus-Restore,
+    Tab-Trap, Toast-Rollen, Buttons, Drawer).
+- [x] **Abnahmekriterien:** Vollständige Bedienung ohne Maus möglich; Modals per `Esc` +
       Tab-Fokus sicher bedienbar; Lighthouse/axe-Check ohne kritische Fehler.
-- [ ] **Betroffene Dateien:** `index.html`, `design-system.css` (Fokus-Styles), `app.js`,
-      `actions-editor.js`, `style.css`
+- [x] **Betroffene Dateien:** `accessibility.js` (neu), `index.html`, `app.js`, `shortcuts.js`,
+      `style.css`, `i18n.js`, `eslint.config.js`, `tests/setup.js`, `tests/accessibility.test.js` (neu)
 
 ---
 
@@ -199,18 +218,30 @@
 
 ### 8. Mobile / LAN-Nutzung prüfen
 
-- [ ] **Status:** Teilweise implementiert (responsive CSS vorhanden, aber unvollständig getestet)
-- [ ] **Problem:** Mit `feat: enable LAN dashboard access` (Commit `e11d6b3`) kann das Dashboard
+- [x] **Status:** **ERLEDIGT** (2026-08-17)
+- [x] **Problem:** Mit `feat: enable LAN dashboard access` (Commit `e11d6b3`) kann das Dashboard
       aus dem LAN (z. B. Handy) geöffnet werden. Responsive CSS existiert teilweise
       (`style.css` `@media (max-width: 960px)` Zeile 1779, `768px` Zeilen 2581/3218, zusätzlich `640px` Zeile 1609).
       Sidebar wird zu horizontaler Leiste, Tabellen werden zu Cards, Editor-Layouts stacken.
-- [ ] **Ziel:** Dashboard auch auf kleineren Bildschirmen gut bedienbar (Sidebar, Tabellen,
+- [x] **Ziel:** Dashboard auch auf kleineren Bildschirmen gut bedienbar (Sidebar, Tabellen,
       Editoren, Server-Manager-Modals).
-- [ ] **Umsetzungsvorschlag:** Gezieltes Mobile-Review (mind. 375 px und 768 px breite), Seitenleiste
+- [x] **Umsetzungsvorschlag:** Gezieltes Mobile-Review (mind. 375 px und 768 px breite), Seitenleiste
       zu Drawer, Tabellen responsiv, Modals scrollbar & zentriert.
-- [ ] **Abnahmekriterien:** Alle Hauptviews sind auf ~375 px nutzbar; keine horizontalen
+- [x] **Umsetzung:**
+  - Sidebar wird ≤768px zum Off-Canvas-Drawer (fixiert, `translateX(-100%)` → `mobile-open`),
+    geöffnet über einen mobilen Top-Bar (`#mobile-header` mit `toggleMobileSidebar()`) mit
+    Backdrop (`#sidebar-backdrop`, Klick schließt). Die Desktop-Modi `icons`/`hide` werden im
+    Drawer neutralisiert (Labels + Footer mit Shutdown/Theme/Sprache immer sichtbar).
+  - `Esc` schließt den Drawer (shortcuts.js); View-Wechsel und Fensterbreite >768px schließen
+    ihn automatisch.
+  - `.wizard-card` erhält `max-height: 85vh` + `overflow-y: auto`; ≤640px sind Modals/Wizard
+    oben ausgerichtet mit reduziertem Padding, `.modal-actions` wrappen die Buttons.
+  - Actions-Editor ≤640px: Tabellen-Panel und Detail-Panel stacken vertikal, das
+    Tabellen-Panel scrollt horizontal; `.array-table` scrollt horizontal statt das Layout zu
+    sprengen.
+- [x] **Abnahmekriterien:** Alle Hauptviews sind auf ~375 px nutzbar; keine horizontalen
       Überläufe in Kernflüssen.
-- [ ] **Betroffene Dateien:** `style.css`, `index.html`, `app.js`
+- [x] **Betroffene Dateien:** `style.css`, `index.html`, `app.js`
 
 ---
 
@@ -234,5 +265,7 @@
 - **Undo nach dem Speichern / Backup-Wiederherstellung** — Neue Backups-API (`GET /api/v1/backups`, `POST /api/v1/backups/restore`, `POST /api/v1/backups/create`) mit `BackupService`, neue GUI-View „Backups" mit Liste, Wiederherstellen-Dialog und „Backup Now", i18n DE/EN, Help-Topic. Backend- + GUI-Tests grün. (P2)
 - **Tastenkürzel** — Neues `templates/gui/shortcuts.js` (`Ctrl+S` speichert im aktiven Editor, `/` fokussiert die Suche, `Esc` schließt das oberste Modal, `?` öffnet das Kürzel-Hilfethema; Eingabe-Safety), `Esc`-Bestätigen im Confirm-Dialog (`showConfirmDialog`), Kürzel-Doku in `help.js` + `kbd`-Hints an den Save-Buttons, 19 neue GUI-Tests. GUI-Tests grün. (P2)
 - **Overlay-Vorschau & Overlay-Test** — `renderOverlayUrls()` rendert pro Overlay eine Card mit Live-`<iframe>`-Vorschau (`chroma=0`) und „Test"-Button, der `POST /api/v1/overlay/display` mit Beispielnachricht sendet (Toast-Feedback, Button-Deaktivierung); i18n DE/EN (inkl. Abschnitts-Überschriften `overlays.builtin/plugins`), Help-Topic „Vorschau & Test", 9 neue GUI-Tests. GUI-Tests grün. (P1)
+- **Accessibility (Barrierefreiheit & Tastaturbedienung)** — Neues `templates/gui/accessibility.js` (ModalFocus): ARIA (`role="dialog"`, `aria-modal`, `aria-labelledby`), Fokus-Trap + Fokus-Restore beim Öffnen/Schließen aller Overlays; Nav-Items als `<button>` + aria-Labels für Icon-Buttons; `aria-live` + `role` auf Toasts; `:focus-visible`-Outlines; `Esc` schließt den mobilen Drawer; 17 neue GUI-Tests. GUI-Tests grün. (P1)
+- **Mobile / LAN-Nutzung** — Sidebar ≤768px als Off-Canvas-Drawer mit Mobile-Top-Bar + Backdrop (Öffnen/Schließen, `Esc`, View-Wechsel, Resize), Modals/Wizard scrollbar (≤640px top-aligned), Actions-Editor + `array-table` horizontal scrollbar statt Überlauf, 17 GUI-Tests inkl. Drawer. GUI-Tests grün. (P2)
 
 ---
