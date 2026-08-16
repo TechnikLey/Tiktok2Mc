@@ -147,6 +147,7 @@ const Shortcuts = (() => {
     { name: 'hook-review', isOpen: () => !_elHidden('hook-review-modal'), close: () => hookEditor.hideReview() },
     { name: 'review', isOpen: () => !_elHidden('review-modal'), close: () => editor.hideReview() },
     { name: 'advanced', isOpen: () => !_elHidden('advanced-confirm-dialog'), close: () => _click('advanced-confirm-cancel') },
+    { name: 'mobile-sidebar', isOpen: () => !!document.querySelector('.sidebar.mobile-open'), close: () => closeMobileSidebar() },
   ];
 
   function _closeTopModal() {

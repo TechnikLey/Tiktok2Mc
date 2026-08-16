@@ -99,6 +99,10 @@ body {
 }
 
 .nav-item {
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -324,6 +328,8 @@ body {
   z-index: 100;
   cursor: pointer;
   background: transparent;
+  border: none;
+  padding: 0;
   transition: background var(--transition-fast);
   border-right: 2px solid transparent;
 }
@@ -380,6 +386,45 @@ body {
   padding: var(--space-6) var(--space-8);
 }
 .dashboard-content.dashboard-hidden {
+  display: none;
+}
+
+/* ─── Mobile top bar (≤768px) ─── */
+.mobile-header {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+  z-index: var(--z-sticky);
+}
+.mobile-header-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-accent);
+}
+.mobile-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.mobile-menu-btn:hover {
+  background: var(--color-elevated);
+}
+
+/* ─── Mobile sidebar backdrop ─── */
+.sidebar-backdrop {
   display: none;
 }
 
@@ -924,6 +969,8 @@ tr:last-child td { border-bottom: none; }
   padding: var(--space-8);
   width: 100%;
   max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
   box-shadow: var(--shadow-xl);
   animation: modal-enter var(--transition-enter) both;
 }
@@ -1618,6 +1665,22 @@ input[type="color"] {
     font-size: 0.85em;
   }
   .backup-table .backup-actions { text-align: left; }
+
+  /* Modals: top-aligned + scrollable on small screens */
+  .wizard-overlay { align-items: flex-start; }
+  .wizard-overlay .wizard-card,
+  .wizard-overlay .modal-card { padding: var(--space-5); }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* Actions editor: stack the table and the detail panel */
+  .actions-body { flex-direction: column; overflow-y: auto; }
+  .actions-table-panel { width: 100%; min-width: 0; flex-shrink: 1; border-right: none; border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+  .actions-detail { flex: none; overflow: visible; }
+  .actions-topbar { flex-wrap: wrap; }
+
+  /* Wide generated tables scroll horizontally instead of breaking layout */
+  .array-table { display: block; overflow-x: auto; white-space: nowrap; }
 }
 
 /* ─── Modal ─── */
@@ -2580,44 +2643,68 @@ input[type="color"] {
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
   .app-layout { flex-direction: column; }
+
+  /* ─── Mobile top bar ─── */
+  .mobile-header { display: flex; }
+
+  /* ─── Sidebar as off-canvas drawer ─── */
   .sidebar {
-    width: 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    padding: var(--space-2) var(--space-3);
-    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 85vw);
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    border-right: 1px solid var(--color-border);
+    border-bottom: none;
+    padding: 0;
+    z-index: 290;
+    transform: translateX(-100%);
+    transition: transform var(--transition-base);
+    box-shadow: none;
   }
-  .sidebar-brand { padding: 0; border: none; }
+  .sidebar.mobile-open { transform: translateX(0); box-shadow: var(--shadow-xl); }
+
+  .sidebar-brand { padding: var(--space-4) var(--space-3); border-bottom: 1px solid var(--color-border); }
   .sidebar-brand h1 { font-size: var(--text-base); }
   .sidebar-nav {
-    flex: none;
-    flex-direction: row;
-    padding: 0;
-    margin-left: auto;
-    gap: 0;
+    flex: 1;
+    flex-direction: column;
+    padding: var(--space-3);
+    margin-left: 0;
+    gap: 2px;
+    overflow-y: auto;
   }
-  .nav-item { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); }
-  .nav-item .nav-icon { width: 16px; height: 16px; }
+  .nav-item { padding: var(--space-3) var(--space-3); font-size: var(--text-base); }
+  .nav-item .nav-icon { width: 20px; height: 20px; }
+
+  /* Neutralize the desktop icon/hide modes inside the drawer */
   .sidebar.icons,
-  .sidebar.hide { width: 100%; min-width: 100%; flex: none; overflow: visible; border-bottom: 1px solid var(--color-border); }
+  .sidebar.hide { width: min(280px, 85vw); min-width: 0; flex: none; overflow-y: auto; overflow-x: hidden; border-bottom: none; }
   .sidebar.icons .sidebar-title,
   .sidebar.hide .sidebar-title,
   .sidebar.icons .nav-label,
   .sidebar.hide .nav-label { display: inline; }
   .sidebar.icons .nav-item,
-  .sidebar.hide .nav-item { justify-content: flex-start; padding: var(--space-2) var(--space-3); }
+  .sidebar.hide .nav-item { justify-content: flex-start; padding: var(--space-3) var(--space-3); }
+  .sidebar.icons .sidebar-brand { justify-content: space-between; padding: var(--space-4) var(--space-3); gap: var(--space-2); }
+  .sidebar.icons .nav-icon { margin: 0; width: 20px; height: 20px; }
   .sidebar.icons .sidebar-footer,
-  .sidebar.hide .sidebar-footer { flex-direction: row; padding: var(--space-2) var(--space-3); display: flex; }
+  .sidebar.hide .sidebar-footer { flex-direction: column; padding: var(--space-3); display: flex; gap: var(--space-2); align-items: stretch; }
   .sidebar.icons .sidebar-footer .btn--danger,
-  .sidebar.hide .sidebar-footer .btn--danger { font-size: var(--text-sm); width: auto; padding: var(--space-1) var(--space-3); border-radius: var(--radius-md); height: auto; min-width: auto; line-height: inherit; }
+  .sidebar.hide .sidebar-footer .btn--danger { font-size: var(--text-sm); width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); height: auto; min-width: 0; line-height: inherit; }
   .sidebar.icons .sidebar-footer .btn--danger::after,
   .sidebar.hide .sidebar-footer .btn--danger::after { content: none; }
+  .sidebar.icons .sidebar-footer .theme-toggle,
+  .sidebar.hide .sidebar-footer .theme-toggle { width: 100%; height: auto; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); font-size: var(--text-sm); align-self: stretch; }
+  .sidebar.icons .sidebar-footer .theme-toggle span,
+  .sidebar.hide .sidebar-footer .theme-toggle span { display: inline; }
   .sidebar.icons #status-pill,
   .sidebar.hide #status-pill,
   .sidebar.icons #tiktok-status-pill,
-  .sidebar.hide #tiktok-status-pill { font-size: var(--text-xs); width: auto; height: auto; padding: var(--space-1) var(--space-3); min-width: auto; display: inline-block; }
+  .sidebar.hide #tiktok-status-pill { font-size: var(--text-xs); width: auto; height: auto; padding: var(--space-1) var(--space-3); min-width: 0; display: inline-block; }
   .sidebar.icons .toggle-full,
   .sidebar.hide .toggle-full { display: inline; }
   .sidebar.icons .toggle-icons,
@@ -2626,8 +2713,33 @@ input[type="color"] {
   .sidebar.hide .sidebar-toggle { width: auto; }
   .sidebar.icons .sidebar-hide-btn,
   .sidebar.hide .sidebar-hide-btn { display: none; }
-  .sidebar.hide + .sidebar-reveal { display: none; }
-  .sidebar-footer { display: none; }
+  .sidebar.icons .sidebar-lang-row,
+  .sidebar.hide .sidebar-lang-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; }
+  .sidebar.icons .sidebar-lang-label,
+  .sidebar.hide .sidebar-lang-label { display: inline; }
+  .sidebar.icons .lang-switch,
+  .sidebar.hide .lang-switch { flex-direction: row; }
+
+  .sidebar-toggle,
+  .sidebar-hide-btn,
+  .sidebar-reveal { display: none; }
+
+  /* Footer always available in the drawer */
+  .sidebar-footer { display: flex; flex-direction: column; align-items: stretch; padding: var(--space-3); border-top: 1px solid var(--color-border); }
+  .sidebar-footer .btn--danger { width: 100%; }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 280;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-base);
+  }
+  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
   .dashboard-content { padding: var(--space-4); }
 
   #plugins-config-section .view-header { flex-direction: column; align-items: flex-start !important; gap: var(--space-2); }
@@ -3287,4 +3399,19 @@ input[type="color"] {
   text-align: center;
   margin-bottom: var(--space-4);
   min-height: 1.4em;
+}
+
+/* ─── Keyboard focus visibility ───
+ * design-system.css already draws a :focus-visible outline; many components
+ * reset outline: none, so re-assert the outline here (higher specificity)
+ * for keyboard users without affecting mouse-only interaction. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

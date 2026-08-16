@@ -101,6 +101,7 @@ function toGlobalScope(code) {
 const i18nJs = readFileSync(join(__dirname, '..', 'i18n.js'), 'utf-8');
 const helpJs = readFileSync(join(__dirname, '..', 'help.js'), 'utf-8');
 const shortcutsJs = readFileSync(join(__dirname, '..', 'shortcuts.js'), 'utf-8');
+const accessibilityJs = readFileSync(join(__dirname, '..', 'accessibility.js'), 'utf-8');
 const actionsEditorJs = readFileSync(join(__dirname, '..', 'actions-editor.js'), 'utf-8');
 const appJs = readFileSync(join(__dirname, '..', 'app.js'), 'utf-8');
 
@@ -109,5 +110,6 @@ const appJs = readFileSync(join(__dirname, '..', 'app.js'), 'utf-8');
 (0, eval)(toGlobalScope(i18nJs));
 (0, eval)(toGlobalScope(helpJs));
 (0, eval)(toGlobalScope(shortcutsJs));
+(0, eval)(toGlobalScope(accessibilityJs));
 (0, eval)(toGlobalScope(actionsEditorJs));
 (0, eval)(toGlobalScope(appJs));

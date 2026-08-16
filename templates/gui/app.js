@@ -559,6 +559,7 @@ function showToast(msg, type = 'info') {
   const t = document.createElement('div');
   t.className = 'toast ' + type;
   t.textContent = msg;
+  t.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
   c.appendChild(t);
   setTimeout(() => t.remove(), 4000);
 }
@@ -6810,6 +6811,38 @@ function _initSidebarReveal() {
   });
 }
 
+/* ─── Mobile sidebar (off-canvas drawer) ─── */
+function _isMobileWidth() {
+  return window.innerWidth <= 768;
+}
+
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+  const open = sidebar.classList.toggle('mobile-open');
+  document.getElementById('sidebar-backdrop')?.classList.toggle('open', open);
+  document.querySelector('.mobile-menu-btn')?.setAttribute('aria-expanded', String(open));
+  if (open) {
+    const first = sidebar.querySelector('a[href], button, input, select, textarea, [tabindex]');
+    if (first) first.focus();
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar || !sidebar.classList.contains('mobile-open')) return;
+  sidebar.classList.remove('mobile-open');
+  document.getElementById('sidebar-backdrop')?.classList.remove('open');
+  document.querySelector('.mobile-menu-btn')?.setAttribute('aria-expanded', 'false');
+}
+
+function _initMobileSidebar() {
+  document.getElementById('sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
+  window.addEventListener('resize', () => {
+    if (!_isMobileWidth()) closeMobileSidebar();
+  });
+}
+
 /* ─── Editor helpers (show/hide editors within app-layout) ─── */
 function _hideAllEditors() {
   document.querySelectorAll('.editor-overlay').forEach(el => el.classList.add('hidden'));
@@ -6850,6 +6883,7 @@ function switchView(viewId) {
 
 function switchViewNow(viewId) {
   _hideAllEditors();
+  closeMobileSidebar();
   // Close inline plugin config if open
   const pluginInline = document.getElementById('plugins-config-section');
   if (pluginInline && !pluginInline.classList.contains('hidden')) {
@@ -6903,6 +6937,7 @@ function switchToEditor(viewId, openFn) {
 
 function switchToEditorNow(viewId, openFn) {
   _hideAllEditors();
+  closeMobileSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navItem = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   navItem?.classList.add('active');
@@ -7269,6 +7304,7 @@ async function init() {
   _syncLangButtons();
   _initEditorVisibilityObserver();
   _initSidebarReveal();
+  _initMobileSidebar();
   await loadHealth();
   await loadStatus();
   await loadConfig();

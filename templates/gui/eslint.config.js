@@ -27,6 +27,8 @@ const appGlobals = {
   closeServerDownloadModal: "writable",
   closeServerSwitchModal: "writable",
   closeServerCustomModal: "writable",
+  closeMobileSidebar: "writable",
+  toggleMobileSidebar: "writable",
 };
 
 export default defineConfig([
@@ -52,11 +54,11 @@ export default defineConfig([
     },
   },
   {
-    // Classic browser scripts. Top-level bindings are global by design (used
-    // from inline HTML handlers and other scripts), so unused-var and
-    // redeclaration analysis cannot apply here. Cross-file globals are
-    // declared explicitly above. Empty catch blocks swallow errors on purpose.
-    files: ["app.js", "actions-editor.js", "help.js", "shortcuts.js"],
+  // Classic browser scripts. Top-level bindings are global by design (used
+  // from inline HTML handlers and other scripts), so unused-var and
+  // redeclaration analysis cannot apply here. Cross-file globals are
+  // declared explicitly above. Empty catch blocks swallow errors on purpose.
+  files: ["app.js", "actions-editor.js", "help.js", "shortcuts.js", "accessibility.js"],
     languageOptions: {
       sourceType: "script",
       globals: { ...globals.browser, ...appGlobals },
