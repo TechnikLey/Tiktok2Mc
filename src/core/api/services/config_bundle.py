@@ -160,9 +160,10 @@ class ConfigBundleService:
             for name, data in sorted(entries.items()):
                 target = self._target_for(name)
                 assert target is not None
+                category = self._category_for(name)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 try:
-                    get_backup_manager().create_backup(target)
+                    get_backup_manager().create_backup(target, category=category)
                 except OSError as exc:
                     log.warning("Safety backup failed for %s: %s", target, exc)
                 self._atomic_write_bytes(target, data)
@@ -194,6 +195,22 @@ class ConfigBundleService:
             if hooks_dir is None:
                 return None
             return hooks_dir / m.group(1) / "config.yaml"
+
+        return None
+
+    @staticmethod
+    def _category_for(name: str) -> str | None:
+        """Map a bundle-internal name to its backup category."""
+        if name == "config/config.yaml":
+            return "config"
+        if name == "data/actions.mca":
+            return "actions"
+        if name == "data/event_commands.yaml":
+            return "event_commands"
+
+        m = _PLUGIN_RE.fullmatch(name)
+        if m:
+            return f"plugins/{m.group(1)}"
 
         return None
 

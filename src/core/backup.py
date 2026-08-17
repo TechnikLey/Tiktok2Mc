@@ -239,6 +239,12 @@ class BackupManager:
                     return f"plugins/{plugin_name}"
             return "config"
 
+        if name == "actions.mca":
+            return "actions"
+
+        if name == "event_commands.yaml":
+            return "event_commands"
+
         if "api_plugin_registry" in name:
             return "plugin_registry"
 

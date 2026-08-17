@@ -79,6 +79,12 @@ describe('_backupCategoryLabel', () => {
   it('escapes unknown category names', () => {
     expect(window._backupCategoryLabel('a<b>')).toBe('a&lt;b&gt;');
   });
+
+  it('labels _other and hook_registry categories', () => {
+    I18N.setLang('en');
+    expect(window._backupCategoryLabel('_other')).toBe('Other');
+    expect(window._backupCategoryLabel('hook_registry')).toBe('Hook Registry');
+  });
 });
 
 describe('renderBackups', () => {
@@ -96,12 +102,11 @@ describe('renderBackups', () => {
     expect(root.textContent).toContain('Plugin: testplugin');
   });
 
-  it('shows restore buttons for restorable entries only', () => {
+  it('shows restore buttons for all entries', () => {
     window.renderBackups();
     const root = document.getElementById('backups-root');
-    const buttons = root.querySelectorAll('.btn-help, [onclick^="restoreBackup"]');
-    expect(buttons.length).toBe(2);
-    expect(root.textContent).toContain('Not restorable');
+    const buttons = root.querySelectorAll('[onclick^="restoreBackup"]');
+    expect(buttons.length).toBe(3);
   });
 
   it('shows filenames, timestamps and sizes', () => {
@@ -202,6 +207,59 @@ describe('restoreBackup', () => {
     window.restoreBackup('config', 'config.v20260814_120000_000000.yaml.bak');
     document.getElementById('btn-confirm-cancel').click();
     await new Promise(r => setTimeout(r, 0));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('restoreBackupCustom', () => {
+  beforeEach(() => {
+    document.getElementById('confirm-dialog').classList.add('hidden');
+    document.getElementById('prompt-dialog').classList.add('hidden');
+    I18N.setLang('en');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('restores with a custom target after prompt and confirm', async () => {
+    const promptSpy = vi.spyOn(window, 'showPromptDialog').mockResolvedValue('data/gifts.json');
+    const confirmSpy = vi.spyOn(window, 'showConfirmDialog').mockResolvedValue(true);
+    const fetchSpy = vi.fn(async () => ({
+      ok: true, status: 200, statusText: 'OK',
+      json: async () => ({ status: 'ok', target: 'data/gifts.json' }),
+    }));
+    globalThis.fetch = fetchSpy;
+    const toastSpy = vi.spyOn(window, 'showToast').mockImplementation(() => {});
+
+    await window.restoreBackupCustom('_other', 'gifts.json.bak');
+
+    expect(promptSpy).toHaveBeenCalled();
+    expect(confirmSpy).toHaveBeenCalled();
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(body).toEqual({ category: '_other', filename: 'gifts.json.bak', target: 'data/gifts.json' });
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/restored/i), 'success');
+    toastSpy.mockRestore();
+  });
+
+  it('does not post when user cancels the prompt', async () => {
+    vi.spyOn(window, 'showPromptDialog').mockResolvedValue(null);
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+
+    await window.restoreBackupCustom('_other', 'gifts.json.bak');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not post when user cancels the confirmation', async () => {
+    vi.spyOn(window, 'showPromptDialog').mockResolvedValue('data/gifts.json');
+    vi.spyOn(window, 'showConfirmDialog').mockResolvedValue(false);
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy;
+
+    await window.restoreBackupCustom('_other', 'gifts.json.bak');
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });

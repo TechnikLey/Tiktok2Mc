@@ -224,6 +224,61 @@ function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), ok
   });
 }
 
+function showPromptDialog(title, message, defaultValue = '', okText = I18N.t('common.confirm'), okClass = 'btn-primary') {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('prompt-dialog');
+    const titleEl = document.getElementById('prompt-title');
+    const msgEl = document.getElementById('prompt-message');
+    const input = document.getElementById('prompt-input');
+    const okBtn = document.getElementById('btn-prompt-ok');
+    const cancelBtn = document.getElementById('btn-prompt-cancel');
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    msgEl.className = 'muted dialog-desc';
+    okBtn.textContent = okText;
+    okBtn.className = 'btn ' + okClass;
+    input.value = defaultValue;
+
+    const cleanup = () => {
+      dlg.classList.add('hidden');
+      document.removeEventListener('keydown', onKey);
+      okBtn.replaceWith(okBtn.cloneNode(true));
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+    };
+
+    const submit = () => {
+      const val = input.value.trim();
+      cleanup();
+      resolve(val || null);
+    };
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+        resolve(null);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        submit();
+      }
+    };
+
+    const newOk = okBtn.cloneNode(true);
+    const newCancel = cancelBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+    newOk.addEventListener('click', submit);
+    newCancel.addEventListener('click', () => { cleanup(); resolve(null); });
+
+    dlg.classList.remove('hidden');
+    input.focus();
+    input.select();
+    document.addEventListener('keydown', onKey);
+  });
+}
+
 /* ─── Live Log ─── */
 const LOG_FILTER_KEY = 'tiktok2mc_log_filter';
 const LOG_AUTOSCROLL_KEY = 'tiktok2mc_log_autoscroll';
@@ -2009,8 +2064,11 @@ function _formatBytes(n) {
 function _backupCategoryLabel(category) {
   if (category === 'config') return I18N.t('backups.catConfig');
   if (category === 'actions') return I18N.t('backups.catActions');
+  if (category === 'event_commands') return I18N.t('backups.catEventCommands');
   if (category === 'plugin_registry') return I18N.t('backups.catPluginRegistry');
   if (category === 'migration') return I18N.t('backups.catMigration');
+  if (category === '_other') return I18N.t('backups.catOther');
+  if (category === 'hook_registry') return I18N.t('backups.catHookRegistry');
   if (category.startsWith('plugins/')) return I18N.t('backups.catPlugin') + ': ' + escapeHtml(category.slice('plugins/'.length));
   return escapeHtml(category);
 }
@@ -2027,10 +2085,11 @@ function renderBackups() {
   const colSize = I18N.t('backups.colSize');
   const colAction = I18N.t('backups.colAction');
   const html = _backupsData.categories.map(cat => {
+    const needsCustomTarget = cat.category === '_other' || cat.category === 'hook_registry';
     const rows = cat.entries.map(e => {
       const restoreBtn = e.restorable
         ? `<button class="btn btn--secondary btn--sm" onclick="restoreBackup('${e.category}', '${e.filename}')">${I18N.t('backups.restore')}</button>`
-        : '<span class="text-muted">' + I18N.t('backups.notRestorable') + '</span>';
+        : `<button class="btn btn--secondary btn--sm" onclick="restoreBackupCustom('${e.category}', '${e.filename}')">${I18N.t('backups.restore')}</button>`;
       return '<tr>' +
         '<td data-label="' + colWhen + '">' + escapeHtml(e.label || '—') + '</td>' +
         '<td class="backup-filename" data-label="' + colFile + '">' + escapeHtml(e.filename) + '</td>' +
@@ -2066,6 +2125,31 @@ function restoreBackup(category, filename) {
       })
       .catch(e => showToast(e.message, 'error'));
   });
+}
+
+async function restoreBackupCustom(category, filename) {
+  const target = await showPromptDialog(
+    I18N.t('backups.restoreTitle'),
+    I18N.t('backups.restoreCustomTarget', { filename }),
+    '',
+    I18N.t('backups.restore'),
+    'btn-danger'
+  );
+  if (!target) return;
+  const confirmed = await showConfirmDialog(
+    I18N.t('backups.restoreTitle'),
+    I18N.t('backups.restoreCustomWarning', { filename, target }),
+    I18N.t('backups.restore'),
+    'btn-danger'
+  );
+  if (!confirmed) return;
+  try {
+    await postJSON('/backups/restore', { category, filename, target });
+    showToast(I18N.t('backups.restored'), 'success');
+    loadBackups();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 }
 
 async function createBackupsNow() {
@@ -7268,6 +7352,7 @@ function switchViewNow(viewId) {
   }
   if (viewId === 'log') {
     crashReports.load();
+    liveLog._scrollToBottom();
   }
   if (viewId === 'revenue') {
     loadRevenueView();

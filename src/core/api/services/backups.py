@@ -142,31 +142,35 @@ class BackupService:
     # Restore
     # ------------------------------------------------------------------
 
-    def restore(self, category: str, filename: str) -> dict[str, Any]:
+    def restore(
+        self, category: str, filename: str, *, target: str | None = None
+    ) -> dict[str, Any]:
         """Restore *filename* from *category* back to its target file.
 
         A safety snapshot of the current target is created first, so a
         restore itself can be undone.  Raises ``ValueError`` for unknown
         categories or unsafe file names.
+
+        *target* is an optional custom restore path (relative to the
+        project root).  Required for categories without a fixed target
+        (e.g. ``_other``, ``hook_registry``).
         """
-        target = self._restore_target(category)
-        if target is None:
-            raise ValueError(f"Category '{category}' cannot be restored")
+        resolved_target = self._resolve_restore_target(category, target)
 
         backup_path = self._resolve_backup(category, filename)
-        target.parent.mkdir(parents=True, exist_ok=True)
+        resolved_target.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            self._manager.create_backup(target, category=category)
+            self._manager.create_backup(resolved_target, category=category)
         except OSError as exc:
-            log.warning("Pre-restore snapshot failed for %s: %s", target, exc)
+            log.warning("Pre-restore snapshot failed for %s: %s", resolved_target, exc)
 
-        self._manager.restore_backup(backup_path, target)
+        self._manager.restore_backup(backup_path, resolved_target)
         return {
             "status": "ok",
             "category": category,
             "filename": filename,
-            "target": str(target),
+            "target": str(resolved_target),
         }
 
     # ------------------------------------------------------------------
@@ -231,12 +235,33 @@ class BackupService:
             return fixed
         if category == "actions":
             return _actions_path()
+        if category == "event_commands":
+            return core.paths.get_root_dir() / "data" / "event_commands.yaml"
         if category.startswith("plugins/"):
             name = category[len("plugins/") :]
             if not name or not name.isidentifier():
                 return None
             return core.paths.get_plugins_dir() / name / "config.yaml"
         return None
+
+    def _resolve_restore_target(self, category: str, custom_target: str | None) -> Path:
+        """Return the restore target, using *custom_target* if no fixed one exists.
+
+        Raises ``ValueError`` if there is no way to determine a target.
+        """
+        fixed = self._restore_target(category)
+        if fixed is not None:
+            return fixed
+        if not custom_target:
+            raise ValueError(
+                f"Category '{category}' has no default restore target. "
+                "Please provide a target path."
+            )
+        root = core.paths.get_root_dir().resolve()
+        resolved = (root / custom_target).resolve()
+        if not str(resolved).startswith(str(root)):
+            raise ValueError("Target path must not escape the project root")
+        return resolved
 
     def _resolve_backup(self, category: str, filename: str) -> Path:
         """Resolve a backup file inside *category*, rejecting traversal."""

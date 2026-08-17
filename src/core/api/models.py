@@ -579,6 +579,13 @@ class BackupRestoreRequest(BaseModel):
 
     category: str = Field(..., description="Category of the backup to restore")
     filename: str = Field(..., description="File name of the backup to restore")
+    target: str | None = Field(
+        None,
+        description=(
+            "Optional custom restore target path (relative to project root). "
+            "Required for categories without a fixed target (_other, hook_registry)."
+        ),
+    )
 
 
 class BackupRestoreResponse(BaseModel):

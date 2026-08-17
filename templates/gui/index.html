@@ -830,6 +830,19 @@
         </div>
     </div>
 
+    <!-- Prompt Dialog (text input) -->
+    <div id="prompt-dialog" class="wizard-overlay hidden modal-z-300">
+        <div class="wizard-card modal-sm">
+            <h2 id="prompt-title" class="dialog-title">Prompt</h2>
+            <p id="prompt-message" class="muted dialog-desc"></p>
+            <input type="text" id="prompt-input" class="prompt-dialog-input" />
+            <div class="dialog-actions-center">
+                <button class="btn btn--secondary" id="btn-prompt-cancel" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn--primary" id="btn-prompt-ok" data-i18n="common.confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Unsaved Changes Modal -->
     <div id="unsaved-changes-modal" class="wizard-overlay hidden modal-z-400">
       <div class="wizard-card text-center modal-md">

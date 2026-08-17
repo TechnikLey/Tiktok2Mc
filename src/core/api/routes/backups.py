@@ -40,7 +40,7 @@ async def restore_backup(body: BackupRestoreRequest):
     """Restore a backup file back to its target (with a pre-restore snapshot)."""
     try:
         return BackupRestoreResponse(
-            **_get_service().restore(body.category, body.filename)
+            **_get_service().restore(body.category, body.filename, target=body.target)
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

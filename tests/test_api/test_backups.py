@@ -118,6 +118,89 @@ class TestBackupsRestore:
         )
         assert resp.status_code == 400
 
+    def test_restore_other_with_custom_target(self, client, project_dir):
+        from core.backup import get_backup_manager
+
+        root = project_dir / "data"
+        root.mkdir(exist_ok=True)
+        source = root / "gifts.json"
+        source.write_text("[]", encoding="utf-8")
+        get_backup_manager().create_backup(source)
+
+        target = project_dir / "data" / "restored_gifts.json"
+        resp = client.post(
+            "/api/v1/backups/restore",
+            json={
+                "category": "_other",
+                "filename": source.name + ".bak",
+                "target": "data/restored_gifts.json",
+            },
+        )
+        # The filename may have a versioned name, so find it from the listing
+        listed = client.get("/api/v1/backups").json()
+        other_cat = next(
+            (c for c in listed["categories"] if c["category"] == "_other"), None
+        )
+        assert other_cat is not None
+        bak_name = other_cat["entries"][0]["filename"]
+        resp = client.post(
+            "/api/v1/backups/restore",
+            json={
+                "category": "_other",
+                "filename": bak_name,
+                "target": "data/restored_gifts.json",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["target"].endswith("restored_gifts.json")
+        assert target.exists()
+
+    def test_restore_other_without_target_400(self, client, project_dir):
+        from core.backup import get_backup_manager
+
+        root = project_dir / "data"
+        root.mkdir(exist_ok=True)
+        source = root / "gifts.json"
+        source.write_text("[]", encoding="utf-8")
+        get_backup_manager().create_backup(source)
+
+        listed = client.get("/api/v1/backups").json()
+        other_cat = next(
+            (c for c in listed["categories"] if c["category"] == "_other"), None
+        )
+        assert other_cat is not None
+        bak_name = other_cat["entries"][0]["filename"]
+        resp = client.post(
+            "/api/v1/backups/restore",
+            json={"category": "_other", "filename": bak_name},
+        )
+        assert resp.status_code == 400
+
+    def test_restore_custom_target_escape_400(self, client, project_dir):
+        from core.backup import get_backup_manager
+
+        root = project_dir / "data"
+        root.mkdir(exist_ok=True)
+        source = root / "gifts.json"
+        source.write_text("[]", encoding="utf-8")
+        get_backup_manager().create_backup(source)
+
+        listed = client.get("/api/v1/backups").json()
+        other_cat = next(
+            (c for c in listed["categories"] if c["category"] == "_other"), None
+        )
+        assert other_cat is not None
+        bak_name = other_cat["entries"][0]["filename"]
+        resp = client.post(
+            "/api/v1/backups/restore",
+            json={
+                "category": "_other",
+                "filename": bak_name,
+                "target": "../../etc/passwd",
+            },
+        )
+        assert resp.status_code == 400
+
 
 class TestBackupsCreate:
     def test_create_config_and_actions(self, client, project_dir):
