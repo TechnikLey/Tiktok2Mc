@@ -6004,7 +6004,7 @@ class ReactionEditor {
           <div class="reaction-card-header">
             <div class="reaction-meta">
               <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
-              <span style="font-size:0.75rem;color:var(--text-secondary);">${I18N.t('reactions.eventLabel', { name: escapeHtml(info.name) })}</span>
+              <span style="font-size:0.75rem;color:var(--text-secondary);">${I18N.t('reactions.eventLabel', { name: escapeHtml(this._localized(info, 'name')) })}</span>
             </div>
             <div class="reaction-card-actions">
               <button class="reaction-btn-sm reaction-btn-test" onclick="reactionEditor.testReaction('${escapeHtml(event)}', ${idx})"${pluginDisabled ? ' disabled' : ''}>${I18N.t('reactions.test')}</button>
@@ -6017,12 +6017,12 @@ class ReactionEditor {
             <div class="reaction-flow">
               <div class="reaction-when">
                 <span style="font-size:1.1rem;">${info.icon || '⚡'}</span>
-                <span>${escapeHtml(info.name)}</span>
+                <span>${escapeHtml(this._localized(info, 'name'))}</span>
               </div>
               <span class="reaction-arrow">→</span>
               <div class="reaction-then">
                 <span style="font-size:1.1rem;">${pluginInfo.icon || '🔌'}</span>
-                <span>${escapeHtml(cmdInfo.name)}</span>
+                <span>${escapeHtml(this._localized(cmdInfo, 'name'))}</span>
               </div>
             </div>
             ${this._renderReactionArgs(action, cmdInfo)}
@@ -6281,8 +6281,8 @@ class ReactionEditor {
         const selected = this.wizardDraft.event === item.key ? 'selected' : '';
         html += `<div class="event-option ${selected}" onclick="reactionEditor.selectEvent('${escapeHtml(item.key)}')">
           <span class="event-icon">${item.icon}</span>
-          <h4>${escapeHtml(item.name)}</h4>
-          <p>${escapeHtml(item.desc)}</p>
+          <h4>${escapeHtml(this._localized(item, 'name'))}</h4>
+          <p>${escapeHtml(this._localized(item, 'desc'))}</p>
         </div>`;
       }
       html += `</div></div>`;
@@ -6308,8 +6308,8 @@ class ReactionEditor {
       const selected = this.wizardDraft.plugin === key ? 'selected' : '';
       html += `<div class="plugin-option ${selected}" onclick="reactionEditor.selectPlugin('${escapeHtml(key)}')">
         <div style="font-size:1.5rem;">${info.icon}</div>
-        <div class="plugin-option-name">${escapeHtml(info.name)}</div>
-        <div class="plugin-option-desc">${escapeHtml(info.desc)}</div>
+        <div class="plugin-option-name">${escapeHtml(this._localized(info, 'name'))}</div>
+        <div class="plugin-option-desc">${escapeHtml(this._localized(info, 'desc'))}</div>
       </div>`;
     }
     html += `</div>`;
@@ -6331,8 +6331,8 @@ class ReactionEditor {
     for (const [key, info] of Object.entries(commands)) {
       const selected = this.wizardDraft.command === key ? 'selected' : '';
       html += `<div class="command-option ${selected}" onclick="reactionEditor.selectCommand('${escapeHtml(key)}')">
-        <h4>${escapeHtml(info.name)}</h4>
-        <p>${escapeHtml(info.desc)}</p>
+        <h4>${escapeHtml(this._localized(info, 'name'))}</h4>
+        <p>${escapeHtml(this._localized(info, 'desc'))}</p>
       </div>`;
     }
     html += `</div>`;
@@ -6351,9 +6351,9 @@ class ReactionEditor {
     html += `<div class="reaction-preview">
       <div class="reaction-preview-label">${I18N.t('reactions.preview')}</div>
       <div class="reaction-preview-flow">
-        <div class="reaction-when"><span style="font-size:1.1rem;">${evInfo.icon}</span> <span>${escapeHtml(evInfo.name)}</span></div>
+        <div class="reaction-when"><span style="font-size:1.1rem;">${evInfo.icon}</span> <span>${escapeHtml(this._localized(evInfo, 'name'))}</span></div>
         <span class="reaction-arrow">→</span>
-        <div class="reaction-then"><span style="font-size:1.1rem;">${plInfo.icon}</span> <span>${escapeHtml(cmdInfo.name)}</span></div>
+        <div class="reaction-then"><span style="font-size:1.1rem;">${plInfo.icon}</span> <span>${escapeHtml(this._localized(cmdInfo, 'name'))}</span></div>
       </div>
     </div>`;
 

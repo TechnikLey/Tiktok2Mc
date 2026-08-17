@@ -21,16 +21,16 @@
       "name": "Win Milestone Reached",
       "desc": "When the win count reaches a configured milestone",
       "icon": "🏆",
-      "name_i18n": { "de": "Sieg-Meilenstein erreicht" },
-      "desc_i18n": { "de": "Wenn die Sieganzahl einen konfigurierten Meilenstein erreicht" }
+      "name_i18n": { "en": "Win Milestone Reached", "de": "Sieg-Meilenstein erreicht" },
+      "desc_i18n": { "en": "When the win count reaches a configured milestone", "de": "Wenn die Sieganzahl einen konfigurierten Meilenstein erreicht" }
     },
     {
       "key": "win.record_low",
       "name": "New Record Low",
       "desc": "When the win count drops to a new record low",
       "icon": "📉",
-      "name_i18n": { "de": "Neuer Tiefststand" },
-      "desc_i18n": { "de": "Wenn die Sieganzahl auf einen neuen Tiefststand sinkt" }
+      "name_i18n": { "en": "New Record Low", "de": "Neuer Tiefststand" },
+      "desc_i18n": { "en": "When the win count drops to a new record low", "de": "Wenn die Sieganzahl auf einen neuen Tiefststand sinkt" }
     }
   ],
   "accepted_commands": {
@@ -43,11 +43,11 @@
           "label": "How many wins",
           "default": 1,
           "min": 1,
-          "label_i18n": { "de": "Wie viele Siege" }
+          "label_i18n": { "en": "How many wins", "de": "Wie viele Siege" }
         }
       },
-      "name_i18n": { "de": "Sieg hinzufügen" },
-      "desc_i18n": { "de": "Sieganzahl erhöhen" }
+      "name_i18n": { "en": "Add Win", "de": "Sieg hinzufügen" },
+      "desc_i18n": { "en": "Increase the win count", "de": "Sieganzahl erhöhen" }
     },
     "remove_win": {
       "name": "Remove Win",
@@ -58,11 +58,11 @@
           "label": "How many to remove",
           "default": 1,
           "min": 1,
-          "label_i18n": { "de": "Wie viele entfernen" }
+          "label_i18n": { "en": "How many to remove", "de": "Wie viele entfernen" }
         }
       },
-      "name_i18n": { "de": "Sieg entfernen" },
-      "desc_i18n": { "de": "Sieganzahl verringern" }
+      "name_i18n": { "en": "Remove Win", "de": "Sieg entfernen" },
+      "desc_i18n": { "en": "Decrease the win count", "de": "Sieganzahl verringern" }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
