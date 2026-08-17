@@ -5772,19 +5772,7 @@ class ReactionEditor {
       },
     };
 
-    this.categoryLabels = {
-      all: I18N.t('reactions.categoryAll'),
-      tiktok: I18N.t('reactions.categoryTiktok'),
-      minecraft: I18N.t('reactions.categoryMinecraft'),
-      server: I18N.t('reactions.categoryServer'),
-      custom: I18N.t('reactions.categoryCustom'),
-    };
-
-    this.templates = [
-      { event: 'minecraft.player_death', plugin: 'spotify-control', command: 'pause', args: {}, title: I18N.t('reactions.templatePauseMusic'), desc: I18N.t('reactions.templatePauseMusicDesc') },
-      { event: 'timer.zero', plugin: 'win-counter', command: 'add_win', args: { amount: 1 }, title: I18N.t('reactions.templateAddWinTimer'), desc: I18N.t('reactions.templateAddWinTimerDesc') },
-      { event: 'tiktok.gift', plugin: 'timer', command: 'add_time', args: { seconds: 30 }, title: I18N.t('reactions.templateAddTimeGift'), desc: I18N.t('reactions.templateAddTimeGiftDesc') },
-    ];
+    this.templates = [];
 
     this._bindEvents();
   }
@@ -5912,7 +5900,14 @@ class ReactionEditor {
   }
 
   _categoryLabel(cat) {
-    if (this.categoryLabels[cat]) return this.categoryLabels[cat];
+    const i18nMap = {
+      all: 'reactions.categoryAll',
+      tiktok: 'reactions.categoryTiktok',
+      minecraft: 'reactions.categoryMinecraft',
+      server: 'reactions.categoryServer',
+      custom: 'reactions.categoryCustom',
+    };
+    if (i18nMap[cat]) return I18N.t(i18nMap[cat]);
     const plugin = this.pluginCatalog[cat];
     if (plugin && plugin.name) return plugin.name;
     return this._humanizeCategory(cat);
@@ -5987,7 +5982,7 @@ class ReactionEditor {
       const actions = this.data[event] || [];
       const info = this.eventCatalog[event] || { name: event, category: 'custom', icon: '⚡' };
       const catClass = `reaction-category-${info.category || 'custom'}`;
-      const catLabel = this.categoryLabels[info.category] || 'Custom';
+      const catLabel = this._categoryLabel(info.category);
 
       for (let idx = 0; idx < actions.length; idx++) {
         const action = actions[idx];
@@ -6067,32 +6062,12 @@ class ReactionEditor {
     let html = `<div class="reaction-empty">
       <h3>${I18N.t('reactions.noneYet')}</h3>
       <p>${I18N.t('reactions.emptyDesc')}</p>
-      <div class="reaction-templates">`;
-    for (const t of this.templates) {
-      const ev = this.eventCatalog[t.event] || { name: t.event, icon: '⚡' };
-      const pl = this.pluginCatalog[t.plugin] || { name: t.plugin, icon: '🔌' };
-      html += `<div class="reaction-template-card" onclick="reactionEditor.useTemplate(${JSON.stringify(t).replace(/"/g, '&quot;')})">
-        <div class="reaction-template-icon">${ev.icon} ${pl.icon}</div>
-        <h4>${escapeHtml(t.title)}</h4>
-        <p>${escapeHtml(t.desc)}</p>
-      </div>`;
-    }
-    html += `</div>
       <button class="btn btn-primary" style="margin-top:1.5rem;padding:0.7rem 1.4rem;" onclick="reactionEditor.startCreate()">${I18N.t('reactions.createYourFirst')}</button>
     </div>`;
     this.content.innerHTML = html;
   }
 
   /* ─── Actions ─── */
-
-  useTemplate(t) {
-    this.wizardEditing = null;
-    this.wizardStep = 0;
-    this.wizardDraft = { event: t.event, plugin: t.plugin, command: t.command, args: JSON.parse(JSON.stringify(t.args || {})) };
-    this._openWizard();
-    this.wizardStep = 3; // skip to confirmation since template is complete
-    this._renderWizard();
-  }
 
   startCreate() {
     this.wizardEditing = null;
@@ -7388,7 +7363,7 @@ function switchViewNow(viewId) {
   }
   if (viewId === 'log') {
     crashReports.load();
-    liveLog._scrollToBottom();
+    requestAnimationFrame(() => liveLog._scrollToBottom());
   }
   if (viewId === 'revenue') {
     loadRevenueView();

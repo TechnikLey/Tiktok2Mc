@@ -2413,30 +2413,6 @@ input[type="color"] {
 }
 .reaction-empty h3 { margin: 0 0 var(--space-2) 0; color: var(--color-text); font-weight: var(--weight-medium); font-size: var(--text-lg); }
 .reaction-empty p { max-width: 520px; margin: 0 auto var(--space-6) auto; line-height: var(--leading-normal); font-size: var(--text-base); }
-.reaction-templates {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-4);
-  max-width: 700px;
-  margin: 0 auto;
-}
-.reaction-template-card {
-  background: var(--color-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-5);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  text-align: left;
-}
-.reaction-template-card:hover {
-  border-color: var(--color-accent);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-.reaction-template-card h4 { margin: 0 0 var(--space-2) 0; color: var(--color-accent); font-size: var(--text-md); }
-.reaction-template-card p { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: var(--leading-normal); }
-.reaction-template-icon { font-size: 1.4rem; margin-bottom: var(--space-2); }
 
 /* ─── Reaction Card ─── */
 .reaction-card {
