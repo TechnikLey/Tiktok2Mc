@@ -918,6 +918,84 @@ class TestUpdateDailyRevenue:
         assert data["estimated_revenue_usd"] == 20.0
 
 
+class TestSessionSummary:
+    def test_reset_session_resets_counters(self, monkeypatch):
+        from src.python.main import _reset_session, ctx
+
+        monkeypatch.setattr(ctx, "session_gifts", 99)
+        monkeypatch.setattr(ctx, "session_gift_value_usd", 99.0)
+        monkeypatch.setattr(ctx, "session_likes", 99)
+        monkeypatch.setattr(ctx, "session_follows", 99)
+        monkeypatch.setattr(ctx, "session_comments", 99)
+        monkeypatch.setattr(ctx, "session_shares", 99)
+        monkeypatch.setattr(ctx, "session_joins", 99)
+        monkeypatch.setattr(ctx, "session_end_ts", 1.0)
+
+        _reset_session()
+
+        assert ctx.session_gifts == 0
+        assert ctx.session_gift_value_usd == 0.0
+        assert ctx.session_likes == 0
+        assert ctx.session_follows == 0
+        assert ctx.session_comments == 0
+        assert ctx.session_shares == 0
+        assert ctx.session_joins == 0
+        assert ctx.session_end_ts is None
+        assert ctx.session_start_ts is not None
+
+    def test_session_summary_entry_snapshot(self, monkeypatch):
+        from src.python.main import _session_summary_entry, ctx
+
+        monkeypatch.setattr(ctx, "session_start_ts", 1000.0)
+        monkeypatch.setattr(ctx, "session_end_ts", 4600.0)
+        monkeypatch.setattr(ctx, "session_gifts", 12)
+        monkeypatch.setattr(ctx, "session_gift_value_usd", 4.5)
+        monkeypatch.setattr(ctx, "session_likes", 340)
+        monkeypatch.setattr(ctx, "session_follows", 5)
+        monkeypatch.setattr(ctx, "session_comments", 78)
+        monkeypatch.setattr(ctx, "session_shares", 2)
+        monkeypatch.setattr(ctx, "session_joins", 41)
+
+        entry = _session_summary_entry()
+
+        assert entry["duration_seconds"] == 3600.0
+        assert entry["gifts"] == 12
+        assert entry["gift_value_usd"] == 4.5
+        assert entry["likes"] == 340
+        assert entry["follows"] == 5
+        assert entry["comments"] == 78
+        assert entry["shares"] == 2
+        assert entry["joins"] == 41
+        assert entry["start"].startswith("1970-01-01T00:16:40")
+
+    def test_session_summary_entry_empty_without_start(self, monkeypatch):
+        from src.python.main import _session_summary_entry, ctx
+
+        monkeypatch.setattr(ctx, "session_start_ts", None)
+        assert _session_summary_entry() == {}
+
+    def test_save_session_summary_appends(self, tmp_path, monkeypatch):
+        from src.python.main import _save_session_summary
+
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+        log_file = tmp_path / "data" / "sessions.jsonl"
+
+        _save_session_summary({"start": "2026-08-16T20:00:00+00:00", "gifts": 3})
+        _save_session_summary({"start": "2026-08-17T20:00:00+00:00", "gifts": 7})
+
+        lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 2
+        assert json.loads(lines[0])["gifts"] == 3
+        assert json.loads(lines[1])["gifts"] == 7
+
+    def test_save_session_summary_ignores_empty(self, tmp_path, monkeypatch):
+        from src.python.main import _save_session_summary
+
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+        _save_session_summary({})
+        assert not (tmp_path / "data" / "sessions.jsonl").exists()
+
+
 # =========================================================================
 # Webhook endpoint auth (X-API-Key on non-localhost requests)
 # =========================================================================

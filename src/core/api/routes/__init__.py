@@ -20,6 +20,7 @@ from .reload import router as reload_router
 from .revenue import router as revenue_router
 from .server_lifecycle import router as server_lifecycle_router
 from .servers import router as servers_router
+from .sessions import router as sessions_router
 from .system import router as system_router
 from .triggers import router as triggers_router
 from .updater import router as updater_router
@@ -31,6 +32,7 @@ api_router.include_router(health_router)
 api_router.include_router(diagnostics_router)
 api_router.include_router(config_router)
 api_router.include_router(config_bundle_router)
+api_router.include_router(sessions_router)
 api_router.include_router(plugins_router)
 api_router.include_router(plugin_config_router)
 api_router.include_router(events_router)

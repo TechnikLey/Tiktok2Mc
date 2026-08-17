@@ -171,6 +171,17 @@ class BotContext:
         self.gift_day_start_value = 0
         self.gift_current_log_date = None
 
+        # Session tracking (reset on each live connection)
+        self.session_start_ts = None
+        self.session_gifts = 0
+        self.session_gift_value_usd = 0.0
+        self.session_likes = 0
+        self.session_follows = 0
+        self.session_comments = 0
+        self.session_shares = 0
+        self.session_joins = 0
+        self.session_end_ts = None
+
         # Runtime
         self.main_loop = None
         self.hook_api = None
@@ -2085,6 +2096,8 @@ def create_client(user):
 
             with ctx.gift_lock:
                 ctx.gift_value_usd += event.value
+                ctx.session_gift_value_usd += event.value
+                ctx.session_gifts += count
 
             username = get_safe_username(event.user)
             _publish_tiktok_event(
@@ -2115,6 +2128,7 @@ def create_client(user):
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
         username = get_safe_username(event.user)
+        ctx.session_follows += 1
         _publish_tiktok_event("follow", username)
         _process_follow(username)
 
@@ -2137,6 +2151,7 @@ def create_client(user):
                 # Throttle like events to ~1 per 3 seconds
                 if now - ctx._last_like_event >= 3:
                     delta = total_since_start
+                    ctx.session_likes = total_since_start
                     _publish_tiktok_event(
                         "like", username or "unknown", delta=delta, total=event.total
                     )
@@ -2154,6 +2169,7 @@ def create_client(user):
     @client.on(JoinEvent)
     def on_join(event):
         username = get_safe_username(event.user)
+        ctx.session_joins += 1
         _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
             enqueue_threadsafe(("join", username), label="join")
@@ -2170,6 +2186,7 @@ def create_client(user):
             return
 
         username = get_safe_username(event.user)
+        ctx.session_comments += 1
         _publish_tiktok_event("comment", username)
         comment_text = getattr(event, "comment", "")
 
@@ -2202,6 +2219,7 @@ def create_client(user):
     @client.on(ShareEvent)
     def on_share(event):
         username = get_safe_username(event.user)
+        ctx.session_shares += 1
         _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
             enqueue_threadsafe(("share", username), label="share")
@@ -2213,11 +2231,13 @@ def create_client(user):
     def on_live_end(_):
         log.info(f"Live ended for @{user}.")
         ctx.tiktok_live = False
+        ctx.session_end_ts = time.time()
         _publish_tiktok_status(False)
         # Revenue persistence and the shutdown signal are plain file I/O —
         # run them on the background executor so live-end never blocks the
         # TikTok client thread.
         _run_in_background(update_daily_revenue)
+        _run_in_background(_save_session_summary, _session_summary_entry())
         _run_in_background(_touch_runtime_shutdown)
 
     # =========================
@@ -2237,6 +2257,7 @@ def create_client(user):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
+        _reset_session()
         _publish_tiktok_status(True)
 
     return client
@@ -2296,6 +2317,65 @@ async def gift_revenue_counter():
     while True:
         await asyncio.sleep(ctx.autosave_interval_seconds)
         await asyncio.to_thread(update_daily_revenue)
+
+
+# ========================
+# Session summary (per stream)
+# ========================
+def _reset_session():
+    """Reset the per-session counters before a new live connection."""
+    ctx.session_start_ts = time.time()
+    ctx.session_gifts = 0
+    ctx.session_gift_value_usd = 0.0
+    ctx.session_likes = 0
+    ctx.session_follows = 0
+    ctx.session_comments = 0
+    ctx.session_shares = 0
+    ctx.session_joins = 0
+    ctx.session_end_ts = None
+
+
+def _session_summary_entry() -> dict:
+    """Snapshot the finished session for persistence.
+
+    Called synchronously on the TikTok client thread at live end so the
+    counters cannot be clobbered by a reconnect before the write happens.
+    Returns ``{}`` when no session was active.
+    """
+    start = ctx.session_start_ts
+    if start is None:
+        return {}
+    end = ctx.session_end_ts or time.time()
+    return {
+        "start": datetime.datetime.fromtimestamp(start, tz=datetime.UTC).isoformat(),
+        "end": datetime.datetime.fromtimestamp(end, tz=datetime.UTC).isoformat(),
+        "duration_seconds": round(max(0.0, end - start), 1),
+        "gifts": ctx.session_gifts,
+        "gift_value_usd": round(ctx.session_gift_value_usd, 2),
+        "likes": ctx.session_likes,
+        "follows": ctx.session_follows,
+        "comments": ctx.session_comments,
+        "shares": ctx.session_shares,
+        "joins": ctx.session_joins,
+    }
+
+
+def _save_session_summary(entry: dict) -> None:
+    """Append one session summary line to ``data/sessions.jsonl``.
+
+    Pure file I/O — run it on the background executor (never on the TikTok
+    client thread). A missing/empty entry is ignored.
+    """
+    if not entry:
+        return
+    file_path = BASE_DIR.parent / "data" / "sessions.jsonl"
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with file_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        log.info("[SESSION] Summary saved: %s", file_path)
+    except OSError as exc:
+        log.warning("Failed to save session summary %s: %s", file_path, exc)
 
 
 # ==========================================

@@ -433,6 +433,27 @@
       ],
     },
 
+    sessions: {
+      title: { en: 'Sessions', de: 'Sessions' },
+      sections: [
+        {
+          h: { en: 'Session Tracking', de: 'Session-Tracking' },
+          body: {
+            en: [
+              'Whenever a live stream ends, TikTok2Mc automatically saves a summary with gifts, likes, follows, comments, shares, and joins for that session.',
+              'The summary cards at the top show aggregated totals across all recorded sessions. The table below lists each session in reverse chronological order.',
+              'Use "Download Report" to save a Markdown summary of all sessions to a file.',
+            ],
+            de: [
+              'Wann immer ein Livestream endet, speichert TikTok2Mc automatisch eine Zusammenfassung mit Gifts, Likes, Follows, Kommentaren, Shares und Joins für diese Session.',
+              'Die Übersichtskarten oben zeigen aggregierte Summen über alle aufgezeichneten Sessions. Die Tabelle unten listet jede Session in umgekehrter chronologischer Reihenfolge auf.',
+              '"Bericht herunterladen" speichert eine Markdown-Zusammenfassung aller Sessions in eine Datei.',
+            ],
+          },
+        },
+      ],
+    },
+
     triggers: {
       title: { en: 'Event Tester', de: 'Event-Tester' },
       sections: [

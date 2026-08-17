@@ -247,14 +247,14 @@
 
 ## P3 — Nice-to-have / Ideen
 
-- [ ] **Status:** Ideensammlung
-- [ ] Beispiele für weitere Verbesserungen (noch nicht priorisiert):
-  - Tab-Autocomplete + History für MC-Befehle in der Konsole (`view-console`).
-  - Konfigurierbare Log-Level-Standardansicht pro Sitzung (persistiert).
-  - Dashboard „Aufgeräumt/Profi"-Modus (Dichte der Info-Kacheln).
-  - Export/Import von kompletten Konfigurationen (Bundle aus `config.yaml` + `actions.mca` +
+- [x] **Status:** Umgesetzt
+- [x] Beispiele für weitere Verbesserungen (noch nicht priorisiert):
+  - [x] Tab-Autocomplete + History für MC-Befehle in der Konsole (`view-console`).
+  - [x] Konfigurierbare Log-Level-Standardansicht pro Sitzung (persistiert).
+  - [x] Dashboard „Aufgeräumt/Profi"-Modus (Dichte der Info-Kacheln).
+  - [x] Export/Import von kompletten Konfigurationen (Bundle aus `config.yaml` + `actions.mca` +
     Plugin-Configs) als Datei.
-  - Session-Zusammenfassung am Stream-Ende (analog Revenue, aber als Bericht).
+  - [x] Session-Zusammenfassung am Stream-Ende (analog Revenue, aber als Bericht).
 
 ---
 
@@ -267,5 +267,10 @@
 - **Overlay-Vorschau & Overlay-Test** — `renderOverlayUrls()` rendert pro Overlay eine Card mit Live-`<iframe>`-Vorschau (`chroma=0`) und „Test"-Button, der `POST /api/v1/overlay/display` mit Beispielnachricht sendet (Toast-Feedback, Button-Deaktivierung); i18n DE/EN (inkl. Abschnitts-Überschriften `overlays.builtin/plugins`), Help-Topic „Vorschau & Test", 9 neue GUI-Tests. GUI-Tests grün. (P1)
 - **Accessibility (Barrierefreiheit & Tastaturbedienung)** — Neues `templates/gui/accessibility.js` (ModalFocus): ARIA (`role="dialog"`, `aria-modal`, `aria-labelledby`), Fokus-Trap + Fokus-Restore beim Öffnen/Schließen aller Overlays; Nav-Items als `<button>` + aria-Labels für Icon-Buttons; `aria-live` + `role` auf Toasts; `:focus-visible`-Outlines; `Esc` schließt den mobilen Drawer; 17 neue GUI-Tests. GUI-Tests grün. (P1)
 - **Mobile / LAN-Nutzung** — Sidebar ≤768px als Off-Canvas-Drawer mit Mobile-Top-Bar + Backdrop (Öffnen/Schließen, `Esc`, View-Wechsel, Resize), Modals/Wizard scrollbar (≤640px top-aligned), Actions-Editor + `array-table` horizontal scrollbar statt Überlauf, 17 GUI-Tests inkl. Drawer. GUI-Tests grün. (P2)
+- **P3-1 Konsole Autocomplete + History** — Tab-Autocomplete für MC-Befehle mit Zyklen, Pfeiltasten-History (Up/Down), Enter zum Ausführen, Enter-Clear bei leerer Eingabe. 11 GUI-Tests. (P3)
+- **P3-2 Log-Level-Persistenz + Autoscroll** — Log-Level-Filter (All/Info/Debug/Warn/Error) mit `localStorage`-Persistenz, Autoscroll-Toggle mit Persistenz. 6 GUI-Tests. (P3)
+- **P3-3 Dashboard Dichte** — Spacious/Compact Toggle in Status-View mit `localStorage`-Persistenz, `status-grid--compact` CSS. 4 GUI-Tests. (P3)
+- **P3-4 Config-Bundle** — Export/Import kompletter Konfiguration als ZIP-Bundle (config.yaml, actions.mca, event_commands.yaml, Plugin-/Hook-Configs + bundle.json). `ConfigBundleService` Backend, GUI Export/Import in Backups-View, i18n DE/EN, 17 Backend- + 6 GUI-Tests. (P3)
+- **P3-5 Session Summary** — Automatische Session-Zusammenfassung bei Stream-Ende: Bridge-Counter (Gifts/Likes/Follows/Comments/Shares/Joins + Gift-Value), `_save_session_summary()` → `data/sessions.jsonl`. API `GET /sessions` + `GET /sessions/report` (Markdown). GUI Sessions-View (Status-Cards + Tabelle + Download), i18n DE/EN, Help-Topic. 11 Backend- + 8 Bridge- + 13 GUI-Tests. (P3)
 
 ---

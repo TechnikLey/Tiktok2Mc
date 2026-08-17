@@ -614,3 +614,35 @@ class BundleImportResponse(BaseModel):
         default_factory=list, description="Bundle-internal names that were applied"
     )
     count: int = Field(0, description="Number of applied files")
+
+
+# ── Session models ───────────────────────────────────────────────────
+
+
+class SessionEntry(BaseModel):
+    """One completed TikTok stream session summary."""
+
+    start: str = Field(..., description="Session start (ISO 8601 UTC)")
+    end: str = Field(..., description="Session end (ISO 8601 UTC)")
+    duration_seconds: float = Field(0, description="Session duration in seconds")
+    gifts: int = Field(0, description="Gifts received")
+    gift_value_usd: float = Field(0, description="Estimated gift value in USD")
+    likes: int = Field(0, description="Likes received")
+    follows: int = Field(0, description="Follows received")
+    comments: int = Field(0, description="Comments received")
+    shares: int = Field(0, description="Shares received")
+    joins: int = Field(0, description="Joins received")
+
+
+class SessionsResponse(BaseModel):
+    """List of session summaries plus totals."""
+
+    total: int = Field(0, description="Number of recorded sessions")
+    total_gifts: int = Field(0, description="Gifts across all sessions")
+    total_gift_value_usd: float = Field(0, description="Gift value across all sessions")
+    total_likes: int = Field(0, description="Likes across all sessions")
+    total_follows: int = Field(0, description="Follows across all sessions")
+    total_comments: int = Field(0, description="Comments across all sessions")
+    total_shares: int = Field(0, description="Shares across all sessions")
+    total_joins: int = Field(0, description="Joins across all sessions")
+    sessions: list[SessionEntry] = Field(default_factory=list)
