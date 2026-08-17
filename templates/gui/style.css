@@ -2359,12 +2359,12 @@ input[type="color"] {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  flex-wrap: wrap;
 }
-.reactions-topbar-left { flex: 1; min-width: 200px; }
-.reactions-topbar h2 { margin: 0; font-size: var(--text-xl); color: var(--color-accent); font-weight: var(--weight-medium); }
+.reactions-topbar-left { flex: 1; min-width: 0; }
+.reactions-topbar h2 { margin: 0; font-size: var(--text-xl); color: var(--color-accent); font-weight: var(--weight-medium); white-space: nowrap; }
 .reactions-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 2px; }
-.reactions-search-wrap { flex: 1; max-width: 300px; position: relative; }
+.reactions-search-wrap { flex: 1; min-width: 150px; max-width: 300px; position: relative; }
+.header-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; white-space: nowrap; }
 .reactions-search-wrap input {
   width: 100%;
   padding: var(--space-2) var(--space-4);

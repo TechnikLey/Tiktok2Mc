@@ -17,67 +17,117 @@ from core.api.launcher import PluginLauncher
 log = logging.getLogger(__name__)
 
 # Built-in events that are not owned by a plugin (TikTok, Minecraft, Server).
-CORE_EVENTS: dict[str, dict[str, str]] = {
+CORE_EVENTS: dict[str, dict[str, Any]] = {
     # TikTok
     "tiktok.follow": {
         "name": "New Follower",
+        "name_i18n": {"en": "New Follower", "de": "Neuer Follower"},
         "desc": "When someone follows your TikTok account",
+        "desc_i18n": {
+            "en": "When someone follows your TikTok account",
+            "de": "Jemand folgt deinem TikTok-Account",
+        },
         "category": "tiktok",
         "icon": "👤",
     },
     "tiktok.join": {
         "name": "Viewer Joins",
+        "name_i18n": {"en": "Viewer Joins", "de": "Zuschauer betritt"},
         "desc": "When someone joins your live stream",
+        "desc_i18n": {
+            "en": "When someone joins your live stream",
+            "de": "Jemand betritt deinen Live-Stream",
+        },
         "category": "tiktok",
         "icon": "🚪",
     },
     "tiktok.comment": {
         "name": "New Comment",
+        "name_i18n": {"en": "New Comment", "de": "Neuer Kommentar"},
         "desc": "When someone sends a chat message",
+        "desc_i18n": {
+            "en": "When someone sends a chat message",
+            "de": "Jemand sendet eine Nachricht",
+        },
         "category": "tiktok",
         "icon": "💬",
     },
     "tiktok.like": {
         "name": "New Like",
+        "name_i18n": {"en": "New Like", "de": "Neues Like"},
         "desc": "When someone likes your stream",
+        "desc_i18n": {
+            "en": "When someone likes your stream",
+            "de": "Jemand liked deinen Stream",
+        },
         "category": "tiktok",
         "icon": "❤️",
     },
     "tiktok.share": {
         "name": "New Share",
+        "name_i18n": {"en": "New Share", "de": "Neuer Share"},
         "desc": "When someone shares your stream",
+        "desc_i18n": {
+            "en": "When someone shares your stream",
+            "de": "Jemand teilt deinen Stream",
+        },
         "category": "tiktok",
         "icon": "🔗",
     },
     "tiktok.gift": {
         "name": "Gift Received",
+        "name_i18n": {"en": "Gift Received", "de": "Geschenk erhalten"},
         "desc": "When someone sends a gift",
+        "desc_i18n": {
+            "en": "When someone sends a gift",
+            "de": "Jemand sendet ein Geschenk",
+        },
         "category": "tiktok",
         "icon": "🎁",
     },
     # Minecraft
     "minecraft.player_death": {
         "name": "Player Dies",
+        "name_i18n": {"en": "Player Dies", "de": "Spieler stirbt"},
         "desc": "When you or another player dies",
+        "desc_i18n": {
+            "en": "When you or another player dies",
+            "de": "Du oder ein anderer Spieler stirbt",
+        },
         "category": "minecraft",
         "icon": "💀",
     },
     "minecraft.player_respawn": {
         "name": "Player Respawns",
+        "name_i18n": {"en": "Player Respawns", "de": "Spieler spawnt neu"},
         "desc": "When a player respawns after dying",
+        "desc_i18n": {
+            "en": "When a player respawns after dying",
+            "de": "Ein Spieler spawnt nach dem Tod neu",
+        },
         "category": "minecraft",
         "icon": "✨",
     },
     # Server
     "server.started": {
         "name": "Server Starts",
+        "name_i18n": {"en": "Server Starts", "de": "Server startet"},
         "desc": "When the Minecraft server finishes starting",
+        "desc_i18n": {
+            "en": "When the Minecraft server finishes starting",
+            "de": "Der Minecraft-Server hat erfolgreich gestartet",
+        },
         "category": "server",
         "icon": "🟢",
     },
     "server.stopping": {
         "name": "Server Stopping",
+        "name_i18n": {"en": "Server Stopping", "de": "Server stoppt"},
         "desc": "When the Minecraft server begins to shut down",
+        "desc_i18n": {
+            "en": "When the Minecraft server begins to shut down",
+            "de": "Der Minecraft-Server fährt herunter",
+        },
         "category": "server",
         "icon": "🛑",
     },
