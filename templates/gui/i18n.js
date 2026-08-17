@@ -333,6 +333,12 @@
     'updates.checkFailed': 'Update check failed.',
     'updates.installing': 'Installing plugin updates...',
     'updates.lastFailedMsg': 'Last update failed: {msg}',
+    'updates.popupTitle': 'Update Available',
+    'updates.popupDesc': 'A new version of TikTok2Mc is available: v{version}. Do you want to update now?',
+    'updates.updateNow': 'Update Now',
+    'updates.dismiss': 'Dismiss',
+    'updates.updating': 'Starting update\u2026',
+    'updates.applyFailed': 'Failed to start the update: {msg}',
 
     /* ── Backups ── */
     'backups.title': 'Backups',
@@ -1190,6 +1196,12 @@
     'updates.checkFailed': 'Update-Prüfung fehlgeschlagen.',
     'updates.installing': 'Installiere Plugin-Updates...',
     'updates.lastFailedMsg': 'Letztes Update fehlgeschlagen: {msg}',
+    'updates.popupTitle': 'Update verfügbar',
+    'updates.popupDesc': 'Eine neue Version von TikTok2Mc ist verfügbar: v{version}. Möchtest du jetzt aktualisieren?',
+    'updates.updateNow': 'Jetzt aktualisieren',
+    'updates.dismiss': 'Schließen',
+    'updates.updating': 'Update wird gestartet\u2026',
+    'updates.applyFailed': 'Update konnte nicht gestartet werden: {msg}',
     'updates.exitCode': 'Exit-Code {code}',
 
     /* ── Backups ── */

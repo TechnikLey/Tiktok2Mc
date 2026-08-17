@@ -181,6 +181,7 @@ _plugin_sandbox = (
 # Settings
 # -----------------------------
 UPDATE_ENABLED = cfg.get("update", {}).get("enabled", True)
+UPDATE_AUTO_INSTALL = cfg.get("update", {}).get("auto_install", True)
 console_cfg = cfg.get("console", {})
 CONSOLE_VISIBLE = console_cfg.get("visible", True)
 ALLOW_CLOSE = console_cfg.get("allow_close", True)
@@ -432,9 +433,9 @@ def start_UPDATE_EXE_PATH():
 
 replace_updater_if_exists()
 
-if UPDATE_ENABLED:
+if UPDATE_ENABLED and UPDATE_AUTO_INSTALL:
     time.sleep(0.5)
-    log.info("Automatic updates are enabled.")
+    log.info("Automatic updates are enabled (auto-install).")
 
     while True:
         result = start_UPDATE_EXE_PATH()
@@ -487,7 +488,12 @@ if UPDATE_ENABLED:
             log.error("Updater failed with exit code %s. Aborting update.", result)
             break
 else:
-    log.info("Automatic updates are disabled.")
+    if UPDATE_ENABLED and not UPDATE_AUTO_INSTALL:
+        log.info(
+            "Updates enabled but auto-install is disabled. Updates will be handled via the GUI."
+        )
+    else:
+        log.info("Automatic updates are disabled.")
 
 
 # -----------------------------

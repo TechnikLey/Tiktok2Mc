@@ -586,6 +586,19 @@
         </div>
     </div>
 
+    <!-- Update Notification Dialog -->
+    <div id="update-notification-dialog" class="wizard-overlay hidden">
+        <div class="wizard-card text-center">
+            <div class="update-notification-icon" style="font-size:2.5rem;margin-bottom:0.5rem;">&#x2191;</div>
+            <h2 class="dialog-title" data-i18n="updates.popupTitle">Update Available</h2>
+            <p class="muted dialog-desc" id="update-notification-desc"></p>
+            <div class="dialog-actions-center" style="gap:0.75rem;">
+                <button class="btn btn--primary" id="btn-update-now" data-i18n="updates.updateNow">Update Now</button>
+                <button class="btn btn--secondary" id="btn-update-dismiss" data-i18n="updates.dismiss">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Config Editor -->
     <div id="config-editor" class="editor-overlay hidden">
         <div class="editor-layout">

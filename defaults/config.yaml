@@ -408,6 +408,11 @@ overlay:
 update:
   enabled: true
 
+  # When true, updates are installed automatically on startup.
+  # When false, you will be notified in the GUI when an update is
+  # available and can install it manually from the Updates tab.
+  auto_install: true
+
   # Maximum number of update log files to keep in logs/update_logs/.
   #  0  = delete all logs after each update
   #  -1 = never delete logs

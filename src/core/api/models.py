@@ -415,6 +415,13 @@ class UpdateResultResponse(BaseModel):
     timestamp: float | None = None
 
 
+class ToolUpdateApplyResponse(BaseModel):
+    """Response for ``POST /api/v1/updates/apply``."""
+
+    status: str = "started"
+    message: str = ""
+
+
 class ConfigResponse(BaseModel):
     path: str
     config: dict[str, Any]

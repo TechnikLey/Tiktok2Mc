@@ -153,6 +153,13 @@ document.getElementById('btn-shutdown-cancel').addEventListener('click', () => {
   document.getElementById('shutdown-overlay').classList.add('hidden');
 });
 
+document.getElementById('btn-update-now').addEventListener('click', () => {
+  hideUpdateNotification();
+  triggerToolUpdate();
+});
+
+document.getElementById('btn-update-dismiss').addEventListener('click', hideUpdateNotification);
+
 /* ─── Server Manager — lifecycle polling is started/stopped in view switch code ─── */
 
 /* ─── Server Manager Modal Wiring ─── */
@@ -3630,6 +3637,7 @@ const HELP_TEXT = {
   'minecraft_server_api.web_server_port': 'Port for the webhook server that receives Minecraft events. Default: 29188.',
   'gui.enabled': 'Launch the graphical dashboard on startup. If disabled, you can still open it manually.',
   'update.enabled': 'Checks for new versions on startup and installs them automatically. It is strongly recommended to keep this enabled.',
+  'update.auto_install': 'When enabled, updates are installed automatically on startup. When disabled, you will be notified in the GUI when an update is available and can install it manually from the Updates tab.',
   'update.max_update_logs': 'Maximum number of update log files to keep in logs/update_logs/. 0 = delete all after each update. -1 = keep forever.',
   'overlay.enabled': 'Enable the built-in text overlay subsystem. When disabled, overlay windows will not open and overlay actions in actions.mca will be skipped.',
   'overlay.display_mode': 'overwrite replaces the current message immediately. queue lines up messages and shows them one after another.',
@@ -3757,6 +3765,7 @@ const FIELD_META = {
   'minecraft_server_api.web_server_port': { basic: false, type: 'number', min: 1, max: 65535 },
   'gui.enabled': { basic: true, type: 'bool' },
   'update.enabled': { basic: true, type: 'bool' },
+  'update.auto_install': { basic: true, type: 'bool' },
   'update.max_update_logs': { basic: true, type: 'number' },
   'overlay.enabled': { basic: true, type: 'bool' },
   'overlay.display_mode': { basic: true, type: 'select', options: ['overwrite','queue'] },
@@ -6638,6 +6647,8 @@ document.getElementById('btn-unsaved-cancel').addEventListener('click', () => {
 /* ─── Update Checker ─── */
 let _updateData = null;
 let _lastResultToastCode = null;
+let _autoInstallEnabled = true;
+let _updateNotificationShown = false;
 
 async function checkAllUpdates() {
   const summary = document.getElementById('updates-summary');
@@ -6646,11 +6657,16 @@ async function checkAllUpdates() {
   if (detail) detail.classList.add('hidden');
 
   try {
-    const [toolData, pluginData, lastResult] = await Promise.all([
+    const [toolData, pluginData, lastResult, autoInstallData] = await Promise.all([
       fetchJSON('/updates/check').catch(() => null),
       fetchJSON('/plugins/updates').catch(() => null),
       fetchJSON('/updates/result').catch(() => null),
+      fetchJSON('/updates/auto_install').catch(() => null),
     ]);
+
+    if (autoInstallData && typeof autoInstallData.auto_install === 'boolean') {
+      _autoInstallEnabled = autoInstallData.auto_install;
+    }
 
     _updateData = { tool: toolData, plugins: pluginData, lastResult };
     if (lastResult && lastResult.exit_code !== null && lastResult.ok === false) {
@@ -6660,6 +6676,11 @@ async function checkAllUpdates() {
       }
     }
     _renderUpdateResults();
+
+    if (!_autoInstallEnabled && !_updateNotificationShown && toolData && toolData.update_available) {
+      _updateNotificationShown = true;
+      showUpdateNotification(toolData.latest_version);
+    }
   } catch (e) {
     if (summary) summary.innerHTML = '<span class="log-err">' + I18N.t('updates.checkFailed') + '</span>';
     log('Update check failed: ' + e.message, 'err');
@@ -6708,7 +6729,14 @@ function _renderUpdateResults() {
     '<span class="update-status__icon">!</span>' +
     '<div><span class="update-status__text">' + I18N.t('updates.available', { count: total }) + '</span>' +
     (tool ? '<span class="update-status__version">v' + tool.current_version + '</span>' : '') +
-    '</div></div>' +
+    '</div></div>';
+
+  if (!_autoInstallEnabled && toolAvail) {
+    html +=
+      '<button class="btn btn--primary" style="width:100%;margin-bottom:0.5rem;" onclick="triggerToolUpdate()">' + I18N.t('updates.updateNow') + '</button>';
+  }
+
+  html +=
     '<button class="btn btn--primary" style="width:100%;" onclick="applyUpdates()">' + I18N.t('updates.applyRestart') + '</button>';
 
   summary.innerHTML = html;
@@ -6765,6 +6793,36 @@ async function applyUpdates() {
       ? I18N.t('updates.installedRestart', { count: result.installed })
       : I18N.t('updates.restartToApply')
   );
+}
+
+function showUpdateNotification(version) {
+  const desc = document.getElementById('update-notification-desc');
+  if (desc) {
+    desc.textContent = I18N.t('updates.popupDesc', { version: version });
+  }
+  document.getElementById('update-notification-dialog').classList.remove('hidden');
+}
+
+function hideUpdateNotification() {
+  document.getElementById('update-notification-dialog').classList.add('hidden');
+}
+
+async function triggerToolUpdate() {
+  const btn = event?.target;
+  if (btn) btn.disabled = true;
+  showToast(I18N.t('updates.updating'), 'info');
+  try {
+    const result = await postJSON('/updates/apply', {});
+    if (result.status === 'started') {
+      showToast(I18N.t('updates.updating'), 'info');
+    } else {
+      showToast(I18N.t('updates.applyFailed', { msg: result.message || I18N.t('common.unknownError') }), 'error');
+    }
+  } catch (e) {
+    showToast(I18N.t('updates.applyFailed', { msg: e.message }), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ─── SSE Log Streaming ─── */
@@ -6828,6 +6886,12 @@ function connectLogStream() {
         renderLivePluginGrid(payload.plugins || {});
       } else if (type === 'dashboard.ecm_diagnostics') {
         updateEcmDiagnostics(payload);
+      } else if (type === 'update.available') {
+        // Auto-install disabled: show notification if not already shown
+        if (!_autoInstallEnabled && !_updateNotificationShown) {
+          _updateNotificationShown = true;
+          showUpdateNotification(payload.latest_version || 'unknown');
+        }
       }
     } catch (_) {}
   };
