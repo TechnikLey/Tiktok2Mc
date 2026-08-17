@@ -69,6 +69,21 @@ All overlays are served through the central API at `http://127.0.0.1:29185`:
 - **User Guide** — [`docs/GUIDE.md`](./docs/GUIDE.md) covers installation, configuration, actions, comment commands, plugins, overlays, server management, and FAQ in detail.
 - **Issues** — Open a [GitHub Issue](https://github.com/TechnikLey/Tiktok2Mc/issues) for bugs or feature requests.
 
+## Developer Documentation
+
+The developer documentation is best viewed online:
+
+- **[English Dev Documentation](https://technikley.github.io/Tiktok2Mc/en)**
+- **[Deutsche Entwickler-Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
+
+> [!TIP]
+> The online docs are better organized and easier to navigate. You can also browse the Markdown files directly in the repository if you prefer:
+> - [English Dev Documentation](./docs/dev-book-en/src/Introduction.md)
+> - [Deutsche Entwickler-Dokumentation](./docs/dev-book-de/src/Introduction.md)
+
+> [!WARNING]
+> The developer documentation may not always be fully up to date.
+
 ## License
 
 PolyForm Noncommercial License 1.0.0 with a special exception for TikTok content creators.
