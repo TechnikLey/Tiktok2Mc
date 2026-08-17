@@ -7,6 +7,7 @@ JSON store (``data/api_plugin_registry.json``).
 
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -319,6 +320,15 @@ async def enable_plugin(name: str):
         if plugin.enabled:
             log.info("Plugin '%s' is already enabled — returning current state", name)
             return plugin
+        # Check platform compatibility
+        plugin_platform = getattr(plugin, "platform", "all") or "all"
+        if plugin_platform != "all":
+            current_os = "windows" if sys.platform == "win32" else "linux"
+            if plugin_platform != current_os:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Cannot enable '{name}': plugin is for '{plugin_platform}' only, but running on '{current_os}'",
+                )
         # Check dependencies are enabled
         if plugin.depends_on:
             registered = {p.name: p for p in registry.list()}

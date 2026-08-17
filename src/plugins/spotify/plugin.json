@@ -7,6 +7,7 @@
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
+  "platform": "all",
   "capabilities": [
     "spotify:playback",
     "spotify:control",
@@ -19,41 +20,55 @@
       "key": "spotify.track_changed",
       "name": "Track Changed",
       "desc": "When the currently playing Spotify track changes",
-      "icon": "🎵"
+      "icon": "🎵",
+      "name_i18n": { "de": "Track gewechselt" },
+      "desc_i18n": { "de": "Wenn sich der aktuelle Spotify-Track ändert" }
     },
     {
       "key": "spotify.play",
       "name": "Playback Started",
       "desc": "When Spotify playback starts",
-      "icon": "▶️"
+      "icon": "▶️",
+      "name_i18n": { "de": "Wiedergabe gestartet" },
+      "desc_i18n": { "de": "Wenn die Spotify-Wiedergabe startet" }
     },
     {
       "key": "spotify.pause",
       "name": "Playback Paused",
       "desc": "When Spotify playback is paused",
-      "icon": "⏸️"
+      "icon": "⏸️",
+      "name_i18n": { "de": "Wiedergabe pausiert" },
+      "desc_i18n": { "de": "Wenn die Spotify-Wiedergabe pausiert wird" }
     }
   ],
   "accepted_commands": {
     "play": {
       "name": "Play Music",
       "desc": "Start or resume playback",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Musik abspielen" },
+      "desc_i18n": { "de": "Wiedergabe starten oder fortsetzen" }
     },
     "pause": {
       "name": "Pause Music",
       "desc": "Pause the current track",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Musik pausieren" },
+      "desc_i18n": { "de": "Aktuellen Track pausieren" }
     },
     "next": {
       "name": "Next Track",
       "desc": "Skip to the next song",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Nächster Track" },
+      "desc_i18n": { "de": "Zum nächsten Song springen" }
     },
     "previous": {
       "name": "Previous Track",
       "desc": "Go back to the previous song",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Vorheriger Track" },
+      "desc_i18n": { "de": "Zum vorherigen Song zurückgehen" }
     },
     "volume": {
       "name": "Set Volume",
@@ -64,34 +79,47 @@
           "label": "Volume level (0–100)",
           "default": 50,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "label_i18n": { "de": "Lautstärke (0–100)" }
         }
-      }
+      },
+      "name_i18n": { "de": "Lautstärke einstellen" },
+      "desc_i18n": { "de": "Wiedergabelautstärke ändern" }
     },
     "volume_up": {
       "name": "Volume Up",
       "desc": "Increase the volume",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Lauter" },
+      "desc_i18n": { "de": "Lautstärke erhöhen" }
     },
     "volume_down": {
       "name": "Volume Down",
       "desc": "Decrease the volume",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Leiser" },
+      "desc_i18n": { "de": "Lautstärke verringern" }
     },
     "shuffle": {
       "name": "Toggle Shuffle",
       "desc": "Turn shuffle on or off",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Zufallswiedergabe umschalten" },
+      "desc_i18n": { "de": "Zufallswiedergabe ein- oder ausschalten" }
     },
     "repeat": {
       "name": "Toggle Repeat",
       "desc": "Turn repeat on or off",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Wiederholung umschalten" },
+      "desc_i18n": { "de": "Wiederholung ein- oder ausschalten" }
     },
     "save": {
       "name": "Save Track",
       "desc": "Save the currently playing song to your library",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Track speichern" },
+      "desc_i18n": { "de": "Aktuellen Song in der Bibliothek speichern" }
     },
     "playtrack": {
       "name": "Play Specific Track",
@@ -101,9 +129,12 @@
           "type": "string",
           "label": "Song name or URL",
           "default": "",
-          "placeholder": "Never Gonna Give You Up"
+          "placeholder": "Never Gonna Give You Up",
+          "label_i18n": { "de": "Songname oder URL" }
         }
-      }
+      },
+      "name_i18n": { "de": "Bestimmten Track abspielen" },
+      "desc_i18n": { "de": "Nach einem Song suchen und abspielen" }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",

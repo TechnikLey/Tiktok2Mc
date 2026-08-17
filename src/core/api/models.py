@@ -109,6 +109,16 @@ class ReactionEvent(BaseModel):
     name: str = Field("", description="Human-readable name shown in the GUI")
     desc: str = Field("", description="Short description shown in the GUI")
     icon: str = Field("⚡", description="Emoji icon shown in the GUI")
+    name_i18n: dict[str, str] = Field(
+        default_factory=dict,
+        description='Optional localized names keyed by language code (e.g. {"de": "Neuer Follower"}). '
+        "Falls back to ``name`` when the requested language is absent.",
+    )
+    desc_i18n: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional localized descriptions keyed by language code. "
+        "Falls back to ``desc`` when the requested language is absent.",
+    )
 
 
 class ReactionCommandArg(BaseModel):
@@ -124,6 +134,10 @@ class ReactionCommandArg(BaseModel):
     )
     placeholder: str = Field("", description="Input placeholder for the GUI")
     hint: str = Field("", description="Help text shown under the input")
+    label_i18n: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional localized labels keyed by language code.",
+    )
 
 
 class ReactionCommand(BaseModel):
@@ -133,6 +147,14 @@ class ReactionCommand(BaseModel):
     desc: str = Field("", description="Short description shown in the GUI")
     args: dict[str, ReactionCommandArg] = Field(
         default_factory=dict, description="Argument schemas keyed by argument name"
+    )
+    name_i18n: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional localized names keyed by language code.",
+    )
+    desc_i18n: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional localized descriptions keyed by language code.",
     )
 
 
@@ -190,6 +212,11 @@ class PluginManifest(BaseModel):
         None, description="Comment prefix + commands this plugin handles (declarative)"
     )
     icon: str = Field("🔌", description="Display icon (emoji) shown in the GUI")
+    platform: str = Field(
+        "all",
+        description="Target platform: 'all', 'linux', or 'windows'. "
+        "Incompatible plugins cannot be enabled.",
+    )
     emitted_events: list[ReactionEvent] = Field(
         default_factory=list,
         description="Events this plugin publishes to the EventBus; shown as reaction triggers in the GUI",
@@ -251,6 +278,10 @@ class PluginRegistration(BaseModel):
         None, description="Unix timestamp of last successful health check"
     )
     error: str = Field("", description="Error message if plugin manifest is broken")
+    platform: str = Field(
+        "all",
+        description="Target platform: 'all', 'linux', or 'windows'",
+    )
 
     @classmethod
     def from_manifest(
@@ -284,6 +315,7 @@ class PluginRegisterRequest(BaseModel):
     )
     health_status: str = "unknown"
     last_heartbeat: float | None = None
+    platform: str = "all"
 
 
 class PluginUpdateRequest(BaseModel):

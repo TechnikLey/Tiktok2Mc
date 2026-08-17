@@ -100,6 +100,7 @@ PLUGIN_JSON_TEMPLATE = """\
   "author": "",
   "homepage": "",
   "min_api_version": "1.0.0",
+  "platform": "all",
   "capabilities": [],
   "depends_on": [],
   "update_url": "{update_url}",

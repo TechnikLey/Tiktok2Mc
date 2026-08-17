@@ -42,9 +42,10 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
 | `config_schema` | Schema for the configuration (see [Configuration](./ch03-03-configuration.md)) |
 | `comment_handler` | Object with `prefix` (string) and `enabled` (boolean). Declares that the plugin reacts to TikTok comments with a specific prefix (e.g., `"$"`). See [Receiving Events](./ch03-05-events-and-subscriptions.md). |
 | `update_url` | URL for auto-updates, e.g., `"https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"`. If empty string, no update check. |
+| `platform` | Target platform: `"all"` (default), `"linux"`, or `"windows"`. Incompatible plugins cannot be enabled via the GUI or API. |
 | `icon` | Emoji shown in the GUI (Reactions tab). Defaults to `"🔌"`. |
-| `emitted_events` | List of events this plugin publishes to the EventBus. Each entry: `key` (event id, e.g. `"my-plugin.thing"`), `name`, `desc`, `icon`. These appear as trigger options in the GUI "Create Reaction" wizard, automatically grouped under the plugin's own name. |
-| `accepted_commands` | Object of commands this plugin accepts via the command queue. Each command: `name`, `desc`, `args` (object of argument schemas with `type`, `label`, `default`, `min`, `max`, `options`, `placeholder`, `hint`). These appear as action options in the GUI "Create Reaction" wizard. |
+| `emitted_events` | List of events this plugin publishes to the EventBus. Each entry: `key` (event id, e.g. `"my-plugin.thing"`), `name`, `desc`, `icon`. These appear as trigger options in the GUI "Create Reaction" wizard, automatically grouped under the plugin's own name. Optional: `name_i18n` (object with language codes as keys, e.g. `{"de": "Neues Ding"}`) and `desc_i18n` for localized display. |
+| `accepted_commands` | Object of commands this plugin accepts via the command queue. Each command: `name`, `desc`, `args` (object of argument schemas with `type`, `label`, `default`, `min`, `max`, `options`, `placeholder`, `hint`). These appear as action options in the GUI "Create Reaction" wizard. Optional: `name_i18n`, `desc_i18n` for localized display. |
 
 > [!NOTE]
 > The internal fields `ics` (boolean, default `true`) and `level` (integer 1–4, default `4`) are set automatically. You usually do not need to specify them in the `plugin.json`.
@@ -66,6 +67,7 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
   "depends_on": [],
   "update_url": "https://api.github.com/repos/YourName/Tiktok2Mc/releases/latest",
   "icon": "⚡",
+  "platform": "all",
   "emitted_events": [
     {
       "key": "my-plugin.thing",
@@ -101,6 +103,9 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
 
 > [!NOTE]
 > The `emitted_events` and `accepted_commands` fields power the **Reactions tab** in the dashboard. The GUI fetches them via `GET /api/v1/reactions/catalog`, which merges every plugin's declarations with the built-in core events (TikTok, Minecraft, Server). Plugin events are grouped under the plugin's own name in the "Create Reaction" wizard — a new plugin shows up automatically, no GUI code changes required.
+
+> [!NOTE]
+> **Language of plugin content:** The application interface is available in English and German. However, text provided by plugins (event names, descriptions, command labels, config help text, overlay content) may appear in the plugin author's language if they have not been translated. Plugin authors can optionally provide localized strings via `name_i18n` / `desc_i18n` fields in `emitted_events` and `accepted_commands`, but this is not required. When no translation is available for the selected language, the original plugin string is shown.
 
 ## main.py — The Entry Point
 

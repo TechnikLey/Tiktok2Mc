@@ -7,6 +7,7 @@
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
+  "platform": "all",
   "capabilities": [
     "win-counter:count",
     "win-counter:milestones",
@@ -19,13 +20,17 @@
       "key": "win.milestone",
       "name": "Win Milestone Reached",
       "desc": "When the win count reaches a configured milestone",
-      "icon": "🏆"
+      "icon": "🏆",
+      "name_i18n": { "de": "Sieg-Meilenstein erreicht" },
+      "desc_i18n": { "de": "Wenn die Sieganzahl einen konfigurierten Meilenstein erreicht" }
     },
     {
       "key": "win.record_low",
       "name": "New Record Low",
       "desc": "When the win count drops to a new record low",
-      "icon": "📉"
+      "icon": "📉",
+      "name_i18n": { "de": "Neuer Tiefststand" },
+      "desc_i18n": { "de": "Wenn die Sieganzahl auf einen neuen Tiefststand sinkt" }
     }
   ],
   "accepted_commands": {
@@ -37,9 +42,12 @@
           "type": "number",
           "label": "How many wins",
           "default": 1,
-          "min": 1
+          "min": 1,
+          "label_i18n": { "de": "Wie viele Siege" }
         }
-      }
+      },
+      "name_i18n": { "de": "Sieg hinzufügen" },
+      "desc_i18n": { "de": "Sieganzahl erhöhen" }
     },
     "remove_win": {
       "name": "Remove Win",
@@ -49,9 +57,12 @@
           "type": "number",
           "label": "How many to remove",
           "default": 1,
-          "min": 1
+          "min": 1,
+          "label_i18n": { "de": "Wie viele entfernen" }
         }
-      }
+      },
+      "name_i18n": { "de": "Sieg entfernen" },
+      "desc_i18n": { "de": "Sieganzahl verringern" }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",

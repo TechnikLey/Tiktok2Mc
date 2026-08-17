@@ -7,6 +7,7 @@
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
+  "platform": "all",
   "capabilities": [
     "death-counter:count",
     "death-counter:milestones",
@@ -19,14 +20,18 @@
       "key": "death.milestone",
       "name": "Death Milestone Reached",
       "desc": "When the death count reaches a configured milestone",
-      "icon": "💀"
+      "icon": "💀",
+      "name_i18n": { "de": "Todes-Meilenstein erreicht" },
+      "desc_i18n": { "de": "Wenn die Todesanzahl einen konfigurierten Meilenstein erreicht" }
     }
   ],
   "accepted_commands": {
     "player_death": {
       "name": "Count Death",
       "desc": "Increase the death counter",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Tod zählen" },
+      "desc_i18n": { "de": "Todeszähler erhöhen" }
     },
     "add_death": {
       "name": "Add Deaths",
@@ -36,14 +41,19 @@
           "type": "number",
           "label": "How many deaths",
           "default": 1,
-          "min": 1
+          "min": 1,
+          "label_i18n": { "de": "Wie viele Tode" }
         }
-      }
+      },
+      "name_i18n": { "de": "Tode hinzufügen" },
+      "desc_i18n": { "de": "Tode zum Zähler hinzufügen" }
     },
     "reset": {
       "name": "Reset Counter",
       "desc": "Reset the death counter to zero",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Zähler zurücksetzen" },
+      "desc_i18n": { "de": "Todeszähler auf Null zurücksetzen" }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",

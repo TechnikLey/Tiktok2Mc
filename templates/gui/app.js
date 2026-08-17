@@ -2249,6 +2249,23 @@ async function _uploadConfigBundle(file) {
   }
 }
 
+function _currentOS() {
+  const p = (navigator.platform || '').toLowerCase();
+  return p.includes('win') ? 'windows' : 'linux';
+}
+
+function _platformLabel(platform) {
+  if (!platform || platform === 'all') return I18N.t('plugins.platformAll');
+  if (platform === 'linux') return I18N.t('plugins.platformLinux');
+  if (platform === 'windows') return I18N.t('plugins.platformWindows');
+  return platform;
+}
+
+function _isPlatformCompatible(plugin) {
+  const pp = plugin.platform || 'all';
+  return pp === 'all' || pp === _currentOS();
+}
+
 function renderPluginManager() {
   const tableDiv = document.getElementById('plugin-manager-table');
   if (!tableDiv) return;
@@ -2256,12 +2273,16 @@ function renderPluginManager() {
     tableDiv.innerHTML = '<p class="muted">' + I18N.t('plugins.noPlugins') + '</p>';
     return;
   }
-  let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>Port</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>Port</th><th>' + I18N.t('plugins.platform') + '</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
   for (const p of currentPlugins) {
     const status = getPluginStatus(p);
     const hasError = !!p.error;
+    const compatible = _isPlatformCompatible(p);
     const errorTitle = hasError ? ` title="${escapeHtml(p.error)}"` : '';
-    const enableDisabled = hasError ? ' disabled' : '';
+    const enableDisabled = hasError || !compatible ? ' disabled' : '';
+    const platformBadge = !compatible
+      ? '<span class="plugin-status status-disabled" title="' + I18N.t('plugins.platformIncompatible') + '">' + _platformLabel(p.platform) + ' ⚠️</span>'
+      : (p.platform && p.platform !== 'all' ? '<span class="plugin-status status-info">' + _platformLabel(p.platform) + '</span>' : '<span class="text-muted">—</span>');
     const action = p.enabled
       ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.disable')}</button>`
       : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.enable')}</button>`;
@@ -2270,11 +2291,12 @@ function renderPluginManager() {
       <td data-label="Name">${escapeHtml(p.display_name || p.name)}${hasError ? ' <span class="status-error-indicator" title="' + escapeHtml(p.error) + '">⚠️</span>' : ''}</td>
       <td data-label="Version">${p.version || '-'}</td>
       <td data-label="Port">${p.port || '-'}</td>
+      <td data-label="${I18N.t('plugins.platform')}">${platformBadge}</td>
       <td data-label="Status"><span class="plugin-status ${status.cls}">${status.label}</span></td>
       <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${editDisabled} onclick="pluginEditor.openInline('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td>
     </tr>`;
     if (hasError) {
-      html += `<tr class="error-detail-row"><td colspan="5"><span class="error-detail">${escapeHtml(p.error)}</span></td></tr>`;
+      html += `<tr class="error-detail-row"><td colspan="6"><span class="error-detail">${escapeHtml(p.error)}</span></td></tr>`;
     }
   }
   html += '</tbody></table>';
@@ -2310,6 +2332,11 @@ function isBuiltinPlugin(name) {
 }
 
 async function promptEnablePlugin(name, displayName) {
+  const plugin = currentPlugins.find(p => p.name === name);
+  if (plugin && !_isPlatformCompatible(plugin)) {
+    showToast(I18N.t('plugins.platformCannotEnable', { platform: _platformLabel(plugin.platform), current: _currentOS() }), 'error');
+    return;
+  }
   const isBuiltin = isBuiltinPlugin(name);
   let message = I18N.t('plugins.enableConfirm', { name: displayName || name });
   if (!isBuiltin) {
@@ -5746,17 +5773,17 @@ class ReactionEditor {
     };
 
     this.categoryLabels = {
-      all: 'All Reactions',
-      tiktok: 'TikTok Events',
-      minecraft: 'Minecraft Events',
-      server: 'Server Events',
-      custom: 'Custom Events',
+      all: I18N.t('reactions.categoryAll'),
+      tiktok: I18N.t('reactions.categoryTiktok'),
+      minecraft: I18N.t('reactions.categoryMinecraft'),
+      server: I18N.t('reactions.categoryServer'),
+      custom: I18N.t('reactions.categoryCustom'),
     };
 
     this.templates = [
-      { event: 'minecraft.player_death', plugin: 'spotify-control', command: 'pause', args: {}, title: 'Pause Music on Death', desc: 'Automatically pause Spotify when you die in Minecraft.' },
-      { event: 'timer.zero', plugin: 'win-counter', command: 'add_win', args: { amount: 1 }, title: 'Add Win on Timer', desc: 'Award a win when the countdown timer hits zero.' },
-      { event: 'tiktok.gift', plugin: 'timer', command: 'add_time', args: { seconds: 30 }, title: 'Add Time on Gift', desc: 'Add 30 seconds to the timer every time someone sends a gift.' },
+      { event: 'minecraft.player_death', plugin: 'spotify-control', command: 'pause', args: {}, title: I18N.t('reactions.templatePauseMusic'), desc: I18N.t('reactions.templatePauseMusicDesc') },
+      { event: 'timer.zero', plugin: 'win-counter', command: 'add_win', args: { amount: 1 }, title: I18N.t('reactions.templateAddWinTimer'), desc: I18N.t('reactions.templateAddWinTimerDesc') },
+      { event: 'tiktok.gift', plugin: 'timer', command: 'add_time', args: { seconds: 30 }, title: I18N.t('reactions.templateAddTimeGift'), desc: I18N.t('reactions.templateAddTimeGiftDesc') },
     ];
 
     this._bindEvents();
@@ -5868,6 +5895,15 @@ class ReactionEditor {
 
   /* ─── Sidebar / Filters ─── */
 
+  _localized(obj, field) {
+    const i18nKey = field + '_i18n';
+    if (obj[i18nKey]) {
+      const lang = I18N.lang();
+      if (obj[i18nKey][lang]) return obj[i18nKey][lang];
+    }
+    return obj[field] || '';
+  }
+
   _humanizeCategory(cat) {
     return cat
       .split(/[-_]/)
@@ -5961,19 +5997,19 @@ class ReactionEditor {
         const pluginDisabled = !!plugin && !plugin.enabled;
         const disabledClass = pluginDisabled ? ' reaction-card--disabled' : '';
         const disabledNotice = pluginDisabled
-          ? `<div class="reaction-disabled-notice">⚠️ Plugin <strong>${escapeHtml(pluginInfo.name)}</strong> is disabled. This reaction will not trigger until you enable the plugin in the <strong>Plugins</strong> section.</div>`
+          ? `<div class="reaction-disabled-notice">${I18N.t('reactions.disabledNotice', { plugin: escapeHtml(pluginInfo.name) })}</div>`
           : '';
 
         html += `<div class="reaction-card${disabledClass}">
           <div class="reaction-card-header">
             <div class="reaction-meta">
               <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
-              <span style="font-size:0.75rem;color:var(--text-secondary);">Event: ${escapeHtml(info.name)}</span>
+              <span style="font-size:0.75rem;color:var(--text-secondary);">${I18N.t('reactions.eventLabel', { name: escapeHtml(info.name) })}</span>
             </div>
             <div class="reaction-card-actions">
-              <button class="reaction-btn-sm reaction-btn-test" onclick="reactionEditor.testReaction('${escapeHtml(event)}', ${idx})"${pluginDisabled ? ' disabled' : ''}>Test</button>
-              <button class="reaction-btn-sm reaction-btn-edit" onclick="reactionEditor.startEdit('${escapeHtml(event)}', ${idx})">Edit</button>
-              <button class="reaction-btn-sm reaction-btn-delete" onclick="reactionEditor.confirmDelete('${escapeHtml(event)}', ${idx})">Delete</button>
+              <button class="reaction-btn-sm reaction-btn-test" onclick="reactionEditor.testReaction('${escapeHtml(event)}', ${idx})"${pluginDisabled ? ' disabled' : ''}>${I18N.t('reactions.test')}</button>
+              <button class="reaction-btn-sm reaction-btn-edit" onclick="reactionEditor.startEdit('${escapeHtml(event)}', ${idx})">${I18N.t('reactions.edit')}</button>
+              <button class="reaction-btn-sm reaction-btn-delete" onclick="reactionEditor.confirmDelete('${escapeHtml(event)}', ${idx})">${I18N.t('reactions.delete')}</button>
             </div>
           </div>
           ${disabledNotice}
@@ -6042,7 +6078,7 @@ class ReactionEditor {
       </div>`;
     }
     html += `</div>
-      <button class="btn btn-primary" style="margin-top:1.5rem;padding:0.7rem 1.4rem;" onclick="reactionEditor.startCreate()">Create Your First Reaction</button>
+      <button class="btn btn-primary" style="margin-top:1.5rem;padding:0.7rem 1.4rem;" onclick="reactionEditor.startCreate()">${I18N.t('reactions.createYourFirst')}</button>
     </div>`;
     this.content.innerHTML = html;
   }
@@ -6137,7 +6173,7 @@ class ReactionEditor {
     const evInfo = this.eventCatalog[event] || { name: event };
     const plInfo = this.pluginCatalog[action.target] || { name: action.target };
     const cmdInfo = (this.commandCatalog[action.target] || {})[action.command] || { name: action.command };
-    const msg = `Delete reaction: "${evInfo.name} → ${cmdInfo.name}"? This cannot be undone.`;
+    const msg = I18N.t('reactions.deleteMessage') + ' "' + evInfo.name + ' → ' + cmdInfo.name + '"';
     document.getElementById('reaction-delete-message').textContent = msg;
     document.getElementById('reaction-delete-modal').classList.remove('hidden');
     const confirmBtn = document.getElementById('reaction-delete-confirm');
@@ -6209,9 +6245,9 @@ class ReactionEditor {
 
   _renderStepEvent() {
     const standardLabels = {
-      tiktok: 'TikTok Events',
-      minecraft: 'Minecraft Events',
-      server: 'Server Events',
+      tiktok: I18N.t('reactions.categoryTiktok'),
+      minecraft: I18N.t('reactions.categoryMinecraft'),
+      server: I18N.t('reactions.categoryServer'),
     };
     // Standard groups first, then one group per plugin (named after the plugin).
     const groups = [];
@@ -6309,11 +6345,11 @@ class ReactionEditor {
     const plInfo = this.pluginCatalog[this.wizardDraft.plugin] || { name: this.wizardDraft.plugin, icon: '🔌' };
     const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[this.wizardDraft.command] || { name: this.wizardDraft.command, desc: '' };
 
-    let html = `<h3>Step 4: Review and fine-tune</h3>
-    <p class="muted-desc">Make sure everything looks right. Some commands let you set extra options below.</p>`;
+    let html = `<h3>${I18N.t('reactions.step4Title')}</h3>
+    <p class="muted-desc">${I18N.t('reactions.step4Desc')}</p>`;
 
     html += `<div class="reaction-preview">
-      <div class="reaction-preview-label">Preview</div>
+      <div class="reaction-preview-label">${I18N.t('reactions.preview')}</div>
       <div class="reaction-preview-flow">
         <div class="reaction-when"><span style="font-size:1.1rem;">${evInfo.icon}</span> <span>${escapeHtml(evInfo.name)}</span></div>
         <span class="reaction-arrow">→</span>
@@ -6326,7 +6362,7 @@ class ReactionEditor {
     const hasArgs = Object.keys(argSchema).length > 0;
     if (hasArgs) {
       html += `<div class="args-form" style="margin-top:1.25rem;">`;
-      html += `<strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.75rem;">Options</strong>`;
+      html += `<strong style="font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:0.75rem;">${I18N.t('reactions.options')}</strong>`;
       for (const [argKey, spec] of Object.entries(argSchema)) {
         const currentVal = this.wizardDraft.args[argKey] !== undefined ? this.wizardDraft.args[argKey] : (spec.default !== undefined ? spec.default : '');
         const id = `arg_${argKey}`;
@@ -6468,7 +6504,7 @@ class ReactionEditor {
     this._closeWizard();
     this.renderSidebar();
     this.renderList();
-    showToast(this.wizardEditing ? 'Reaction updated.' : 'Reaction created.', 'success');
+    showToast(this.wizardEditing ? I18N.t('reactions.updated') : I18N.t('reactions.created'), 'success');
   }
 }
 
@@ -7422,6 +7458,12 @@ document.addEventListener('i18n:changed', () => {
   const cfgEditor = document.getElementById('config-editor');
   if (cfgEditor && !cfgEditor.classList.contains('hidden') && typeof editor !== 'undefined') {
     editor.render();
+  }
+  loadStatus();
+  renderLivePluginGrid(_livePluginData);
+  if (typeof reactionEditor !== 'undefined') {
+    reactionEditor.renderSidebar();
+    reactionEditor.renderList();
   }
 });
 

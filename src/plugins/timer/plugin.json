@@ -7,6 +7,7 @@
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
+  "platform": "all",
   "capabilities": [
     "timer:schedule",
     "timer:pause",
@@ -21,65 +22,87 @@
       "key": "timer.started",
       "name": "Timer Starts",
       "desc": "When the countdown timer starts",
-      "icon": "▶️"
+      "icon": "▶️",
+      "name_i18n": { "de": "Timer gestartet" },
+      "desc_i18n": { "de": "Wenn der Countdown-Timer startet" }
     },
     {
       "key": "timer.paused",
       "name": "Timer Pauses",
       "desc": "When the countdown timer is paused",
-      "icon": "⏸️"
+      "icon": "⏸️",
+      "name_i18n": { "de": "Timer pausiert" },
+      "desc_i18n": { "de": "Wenn der Countdown-Timer pausiert wird" }
     },
     {
       "key": "timer.resumed",
       "name": "Timer Resumes",
       "desc": "When the countdown timer resumes",
-      "icon": "▶️"
+      "icon": "▶️",
+      "name_i18n": { "de": "Timer fortgesetzt" },
+      "desc_i18n": { "de": "Wenn der Countdown-Timer fortgesetzt wird" }
     },
     {
       "key": "timer.reset",
       "name": "Timer Resets",
       "desc": "When the countdown timer is reset",
-      "icon": "🔄"
+      "icon": "🔄",
+      "name_i18n": { "de": "Timer zurückgesetzt" },
+      "desc_i18n": { "de": "Wenn der Countdown-Timer zurückgesetzt wird" }
     },
     {
       "key": "timer.tick",
       "name": "Timer Ticks",
       "desc": "Every second while the timer is running",
-      "icon": "⏱️"
+      "icon": "⏱️",
+      "name_i18n": { "de": "Timer-Tick" },
+      "desc_i18n": { "de": "Jede Sekunde solange der Timer läuft" }
     },
     {
       "key": "timer.zero",
       "name": "Timer Hits Zero",
       "desc": "When the countdown reaches zero",
-      "icon": "⏰"
+      "icon": "⏰",
+      "name_i18n": { "de": "Timer erreicht Null" },
+      "desc_i18n": { "de": "Wenn der Countdown Null erreicht" }
     },
     {
       "key": "timer.milestone",
       "name": "Timer Milestone",
       "desc": "When the timer passes a configured milestone",
-      "icon": "🎯"
+      "icon": "🎯",
+      "name_i18n": { "de": "Timer-Meilenstein" },
+      "desc_i18n": { "de": "Wenn der Timer einen konfigurierten Meilenstein überschreitet" }
     }
   ],
   "accepted_commands": {
     "start": {
       "name": "Start Timer",
       "desc": "Begin the countdown from the current time",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Timer starten" },
+      "desc_i18n": { "de": "Countdown ab der aktuellen Zeit beginnen" }
     },
     "pause": {
       "name": "Pause Timer",
       "desc": "Pause the countdown",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Timer pausieren" },
+      "desc_i18n": { "de": "Countdown pausieren" }
     },
     "resume": {
       "name": "Resume Timer",
       "desc": "Continue a paused countdown",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Timer fortsetzen" },
+      "desc_i18n": { "de": "Pausierten Countdown fortsetzen" }
     },
     "reset": {
       "name": "Reset Timer",
       "desc": "Reset the timer to its starting value",
-      "args": {}
+      "args": {},
+      "name_i18n": { "de": "Timer zurücksetzen" },
+      "desc_i18n": { "de": "Timer auf Ausgangswert zurücksetzen" }
     },
     "add_time": {
       "name": "Add Time",
@@ -89,9 +112,12 @@
           "type": "number",
           "label": "Seconds to add",
           "default": 10,
-          "min": 1
+          "min": 1,
+          "label_i18n": { "de": "Sekunden hinzufügen" }
         }
-      }
+      },
+      "name_i18n": { "de": "Zeit hinzufügen" },
+      "desc_i18n": { "de": "Sekunden zum aktuellen Timer hinzufügen" }
     },
     "set_time": {
       "name": "Set Time",
@@ -101,9 +127,12 @@
           "type": "number",
           "label": "Seconds to set",
           "default": 60,
-          "min": 0
+          "min": 0,
+          "label_i18n": { "de": "Sekunden einstellen" }
         }
-      }
+      },
+      "name_i18n": { "de": "Zeit einstellen" },
+      "desc_i18n": { "de": "Timer auf eine bestimmte Anzahl Sekunden setzen" }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
