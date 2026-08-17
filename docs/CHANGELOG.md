@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic Backups** — your configuration files are now automatically backed up before changes, so you can recover if something goes wrong.
 - **Port Conflict Detection** — if the required network ports are already in use, the tool now detects this and resolves it automatically.
 - **Security warnings** — you'll see a console warning if you're still using the default RCON password or if the tool is exposed to your whole network.
+- **Mobile-friendly dashboard** — the sidebar collapses to an off-canvas drawer on screens ≤768px with a hamburger menu. Modals and the actions editor stack vertically on small screens. Fully usable from your phone over LAN.
+- **Accessibility** — keyboard navigation for modals (`Esc` to close, `Tab` trap), `aria-labels` on icon buttons and nav items, `:focus-visible` outlines, `aria-live` toasts. The dashboard is now navigable without a mouse.
+- **Context help** — a "?" button in every view header and editor opens a built-in help panel with explanations. No more digging through documentation.
+- **Keyboard shortcuts** — `Ctrl+S` saves in any editor, `/` focuses search, `Esc` closes modals, `?` opens the shortcut reference.
+- **Overlay preview & test** — see a live preview of each overlay directly in the GUI and trigger a test message with one click.
+- **Console autocomplete & history** — Tab completes Minecraft command prefixes (e.g. `/give`, `/tp`), Up/Down arrows cycle through your command history.
+- **Log-level filter** — filter the live log by All/Info/Debug/Warn/Error with the level persisted across sessions.
+- **Dashboard density toggle** — switch between Spacious and Compact layout for the status cards.
+- **Config bundle export & import** — download or upload your entire setup (config, actions, plugin configs) as a single ZIP file — handy for backups or moving to another machine.
+- **Session summaries** — when a live stream ends, a summary is automatically saved (gifts, likes, follows, comments, shares, joins, gift value). View session history in the new Sessions tab and download a Markdown report.
 
 ### Changed
 
