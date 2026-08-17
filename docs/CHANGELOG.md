@@ -59,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Due to a full system rewrite, many legacy issues from previous versions were inherently resolved. No specific bug list is carried forward.
 
+- **Documentation (GitHub Pages)** — Fixed admonitions (Note, Tip, Warning, Caution, Important) not rendering on the deployed GitHub Pages site. The mdBook workflow now uses v0.5.2 with native GFM alert support instead of v0.4.36 which required a separate preprocessor.
+
 ---
 
 ## [v0.5.0] - 2026-05-26
