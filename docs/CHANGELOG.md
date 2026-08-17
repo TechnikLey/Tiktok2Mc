@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation overhaul** — All documentation has been completely rewritten to reflect the v1.0.0 rewrite: `README.md`, `GUIDE.md`, and both `dev-book-de` / `dev-book-en` developer books are updated with the new GUI workflow and current architecture.
 - **Timer, Win Counter, Death Counter** — these plugins no longer depend on each other. You can use any combination without one forcing settings on another.
 - **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
 - **Port count reduced from 12 to 5** — each plugin (Timer, Death Counter, Win Counter, Spotify Control) previously ran its own web server on a dedicated port. All plugins are now served through the central API server (29185). Only three ports are bound today (API: 29185, webhook: 29188, MC Server API: 29187); RCON (25575) and the Minecraft server (25565) are only connected to.
