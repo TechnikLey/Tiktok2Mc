@@ -2,7 +2,7 @@
   "name": "mca-language",
   "displayName": "MCA Language",
   "description": "Language server, syntax highlighting, IntelliSense, and diagnostics for MCA trigger/action definition files (.mca)",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.80.0"
   },
