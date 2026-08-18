@@ -6352,6 +6352,21 @@ class CommentCommandsEditor {
     btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
   }
 
+  async _loadPluginsForSelect(selectEl, current) {
+    try {
+      const res = await fetchJSON('/plugins');
+      const plugins = res.plugins || [];
+      let html = '<option value="">—</option>';
+      for (const p of plugins) {
+        const sel = p.name === current ? ' selected' : '';
+        html += `<option value="${escapeHtml(p.name)}"${sel}>${escapeHtml(p.name)}</option>`;
+      }
+      selectEl.innerHTML = html;
+    } catch (e) {
+      /* ignore — select stays empty */
+    }
+  }
+
   /* ─── Sidebar ─── */
   renderSidebar() {
     const groups = this.data.groups || [];
@@ -6409,7 +6424,7 @@ class CommentCommandsEditor {
       const isSystem = h === 'rcon' || h === 'http';
       const catClass = isSystem ? 'reaction-category-minecraft' : 'reaction-category-custom';
       const catLabel = isSystem ? I18N.t('cc.catSystem') : I18N.t('cc.catPlugin');
-      const handlerLabel = isSystem ? (h === 'rcon' ? 'RCON' : 'HTTP') : h;
+      const handlerLabel = h === 'rcon' ? 'RCON' : h === 'http' ? 'HTTP' : h === 'plugin' ? `Plugin: ${escapeHtml(g.plugin_name || '—')}` : h;
       const prefixDisplay = escapeHtml(g.prefix || '#');
       const cmds = (g.commands || []).join(', ') || '—';
       const roles = (g.allowed_roles || []).join(', ');
@@ -6546,6 +6561,7 @@ class CommentCommandsEditor {
 
     if (this._wizardStep === 0) {
       if (nextBtn) nextBtn.textContent = I18N.t('common.next');
+      const isPlugin = d.handler === 'plugin';
       body.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:1rem;">
           <div style="display:flex;align-items:center;gap:1rem;">
@@ -6557,6 +6573,13 @@ class CommentCommandsEditor {
             <select id="cc-wiz-handler" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
               <option value="rcon" ${d.handler === 'rcon' ? 'selected' : ''}>RCON (${I18N.t('cc.handlerRconDesc')})</option>
               <option value="http" ${d.handler === 'http' ? 'selected' : ''}>HTTP (${I18N.t('cc.handlerHttpDesc')})</option>
+              <option value="plugin" ${isPlugin ? 'selected' : ''}>Plugin (${I18N.t('cc.handlerPluginDesc')})</option>
+            </select>
+          </div>
+          <div id="cc-wiz-plugin-row" style="display:${isPlugin ? 'flex' : 'none'};align-items:center;gap:1rem;">
+            <label style="font-weight:600;min-width:80px;">Plugin</label>
+            <select id="cc-wiz-plugin-name" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);min-width:180px;">
+              <option value="">—</option>
             </select>
           </div>
           <div style="display:flex;align-items:center;gap:1rem;">
@@ -6567,7 +6590,16 @@ class CommentCommandsEditor {
       const prefixEl = document.getElementById('cc-wiz-prefix');
       if (prefixEl) prefixEl.addEventListener('input', () => { d.prefix = prefixEl.value; });
       const handlerEl = document.getElementById('cc-wiz-handler');
-      if (handlerEl) handlerEl.addEventListener('change', () => { d.handler = handlerEl.value; });
+      if (handlerEl) handlerEl.addEventListener('change', () => {
+        d.handler = handlerEl.value;
+        const pluginRow = document.getElementById('cc-wiz-plugin-row');
+        if (pluginRow) pluginRow.style.display = d.handler === 'plugin' ? 'flex' : 'none';
+      });
+      const pluginNameEl = document.getElementById('cc-wiz-plugin-name');
+      if (pluginNameEl) {
+        pluginNameEl.addEventListener('change', () => { d.plugin_name = pluginNameEl.value; });
+        this._loadPluginsForSelect(pluginNameEl, d.plugin_name);
+      }
       const enabledEl = document.getElementById('cc-wiz-enabled');
       if (enabledEl) enabledEl.addEventListener('change', () => { d.enabled = enabledEl.checked; });
     } else if (this._wizardStep === 1) {

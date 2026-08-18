@@ -116,7 +116,7 @@ class BotContext:
         self.comment_cmd_enable = False
         self.comment_cmd_groups = []
         self.comment_cmd_all_prefixes = set()
-        self.comment_handler_map: dict[str, str] = {}  # prefix → plugin_name
+
         self.comment_cmd_global_cooldown = 0
         self.comment_cmd_global_last = 0.0
         self.comment_cmd_global_user_cooldown = 0
@@ -499,12 +499,17 @@ def _apply_comment_commands_from_yaml() -> None:
                 if cname and isinstance(ccfg, dict):
                     commands_config[cname] = ccfg
         handler = str(g.get("handler", "rcon")).lower()
+        plugin_name = str(g.get("plugin_name", "")).strip()
         url = str(g.get("url", ""))
         cooldown = max(0, int(g.get("cooldown", 0)))
         user_cooldown = max(0, int(g.get("user_cooldown", 0)))
         if mode == "allow-all" and not commands and handler == "rcon":
             log.warning(
                 f"comment_commands group '{prefix}': allow-all + empty list — ALL commands allowed!"
+            )
+        if handler == "plugin" and not plugin_name:
+            log.warning(
+                f"comment_commands group '{prefix}': handler is 'plugin' but plugin_name is empty — group will be ignored"
             )
         trigger_comment = g.get("trigger_comment_event", True)
 
@@ -537,6 +542,7 @@ def _apply_comment_commands_from_yaml() -> None:
                 "commands": commands,
                 "commands_config": commands_config,
                 "handler": handler,
+                "plugin_name": plugin_name,
                 "url": url,
                 "cooldown": cooldown,
                 "user_cooldown": user_cooldown,
@@ -1157,24 +1163,6 @@ def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) 
         log.warning("Failed to route comment to plugin '%s': %s", plugin_name, exc)
 
 
-def _fetch_comment_handlers() -> dict[str, str]:
-    """Fetch ``{prefix: plugin_name}`` from the API registry.
-
-    Called once at startup so the bridge can route chat commands
-    to the correct plugin's command queue.
-    """
-    try:
-        req = urllib.request.Request(f"{API_BASE}/comment-handlers")
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("handlers") or {}
-    except (OSError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        log.info(
-            "No comment handlers from API (plugins may not be registered yet): %s", exc
-        )
-        return {}
-
-
 def _dispatch_comment_http(cmd_url, username, cmd_text):
     import urllib.parse
     import urllib.request
@@ -1705,18 +1693,17 @@ def _process_comment_command(
                     for k, v in ctx.comment_cmd_last_user.items()
                 }
 
-            # 1. API-registered handler (declarative, dynamic)
-            plugin_name = ctx.comment_handler_map.get(prefix)
-            if plugin_name:
-                _dispatch_comment_to_plugin(plugin_name, cmd_text, username)
-            # 2. Legacy RCON handler
+            # 1. Plugin handler (configured via comment_commands.yaml)
+            if cmd_handler == "plugin" and group.get("plugin_name"):
+                _dispatch_comment_to_plugin(group["plugin_name"], cmd_text, username)
+            # 2. RCON handler
             elif cmd_handler == "rcon":
                 enqueue_threadsafe(
                     ([cmd_text], username),
                     queue=ctx.rcon_queue,
                     label=f"comment_rcon:{prefix}",
                 )
-            # 3. Legacy HTTP handler (backward compat)
+            # 3. HTTP handler
             elif cmd_handler == "http" and cmd_url:
                 if conditional:
                     resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
@@ -2405,7 +2392,6 @@ async def reload_config():
 
         # Network/file fetches run in a thread so the reload never blocks the
         # main loop; both helpers are pure reads (no ctx mutation).
-        ctx.comment_handler_map = await asyncio.to_thread(_fetch_comment_handlers)
         ctx.event_subscriptions = await asyncio.to_thread(_load_event_subscriptions)
 
         # Force the RCON worker to reconnect with the new settings.
@@ -2535,11 +2521,6 @@ async def run_bot():
             "Set it via the GUI wizard or config.yaml; the bridge will connect once it is provided.",
             default_user,
         )
-
-    # Fetch registered comment handlers from API for prefix→plugin routing
-    ctx.comment_handler_map = _fetch_comment_handlers()
-    if ctx.comment_handler_map:
-        log.info("[COMMENT] Registered handlers: %s", ctx.comment_handler_map)
 
     try:
         diags = validate_file(ACTIONS_FILE, raise_on_error=False)

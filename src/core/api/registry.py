@@ -95,8 +95,7 @@ class PluginRegistry:
 
         Only the supplied keyword arguments are changed; everything
         else is preserved.  Pass ``_UNSET`` as the value for a field
-        to explicitly set it to ``None`` (e.g. clearing
-        ``comment_handler``).
+        to explicitly set it to ``None``.
         """
         with self._lock:
             plugin = self._plugins.get(name)

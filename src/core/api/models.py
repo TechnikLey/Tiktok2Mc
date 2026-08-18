@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -208,9 +208,6 @@ class PluginManifest(BaseModel):
     config_schema: PluginConfigSchemaModel | None = Field(
         None, description="Schema for plugin-local config (GUI + validation)"
     )
-    comment_handler: Optional["CommentHandler"] = Field(
-        None, description="Comment prefix + commands this plugin handles (declarative)"
-    )
     icon: str = Field("🔌", description="Display icon (emoji) shown in the GUI")
     platform: str = Field(
         "all",
@@ -225,15 +222,6 @@ class PluginManifest(BaseModel):
         default_factory=dict,
         description="Commands this plugin accepts via the command queue; shown as reaction actions in the GUI",
     )
-
-
-class CommentHandler(BaseModel):
-    """Declares that a plugin handles chat commands with a given prefix."""
-
-    prefix: str = Field(
-        "$", description="Comment prefix this handler responds to (e.g. $, !, #)"
-    )
-    enabled: bool = Field(True, description="Whether this handler is currently active")
 
 
 # ── Plugin models ────────────────────────────────────────────────────
@@ -268,9 +256,6 @@ class PluginRegistration(BaseModel):
         None, description="Unix timestamp of first registration"
     )
     updated_at: float | None = Field(None, description="Unix timestamp of last update")
-    comment_handler: Optional["CommentHandler"] = Field(
-        None, description="Comment prefix this plugin handles"
-    )
     health_status: str = Field(
         "unknown", description="Current health: unknown, healthy, unhealthy, dead"
     )
@@ -310,9 +295,6 @@ class PluginRegisterRequest(BaseModel):
     update_url: str = ""
     author: str = ""
     homepage: str = ""
-    comment_handler: Optional["CommentHandler"] = Field(
-        None, description="Comment prefix this plugin handles"
-    )
     health_status: str = "unknown"
     last_heartbeat: float | None = None
     platform: str = "all"
@@ -334,7 +316,6 @@ class PluginUpdateRequest(BaseModel):
     update_url: str | None = None
     author: str | None = None
     homepage: str | None = None
-    comment_handler: Optional["CommentHandler"] = None
     health_status: str | None = None
     last_heartbeat: float | None = None
 

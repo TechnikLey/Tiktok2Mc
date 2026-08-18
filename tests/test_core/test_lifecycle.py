@@ -217,23 +217,3 @@ class TestBridgeInit:
         cfg = load_yaml(config_file)
         assert cfg["server_host"] == "127.0.0.1"
         assert cfg["tiktok"]["user"] == "test_user"
-
-    def test_comment_handler_fetch_mocked(self, monkeypatch):
-        expected = {"$": "spotify-control", "!": "timer-plugin"}
-        encoded = json.dumps(expected).encode("utf-8")
-
-        def mock_urlopen(*args, **kwargs):
-            m = MagicMock()
-            m.status = 200
-            m.read.return_value = encoded
-            m.__enter__.return_value = m
-            m.__exit__.return_value = None
-            return m
-
-        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
-
-        import urllib.request
-
-        resp = urllib.request.urlopen("http://127.0.0.1:29185/api/v1/comment-handlers")
-        data = json.loads(resp.read().decode())
-        assert data == expected

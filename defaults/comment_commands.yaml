@@ -26,7 +26,10 @@
 #                            — "allow-all" = everything except listed works
 #         commands: [say, give]
 #         commands_config: {}  — per-command overrides (cooldown, roles, url, handler)
-#         handler: rcon     — "rcon" = send to Minecraft, "http" = POST to URL
+#         handler: rcon     — "rcon" = send to Minecraft
+#                            — "http"  = POST to URL
+#                            — "plugin" = route to a plugin (requires plugin_name)
+#         plugin_name: ""   — plugin to route to (only for handler: plugin)
 #         cooldown: 0       — per-group cooldown (seconds)
 #         user_cooldown: 0  — per-group per-user cooldown (seconds)
 #         trigger_comment_event: true  — also fire 'comment' trigger in actions.mca
@@ -34,15 +37,21 @@
 # -------------------------------------------------------------------
 # PLUGIN COMMANDS
 # -------------------------------------------------------------------
-# Plugins register their own command groups dynamically via the API
-# (plugin.json → comment_handler). They do NOT need entries here.
-# Only system-level groups (#, !, etc.) belong in this file.
+# ALL comment commands — including plugin commands — are configured here.
+# To route chat commands to a plugin, add a group with handler: plugin
+# and set plugin_name to the plugin's registered name (e.g. "spotify-control").
 #
-# -------------------------------------------------------------------
-# RUNTIME LOCATION
-# -------------------------------------------------------------------
-# This file lives in data/comment_commands.yaml at runtime.
-# The defaults/ copy is only a template.
+# Example plugin group:
+#   - enabled: true
+#     prefix: "$"
+#     plugin_name: spotify-control
+#     handler: plugin
+#     allowed_roles: [all]
+#     mode: allow-all
+#     commands: [play, pause, next, volume]
+#     cooldown: 0
+#     user_cooldown: 0
+#     trigger_comment_event: true
 # ===================================================================
 
 comment_commands:

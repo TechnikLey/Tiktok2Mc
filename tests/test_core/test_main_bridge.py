@@ -273,30 +273,22 @@ class TestReloadOffloadsToThread:
         assert seen.get("build") != main_thread
 
     @pytest.mark.asyncio
-    async def test_reload_config_fetches_handlers_in_thread(self, monkeypatch):
+    async def test_reload_config_fetches_subscriptions_in_thread(self, monkeypatch):
         from src.python import main as main_mod
 
         seen = {}
         main_thread = threading.get_ident()
-
-        def fake_fetch_comment_handlers():
-            seen["handlers"] = threading.get_ident()
-            return {}
 
         def fake_load_event_subscriptions():
             seen["subscriptions"] = threading.get_ident()
             return {}
 
         monkeypatch.setattr(
-            main_mod, "_fetch_comment_handlers", fake_fetch_comment_handlers
-        )
-        monkeypatch.setattr(
             main_mod, "_load_event_subscriptions", fake_load_event_subscriptions
         )
 
         await main_mod.reload_config()
 
-        assert seen.get("handlers") != main_thread
         assert seen.get("subscriptions") != main_thread
 
 
