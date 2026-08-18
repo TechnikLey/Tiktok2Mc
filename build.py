@@ -1280,6 +1280,7 @@ def cmd_app(args):
         FILES = [
             ("defaults/config.yaml", "config/config.yaml"),
             ("defaults/gifts.json", "core/gifts.json"),
+            ("defaults/comment_commands.yaml", "data/comment_commands.yaml"),
             ("LICENSE", "LICENSE"),
             ("README.md", "README.md"),
             ("defaults/actions.mca", "data/actions.mca"),
