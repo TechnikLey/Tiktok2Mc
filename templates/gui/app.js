@@ -6541,6 +6541,30 @@ class CommentCommandsEditor {
       </button>
     </div>`;
 
+    /* Plugin commands suggestions (inline) */
+    if (h === 'plugin' && g.plugin_name && this._pluginCatalog[g.plugin_name]) {
+      const pcmds = this._pluginCatalog[g.plugin_name];
+      const pkeys = Object.keys(pcmds);
+      if (pkeys.length) {
+        panelHtml += `<div class="cc-plugin-commands-ref" style="margin-top:var(--space-3);">
+          <div class="cc-plugin-commands-ref-header" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.cc-ref-toggle').classList.toggle('open')">
+            <h4><span class="mi" style="font-size:14px;">extension</span> ${I18N.t('cc.availableCommands')} — ${escapeHtml(g.plugin_name)}</h4>
+            <span class="cc-ref-toggle">▾</span>
+          </div>
+          <div class="cc-plugin-commands-ref-body">
+            ${pkeys.map(k => {
+              const c = pcmds[k];
+              const alreadyAdded = cmds.includes(k);
+              return `<div class="cc-plugin-cmd-item">
+                <span class="cc-plugin-cmd-name${alreadyAdded ? '' : ''}" data-cmd="${escapeHtml(k)}" ${alreadyAdded ? 'style="opacity:0.4;cursor:default;"' : `onclick="commentCommandsEditor.addCommand(${i},'${escapeHtml(k)}')"`} title="${alreadyAdded ? 'Already added' : 'Click to add'}">${escapeHtml(k)}${alreadyAdded ? ' ✓' : ''}</span>
+                <span class="cc-plugin-cmd-desc">${escapeHtml(c.desc || c.name || '')}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+    }
+
     panelHtml += `</div></div>`;
     return panelHtml;
   }
