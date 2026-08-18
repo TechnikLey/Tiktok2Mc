@@ -80,6 +80,10 @@ class ConfigBundleService:
         if event_commands.exists():
             files["data/event_commands.yaml"] = event_commands
 
+        comment_commands = core.paths.get_root_dir() / "data" / "comment_commands.yaml"
+        if comment_commands.exists():
+            files["data/comment_commands.yaml"] = comment_commands
+
         plugins_dir = discover_plugins_dir()
         if plugins_dir.is_dir():
             for child in sorted(plugins_dir.iterdir()):
@@ -184,6 +188,8 @@ class ConfigBundleService:
             return ActionsService().actions_path
         if name == "data/event_commands.yaml":
             return core.paths.get_root_dir() / "data" / "event_commands.yaml"
+        if name == "data/comment_commands.yaml":
+            return core.paths.get_root_dir() / "data" / "comment_commands.yaml"
 
         m = _PLUGIN_RE.fullmatch(name)
         if m:
@@ -207,6 +213,8 @@ class ConfigBundleService:
             return "actions"
         if name == "data/event_commands.yaml":
             return "event_commands"
+        if name == "data/comment_commands.yaml":
+            return "comment_commands"
 
         m = _PLUGIN_RE.fullmatch(name)
         if m:
@@ -252,6 +260,7 @@ class ConfigBundleService:
                 raise ValueError(f"{name}: {first}")
         elif (
             name == "data/event_commands.yaml"
+            or name == "data/comment_commands.yaml"
             or _PLUGIN_RE.fullmatch(name)
             or _HOOK_RE.fullmatch(name)
         ):

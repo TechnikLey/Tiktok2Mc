@@ -22,6 +22,7 @@ const appGlobals = {
   pluginEditor: "writable",
   hookEditor: "writable",
   reactionEditor: "writable",
+  commentCommandsEditor: "writable",
   actionsEditor: "writable",
   closeServerCreateModal: "writable",
   closeServerDownloadModal: "writable",

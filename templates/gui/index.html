@@ -46,6 +46,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.reactions">Reactions</span>
                 </button>
+                <button type="button" class="nav-item" data-view="commands" onclick="switchToEditor('commands', () => commentCommandsEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.commands">Commands</span>
+                </button>
                 <button type="button" class="nav-item" data-view="settings" onclick="switchToEditor('settings', openConfigEditor)">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.settings">Settings</span>
@@ -756,6 +760,63 @@
         <div class="dialog-actions-center">
           <button class="btn btn--secondary" id="reaction-delete-cancel" data-i18n="common.cancel">Cancel</button>
           <button class="btn btn--danger" id="reaction-delete-confirm" data-i18n="common.delete">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Commands Editor -->
+    <div id="comment-commands-editor" class="editor-overlay hidden">
+      <div class="reactions-layout">
+        <nav class="reactions-sidebar" id="cc-sidebar">
+          <div class="sidebar-header" data-i18n="editor.filterByCategory">Filter by Category</div>
+          <div class="sidebar-group" id="cc-sidebar-categories"></div>
+        </nav>
+        <div class="reactions-main">
+          <div class="reactions-topbar">
+            <div class="reactions-topbar-left">
+              <h2 data-i18n="cc.title">Chat Commands</h2>
+              <div class="reactions-subtitle" data-i18n="cc.subtitle">Let viewers send commands via TikTok chat</div>
+            </div>
+            <div class="reactions-search-wrap">
+              <svg class="search-icon-inline" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <input type="text" id="cc-search" data-i18n-placeholder="cc.searchPlaceholder" placeholder="Search commands..." oninput="commentCommandsEditor.onSearch(this.value)">
+            </div>
+            <div class="header-actions">
+              <button class="btn btn--primary" id="cc-add" onclick="commentCommandsEditor.startCreate()" data-i18n="cc.create">+ Create Group</button>
+              <button class="btn btn--primary btn-save-disabled" id="cc-save" onclick="commentCommandsEditor.save()" disabled data-i18n="cc.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+              <button class="btn-help" onclick="Help.openHelp('commentCommands')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+            </div>
+          </div>
+          <div class="reactions-content" id="cc-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Commands Group Editor (inline form) -->
+    <div id="cc-group-editor" class="wizard-overlay hidden modal-z-250">
+      <div class="wizard-card" style="max-width:560px;">
+        <div class="wizard-header">
+          <h2 id="cc-group-title" data-i18n="cc.createGroup">Create Command Group</h2>
+        </div>
+        <div class="wizard-body" id="cc-group-body"></div>
+        <div class="wizard-footer">
+          <button class="btn btn--secondary" id="cc-group-cancel" data-i18n="common.cancel">Cancel</button>
+          <div style="display:flex;gap:var(--space-3);">
+            <button class="btn btn--secondary" id="cc-group-back" data-i18n="common.back" style="display:none;">Back</button>
+            <button class="btn btn--primary" id="cc-group-next" data-i18n="common.next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Commands Delete Confirm -->
+    <div id="cc-delete-modal" class="wizard-overlay hidden modal-z-300">
+      <div class="wizard-card text-center modal-sm">
+        <h2 class="dialog-title text-danger" data-i18n="cc.deleteTitle">Delete Group?</h2>
+        <p id="cc-delete-message" class="muted dialog-desc"></p>
+        <div class="dialog-actions-center">
+          <button class="btn btn--secondary" id="cc-delete-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--danger" id="cc-delete-confirm" data-i18n="common.delete">Delete</button>
         </div>
       </div>
     </div>

@@ -3523,14 +3523,14 @@ const SECTION_ORDER = [
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
   'port_policy','api_key',
-  'comment_commands','random_triggers'
+  'random_triggers'
 ];
 
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method','api'],
   'Minecraft': ['java','mc_version','minecraft_server_api'],
   'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
-  'Chat & Commands': ['comment_commands','random_triggers']
+  'Chat & Commands': ['random_triggers']
 };
 
 const SECTION_META = {
@@ -3539,7 +3539,6 @@ const SECTION_META = {
   api: { title: 'API Server', desc: 'Configuration for the central API server that powers the dashboard and internal communication.', category: 'Connection' },
   java: { title: 'Minecraft Server', desc: 'Controls how much RAM the Minecraft server uses and which port it runs on.', category: 'Minecraft' },
   mc_version: { title: 'Minecraft Version', desc: 'The Minecraft version the server runs on. Used for version-aware features.', category: 'Minecraft' },
-  comment_commands: { title: 'Chat Commands', desc: 'Let viewers send commands via TikTok chat. You can create multiple groups with different prefixes, roles, and rules.', category: 'Chat & Commands' },
   random_triggers: { title: 'Random Trigger Filter', desc: 'Controls which triggers can be selected by the $random action in data/actions.mca.', category: 'Chat & Commands' },
   console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
   minecraft_server_api: { title: 'Minecraft Server API', desc: 'Handles communication between the tool and the Minecraft server. Required for player death/respawn detection.', category: 'Minecraft' },
@@ -3563,7 +3562,6 @@ const SECTION_META_DE = {
   api: { title: 'API-Server', desc: 'Konfiguration des zentralen API-Servers, der das Dashboard und die interne Kommunikation antreibt.' },
   java: { title: 'Minecraft-Server', desc: 'Steuert, wie viel RAM der Minecraft-Server verwendet und auf welchem Port er läuft.' },
   mc_version: { title: 'Minecraft-Version', desc: 'Die Minecraft-Version, auf der der Server läuft. Wird für versionsabhängige Funktionen verwendet.' },
-  comment_commands: { title: 'Chat-Befehle', desc: 'Lass Zuschauer Befehle über den TikTok-Chat senden. Du kannst mehrere Gruppen mit unterschiedlichen Präfixen, Rollen und Regeln erstellen.' },
   random_triggers: { title: 'Zufalls-Trigger-Filter', desc: 'Steuert, welche Trigger für die $random-Aktion in data/actions.mca ausgewählt werden können.' },
   console: { title: 'Konsolen-Sichtbarkeit', desc: 'Steuert, welche Fenster und Prozesse beim Start des Tools angezeigt werden.' },
   minecraft_server_api: { title: 'Minecraft-Server-API', desc: 'Übernimmt die Kommunikation zwischen dem Tool und dem Minecraft-Server. Erforderlich für die Spieler-Tod-/Wiederbelebungs-Erkennung.' },
@@ -3606,27 +3604,6 @@ const HELP_TEXT = {
   'tiktok.autosave_interval_seconds': 'How often (in seconds) the gift revenue log file is saved to disk. The log is stored at data/gift_revenue_log.jsonl.',
   'tiktok.follow_tracking.mode': 'all_time tracks follows across ALL streams. Once a user is recorded, their future follows are ignored even after restarting. per_stream resets the list every time the tool starts.',
   'tiktok.follow_tracking.file': 'Path to the file storing tracked follower names. Default: data/followed_users.txt.',
-  'comment_commands.enabled': 'Master switch — set to true to let viewers send commands via chat. Each group below processes matching comments independently.',
-  'comment_commands.cooldown': 'Global cooldown across ALL groups. If set to 10, a viewer who runs $skip must wait 10 seconds before ANY command works. Set to 0 to disable.',
-  'comment_commands.user_cooldown': 'Global user cooldown — like global cooldown, but per user. If set to 30, a viewer must wait 30 seconds before THEIR NEXT command in any group. Set to 0 to disable.',
-  'comment_commands.groups': 'Define one or more command groups. Each group has its own prefix, role requirements, allow/deny rules, dispatch target, and cooldowns.',
-  'comment_commands.groups[].enabled': 'Turn this command group on or off.',
-  'comment_commands.groups[].prefix': 'The character that triggers this group. For example: # for Minecraft commands or $ for Spotify.',
-  'comment_commands.groups[].allowed_roles': 'Who can use commands in this group. Options: all, moderator, superfan, fanclub. Be careful with "all" — anyone in chat can use these commands.',
-  'comment_commands.groups[].mode': 'deny-all means ONLY the listed commands work. allow-all means ALL commands work EXCEPT the listed ones. deny-all is safer for public access.',
-  'comment_commands.groups[].commands': 'List of base command names to allow or block, depending on the mode above.',
-  'comment_commands.groups[].commands_config': 'Per-command overrides for points cost, cooldown, roles, URL, and handler. Only needed if you want special settings for specific commands.',
-  'comment_commands.groups[].handler': 'rcon sends commands to your Minecraft server. http sends them to a web URL.',
-  'comment_commands.groups[].cooldown': 'Seconds to wait between ANY command in this group. Set to 0 to disable.',
-  'comment_commands.groups[].user_cooldown': 'Seconds the SAME viewer must wait before their next command in this group. Set to 0 to disable.',
-  'comment_commands.groups[].trigger_comment_event': 'Also fire the "comment" trigger in actions.mca when a command is used? Default: true.',
-  'comment_commands.groups[].url': 'HTTP endpoint that receives the command. You can use placeholders: {user} = viewer name, {text} = command text.',
-  'comment_commands.groups[].commands_config[].points_cost': 'Points cost — viewer needs this many channel points to use this command. Set to 0 to make it free.',
-  'comment_commands.groups[].commands_config[].cooldown': 'Per-command cooldown in seconds. Overrides the group cooldown.',
-  'comment_commands.groups[].commands_config[].conditional': 'When true: points and cooldowns only apply if the command succeeds. If it fails, nothing is deducted and no cooldown is set.',
-  'comment_commands.groups[].commands_config[].url': 'Direct URL for this specific command. This bypasses the group URL.',
-  'comment_commands.groups[].commands_config[].handler': 'Override the handler for this command: rcon or http.',
-  'comment_commands.groups[].commands_config[].roles': 'Per-command role override. Replaces the group allowed_roles for this command only.',
   'random_triggers.mode': 'deny-all means ONLY triggers in the list are eligible for $random. allow-all means ALL triggers are eligible EXCEPT those in the list.',
   'random_triggers.triggers': 'List of trigger names. Which ones are used depends on the mode. Triggers containing "$random" are automatically excluded to prevent infinite recursion.',
   'console.log_level': 'Visibility level: 0 = Hide everything, 1 = Silent (hide console, keep GUI), 2 = Standard (recommended), 3 = Advanced, 4 = Debug, 5 = Override (debugging only).',
@@ -3678,27 +3655,6 @@ const HELP_TEXT_DE = {
   'tiktok.autosave_interval_seconds': 'Wie oft (in Sekunden) die Geschenk-Umsatzlog-Datei auf der Festplatte gespeichert wird. Die Log-Datei liegt unter data/gift_revenue_log.jsonl.',
   'tiktok.follow_tracking.mode': 'all_time verfolgt Follower über ALLE Streams hinweg. Sobald ein Nutzer erfasst wurde, werden zukünftige Follows auch nach einem Neustart ignoriert. per_stream setzt die Liste bei jedem Start des Tools zurück.',
   'tiktok.follow_tracking.file': 'Pfad zur Datei, die die verfolgten Followernamen speichert. Standard: data/followed_users.txt.',
-  'comment_commands.enabled': 'Hauptschalter — setze auf true, damit Zuschauer Befehle über den Chat senden können. Jede Gruppe unten verarbeitet passende Kommentare unabhängig.',
-  'comment_commands.cooldown': 'Globaler Cooldown über ALLE Gruppen. Bei 10 muss ein Zuschauer, der $skip ausführt, 10 Sekunden warten, bevor IRGENDEIN Befehl funktioniert. Setze auf 0 zum Deaktivieren.',
-  'comment_commands.user_cooldown': 'Globaler Benutzer-Cooldown — wie der globale Cooldown, aber pro Benutzer. Bei 30 muss ein Zuschauer 30 Sekunden warten, bevor SEIN NÄCHSTER Befehl in einer Gruppe funktioniert. Setze auf 0 zum Deaktivieren.',
-  'comment_commands.groups': 'Definiere eine oder mehrere Befehlgruppen. Jede Gruppe hat ihr eigenes Präfix, Rollenanforderungen, Erlaubt/Verweigert-Regeln, Ziel und Cooldowns.',
-  'comment_commands.groups[].enabled': 'Schaltet diese Befehlgruppe ein oder aus.',
-  'comment_commands.groups[].prefix': 'Das Zeichen, das diese Gruppe auslöst. Zum Beispiel: # für Minecraft-Befehle oder $ für Spotify.',
-  'comment_commands.groups[].allowed_roles': 'Wer darf Befehle dieser Gruppe verwenden? Optionen: all, moderator, superfan, fanclub. Sei vorsichtig mit „all" — jeder im Chat kann diese Befehle verwenden.',
-  'comment_commands.groups[].mode': 'deny-all bedeutet, dass NUR die aufgelisteten Befehle funktionieren. allow-all bedeutet, dass ALLE Befehle funktionieren AUSSER den aufgelisteten. deny-all ist für öffentlichen Zugriff sicherer.',
-  'comment_commands.groups[].commands': 'Liste der Basis-Befehlsnamen, die je nach Modus oben erlaubt oder blockiert werden.',
-  'comment_commands.groups[].commands_config': 'Befehlsübergreifende Überschreibungen für Punktekosten, Cooldown, Rollen, URL und Handler. Nur nötig, wenn du besondere Einstellungen für bestimmte Befehle willst.',
-  'comment_commands.groups[].handler': 'rcon sendet Befehle an deinen Minecraft-Server. http sendet sie an eine Web-URL.',
-  'comment_commands.groups[].cooldown': 'Sekunden zwischen IRGENDEINEM Befehl in dieser Gruppe. Setze auf 0 zum Deaktivieren.',
-  'comment_commands.groups[].user_cooldown': 'Sekunden, die der GLEICHE Zuschauer warten muss, bevor er seinen nächsten Befehl in dieser Gruppe ausführen kann. Setze auf 0 zum Deaktivieren.',
-  'comment_commands.groups[].trigger_comment_event': 'Soll bei Verwendung eines Befehls zusätzlich der „comment"-Trigger in actions.mca ausgelöst werden? Standard: true.',
-  'comment_commands.groups[].url': 'HTTP-Endpunkt, der den Befehl empfängt. Du kannst Platzhalter verwenden: {user} = Zuschauername, {text} = Befehlstext.',
-  'comment_commands.groups[].commands_config[].points_cost': 'Punktkosten — der Zuschauer benötigt so viele Kanalpunkte, um diesen Befehl zu verwenden. Setze auf 0, um ihn kostenlos zu machen.',
-  'comment_commands.groups[].commands_config[].cooldown': 'Cooldown pro Befehl in Sekunden. Überschreibt den Gruppen-Cooldown.',
-  'comment_commands.groups[].commands_config[].conditional': 'Wenn true: Punkte und Cooldowns gelten nur, wenn der Befehl erfolgreich ist. Bei Misserfolg wird nichts abgezogen und kein Cooldown gesetzt.',
-  'comment_commands.groups[].commands_config[].url': 'Direkte URL für diesen spezifischen Befehl. Umgeht die Gruppen-URL.',
-  'comment_commands.groups[].commands_config[].handler': 'Überschreibe den Handler für diesen Befehl: rcon oder http.',
-  'comment_commands.groups[].commands_config[].roles': 'Rollenüberschreibung pro Befehl. Ersetzt die Gruppen-allowed_roles nur für diesen Befehl.',
   'random_triggers.mode': 'deny-all bedeutet, dass NUR Trigger in der Liste für $random infrage kommen. allow-all bedeutet, dass ALLE Trigger infrage kommen AUSSER den aufgelisteten.',
   'random_triggers.triggers': 'Liste der Triggernamen. Welche verwendet werden, hängt vom Modus ab. Trigger, die „$random" enthalten, werden automatisch ausgeschlossen, um Endlosrekursion zu verhindern.',
   'console.log_level': 'Sichtbarkeitsstufe: 0 = Alles ausblenden, 1 = Still (Konsole ausblenden, GUI behalten), 2 = Standard (empfohlen), 3 = Erweitert, 4 = Debug, 5 = Override (nur zum Debuggen).',
@@ -3751,10 +3707,6 @@ const FIELD_META = {
   'tiktok.follow_tracking': { basic: true },
   'tiktok.follow_tracking.mode': { basic: true, type: 'select', options: ['all_time','per_stream'] },
 
-  'comment_commands': { basic: true },
-  'comment_commands.enabled': { basic: true, type: 'bool' },
-  'comment_commands.cooldown': { basic: true, type: 'number', min: 0 },
-  'comment_commands.user_cooldown': { basic: true, type: 'number', min: 0 },
   'random_triggers': { basic: true },
   'random_triggers.mode': { basic: true, type: 'select', options: ['deny-all','allow-all'] },
   'console.log_level': { basic: false, type: 'number', min: 0, max: 5 },
@@ -3777,15 +3729,6 @@ const FIELD_META = {
   'overlay.theme.background': { basic: true, type: 'color' },
   'overlay.theme.text': { basic: true, type: 'color' },
   'theme': { basic: true },
-  'comment_commands.groups': { basic: true },
-  'comment_commands.groups[].enabled': { basic: true, type: 'bool' },
-  'comment_commands.groups[].prefix': { basic: true, type: 'text' },
-  'comment_commands.groups[].handler': { basic: true, type: 'select', options: ['rcon','http'] },
-  'comment_commands.groups[].mode': { basic: true, type: 'select', options: ['deny-all','allow-all'] },
-  'comment_commands.groups[].cooldown': { basic: true, type: 'number', min: 0 },
-  'comment_commands.groups[].user_cooldown': { basic: true, type: 'number', min: 0 },
-  'comment_commands.groups[].trigger_comment_event': { basic: true, type: 'bool' },
-  'comment_commands.groups[].url': { basic: true, type: 'text' },
   'api_key': { basic: false, type: 'password' },
   'port_policy.auto_resolve': { basic: false, type: 'bool' },
   'port_policy.session_only': { basic: false, type: 'bool' },
@@ -4148,9 +4091,7 @@ class ConfigEditor {
         }
         html += '</div></div>';
       } else if (Array.isArray(v)) {
-        if (path === 'comment_commands.groups') {
-          html += this.buildGroupEditor(path, v);
-        } else if (path === 'overlay.overlays') {
+        if (path === 'overlay.overlays') {
           html += this.buildOverlaySlotsEditor(path, v);
         } else if (path === 'random_triggers.triggers') {
           html += this.buildTagEditor(path, v, { label: 'Triggers', suggestions: ['likes','like_2','follow','join','comment','gift','share'] });
@@ -4340,160 +4281,6 @@ class ConfigEditor {
   removeOverlaySlot(path, index) {
     const arr = this.getValue(path) || [];
     arr.splice(index, 1);
-    this.setValue(path, arr);
-    this.render();
-  }
-
-  buildGroupEditor(path, groups) {
-    const help = getHelp(path);
-    let cards = (groups || []).map((g, i) => this.buildGroupCard(path, g, i)).join('');
-    return `<div class="editor-field full-width" data-path="${path}">
-      <div class="field-label">Command Groups</div>
-      <div class="field-widget">
-        ${cards}
-        <button class="btn btn-secondary" onclick="editor.addGroup('${path}')">Add Group</button>
-        ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
-      </div>
-    </div>`;
-  }
-
-  buildGroupCard(path, g, i) {
-    const p = `${path}[${i}]`;
-    const roles = (g.allowed_roles || []).map(r => `<span class="tag-chip">${escapeHtml(r)}</span>`).join('');
-    return `<div class="group-card" id="${p.replace(/[^a-zA-Z0-9]/g, '_')}">
-      <div class="group-header"><h4>Group ${i + 1} — Prefix "${escapeHtml(g.prefix || '')}"</h4><button class="btn-icon" onclick="editor.removeArrayItem('${path}', ${i})">Remove</button></div>
-      <div class="group-body">
-        ${this.buildField('enabled', g.enabled, `${p}.enabled`)}
-        ${this.buildField('prefix', g.prefix, `${p}.prefix`)}
-        ${this.buildField('handler', g.handler, `${p}.handler`)}
-        ${this.buildField('mode', g.mode, `${p}.mode`)}
-        ${g.handler === 'http' ? this.buildField('url', g.url, `${p}.url`) : ''}
-        ${this.buildRoleSelector(`${p}.allowed_roles`, g.allowed_roles)}
-        ${this.buildTagEditor(`${p}.commands`, g.commands || [], { label: 'Commands' })}
-        ${this.buildField('cooldown', g.cooldown, `${p}.cooldown`)}
-        ${this.buildField('user_cooldown', g.user_cooldown, `${p}.user_cooldown`)}
-        ${this.buildField('trigger_comment_event', g.trigger_comment_event, `${p}.trigger_comment_event`)}
-        ${this.buildCommandsConfig(`${p}.commands_config`, g.commands_config, g.commands || [])}
-      </div>
-    </div>`;
-  }
-
-  buildCommandsConfig(path, cfg, commands) {
-    const help = getHelp(path);
-    let config = cfg;
-    if (Array.isArray(config)) config = {};
-    if (!commands.length) {
-      return `<div class="editor-field full-width" data-path="${path}">
-        <div class="field-label">Command Overrides</div>
-        <div class="field-widget"><p class="field-desc">${I18N.t('config.noCommandOverrides')}</p></div>
-      </div>`;
-    }
-    let html = `<div class="editor-field full-width" data-path="${path}"><div class="field-label">Command Overrides</div><div class="field-widget">`;
-    for (const cmd of commands) {
-      const c = config[cmd] || {};
-      const overrideKeys = Object.keys(c).filter(k => k !== 'undefined');
-      let fieldsHtml = '';
-      for (const key of overrideKeys) {
-        fieldsHtml += this.buildOverrideWidget(key, c[key], `${path}.${cmd}.${key}`);
-      }
-      const used = new Set(overrideKeys);
-      const available = ['points_cost','cooldown','user_cooldown','conditional','url','handler','roles'].filter(k => !used.has(k));
-      html += `<details style="margin-bottom:0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.6rem;">
-        <summary style="cursor:pointer;font-size:0.9rem;font-weight:500;">${escapeHtml(cmd)}</summary>
-        <div style="padding:0.6rem 0.25rem 0.2rem 0.25rem;">
-          ${fieldsHtml}
-          ${available.length ? `<div style="margin-top:0.5rem;"><select onchange="editor.addOverride('${path}.${cmd}', this.value);this.value=''" style="padding:0.35rem 0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;"><option value="">+ Add override...</option>${available.map(k => `<option value="${k}">${toTitle(k)}</option>`).join('')}</select></div>` : ''}
-        </div>
-      </details>`;
-    }
-    html += `${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}</div></div>`;
-    return html;
-  }
-
-  buildOverrideWidget(key, value, path) {
-    const label = toTitle(key);
-    const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
-    let widget;
-
-    if (key === 'roles') {
-      const roles = ['all','moderator','superfan','fanclub'];
-      const current = value || [];
-      const boxes = roles.map(r => {
-        const checked = current.includes(r) ? 'checked' : '';
-        return `<label style="margin-right:0.75rem;font-size:0.85rem;"><input type="checkbox" ${checked} data-role="${r}" onchange="editor.onRoleChange('${path}', this)">${toTitle(r)}</label>`;
-      }).join('');
-      widget = `<div>${boxes}</div>`;
-    } else if (key === 'conditional') {
-      widget = `<input type="checkbox" class="toggle" id="${id}" ${value ? 'checked' : ''} data-path="${path}" data-type="bool">`;
-    } else if (key === 'handler') {
-      widget = `<select id="${id}" data-path="${path}" data-type="string" style="padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);"><option value="">(inherit from group)</option><option value="rcon" ${value==='rcon'?'selected':''}>rcon</option><option value="http" ${value==='http'?'selected':''}>http</option></select>`;
-    } else if (key === 'points_cost' || key === 'cooldown' || key === 'user_cooldown') {
-      widget = `<input type="number" id="${id}" value="${value !== undefined && value !== '' ? escapeHtml(String(value)) : ''}" data-path="${path}" data-type="number" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">`;
-    } else {
-      widget = `<input type="text" id="${id}" value="${escapeHtml(value || '')}" data-path="${path}" data-type="string" style="width:100%;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">`;
-    }
-
-    return `<div style="margin-bottom:0.6rem;padding:0.5rem;background:var(--elevated);border-radius:4px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
-        <span style="font-size:0.85rem;color:var(--text);font-weight:500;">${escapeHtml(label)}</span>
-        <button class="btn-icon" style="font-size:0.85rem;" onclick="editor.removeOverride('${path}')">Remove</button>
-      </div>
-      ${widget}
-    </div>`;
-  }
-
-  addOverride(cmdPath, key) {
-    const keys = cmdPath.split(/\.|\[(\d+)\]/).filter(k => k !== '' && k !== undefined);
-    let target = this.data;
-    for (let i = 0; i < keys.length - 1; i++) {
-      const k = keys[i];
-      if (!(k in target)) target[k] = {};
-      target = target[k];
-    }
-    const last = keys[keys.length - 1];
-    if (!target[last] || typeof target[last] !== 'object' || Array.isArray(target[last])) target[last] = {};
-    let defaultValue = '';
-    if (key === 'points_cost' || key === 'cooldown') defaultValue = 0;
-    else if (key === 'conditional') defaultValue = false;
-    else if (key === 'roles') defaultValue = [];
-    target[last][key] = defaultValue;
-    this._preserveDetailsAndRender();
-  }
-
-  removeOverride(path) {
-    const keys = path.split(/\.|\[(\d+)\]/).filter(k => k !== '' && k !== undefined);
-    let target = this.data;
-    for (let i = 0; i < keys.length - 1; i++) {
-      const k = keys[i];
-      if (!(k in target)) return;
-      target = target[k];
-    }
-    const last = keys[keys.length - 1];
-    delete target[last];
-    this._preserveDetailsAndRender();
-  }
-
-  _preserveDetailsAndRender() {
-    // Speichere offene <details> anhand ihrer Summary-Texte
-    const openSet = new Set();
-    for (const details of this.content.querySelectorAll('details')) {
-      if (details.open && details.querySelector('summary')) {
-        openSet.add(details.querySelector('summary').textContent.trim());
-      }
-    }
-    this.render();
-    // Wiederherstellen
-    for (const details of this.content.querySelectorAll('details')) {
-      const summary = details.querySelector('summary');
-      if (summary && openSet.has(summary.textContent.trim())) {
-        details.open = true;
-      }
-    }
-  }
-
-  addGroup(path) {
-    const arr = this.getValue(path) || [];
-    arr.push({ enabled: true, prefix: '#', allowed_roles: ['moderator'], mode: 'deny-all', commands: [], commands_config: {}, handler: 'rcon', cooldown: 0, user_cooldown: 0, trigger_comment_event: true });
     this.setValue(path, arr);
     this.render();
   }
@@ -6492,7 +6279,413 @@ class ReactionEditor {
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   Comment Commands Editor
+   ════════════════════════════════════════════════════════════════════ */
+
+class CommentCommandsEditor {
+  constructor() {
+    this.el = document.getElementById('comment-commands-editor');
+    this.content = document.getElementById('cc-content');
+    this.sidebar = document.getElementById('cc-sidebar-categories');
+    this.data = { enabled: false, cooldown: 0, user_cooldown: 0, groups: [] };
+    this.original = JSON.parse(JSON.stringify(this.data));
+    this._dirty = false;
+    this.searchQuery = '';
+    this.activeCategory = 'all';
+    this._wizardMode = null; // 'create' | 'edit'
+    this._wizardIndex = null; // index being edited
+    this._wizardStep = 0;
+    this._bindEvents();
+  }
+
+  _bindEvents() {
+    document.getElementById('cc-add')?.addEventListener('click', () => this.startCreate());
+    document.getElementById('cc-group-cancel')?.addEventListener('click', () => this._closeWizard());
+    document.getElementById('cc-group-next')?.addEventListener('click', () => this._wizardNext());
+    document.getElementById('cc-group-back')?.addEventListener('click', () => this._wizardBack());
+    document.getElementById('cc-delete-cancel')?.addEventListener('click', () => this._hideDeleteModal());
+  }
+
+  async open() {
+    this.el.classList.remove('hidden');
+    await this.load();
+  }
+
+  close() {
+    if (this._dirty) {
+      showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
+        if (!confirmed) return;
+        this._dirty = false;
+        this._updateSaveButton();
+        this.el.classList.add('hidden');
+      });
+      return;
+    }
+    this.el.classList.add('hidden');
+  }
+
+  async load() {
+    try {
+      const res = await fetchJSON('/comment-commands');
+      this.data = JSON.parse(JSON.stringify(res.comment_commands || { enabled: false, cooldown: 0, user_cooldown: 0, groups: [] }));
+      this.original = JSON.parse(JSON.stringify(this.data));
+      this._dirty = false;
+      this._updateSaveButton();
+      this.renderSidebar();
+      this.renderList();
+    } catch (e) {
+      showToast(I18N.t('cc.loadFailed', { msg: e.message }), 'error');
+    }
+  }
+
+  isDirty() { return this._dirty; }
+
+  onSearch(q) { this.searchQuery = q.trim().toLowerCase(); this.renderList(); }
+
+  _updateSaveButton() {
+    const btn = document.getElementById('cc-save');
+    if (!btn) return;
+    const dirty = this._dirty;
+    btn.disabled = !dirty;
+    btn.style.opacity = dirty ? '1' : '0.5';
+    btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
+  }
+
+  /* ─── Sidebar ─── */
+  renderSidebar() {
+    const groups = this.data.groups || [];
+    let sysCount = 0, plugCount = 0;
+    for (const g of groups) {
+      const h = (g.handler || '').toLowerCase();
+      if (h === 'rcon' || h === 'http') sysCount++; else plugCount++;
+    }
+    const total = groups.length;
+    const cats = [['all', total], ['system', sysCount], ['plugin', plugCount]].filter(([, c]) => c > 0);
+    let html = '';
+    for (const [key, count] of cats) {
+      const active = this.activeCategory === key ? 'active' : '';
+      const label = key === 'all' ? I18N.t('cc.catAll') : key === 'system' ? I18N.t('cc.catSystem') : I18N.t('cc.catPlugin');
+      html += `<div class="sidebar-filter ${active}" onclick="commentCommandsEditor.setCategory('${key}')">
+        <span>${escapeHtml(label)}</span><span class="badge">${count}</span>
+      </div>`;
+    }
+    this.sidebar.innerHTML = html;
+  }
+
+  setCategory(cat) { this.activeCategory = cat; this.renderSidebar(); this.renderList(); }
+
+  /* ─── List ─── */
+  renderList() {
+    const groups = this.data.groups || [];
+    const filtered = groups.filter((g, i) => {
+      g._index = i;
+      const h = (g.handler || '').toLowerCase();
+      const cat = (h === 'rcon' || h === 'http') ? 'system' : 'plugin';
+      if (this.activeCategory !== 'all' && this.activeCategory !== cat) return false;
+      if (this.searchQuery) {
+        const q = this.searchQuery;
+        if ((g.prefix || '').includes(q)) return true;
+        if ((g.commands || []).some(c => c.toLowerCase().includes(q))) return true;
+        return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      const isFiltered = this.searchQuery || this.activeCategory !== 'all';
+      this.content.innerHTML = `<div class="reaction-empty">
+        <h3>${isFiltered ? I18N.t('cc.noResults') : I18N.t('cc.noneYet')}</h3>
+        <p>${isFiltered ? I18N.t('cc.noResultsDesc') : I18N.t('cc.emptyDesc')}</p>
+        ${!isFiltered ? `<button class="btn btn-primary" style="margin-top:1.5rem;padding:0.7rem 1.4rem;" onclick="commentCommandsEditor.startCreate()">${I18N.t('cc.createYourFirst')}</button>` : ''}
+      </div>`;
+      return;
+    }
+
+    let html = this._renderGlobalSettings();
+    for (const g of filtered) {
+      const i = g._index;
+      const h = (g.handler || '').toLowerCase();
+      const isSystem = h === 'rcon' || h === 'http';
+      const catClass = isSystem ? 'reaction-category-minecraft' : 'reaction-category-custom';
+      const catLabel = isSystem ? I18N.t('cc.catSystem') : I18N.t('cc.catPlugin');
+      const handlerLabel = isSystem ? (h === 'rcon' ? 'RCON' : 'HTTP') : h;
+      const prefixDisplay = escapeHtml(g.prefix || '#');
+      const cmds = (g.commands || []).join(', ') || '—';
+      const roles = (g.allowed_roles || []).join(', ');
+      const modeLabel = g.mode || 'deny-all';
+      const disabledClass = !g.enabled ? ' reaction-card--disabled' : '';
+      const disabledNotice = !g.enabled ? `<div class="reaction-disabled-notice">${I18N.t('cc.groupDisabled')}</div>` : '';
+
+      html += `<div class="reaction-card${disabledClass}">
+        <div class="reaction-card-header">
+          <div class="reaction-meta">
+            <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
+            <span style="font-size:0.85rem;color:var(--text-secondary);">${I18N.t('cc.handler')}: ${escapeHtml(handlerLabel)}</span>
+          </div>
+          <div class="reaction-card-actions">
+            <button class="reaction-btn-sm reaction-btn-edit" onclick="commentCommandsEditor.startEdit(${i})">${I18N.t('cc.edit')}</button>
+            <button class="reaction-btn-sm reaction-btn-delete" onclick="commentCommandsEditor.confirmDelete(${i})">${I18N.t('cc.delete')}</button>
+          </div>
+        </div>
+        ${disabledNotice}
+        <div class="reaction-card-body">
+          <div class="reaction-flow">
+            <div class="reaction-when">
+              <span style="font-size:1.3rem;font-weight:700;">${prefixDisplay}</span>
+              <span style="font-size:0.85rem;color:var(--text-secondary);">${I18N.t('cc.prefix')}</span>
+            </div>
+            <span class="reaction-arrow">&rarr;</span>
+            <div class="reaction-then" style="flex-wrap:wrap;gap:0.3rem;">
+              ${(g.commands || []).slice(0, 6).map(c => `<span class="reaction-arg-chip"><span class="reaction-arg-value">${escapeHtml(c)}</span></span>`).join('')}
+              ${(g.commands || []).length > 6 ? `<span class="reaction-arg-chip"><span class="reaction-arg-value">+${g.commands.length - 6}</span></span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.5rem;font-size:0.8rem;color:var(--text-secondary);">
+            <span>${I18N.t('cc.roles')}: ${escapeHtml(roles)}</span>
+            <span>${I18N.t('cc.mode')}: ${escapeHtml(modeLabel)}</span>
+            ${g.cooldown ? `<span>${I18N.t('cc.cooldown')}: ${g.cooldown}s</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }
+    this.content.innerHTML = html;
+  }
+
+  /* ─── Global settings toggle ─── */
+  _renderGlobalSettings() {
+    return `<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding:0.8rem 1rem;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+        <input type="checkbox" class="toggle" ${this.data.enabled ? 'checked' : ''} onchange="commentCommandsEditor.toggleGlobal(this.checked)">
+        <span style="font-weight:600;">${I18N.t('cc.masterSwitch')}</span>
+      </label>
+      <div style="margin-left:auto;display:flex;gap:0.8rem;align-items:center;">
+        <label style="font-size:0.8rem;color:var(--text-secondary);">${I18N.t('cc.globalCooldown')}:
+          <input type="number" min="0" value="${this.data.cooldown || 0}" style="width:60px;padding:0.2rem 0.4rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.8rem;" onchange="commentCommandsEditor.setGlobalCooldown(parseInt(this.value)||0)">
+        </label>
+        <label style="font-size:0.8rem;color:var(--text-secondary);">${I18N.t('cc.globalUserCooldown')}:
+          <input type="number" min="0" value="${this.data.user_cooldown || 0}" style="width:60px;padding:0.2rem 0.4rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.8rem;" onchange="commentCommandsEditor.setGlobalUserCooldown(parseInt(this.value)||0)">
+        </label>
+      </div>
+    </div>`;
+  }
+
+  toggleGlobal(enabled) { this.data.enabled = enabled; this._dirty = true; this._updateSaveButton(); }
+  setGlobalCooldown(v) { this.data.cooldown = v; this._dirty = true; this._updateSaveButton(); }
+  setGlobalUserCooldown(v) { this.data.user_cooldown = v; this._dirty = true; this._updateSaveButton(); }
+
+  /* ─── Wizard (create / edit group) ─── */
+  startCreate() {
+    this._wizardMode = 'create';
+    this._wizardIndex = null;
+    this._wizardStep = 0;
+    this._wizardDraft = { enabled: true, prefix: '#', allowed_roles: ['moderator'], mode: 'deny-all', commands: [], commands_config: {}, handler: 'rcon', url: '', cooldown: 0, user_cooldown: 0, trigger_comment_event: true };
+    this._openWizard();
+  }
+
+  startEdit(idx) {
+    const g = this.data.groups[idx];
+    if (!g) return;
+    this._wizardMode = 'edit';
+    this._wizardIndex = idx;
+    this._wizardStep = 0;
+    this._wizardDraft = JSON.parse(JSON.stringify(g));
+    if (!this._wizardDraft.commands_config) this._wizardDraft.commands_config = {};
+    this._openWizard();
+  }
+
+  _openWizard() {
+    this._renderWizardStep();
+    document.getElementById('cc-group-editor').classList.remove('hidden');
+  }
+
+  _closeWizard() { document.getElementById('cc-group-editor').classList.add('hidden'); }
+
+  _wizardBack() {
+    if (this._wizardStep > 0) { this._wizardStep--; this._renderWizardStep(); }
+  }
+
+  _wizardNext() {
+    if (this._wizardStep === 0) {
+      const prefix = (this._wizardDraft.prefix || '').trim();
+      if (!prefix || prefix.length > 2) { showToast(I18N.t('cc.prefixRequired'), 'error'); return; }
+      this._wizardStep = 1;
+      this._renderWizardStep();
+    } else if (this._wizardStep === 1) {
+      this._wizardStep = 2;
+      this._renderWizardStep();
+    } else if (this._wizardStep === 2) {
+      this._collectStep2();
+      this._commitWizard();
+    }
+  }
+
+  _collectStep2() {
+    const d = this._wizardDraft;
+    const cmdsEl = document.getElementById('cc-cmds');
+    if (cmdsEl) d.commands = cmdsEl.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const cdEl = document.getElementById('cc-cd');
+    if (cdEl) d.cooldown = parseInt(cdEl.value) || 0;
+    const ucdEl = document.getElementById('cc-ucd');
+    if (ucdEl) d.user_cooldown = parseInt(ucdEl.value) || 0;
+    const urlEl = document.getElementById('cc-url');
+    if (urlEl) d.url = urlEl.value;
+    const trigEl = document.getElementById('cc-trig');
+    if (trigEl) d.trigger_comment_event = trigEl.checked;
+  }
+
+  _renderWizardStep() {
+    const d = this._wizardDraft;
+    const title = document.getElementById('cc-group-title');
+    const body = document.getElementById('cc-group-body');
+    const backBtn = document.getElementById('cc-group-back');
+    const nextBtn = document.getElementById('cc-group-next');
+
+    if (title) title.textContent = this._wizardMode === 'edit' ? I18N.t('cc.editGroup') : I18N.t('cc.createGroup');
+    if (backBtn) backBtn.style.display = this._wizardStep > 0 ? '' : 'none';
+
+    if (this._wizardStep === 0) {
+      if (nextBtn) nextBtn.textContent = I18N.t('common.next');
+      body.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <label style="font-weight:600;min-width:80px;">${I18N.t('cc.prefix')}</label>
+            <input type="text" id="cc-wiz-prefix" value="${escapeHtml(d.prefix || '#')}" maxlength="2" style="width:60px;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:1.1rem;text-align:center;font-weight:700;">
+          </div>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <label style="font-weight:600;min-width:80px;">${I18N.t('cc.handler')}</label>
+            <select id="cc-wiz-handler" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <option value="rcon" ${d.handler === 'rcon' ? 'selected' : ''}>RCON (${I18N.t('cc.handlerRconDesc')})</option>
+              <option value="http" ${d.handler === 'http' ? 'selected' : ''}>HTTP (${I18N.t('cc.handlerHttpDesc')})</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <label style="font-weight:600;min-width:80px;">${I18N.t('cc.enabled')}</label>
+            <input type="checkbox" class="toggle" ${d.enabled ? 'checked' : ''} id="cc-wiz-enabled">
+          </div>
+        </div>`;
+      const prefixEl = document.getElementById('cc-wiz-prefix');
+      if (prefixEl) prefixEl.addEventListener('input', () => { d.prefix = prefixEl.value; });
+      const handlerEl = document.getElementById('cc-wiz-handler');
+      if (handlerEl) handlerEl.addEventListener('change', () => { d.handler = handlerEl.value; });
+      const enabledEl = document.getElementById('cc-wiz-enabled');
+      if (enabledEl) enabledEl.addEventListener('change', () => { d.enabled = enabledEl.checked; });
+    } else if (this._wizardStep === 1) {
+      if (nextBtn) nextBtn.textContent = I18N.t('common.next');
+      const roles = d.allowed_roles || [];
+      body.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <div>
+            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.allowedRoles')}</label>
+            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;">
+              ${['all', 'moderator', 'superfan', 'fanclub'].map(r => `<label style="display:flex;align-items:center;gap:0.3rem;cursor:pointer;"><input type="checkbox" value="${r}" ${roles.includes(r) ? 'checked' : ''} class="cc-role-cb"> ${r}</label>`).join('')}
+            </div>
+          </div>
+          <div>
+            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.mode')}</label>
+            <select id="cc-wiz-mode" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+              <option value="deny-all" ${d.mode === 'deny-all' ? 'selected' : ''}>deny-all (${I18N.t('cc.modeDenyDesc')})</option>
+              <option value="allow-all" ${d.mode === 'allow-all' ? 'selected' : ''}>allow-all (${I18N.t('cc.modeAllowDesc')})</option>
+            </select>
+          </div>
+        </div>`;
+      document.querySelectorAll('.cc-role-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const checked = [...document.querySelectorAll('.cc-role-cb:checked')].map(c => c.value);
+          d.allowed_roles = checked;
+        });
+      });
+      const modeEl = document.getElementById('cc-wiz-mode');
+      if (modeEl) modeEl.addEventListener('change', () => { d.mode = modeEl.value; });
+    } else if (this._wizardStep === 2) {
+      if (nextBtn) nextBtn.textContent = this._wizardMode === 'edit' ? I18N.t('cc.updateGroup') : I18N.t('cc.createGroup');
+      body.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <div>
+            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.commands')} <span style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(${I18N.t('cc.commandsHelp')})</span></label>
+            <input type="text" id="cc-cmds" value="${escapeHtml((d.commands || []).join(', '))}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);" placeholder="${I18N.t('cc.commandsPlaceholder')}">
+          </div>
+          <div style="display:flex;gap:1rem;">
+            <div style="flex:1;">
+              <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.cooldown')}</label>
+              <input type="number" id="cc-cd" min="0" value="${d.cooldown || 0}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            </div>
+            <div style="flex:1;">
+              <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.userCooldown')}</label>
+              <input type="number" id="cc-ucd" min="0" value="${d.user_cooldown || 0}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            </div>
+          </div>
+          ${d.handler === 'http' ? `<div>
+            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.url')}</label>
+            <input type="text" id="cc-url" value="${escapeHtml(d.url || '')}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);" placeholder="https://example.com/{user}/{text}">
+          </div>` : ''}
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+            <input type="checkbox" id="cc-trig" ${d.trigger_comment_event !== false ? 'checked' : ''}>
+            <span style="font-size:0.85rem;">${I18N.t('cc.triggerCommentEvent')}</span>
+          </label>
+        </div>`;
+    }
+  }
+
+  _commitWizard() {
+    const draft = this._wizardDraft;
+    if (!draft.prefix) { showToast(I18N.t('cc.prefixRequired'), 'error'); return; }
+    if (this._wizardMode === 'edit' && this._wizardIndex !== null) {
+      this.data.groups[this._wizardIndex] = draft;
+    } else {
+      this.data.groups.push(draft);
+    }
+    this._dirty = true;
+    this._updateSaveButton();
+    this._closeWizard();
+    this.renderSidebar();
+    this.renderList();
+    showToast(this._wizardMode === 'edit' ? I18N.t('cc.updated') : I18N.t('cc.created'), 'success');
+  }
+
+  /* ─── Delete ─── */
+  confirmDelete(idx) {
+    const g = this.data.groups[idx];
+    if (!g) return;
+    document.getElementById('cc-delete-message').textContent = I18N.t('cc.deleteMessage', { prefix: g.prefix });
+    document.getElementById('cc-delete-modal').classList.remove('hidden');
+    const confirmBtn = document.getElementById('cc-delete-confirm');
+    const newBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+    newBtn.addEventListener('click', () => {
+      this._hideDeleteModal();
+      this.data.groups.splice(idx, 1);
+      this._dirty = true;
+      this._updateSaveButton();
+      this.renderSidebar();
+      this.renderList();
+      showToast(I18N.t('cc.deleted'), 'info');
+    });
+  }
+
+  _hideDeleteModal() { document.getElementById('cc-delete-modal').classList.add('hidden'); }
+
+  /* ─── Save ─── */
+  async save() {
+    for (const g of (this.data.groups || [])) {
+      if (!g.prefix) { showToast(I18N.t('cc.groupWithoutPrefix'), 'error'); return; }
+    }
+    try {
+      await putJSON('/comment-commands', { comment_commands: this.data });
+      await postJSON('/reload', { config: false, actions: false, comment_commands: true });
+      this.original = JSON.parse(JSON.stringify(this.data));
+      this._dirty = false;
+      this._updateSaveButton();
+      showToast(I18N.t('cc.saved'), 'success');
+    } catch (e) {
+      showToast(I18N.t('cc.saveFailed', { msg: e.message }), 'error');
+      throw e;
+    }
+  }
+}
+
 const reactionEditor = new ReactionEditor();
+const commentCommandsEditor = new CommentCommandsEditor();
 const pluginEditor = new PluginConfigEditor();
 const actionsEditor = new ActionsEditor();
 
@@ -6511,7 +6704,7 @@ if (typeof pywebview === 'undefined' || !pywebview.api) {
 }
 
 function isAnyEditorDirty() {
-  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || reactionEditor.isDirty();
+  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || reactionEditor.isDirty() || commentCommandsEditor.isDirty();
 }
 
 /* Detect close requests from pywebview's on_closing (deadlock-free polling) */
@@ -6554,6 +6747,12 @@ async function _saveAllEditors() {
       throw new Error('Reaction editor could not be saved — check for errors.');
     }
   }
+  if (commentCommandsEditor.isDirty()) {
+    await commentCommandsEditor.save();
+    if (commentCommandsEditor.isDirty()) {
+      throw new Error('Comment commands editor could not be saved — check for errors.');
+    }
+  }
   if (editor.isDirty()) {
     const oldRcon = (editor.original || {}).rcon || {};
     editor.collect();
@@ -6593,6 +6792,10 @@ function _discardAllEditors() {
   if (reactionEditor.isDirty()) {
     reactionEditor._dirty = false;
     reactionEditor._updateSaveButton();
+  }
+  if (commentCommandsEditor.isDirty()) {
+    commentCommandsEditor._dirty = false;
+    commentCommandsEditor._updateSaveButton();
   }
   if (editor.isDirty()) {
     editor.data = JSON.parse(JSON.stringify(editor.original));

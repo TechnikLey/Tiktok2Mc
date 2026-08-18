@@ -245,6 +245,9 @@ class BackupManager:
         if name == "event_commands.yaml":
             return "event_commands"
 
+        if name == "comment_commands.yaml":
+            return "comment_commands"
+
         if "api_plugin_registry" in name:
             return "plugin_registry"
 

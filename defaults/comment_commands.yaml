@@ -1,0 +1,66 @@
+# ===================================================================
+# Chat Commands — Configuration
+# ===================================================================
+# Let viewers send commands via TikTok chat. Each group defines its own
+# prefix character, access roles, allow/deny rules, and dispatch handler.
+#
+# !!! SECURITY WARNING !!!
+# RCON handlers send RAW commands to your Minecraft server. Anyone with the
+# required role can execute any command.
+# ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
+# or "superfan".
+#
+# -------------------------------------------------------------------
+# FORMAT
+# -------------------------------------------------------------------
+#
+#   comment_commands:
+#     enabled: true/false   — master switch
+#     cooldown: 0           — global cooldown across ALL groups (seconds)
+#     user_cooldown: 0      — global per-user cooldown across ALL groups (seconds)
+#     groups:
+#       - enabled: true
+#         prefix: "#"       — single character that triggers this group
+#         allowed_roles: [moderator, superfan]  — who can use it
+#         mode: deny-all    — "deny-all" = only listed commands work
+#                            — "allow-all" = everything except listed works
+#         commands: [say, give]
+#         commands_config: {}  — per-command overrides (cooldown, roles, url, handler)
+#         handler: rcon     — "rcon" = send to Minecraft, "http" = POST to URL
+#         cooldown: 0       — per-group cooldown (seconds)
+#         user_cooldown: 0  — per-group per-user cooldown (seconds)
+#         trigger_comment_event: true  — also fire 'comment' trigger in actions.mca
+#
+# -------------------------------------------------------------------
+# PLUGIN COMMANDS
+# -------------------------------------------------------------------
+# Plugins register their own command groups dynamically via the API
+# (plugin.json → comment_handler). They do NOT need entries here.
+# Only system-level groups (#, !, etc.) belong in this file.
+#
+# -------------------------------------------------------------------
+# RUNTIME LOCATION
+# -------------------------------------------------------------------
+# This file lives in data/comment_commands.yaml at runtime.
+# The defaults/ copy is only a template.
+# ===================================================================
+
+comment_commands:
+  enabled: false
+  cooldown: 0
+  user_cooldown: 0
+  groups:
+    - enabled: true
+      prefix: "#"
+      allowed_roles:
+        - moderator
+        - superfan
+      mode: deny-all
+      commands:
+        - say
+        - give
+      commands_config: {}
+      handler: rcon
+      cooldown: 0
+      user_cooldown: 0
+      trigger_comment_event: true

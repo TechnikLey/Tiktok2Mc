@@ -239,8 +239,9 @@ describe('getHelp', () => {
     expect(help).toContain('TikTok username');
   });
   it('handles array-index paths', () => {
-    const help = getHelp('comment_commands.groups[0].prefix');
-    expect(help).toBeTruthy();
+    const help = getHelp('overlay.overlays[0].name');
+    expect(typeof help).toBe('string');
+    expect(help).toBe('');
   });
   it('returns empty for unknown paths', () => {
     expect(getHelp('some.unknown.path')).toBe('');

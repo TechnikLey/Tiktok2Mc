@@ -534,7 +534,6 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "api": dict,
     "api_key": str,
     "auto_update_config": bool,
-    "comment_commands": dict,
     "config_advanced": bool,
     "config_version": str,
     "console": dict,

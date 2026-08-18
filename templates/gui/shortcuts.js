@@ -86,6 +86,7 @@ const Shortcuts = (() => {
       ['plugins-config-section', () => pluginEditor.save()],
       ['hooks-config-section', () => hookEditor.save()],
       ['reaction-editor', () => reactionEditor.save()],
+      ['comment-commands-editor', () => commentCommandsEditor.save()],
       ['actions-editor', () => actionsEditor.save()],
     ];
     for (const [id, run] of targets) {
@@ -103,6 +104,7 @@ const Shortcuts = (() => {
       ['plugins-config-section', 'plugins-config-search'],
       ['hooks-config-section', 'hooks-config-search'],
       ['reaction-editor', 'reaction-search'],
+      ['comment-commands-editor', 'cc-search'],
     ];
     for (const [overlay, id] of editorMap) {
       if (!_elHidden(overlay)) {

@@ -441,6 +441,18 @@ class EventCommandsUpdateRequest(BaseModel):
     event_commands: dict[str, list[dict[str, Any]]]
 
 
+# ── Comment Commands models ────────────────────────────────────────
+
+
+class CommentCommandsResponse(BaseModel):
+    path: str
+    comment_commands: dict[str, Any]
+
+
+class CommentCommandsUpdateRequest(BaseModel):
+    comment_commands: dict[str, Any]
+
+
 class ReactionCatalogResponse(BaseModel):
     """Merged reaction catalog served to the GUI reactions wizard."""
 

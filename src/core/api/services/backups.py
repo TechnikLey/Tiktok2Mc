@@ -237,6 +237,8 @@ class BackupService:
             return _actions_path()
         if category == "event_commands":
             return core.paths.get_root_dir() / "data" / "event_commands.yaml"
+        if category == "comment_commands":
+            return core.paths.get_root_dir() / "data" / "comment_commands.yaml"
         if category.startswith("plugins/"):
             name = category[len("plugins/") :]
             if not name or not name.isidentifier():

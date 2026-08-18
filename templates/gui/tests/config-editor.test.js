@@ -181,37 +181,13 @@ describe('ConfigEditor', () => {
     });
   });
 
-  /* ─── addGroup / removeArrayItem ─── */
-  describe('addGroup / removeArrayItem', () => {
-    it('addGroup appends a default group object', () => {
-      editor.data.comment_commands = { groups: [] };
-      editor.addGroup('comment_commands.groups');
-      expect(editor.data.comment_commands.groups).toHaveLength(1);
-      expect(editor.data.comment_commands.groups[0].prefix).toBe('#');
-      expect(editor.data.comment_commands.groups[0].enabled).toBe(true);
-    });
-
+  /* ─── removeArrayItem ─── */
+  describe('removeArrayItem', () => {
     it('removeArrayItem removes element at index', () => {
       editor.data.items = [{ x: 1 }, { x: 2 }, { x: 3 }];
       editor.removeArrayItem('items', 1);
       expect(editor.data.items).toHaveLength(2);
       expect(editor.data.items[1].x).toBe(3);
-    });
-  });
-
-  /* ─── addOverride / removeOverride ─── */
-  describe('addOverride / removeOverride', () => {
-    it('addOverride adds a new override with default value', () => {
-      editor.data.comment_commands = { groups: [{ commands: ['cmd1'], commands_config: {} }] };
-      editor.addOverride('comment_commands.groups[0].commands_config.cmd1', 'points_cost');
-      const cfg = editor.data.comment_commands.groups[0].commands_config;
-      expect(cfg.cmd1.points_cost).toBe(0);
-    });
-
-    it('removeOverride deletes an override key', () => {
-      editor.data.test = { overrides: { cmd1: { points_cost: 10 } } };
-      editor.removeOverride('test.overrides.cmd1.points_cost');
-      expect(editor.data.test.overrides.cmd1.points_cost).toBeUndefined();
     });
   });
 

@@ -28,6 +28,9 @@ router = APIRouter(tags=["Reload"])
 class ReloadRequest(BaseModel):
     config: bool = Field(True, description="Reload global config.yaml")
     actions: bool = Field(True, description="Reload data/actions.mca")
+    comment_commands: bool = Field(
+        False, description="Reload data/comment_commands.yaml"
+    )
     overlay: bool = Field(True, description="Reload overlay settings in the API")
     rcon: bool = Field(True, description="Update API RCON service configuration")
     send_minecraft_reload: bool = Field(
@@ -100,6 +103,10 @@ async def reload_runtime(body: ReloadRequest):
         payload = {"send_minecraft_reload": body.send_minecraft_reload}
         if _write_signal("reload_actions", payload):
             signals.append("reload_actions")
+
+    if body.comment_commands:
+        if _write_signal("reload_comment_commands"):
+            signals.append("reload_comment_commands")
 
     if not signals:
         raise HTTPException(status_code=400, detail="No reload targets selected")

@@ -81,10 +81,12 @@ BASE_DIR = get_base_dir()
 
 CONFIG_FILE = (BASE_DIR.parent / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (BASE_DIR.parent / "data" / "actions.mca").resolve()
+COMMENT_COMMANDS_FILE = (BASE_DIR.parent / "data" / "comment_commands.yaml").resolve()
 FOLLOWED_USERS_FILE = (BASE_DIR.parent / "data" / "followed_users.txt").resolve()
 RUNTIME_DIR = get_runtime_dir()
 RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
 RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
+RELOAD_COMMENT_COMMANDS_SIGNAL = (RUNTIME_DIR / "reload_comment_commands").resolve()
 
 
 class BotContext:
@@ -416,26 +418,33 @@ def _apply_config(config: dict) -> None:
         config.get("tiktok", {}).get("like_triggers", [])
     )
 
-    comment_cmd_cfg = config.get("comment_commands", {})
-    ctx.comment_cmd_enable = bool(comment_cmd_cfg.get("enabled", False))
-    ctx.comment_cmd_global_cooldown = max(0, int(comment_cmd_cfg.get("cooldown", 0)))
-    ctx.comment_cmd_global_user_cooldown = max(
-        0, int(comment_cmd_cfg.get("user_cooldown", 0))
-    )
-    raw_groups = comment_cmd_cfg.get("groups", None)
-    if raw_groups is None:
-        raw_groups = [
-            {
-                "enabled": True,
-                "prefix": comment_cmd_cfg.get("prefix", "#"),
-                "allowed_roles": comment_cmd_cfg.get("allowed_roles", ["moderator"]),
-                "mode": comment_cmd_cfg.get("mode", "deny-all"),
-                "commands": comment_cmd_cfg.get("commands", []),
-                "handler": "rcon",
-                "url": "",
-            }
-        ]
-        log.info("[CONFIG] comment_commands: using legacy single-group format")
+    _apply_comment_commands_from_yaml()
+
+    ctx.datapack_root = (BASE_DIR / ".." / "server" / "datapack").resolve()
+    ctx.datapack_root.mkdir(parents=True, exist_ok=True)
+
+
+def _apply_comment_commands_from_yaml() -> None:
+    """Load comment_commands from data/comment_commands.yaml into BotContext."""
+    if not COMMENT_COMMANDS_FILE.exists():
+        ctx.comment_cmd_enable = False
+        ctx.comment_cmd_groups = []
+        ctx.comment_cmd_all_prefixes = set()
+        return
+
+    try:
+        cc_cfg = load_yaml(COMMENT_COMMANDS_FILE).get("comment_commands", {})
+    except Exception as e:
+        log.error("[CONFIG] Failed to load comment_commands.yaml: %s", e)
+        ctx.comment_cmd_enable = False
+        ctx.comment_cmd_groups = []
+        ctx.comment_cmd_all_prefixes = set()
+        return
+
+    ctx.comment_cmd_enable = bool(cc_cfg.get("enabled", False))
+    ctx.comment_cmd_global_cooldown = max(0, int(cc_cfg.get("cooldown", 0)))
+    ctx.comment_cmd_global_user_cooldown = max(0, int(cc_cfg.get("user_cooldown", 0)))
+    raw_groups = cc_cfg.get("groups", [])
     ctx.comment_cmd_groups = []
     ctx.comment_cmd_all_prefixes = set()
     seen_prefixes = set()
@@ -499,7 +508,6 @@ def _apply_config(config: dict) -> None:
             )
         trigger_comment = g.get("trigger_comment_event", True)
 
-        # Warn about commands_config entries that can never be used
         cmd_warn_count = 0
         cmd_warn_max = 5
         for cname in commands_config:
@@ -535,9 +543,6 @@ def _apply_config(config: dict) -> None:
                 "trigger_comment_event": trigger_comment,
             }
         )
-
-    ctx.datapack_root = (BASE_DIR / ".." / "server" / "datapack").resolve()
-    ctx.datapack_root.mkdir(parents=True, exist_ok=True)
 
 
 def load_config():
@@ -2494,6 +2499,13 @@ async def _reload_signal_watcher():
                 await reload_actions(
                     send_minecraft_reload=options.get("send_minecraft_reload", True)
                 )
+            if RELOAD_COMMENT_COMMANDS_SIGNAL.exists():
+                try:
+                    RELOAD_COMMENT_COMMANDS_SIGNAL.unlink()
+                except OSError:
+                    pass
+                _apply_comment_commands_from_yaml()
+                log.info("[RELOAD] comment_commands reloaded from YAML")
         except Exception as e:  # watcher must never die
             log.error("[RELOAD] Signal watcher error: %s", e)
 
@@ -2566,7 +2578,11 @@ async def run_bot():
     load_event_hooks(ctx.hook_api, config=ctx.config)
 
     # Clear any stale reload signals from a previous run before the watcher starts.
-    for sig in (RELOAD_CONFIG_SIGNAL, RELOAD_ACTIONS_SIGNAL):
+    for sig in (
+        RELOAD_CONFIG_SIGNAL,
+        RELOAD_ACTIONS_SIGNAL,
+        RELOAD_COMMENT_COMMANDS_SIGNAL,
+    ):
         try:
             sig.unlink(missing_ok=True)
         except OSError:
