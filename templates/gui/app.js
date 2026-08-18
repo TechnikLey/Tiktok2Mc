@@ -2300,7 +2300,7 @@ function renderPluginManager() {
       <td data-label="Port">${p.port || '-'}</td>
       <td data-label="${I18N.t('plugins.platform')}">${platformBadge}</td>
       <td data-label="Status"><span class="plugin-status ${status.cls}">${status.label}</span></td>
-      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${editDisabled} onclick="pluginEditor.openInline('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button></td>
+      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${editDisabled} onclick="pluginEditor.openInline('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button> <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="openReadmeModal('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Readme</button></td>
     </tr>`;
     if (hasError) {
       html += `<tr class="error-detail-row"><td colspan="6"><span class="error-detail">${escapeHtml(p.error)}</span></td></tr>`;
@@ -2405,6 +2405,35 @@ async function restartPlugin(name, displayName) {
     showToast(msg, 'error');
     log(msg, 'err');
   }
+}
+
+/* ─── Plugin README Modal ─── */
+
+async function openReadmeModal(pluginName, displayName) {
+  const modal = document.getElementById('readme-modal');
+  const title = document.getElementById('readme-modal-title');
+  const body = document.getElementById('readme-modal-body');
+  if (!modal || !title || !body) return;
+
+  title.textContent = displayName || pluginName;
+  body.innerHTML = '<p class="muted">Loading…</p>';
+  modal.classList.remove('hidden');
+
+  try {
+    const res = await fetch(`${API}/plugins/${pluginName}/readme`);
+    if (!res.ok) {
+      body.innerHTML = '<p class="muted">No README available for this plugin.</p>';
+      return;
+    }
+    const md = await res.text();
+    body.innerHTML = typeof marked !== 'undefined' ? marked.parse(md) : escapeHtml(md);
+  } catch {
+    body.innerHTML = '<p class="muted">Failed to load README.</p>';
+  }
+}
+
+function closeReadmeModal() {
+  document.getElementById('readme-modal')?.classList.add('hidden');
 }
 
 /* ─── Hook Management ─── */

@@ -2,6 +2,7 @@ from copy import deepcopy
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import PlainTextResponse
 from ruamel.yaml.error import YAMLError
 
 from core.plugin_config import (
@@ -110,4 +111,23 @@ async def get_plugin_schema(name: str):
 
         return {"name": name, "schema": schema}
     except Exception as e:  # any unexpected error becomes an HTTP 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── README ────────────────────────────────────────────────────────────
+
+
+@router.get("/plugins/{name}/readme")
+async def get_plugin_readme(name: str):
+    """Return the plugin's README.md as Markdown text."""
+    plugin_dir = _find_plugin_dir(name)
+    if not plugin_dir:
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+    readme_path = plugin_dir / "README.md"
+    if not readme_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' has no README.md")
+    try:
+        md = readme_path.read_text(encoding="utf-8")
+        return PlainTextResponse(md, media_type="text/markdown")
+    except OSError as e:
         raise HTTPException(status_code=500, detail=str(e))

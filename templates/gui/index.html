@@ -1053,6 +1053,17 @@
       </div>
     </div>
 
+    <!-- Plugin README Modal -->
+    <div id="readme-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card readme-modal-card">
+        <div class="readme-modal-header">
+          <h2 id="readme-modal-title">Plugin Documentation</h2>
+          <button class="btn btn--secondary btn--sm" onclick="closeReadmeModal()" data-i18n="common.close">Close</button>
+        </div>
+        <div id="readme-modal-body" class="readme-modal-body markdown-body"></div>
+      </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
@@ -1061,6 +1072,7 @@
     <script src="./shortcuts.js?v=1"></script>
     <script src="./accessibility.js?v=1"></script>
     <script src="./actions-editor.js?v=3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="./app.js?v=8"></script>
 </div>
 </body>
