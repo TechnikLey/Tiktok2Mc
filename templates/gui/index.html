@@ -782,7 +782,7 @@
               <input type="text" id="cc-search" data-i18n-placeholder="cc.searchPlaceholder" placeholder="Search commands..." oninput="commentCommandsEditor.onSearch(this.value)">
             </div>
             <div class="header-actions">
-              <button class="btn btn--primary" id="cc-add" onclick="commentCommandsEditor.startCreate()" data-i18n="cc.create">+ Create Group</button>
+              <button class="btn btn--primary" id="cc-add" onclick="commentCommandsEditor.startCreate()" data-i18n="cc.add">+ Add Command Group</button>
               <button class="btn btn--primary btn-save-disabled" id="cc-save" onclick="commentCommandsEditor.save()" disabled data-i18n="cc.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
               <button class="btn-help" onclick="Help.openHelp('commentCommands')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
             </div>
@@ -792,17 +792,18 @@
       </div>
     </div>
 
-    <!-- Comment Commands Group Editor (inline form) -->
+    <!-- Comment Commands Group Editor (wizard) -->
     <div id="cc-group-editor" class="wizard-overlay hidden modal-z-250">
-      <div class="wizard-card" style="max-width:560px;">
+      <div class="wizard-card cc-wizard-card">
         <div class="wizard-header">
           <h2 id="cc-group-title" data-i18n="cc.createGroup">Create Command Group</h2>
+          <div class="wizard-steps-bar" id="cc-wizard-steps"></div>
         </div>
-        <div class="wizard-body" id="cc-group-body"></div>
+        <div class="wizard-body cc-wizard-body" id="cc-group-body"></div>
         <div class="wizard-footer">
-          <button class="btn btn--secondary" id="cc-group-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--secondary" id="cc-group-back" data-i18n="common.back" style="visibility:hidden;">Back</button>
           <div style="display:flex;gap:var(--space-3);">
-            <button class="btn btn--secondary" id="cc-group-back" data-i18n="common.back" style="display:none;">Back</button>
+            <button class="btn btn--secondary" id="cc-group-cancel" data-i18n="common.cancel">Cancel</button>
             <button class="btn btn--primary" id="cc-group-next" data-i18n="common.next">Next</button>
           </div>
         </div>

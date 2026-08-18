@@ -6293,9 +6293,13 @@ class CommentCommandsEditor {
     this._dirty = false;
     this.searchQuery = '';
     this.activeCategory = 'all';
-    this._wizardMode = null; // 'create' | 'edit'
-    this._wizardIndex = null; // index being edited
+    this._wizardMode = null;
+    this._wizardIndex = null;
     this._wizardStep = 0;
+    this._wizardDraft = {};
+    this._expandedOverride = null;
+    this._pluginCatalog = {};
+    this._refPanelOpen = false;
     this._bindEvents();
   }
 
@@ -6332,10 +6336,21 @@ class CommentCommandsEditor {
       this.original = JSON.parse(JSON.stringify(this.data));
       this._dirty = false;
       this._updateSaveButton();
+      this._expandedOverride = null;
       this.renderSidebar();
       this.renderList();
     } catch (e) {
       showToast(I18N.t('cc.loadFailed', { msg: e.message }), 'error');
+    }
+    this._loadPluginCatalog();
+  }
+
+  async _loadPluginCatalog() {
+    try {
+      const res = await fetchJSON('/reactions/catalog');
+      this._pluginCatalog = res.commands || {};
+    } catch (e) {
+      this._pluginCatalog = {};
     }
   }
 
@@ -6362,9 +6377,7 @@ class CommentCommandsEditor {
         html += `<option value="${escapeHtml(p.name)}"${sel}>${escapeHtml(p.name)}</option>`;
       }
       selectEl.innerHTML = html;
-    } catch (e) {
-      /* ignore — select stays empty */
-    }
+    } catch (e) { /* ignore */ }
   }
 
   /* ─── Sidebar ─── */
@@ -6419,55 +6432,215 @@ class CommentCommandsEditor {
 
     let html = this._renderGlobalSettings();
     for (const g of filtered) {
-      const i = g._index;
-      const h = (g.handler || '').toLowerCase();
-      const isSystem = h === 'rcon' || h === 'http';
-      const catClass = isSystem ? 'reaction-category-minecraft' : 'reaction-category-custom';
-      const catLabel = isSystem ? I18N.t('cc.catSystem') : I18N.t('cc.catPlugin');
-      const handlerLabel = h === 'rcon' ? 'RCON' : h === 'http' ? 'HTTP' : h === 'plugin' ? `Plugin: ${escapeHtml(g.plugin_name || '—')}` : h;
-      const prefixDisplay = escapeHtml(g.prefix || '#');
-      const cmds = (g.commands || []).join(', ') || '—';
-      const roles = (g.allowed_roles || []).join(', ');
-      const modeLabel = g.mode || 'deny-all';
-      const disabledClass = !g.enabled ? ' reaction-card--disabled' : '';
-      const disabledNotice = !g.enabled ? `<div class="reaction-disabled-notice">${I18N.t('cc.groupDisabled')}</div>` : '';
-
-      html += `<div class="reaction-card${disabledClass}">
-        <div class="reaction-card-header">
-          <div class="reaction-meta">
-            <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
-            <span style="font-size:0.85rem;color:var(--text-secondary);">${I18N.t('cc.handler')}: ${escapeHtml(handlerLabel)}</span>
-          </div>
-          <div class="reaction-card-actions">
-            <button class="reaction-btn-sm reaction-btn-edit" onclick="commentCommandsEditor.startEdit(${i})">${I18N.t('cc.edit')}</button>
-            <button class="reaction-btn-sm reaction-btn-delete" onclick="commentCommandsEditor.confirmDelete(${i})">${I18N.t('cc.delete')}</button>
-          </div>
-        </div>
-        ${disabledNotice}
-        <div class="reaction-card-body">
-          <div class="reaction-flow">
-            <div class="reaction-when">
-              <span style="font-size:1.3rem;font-weight:700;">${prefixDisplay}</span>
-              <span style="font-size:0.85rem;color:var(--text-secondary);">${I18N.t('cc.prefix')}</span>
-            </div>
-            <span class="reaction-arrow">&rarr;</span>
-            <div class="reaction-then" style="flex-wrap:wrap;gap:0.3rem;">
-              ${(g.commands || []).slice(0, 6).map(c => `<span class="reaction-arg-chip"><span class="reaction-arg-value">${escapeHtml(c)}</span></span>`).join('')}
-              ${(g.commands || []).length > 6 ? `<span class="reaction-arg-chip"><span class="reaction-arg-value">+${g.commands.length - 6}</span></span>` : ''}
-            </div>
-          </div>
-          <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.5rem;font-size:0.8rem;color:var(--text-secondary);">
-            <span>${I18N.t('cc.roles')}: ${escapeHtml(roles)}</span>
-            <span>${I18N.t('cc.mode')}: ${escapeHtml(modeLabel)}</span>
-            ${g.cooldown ? `<span>${I18N.t('cc.cooldown')}: ${g.cooldown}s</span>` : ''}
-          </div>
-        </div>
-      </div>`;
+      html += this._renderGroupPanel(g);
     }
     this.content.innerHTML = html;
   }
 
-  /* ─── Global settings toggle ─── */
+  _renderGroupPanel(g) {
+    const i = g._index;
+    const h = (g.handler || '').toLowerCase();
+    const isSystem = h === 'rcon' || h === 'http';
+    const catClass = isSystem ? 'reaction-category-minecraft' : 'reaction-category-custom';
+    const catLabel = isSystem ? I18N.t('cc.catSystem') : I18N.t('cc.catPlugin');
+    const handlerLabel = h === 'rcon' ? 'RCON' : h === 'http' ? 'HTTP' : h === 'plugin' ? `Plugin: ${escapeHtml(g.plugin_name || '—')}` : h;
+    const prefixDisplay = escapeHtml(g.prefix || '#');
+    const roles = (g.allowed_roles || []).join(', ');
+    const modeLabel = g.mode || 'deny-all';
+    const disabledClass = !g.enabled ? ' cc-group-panel--disabled' : '';
+    const cmds = g.commands || [];
+    const config = g.commands_config || {};
+    const isExpanded = (ed) => this._expandedOverride && this._expandedOverride.groupIdx === i && this._expandedOverride.cmdName === ed;
+
+    let panelHtml = `<div class="cc-group-panel${disabledClass}">`;
+
+    /* Header */
+    panelHtml += `<div class="cc-group-header">
+      <div class="cc-group-header-left">
+        <span class="cc-group-prefix">${prefixDisplay}</span>
+        <div class="cc-group-meta">
+          <span class="reaction-category-badge ${catClass}">${escapeHtml(catLabel)}</span>
+          <span class="cc-group-meta-sep">·</span>
+          <span>${escapeHtml(handlerLabel)}</span>
+        </div>
+      </div>
+      <div class="cc-group-header-actions">
+        <button class="reaction-btn-sm reaction-btn-edit" onclick="commentCommandsEditor.startEdit(${i})">${I18N.t('cc.editGroup')}</button>
+        <button class="reaction-btn-sm reaction-btn-delete" onclick="commentCommandsEditor.confirmDelete(${i})">${I18N.t('cc.delete')}</button>
+      </div>
+    </div>`;
+
+    /* Disabled notice */
+    if (!g.enabled) {
+      panelHtml += `<div class="reaction-disabled-notice">${I18N.t('cc.groupDisabled')}</div>`;
+    }
+
+    /* Info bar */
+    panelHtml += `<div class="cc-group-info">
+      <div class="cc-group-info-item"><span class="cc-group-info-label">${I18N.t('cc.roles')}:</span> ${escapeHtml(roles)}</div>
+      <div class="cc-group-info-item"><span class="cc-group-info-label">${I18N.t('cc.mode')}:</span> ${escapeHtml(modeLabel)}</div>
+      ${g.cooldown ? `<div class="cc-group-info-item"><span class="cc-group-info-label">${I18N.t('cc.cooldown')}:</span> ${g.cooldown}s</div>` : ''}
+      ${g.user_cooldown ? `<div class="cc-group-info-item"><span class="cc-group-info-label">${I18N.t('cc.userCooldown')}:</span> ${g.user_cooldown}s</div>` : ''}
+    </div>`;
+
+    /* Commands table */
+    panelHtml += `<div class="cc-group-commands">`;
+    if (cmds.length) {
+      panelHtml += `<div class="cc-group-cmd-header">
+        <span>${I18N.t('cc.commands')}</span>
+        <span>${I18N.t('cc.cooldown')}</span>
+        <span>${I18N.t('cc.cmdOverrideRoles')}</span>
+        <span>${I18N.t('cc.handler')}</span>
+        <span></span>
+      </div>`;
+      for (const cmd of cmds) {
+        const cfg = config[cmd] || {};
+        const hasOverrides = Object.keys(cfg).length > 0;
+        const expanded = isExpanded(cmd);
+        const cdDisplay = cfg.cooldown != null ? `${cfg.cooldown}s` : '—';
+        const rolesDisplay = cfg.roles ? cfg.roles.join(', ') : '—';
+        const handlerDisplay = cfg.handler || '—';
+
+        const cdClass = cfg.cooldown != null ? 'cc-group-cmd-td cc-group-cmd-td-override' : 'cc-group-cmd-td';
+        const rolesClass = cfg.roles ? 'cc-group-cmd-td cc-group-cmd-td-override' : 'cc-group-cmd-td';
+        const handlerClass = cfg.handler ? 'cc-group-cmd-td cc-group-cmd-td-override' : 'cc-group-cmd-td';
+
+        panelHtml += `<div class="cc-group-cmd-row" id="cc-cmd-row-${i}-${escapeHtml(cmd)}">
+          <div class="cc-group-cmd-name">
+            ${hasOverrides ? '<span class="cc-group-cmd-override-dot" title="Has overrides"></span>' : ''}
+            ${escapeHtml(cmd)}
+          </div>
+          <span class="${cdClass}">${cdDisplay}</span>
+          <span class="${rolesClass}">${rolesDisplay}</span>
+          <span class="${handlerClass}">${handlerDisplay}</span>
+          <div class="cc-group-cmd-actions">
+            <button class="cc-group-cmd-btn" title="${I18N.t('cc.cmdEditOverrides')}" onclick="commentCommandsEditor.toggleOverride(${i},'${escapeHtml(cmd)}')">
+              ${expanded ? '&#9650;' : '&#9660;'}
+            </button>
+            <button class="cc-group-cmd-btn cc-group-cmd-btn--danger" title="${I18N.t('cc.cmdRemove')}" onclick="commentCommandsEditor.removeCommand(${i},'${escapeHtml(cmd)}')">
+              &times;
+            </button>
+          </div>
+        </div>`;
+
+        /* Inline override panel */
+        if (expanded) {
+          panelHtml += this._renderInlineOverridePanel(i, cmd, cfg, g);
+        }
+      }
+    } else {
+      panelHtml += `<div class="cc-group-cmd-empty">${I18N.t('cc.noCommands')}</div>`;
+    }
+
+    /* Add command row */
+    panelHtml += `<div class="cc-group-cmd-add">
+      <input type="text" class="cc-group-cmd-add-input" id="cc-add-cmd-${i}" placeholder="${I18N.t('cc.commandsPlaceholder')}"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();commentCommandsEditor.addCommand(${i},this.value);this.value='';}">
+      <button class="cc-group-cmd-add-btn" onclick="const inp=document.getElementById('cc-add-cmd-${i}');commentCommandsEditor.addCommand(${i},inp.value);inp.value='';">
+        + ${I18N.t('cc.cmdAdd')}
+      </button>
+    </div>`;
+
+    panelHtml += `</div></div>`;
+    return panelHtml;
+  }
+
+  _renderInlineOverridePanel(groupIdx, cmd, cfg, group) {
+    const cdVal = cfg.cooldown != null ? cfg.cooldown : '';
+    const handlerVal = cfg.handler || '';
+    const urlVal = cfg.url || '';
+    const roles = cfg.roles || [];
+    const dataAttr = `data-gi="${groupIdx}" data-cmd="${escapeHtml(cmd)}"`;
+
+    return `<div class="cc-override-panel" ${dataAttr}>
+      <div class="cc-override-field">
+        <label>${I18N.t('cc.cmdOverrideCooldown')}</label>
+        <input type="number" class="cc-ov-cooldown" min="0" value="${cdVal}" placeholder="${I18N.t('cc.cmdOverrideUseGroup')}">
+      </div>
+      <div class="cc-override-field cc-override-roles">
+        <label>${I18N.t('cc.cmdOverrideRoles')}</label>
+        <div class="cc-ov-role-toggles">
+          ${['all', 'moderator', 'superfan', 'fanclub'].map(r => `<label class="cc-ov-role-toggle"><input type="checkbox" class="cc-ov-role-cb" value="${r}" ${roles.includes(r) ? 'checked' : ''}> ${r}</label>`).join('')}
+        </div>
+      </div>
+      <div class="cc-override-field">
+        <label>${I18N.t('cc.cmdOverrideHandler')}</label>
+        <select class="cc-ov-handler">
+          <option value="" ${!handlerVal ? 'selected' : ''}>${I18N.t('cc.cmdOverrideUseGroup')}</option>
+          <option value="rcon" ${handlerVal === 'rcon' ? 'selected' : ''}>RCON</option>
+          <option value="http" ${handlerVal === 'http' ? 'selected' : ''}>HTTP</option>
+          <option value="plugin" ${handlerVal === 'plugin' ? 'selected' : ''}>Plugin</option>
+        </select>
+      </div>
+      <div class="cc-override-field">
+        <label>${I18N.t('cc.cmdOverrideUrl')}</label>
+        <input type="text" class="cc-ov-url" value="${escapeHtml(urlVal)}" placeholder="${I18N.t('cc.cmdOverrideUseGroup')}">
+      </div>
+    </div>`;
+  }
+
+  /* ─── Inline command management ─── */
+  addCommand(groupIdx, raw) {
+    const v = (raw || '').trim().toLowerCase();
+    if (!v) return;
+    const g = this.data.groups[groupIdx];
+    if (!g) return;
+    if (!g.commands) g.commands = [];
+    if (g.commands.includes(v)) { showToast(I18N.t('cc.duplicateCommand') + ': ' + v, 'error'); return; }
+    g.commands.push(v);
+    this._dirty = true;
+    this._updateSaveButton();
+    this.renderList();
+  }
+
+  removeCommand(groupIdx, cmd) {
+    const g = this.data.groups[groupIdx];
+    if (!g) return;
+    g.commands = (g.commands || []).filter(c => c !== cmd);
+    if (g.commands_config) delete g.commands_config[cmd];
+    if (this._expandedOverride && this._expandedOverride.groupIdx === groupIdx && this._expandedOverride.cmdName === cmd) {
+      this._expandedOverride = null;
+    }
+    this._dirty = true;
+    this._updateSaveButton();
+    this.renderList();
+  }
+
+  toggleOverride(groupIdx, cmd) {
+    if (this._expandedOverride && this._expandedOverride.groupIdx === groupIdx && this._expandedOverride.cmdName === cmd) {
+      this._collectAndSaveOverride(groupIdx, cmd);
+      this._expandedOverride = null;
+    } else {
+      if (this._expandedOverride) {
+        this._collectAndSaveOverride(this._expandedOverride.groupIdx, this._expandedOverride.cmdName);
+      }
+      this._expandedOverride = { groupIdx, cmdName: cmd };
+    }
+    this.renderList();
+  }
+
+  _collectAndSaveOverride(groupIdx, cmd) {
+    const panel = document.querySelector(`.cc-override-panel[data-gi="${groupIdx}"][data-cmd="${CSS.escape(cmd)}"]`);
+    if (!panel) return;
+    const g = this.data.groups[groupIdx];
+    if (!g) return;
+    if (!g.commands_config) g.commands_config = {};
+    const cfg = {};
+    const cdEl = panel.querySelector('.cc-ov-cooldown');
+    const handlerEl = panel.querySelector('.cc-ov-handler');
+    const urlEl = panel.querySelector('.cc-ov-url');
+    const roleCbs = panel.querySelectorAll('.cc-ov-role-cb:checked');
+    if (cdEl && cdEl.value !== '') cfg.cooldown = parseInt(cdEl.value) || 0;
+    if (roleCbs.length) cfg.roles = [...roleCbs].map(cb => cb.value);
+    if (handlerEl && handlerEl.value) cfg.handler = handlerEl.value;
+    if (urlEl && urlEl.value) cfg.url = urlEl.value;
+    if (Object.keys(cfg).length > 0) g.commands_config[cmd] = cfg;
+    else delete g.commands_config[cmd];
+    this._dirty = true;
+    this._updateSaveButton();
+  }
+
+  /* ─── Global settings ─── */
   _renderGlobalSettings() {
     return `<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding:0.8rem 1rem;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">
       <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
@@ -6489,12 +6662,16 @@ class CommentCommandsEditor {
   setGlobalCooldown(v) { this.data.cooldown = v; this._dirty = true; this._updateSaveButton(); }
   setGlobalUserCooldown(v) { this.data.user_cooldown = v; this._dirty = true; this._updateSaveButton(); }
 
-  /* ─── Wizard (create / edit group) ─── */
+  /* ─── Wizard (create / edit group — 3 steps, no overrides) ─── */
   startCreate() {
     this._wizardMode = 'create';
     this._wizardIndex = null;
     this._wizardStep = 0;
-    this._wizardDraft = { enabled: true, prefix: '#', allowed_roles: ['moderator'], mode: 'deny-all', commands: [], commands_config: {}, handler: 'rcon', url: '', cooldown: 0, user_cooldown: 0, trigger_comment_event: true };
+    this._wizardDraft = {
+      enabled: true, prefix: this._nextAvailablePrefix(), allowed_roles: ['moderator'], mode: 'deny-all',
+      commands: [], commands_config: {}, handler: 'rcon', plugin_name: '',
+      url: '', cooldown: 0, user_cooldown: 0, trigger_comment_event: true
+    };
     this._openWizard();
   }
 
@@ -6516,149 +6693,380 @@ class CommentCommandsEditor {
 
   _closeWizard() { document.getElementById('cc-group-editor').classList.add('hidden'); }
 
+  _nextAvailablePrefix() {
+    const seq = ['#','!','$','@','*','?','+','~','&','%','/','^'];
+    const used = new Set((this.data.groups || []).map(g => g.prefix));
+    return seq.find(c => !used.has(c)) || '?';
+  }
+
   _wizardBack() {
     if (this._wizardStep > 0) { this._wizardStep--; this._renderWizardStep(); }
   }
 
   _wizardNext() {
-    if (this._wizardStep === 0) {
-      const prefix = (this._wizardDraft.prefix || '').trim();
-      if (!prefix || prefix.length > 2) { showToast(I18N.t('cc.prefixRequired'), 'error'); return; }
-      this._wizardStep = 1;
+    if (!this._validateCurrentStep()) return;
+    if (this._wizardStep < 2) {
+      this._collectStepData(this._wizardStep);
+      this._wizardStep++;
       this._renderWizardStep();
-    } else if (this._wizardStep === 1) {
-      this._wizardStep = 2;
-      this._renderWizardStep();
-    } else if (this._wizardStep === 2) {
-      this._collectStep2();
+    } else {
+      this._collectStepData(this._wizardStep);
       this._commitWizard();
     }
   }
 
-  _collectStep2() {
+  /* ─── Validation ─── */
+  static VALID_PREFIX_CHARS = new Set('!@#$%^&*?~+/=<>-_|\\:.;()[]{}\'"`');
+  static _isSpecialChar(ch) { return CommentCommandsEditor.VALID_PREFIX_CHARS.has(ch); }
+
+  _validateCurrentStep() {
     const d = this._wizardDraft;
-    const cmdsEl = document.getElementById('cc-cmds');
-    if (cmdsEl) d.commands = cmdsEl.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-    const cdEl = document.getElementById('cc-cd');
-    if (cdEl) d.cooldown = parseInt(cdEl.value) || 0;
-    const ucdEl = document.getElementById('cc-ucd');
-    if (ucdEl) d.user_cooldown = parseInt(ucdEl.value) || 0;
-    const urlEl = document.getElementById('cc-url');
-    if (urlEl) d.url = urlEl.value;
-    const trigEl = document.getElementById('cc-trig');
-    if (trigEl) d.trigger_comment_event = trigEl.checked;
+    if (this._wizardStep === 0) {
+      const prefix = (d.prefix || '').trim();
+      if (!prefix) { this._showStepError(I18N.t('cc.prefixRequired')); return false; }
+      if (prefix.length !== 1 || !CommentCommandsEditor._isSpecialChar(prefix)) {
+        this._showStepError(I18N.t('cc.prefixInvalid')); return false;
+      }
+      const otherIdx = this._wizardMode === 'edit' ? this._wizardIndex : -1;
+      const dup = this.data.groups.some((g, i) => i !== otherIdx && (g.prefix || '').trim() === prefix);
+      if (dup) { this._showStepError(I18N.t('cc.prefixDuplicate')); return false; }
+      if (d.handler === 'plugin' && !d.plugin_name) { this._showStepError(I18N.t('cc.pluginRequired')); return false; }
+    }
+    return true;
   }
 
+  _showStepError(msg) {
+    const el = document.getElementById('cc-wiz-error');
+    if (el) { el.textContent = msg; el.style.display = 'flex'; }
+    else showToast(msg, 'error');
+  }
+
+  /* ─── Collect data ─── */
+  _collectStepData(step) {
+    const d = this._wizardDraft;
+    if (step === 0) {
+      const prefixEl = document.getElementById('cc-wiz-prefix');
+      if (prefixEl) d.prefix = prefixEl.value.trim();
+      const handlerEl = document.getElementById('cc-wiz-handler');
+      if (handlerEl) d.handler = handlerEl.value;
+      const pluginNameEl = document.getElementById('cc-wiz-plugin-name');
+      if (pluginNameEl) d.plugin_name = pluginNameEl.value;
+      const enabledEl = document.getElementById('cc-wiz-enabled');
+      if (enabledEl) d.enabled = enabledEl.checked;
+    } else if (step === 1) {
+      const checked = [...document.querySelectorAll('.cc-role-cb:checked')].map(c => c.value);
+      d.allowed_roles = checked;
+      const modeEl = document.getElementById('cc-wiz-mode');
+      if (modeEl) d.mode = modeEl.value;
+    } else if (step === 2) {
+      const cdEl = document.getElementById('cc-cd');
+      if (cdEl) d.cooldown = parseInt(cdEl.value) || 0;
+      const ucdEl = document.getElementById('cc-ucd');
+      if (ucdEl) d.user_cooldown = parseInt(ucdEl.value) || 0;
+      const urlEl = document.getElementById('cc-url');
+      if (urlEl) d.url = urlEl.value;
+      const trigEl = document.getElementById('cc-trig');
+      if (trigEl) d.trigger_comment_event = trigEl.checked;
+    }
+  }
+
+  /* ─── Render wizard step ─── */
   _renderWizardStep() {
     const d = this._wizardDraft;
     const title = document.getElementById('cc-group-title');
     const body = document.getElementById('cc-group-body');
+    const stepsBar = document.getElementById('cc-wizard-steps');
     const backBtn = document.getElementById('cc-group-back');
     const nextBtn = document.getElementById('cc-group-next');
 
     if (title) title.textContent = this._wizardMode === 'edit' ? I18N.t('cc.editGroup') : I18N.t('cc.createGroup');
-    if (backBtn) backBtn.style.display = this._wizardStep > 0 ? '' : 'none';
+    if (backBtn) backBtn.style.visibility = this._wizardStep > 0 ? 'visible' : 'hidden';
+    if (nextBtn) nextBtn.textContent = this._wizardStep === 2
+      ? (this._wizardMode === 'edit' ? I18N.t('cc.updateGroup') : I18N.t('cc.createGroup'))
+      : I18N.t('common.next');
 
-    if (this._wizardStep === 0) {
-      if (nextBtn) nextBtn.textContent = I18N.t('common.next');
-      const isPlugin = d.handler === 'plugin';
-      body.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:1rem;">
-          <div style="display:flex;align-items:center;gap:1rem;">
-            <label style="font-weight:600;min-width:80px;">${I18N.t('cc.prefix')}</label>
-            <input type="text" id="cc-wiz-prefix" value="${escapeHtml(d.prefix || '#')}" maxlength="2" style="width:60px;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:1.1rem;text-align:center;font-weight:700;">
-          </div>
-          <div style="display:flex;align-items:center;gap:1rem;">
-            <label style="font-weight:600;min-width:80px;">${I18N.t('cc.handler')}</label>
-            <select id="cc-wiz-handler" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-              <option value="rcon" ${d.handler === 'rcon' ? 'selected' : ''}>RCON (${I18N.t('cc.handlerRconDesc')})</option>
-              <option value="http" ${d.handler === 'http' ? 'selected' : ''}>HTTP (${I18N.t('cc.handlerHttpDesc')})</option>
-              <option value="plugin" ${isPlugin ? 'selected' : ''}>Plugin (${I18N.t('cc.handlerPluginDesc')})</option>
-            </select>
-          </div>
-          <div id="cc-wiz-plugin-row" style="display:${isPlugin ? 'flex' : 'none'};align-items:center;gap:1rem;">
-            <label style="font-weight:600;min-width:80px;">Plugin</label>
-            <select id="cc-wiz-plugin-name" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);min-width:180px;">
-              <option value="">—</option>
-            </select>
-          </div>
-          <div style="display:flex;align-items:center;gap:1rem;">
-            <label style="font-weight:600;min-width:80px;">${I18N.t('cc.enabled')}</label>
-            <input type="checkbox" class="toggle" ${d.enabled ? 'checked' : ''} id="cc-wiz-enabled">
-          </div>
-        </div>`;
-      const prefixEl = document.getElementById('cc-wiz-prefix');
-      if (prefixEl) prefixEl.addEventListener('input', () => { d.prefix = prefixEl.value; });
-      const handlerEl = document.getElementById('cc-wiz-handler');
-      if (handlerEl) handlerEl.addEventListener('change', () => {
-        d.handler = handlerEl.value;
-        const pluginRow = document.getElementById('cc-wiz-plugin-row');
-        if (pluginRow) pluginRow.style.display = d.handler === 'plugin' ? 'flex' : 'none';
-      });
-      const pluginNameEl = document.getElementById('cc-wiz-plugin-name');
-      if (pluginNameEl) {
-        pluginNameEl.addEventListener('change', () => { d.plugin_name = pluginNameEl.value; });
-        this._loadPluginsForSelect(pluginNameEl, d.plugin_name);
-      }
-      const enabledEl = document.getElementById('cc-wiz-enabled');
-      if (enabledEl) enabledEl.addEventListener('change', () => { d.enabled = enabledEl.checked; });
-    } else if (this._wizardStep === 1) {
-      if (nextBtn) nextBtn.textContent = I18N.t('common.next');
-      const roles = d.allowed_roles || [];
-      body.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:1rem;">
-          <div>
-            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.allowedRoles')}</label>
-            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;">
-              ${['all', 'moderator', 'superfan', 'fanclub'].map(r => `<label style="display:flex;align-items:center;gap:0.3rem;cursor:pointer;"><input type="checkbox" value="${r}" ${roles.includes(r) ? 'checked' : ''} class="cc-role-cb"> ${r}</label>`).join('')}
-            </div>
-          </div>
-          <div>
-            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.mode')}</label>
-            <select id="cc-wiz-mode" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-              <option value="deny-all" ${d.mode === 'deny-all' ? 'selected' : ''}>deny-all (${I18N.t('cc.modeDenyDesc')})</option>
-              <option value="allow-all" ${d.mode === 'allow-all' ? 'selected' : ''}>allow-all (${I18N.t('cc.modeAllowDesc')})</option>
-            </select>
-          </div>
-        </div>`;
-      document.querySelectorAll('.cc-role-cb').forEach(cb => {
-        cb.addEventListener('change', () => {
-          const checked = [...document.querySelectorAll('.cc-role-cb:checked')].map(c => c.value);
-          d.allowed_roles = checked;
-        });
-      });
-      const modeEl = document.getElementById('cc-wiz-mode');
-      if (modeEl) modeEl.addEventListener('change', () => { d.mode = modeEl.value; });
-    } else if (this._wizardStep === 2) {
-      if (nextBtn) nextBtn.textContent = this._wizardMode === 'edit' ? I18N.t('cc.updateGroup') : I18N.t('cc.createGroup');
-      body.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:1rem;">
-          <div>
-            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.commands')} <span style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(${I18N.t('cc.commandsHelp')})</span></label>
-            <input type="text" id="cc-cmds" value="${escapeHtml((d.commands || []).join(', '))}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);" placeholder="${I18N.t('cc.commandsPlaceholder')}">
-          </div>
-          <div style="display:flex;gap:1rem;">
-            <div style="flex:1;">
-              <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.cooldown')}</label>
-              <input type="number" id="cc-cd" min="0" value="${d.cooldown || 0}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-            </div>
-            <div style="flex:1;">
-              <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.userCooldown')}</label>
-              <input type="number" id="cc-ucd" min="0" value="${d.user_cooldown || 0}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-            </div>
-          </div>
-          ${d.handler === 'http' ? `<div>
-            <label style="font-weight:600;display:block;margin-bottom:0.3rem;">${I18N.t('cc.url')}</label>
-            <input type="text" id="cc-url" value="${escapeHtml(d.url || '')}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);" placeholder="https://example.com/{user}/{text}">
-          </div>` : ''}
-          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
-            <input type="checkbox" id="cc-trig" ${d.trigger_comment_event !== false ? 'checked' : ''}>
-            <span style="font-size:0.85rem;">${I18N.t('cc.triggerCommentEvent')}</span>
-          </label>
-        </div>`;
+    const stepNames = [I18N.t('cc.stepBasic'), I18N.t('cc.stepAccess'), I18N.t('cc.stepCommands')];
+    if (stepsBar) {
+      stepsBar.innerHTML = stepNames.map((name, i) => {
+        let cls = '';
+        if (i === this._wizardStep) cls = 'active';
+        else if (i < this._wizardStep) cls = 'done';
+        return `<div class="wizard-step-dot ${cls}" title="${escapeHtml(name)}"></div>`;
+      }).join('');
     }
+
+    if (this._wizardStep === 0) this._renderStepBasic(d, body);
+    else if (this._wizardStep === 1) this._renderStepAccess(d, body);
+    else if (this._wizardStep === 2) this._renderStepCommands(d, body);
   }
 
+  /* ─── Step 0: Basic ─── */
+  _renderStepBasic(d, body) {
+    const isPlugin = d.handler === 'plugin';
+    body.innerHTML = `
+      <div class="form-group">
+        <label>${I18N.t('cc.prefix')}</label>
+        <div style="display:flex;align-items:center;gap:0.8rem;">
+          <input type="text" id="cc-wiz-prefix" value="${escapeHtml(d.prefix || '#')}" maxlength="1"
+            style="width:70px;padding:0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:1.3rem;text-align:center;font-weight:700;">
+          <span class="hint" style="margin:0;">e.g. #, !, $, @, *</span>
+        </div>
+        <div id="cc-wiz-prefix-error" class="cc-validation-error" style="display:none;"></div>
+      </div>
+      <div class="form-group">
+        <label>${I18N.t('cc.handler')}</label>
+        <select id="cc-wiz-handler" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%;">
+          <option value="rcon" ${d.handler === 'rcon' ? 'selected' : ''}>RCON — ${I18N.t('cc.handlerRconDesc')}</option>
+          <option value="http" ${d.handler === 'http' ? 'selected' : ''}>HTTP — ${I18N.t('cc.handlerHttpDesc')}</option>
+          <option value="plugin" ${isPlugin ? 'selected' : ''}>Plugin — ${I18N.t('cc.handlerPluginDesc')}</option>
+        </select>
+      </div>
+      <div id="cc-wiz-plugin-row" class="form-group" style="display:${isPlugin ? 'block' : 'none'};">
+        <label>Plugin</label>
+        <select id="cc-wiz-plugin-name" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%;">
+          <option value="">—</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+          <input type="checkbox" class="toggle" ${d.enabled ? 'checked' : ''} id="cc-wiz-enabled">
+          <span>${I18N.t('cc.enabled')}</span>
+        </label>
+      </div>
+      <div id="cc-wiz-error" class="cc-validation-error" style="display:none;"></div>`;
+
+    const prefixEl = document.getElementById('cc-wiz-prefix');
+    if (prefixEl) prefixEl.addEventListener('input', () => {
+      d.prefix = prefixEl.value;
+      const errEl = document.getElementById('cc-wiz-prefix-error');
+      const otherIdx = this._wizardMode === 'edit' ? this._wizardIndex : -1;
+      const prefix = prefixEl.value.trim();
+      if (!prefix) {
+        errEl.style.display = 'none'; prefixEl.style.borderColor = '';
+      } else if (prefix.length !== 1 || !CommentCommandsEditor._isSpecialChar(prefix)) {
+        errEl.textContent = I18N.t('cc.prefixInvalid');
+        errEl.style.display = 'flex';
+        prefixEl.style.borderColor = 'var(--color-danger)';
+      } else if (this.data.groups.some((g, i) => i !== otherIdx && (g.prefix || '').trim() === prefix)) {
+        errEl.textContent = I18N.t('cc.prefixDuplicate');
+        errEl.style.display = 'flex';
+        prefixEl.style.borderColor = 'var(--color-danger)';
+      } else {
+        errEl.style.display = 'none';
+        prefixEl.style.borderColor = '';
+      }
+    });
+    const handlerEl = document.getElementById('cc-wiz-handler');
+    if (handlerEl) handlerEl.addEventListener('change', () => {
+      d.handler = handlerEl.value;
+      const pluginRow = document.getElementById('cc-wiz-plugin-row');
+      if (pluginRow) pluginRow.style.display = d.handler === 'plugin' ? 'block' : 'none';
+    });
+    const pluginNameEl = document.getElementById('cc-wiz-plugin-name');
+    if (pluginNameEl) {
+      pluginNameEl.addEventListener('change', () => { d.plugin_name = pluginNameEl.value; });
+      this._loadPluginsForSelect(pluginNameEl, d.plugin_name);
+    }
+    const enabledEl = document.getElementById('cc-wiz-enabled');
+    if (enabledEl) enabledEl.addEventListener('change', () => { d.enabled = enabledEl.checked; });
+  }
+
+  /* ─── Step 1: Access ─── */
+  _renderStepAccess(d, body) {
+    const roles = d.allowed_roles || [];
+    const showSecurityWarning = d.handler === 'rcon' && d.mode === 'allow-all' && roles.includes('all');
+    body.innerHTML = `
+      <div class="form-group">
+        <label>${I18N.t('cc.allowedRoles')}</label>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+          ${['all', 'moderator', 'superfan', 'fanclub'].map(r => `<label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+            <input type="checkbox" value="${r}" ${roles.includes(r) ? 'checked' : ''} class="cc-role-cb"> ${r}
+          </label>`).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>${I18N.t('cc.mode')}</label>
+        <select id="cc-wiz-mode" style="padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);width:100%;">
+          <option value="deny-all" ${d.mode === 'deny-all' ? 'selected' : ''}>deny-all — ${I18N.t('cc.modeDenyDesc')}</option>
+          <option value="allow-all" ${d.mode === 'allow-all' ? 'selected' : ''}>allow-all — ${I18N.t('cc.modeAllowDesc')}</option>
+        </select>
+      </div>
+      <div id="cc-security-warning" class="cc-security-warning" style="display:${showSecurityWarning ? 'block' : 'none'};">
+        ${I18N.t('cc.securityWarning')}
+      </div>`;
+
+    document.querySelectorAll('.cc-role-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        d.allowed_roles = [...document.querySelectorAll('.cc-role-cb:checked')].map(c => c.value);
+        this._updateSecurityWarning(d);
+      });
+    });
+    const modeEl = document.getElementById('cc-wiz-mode');
+    if (modeEl) modeEl.addEventListener('change', () => {
+      d.mode = modeEl.value;
+      this._updateSecurityWarning(d);
+    });
+  }
+
+  _updateSecurityWarning(d) {
+    const warnEl = document.getElementById('cc-security-warning');
+    if (!warnEl) return;
+    const show = d.handler === 'rcon' && d.mode === 'allow-all' && (d.allowed_roles || []).includes('all');
+    warnEl.style.display = show ? 'block' : 'none';
+  }
+
+  /* ─── Step 2: Commands ─── */
+  _renderStepCommands(d, body) {
+    const cmds = d.commands || [];
+    body.innerHTML = `
+      <div class="form-group">
+        <label>${I18N.t('cc.commands')} <span style="font-weight:400;color:var(--text-secondary);font-size:0.8rem;">(${I18N.t('cc.commandsHelp')})</span></label>
+        <div class="cc-cmd-chips" id="cc-chips-container">
+          ${cmds.map(c => `<span class="cc-cmd-chip">${escapeHtml(c)}<span class="cc-cmd-chip-remove" data-cmd="${escapeHtml(c)}">&times;</span></span>`).join('')}
+          <input type="text" class="cc-cmd-input" id="cc-cmd-input" placeholder="${I18N.t('cc.commandsPlaceholder')}" value="">
+        </div>
+        <div id="cc-cmds-error" class="cc-validation-error" style="display:none;"></div>
+      </div>
+      <div style="display:flex;gap:1rem;">
+        <div class="form-group" style="flex:1;">
+          <label>${I18N.t('cc.cooldown')} (s)</label>
+          <input type="number" id="cc-cd" min="0" value="${d.cooldown || 0}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>${I18N.t('cc.userCooldown')} (s)</label>
+          <input type="number" id="cc-ucd" min="0" value="${d.user_cooldown || 0}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        </div>
+      </div>
+      ${d.handler === 'http' ? `<div class="form-group">
+        <label>${I18N.t('cc.url')}</label>
+        <input type="text" id="cc-url" value="${escapeHtml(d.url || '')}" style="width:100%;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);" placeholder="${I18N.t('cc.urlPlaceholder')}">
+      </div>` : ''}
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+          <input type="checkbox" id="cc-trig" ${d.trigger_comment_event !== false ? 'checked' : ''}>
+          <span style="font-size:0.85rem;">${I18N.t('cc.triggerCommentEvent')}</span>
+        </label>
+      </div>
+      <p class="hint" style="margin-top:var(--space-2);">${I18N.t('cc.hintOverrides')}</p>
+      ${d.handler === 'plugin' && d.plugin_name ? `<div class="cc-plugin-commands-ref">
+        <div class="cc-plugin-commands-ref-header" id="cc-ref-toggle">
+          <h4><span class="mi" style="font-size:14px;">extension</span> ${I18N.t('cc.availableCommands')} — ${escapeHtml(d.plugin_name)}</h4>
+          <span class="cc-ref-toggle" id="cc-ref-arrow">▾</span>
+        </div>
+        <div class="cc-plugin-commands-ref-body" id="cc-ref-body">
+          ${this._renderPluginCommandsRef(d)}
+        </div>
+      </div>` : ''}`;
+
+    this._bindChipInput(d);
+    this._bindRefPanel(d);
+  }
+
+  _bindChipInput(d) {
+    const container = document.getElementById('cc-chips-container');
+    const input = document.getElementById('cc-cmd-input');
+    if (!container || !input) return;
+
+    const addChip = (val) => {
+      const v = val.trim().toLowerCase();
+      if (!v || (d.commands || []).includes(v)) return;
+      d.commands.push(v);
+      const chip = document.createElement('span');
+      chip.className = 'cc-cmd-chip';
+      chip.innerHTML = `${escapeHtml(v)}<span class="cc-cmd-chip-remove" data-cmd="${escapeHtml(v)}">&times;</span>`;
+      container.insertBefore(chip, input);
+      chip.querySelector('.cc-cmd-chip-remove').addEventListener('click', () => {
+        d.commands = d.commands.filter(c => c !== v);
+        chip.remove();
+      });
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = input.value.replace(',', '').trim();
+        if (val) { addChip(val); input.value = ''; }
+      }
+      if (e.key === 'Backspace' && !input.value && d.commands.length) {
+        const last = d.commands[d.commands.length - 1];
+        d.commands.pop();
+        const lastChip = container.querySelector(`.cc-cmd-chip-remove[data-cmd="${CSS.escape(last)}"]`)?.closest('.cc-cmd-chip');
+        if (lastChip) lastChip.remove();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      const val = input.value.replace(',', '').trim();
+      if (val) { addChip(val); input.value = ''; }
+    });
+
+    container.addEventListener('click', (e) => {
+      if (e.target === container || e.target === input) input.focus();
+    });
+
+    container.querySelectorAll('.cc-cmd-chip-remove').forEach(btn => {
+      const v = btn.dataset.cmd;
+      btn.addEventListener('click', () => {
+        d.commands = d.commands.filter(c => c !== v);
+        btn.closest('.cc-cmd-chip')?.remove();
+      });
+    });
+  }
+
+  _renderPluginCommandsRef(d) {
+    const pname = d.plugin_name;
+    const cmds = pname ? (this._pluginCatalog[pname] || null) : null;
+    if (!cmds || !Object.keys(cmds).length) return `<p style="color:var(--text-muted);font-size:var(--text-sm);margin:0;">${I18N.t('cc.noPluginCommands')}</p>`;
+    return `<div class="cc-plugin-cmd-group">
+      <div class="cc-plugin-cmd-group-name">${escapeHtml(pname)}</div>
+      ${Object.keys(cmds).map(k => {
+        const c = cmds[k];
+        return `<div class="cc-plugin-cmd-item">
+          <span class="cc-plugin-cmd-name" data-plugin="${escapeHtml(pname)}" data-cmd="${escapeHtml(k)}" title="Click to add">${escapeHtml(k)}</span>
+          <span class="cc-plugin-cmd-desc">${escapeHtml(c.desc || c.name || '')}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  _bindRefPanel(d) {
+    const toggle = document.getElementById('cc-ref-toggle');
+    const body = document.getElementById('cc-ref-body');
+    const arrow = document.getElementById('cc-ref-arrow');
+    if (body && arrow && this._refPanelOpen) {
+      body.classList.add('open');
+      arrow.classList.add('open');
+    }
+    if (toggle && body && arrow) {
+      toggle.addEventListener('click', () => {
+        this._refPanelOpen = !this._refPanelOpen;
+        body.classList.toggle('open', this._refPanelOpen);
+        arrow.classList.toggle('open', this._refPanelOpen);
+      });
+    }
+    document.querySelectorAll('.cc-plugin-cmd-name[data-plugin]').forEach(el => {
+      el.addEventListener('click', () => {
+        const val = el.dataset.cmd;
+        if (val && !d.commands.includes(val)) {
+          d.commands.push(val);
+          const container = document.getElementById('cc-chips-container');
+          const input = document.getElementById('cc-cmd-input');
+          if (container && input) {
+            const chip = document.createElement('span');
+            chip.className = 'cc-cmd-chip';
+            chip.innerHTML = `${escapeHtml(val)}<span class="cc-cmd-chip-remove" data-cmd="${escapeHtml(val)}">&times;</span>`;
+            container.insertBefore(chip, input);
+            chip.querySelector('.cc-cmd-chip-remove').addEventListener('click', () => {
+              d.commands = d.commands.filter(c => c !== val);
+              chip.remove();
+            });
+          }
+        }
+      });
+    });
+  }
+
+  /* ─── Commit wizard ─── */
   _commitWizard() {
     const draft = this._wizardDraft;
     if (!draft.prefix) { showToast(I18N.t('cc.prefixRequired'), 'error'); return; }
