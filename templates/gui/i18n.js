@@ -1825,7 +1825,7 @@
 
     /* ── Comment Commands ── */
     'cc.title': 'Chat-Befehle',
-    'cc.subtitle': 'Lass Zuschauer Minecraft-Befehle über den TikTok-Chat ausführen',
+    'cc.subtitle': 'Minecraft-Befehle via TikTok-Chat für Zuschauer',
     'cc.masterSwitch': 'Alle Befehlsgruppen aktivieren',
     'cc.globalCooldown': 'Globaler Cooldown',
     'cc.globalUserCooldown': 'Globaler Benutzer-Cooldown',
