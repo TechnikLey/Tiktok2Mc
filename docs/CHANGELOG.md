@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Comment commands centralized** — ALL comment commands (including plugin commands) are now configured in a single place: `comment_commands.yaml`. The old split system where plugins declared their own `comment_handler` in `plugin.json` is removed. To route chat commands to a plugin, add a group with `handler: plugin` and set `plugin_name` to the plugin's name. You can see and edit everything — system and plugin commands — in one overview.
 - **Documentation overhaul** — All documentation has been completely rewritten to reflect the v1.0.0 rewrite: `README.md`, `GUIDE.md`, and both `dev-book-de` / `dev-book-en` developer books are updated with the new GUI workflow and current architecture.
 - **Timer, Win Counter, Death Counter** — these plugins no longer depend on each other. You can use any combination without one forcing settings on another.
 - **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
@@ -55,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ChannelPoints plugin** (economy and points system)
 - **LikeGoal plugin** (like goal overlay)
 - **`shell_actions.txt`** — replaced by the `&` prefix in `actions.mca`
+- **Plugin `comment_handler` from plugin.json** — plugin comment routing is no longer declared in the plugin manifest. Use `comment_commands.yaml` with `handler: plugin` instead.
+- **Comment handler API endpoints** — `PUT/DELETE /plugins/{name}/comment-handler` and `GET /comment-handlers` have been removed.
 
 ### Fixed
 
