@@ -404,57 +404,27 @@ Plugins are optional features you can turn on or off.
 
 ### Timer
 
-A configurable timer for your stream. Can count down from a set time or count up from zero.
+A configurable timer for your stream. Can count down from a set time or count up from zero. Supports milestones, auto-start, looping, and an OBS overlay.
 
-**Settings** (in the Dashboard under Plugins → Timer, or in `plugins/timer/config.yaml`):
-- `direction` — `down` (countdown) or `up` (count up)
-- `start_time` — starting time in seconds
-- `time_step` — seconds added/removed per tick (default: 1)
-- `auto_start` — start automatically when the tool loads
-- `loop` — when counting down, reset to start time instead of pausing at zero
-- `reset_on` — events that trigger auto-reset: `zero`, `manual`, `command`
-- `signal_on` — timer events published to EventBus (e.g., `zero`, `started`, `paused`, `reset`)
-- `milestones` — list of times (seconds) that emit `timer.milestone` events
-- `format` — display format: `mm:ss`, `hh:mm:ss`, or `seconds`
-- `theme` — customize colors (background, text, warning, blink, danger)
-
-Control it via chat commands (if configured), the Dashboard, or the Event-Command Mapper.
+[Timer Plugin — full documentation](../src/plugins/timer/README.md)
 
 ### Death Counter
 
-Automatically detects player deaths and counts them. No setup needed beyond enabling.
+Automatically detects player deaths and counts them. No setup needed beyond enabling. Supports milestones and an OBS overlay.
 
-The counter updates in real-time on the overlay. You can configure milestones that trigger events in the Event-Command Mapper.
+[Death Counter Plugin — full documentation](../src/plugins/deathcounter/README.md)
 
 ### Win Counter
 
-Tracks wins and losses. Configure how many wins are needed for each milestone.
+Tracks wins and losses with configurable milestones. Use the Event-Command Mapper to add wins automatically (e.g., when the timer hits zero).
 
-**Settings** (in the Dashboard under Plugins → Win Counter, or in `plugins/wincounter/config.yaml`):
-- `initial_needed` — wins required for the first milestone
-- `milestone_increment` — additional wins needed for each next milestone
-
-Use the Event-Command Mapper to add wins automatically (e.g., when the timer hits zero).
+[Win Counter Plugin — full documentation](../src/plugins/wincounter/README.md)
 
 ### Spotify Control
 
-Lets viewers control your Spotify playback through TikTok chat. Viewers can type commands like `$play`, `$pause`, `$skip`, `$volume 50`.
+Lets viewers control your Spotify playback through TikTok chat. Requires a Spotify Developer App (Client ID + Secret) and the `$` comment command group to be enabled.
 
-**Setup:**
-1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app.
-2. Add `http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control` as a Redirect URI.
-3. Enter your Client ID and Client Secret in the Dashboard (Plugins → Spotify Control → Config), or directly in `plugins/spotify/config.yaml`.
-4. Enable the plugin in the Dashboard (Plugins → toggle Spotify Control on).
-5. On first start, your browser will open for Spotify login.
-
-**Settings:**
-- `volume_step` — percent change per volume up/down command (default: 10)
-- `playtrack_mode` — `replace` (play immediately) or `queue` (add to queue)
-- `theme` — customize colors (background, text, accent)
-
-The overlay shows the current track with album art.
-
-> You also need to enable the `$` comment command group (under `comment_commands` in the Dashboard's Settings, or in `config.yaml`) for chat commands to work.
+[Spotify Control Plugin — full documentation](../src/plugins/spotify/README.md)
 
 ---
 
