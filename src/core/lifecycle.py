@@ -553,6 +553,18 @@ class ProcessSupervisor:
                     _update_process_health(name, ProcessState.FAILED)
                     return False
 
+            # A concurrent stop() may have changed proc.state while we were
+            # blocked in the readiness loop.  Honour that and bail out instead
+            # of racing the health monitor with an illegal transition.
+            if proc.state != ProcessState.STARTING:
+                log.info(
+                    "[SUPERVISOR] %s was stopped/restarted during readiness check "
+                    "(state: %s) — aborting start",
+                    name,
+                    proc.state.value,
+                )
+                return False
+
             proc.state = ProcessState.RUNNING
             proc.start_time = time.time()
             _update_process_health(name, ProcessState.RUNNING)
