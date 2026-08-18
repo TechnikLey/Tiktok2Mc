@@ -44,6 +44,9 @@ window.pywebview = {
   },
 };
 
+// Prevent app.js init() from starting intervals that outlive the test env
+window.__TEST__ = true;
+
 // --- Transform top-level declarations to window.* assignments ---
 // Only affects declarations at brace depth 0 (not inside functions/blocks)
 

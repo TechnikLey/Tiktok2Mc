@@ -8524,22 +8524,24 @@ async function init() {
   checkAllUpdates();
   if (isFirstRun(currentConfig)) showWizard();
   else hideWizard();
-  _healthIntervalId = setInterval(loadHealth, 10000);
-  _statusIntervalId = setInterval(loadStatus, 10000);
-  _pluginsIntervalId = setInterval(loadPlugins, 5000);
-  _hooksIntervalId = setInterval(loadHooks, 10000);
-  _uptimeIntervalId = setInterval(() => {
-    const activeView = document.querySelector('.view.active');
-    if (activeView && activeView.id === 'view-status') {
-      _updateUptimeDisplay();
+  if (!window.__TEST__) {
+    _healthIntervalId = setInterval(loadHealth, 10000);
+    _statusIntervalId = setInterval(loadStatus, 10000);
+    _pluginsIntervalId = setInterval(loadPlugins, 5000);
+    _hooksIntervalId = setInterval(loadHooks, 10000);
+    _uptimeIntervalId = setInterval(() => {
+      const activeView = document.querySelector('.view.active');
+      if (activeView && activeView.id === 'view-status') {
+        _updateUptimeDisplay();
+      }
+      if (activeView && (activeView.id === 'view-status' || activeView.id === 'view-servers')) {
+        _updateServerUptimeDisplay();
+      }
+      _updateTiktokStatusDisplay();
+    }, 1000);
+    if (typeof pywebview !== 'undefined' && pywebview.api) {
+      _closePollIntervalId = setInterval(_pollCloseRequest, 200);
     }
-    if (activeView && (activeView.id === 'view-status' || activeView.id === 'view-servers')) {
-      _updateServerUptimeDisplay();
-    }
-    _updateTiktokStatusDisplay();
-  }, 1000);
-  if (typeof pywebview !== 'undefined' && pywebview.api) {
-    _closePollIntervalId = setInterval(_pollCloseRequest, 200);
   }
 }
 function hideAppLoading() {
