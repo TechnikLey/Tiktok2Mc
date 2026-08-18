@@ -6300,6 +6300,7 @@ class CommentCommandsEditor {
     this._expandedOverride = null;
     this._pluginCatalog = {};
     this._refPanelOpen = false;
+    this._openPluginRefPanels = new Set();
     this._bindEvents();
   }
 
@@ -6546,17 +6547,18 @@ class CommentCommandsEditor {
       const pcmds = this._pluginCatalog[g.plugin_name];
       const pkeys = Object.keys(pcmds);
       if (pkeys.length) {
+        const isOpen = this._openPluginRefPanels.has(i);
         panelHtml += `<div class="cc-plugin-commands-ref" style="margin-top:var(--space-3);">
-          <div class="cc-plugin-commands-ref-header" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.cc-ref-toggle').classList.toggle('open')">
+          <div class="cc-plugin-commands-ref-header" onclick="commentCommandsEditor._toggleInlinePluginRef(${i})">
             <h4><span class="mi" style="font-size:14px;">extension</span> ${I18N.t('cc.availableCommands')} — ${escapeHtml(g.plugin_name)}</h4>
-            <span class="cc-ref-toggle">▾</span>
+            <span class="cc-ref-toggle${isOpen ? ' open' : ''}">▾</span>
           </div>
-          <div class="cc-plugin-commands-ref-body">
+          <div class="cc-plugin-commands-ref-body${isOpen ? ' open' : ''}">
             ${pkeys.map(k => {
               const c = pcmds[k];
               const alreadyAdded = cmds.includes(k);
               return `<div class="cc-plugin-cmd-item">
-                <span class="cc-plugin-cmd-name${alreadyAdded ? '' : ''}" data-cmd="${escapeHtml(k)}" ${alreadyAdded ? 'style="opacity:0.4;cursor:default;"' : `onclick="commentCommandsEditor.addCommand(${i},'${escapeHtml(k)}')"`} title="${alreadyAdded ? 'Already added' : 'Click to add'}">${escapeHtml(k)}${alreadyAdded ? ' ✓' : ''}</span>
+                <span class="cc-plugin-cmd-name" data-cmd="${escapeHtml(k)}" ${alreadyAdded ? 'style="opacity:0.4;cursor:default;"' : `onclick="commentCommandsEditor.addCommand(${i},'${escapeHtml(k)}')"`} title="${alreadyAdded ? 'Already added' : 'Click to add'}">${escapeHtml(k)}${alreadyAdded ? ' ✓' : ''}</span>
                 <span class="cc-plugin-cmd-desc">${escapeHtml(c.desc || c.name || '')}</span>
               </div>`;
             }).join('')}
@@ -6639,6 +6641,15 @@ class CommentCommandsEditor {
         this._collectAndSaveOverride(this._expandedOverride.groupIdx, this._expandedOverride.cmdName);
       }
       this._expandedOverride = { groupIdx, cmdName: cmd };
+    }
+    this.renderList();
+  }
+
+  _toggleInlinePluginRef(groupIdx) {
+    if (this._openPluginRefPanels.has(groupIdx)) {
+      this._openPluginRefPanels.delete(groupIdx);
+    } else {
+      this._openPluginRefPanels.add(groupIdx);
     }
     this.renderList();
   }
@@ -7041,12 +7052,14 @@ class CommentCommandsEditor {
     const pname = d.plugin_name;
     const cmds = pname ? (this._pluginCatalog[pname] || null) : null;
     if (!cmds || !Object.keys(cmds).length) return `<p style="color:var(--text-muted);font-size:var(--text-sm);margin:0;">${I18N.t('cc.noPluginCommands')}</p>`;
+    const existing = new Set(d.commands || []);
     return `<div class="cc-plugin-cmd-group">
       <div class="cc-plugin-cmd-group-name">${escapeHtml(pname)}</div>
       ${Object.keys(cmds).map(k => {
         const c = cmds[k];
+        const alreadyAdded = existing.has(k);
         return `<div class="cc-plugin-cmd-item">
-          <span class="cc-plugin-cmd-name" data-plugin="${escapeHtml(pname)}" data-cmd="${escapeHtml(k)}" title="Click to add">${escapeHtml(k)}</span>
+          <span class="cc-plugin-cmd-name" data-plugin="${escapeHtml(pname)}" data-cmd="${escapeHtml(k)}" ${alreadyAdded ? 'style="opacity:0.4;cursor:default;"' : 'title="Click to add"'}>${escapeHtml(k)}${alreadyAdded ? ' ✓' : ''}</span>
           <span class="cc-plugin-cmd-desc">${escapeHtml(c.desc || c.name || '')}</span>
         </div>`;
       }).join('')}
@@ -7073,6 +7086,10 @@ class CommentCommandsEditor {
         const val = el.dataset.cmd;
         if (val && !d.commands.includes(val)) {
           d.commands.push(val);
+          el.style.opacity = '0.4';
+          el.style.cursor = 'default';
+          el.title = 'Already added';
+          el.textContent = val + ' ✓';
           const container = document.getElementById('cc-chips-container');
           const input = document.getElementById('cc-cmd-input');
           if (container && input) {
@@ -7083,6 +7100,10 @@ class CommentCommandsEditor {
             chip.querySelector('.cc-cmd-chip-remove').addEventListener('click', () => {
               d.commands = d.commands.filter(c => c !== val);
               chip.remove();
+              el.style.opacity = '';
+              el.style.cursor = '';
+              el.title = 'Click to add';
+              el.textContent = val;
             });
           }
         }
