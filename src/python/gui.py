@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -109,6 +110,7 @@ class LauncherAPI:
 
     def close_app(self) -> str:
         """Destroy the GUI window immediately so the process exits."""
+        log.warning("close_app() called — destroying window")
         if _window is not None:
             try:
                 _window.destroy()
@@ -181,6 +183,11 @@ class LauncherAPI:
     def stop_system(self) -> str:
         """Stop the system process gracefully via API, then force-kill if needed."""
         global _full_system_proc
+        log.warning(
+            "stop_system() called — _full_system_proc=%s, poll=%s",
+            _full_system_proc,
+            _full_system_proc.poll() if _full_system_proc is not None else "N/A",
+        )
         if _full_system_proc is None or _full_system_proc.poll() is not None:
             return "not_running"
 
@@ -271,6 +278,12 @@ class LauncherAPI:
 
 def _cleanup_processes():
     """Terminate any spawned processes on GUI exit."""
+    log.warning(
+        "atexit _cleanup_processes() called — PID=%s, _full_system_proc=%s, poll=%s",
+        os.getpid(),
+        _full_system_proc,
+        _full_system_proc.poll() if _full_system_proc is not None else "N/A",
+    )
     if _full_system_proc is None or _full_system_proc.poll() is not None:
         log.debug("Cleanup: no managed process to stop, skipping.")
         return
@@ -480,7 +493,10 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
         t.start()
 
     def _on_closing():
-        # Allow window to close normally; process cleanup is handled by atexit
+        log.warning(
+            "GUI WINDOW CLOSING — _on_closing() called. Stack trace:\n%s",
+            "".join(traceback.format_stack()),
+        )
         return True
 
     _window.events.closing += _on_closing
@@ -489,6 +505,8 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
             webview.start(gui="qt", debug=False)
         else:
             webview.start(debug=False)
+        log.warning("webview.start() returned — window closed or destroyed")
+        log.warning("main() returning — atexit handlers will fire next")
     except Exception as exc:  # process exits with hints on any GUI backend error
         hint = _linux_install_hint()
         log.error("GUI backend error: %s", exc)
@@ -502,6 +520,7 @@ if __name__ == "__main__":
     heartbeat = start_heartbeat(log, interval=60.0)
     health = get_health_monitor()
     health.register("gui", HealthState.STARTING)
+    log.info("GUI process starting — PID=%s", os.getpid())
     try:
         health.set_state("gui", HealthState.RUNNING)
         main()
