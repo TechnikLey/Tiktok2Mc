@@ -6292,6 +6292,10 @@ class ReactionEditor {
 
   _openWizard() {
     this.wizardEl.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      const body = this.wizardEl.querySelector('.reaction-wizard-body');
+      if (body) body.scrollTop = 0;
+    });
   }
 
   _closeWizard() {
