@@ -875,6 +875,84 @@ async def check_and_run() -> None:
 # -----------------------------
 # Console command loop
 # -----------------------------
+
+
+def _cli_write_plugin_signal(plugin_name: str, action: str) -> bool:
+    """Write a plugin lifecycle signal file for ``check_and_run()``."""
+    signal_file = RUNTIME_DIR / f"plugin_{action}_{plugin_name}"
+    try:
+        signal_file.write_text(plugin_name, encoding="utf-8")
+        return True
+    except OSError as exc:
+        log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
+        return False
+
+
+def _cli_list_plugins() -> None:
+    """Print all registered plugins with their status."""
+    from core.api.registry import get_registry
+
+    try:
+        registry = get_registry()
+        plugins = registry.list()
+    except Exception as exc:
+        log.error("Failed to load plugin registry: %s", exc)
+        return
+    if not plugins:
+        log.info("\nNo plugins registered.")
+        return
+    log.info("\nRegistered plugins:")
+    for p in sorted(plugins, key=lambda x: x.name):
+        status = "enabled" if p.enabled else "disabled"
+        log.info("  %-30s %s", p.name, status)
+
+
+def _cli_enable_plugin(name: str) -> None:
+    """Enable a plugin by name."""
+    from core.api.registry import get_registry
+
+    try:
+        registry = get_registry()
+        plugin = registry.get(name)
+    except Exception as exc:
+        log.error("Failed to access plugin registry: %s", exc)
+        return
+    if plugin is None:
+        log.error("Plugin '%s' not found in registry.", name)
+        return
+    if plugin.enabled:
+        log.info("Plugin '%s' is already enabled.", name)
+        return
+    if not _cli_write_plugin_signal(name, "start"):
+        log.error("Failed to signal start for plugin '%s'.", name)
+        return
+    registry.update(name, enabled=True, health_status="starting")
+    log.info("Plugin '%s' enabled.", name)
+
+
+def _cli_disable_plugin(name: str) -> None:
+    """Disable a plugin by name."""
+    from core.api.registry import get_registry
+
+    try:
+        registry = get_registry()
+        plugin = registry.get(name)
+    except Exception as exc:
+        log.error("Failed to access plugin registry: %s", exc)
+        return
+    if plugin is None:
+        log.error("Plugin '%s' not found in registry.", name)
+        return
+    if not plugin.enabled:
+        log.info("Plugin '%s' is already disabled.", name)
+        return
+    if not _cli_write_plugin_signal(name, "stop"):
+        log.error("Failed to signal stop for plugin '%s'.", name)
+        return
+    registry.update(name, enabled=False, health_status="unknown")
+    log.info("Plugin '%s' disabled.", name)
+
+
 async def command_loop() -> None:
     """Read console commands and dispatch them."""
     while True:
@@ -894,17 +972,36 @@ async def command_loop() -> None:
                 "The application continues to run."
             )
             return
-        cmd = cmd.strip().lower()
-        if cmd == "help":
+        parts = cmd.strip().split()
+        if not parts:
+            continue
+        command = parts[0].lower()
+        args = parts[1:]
+        if command == "help":
             log.info("\nAvailable commands:")
-            log.info("  exit  - Stop all programs and close")
-            log.info("  stop  - Cancel active shutdown countdown")
-        elif cmd == "exit":
+            log.info("  exit              - Stop all programs and close")
+            log.info("  stop              - Cancel active shutdown countdown")
+            log.info("  plugins           - List all registered plugins")
+            log.info("  enable <name>     - Enable a plugin")
+            log.info("  disable <name>    - Disable a plugin")
+        elif command == "exit":
             break
-        elif cmd == "stop":
+        elif command == "stop":
             shutdown_cancel_event.set()
+        elif command == "plugins":
+            await asyncio.to_thread(_cli_list_plugins)
+        elif command == "enable":
+            if not args:
+                log.info("Usage: enable <plugin-name>")
+            else:
+                await asyncio.to_thread(_cli_enable_plugin, args[0])
+        elif command == "disable":
+            if not args:
+                log.info("Usage: disable <plugin-name>")
+            else:
+                await asyncio.to_thread(_cli_disable_plugin, args[0])
         else:
-            log.info("Unknown command: %s", cmd)
+            log.info("Unknown command: %s (type 'help' for commands)", cmd)
 
     if supervisor.state != SupervisorState.COMPLETE:
         await supervisor.shutdown()

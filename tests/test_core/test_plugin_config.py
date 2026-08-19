@@ -128,7 +128,6 @@ class TestLoadPluginConfig:
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
 
         cfg = load_plugin_config(plugin_dir)
-        assert cfg["enabled"] is True  # framework default
         assert cfg["port"] == 8080
 
     def test_merge_existing_with_defaults(self, tmp_path):
@@ -148,7 +147,6 @@ class TestLoadPluginConfig:
         save_yaml(plugin_dir / "config.yaml", {"port": 9090}, backup=False)
 
         cfg = load_plugin_config(plugin_dir)
-        assert cfg["enabled"] is True  # framework default
         assert cfg["port"] == 9090  # existing
         assert cfg["host"] == "localhost"  # default
 
@@ -166,7 +164,7 @@ class TestLoadPluginConfig:
         (plugin_dir / "config.yaml").write_text(": broken", encoding="utf-8")
 
         cfg = load_plugin_config(plugin_dir)
-        assert cfg["enabled"] is True  # framework default
+        assert cfg == {}  # no schema, no file → empty config
 
     def test_no_schema_no_file(self, tmp_path):
         plugin_dir = tmp_path / "myplugin"
@@ -175,7 +173,7 @@ class TestLoadPluginConfig:
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
 
         cfg = load_plugin_config(plugin_dir)
-        assert cfg == {"enabled": True}  # framework default
+        assert cfg == {}  # no schema, no file → empty config
 
 
 class TestSavePluginConfig:
@@ -376,16 +374,18 @@ class TestConfigValidationOnLoad:
                 {
                     "name": "test-plugin",
                     "config_schema": {
-                        "fields": [],
+                        "fields": [
+                            {"key": "port", "type": "integer", "default": 8080},
+                        ],
                     },
                 }
             ),
             encoding="utf-8",
         )
-        # enabled is "yes" (string) instead of boolean — should be corrected
-        save_yaml(plugin_dir / "config.yaml", {"enabled": "yes"}, backup=False)
+        # port is "not-a-number" — should be healed to schema default
+        save_yaml(plugin_dir / "config.yaml", {"port": "not-a-number"}, backup=False)
         cfg = load_plugin_config(plugin_dir)
-        assert cfg["enabled"] is True  # corrected by framework
+        assert cfg["port"] == 8080  # healed to default
 
     def test_invalid_value_without_default_logs_warning(self, tmp_path, caplog):
         plugin_dir = tmp_path / "test-plugin"
@@ -425,12 +425,7 @@ class TestConfigValidationOnLoad:
             ),
             encoding="utf-8",
         )
-        # enabled is a framework field; invalid value is corrected by
-        # framework injection (not schema healing)
-        save_yaml(plugin_dir / "config.yaml", {"enabled": "bad-value"}, backup=False)
-        cfg = load_plugin_config(plugin_dir)
-        assert cfg["enabled"] is True  # corrected by framework
-        # port is invalid — healing should kick in for non-framework fields
+        # port is invalid — healing should kick in
         save_yaml(plugin_dir / "config.yaml", {"port": "not-a-number"}, backup=False)
         cfg = load_plugin_config(plugin_dir)
         assert cfg["port"] == 8080

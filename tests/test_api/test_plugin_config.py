@@ -150,14 +150,8 @@ class TestGetPluginSchema:
         assert body["name"] == "test-plugin"
         assert body["schema"] is not None
         assert body["schema"]["version"] == 1
-        # enabled (framework), port, label
-        assert len(body["schema"]["fields"]) == 3
-        # enabled should be marked as framework-managed
-        enabled_field = next(
-            f for f in body["schema"]["fields"] if f["key"] == "enabled"
-        )
-        assert enabled_field["framework"] is True
-        assert enabled_field["default"] is True
+        # port, label (no more injected framework fields)
+        assert len(body["schema"]["fields"]) == 2
 
     def test_get_schema_no_schema(self, client, fake_plugins_dir):
         plugin_dir = fake_plugins_dir / "no-schema"
@@ -169,11 +163,9 @@ class TestGetPluginSchema:
         resp = client.get("/api/v1/plugins/no-schema/config/schema")
         assert resp.status_code == 200
         schema = resp.json()["schema"]
-        # framework injects enabled even when plugin has no schema
+        # No framework fields injected, no plugin schema → empty fields
         assert schema is not None
-        assert len(schema["fields"]) == 1
-        assert schema["fields"][0]["key"] == "enabled"
-        assert schema["fields"][0]["framework"] is True
+        assert len(schema["fields"]) == 0
 
     def test_get_schema_unknown_plugin_404(self, client, fake_plugins_dir):
         resp = client.get("/api/v1/plugins/unknown-plugin/config/schema")

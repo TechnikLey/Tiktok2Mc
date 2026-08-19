@@ -240,7 +240,7 @@ def save_plugin_config(plugin_dir: Path, data: dict, backup: bool = True) -> Non
 #  Framework-managed fields
 # ---------------------------------------------------------------------------
 
-_FRAMEWORK_FIELDS = frozenset({"enabled"})
+_FRAMEWORK_FIELDS: frozenset[str] = frozenset()
 
 
 def _strip_framework_fields(schema: dict) -> dict:
@@ -261,11 +261,10 @@ def _strip_framework_fields(schema: dict) -> dict:
 def _inject_framework_fields(data: dict) -> dict:
     """Ensure framework-managed fields exist in *data* with valid types.
 
-    Currently injects ``enabled`` (default ``True``) if missing or not
-    boolean.  Existing values are preserved when valid.
+    This function is currently a no-op because ``_FRAMEWORK_FIELDS`` is
+    empty.  It is kept for forward compatibility: when a new framework
+    field is added, add its injection logic here.
     """
-    if not isinstance(data.get("enabled"), bool):
-        data["enabled"] = True
     return data
 
 
