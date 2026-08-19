@@ -1,20 +1,18 @@
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from threading import Lock
 from typing import Any
 
 from ruamel.yaml.comments import CommentedMap
 
 import core.paths
+from core.config_lock import config_transaction
 from core.utils import normalize_config_version
 from core.validation_framework import validate_config_schema
 from core.version import EXPECTED_CONFIG_VERSION
-from core.yaml_utils import deep_update_rt, load_yaml, save_yaml
+from core.yaml_utils import deep_update_rt, load_yaml
 
 log = logging.getLogger(__name__)
-
-_config_write_lock = Lock()
 
 
 class ApiService:
@@ -76,6 +74,11 @@ class ApiService:
     ) -> None:
         """Validate and write a config dict back to the YAML file atomically.
 
+        Uses a cross-process file lock to prevent concurrent writes from
+        corrupting the config.  The entire read-modify-write cycle runs
+        inside the lock so that no changes are lost between reading the
+        existing file and writing the merged result.
+
         The ``config_version`` is normalised and upgraded to the current
         baseline (*e.g.* legacy ``"0.7"`` → ``"1.0"``).
 
@@ -89,32 +92,31 @@ class ApiService:
         """
         data["config_version"] = EXPECTED_CONFIG_VERSION
 
-        # Load existing config to preserve comments/formatting
-        existing = (
-            load_yaml(self.config_path) if self.config_path.exists() else CommentedMap()
-        )
-        if not isinstance(existing, CommentedMap):
-            existing = (
-                CommentedMap(existing) if isinstance(existing, dict) else CommentedMap()
-            )
+        with config_transaction(self.config_path, backup=backup) as existing:
+            if not isinstance(existing, CommentedMap):
+                existing = (
+                    CommentedMap(existing)
+                    if isinstance(existing, dict)
+                    else CommentedMap()
+                )
 
-        # For keys marked as replace, remove nested keys in existing that are not in data
-        if replace_keys:
-            for key in replace_keys:
-                if key in data and key in existing:
-                    old_val = existing[key]
-                    new_val = data[key]
-                    if isinstance(old_val, (CommentedMap, dict)) and isinstance(
-                        new_val, dict
-                    ):
-                        for old_nested_key in list(old_val.keys()):
-                            if old_nested_key not in new_val:
-                                del old_val[old_nested_key]
+            # For keys marked as replace, remove nested keys in existing
+            # that are not in data.
+            if replace_keys:
+                for key in replace_keys:
+                    if key in data and key in existing:
+                        old_val = existing[key]
+                        new_val = data[key]
+                        if isinstance(old_val, (CommentedMap, dict)) and isinstance(
+                            new_val, dict
+                        ):
+                            for old_nested_key in list(old_val.keys()):
+                                if old_nested_key not in new_val:
+                                    del old_val[old_nested_key]
 
-        deep_update_rt(existing, data)
-        validate_config_schema(existing)
-        with _config_write_lock:
-            save_yaml(self.config_path, existing, backup=backup)
+            deep_update_rt(existing, data)
+            validate_config_schema(existing)
+
         log.info("Config written: %s", self.config_path)
 
     def get_config_status(self) -> bool:

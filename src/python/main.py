@@ -45,6 +45,7 @@ from TikTokLive.events import (
 
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import command_queue
+from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
 from core.error_codes import (
     HOOK_0006,
@@ -87,6 +88,8 @@ RUNTIME_DIR = get_runtime_dir()
 RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
 RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
 RELOAD_COMMENT_COMMANDS_SIGNAL = (RUNTIME_DIR / "reload_comment_commands").resolve()
+
+_last_config_version: int = 0
 
 
 class BotContext:
@@ -553,6 +556,7 @@ def _apply_comment_commands_from_yaml() -> None:
 
 def load_config():
     """Loads configuration values from the YAML config file."""
+    global _last_config_version
     if not CONFIG_FILE.exists():
         log.error(f"Config not found: {CONFIG_FILE}")
         return False
@@ -562,6 +566,7 @@ def load_config():
     try:
         config = load_yaml(CONFIG_FILE)
         _apply_config(config)
+        _last_config_version = read_config_version(CONFIG_FILE)
         return True
     except Exception as e:  # malformed user config must not crash the bridge
         log.error(f"Config error: {e}")
@@ -2377,12 +2382,14 @@ def _save_session_summary(entry: dict) -> None:
 
 async def reload_config():
     """Reload config.yaml at runtime without restarting the bridge."""
+    global _last_config_version
     log.info("[RELOAD] Config reload requested")
     try:
         _validate_dup_cmd_config()
         new_config = load_yaml(CONFIG_FILE)
         old_user = ctx.tiktok_user
         _apply_config(new_config)
+        _last_config_version = read_config_version(CONFIG_FILE)
 
         if ctx.hook_api is not None:
             ctx.hook_api.update_runtime_state(
@@ -2475,7 +2482,13 @@ async def _reload_signal_watcher():
                     RELOAD_CONFIG_SIGNAL.unlink()
                 except OSError:
                     pass
-                await reload_config()
+                current_ver = read_config_version(CONFIG_FILE)
+                if current_ver > 0 and current_ver == _last_config_version:
+                    log.debug(
+                        "[RELOAD] Config version unchanged (%d), skipping", current_ver
+                    )
+                else:
+                    await reload_config()
             if RELOAD_ACTIONS_SIGNAL.exists():
                 options = _read_signal_options(RELOAD_ACTIONS_SIGNAL)
                 try:

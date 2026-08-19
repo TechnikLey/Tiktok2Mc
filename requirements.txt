@@ -18,6 +18,7 @@ mcrcon==0.7.0
 pyinstaller==6.13.0
 packaging==26.0
 ruamel.yaml==0.19.1
+filelock==3.18.0
 
 # === SECURITY ===
 cryptography==44.0.2
