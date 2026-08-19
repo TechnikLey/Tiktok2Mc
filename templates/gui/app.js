@@ -1417,8 +1417,7 @@ function _populateMcPluginsInstanceSelector() {
   const prev = sel.value;
   sel.innerHTML = instances.length
     ? instances.map(inst => {
-      const status = inst.status || 'stopped';
-      return '<option value="' + escapeHtml(inst.id) + '">' + escapeHtml(inst.name) + ' (' + (inst.hasJar ? escapeHtml(inst.version) : I18N.t('servers.notInstalled')) + ') — ' + status + '</option>';
+      return '<option value="' + escapeHtml(inst.id) + '">' + escapeHtml(inst.name) + ' (' + (inst.hasJar ? escapeHtml(inst.version) : I18N.t('servers.notInstalled')) + ')</option>';
     }).join('')
     : '<option value="">' + I18N.t('servers.noInstances') + '</option>';
   if (prev && sel.querySelector('option[value="' + prev + '"]')) {
