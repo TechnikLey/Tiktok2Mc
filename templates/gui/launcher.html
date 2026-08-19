@@ -192,6 +192,93 @@
             text-align: center;
         }
         .footer-card p { font-size: 0.8rem; color: var(--color-text-muted); opacity: 0.6; }
+
+        .remote-btn {
+            width: 100%;
+            padding: 0.65rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            background: transparent;
+            color: var(--color-text-muted);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .remote-btn:hover { color: var(--color-text); border-color: var(--color-accent); background: var(--color-accent-subtle); }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-xl);
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            animation: modal-enter 200ms cubic-bezier(0.16,1,0.3,1);
+        }
+        @keyframes modal-enter {
+            from { opacity: 0; transform: translateY(12px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .modal h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .modal p {
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+            margin-bottom: 1rem;
+        }
+        .modal label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--color-text-muted);
+            margin-bottom: 0.3rem;
+        }
+        .modal input {
+            width: 100%;
+            padding: 0.55rem 0.75rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            background: var(--color-input);
+            color: var(--color-text);
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            transition: border-color var(--transition-fast);
+        }
+        .modal input:focus { outline: none; border-color: var(--color-accent); }
+        .modal input::placeholder { color: var(--color-text-muted); opacity: 0.5; }
+        .input-row { display: flex; gap: 0.75rem; }
+        .input-row > * { flex: 1; }
+        .modal-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .modal-actions button { flex: 1; padding: 0.6rem; border-radius: var(--radius-lg); font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; transition: all var(--transition-fast); }
+        .btn-primary { background: var(--color-accent); color: var(--color-bg); }
+        .btn-primary:hover { background: var(--color-accent-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: transparent; border: 1px solid var(--color-border) !important; color: var(--color-text-muted); }
+        .btn-secondary:hover { color: var(--color-text); border-color: var(--color-text-muted) !important; }
+        .modal-msg { font-size: 0.8rem; margin-top: 0.5rem; padding: 0.5rem; border-radius: var(--radius-lg); display: none; text-align: center; }
+        .modal-msg.error { display: block; background: var(--color-danger-subtle); color: var(--color-danger); border: 1px solid rgba(239,68,68,0.2); }
+        .modal-msg.success { display: block; background: var(--color-success-subtle); color: var(--color-success); border: 1px solid rgba(34,197,94,0.2); }
     </style>
 </head>
 <body>
@@ -218,6 +305,11 @@
                 Start System
             </button>
 
+            <button id="btn-remote" class="remote-btn" onclick="openRemoteModal()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span data-i18n="launcher.remoteConnect">Remote Connect</span>
+            </button>
+
             <div id="message-area" style="display:none;"></div>
 
             <div id="api-hint" class="hint" style="display:none;" data-i18n="launcher.apiOfflineHint">
@@ -227,6 +319,30 @@
 
         <div class="footer-card">
             <p data-i18n="launcher.footerHint">When the system is running, the full dashboard will open automatically.</p>
+        </div>
+    </div>
+
+    <div id="remote-modal" class="modal-overlay" onclick="if(event.target===this)closeRemoteModal()">
+        <div class="modal">
+            <h2 data-i18n="launcher.remoteConnectTitle">Connect to Remote Instance</h2>
+            <p data-i18n="launcher.remoteConnectDesc">Enter the address of a remote TikTok2Mc instance to control it from here.</p>
+            <label data-i18n="launcher.remoteHost">IP Address</label>
+            <input id="remote-host" type="text" data-i18n-placeholder="launcher.remoteHostPlaceholder" placeholder="e.g. 192.168.1.100" autocomplete="off">
+            <div class="input-row">
+                <div>
+                    <label data-i18n="launcher.remotePort">Port</label>
+                    <input id="remote-port" type="text" value="29185" data-i18n-placeholder="launcher.remotePortPlaceholder" placeholder="29185" autocomplete="off">
+                </div>
+                <div>
+                    <label data-i18n="launcher.remoteApiKey">API Key (optional)</label>
+                    <input id="remote-apikey" type="password" data-i18n-placeholder="launcher.remoteApiKeyPlaceholder" placeholder="Leave empty if not set" autocomplete="off">
+                </div>
+            </div>
+            <div id="remote-msg" class="modal-msg"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeRemoteModal()" data-i18n="common.cancel">Cancel</button>
+                <button id="btn-remote-connect" class="btn-primary" onclick="connectRemote()" data-i18n="launcher.remoteConnectBtn">Connect</button>
+            </div>
         </div>
     </div>
 
@@ -366,6 +482,8 @@
             if (!btn.disabled) {
                 btn.textContent = I18N.t('launcher.startSystem');
             }
+            const remoteBtn = document.getElementById('btn-remote');
+            remoteBtn.lastElementChild.textContent = I18N.t('launcher.remoteConnect');
             const current = I18N.lang();
             document.querySelectorAll('.lang-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.lang === current);
@@ -378,6 +496,84 @@
             b.classList.toggle('active', b.dataset.lang === currentLang);
         });
         I18N.apply();
+
+        /* ─── Remote Connect ─── */
+        const REMOTE_STORAGE_KEY = 'tiktok2mc_remote';
+
+        function openRemoteModal() {
+            document.getElementById('remote-modal').classList.add('open');
+            const msg = document.getElementById('remote-msg');
+            msg.className = 'modal-msg';
+            msg.textContent = '';
+            try {
+                const saved = JSON.parse(localStorage.getItem(REMOTE_STORAGE_KEY) || '{}');
+                if (saved.host) document.getElementById('remote-host').value = saved.host;
+                if (saved.port) document.getElementById('remote-port').value = saved.port;
+                if (saved.apiKey) document.getElementById('remote-apikey').value = saved.apiKey;
+            } catch (_) {}
+            document.getElementById('remote-host').focus();
+        }
+
+        function closeRemoteModal() {
+            document.getElementById('remote-modal').classList.remove('open');
+        }
+
+        async function connectRemote() {
+            const host = document.getElementById('remote-host').value.trim();
+            const port = document.getElementById('remote-port').value.trim() || '29185';
+            const apiKey = document.getElementById('remote-apikey').value.trim();
+            const msg = document.getElementById('remote-msg');
+            const btn = document.getElementById('btn-remote-connect');
+
+            if (!host) {
+                msg.className = 'modal-msg error';
+                msg.textContent = I18N.t('launcher.remoteInvalidHost');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = I18N.t('launcher.remoteConnecting');
+            msg.className = 'modal-msg';
+            msg.textContent = '';
+
+            try { localStorage.setItem(REMOTE_STORAGE_KEY, JSON.stringify({ host, port, apiKey })); } catch (_) {}
+
+            if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.connect_remote) {
+                const result = await pywebview.api.connect_remote(host, port, apiKey);
+                if (result === 'ok') return;
+                msg.className = 'modal-msg error';
+                msg.textContent = I18N.t('launcher.remoteFailed', { msg: String(result).replace('error:', '') });
+                btn.disabled = false;
+                btn.textContent = I18N.t('launcher.remoteConnectBtn');
+                return;
+            }
+
+            const baseUrl = 'http://' + host + ':' + port;
+            try {
+                const headers = {};
+                if (apiKey) headers['X-API-Key'] = apiKey;
+                const res = await fetch(baseUrl + '/api/v1/health', {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: headers,
+                    signal: AbortSignal.timeout(5000)
+                });
+                if (!res.ok && res.status !== 401) {
+                    throw new Error('HTTP ' + res.status);
+                }
+                const dashUrl = baseUrl + '/gui/index.html' + (apiKey ? '?key=' + encodeURIComponent(apiKey) : '');
+                window.location.href = dashUrl;
+            } catch (e) {
+                msg.className = 'modal-msg error';
+                msg.textContent = I18N.t('launcher.remoteFailed', { msg: e.message || e });
+                btn.disabled = false;
+                btn.textContent = I18N.t('launcher.remoteConnectBtn');
+            }
+        }
+
+        document.getElementById('remote-host').addEventListener('keydown', function(e) { if (e.key === 'Enter') connectRemote(); });
+        document.getElementById('remote-port').addEventListener('keydown', function(e) { if (e.key === 'Enter') connectRemote(); });
+        document.getElementById('remote-apikey').addEventListener('keydown', function(e) { if (e.key === 'Enter') connectRemote(); });
     </script>
 </body>
 </html>

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -226,6 +227,46 @@ class LauncherAPI:
         if _full_system_proc is not None and _full_system_proc.poll() is None:
             return "starting"
         return "offline"
+
+    def connect_remote(self, host: str, port: str = "29185", api_key: str = "") -> str:
+        """Verify a remote TikTok2Mc instance and navigate to its dashboard.
+
+        Returns "ok" on success, or "error:<message>" on failure.
+        """
+        host = (host or "").strip()
+        port = (port or "29185").strip()
+        if not host:
+            return "error:empty host"
+
+        base = f"http://{host}:{port}"
+        health_url = f"{base}/api/v1/health"
+        headers: dict[str, str] = {}
+        if api_key:
+            headers["X-API-Key"] = api_key.strip()
+
+        try:
+            req = urllib.request.Request(health_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status not in (200, 401):
+                    return f"error:unexpected status {resp.status}"
+        except urllib.error.HTTPError as exc:
+            # 401 means the server is reachable but requires auth — that's fine.
+            if exc.code != 401:
+                return f"error:HTTP {exc.code}"
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            return f"error:{exc}"
+
+        dashboard_url = f"{base}/gui/index.html"
+        if api_key:
+            dashboard_url += f"?key={urllib.parse.quote(api_key.strip())}"
+
+        if _window is not None and hasattr(_window, "load_url"):
+            try:
+                _window.load_url(dashboard_url)
+                return "ok"
+            except Exception as exc:
+                return f"error:{exc}"
+        return "error:no window"
 
 
 def _cleanup_processes():
