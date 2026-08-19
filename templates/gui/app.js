@@ -3804,7 +3804,7 @@ const HELP_TEXT = {
   'like_triggers[].id': 'A short name just for you — so you can tell triggers apart in logs. Example: "likes_100" or "big_milestone".',
   'like_triggers[].every': 'How many likes between each activation. Example: 100 means the trigger fires when likes hit 100, then 200, then 300, and so on.',
   'like_triggers[].function': 'The trigger name from your Actions Editor. Write a command for this name there — it will run every time this trigger fires. Example: if you set this to "likes", create a "likes" trigger in actions.mca.',
-  'like_triggers[].payload': 'Extra text passed to the action. You can use {payload} in your actions.mca command to include it. Leave as "Community" if you don\'t need it.',
+  'like_triggers[].payload': 'This text replaces {user} in your actions.mca command. For example: setting it to "Community" means {user} becomes "Community". Leave as "Community" if unsure.',
   'like_triggers[].enabled': 'Turn off to pause this trigger without deleting it.',
   'console.log_level': 'Visibility level: 0 = Hide everything, 1 = Silent (hide console, keep GUI), 2 = Standard (recommended), 3 = Advanced, 4 = Debug, 5 = Override (debugging only).',
   'console.visible': 'Show or hide the main console window when the tool starts.',
@@ -3860,7 +3860,7 @@ const HELP_TEXT_DE = {
   'like_triggers[].id': 'Ein kurzer Name nur für dich — damit du in Logs siehst, welcher Trigger ausgelöst wurde. Beispiel: "likes_100" oder "großer_meilenstein".',
   'like_triggers[].every': 'Wie viele Likes zwischen den Auslösungen. Beispiel: 100 löst bei 100, 200, 300 usw. aus.',
   'like_triggers[].function': 'Der Trigger-Name aus deinem Aktions-Editor. Schreibe dort einen Befehl für diesen Namen — er wird bei jeder Auslösung ausgeführt. Beispiel: Wenn du „likes" eingibst, erstelle einen „likes"-Trigger in actions.mca.',
-  'like_triggers[].payload': 'Zusätzlicher Text, der an die Aktion übergeben wird. Nutze {payload} in deinem actions.mca-Befehl. Lass „Community" stehen, wenn du es nicht brauchst.',
+  'like_triggers[].payload': 'Dieser Text ersetzt {user} in deinem actions.mca-Befehl. Beispiel: „Community" bedeutet, {user} wird zu „Community". Lass „Community" stehen, wenn unsicher.',
   'like_triggers[].enabled': 'Deaktiviere, um diesen Trigger zu pausieren, ohne ihn zu löschen.',
   'console.log_level': 'Sichtbarkeitsstufe: 0 = Alles ausblenden, 1 = Still (Konsole ausblenden, GUI behalten), 2 = Standard (empfohlen), 3 = Erweitert, 4 = Debug, 5 = Override (nur zum Debuggen).',
   'console.visible': 'Konsolen-Hauptfenster beim Start des Tools anzeigen oder ausblenden.',
@@ -4533,7 +4533,7 @@ class ConfigEditor {
         id: 'Name', idHelp: 'A label for this trigger — only used in logs so you can tell which one fired.',
         every: 'Every N likes', everyHelp: 'How many likes between activations. E.g. 100 → fires at 100, 200, 300…',
         fn: 'Action', fnHelp: 'The trigger name from your actions.mca file. The command you wrote for this name will run.',
-        payload: 'Label', payloadHelp: 'Extra text passed to the action. Use {payload} in actions.mca to use it. Leave "Community" if unsure.',
+        payload: 'Label', payloadHelp: 'This text replaces {user} in your actions.mca command. E.g. "Community" → {user} becomes "Community".',
         add: '+ Add Trigger',
       },
       de: {
@@ -4541,7 +4541,7 @@ class ConfigEditor {
         id: 'Name', idHelp: 'Ein Name für diesen Trigger — wird nur in Logs angezeigt, damit du siehst, welcher ausgelöst wurde.',
         every: 'Alle N Likes', everyHelp: 'Wie viele Likes zwischen den Auslösungen. Z.B. 100 → löst bei 100, 200, 300… aus.',
         fn: 'Aktion', fnHelp: 'Der Trigger-Name aus deiner actions.mca. Der Befehl, den du für diesen Namen geschrieben hast, wird ausgeführt.',
-        payload: 'Label', payloadHelp: 'Zusätzlicher Text, der an die Aktion übergeben wird. Nutze {payload} in actions.mca. Lass „Community" stehen, wenn unsicher.',
+        payload: 'Label', payloadHelp: 'Dieser Text ersetzt {user} in deinem actions.mca-Befehl. Z.B. „Community" → {user} wird zu „Community".',
         add: '+ Trigger hinzufügen',
       }
     }[lang];
