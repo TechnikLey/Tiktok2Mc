@@ -41,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dashboard density toggle** — switch between Spacious and Compact layout for the status cards.
 - **Config bundle export & import** — download or upload your entire setup (config, actions, plugin configs) as a single ZIP file — handy for backups or moving to another machine.
 - **Session summaries** — when a live stream ends, a summary is automatically saved (gifts, likes, follows, comments, shares, joins, gift value). View session history in the new Sessions tab and download a Markdown report.
+- **Full English/German localization** — the entire GUI is fully translated into English and German. Switch languages anytime.
+- **Revenue viewer** — view and filter your streaming income data (gifts, likes, follows) with statistics and history.
+- **Remote connect button** — connect to a running TikTok2Mc instance on a different PC from the launcher.
+- **Plugin README viewer** — read plugin documentation directly inside the dashboard.
+- **New actions.mca `!rc` suffix** — add a `!rc` suffix to vanilla commands to send them via RCON, allowing `{user}` to be replaced with the viewer's name.
+- **Auto-install updates** — a new config option lets updates install automatically without prompting.
+- **Java detection** — the tool handles Java installation with checksum verification, fallback download mirrors, and a proper progress bar with cancel option in the GUI.
+- **Save/discard prompt** — switching between editor tabs warns you if you have unsaved changes, so nothing gets lost.
 
 ### Changed
 
@@ -62,6 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Due to a full system rewrite, many legacy issues from previous versions were inherently resolved. No specific bug list is carried forward.
 
 - **Documentation (GitHub Pages)** — Fixed admonitions (Note, Tip, Warning, Caution, Important) not rendering on the deployed GitHub Pages site. The mdBook workflow now uses v0.5.2 with native GFM alert support instead of v0.4.36 which required a separate preprocessor.
+- **Config changes work reliably across processes** — the tool now properly coordinates when multiple parts read or write the configuration at the same time.
+- **Starting and stopping the tool no longer causes race conditions** — fixed an issue where quickly starting and stopping could cause unexpected behavior.
+- **Overlay rendering fixed** — the overlay HTML template no longer produces broken CSS.
+- **Update failure now shown in the GUI** — when an update fails, you'll see a clear error message instead of a silent failure.
+- **RCON command queue no longer gets stuck** — fixed a deadlock that could cause commands to stop being sent to the Minecraft server.
+- **Updater handles temporary errors** — the update checker now retries on temporary GitHub API errors instead of failing immediately.
+- **`{user}` placeholder in vanilla commands** — the `{user}` placeholder now works in vanilla Minecraft commands when using the `!rc` suffix. A warning is shown if you forget to add the suffix.
 
 ---
 
