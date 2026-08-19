@@ -1046,6 +1046,14 @@ async def command_loop() -> None:
             log.info("  hooks               - List all registered hooks")
             log.info("  hook enable <name>  - Enable a hook (restart required)")
             log.info("  hook disable <name> - Disable a hook (restart required)")
+            log.info("  mc plugins          - List Minecraft server plugins")
+            log.info(
+                "  mc enable <name>    - Enable a Minecraft plugin (.disabled -> .jar)"
+            )
+            log.info(
+                "  mc disable <name>   - Disable a Minecraft plugin (.jar -> .disabled)"
+            )
+            log.info("  mc delete <name>    - Delete a Minecraft plugin permanently")
         elif command == "exit":
             break
         elif command == "stop":
@@ -1080,6 +1088,33 @@ async def command_loop() -> None:
             else:
                 log.info(
                     "Unknown hook command: %s (use 'enable' or 'disable')", args[0]
+                )
+        elif command == "mc":
+            if not args:
+                log.info(
+                    "Usage: mc plugins | mc enable <name> | mc disable <name> | mc delete <name>"
+                )
+            elif args[0] == "plugins":
+                await asyncio.to_thread(_cli_list_mc_plugins)
+            elif args[0] == "enable":
+                if len(args) < 2:
+                    log.info("Usage: mc enable <plugin-name>")
+                else:
+                    await asyncio.to_thread(_cli_enable_mc_plugin, args[1])
+            elif args[0] == "disable":
+                if len(args) < 2:
+                    log.info("Usage: mc disable <plugin-name>")
+                else:
+                    await asyncio.to_thread(_cli_disable_mc_plugin, args[1])
+            elif args[0] == "delete":
+                if len(args) < 2:
+                    log.info("Usage: mc delete <plugin-name>")
+                else:
+                    await asyncio.to_thread(_cli_delete_mc_plugin, args[1])
+            else:
+                log.info(
+                    "Unknown mc command: %s (use 'plugins', 'enable', 'disable', 'delete')",
+                    args[0],
                 )
         else:
             log.info("Unknown command: %s (type 'help' for commands)", cmd)
@@ -1305,6 +1340,127 @@ async def main() -> None:
     _log_diagnostics_report()
 
     log.info("Shutdown complete.")
+
+
+# ── MC Plugin CLI ────────────────────────────────────────────────────
+# Manage Minecraft server plugins (Paper/Spigot/Bukkit .jar files).
+# Enable/disable = rename .jar <-> .jar.disabled on disk.
+
+
+def _mc_plugin_sanitize_name(name: str) -> str:
+    import re
+
+    name = re.sub(r"\.(jar|disabled)$", "", name, flags=re.IGNORECASE)
+    return re.sub(r"[^A-Za-z0-9._-]", "", name)
+
+
+def _mc_plugin_plugins_dir() -> Path:
+    return (ROOT_DIR / "server" / "default" / "plugins").resolve()
+
+
+def _cli_list_mc_plugins() -> None:
+    """List all Minecraft server plugins and their status."""
+    plugins_dir = _mc_plugin_plugins_dir()
+    entries: list[dict[str, object]] = []
+    if not plugins_dir.is_dir():
+        log.info("\nNo Minecraft plugins directory found at '%s'.", plugins_dir)
+        return
+    for entry in sorted(plugins_dir.iterdir()):
+        if entry.is_dir():
+            continue
+        if entry.suffix.lower() == ".disabled":
+            name = entry.stem
+            if name.lower().endswith(".jar"):
+                name = name[:-4]
+            entries.append({"name": name, "filename": entry.name, "enabled": False})
+        elif entry.suffix.lower() == ".jar":
+            entries.append(
+                {"name": entry.stem, "filename": entry.name, "enabled": True}
+            )
+    if not entries:
+        log.info("\nNo Minecraft plugins found.")
+        return
+    enabled = sum(1 for e in entries if e["enabled"])
+    disabled = len(entries) - enabled
+    log.info("\nMinecraft plugins (%d enabled, %d disabled):", enabled, disabled)
+    for pl in entries:
+        status = "enabled" if pl["enabled"] else "disabled"
+        marker = "+" if pl["enabled"] else "-"
+        log.info("  [%s] %-30s %s", marker, pl["name"], status)
+
+
+def _cli_enable_mc_plugin(name: str) -> None:
+    """Enable a Minecraft server plugin by renaming .disabled -> .jar."""
+    name = _mc_plugin_sanitize_name(name)
+    if not name:
+        log.error("Invalid plugin name.")
+        return
+    plugins_dir = _mc_plugin_plugins_dir()
+    disabled_file = plugins_dir / f"{name}.jar.disabled"
+    enabled_file = plugins_dir / f"{name}.jar"
+    if enabled_file.exists():
+        log.info("Plugin '%s' is already enabled.", name)
+        return
+    if not disabled_file.exists():
+        log.error("Plugin '%s' not found in '%s'.", name, plugins_dir)
+        return
+    try:
+        disabled_file.rename(enabled_file)
+        log.info(
+            "Plugin '%s' enabled. Restart the server for changes to take effect.", name
+        )
+    except OSError as exc:
+        log.error("Failed to enable plugin '%s': %s", name, exc)
+
+
+def _cli_disable_mc_plugin(name: str) -> None:
+    """Disable a Minecraft server plugin by renaming .jar -> .disabled."""
+    name = _mc_plugin_sanitize_name(name)
+    if not name:
+        log.error("Invalid plugin name.")
+        return
+    plugins_dir = _mc_plugin_plugins_dir()
+    enabled_file = plugins_dir / f"{name}.jar"
+    disabled_file = plugins_dir / f"{name}.jar.disabled"
+    if disabled_file.exists():
+        log.info("Plugin '%s' is already disabled.", name)
+        return
+    if not enabled_file.exists():
+        log.error("Plugin '%s' not found in '%s'.", name, plugins_dir)
+        return
+    try:
+        enabled_file.rename(disabled_file)
+        log.info(
+            "Plugin '%s' disabled. Restart the server for changes to take effect.", name
+        )
+    except OSError as exc:
+        log.error("Failed to disable plugin '%s': %s", name, exc)
+
+
+def _cli_delete_mc_plugin(name: str) -> None:
+    """Permanently delete a Minecraft server plugin file."""
+    name = _mc_plugin_sanitize_name(name)
+    if not name:
+        log.error("Invalid plugin name.")
+        return
+    plugins_dir = _mc_plugin_plugins_dir()
+    enabled_file = plugins_dir / f"{name}.jar"
+    disabled_file = plugins_dir / f"{name}.jar.disabled"
+    target = (
+        enabled_file
+        if enabled_file.exists()
+        else disabled_file
+        if disabled_file.exists()
+        else None
+    )
+    if target is None:
+        log.error("Plugin '%s' not found in '%s'.", name, plugins_dir)
+        return
+    try:
+        target.unlink()
+        log.info("Plugin '%s' deleted.", name)
+    except OSError as exc:
+        log.error("Failed to delete plugin '%s': %s", name, exc)
 
 
 if __name__ == "__main__":

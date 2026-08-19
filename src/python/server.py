@@ -138,7 +138,6 @@ Xmx = "1G"
 MC_PORT = 25565
 WEBSERVERPORT = 29188
 APIPORT = 29187
-MINECRAFTSERVERAPI_ENABLED = True
 SERVER_HOST = "127.0.0.1"
 MC_VERSION = "1.21.11"
 
@@ -163,9 +162,6 @@ try:
                 "RESOLVED_PORT_MCSERVER_API_PORT",
                 cfg.get("minecraft_server_api", {}).get("api_port", 29187),
             )
-        )
-        MINECRAFTSERVERAPI_ENABLED = cfg.get("minecraft_server_api", {}).get(
-            "enabled", True
         )
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
         MC_VERSION = cfg.get("mc_version", "1.21.11")
@@ -205,34 +201,6 @@ if CONFIGSERVERAPI_FILE.exists():
             yaml_obj.dump(cfg_api, f)
     except OSError as e:
         log.warning("Failed to write MinecraftServerAPI config: %s", e)
-
-# === Enable / disable MinecraftServerAPI plugin ===
-plugin_name = "MinecraftServerAPI-1.21.x.jar"
-plugin_file = PLUGINS_DIR / plugin_name
-disabled_file = plugin_file.with_stem(plugin_file.stem + ".disabled")
-
-if not MINECRAFTSERVERAPI_ENABLED:
-    if plugin_file.exists():
-        try:
-            plugin_file.rename(disabled_file)
-            log.info(f"{plugin_name} has been disabled.")
-        except OSError as e:
-            log.warning(f"Failed to disable {plugin_name}: {e}")
-    elif disabled_file.exists():
-        log.info(f"{plugin_name} is already disabled.")
-    else:
-        log.info(f"{plugin_name} not found.")
-else:
-    if disabled_file.exists():
-        try:
-            disabled_file.rename(plugin_file)
-            log.info(f"{plugin_name} has been re-enabled.")
-        except OSError as e:
-            log.warning(f"Failed to re-enable {plugin_name}: {e}")
-    elif plugin_file.exists():
-        log.info("No plugin disable requested.")
-    else:
-        log.info("Plugin not found, activation failed.")
 
 # === RCON settings ===
 RCON = cfg.get("rcon", {}) if "cfg" in dir() else {}

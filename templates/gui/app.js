@@ -1111,6 +1111,7 @@ function renderServerManager() {
   }
 
   renderVersionLibrary(versionsList);
+  loadMcPlugins();
 }
 
 function renderServerCard(inst) {
@@ -1397,6 +1398,125 @@ async function deleteServerInstance(instanceId) {
     await loadServerManager();
   } catch (e) {
     showToast(I18N.t('servers.deleteFailed', { msg: e.message }), 'error');
+  }
+}
+
+/* ─── Server Manager: Minecraft Plugins ─── */
+
+let _mcPluginsCache = null;
+
+function _mcPluginsInstanceId() {
+  const sel = document.getElementById('mc-plugins-instance-select');
+  return sel ? sel.value : '';
+}
+
+function _populateMcPluginsInstanceSelector() {
+  const sel = document.getElementById('mc-plugins-instance-select');
+  if (!sel) return;
+  const instances = (_serverManagerCache?.instances || []);
+  const prev = sel.value;
+  sel.innerHTML = instances.length
+    ? instances.map(inst => {
+      const status = inst.status || 'stopped';
+      return '<option value="' + escapeHtml(inst.id) + '">' + escapeHtml(inst.name) + ' (' + (inst.hasJar ? escapeHtml(inst.version) : I18N.t('servers.notInstalled')) + ') — ' + status + '</option>';
+    }).join('')
+    : '<option value="">' + I18N.t('servers.noInstances') + '</option>';
+  if (prev && sel.querySelector('option[value="' + prev + '"]')) {
+    sel.value = prev;
+  }
+}
+
+async function loadMcPlugins() {
+  const instanceId = _mcPluginsInstanceId();
+  const listEl = document.getElementById('mc-plugins-list');
+  const countEl = document.getElementById('mc-plugins-count');
+  if (!listEl) return;
+
+  _populateMcPluginsInstanceSelector();
+
+  if (!instanceId) {
+    listEl.innerHTML = '<p class="text-muted">' + I18N.t('servers.selectInstance') + '</p>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+
+  const instance = (_serverManagerCache?.instances || []).find(i => i.id === instanceId);
+  if (instance && !instance.hasJar) {
+    listEl.innerHTML = '<p class="text-muted">' + I18N.t('servers.mcPluginsNotAvailable') + '</p>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+
+  try {
+    const data = await fetchJSON('/server/' + encodeURIComponent(instanceId) + '/mc-plugins');
+    _mcPluginsCache = data.plugins || [];
+    renderMcPluginsList(listEl, countEl, instanceId);
+  } catch (e) {
+    listEl.innerHTML = '<p class="text-muted">' + I18N.t('servers.mcPluginsLoadFailed', { msg: escapeHtml(e.message) }) + '</p>';
+    if (countEl) countEl.textContent = '';
+  }
+}
+
+function renderMcPluginsList(listEl, countEl, instanceId) {
+  const plugins = _mcPluginsCache || [];
+  const enabledCount = plugins.filter(p => p.enabled).length;
+  if (countEl) countEl.textContent = enabledCount + '/' + plugins.length + ' ' + I18N.t('servers.mcPluginsEnabled');
+
+  if (!plugins.length) {
+    listEl.innerHTML = '<p class="text-muted">' + I18N.t('servers.noMcPlugins') + '</p>';
+    return;
+  }
+
+  let html = '<div class="mc-plugins-grid">';
+  for (const p of plugins) {
+    const name = escapeHtml(p.name);
+    const safeId = p.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    html += '<div class="mc-plugin-card' + (p.enabled ? '' : ' mc-plugin-card--disabled') + '" data-plugin="' + name + '">' +
+      '<div class="mc-plugin-card-body">' +
+        '<div class="mc-plugin-name">' + name + '</div>' +
+        '<div class="mc-plugin-filename code">' + escapeHtml(p.filename) + '</div>' +
+      '</div>' +
+      '<div class="mc-plugin-card-actions">' +
+        (p.enabled
+          ? '<button class="btn btn--sm btn--warning-ghost" onclick="toggleMcPlugin(\'' + escapeHtml(instanceId) + '\', \'' + safeId + '\', false)" title="Disable">' + I18N.t('common.disable') + '</button>'
+          : '<button class="btn btn--sm btn--success-ghost" onclick="toggleMcPlugin(\'' + escapeHtml(instanceId) + '\', \'' + safeId + '\', true)" title="Enable">' + I18N.t('common.enable') + '</button>'
+        ) +
+        '<button class="btn btn--sm btn--danger-ghost" onclick="deleteMcPlugin(\'' + escapeHtml(instanceId) + '\', \'' + safeId + '\')" title="Delete">' + I18N.t('common.delete') + '</button>' +
+      '</div>' +
+    '</div>';
+  }
+  html += '</div>';
+  listEl.innerHTML = html;
+}
+
+async function toggleMcPlugin(instanceId, pluginName, enable) {
+  try {
+    const action = enable ? 'enable' : 'disable';
+    const res = await postJSON('/server/' + encodeURIComponent(instanceId) + '/mc-plugins/' + encodeURIComponent(pluginName) + '/' + action);
+    showToast(res.message || I18N.t('servers.mcPlugin' + (enable ? 'Enabled' : 'Disabled'), { name: pluginName }), 'success');
+    await loadMcPlugins();
+  } catch (e) {
+    showToast(I18N.t('servers.mcPluginActionFailed', { msg: e.message }), 'error');
+  }
+}
+
+async function deleteMcPlugin(instanceId, pluginName) {
+  const confirmed = await showConfirmDialog(
+    I18N.t('servers.mcPluginDeleteTitle'),
+    I18N.t('servers.mcPluginDeleteConfirm', { name: pluginName }),
+    I18N.t('common.delete'),
+    'btn-danger',
+    'text-danger'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await fetch(API + '/server/' + encodeURIComponent(instanceId) + '/mc-plugins/' + encodeURIComponent(pluginName), { method: 'DELETE', headers: _withApiKey({}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || I18N.t('servers.mcPluginDeleteFailedTitle'));
+    showToast(data.message || I18N.t('servers.mcPluginDeleted', { name: pluginName }), 'success');
+    await loadMcPlugins();
+  } catch (e) {
+    showToast(I18N.t('servers.mcPluginDeleteFailed', { msg: e.message }), 'error');
   }
 }
 
@@ -3638,7 +3758,6 @@ const HELP_TEXT = {
   'console.log_level': 'Visibility level: 0 = Hide everything, 1 = Silent (hide console, keep GUI), 2 = Standard (recommended), 3 = Advanced, 4 = Debug, 5 = Override (debugging only).',
   'console.visible': 'Show or hide the main console window when the tool starts.',
   'console.allow_close': 'If true, typing "exit" in the console shuts everything down cleanly. If false, the launcher exits immediately after starting programs.',
-  'minecraft_server_api.enabled': 'Required for player death/respawn detection and datapack loading. Keep enabled unless you know you do not need these features.',
   'minecraft_server_api.api_port': 'Port for the internal Minecraft API bridge. Default: 29187.',
   'minecraft_server_api.web_server_port': 'Port for the webhook server that receives Minecraft events. Default: 29188.',
   'gui.enabled': 'Launch the graphical dashboard on startup. If disabled, you can still open it manually.',
@@ -3689,7 +3808,6 @@ const HELP_TEXT_DE = {
   'console.log_level': 'Sichtbarkeitsstufe: 0 = Alles ausblenden, 1 = Still (Konsole ausblenden, GUI behalten), 2 = Standard (empfohlen), 3 = Erweitert, 4 = Debug, 5 = Override (nur zum Debuggen).',
   'console.visible': 'Konsolen-Hauptfenster beim Start des Tools anzeigen oder ausblenden.',
   'console.allow_close': 'Wenn true, fährt die Eingabe von „exit" in der Konsole alles sauber herunter. Wenn false, beendet sich der Launcher sofort nach dem Start der Programme.',
-  'minecraft_server_api.enabled': 'Erforderlich für die Spieler-Tod-/Wiederbelebungs-Erkennung und das Laden von Datapacks. Lasse dies aktiviert, es sei denn, du weißt, dass du diese Funktionen nicht benötigst.',
   'minecraft_server_api.api_port': 'Port für die interne Minecraft-API-Brücke. Standard: 29187.',
   'minecraft_server_api.web_server_port': 'Port für den Webhook-Server, der Minecraft-Ereignisse empfängt. Standard: 29188.',
   'gui.enabled': 'Startet das grafische Dashboard beim Programmstart. Wenn deaktiviert, kannst du es trotzdem manuell öffnen.',
@@ -3741,7 +3859,6 @@ const FIELD_META = {
   'console.log_level': { basic: false, type: 'number', min: 0, max: 5 },
   'console.visible': { basic: false, type: 'bool' },
   'console.allow_close': { basic: false, type: 'bool' },
-  'minecraft_server_api.enabled': { basic: false, type: 'bool' },
   'minecraft_server_api.api_port': { basic: false, type: 'number', min: 1, max: 65535 },
   'minecraft_server_api.web_server_port': { basic: false, type: 'number', min: 1, max: 65535 },
   'gui.enabled': { basic: true, type: 'bool' },

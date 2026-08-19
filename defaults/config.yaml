@@ -254,7 +254,6 @@ console:
 # Handles communication between the bridge and the Minecraft server.
 # Required for player death/respawn detection, datapack loading, etc.
 minecraft_server_api:
-  enabled: true
   api_port: 29187
   web_server_port: 29188
 

@@ -11,6 +11,7 @@ from .events import router as events_router
 from .health import router as health_router
 from .hooks import router as hooks_router
 from .logs import router as logs_router
+from .mc_plugins import router as mc_plugins_router
 from .overlay import router as overlay_router
 from .plugin_config import router as plugin_config_router
 from .plugin_overlay import router as plugin_overlay_router
@@ -54,5 +55,6 @@ api_router.include_router(revenue_router)
 api_router.include_router(versions_router)
 api_router.include_router(triggers_router)
 api_router.include_router(logs_router)
+api_router.include_router(mc_plugins_router)
 api_router.include_router(servers_router)
 api_router.include_router(server_lifecycle_router)

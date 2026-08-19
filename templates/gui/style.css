@@ -3414,6 +3414,86 @@ input[type="color"] {
   flex-shrink: 0;
 }
 
+/* MC Plugins */
+.mc-plugins-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mc-plugin-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.15s, background 0.15s;
+  gap: var(--space-4);
+}
+.mc-plugin-card:hover {
+  border-color: var(--color-accent);
+}
+.mc-plugin-card--disabled {
+  opacity: 0.6;
+}
+
+.mc-plugin-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.mc-plugin-name {
+  font-weight: 600;
+}
+
+.mc-plugin-filename {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.mc-plugin-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Success ghost / warning ghost buttons */
+.btn--success-ghost {
+  background: transparent;
+  color: var(--color-success);
+  border: 1px solid transparent;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn--success-ghost:hover {
+  background: var(--color-success-subtle);
+  border-color: var(--color-success);
+}
+
+.btn--warning-ghost {
+  background: transparent;
+  color: var(--color-warning);
+  border: 1px solid transparent;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn--warning-ghost:hover {
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+}
+
 /* Danger ghost button */
 .btn--danger-ghost {
   background: transparent;

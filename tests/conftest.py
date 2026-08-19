@@ -228,6 +228,7 @@ def _patch_paths(project_dir):
     for mod_name in (
         "core.api.routes.config",
         "core.api.routes.health",
+        "core.api.routes.mc_plugins",
         "core.api.routes.rcon",
         "core.api.routes.versions",
         "core.api.routes.actions",
