@@ -953,6 +953,65 @@ def _cli_disable_plugin(name: str) -> None:
     log.info("Plugin '%s' disabled.", name)
 
 
+def _cli_list_hooks() -> None:
+    """Print all registered hooks with their status."""
+    from core.hook_registry import get_hook_registry
+
+    try:
+        registry = get_hook_registry()
+        hooks = registry.list()
+    except Exception as exc:
+        log.error("Failed to load hook registry: %s", exc)
+        return
+    if not hooks:
+        log.info("\nNo hooks registered.")
+        return
+    log.info("\nRegistered hooks:")
+    for h in sorted(hooks, key=lambda x: x.name):
+        status = "enabled" if h.enabled else "disabled"
+        log.info("  %-30s %s", h.name, status)
+
+
+def _cli_enable_hook(name: str) -> None:
+    """Enable a hook by name. Takes effect on next restart."""
+    from core.hook_registry import get_hook_registry
+
+    try:
+        registry = get_hook_registry()
+    except Exception as exc:
+        log.error("Failed to access hook registry: %s", exc)
+        return
+    hook = registry.get(name)
+    if hook is None:
+        log.error("Hook '%s' not found in registry.", name)
+        return
+    if hook.enabled:
+        log.info("Hook '%s' is already enabled.", name)
+        return
+    registry.set_enabled(name, True)
+    log.info("Hook '%s' enabled (takes effect on restart).", name)
+
+
+def _cli_disable_hook(name: str) -> None:
+    """Disable a hook by name. Takes effect on next restart."""
+    from core.hook_registry import get_hook_registry
+
+    try:
+        registry = get_hook_registry()
+    except Exception as exc:
+        log.error("Failed to access hook registry: %s", exc)
+        return
+    hook = registry.get(name)
+    if hook is None:
+        log.error("Hook '%s' not found in registry.", name)
+        return
+    if not hook.enabled:
+        log.info("Hook '%s' is already disabled.", name)
+        return
+    registry.set_enabled(name, False)
+    log.info("Hook '%s' disabled (takes effect on restart).", name)
+
+
 async def command_loop() -> None:
     """Read console commands and dispatch them."""
     while True:
@@ -979,11 +1038,14 @@ async def command_loop() -> None:
         args = parts[1:]
         if command == "help":
             log.info("\nAvailable commands:")
-            log.info("  exit              - Stop all programs and close")
-            log.info("  stop              - Cancel active shutdown countdown")
-            log.info("  plugins           - List all registered plugins")
-            log.info("  enable <name>     - Enable a plugin")
-            log.info("  disable <name>    - Disable a plugin")
+            log.info("  exit                - Stop all programs and close")
+            log.info("  stop                - Cancel active shutdown countdown")
+            log.info("  plugins             - List all registered plugins")
+            log.info("  enable <name>       - Enable a plugin")
+            log.info("  disable <name>      - Disable a plugin")
+            log.info("  hooks               - List all registered hooks")
+            log.info("  hook enable <name>  - Enable a hook (restart required)")
+            log.info("  hook disable <name> - Disable a hook (restart required)")
         elif command == "exit":
             break
         elif command == "stop":
@@ -1000,6 +1062,25 @@ async def command_loop() -> None:
                 log.info("Usage: disable <plugin-name>")
             else:
                 await asyncio.to_thread(_cli_disable_plugin, args[0])
+        elif command == "hooks":
+            await asyncio.to_thread(_cli_list_hooks)
+        elif command == "hook":
+            if not args:
+                log.info("Usage: hook enable <name> | hook disable <name>")
+            elif args[0] == "enable":
+                if len(args) < 2:
+                    log.info("Usage: hook enable <hook-name>")
+                else:
+                    await asyncio.to_thread(_cli_enable_hook, args[1])
+            elif args[0] == "disable":
+                if len(args) < 2:
+                    log.info("Usage: hook disable <hook-name>")
+                else:
+                    await asyncio.to_thread(_cli_disable_hook, args[1])
+            else:
+                log.info(
+                    "Unknown hook command: %s (use 'enable' or 'disable')", args[0]
+                )
         else:
             log.info("Unknown command: %s (type 'help' for commands)", cmd)
 
