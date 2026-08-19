@@ -1523,6 +1523,86 @@ input[type="color"] {
   background: var(--color-danger-subtle);
 }
 
+/* ─── Like Trigger Cards ─── */
+.like-trigger-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.like-trigger-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  transition: opacity var(--transition-fast);
+}
+.like-trigger-card.disabled { opacity: 0.45; }
+.like-trigger-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+.like-trigger-number {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-width: 24px;
+}
+.like-trigger-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.like-trigger-toggle .toggle-label { min-width: 24px; }
+.like-trigger-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.like-trigger-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.like-trigger-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.like-trigger-field input[type="text"],
+.like-trigger-field input[type="number"] {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--color-text);
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+.like-trigger-field input:focus { border-color: var(--color-accent); outline: none; }
+.like-trigger-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+.like-trigger-card .btn-icon {
+  font-size: 1.2rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+.like-trigger-card .btn-icon:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
 /* ─── Icon Button ─── */
 .btn-icon {
   background: none;

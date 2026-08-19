@@ -418,7 +418,7 @@ def _apply_config(config: dict) -> None:
         log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
 
     ctx.like_triggers = validate_like_triggers(
-        config.get("tiktok", {}).get("like_triggers", [])
+        config.get("like_triggers", config.get("tiktok", {}).get("like_triggers", []))
     )
 
     _apply_comment_commands_from_yaml()

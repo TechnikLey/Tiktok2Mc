@@ -3715,14 +3715,14 @@ const SECTION_ORDER = [
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
   'port_policy','api_key',
-  'random_triggers'
+  'like_triggers'
 ];
 
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method','api'],
   'Minecraft': ['java','mc_version','minecraft_server_api'],
   'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
-  'Chat & Commands': ['random_triggers']
+  'Chat & Commands': ['like_triggers']
 };
 
 const SECTION_META = {
@@ -3732,6 +3732,7 @@ const SECTION_META = {
   java: { title: 'Minecraft Server', desc: 'Controls how much RAM the Minecraft server uses and which port it runs on.', category: 'Minecraft' },
   mc_version: { title: 'Minecraft Version', desc: 'The Minecraft version the server runs on. Used for version-aware features.', category: 'Minecraft' },
   random_triggers: { title: 'Random Trigger Filter', desc: 'Controls which triggers can be selected by the $random action in data/actions.mca.', category: 'Chat & Commands' },
+  like_triggers: { title: 'Like Triggers', desc: 'Fire actions when total stream likes reach a threshold. Each trigger activates at a defined interval and runs a command from actions.mca.', category: 'Chat & Commands' },
   console: { title: 'Console Visibility', desc: 'Controls which windows and processes are shown when the tool starts.', category: 'System' },
   minecraft_server_api: { title: 'Minecraft Server API', desc: 'Handles communication between the tool and the Minecraft server. Required for player death/respawn detection.', category: 'Minecraft' },
   gui: { title: 'Dashboard', desc: 'The graphical user interface is served by the central API server and shown in a window.', category: 'System' },
@@ -3755,6 +3756,7 @@ const SECTION_META_DE = {
   java: { title: 'Minecraft-Server', desc: 'Steuert, wie viel RAM der Minecraft-Server verwendet und auf welchem Port er läuft.' },
   mc_version: { title: 'Minecraft-Version', desc: 'Die Minecraft-Version, auf der der Server läuft. Wird für versionsabhängige Funktionen verwendet.' },
   random_triggers: { title: 'Zufalls-Trigger-Filter', desc: 'Steuert, welche Trigger für die $random-Aktion in data/actions.mca ausgewählt werden können.' },
+  like_triggers: { title: 'Like-Trigger', desc: 'Lösen Aktionen aus, wenn die Gesamtzahl der Stream-Likes einen Schwellenwert erreicht. Jeder Trigger wird bei einem definierten Intervall aktiviert und führt einen Befehl aus actions.mca aus.' },
   console: { title: 'Konsolen-Sichtbarkeit', desc: 'Steuert, welche Fenster und Prozesse beim Start des Tools angezeigt werden.' },
   minecraft_server_api: { title: 'Minecraft-Server-API', desc: 'Übernimmt die Kommunikation zwischen dem Tool und dem Minecraft-Server. Erforderlich für die Spieler-Tod-/Wiederbelebungs-Erkennung.' },
   gui: { title: 'Dashboard', desc: 'Die grafische Benutzeroberfläche wird vom zentralen API-Server bereitgestellt und in einem Fenster angezeigt.' },
@@ -3798,6 +3800,12 @@ const HELP_TEXT = {
   'tiktok.follow_tracking.file': 'Path to the file storing tracked follower names. Default: data/followed_users.txt.',
   'random_triggers.mode': 'deny-all means ONLY triggers in the list are eligible for $random. allow-all means ALL triggers are eligible EXCEPT those in the list.',
   'random_triggers.triggers': 'List of trigger names. Which ones are used depends on the mode. Triggers containing "$random" are automatically excluded to prevent infinite recursion.',
+  'like_triggers': 'Like triggers let you automatically run a command every time your stream reaches a certain number of likes. For example: set one to fire every 100 likes so viewers see a reward as the like count grows. Each trigger connects to a command you write in the Actions Editor (data/actions.mca).',
+  'like_triggers[].id': 'A short name just for you — so you can tell triggers apart in logs. Example: "likes_100" or "big_milestone".',
+  'like_triggers[].every': 'How many likes between each activation. Example: 100 means the trigger fires when likes hit 100, then 200, then 300, and so on.',
+  'like_triggers[].function': 'The trigger name from your Actions Editor. Write a command for this name there — it will run every time this trigger fires. Example: if you set this to "likes", create a "likes" trigger in actions.mca.',
+  'like_triggers[].payload': 'Extra text passed to the action. You can use {payload} in your actions.mca command to include it. Leave as "Community" if you don\'t need it.',
+  'like_triggers[].enabled': 'Turn off to pause this trigger without deleting it.',
   'console.log_level': 'Visibility level: 0 = Hide everything, 1 = Silent (hide console, keep GUI), 2 = Standard (recommended), 3 = Advanced, 4 = Debug, 5 = Override (debugging only).',
   'console.visible': 'Show or hide the main console window when the tool starts.',
   'console.allow_close': 'If true, typing "exit" in the console shuts everything down cleanly. If false, the launcher exits immediately after starting programs.',
@@ -3848,6 +3856,12 @@ const HELP_TEXT_DE = {
   'tiktok.follow_tracking.file': 'Pfad zur Datei, die die verfolgten Followernamen speichert. Standard: data/followed_users.txt.',
   'random_triggers.mode': 'deny-all bedeutet, dass NUR Trigger in der Liste für $random infrage kommen. allow-all bedeutet, dass ALLE Trigger infrage kommen AUSSER den aufgelisteten.',
   'random_triggers.triggers': 'Liste der Triggernamen. Welche verwendet werden, hängt vom Modus ab. Trigger, die „$random" enthalten, werden automatisch ausgeschlossen, um Endlosrekursion zu verhindern.',
+  'like_triggers': 'Like-Trigger lassen dich automatisch einen Befehl ausführen, sobald dein Stream eine bestimmte Like-Zahl erreicht. Zum Beispiel: Setze einen Trigger auf 100 Likes, damit Zuschauer eine Belohnung sehen, während die Like-Zahl steigt. Jeder Trigger verbindet sich mit einem Befehl, den du im Aktions-Editor (data/actions.mca) schreibst.',
+  'like_triggers[].id': 'Ein kurzer Name nur für dich — damit du in Logs siehst, welcher Trigger ausgelöst wurde. Beispiel: "likes_100" oder "großer_meilenstein".',
+  'like_triggers[].every': 'Wie viele Likes zwischen den Auslösungen. Beispiel: 100 löst bei 100, 200, 300 usw. aus.',
+  'like_triggers[].function': 'Der Trigger-Name aus deinem Aktions-Editor. Schreibe dort einen Befehl für diesen Namen — er wird bei jeder Auslösung ausgeführt. Beispiel: Wenn du „likes" eingibst, erstelle einen „likes"-Trigger in actions.mca.',
+  'like_triggers[].payload': 'Zusätzlicher Text, der an die Aktion übergeben wird. Nutze {payload} in deinem actions.mca-Befehl. Lass „Community" stehen, wenn du es nicht brauchst.',
+  'like_triggers[].enabled': 'Deaktiviere, um diesen Trigger zu pausieren, ohne ihn zu löschen.',
   'console.log_level': 'Sichtbarkeitsstufe: 0 = Alles ausblenden, 1 = Still (Konsole ausblenden, GUI behalten), 2 = Standard (empfohlen), 3 = Erweitert, 4 = Debug, 5 = Override (nur zum Debuggen).',
   'console.visible': 'Konsolen-Hauptfenster beim Start des Tools anzeigen oder ausblenden.',
   'console.allow_close': 'Wenn true, fährt die Eingabe von „exit" in der Konsole alles sauber herunter. Wenn false, beendet sich der Launcher sofort nach dem Start der Programme.',
@@ -3928,11 +3942,18 @@ const FIELD_META = {
   'plugin_sandbox.max_files': { basic: false, type: 'number', min: 1 },
   'plugin_sandbox.max_processes': { basic: false, type: 'number', min: 1 },
   'plugin_sandbox.priority_class': { basic: false, type: 'select', options: ['below_normal', 'idle'] },
+
+  'like_triggers': { basic: true },
+  'like_triggers[].id': { basic: true, type: 'text' },
+  'like_triggers[].every': { basic: true, type: 'number', min: 1 },
+  'like_triggers[].function': { basic: true, type: 'text' },
+  'like_triggers[].payload': { basic: true, type: 'text' },
+  'like_triggers[].enabled': { basic: true, type: 'bool' },
 };
 
 function getMeta(path) {
   if (FIELD_META[path]) return FIELD_META[path];
-  const p = path.replace(/\.groups\[\d+\]/, '.groups[]').replace(/\.triggers\[\d+\]/, '.triggers[]').replace(/\.overlays\[\d+\]/, '.overlays[]').replace(/\.commands_config\.\w+/, '.commands_config[]');
+  const p = path.replace(/\.groups\[\d+\]/, '.groups[]').replace(/\.triggers\[\d+\]/, '.triggers[]').replace(/\.overlays\[\d+\]/, '.overlays[]').replace(/\.commands_config\.\w+/, '.commands_config[]').replace(/\.like_triggers\[\d+\]/, '.like_triggers[]');
   return FIELD_META[p] || { basic: false, type: 'text' };
 }
 
@@ -3941,7 +3962,8 @@ function _normalizeEditorPath(path) {
     .replace(/\.groups\[\d+\]/, '.groups[]')
     .replace(/\.triggers\[\d+\]/, '.triggers[]')
     .replace(/\.overlays\[\d+\]/, '.overlays[]')
-    .replace(/\.commands_config\.\w+/, '.commands_config[]');
+    .replace(/\.commands_config\.\w+/, '.commands_config[]')
+    .replace(/\.like_triggers\[\d+\]/, '.like_triggers[]');
 }
 
 function _editorLangIsDe() {
@@ -4241,6 +4263,8 @@ class ConfigEditor {
       body = this.buildThemeEditor(key, value);
     } else if (key === 'overlay') {
       body = this.buildOverlayEditor(key, value);
+    } else if (key === 'like_triggers') {
+      body = this.buildLikeTriggersEditor(key, value);
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       body = this.buildObjectFields(key, value);
     } else if (Array.isArray(value)) {
@@ -4499,6 +4523,108 @@ class ConfigEditor {
     return fields;
   }
 
+  buildLikeTriggersEditor(path, triggers) {
+    const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
+    const help = getHelp(path);
+    const lang = _editorLangIsDe() ? 'de' : 'en';
+    const T = {
+      en: {
+        trigger: 'Trigger', remove: 'Remove trigger',
+        id: 'Name', idHelp: 'A label for this trigger — only used in logs so you can tell which one fired.',
+        every: 'Every N likes', everyHelp: 'How many likes between activations. E.g. 100 → fires at 100, 200, 300…',
+        fn: 'Action', fnHelp: 'The trigger name from your actions.mca file. The command you wrote for this name will run.',
+        payload: 'Label', payloadHelp: 'Extra text passed to the action. Use {payload} in actions.mca to use it. Leave "Community" if unsure.',
+        add: '+ Add Trigger',
+      },
+      de: {
+        trigger: 'Trigger', remove: 'Trigger entfernen',
+        id: 'Name', idHelp: 'Ein Name für diesen Trigger — wird nur in Logs angezeigt, damit du siehst, welcher ausgelöst wurde.',
+        every: 'Alle N Likes', everyHelp: 'Wie viele Likes zwischen den Auslösungen. Z.B. 100 → löst bei 100, 200, 300… aus.',
+        fn: 'Aktion', fnHelp: 'Der Trigger-Name aus deiner actions.mca. Der Befehl, den du für diesen Namen geschrieben hast, wird ausgeführt.',
+        payload: 'Label', payloadHelp: 'Zusätzlicher Text, der an die Aktion übergeben wird. Nutze {payload} in actions.mca. Lass „Community" stehen, wenn unsicher.',
+        add: '+ Trigger hinzufügen',
+      }
+    }[lang];
+    const rows = (triggers || []).map((t, i) => {
+      const enabled = t.enabled !== false;
+      return `<div class="like-trigger-card">
+        <div class="like-trigger-header">
+          <span class="like-trigger-number">#${i + 1}</span>
+          <label class="like-trigger-toggle">
+            <input type="checkbox" class="toggle" data-li-enabled="${i}" ${enabled ? 'checked' : ''} onchange="this.closest('.like-trigger-card').classList.toggle('disabled',!this.checked); this.nextElementSibling.textContent=this.checked?'ON':'OFF'">
+            <span class="toggle-label">${enabled ? 'ON' : 'OFF'}</span>
+          </label>
+          <button class="btn-icon" onclick="editor.removeLikeTrigger('${path}', ${i})" title="${T.remove}">&times;</button>
+        </div>
+        <div class="like-trigger-body">
+          <div class="like-trigger-field">
+            <label>${T.id}</label>
+            <input type="text" data-li-id="${i}" value="${escapeHtml(t.id || '')}" placeholder="e.g. likes_standard">
+            <span class="like-trigger-hint">${T.idHelp}</span>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.every}</label>
+            <input type="number" data-li-every="${i}" value="${t.every || 100}" min="1">
+            <span class="like-trigger-hint">${T.everyHelp}</span>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.fn}</label>
+            <input type="text" data-li-function="${i}" value="${escapeHtml(t.function || '')}" placeholder="e.g. likes">
+            <span class="like-trigger-hint">${T.fnHelp}</span>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.payload}</label>
+            <input type="text" data-li-payload="${i}" value="${escapeHtml(t.payload || 'Community')}" placeholder="Community">
+            <span class="like-trigger-hint">${T.payloadHelp}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="editor-field full-width" data-path="${path}">
+      <div class="field-label" style="font-size:1rem;font-weight:600;">Like Triggers</div>
+      <div class="field-widget">
+        <p class="field-desc" style="margin-bottom:0.75rem;">${escapeHtml(getHelp(path) || 'Fire actions when total stream likes reach a threshold.')}</p>
+        <div class="like-trigger-list" id="${id}_list">${rows}</div>
+        <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="editor.addLikeTrigger('${path}')">${T.add}</button>
+      </div>
+    </div>`;
+  }
+
+  addLikeTrigger(path) {
+    const arr = this.getValue(path) || [];
+    arr.push({ id: '', every: 100, function: '', payload: 'Community', enabled: true });
+    this.setValue(path, arr);
+    this.render();
+  }
+
+  removeLikeTrigger(path, index) {
+    const arr = this.getValue(path) || [];
+    if (index >= 0 && index < arr.length) { arr.splice(index, 1); this.setValue(path, arr); this.render(); }
+  }
+
+  collectLikeTriggers() {
+    const path = 'like_triggers';
+    const current = this.getValue(path);
+    if (!Array.isArray(current)) return;
+    const triggers = [];
+    for (let i = 0; i < current.length; i++) {
+      const enEl = document.querySelector(`[data-li-enabled="${i}"]`);
+      const idEl = document.querySelector(`[data-li-id="${i}"]`);
+      const evEl = document.querySelector(`[data-li-every="${i}"]`);
+      const fnEl = document.querySelector(`[data-li-function="${i}"]`);
+      const plEl = document.querySelector(`[data-li-payload="${i}"]`);
+      if (!idEl) continue;
+      triggers.push({
+        id: idEl.value,
+        every: evEl ? Number(evEl.value) || 100 : 100,
+        function: fnEl ? fnEl.value : '',
+        payload: plEl ? plEl.value : 'Community',
+        enabled: enEl ? enEl.checked : true
+      });
+    }
+    this.setValue(path, triggers);
+  }
+
   buildPrimitiveArray(path, arr) {
     const help = getHelp(path);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
@@ -4680,7 +4806,7 @@ class ConfigEditor {
         this.setValue(path, el.value);
       }
     });
-
+    this.collectLikeTriggers();
   }
 
   /* ─── Validation ─── */
