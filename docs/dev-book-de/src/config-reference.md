@@ -30,7 +30,6 @@ api:
 Jedes Plugin hat eine eigene `config.yaml` in seinem Verzeichnis:
 
 ```yaml
-enabled: true
 # Plugin-spezifische Einstellungen hier
 ```
 
@@ -41,7 +40,6 @@ Die verfügbaren Felder ergeben sich aus dem `config_schema` in der `plugin.json
 Jeder Hook hat eine eigene `config.yaml` in seinem Verzeichnis:
 
 ```yaml
-enabled: true
 # Hook-spezifische Einstellungen hier
 ```
 

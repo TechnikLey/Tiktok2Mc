@@ -51,16 +51,7 @@ HOOK_JSON_TEMPLATE = """\
   "update_url": "{update_url}",
   "config_schema": {{
     "version": 1,
-    "fields": [
-      {{
-        "key": "enabled",
-        "type": "boolean",
-        "default": true,
-        "label": "Enable Hook",
-        "help": "Turn this hook on or off",
-        "category": "General"
-      }}
-    ]
+    "fields": []
   }}
 }}
 """
@@ -72,7 +63,6 @@ CONFIG_YAML_TEMPLATE = """\
 # This is the local configuration file for this hook.
 # Settings defined here are accessible via api.get_hook_config("{name}").
 
-enabled: true
 """
 
 

@@ -5,7 +5,6 @@ Each plugin has its own configuration in `config.yaml`. The system ensures the c
 ## The config.yaml
 
 ```yaml
-enabled: true
 threshold: 10
 theme:
   background: "#000000"
@@ -121,9 +120,9 @@ class MyPlugin(BasePlugin):
 > [!NOTE]
 > `self.config` returns a **copy** of the configuration. Changes do not affect the saved file.
 
-## Special Field: `enabled`
+## Plugin Activation
 
-The `enabled` field in the plugin's `config.yaml` is a framework-managed field that the system injects into every plugin configuration (default `true`). It does **not** control plugin activation: whether a plugin runs is managed via the GUI or `POST /api/v1/plugins/{name}/enable` / `disable` and stored in `data/api_plugin_registry.json`. A plugin does not activate itself through its config.
+Whether a plugin runs is managed via the GUI, the interactive console (`enable <name>` / `disable <name>`), or `POST /api/v1/plugins/{name}/enable` / `disable` and stored in `data/api_plugin_registry.json`. A plugin does **not** activate itself through its config. Plugins start disabled by default and must be explicitly enabled by the user.
 
 ## Next Chapter
 

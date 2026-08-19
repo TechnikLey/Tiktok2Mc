@@ -30,7 +30,6 @@ api:
 Each plugin has its own `config.yaml` in its directory:
 
 ```yaml
-enabled: true
 # Plugin-specific settings here
 ```
 
@@ -41,7 +40,6 @@ The available fields are determined by the `config_schema` in the `plugin.json`.
 Each hook has its own `config.yaml` in its directory:
 
 ```yaml
-enabled: true
 # Hook-specific settings here
 ```
 

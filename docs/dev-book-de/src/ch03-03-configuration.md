@@ -5,7 +5,6 @@ Jedes Plugin hat eine eigene Konfiguration in der `config.yaml`. Das System stel
 ## Die config.yaml
 
 ```yaml
-enabled: true
 schwellwert: 10
 theme:
   background: "#000000"
@@ -121,9 +120,9 @@ class MeinPlugin(BasePlugin):
 > [!NOTE]
 > `self.config` gibt eine **Kopie** der Konfiguration zurück. Änderungen wirken sich nicht auf die gespeicherte Datei aus.
 
-## Besonderes Feld: `enabled`
+## Plugin-Aktivierung
 
-Das Feld `enabled` in der Plugin-`config.yaml` ist ein Framework-Feld, das das System in jede Plugin-Konfiguration injiziert (Standard `true`). Es steuert **nicht** die Aktivierung des Plugins: Ob ein Plugin läuft, wird über die GUI bzw. `POST /api/v1/plugins/{name}/enable` / `disable` gesteuert und in `data/api_plugin_registry.json` gespeichert. Das Plugin aktiviert sich also nicht selbst über seine Config.
+Ob ein Plugin läuft, wird über die GUI, die interaktive Konsole (`enable <name>` / `disable <name>`) bzw. `POST /api/v1/plugins/{name}/enable` / `disable` gesteuert und in `data/api_plugin_registry.json` gespeichert. Das Plugin aktiviert sich also nicht selbst über seine Config. Plugins sind standardmäßig deaktiviert und müssen vom Benutzer explizit aktiviert werden.
 
 ## Nächstes Kapitel
 

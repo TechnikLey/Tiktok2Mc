@@ -31,7 +31,6 @@ CONFIG_YAML_TEMPLATE = """\
 # Plugin configuration
 # All values here override the defaults defined in plugin.json → config_schema.
 
-enabled: true
 """
 
 MAIN_PY_TEMPLATE = '''\
@@ -106,16 +105,7 @@ PLUGIN_JSON_TEMPLATE = """\
   "update_url": "{update_url}",
   "config_schema": {{
     "version": 1,
-    "fields": [
-      {{
-        "key": "enabled",
-        "type": "boolean",
-        "default": true,
-        "label": "Enable Plugin",
-        "help": "Turn this plugin on or off",
-        "category": "General"
-      }}
-    ]
+    "fields": []
   }}
 }}
 """
