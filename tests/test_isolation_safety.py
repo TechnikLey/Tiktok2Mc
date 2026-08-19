@@ -115,6 +115,7 @@ class TestNoProjectFilesModified:
                     "workspace",
                     "__pycache__",
                     ".tmp_path_factory",
+                    "build",
                 ):
                     skip = True
                     break

@@ -309,6 +309,7 @@ def _session_isolation_snapshot(request):
                     "workspace",
                     "__pycache__",
                     ".tmp_path_factory",
+                    "build",
                 ):
                     skip = True
                     break
