@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi import Path as PathParam
 from pydantic import BaseModel
 
@@ -68,6 +68,13 @@ class McPluginActionResponse(BaseModel):
 class McPluginDeleteResponse(BaseModel):
     status: str
     plugin: str
+    message: str
+
+
+class McPluginUploadResponse(BaseModel):
+    status: str
+    plugin: str
+    filename: str
     message: str
 
 
@@ -240,4 +247,49 @@ async def delete_mc_plugin(
         status="deleted",
         plugin=name,
         message=f"Plugin '{name}' deleted",
+    )
+
+
+@router.post(
+    "/server/{instance_id}/mc-plugins/upload",
+    response_model=McPluginUploadResponse,
+)
+async def upload_mc_plugin(
+    instance_id: Annotated[str, PathParam(description="Server instance ID")],
+    file: Annotated[UploadFile, File(description="Plugin .jar file")],
+):
+    _validate_instance_exists(instance_id)
+
+    if not file.filename or not file.filename.lower().endswith(".jar"):
+        raise HTTPException(status_code=400, detail="Only .jar files are accepted")
+
+    name = _sanitize_plugin_name(file.filename)
+    if not name:
+        raise HTTPException(status_code=400, detail="Invalid plugin filename")
+
+    plugins_dir = _get_plugins_dir(instance_id)
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+    target = plugins_dir / f"{name}.jar"
+
+    try:
+        with target.open("wb") as f:
+            while chunk := await file.read(8192):
+                f.write(chunk)
+        log.info(
+            "[MC-PLUGINS] Uploaded '%s' to instance '%s' (%s bytes)",
+            name,
+            instance_id,
+            target.stat().st_size,
+        )
+    except OSError as e:
+        log.warning("[MC-PLUGINS] Failed to upload '%s': %s", name, e)
+        raise HTTPException(status_code=500, detail=f"Failed to save plugin: {e}")
+    finally:
+        await file.close()
+
+    return McPluginUploadResponse(
+        status="uploaded",
+        plugin=name,
+        filename=target.name,
+        message=f"Plugin '{name}' uploaded. Restart the server for changes to take effect.",
     )

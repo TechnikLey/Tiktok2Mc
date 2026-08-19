@@ -1519,6 +1519,50 @@ async function deleteMcPlugin(instanceId, pluginName) {
   }
 }
 
+function uploadMcPlugin() {
+  const instanceId = _mcPluginsInstanceId();
+  if (!instanceId) {
+    showToast(I18N.t('servers.selectInstance'), 'warning');
+    return;
+  }
+  const input = document.getElementById('mc-plugins-file-input');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
+async function confirmUploadMcPlugin() {
+  const instanceId = _mcPluginsInstanceId();
+  const input = document.getElementById('mc-plugins-file-input');
+  const file = input && input.files && input.files[0];
+  if (!instanceId || !file) return;
+
+  if (!file.name.toLowerCase().endsWith('.jar')) {
+    showToast(I18N.t('servers.mcPluginUploadInvalid'), 'error');
+    return;
+  }
+
+  showToast(I18N.t('servers.mcPluginUploading', { name: file.name }), 'info');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch(API + '/server/' + encodeURIComponent(instanceId) + '/mc-plugins/upload', {
+      method: 'POST',
+      body: formData,
+      headers: _withApiKey({}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || I18N.t('servers.mcPluginUploadFailed'));
+    showToast(data.message || I18N.t('servers.mcPluginUploaded', { name: file.name }), 'success');
+    await loadMcPlugins();
+  } catch (e) {
+    showToast(I18N.t('servers.mcPluginUploadFailed', { msg: e.message }), 'error');
+  }
+}
+
 /* ─── Server Manager: Create Server Modal ─── */
 
 async function openServerCreateModal() {

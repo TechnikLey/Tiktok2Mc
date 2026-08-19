@@ -204,3 +204,58 @@ class TestMcPluginsDelete:
     def test_delete_plugin_nonexistent_instance(self, client, project_dir):
         resp = client.delete("/api/v1/server/nonexistent/mc-plugins/SomePlugin")
         assert resp.status_code == 404
+
+
+class TestMcPluginsUpload:
+    def _setup(self, project_dir):
+        server_dir = project_dir / "server" / "default"
+        server_dir.mkdir(parents=True, exist_ok=True)
+        (server_dir / "server.jar").write_bytes(b"fake jar")
+        plugins_dir = server_dir / "plugins"
+        plugins_dir.mkdir(exist_ok=True)
+        return plugins_dir
+
+    def test_upload_jar(self, client, project_dir):
+        self._setup(project_dir)
+        resp = client.post(
+            "/api/v1/server/default/mc-plugins/upload",
+            files={
+                "file": (
+                    "EssentialsX.jar",
+                    b"plugin-content",
+                    "application/java-archive",
+                )
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "uploaded"
+        assert data["plugin"] == "EssentialsX"
+        plugins_dir = project_dir / "server" / "default" / "plugins"
+        assert (plugins_dir / "EssentialsX.jar").exists()
+
+    def test_upload_non_jar_rejected(self, client, project_dir):
+        self._setup(project_dir)
+        resp = client.post(
+            "/api/v1/server/default/mc-plugins/upload",
+            files={"file": ("readme.txt", b"text", "text/plain")},
+        )
+        assert resp.status_code == 400
+
+    def test_upload_nonexistent_instance(self, client, project_dir):
+        resp = client.post(
+            "/api/v1/server/nonexistent/mc-plugins/upload",
+            files={"file": ("Plugin.jar", b"content", "application/java-archive")},
+        )
+        assert resp.status_code == 404
+
+    def test_upload_creates_plugins_dir(self, client, project_dir):
+        server_dir = project_dir / "server" / "default"
+        server_dir.mkdir(parents=True, exist_ok=True)
+        (server_dir / "server.jar").write_bytes(b"fake jar")
+        resp = client.post(
+            "/api/v1/server/default/mc-plugins/upload",
+            files={"file": ("Dynmap.jar", b"plugin", "application/java-archive")},
+        )
+        assert resp.status_code == 200
+        assert (server_dir / "plugins" / "Dynmap.jar").exists()

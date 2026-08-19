@@ -415,6 +415,8 @@
                     <div class="mc-plugins-instance-select" style="margin-bottom: var(--space-4);">
                         <label data-i18n="servers.mcPluginsInstance">Instance:</label>
                         <select id="mc-plugins-instance-select" class="form-input" onchange="loadMcPlugins()" style="max-width:300px;display:inline-block;margin-left:0.5rem;"></select>
+                        <button class="btn btn--sm btn--primary" onclick="uploadMcPlugin()" style="margin-left:0.5rem;" data-i18n="servers.mcPluginsAdd">Add Plugin</button>
+                        <input type="file" id="mc-plugins-file-input" accept=".jar" style="display:none;" onchange="confirmUploadMcPlugin()">
                     </div>
                     <div id="mc-plugins-list">
                         <p class="text-muted" data-i18n="servers.loadingMcPlugins">Loading plugins...</p>

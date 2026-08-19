@@ -549,6 +549,11 @@
     'servers.mcPluginDeleted': 'Plugin {name} deleted',
     'servers.mcPluginDeleteFailed': 'Delete failed: {msg}',
     'servers.mcPluginDeleteFailedTitle': 'Delete failed',
+    'servers.mcPluginsAdd': 'Add Plugin',
+    'servers.mcPluginUploadInvalid': 'Only .jar files are accepted.',
+    'servers.mcPluginUploading': 'Uploading {name}...',
+    'servers.mcPluginUploaded': 'Plugin {name} uploaded',
+    'servers.mcPluginUploadFailed': 'Upload failed: {msg}',
 
     /* ── Revenue ── */
     'revenue.title': 'Revenue',
@@ -1520,6 +1525,11 @@
     'servers.mcPluginDeleted': 'Plugin {name} gelöscht',
     'servers.mcPluginDeleteFailed': 'Löschen fehlgeschlagen: {msg}',
     'servers.mcPluginDeleteFailedTitle': 'Löschen fehlgeschlagen',
+    'servers.mcPluginsAdd': 'Plugin hinzufügen',
+    'servers.mcPluginUploadInvalid': 'Nur .jar-Dateien werden akzeptiert.',
+    'servers.mcPluginUploading': 'Lade {name} hoch...',
+    'servers.mcPluginUploaded': 'Plugin {name} hochgeladen',
+    'servers.mcPluginUploadFailed': 'Upload fehlgeschlagen: {msg}',
 
     /* ── Revenue ── */
     'revenue.title': 'Einnahmen',
