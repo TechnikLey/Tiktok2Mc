@@ -86,7 +86,12 @@ class PluginHealthMonitor:
 _health_monitor: PluginHealthMonitor | None = None
 
 
-def get_health_monitor() -> PluginHealthMonitor:
+def get_plugin_health_monitor() -> PluginHealthMonitor:
+    """Singleton accessor for the plugin heartbeat monitor.
+
+    Deliberately NOT named ``get_health_monitor`` — that name belongs to
+    ``core.health_monitor.get_health_monitor`` (process-level health).
+    """
     global _health_monitor
     if _health_monitor is None:
         _health_monitor = PluginHealthMonitor()

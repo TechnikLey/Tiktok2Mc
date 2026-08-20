@@ -22,7 +22,7 @@ from .api_key import set_api_key
 from .dashboard_publisher import get_dashboard_publisher
 from .eventbus import event_bus
 from .models import API_VERSION
-from .plugin_health import get_health_monitor
+from .plugin_health import get_plugin_health_monitor
 from .plugin_overlay import command_queue
 from .plugin_watcher import get_plugin_watcher
 from .routes import api_router
@@ -262,7 +262,7 @@ async def lifespan(app: FastAPI):
     command_queue.set_loop(asyncio.get_running_loop())
     get_plugin_watcher().start()
     _discover_hooks_at_startup()
-    await get_health_monitor().start()
+    await get_plugin_health_monitor().start()
     get_event_command_mapper().start()
     get_dashboard_publisher().start()
     get_tiktok_live_tracker().start()
@@ -291,7 +291,7 @@ async def lifespan(app: FastAPI):
         await get_dashboard_publisher().stop()
         await get_tiktok_live_tracker().stop()
         await get_event_command_mapper().stop()
-        await get_health_monitor().stop()
+        await get_plugin_health_monitor().stop()
         await event_bus.publish("server.stopping", {})
         log.info("API server shutting down ...")
 

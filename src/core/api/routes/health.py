@@ -12,7 +12,7 @@ from core.api.registry import get_registry
 from core.api.services import ApiService
 from core.api.services.bridge_metrics import get_bridge_metrics_service
 from core.api.tiktok_live import get_tiktok_live_tracker
-from core.health_monitor import get_health_monitor as get_global_health_monitor
+from core.health_monitor import get_health_monitor
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ async def health_extended():
     try:
         plugins = get_registry().list()
         enabled = sum(1 for p in plugins if p.enabled)
-        global_health = get_global_health_monitor()
+        global_health = get_health_monitor()
 
         return {
             "status": "ok",

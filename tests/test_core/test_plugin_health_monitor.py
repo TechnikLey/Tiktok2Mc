@@ -176,8 +176,8 @@ class TestPluginHealthMonitor:
         assert updated.health_status == "healthy"
 
     def test_singleton(self):
-        from core.api.plugin_health import get_health_monitor
+        from core.api.plugin_health import get_plugin_health_monitor
 
-        m1 = get_health_monitor()
-        m2 = get_health_monitor()
+        m1 = get_plugin_health_monitor()
+        m2 = get_plugin_health_monitor()
         assert m1 is m2
