@@ -3,7 +3,10 @@ import { describe, it, expect } from 'vitest';
 /* ─── escapeHtml ─── */
 describe('escapeHtml', () => {
   it('escapes HTML special characters', () => {
-    expect(escapeHtml('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert("xss")&lt;/script&gt;');
+    expect(escapeHtml('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+  });
+  it('escapes quotes for attribute contexts', () => {
+    expect(escapeHtml('a"b\'c')).toBe('a&quot;b&#39;c');
   });
   it('escapes ampersands', () => {
     expect(escapeHtml('a&b')).toBe('a&amp;b');

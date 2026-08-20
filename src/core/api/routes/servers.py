@@ -966,8 +966,21 @@ async def upload_custom_jar(
 
 @router.delete("/servers/{version}", response_model=RemoveResponse)
 async def remove_version(version: str):
-    versions_dir = _get_versions_dir()
-    target_dir = versions_dir / version
+    version = version.strip()
+    # Same semantic validation as download/switch: only supported PaperMC
+    # version identifiers pass.  This rejects path fragments ("..", "\",
+    # "/", pre-releases) before the path is ever joined.
+    if not _is_supported_version(version):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Version '{version}' is not a valid supported version",
+        )
+
+    versions_dir = _get_versions_dir().resolve()
+    target_dir = (versions_dir / version).resolve()
+    # Defense in depth: the resolved target must stay inside versions/.
+    if target_dir != versions_dir and versions_dir not in target_dir.parents:
+        raise HTTPException(status_code=400, detail="Invalid version path")
 
     if not target_dir.exists() or not target_dir.is_dir():
         raise HTTPException(status_code=404, detail=f"Version '{version}' not found")

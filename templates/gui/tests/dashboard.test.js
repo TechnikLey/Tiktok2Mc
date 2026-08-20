@@ -322,8 +322,8 @@ describe('isFirstRun', () => {
 
 /* ─── escapeHtml (double-check) ─── */
 describe('escapeHtml (full coverage)', () => {
-  it('escapes & < > "', () => {
-    expect(escapeHtml('&<>"')).toBe('&amp;&lt;&gt;"');
+  it('escapes & < > " \'', () => {
+    expect(escapeHtml('&<>"\'')).toBe('&amp;&lt;&gt;&quot;&#39;');
   });
   it('passes safe strings', () => {
     expect(escapeHtml('hello world 123')).toBe('hello world 123');

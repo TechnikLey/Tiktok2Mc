@@ -2455,7 +2455,7 @@ function renderPluginManager() {
       : (p.platform && p.platform !== 'all' ? '<span class="plugin-status status-info">' + _platformLabel(p.platform) + '</span>' : '<span class="text-muted">—</span>');
     const action = p.enabled
       ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.disable')}</button>`
-      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${p.name}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.enable')}</button>`;
+      : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.enable')}</button>`;
     const editDisabled = hasError ? ' disabled' : '';
     html += `<tr${errorTitle}>
       <td data-label="Name">${escapeHtml(p.display_name || p.name)}${hasError ? ' <span class="status-error-indicator" title="' + escapeHtml(p.error) + '">⚠️</span>' : ''}</td>
@@ -2463,7 +2463,7 @@ function renderPluginManager() {
       <td data-label="Port">${p.port || '-'}</td>
       <td data-label="${I18N.t('plugins.platform')}">${platformBadge}</td>
       <td data-label="Status"><span class="plugin-status ${status.cls}">${status.label}</span></td>
-      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${editDisabled} onclick="pluginEditor.openInline('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button> <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="openReadmeModal('${p.name}', '${escapeHtml(p.display_name || p.name)}')">Readme</button></td>
+      <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${editDisabled} onclick="pluginEditor.openInline('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button> <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="openReadmeModal('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">Readme</button></td>
     </tr>`;
     if (hasError) {
       html += `<tr class="error-detail-row"><td colspan="6"><span class="error-detail">${escapeHtml(p.error)}</span></td></tr>`;
@@ -4946,9 +4946,14 @@ const editor = new ConfigEditor();
 
 /* ─── Utilities ─── */
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  // Escapes quotes as well — the output is interpolated into quoted HTML
+  // attributes and inline onclick JS strings throughout the dashboard.
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 function toTitle(str) {
   return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());

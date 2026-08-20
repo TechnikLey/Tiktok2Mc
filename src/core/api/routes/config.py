@@ -23,7 +23,9 @@ def _get_service() -> ApiService:
 async def get_config():
     svc = _get_service()
     try:
-        cfg = svc.read_config()
+        # Secrets are replaced with a placeholder; write_config strips it
+        # again so GUI round-trips never overwrite the stored values.
+        cfg = svc.get_config_redacted()
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:  # any unexpected error becomes an HTTP 500
@@ -40,4 +42,6 @@ async def update_config(body: ConfigUpdateRequest):
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to write config")
         raise HTTPException(status_code=500, detail=str(e))
-    return ConfigResponse(path=str(svc.config_path), config=body.config)
+    # Return the persisted state (normalised version, secrets redacted)
+    # instead of echoing the request body.
+    return ConfigResponse(path=str(svc.config_path), config=svc.get_config_redacted())

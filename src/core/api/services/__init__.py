@@ -14,6 +14,46 @@ from core.yaml_utils import deep_update_rt, load_yaml
 
 log = logging.getLogger(__name__)
 
+# Placeholder returned by ``GET /config`` instead of real secret values.
+# ``write_config`` strips it again, so a GUI round-trip (read → edit →
+# write) never overwrites a stored secret with the placeholder.
+REDACTED_PLACEHOLDER = "__REDACTED__"
+
+_SECRET_KEY_NAMES = frozenset(
+    {"password", "secret", "token", "api_key", "github_token"}
+)
+
+
+def _is_secret_key(key: Any) -> bool:
+    return str(key).lower() in _SECRET_KEY_NAMES
+
+
+def _redact(value: Any) -> Any:
+    """Deep-copy *value*, replacing secret strings with the placeholder."""
+    if isinstance(value, dict):
+        return {
+            key: REDACTED_PLACEHOLDER
+            if _is_secret_key(key) and isinstance(val, str) and val
+            else _redact(val)
+            for key, val in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
+
+
+def _strip_redacted(value: Any) -> Any:
+    """Remove placeholder leaves so config merges keep the stored secrets."""
+    if isinstance(value, dict):
+        return {
+            key: _strip_redacted(val)
+            for key, val in value.items()
+            if not (_is_secret_key(key) and val == REDACTED_PLACEHOLDER)
+        }
+    if isinstance(value, list):
+        return [_strip_redacted(item) for item in value]
+    return value
+
 
 class ApiService:
     """Central business logic for the API server.
@@ -89,7 +129,12 @@ class ApiService:
         dicts should be fully replaced rather than merged.  This ensures
         deleted sub-keys are removed on disk (``deep_update_rt`` preserves
         old keys by default to keep YAML comments).
+
+        Values equal to :data:`REDACTED_PLACEHOLDER` are removed before
+        merging, so clients that echo back a redacted ``GET /config``
+        response never overwrite the real secrets on disk.
         """
+        data = _strip_redacted(data)
         data["config_version"] = EXPECTED_CONFIG_VERSION
 
         with config_transaction(self.config_path, backup=backup) as existing:
@@ -121,3 +166,7 @@ class ApiService:
 
     def get_config_status(self) -> bool:
         return self.config_path.exists()
+
+    def get_config_redacted(self) -> dict[str, Any]:
+        """Read the config with secret values replaced by the placeholder."""
+        return _redact(self.read_config())

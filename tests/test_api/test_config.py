@@ -80,3 +80,47 @@ class TestConfigEndpoints:
             from tests.conftest import MINIMAL_CONFIG
 
             save_yaml(config_file, MINIMAL_CONFIG, backup=False)
+
+
+class TestConfigSecretRedaction:
+    def _set_password(self, client, password):
+        current = client.get("/api/v1/config").json()
+        cfg = current["config"]
+        cfg.setdefault("rcon", {})["password"] = password
+        resp = client.put("/api/v1/config", json={"config": cfg, "backup": False})
+        assert resp.status_code == 200
+
+    def test_get_config_redacts_secrets(self, client):
+        self._set_password(client, "super-secret")
+        body = client.get("/api/v1/config").json()
+        assert body["config"]["rcon"]["password"] == "__REDACTED__"
+
+    def test_round_trip_preserves_secret(self, client):
+        self._set_password(client, "super-secret")
+
+        # GUI flow: read (redacted) → echo back unchanged
+        redacted = client.get("/api/v1/config").json()["config"]
+        resp = client.put("/api/v1/config", json={"config": redacted, "backup": False})
+        assert resp.status_code == 200
+
+        # The real value must still be on disk
+        from core.api.services import ApiService
+
+        stored = ApiService().read_config()
+        assert stored["rcon"]["password"] == "super-secret"
+
+    def test_secret_can_be_overwritten_with_new_value(self, client):
+        self._set_password(client, "super-secret")
+        current = client.get("/api/v1/config").json()
+        cfg = current["config"]
+        cfg["rcon"]["password"] = "new-secret"
+        client.put("/api/v1/config", json={"config": cfg, "backup": False})
+
+        from core.api.services import ApiService
+
+        assert ApiService().read_config()["rcon"]["password"] == "new-secret"
+
+    def test_empty_secret_stays_empty(self, client):
+        self._set_password(client, "")
+        body = client.get("/api/v1/config").json()
+        assert body["config"]["rcon"]["password"] == ""

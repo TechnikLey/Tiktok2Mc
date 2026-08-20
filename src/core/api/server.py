@@ -1,6 +1,9 @@
 import asyncio
+import ipaddress
+import json
 import logging
 import secrets
+import socket
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
@@ -47,14 +50,106 @@ def _same_host_origin(origin: str, host: str) -> bool:
     return parsed.netloc == host
 
 
+def _is_local_machine_host(hostname: str | None) -> bool:
+    """Whether *hostname* (Host header without port) refers to this machine.
+
+    Loopback names and any IP literal are accepted.  A DNS name is only
+    accepted when it is this machine's own hostname — DNS rebinding works
+    by pointing a *foreign* domain at 127.0.0.1, which this check detects.
+    """
+    if not hostname:
+        return False
+    if hostname in _LOCALHOSTS:
+        return True
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        return True
+    return hostname.lower() == socket.gethostname().lower()
+
+
+async def _send_json_error(send, status: int, detail: str) -> None:
+    body = json.dumps({"detail": detail}).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
+class LocalOriginGuardMiddleware:
+    """Reject browser requests that did not originate from the dashboard.
+
+    Blocks the two browser-based attack classes against a localhost API:
+
+    * **Cross-site request forgery ("drive-by"):** a malicious web page
+      makes ``fetch()`` calls to ``http://127.0.0.1:<port>``.  Browsers
+      attach a foreign ``Origin`` header (and/or ``Sec-Fetch-Site:
+      cross-site``) to such requests — they are rejected with ``403``
+      instead of being silently executed.
+    * **DNS rebinding:** an attacker domain resolves to ``127.0.0.1``, so
+      the request arrives from localhost but carries the attacker's
+      hostname in the ``Host`` header.  Requests from localhost clients
+      whose ``Host`` is neither a loopback name, an IP literal nor this
+      machine's own hostname are rejected as well.
+
+    Non-browser clients (the bridge, plugins, curl, scripts) send neither
+    ``Origin`` nor ``Sec-Fetch-Site`` and are unaffected.
+    """
+
+    def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
+        self.app = app
+        self.extra_origins = frozenset(extra_origins)
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+
+        origin = headers.get("origin")
+        if origin is not None and not (
+            origin in self.extra_origins
+            or _same_host_origin(origin, headers.get("host", ""))
+        ):
+            await _send_json_error(send, 403, "Cross-origin request rejected")
+            return
+
+        if headers.get("sec-fetch-site") == "cross-site":
+            await _send_json_error(send, 403, "Cross-site request rejected")
+            return
+
+        client = scope.get("client")
+        client_host = client[0] if client else ""
+        if client_host in _LOCALHOSTS:
+            host_header = headers.get("host", "")
+            hostname = urlsplit(f"//{host_header}").hostname if host_header else None
+            if not _is_local_machine_host(hostname):
+                await _send_json_error(send, 403, "Invalid Host header")
+                return
+
+        await self.app(scope, receive, send)
+
+
 class SameHostCORSMiddleware:
     """Reflect an Origin only when it belongs to the server's own host.
 
     The desktop GUI (pywebview) and any LAN browser that opens the
     dashboard at ``http://<server-host>:<port>`` send an ``Origin`` whose
     host matches the request's ``Host`` header — those are allowed and the
-    origin is echoed.  Foreign origins (malicious websites, DNS rebinding)
-    never match, so the API stays unreadable from arbitrary pages.
+    origin is echoed.  Foreign origins never match, so no CORS headers are
+    reflected to arbitrary pages.  Note that reflection alone does not
+    block cross-origin *execution*; request rejection is handled by
+    :class:`LocalOriginGuardMiddleware`.
     """
 
     def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
@@ -218,8 +313,10 @@ def create_app(
     cors_origins:
         Optional explicit list of allowed origins for CORS.  When omitted,
         the ``SameHostCORSMiddleware`` reflects any origin whose host
-        matches the request (local GUI and LAN dashboard).  Pass ``["*"]``
-        only for development.
+        matches the request (local GUI and LAN dashboard) and the
+        ``LocalOriginGuardMiddleware`` rejects cross-origin, cross-site
+        and DNS-rebinding requests outright.  Pass ``["*"]`` only for
+        development — it disables both middlewares.
     api_key:
         Optional API key for authentication.  When set, all non-localhost
         requests must include the ``X-API-Key`` header (or ``?key=`` query
@@ -247,6 +344,11 @@ def create_app(
         )
     else:
         app.add_middleware(SameHostCORSMiddleware)
+        # Rejects (not just de-CORS) cross-origin / rebinding requests.
+        # Only active in the default mode — an explicit cors_origins list
+        # is the documented development escape hatch and replaces the
+        # whole origin-protection stack.
+        app.add_middleware(LocalOriginGuardMiddleware)
 
     class CancelledErrorMiddleware:
         """Suppress CancelledError spam when clients disconnect or the server shuts down."""

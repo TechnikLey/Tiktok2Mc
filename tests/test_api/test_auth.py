@@ -117,7 +117,8 @@ class TestSameHostCORS:
         )
         assert resp.headers.get("access-control-allow-credentials") == "true"
 
-    def test_foreign_origin_gets_no_cors_headers(self):
+    def test_foreign_origin_is_rejected(self):
+        """Cross-origin requests must be rejected, not just served without CORS headers."""
         with TestClient(self._app()) as tc:
             resp = tc.get(
                 "/api/v1/health",
@@ -127,8 +128,53 @@ class TestSameHostCORS:
                     "X-API-Key": "secret123",
                 },
             )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
         assert "access-control-allow-origin" not in resp.headers
+
+    def test_foreign_origin_post_is_rejected(self):
+        """Drive-by CSRF via no-cors POST must not reach the route."""
+        with TestClient(self._app()) as tc:
+            resp = tc.post(
+                "/api/v1/rcon/command",
+                headers={
+                    "Origin": "https://evil.example",
+                    "Host": "127.0.0.1:29185",
+                    "X-API-Key": "secret123",
+                },
+                json={"command": "say hi"},
+            )
+        assert resp.status_code == 403
+
+    def test_cross_site_fetch_site_is_rejected(self):
+        """Sec-Fetch-Site: cross-site must be rejected even without Origin."""
+        with TestClient(self._app()) as tc:
+            resp = tc.get(
+                "/api/v1/health",
+                headers={
+                    "Host": "127.0.0.1:29185",
+                    "Sec-Fetch-Site": "cross-site",
+                    "X-API-Key": "secret123",
+                },
+            )
+        assert resp.status_code == 403
+
+    def test_same_site_fetch_site_is_allowed(self):
+        with TestClient(self._app()) as tc:
+            resp = tc.get(
+                "/api/v1/health",
+                headers={
+                    "Host": "127.0.0.1:29185",
+                    "Sec-Fetch-Site": "same-origin",
+                    "X-API-Key": "secret123",
+                },
+            )
+        assert resp.status_code == 200
+
+    def test_requests_without_origin_pass(self):
+        """Non-browser clients (bridge, plugins, curl) send no Origin."""
+        with TestClient(self._app()) as tc:
+            resp = tc.get("/api/v1/health", headers={"X-API-Key": "secret123"})
+        assert resp.status_code == 200
 
     def test_preflight_reflects_same_host_origin(self):
         with TestClient(self._app()) as tc:
@@ -165,3 +211,40 @@ class TestSameHostCORS:
         assert (
             resp.headers.get("access-control-allow-origin") == "http://127.0.0.1:29185"
         )
+
+
+class TestDnsRebindingGuard:
+    def _client(self):
+        from core.api import create_app
+
+        # Simulate a browser connecting from localhost (rebinding scenario).
+        return TestClient(create_app(api_key="secret123"), client=("127.0.0.1", 51234))
+
+    def test_localhost_client_with_foreign_host_is_rejected(self):
+        with self._client() as tc:
+            resp = tc.get("/api/v1/health", headers={"Host": "evil.example:29185"})
+        assert resp.status_code == 403
+
+    def test_localhost_client_with_ip_host_is_allowed(self):
+        with self._client() as tc:
+            resp = tc.get("/api/v1/health", headers={"Host": "192.168.1.50:29185"})
+        assert resp.status_code == 200
+
+    def test_localhost_client_with_loopback_host_is_allowed(self):
+        with self._client() as tc:
+            resp = tc.get("/api/v1/health", headers={"Host": "localhost:29185"})
+        assert resp.status_code == 200
+
+    def test_remote_client_with_foreign_host_is_allowed(self):
+        """LAN clients may use the server machine's hostname; api_key governs them."""
+        from core.api import create_app
+
+        client = TestClient(
+            create_app(api_key="secret123"), client=("192.168.1.77", 51234)
+        )
+        with client as tc:
+            resp = tc.get(
+                "/api/v1/health",
+                headers={"Host": "server-pc:29185", "X-API-Key": "secret123"},
+            )
+        assert resp.status_code == 200

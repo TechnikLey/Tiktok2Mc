@@ -1,4 +1,5 @@
 import asyncio
+import html
 import json
 import logging
 import time
@@ -184,7 +185,8 @@ async def oauth_callback(name: str, code: str = "", state: str = "", error: str 
     """
     if error:
         return HTMLResponse(
-            f"<h1>Authorization failed</h1><p>{error}</p>", status_code=400
+            f"<h1>Authorization failed</h1><p>{html.escape(error)}</p>",
+            status_code=400,
         )
     if not code:
         return HTMLResponse("<h1>Missing authorization code</h1>", status_code=400)
