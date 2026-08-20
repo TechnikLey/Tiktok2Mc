@@ -574,6 +574,16 @@ def sanitize_filename(name):
     return re.sub(r"[^a-z0-9_-]", "", name)
 
 
+def mc_safe_name(user: str) -> str:
+    """Sanitize a TikTok username/nickname for use inside MC/RCON commands.
+
+    unique_ids are [A-Za-z0-9._] and pass through unchanged; nicknames may
+    contain spaces, quotes or control characters that would shift command
+    arguments or break JSON text components when substituted into {user}.
+    """
+    return re.sub(r"[^A-Za-z0-9._-]", "_", str(user))[:30]
+
+
 def generate_datapack():
     """Generates datapack files for vanilla commands and stores
     plugin/script commands separately.
@@ -953,9 +963,11 @@ async def execute_global_command(
     # --- 2. RCON-ONLY COMMANDS ---
     if name in ctx.rcon_only_actions:
         for cmd in ctx.rcon_only_actions[name]:
-            # Substitute {user} placeholder for dynamic vanilla/RCON commands
+            # Substitute {user} placeholder for dynamic vanilla/RCON commands.
+            # Sanitized: a nickname with spaces/quotes must not shift
+            # arguments or break JSON components on the server.
             if "{user}" in cmd and user_display:
-                cmd = cmd.replace("{user}", user_display)
+                cmd = cmd.replace("{user}", mc_safe_name(user_display))
             commands_to_send.append(cmd)
 
     # --- 3. SHELL COMMANDS ---
@@ -1569,6 +1581,10 @@ def _process_comment_command(
             if not prefix or not comment_text.startswith(prefix):
                 continue
             cmd_text = comment_text[len(prefix) :].strip()
+            # A leading "/" is accepted by RCON/console but would bypass the
+            # first-word deny/allow match below ("/op" != "op") — strip it so
+            # matching and dispatch see the same normalized command.
+            cmd_text = cmd_text.lstrip("/").strip()
             if not cmd_text:
                 continue
 
@@ -1945,6 +1961,8 @@ def handle_custom_trigger():
             return {
                 "status": "ok",
                 "message": f"TikTok connection toggled. Now DISABLE_TIKTOK_CONNECT={new_state}",
+                # Structured state so the API does not have to parse the message
+                "connected": not new_state,
             }, 200
 
         # Route 'follow' through the shared dedup logic so custom_trigger respects _followed_cache

@@ -145,20 +145,23 @@ class TriggerService:
         )
         self._record(result)
 
-        connected = True
-        message = result.error_message
-        if "DISABLE_TIKTOK_CONNECT=True" in message:
-            connected = False
-        elif "DISABLE_TIKTOK_CONNECT=False" in message:
+        # Prefer the structured flag from the bridge response; fall back to
+        # parsing the human-readable message for older bridge versions.
+        bridge_data = result.bridge_response or {}
+        connected = bridge_data.get("connected")
+        if not isinstance(connected, bool):
             connected = True
-        elif message and (
-            "disabled" in message.lower() or "now true" in message.lower()
-        ):
-            connected = False
+            message = result.error_message
+            if (
+                "DISABLE_TIKTOK_CONNECT=True" in message
+                or (message and "disabled" in message.lower())
+                or (message and "now true" in message.lower())
+            ):
+                connected = False
 
         return {
             "status": result.status.value if result.success else "error",
-            "message": message,
+            "message": result.error_message,
             "connected": connected,
         }
 

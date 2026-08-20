@@ -186,6 +186,31 @@ class TestTriggerService:
         assert result["status"] == "success"
         assert result["connected"] is True
 
+    def test_toggle_tiktok_connection_structured_flag(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=True,
+            trigger_name="tiktok",
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=5.0,
+            payload={"trigger": "tiktok", "user": "System"},
+            error_message="TikTok connection toggled.",
+            bridge_response={
+                "status": "ok",
+                "message": "TikTok connection toggled.",
+                "connected": False,
+            },
+        )
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time() - 10
+
+        result = svc.toggle_tiktok_connection()
+
+        assert result["status"] == "success"
+        # Structured flag wins even though the message no longer carries
+        # the legacy DISABLE_TIKTOK_CONNECT marker
+        assert result["connected"] is False
+
     def test_get_trigger_definitions(self):
         svc = TriggerService()
         defs = svc.get_trigger_definitions()

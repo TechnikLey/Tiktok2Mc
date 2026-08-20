@@ -50,7 +50,8 @@ share:/give @a minecraft:firework_rocket 3
 'Tom the Tomato':/give @a minecraft:potato 1
 
 # 10. Shell command: Discord webhook on follow (PC-side)
-#follow:&curl -X POST -H "Content-Type: application/json" -d "{\"content\":\"{user} just followed!\"}" https://discord.com/api/webhooks/YOUR_WEBHOOK
+# Note: & shell commands do NOT substitute {user} — the payload is static.
+#follow:&curl -X POST -H "Content-Type: application/json" -d "{\"content\":\"New follower!\"}" https://discord.com/api/webhooks/YOUR_WEBHOOK
 
 # 11. Disabled with ## – kept as template, won't fire
 # Note: like_2 is already active above, so the validator/language server shows
