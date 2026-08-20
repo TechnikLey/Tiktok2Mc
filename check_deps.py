@@ -83,7 +83,6 @@ def _detect_package_manager():
 # (import_name, pip_name, required_for, optional)
 PYTHON_PACKAGES = [
     # Core
-    ("yaml", "PyYAML", "core", False),
     ("webview", "pywebview", "core", False),
     ("flask", "Flask", "core", False),
     ("fastapi", "fastapi", "core", False),
@@ -106,7 +105,8 @@ PYTHON_PACKAGES = [
     ("PyQt6", "PyQt6", "gui", False),
     ("PyQt6.WebEngine", "PyQt6-WebEngine", "gui", False),
     ("qtpy", "qtpy", "gui", False),
-    # Testing
+    # Testing (PyYAML is only used directly by tests, not at runtime)
+    ("yaml", "PyYAML", "testing", True),
     ("pytest", "pytest", "testing", True),
     ("pytest_timeout", "pytest-timeout", "testing", True),
     ("pytest_asyncio", "pytest-asyncio", "testing", True),
