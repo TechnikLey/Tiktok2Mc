@@ -702,7 +702,7 @@ class ProcessSupervisor:
                 log.warning("[SUPERVISOR] start_all: %s raised %s", name, res)
                 results[name] = False
             else:
-                results[name] = res
+                results[name] = res  # type: ignore[assignment]
         return results
 
     async def start_shell(self) -> dict[str, bool]:
@@ -718,7 +718,7 @@ class ProcessSupervisor:
                 log.warning("[SUPERVISOR] start_shell: %s raised %s", name, res)
                 results[name] = False
             else:
-                results[name] = res
+                results[name] = res  # type: ignore[assignment]
         return results
 
     # ------------------------------------------------------------------
@@ -876,7 +876,7 @@ class ProcessSupervisor:
                 log.warning("[SUPERVISOR] stop_all: %s raised %s", name, res)
                 results[name] = False
             else:
-                results[name] = res
+                results[name] = res  # type: ignore[assignment]
         return results
 
     # ------------------------------------------------------------------

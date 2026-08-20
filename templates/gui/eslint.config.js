@@ -6,6 +6,7 @@ import { defineConfig } from "eslint/config";
 // actions-editor.js are loaded into one page via <script> tags) and by the
 // vitest tests (which evaluate both files into the jsdom global scope).
 const appGlobals = {
+  marked: "readonly",
   pywebview: "writable",
   ActionsEditor: "writable",
   I18N: "writable",

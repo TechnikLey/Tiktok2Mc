@@ -141,6 +141,7 @@ def main():
     choice = input("Choice (1 or 2, default: 1): ").strip()
 
     plugin_name = ""
+    target_dir: Path = MAIN_HOOKS_DIR
     if choice == "2":
         # List available plugins
         plugins = [

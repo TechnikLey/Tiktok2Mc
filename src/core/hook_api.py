@@ -131,7 +131,7 @@ class HookAPI:
     def send_overlay_text(
         self,
         title: str,
-        subtitle: str | None = "",
+        subtitle: str = "",
         duration: int | None = 3,
         overlay_name: str | None = "default",
     ) -> bool:

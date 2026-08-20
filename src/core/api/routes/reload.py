@@ -104,7 +104,7 @@ async def reload_runtime(body: ReloadRequest):
         if _write_signal("reload_actions", payload):
             signals.append("reload_actions")
 
-    if body.comment_commands:
+    if body.comment_commands:  # noqa: SIM102
         if _write_signal("reload_comment_commands"):
             signals.append("reload_comment_commands")
 
