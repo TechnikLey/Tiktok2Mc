@@ -1,14 +1,18 @@
 import asyncio
 import json
 import logging
+import secrets
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from core.api.api_key import get_api_key
 from core.api.eventbus import event_bus
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket"])
+
+_LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
 @router.websocket("/ws")
@@ -22,6 +26,15 @@ async def websocket_endpoint(ws: WebSocket):
 
     By default the client receives **all** event types.
     """
+    api_key = get_api_key()
+    if api_key:
+        client_host = ws.client.host if ws.client else ""
+        if client_host not in _LOCALHOSTS:
+            req_key = ws.query_params.get("key", "")
+            if not secrets.compare_digest(req_key, api_key):
+                await ws.close(code=4401, reason="Unauthorized")
+                return
+
     await ws.accept()
 
     # Shared mutable state guarded by a lock so reader and writer agree

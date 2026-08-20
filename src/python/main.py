@@ -320,11 +320,6 @@ def enqueue_threadsafe(
         return False
 
 
-# ==========================================
-# SETUP & HELPER FUNCTIONS
-# ==========================================
-
-
 def _validate_dup_cmd_config():
     """Validate raw YAML for duplicate keys in commands_config sections.
 
@@ -1024,8 +1019,11 @@ async def trigger_worker():
             await asyncio.sleep(0.1)
 
 
+API_BASE = "http://127.0.0.1:29185/api/v1"
+
+
 # ==========================================
-# Webhook endpoint for MinecraftServerAPI
+# EventBus publisher
 # ==========================================
 def _publish_event(event_type: str, event_data: dict) -> None:
     """Forward a Minecraft event to the central EventBus via API."""
@@ -1123,32 +1121,6 @@ def handle_minecraft_events():
     return {"status": "processed"}, 200
 
 
-API_BASE = "http://127.0.0.1:29185/api/v1"
-
-
-# ==========================================
-# Webhook endpoint for MinecraftServerAPI
-# ==========================================
-def _publish_event(event_type: str, event_data: dict) -> None:
-    """Forward a Minecraft event to the central EventBus via API."""
-    body = json.dumps({"type": event_type, "data": event_data}).encode("utf-8")
-    try:
-        req = urllib.request.Request(
-            f"{API_BASE}/events",
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        urllib.request.urlopen(req, timeout=3)
-    except (OSError, ValueError) as exc:
-        log.warning("Failed to publish event '%s' to EventBus: %s", event_type, exc)
-        get_crash_manager().report_exception(
-            TIKTOK_0004,
-            exc=exc,
-            context_info={"event_type": event_type, "target": "eventbus_api_webhook"},
-        )
-
-
 def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) -> None:
     """Post a comment command to a plugin's command queue via the API."""
     url = f"{API_BASE}/plugins/{plugin_name}/command"
@@ -1169,9 +1141,6 @@ def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) 
 
 
 def _dispatch_comment_http(cmd_url, username, cmd_text):
-    import urllib.parse
-    import urllib.request
-
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -1187,10 +1156,6 @@ def _dispatch_comment_http(cmd_url, username, cmd_text):
 
 
 def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
-    import json
-    import urllib.parse
-    import urllib.request
-
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -1591,12 +1556,9 @@ def _process_comment_command(
             allowed = False
             if (
                 "all" in group["roles"]
-                or "moderator" in group["roles"]
-                and is_moderator
-                or "superfan" in group["roles"]
-                and is_super_fan
-                or "fanclub" in group["roles"]
-                and in_fanclub
+                or ("moderator" in group["roles"] and is_moderator)
+                or ("superfan" in group["roles"] and is_super_fan)
+                or ("fanclub" in group["roles"] and in_fanclub)
             ):
                 allowed = True
 
@@ -1633,12 +1595,9 @@ def _process_comment_command(
                 cmd_allowed = False
                 if (
                     "all" in cmd_roles
-                    or "moderator" in cmd_roles
-                    and is_moderator
-                    or "superfan" in cmd_roles
-                    and is_super_fan
-                    or "fanclub" in cmd_roles
-                    and in_fanclub
+                    or ("moderator" in cmd_roles and is_moderator)
+                    or ("superfan" in cmd_roles and is_super_fan)
+                    or ("fanclub" in cmd_roles and in_fanclub)
                 ):
                     cmd_allowed = True
                 if not cmd_allowed:
@@ -2049,7 +2008,7 @@ async def execute_shell_commands(cmds: list[str]):
 
 # ==========================================
 # User-friendly name extraction
-# =========================================
+# ==========================================
 def get_safe_username(user):
     name = (
         getattr(user, "unique_id", None) or getattr(user, "nickname", None) or "Unknown"
@@ -2057,12 +2016,6 @@ def get_safe_username(user):
     return name
 
 
-# =========================================
-# Like trigger validation
-# =========================================
-
-# ==========================================
-# Custom trigger + test comment endpoints
 # ==========================================
 # TIKTOK CLIENT
 # ==========================================

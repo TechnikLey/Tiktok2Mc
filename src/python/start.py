@@ -42,16 +42,6 @@ from typing import Any, NoReturn
 
 multiprocessing.freeze_support()
 
-# Pre-import uvicorn so the API server task does not trigger a late load of
-# _multiprocessing from a non-main thread.
-try:
-    pass
-except Exception as _exc:  # pragma: no cover  # pre-import is best-effort
-    import logging as _logging
-
-    _pre_log = _logging.getLogger("start.preimport")
-    _pre_log.warning("Failed to pre-import uvicorn/core.api: %s", _exc)
-
 from core.api.eventbus import event_bus  # noqa: E402
 from core.api.launcher import PluginLauncher  # noqa: E402
 from core.api.models import API_VERSION  # noqa: E402
