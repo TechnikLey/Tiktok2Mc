@@ -1019,7 +1019,12 @@ async def trigger_worker():
             await asyncio.sleep(0.1)
 
 
-API_BASE = "http://127.0.0.1:29185/api/v1"
+# Central API base URL. The supervisor exports RESOLVED_PORT_API_PORT when
+# the port scanner had to relocate the API — honour it like the webhook
+# port above instead of assuming the default.
+API_BASE = "http://127.0.0.1:{}/api/v1".format(
+    os.environ.get("RESOLVED_PORT_API_PORT", "29185")
+)
 
 
 # ==========================================
@@ -1085,9 +1090,17 @@ def _record_metrics_event():
     """Call this to record an event for metrics tracking."""
     import time
 
+    now = time.time()
     if not hasattr(handle_metrics, "_event_timestamps"):
         handle_metrics._event_timestamps = []
-    handle_metrics._event_timestamps.append(time.time())
+    timestamps = handle_metrics._event_timestamps
+    timestamps.append(now)
+    # Prune here as well — GET /metrics may never be polled, and the list
+    # would otherwise grow for the whole stream (likes alone can be
+    # thousands per minute).
+    if len(timestamps) > 10000 or len(timestamps) % 500 == 0:
+        cutoff = now - 60
+        handle_metrics._event_timestamps = [ts for ts in timestamps if ts > cutoff]
 
 
 @app.route("/webhook", methods=["POST"])
@@ -1523,6 +1536,12 @@ def _process_comment_command(
     if not ctx.comment_cmd_enable or not ctx.comment_cmd_groups:
         return suppress
 
+    # Conditional HTTP handlers block for up to 10 s. They are collected
+    # here and executed AFTER the lock is released — never do blocking I/O
+    # while holding ctx.comment_cmd_lock, or /test_comment and every other
+    # comment stalls behind a slow endpoint.
+    pending_conditional: list[tuple[str, str, str, str, float]] = []
+
     # The cooldown dicts are mutated from multiple TikTok event threads and
     # the /test_comment Flask endpoint; guard them with a lock.
     with ctx.comment_cmd_lock:
@@ -1656,6 +1675,13 @@ def _process_comment_command(
                     k: {u: t for u, t in v.items() if t >= cutoff}
                     for k, v in ctx.comment_cmd_last_user.items()
                 }
+            if len(ctx.comment_cmd_global_user_last) > 1000:
+                cutoff = now - 3600
+                ctx.comment_cmd_global_user_last = {
+                    u: t
+                    for u, t in ctx.comment_cmd_global_user_last.items()
+                    if t >= cutoff
+                }
 
             # 1. Plugin handler (configured via comment_commands.yaml)
             if cmd_handler == "plugin" and group.get("plugin_name"):
@@ -1670,34 +1696,40 @@ def _process_comment_command(
             # 3. HTTP handler
             elif cmd_handler == "http" and cmd_url:
                 if conditional:
-                    resp_data = _dispatch_comment_http_sync(cmd_url, username, cmd_text)
-                    if resp_data and resp_data.get("found", False):
-                        ctx.comment_cmd_last_global[prefix] = now
-                        ctx.comment_cmd_last_user.setdefault(prefix, {})[username] = now
-                        ctx.comment_cmd_global_last = now
-                        ctx.comment_cmd_global_user_last[username] = now
-                        mode_label = resp_data.get("mode", "replace")
-                        if mode_label == "queue":
-                            log.info(
-                                f"{log_prefix} {username} → '{base_cmd}' successful — conditional response: mode={mode_label}"
-                            )
-                    else:
-                        log.info(
-                            f"{log_prefix} {username} → '{base_cmd}' conditional response negative — no cooldown triggered"
-                        )
+                    pending_conditional.append(
+                        (cmd_url, username, cmd_text, prefix, now)
+                    )
                 else:
                     url = cmd_url.replace(
                         "{user}", urllib.parse.quote(username, safe="")
                     )
                     url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
-                    threading.Thread(
-                        target=_dispatch_comment_http,
-                        args=(url, username, cmd_text),
-                        daemon=True,
-                    ).start()
+                    _run_in_background(_dispatch_comment_http, url, username, cmd_text)
 
             if not group.get("trigger_comment_event", True):
                 suppress = True
+
+    # Conditional HTTP runs without the lock. The comment worker is a
+    # single thread, so comments are still processed sequentially — but
+    # /test_comment and the TikTok event threads are never blocked by a
+    # slow endpoint.
+    for c_url, c_user, c_text, c_prefix, c_now in pending_conditional:
+        resp_data = _dispatch_comment_http_sync(c_url, c_user, c_text)
+        if resp_data and resp_data.get("found", False):
+            with ctx.comment_cmd_lock:
+                ctx.comment_cmd_last_global[c_prefix] = c_now
+                ctx.comment_cmd_last_user.setdefault(c_prefix, {})[c_user] = c_now
+                ctx.comment_cmd_global_last = c_now
+                ctx.comment_cmd_global_user_last[c_user] = c_now
+            mode_label = resp_data.get("mode", "replace")
+            if mode_label == "queue":
+                log.info(
+                    f"{log_prefix} {c_user} → conditional response: mode={mode_label}"
+                )
+        else:
+            log.info(
+                f"{log_prefix} {c_user} → conditional response negative — no cooldown triggered"
+            )
 
     return suppress
 
@@ -1710,9 +1742,22 @@ def _process_comment_command(
 # worker keeps the TikTok event loop responsive; the cooldown dicts stay
 # guarded by ctx.comment_cmd_lock so the /test_comment Flask endpoint can
 # still call _process_comment_command synchronously.
-_comment_queue: queue.Queue = queue.Queue()
+_COMMENT_QUEUE_MAX = 2000
+_comment_queue: queue.Queue = queue.Queue(maxsize=_COMMENT_QUEUE_MAX)
 _comment_worker_started = False
 _comment_worker_lock = threading.Lock()
+
+
+def _enqueue_comment(item: tuple) -> None:
+    """Enqueue a comment event, dropping with a warning when full."""
+    try:
+        _comment_queue.put_nowait(item)
+    except queue.Full:
+        log.warning(
+            "[COMMENT] Queue full (%d) — dropping comment from %s",
+            _COMMENT_QUEUE_MAX,
+            item[0] if item else "?",
+        )
 
 
 def _comment_worker_main():
@@ -2159,7 +2204,7 @@ def create_client(user):
         # Heavy comment handling (logging, prefix matching, cooldowns, HTTP
         # conditional handlers) runs on a dedicated worker thread.
         _start_comment_worker()
-        _comment_queue.put(
+        _enqueue_comment(
             (username, comment_text, is_moderator, is_super_fan, in_fanclub)
         )
 

@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from core.port_scanner import (
@@ -220,30 +219,36 @@ class TestPortsToEnv:
 
 
 class TestPersistToConfig:
-    @patch("core.yaml_utils.load_yaml")
-    @patch("core.yaml_utils.save_yaml")
-    def test_persist_changed_ports(self, mock_save, mock_load):
-        mock_load.return_value = {"minecraft_server_api": {"web_server_port": 29188}}
-        resolved = {"webhook_port": 29189}
-        persist_to_config(resolved, Path("/fake/config.yaml"))
-        mock_save.assert_called_once()
-        args = mock_save.call_args
-        assert args[0][1]["minecraft_server_api"]["web_server_port"] == 29189
+    def test_persist_changed_ports(self, tmp_path):
+        from core.yaml_utils import load_yaml, save_yaml
 
-    @patch("core.yaml_utils.load_yaml")
-    @patch("core.yaml_utils.save_yaml")
-    def test_no_change_default_port(self, mock_save, mock_load):
-        mock_load.return_value = {}
-        resolved = {"webhook_port": 29188}
-        persist_to_config(resolved, Path("/fake/config.yaml"))
-        mock_save.assert_not_called()
+        cfg_file = tmp_path / "config.yaml"
+        save_yaml(
+            cfg_file,
+            {"minecraft_server_api": {"web_server_port": 29188}},
+            backup=False,
+        )
+        persist_to_config({"webhook_port": 29189}, cfg_file)
+        result = load_yaml(cfg_file)
+        assert result["minecraft_server_api"]["web_server_port"] == 29189
 
-    @patch("core.yaml_utils.load_yaml")
-    @patch("core.yaml_utils.save_yaml")
-    def test_creates_missing_section(self, mock_save, mock_load):
-        mock_load.return_value = {}
-        resolved = {"webhook_port": 29189}
-        persist_to_config(resolved, Path("/fake/config.yaml"))
-        mock_save.assert_called_once()
-        args = mock_save.call_args
-        assert args[0][1] == {"minecraft_server_api": {"web_server_port": 29189}}
+    def test_no_change_default_port(self, tmp_path):
+        from core.yaml_utils import load_yaml, save_yaml
+
+        cfg_file = tmp_path / "config.yaml"
+        save_yaml(cfg_file, {}, backup=False)
+        before = cfg_file.read_text(encoding="utf-8")
+        persist_to_config({"webhook_port": 29188}, cfg_file)
+        assert load_yaml(cfg_file) == {}
+        # No write must happen when nothing changed
+        assert cfg_file.read_text(encoding="utf-8") == before
+
+    def test_creates_missing_section(self, tmp_path):
+        from core.yaml_utils import load_yaml, save_yaml
+
+        cfg_file = tmp_path / "config.yaml"
+        save_yaml(cfg_file, {}, backup=False)
+        persist_to_config({"webhook_port": 29189}, cfg_file)
+        assert load_yaml(cfg_file) == {
+            "minecraft_server_api": {"web_server_port": 29189}
+        }

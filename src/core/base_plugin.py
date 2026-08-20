@@ -43,7 +43,8 @@ log = logging.getLogger(__name__)
 #  Helpers
 # ---------------------------------------------------------------------------
 
-_API_BASE = os.environ.get("API_BASE_URL", "http://127.0.0.1:29185/api/v1")
+_API_PORT = int(os.environ.get("RESOLVED_PORT_API_PORT", "29185"))
+_API_BASE = os.environ.get("API_BASE_URL", f"http://127.0.0.1:{_API_PORT}/api/v1")
 _SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
 
 
@@ -330,7 +331,7 @@ class BasePlugin:
 
                 window = webview.create_window(
                     self.PLUGIN_NAME,
-                    f"http://{_SERVER_HOST}:29185/api/v1/plugins/{self.PLUGIN_NAME}/overlay",
+                    f"http://{_SERVER_HOST}:{_API_PORT}/api/v1/plugins/{self.PLUGIN_NAME}/overlay",
                     width=self._window_state["width"],
                     height=self._window_state["height"],
                     on_top=True,
@@ -345,9 +346,10 @@ class BasePlugin:
         else:
             log.info(
                 "[%s] Running in gui_hidden mode. Open "
-                "http://%s:29185/api/v1/plugins/%s/overlay in OBS as a Browser Source.",
+                "http://%s:%d/api/v1/plugins/%s/overlay in OBS as a Browser Source.",
                 self.PLUGIN_NAME,
                 _SERVER_HOST,
+                _API_PORT,
                 self.PLUGIN_NAME,
             )
             tick_thread.join()

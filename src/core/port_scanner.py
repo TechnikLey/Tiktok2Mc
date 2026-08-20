@@ -245,36 +245,46 @@ def persist_to_config(
 
     Only updates ports that were actually changed from their defaults.
     Preserves all existing comments and formatting via ruamel.yaml.
+
+    The write runs inside ``config_transaction`` so it cannot race a
+    concurrent writer and the config version counter is bumped (the
+    bridge reloads on version changes).
     """
-    from core.yaml_utils import load_yaml, save_yaml
+    from core.config_lock import config_transaction
+    from core.yaml_utils import load_yaml
+
+    def apply_ports(cfg: dict[str, Any]) -> bool:
+        changed = False
+        for bp in bind_ports or BIND_PORTS:
+            key = bp["key"]
+            config_path_key = bp["config_path"]
+            resolved_val = resolved.get(key)
+            if resolved_val is None or resolved_val == bp["default"]:
+                continue
+            # Navigate dotted config path (e.g. "minecraft_server_api.web_server_port")
+            parts = config_path_key.split(".")
+            target = cfg
+            for part in parts[:-1]:
+                if part not in target or not isinstance(target.get(part), dict):
+                    target.setdefault(part, {})
+                target = target[part]
+            if target.get(parts[-1]) != resolved_val:
+                target[parts[-1]] = resolved_val
+                changed = True
+        return changed
 
     try:
-        cfg = load_yaml(config_path)
+        # Fast pre-check: skip the transaction (and its backup write)
+        # entirely when no port actually changed.
+        if not apply_ports(load_yaml(config_path)):
+            return
     except (OSError, ValueError, YAMLError) as exc:
         log.warning("Cannot load config for port persistence: %s", exc)
         return
 
-    changed = False
-    for bp in bind_ports or BIND_PORTS:
-        key = bp["key"]
-        config_path_key = bp["config_path"]
-        resolved_val = resolved.get(key)
-        if resolved_val is None or resolved_val == bp["default"]:
-            continue
-        # Navigate dotted config path (e.g. "minecraft_server_api.web_server_port")
-        parts = config_path_key.split(".")
-        target = cfg
-        for part in parts[:-1]:
-            if part not in target or not isinstance(target.get(part), dict):
-                target.setdefault(part, {})
-            target = target[part]
-        if target.get(parts[-1]) != resolved_val:
-            target[parts[-1]] = resolved_val
-            changed = True
-
-    if changed:
-        try:
-            save_yaml(config_path, cfg, backup=True)
-            log.info("Persisted resolved ports to %s", config_path)
-        except (OSError, ValueError, YAMLError) as exc:
-            log.warning("Failed to persist resolved ports: %s", exc)
+    try:
+        with config_transaction(config_path, backup=True) as cfg:
+            apply_ports(cfg)
+        log.info("Persisted resolved ports to %s", config_path)
+    except (OSError, ValueError, YAMLError) as exc:
+        log.warning("Failed to persist resolved ports: %s", exc)
