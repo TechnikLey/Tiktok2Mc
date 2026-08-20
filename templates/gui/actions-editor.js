@@ -265,21 +265,26 @@ class ActionsEditor {
 
     dropdown.style.display = 'block';
 
-    // Close dropdown when clicking outside
-    if (!input.dataset.dropdownCloseHandler) {
-      input.dataset.dropdownCloseHandler = true;
-      document.addEventListener('click', (e) => {
-        const searchInputs = document.querySelectorAll('.cmd-script-search');
-        searchInputs.forEach(inp => {
-          const dd = inp.nextElementSibling;
-          if (dd && dd.classList.contains('cmd-script-dropdown')) {
-            if (!inp.contains(e.target) && !dd.contains(e.target)) {
-              dd.style.display = 'none';
-            }
+    // Close dropdown when clicking outside. Installed once per editor
+    // instance — NOT per rendered input (renderDetail() recreates the
+    // inputs on every keystroke, which would leak document listeners).
+    this._ensureDropdownCloseHandler();
+  }
+
+  _ensureDropdownCloseHandler() {
+    if (this._dropdownCloseHandler) return;
+    this._dropdownCloseHandler = true;
+    document.addEventListener('click', (e) => {
+      const searchInputs = document.querySelectorAll('.cmd-script-search');
+      searchInputs.forEach(inp => {
+        const dd = inp.nextElementSibling;
+        if (dd && dd.classList.contains('cmd-script-dropdown')) {
+          if (!inp.contains(e.target) && !dd.contains(e.target)) {
+            dd.style.display = 'none';
           }
-        });
+        }
       });
-    }
+    });
   }
 
   _selectScript(event, scriptName) {
