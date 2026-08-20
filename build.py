@@ -1324,6 +1324,8 @@ def cmd_app(args):
             content = config_src.read_text(encoding="utf-8")
             config_default.write_text(header + content, encoding="utf-8")
 
+        (OUT_DIR / "data" / "diagnostics").mkdir(parents=True, exist_ok=True)
+
         # ----- Metadata & Cleanup -----
         cprint("Cleaning up temporary files...", Color.CYAN)
         (OUT_DIR / "version.txt").write_text(

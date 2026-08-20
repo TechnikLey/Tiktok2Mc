@@ -2,11 +2,11 @@
 
 import asyncio
 import logging
-import os
 
 from fastapi import APIRouter, HTTPException
 
 from core.lifecycle import SupervisorState, get_supervisor
+from core.shutdown import ShutdownReason, get_shutdown_controller
 
 log = logging.getLogger(__name__)
 
@@ -40,18 +40,22 @@ async def restart_system():
 
 @router.post("/shutdown/now")
 async def shutdown_now():
-    """Trigger immediate shutdown of the entire application."""
-    log.info("Shutdown requested via API – shutting down supervisor then exiting")
+    """Trigger immediate shutdown of the entire application.
 
-    async def _delayed_exit():
-        await asyncio.sleep(0.3)
-        try:
-            supervisor = get_supervisor()
-            await supervisor.shutdown()
-        except Exception:  # shutdown must never block the forced exit
-            log.exception("Supervisor shutdown failed, exiting directly")
-        finally:
-            os._exit(0)
+    Routes through the ShutdownController for proper diagnostics.
+    The caller (GUI) gets an immediate response; the actual shutdown
+    runs asynchronously with full logging and forensic state tracking.
+    """
+    ctrl = get_shutdown_controller()
+    request = ctrl.request_shutdown(
+        reason=ShutdownReason.USER_REQUEST,
+        source="api:/api/v1/shutdown/now",
+    )
+    if request is None:
+        return {
+            "status": "shutdown_already_pending",
+            "shutdown_id": ctrl.accepted_request.id if ctrl.accepted_request else None,
+        }
 
-    asyncio.create_task(_delayed_exit())
-    return {"status": "shutdown_requested"}
+    log.info("Shutdown requested via API (ID: %s)", request.id)
+    return {"status": "shutdown_requested", "shutdown_id": request.id}

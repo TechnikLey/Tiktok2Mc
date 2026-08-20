@@ -1150,6 +1150,33 @@ SHUTDOWN_0002 = ErrorCode(
     recovery_hint="Check runtime directory permissions.",
     impact="Shutdown progress is not visible.",
 )
+SHUTDOWN_0003 = ErrorCode(
+    code="SHUTDOWN-0003",
+    subsystem=Subsystem.SHUTDOWN,
+    severity=Severity.WARNING,
+    message="Shutdown request rejected (already pending).",
+    description="A second shutdown was requested while one was already pending or running.",
+    recovery_hint="No action needed — the first request is being processed.",
+    impact="The second request is ignored.",
+)
+SHUTDOWN_0004 = ErrorCode(
+    code="SHUTDOWN-0004",
+    subsystem=Subsystem.SHUTDOWN,
+    severity=Severity.ERROR,
+    message="Unclean shutdown detected at startup.",
+    description="The previous run did not exit cleanly. The shutdown state file indicates an incomplete shutdown.",
+    recovery_hint="Check logs for the previous shutdown ID. The application restarts normally.",
+    impact="Previous shutdown was not clean; child processes may have been orphaned.",
+)
+SHUTDOWN_0005 = ErrorCode(
+    code="SHUTDOWN-0005",
+    subsystem=Subsystem.SHUTDOWN,
+    severity=Severity.CRITICAL,
+    message="Exception during shutdown cleanup.",
+    description="An exception occurred while the shutdown controller was performing cleanup.",
+    recovery_hint="Review the exception details. Manual cleanup may be needed.",
+    impact="Shutdown may be incomplete.",
+)
 
 # ------------------------------------------------------------- STARTUP ----
 STARTUP_0001 = ErrorCode(

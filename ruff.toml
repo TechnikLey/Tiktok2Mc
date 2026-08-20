@@ -125,6 +125,7 @@ ignore = ["F841"]
 
 # Core services that must never crash (best-effort boundaries)
 "src/core/lifecycle.py" = ["BLE001", "S110"]  # lifecycle supervisor: shutdown/kill/cleanup paths
+"src/core/shutdown.py" = ["BLE001", "S110"]  # shutdown controller: shutdown/kill/cleanup paths
 "src/core/logger.py" = ["BLE001", "S110"]  # logging/crash reporting must never crash
 "src/core/java_utils.py" = ["BLE001", "S110"]  # java detection/install: many fallback probes
 "src/core/port_scanner.py" = ["BLE001", "S110"]  # port probing is inherently exception-prone

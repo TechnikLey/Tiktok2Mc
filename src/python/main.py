@@ -2617,11 +2617,34 @@ async def run_bot():
 
 
 if __name__ == "__main__":
+    import signal as _signal_mod
+
     install_global_exception_hook("main")
     heartbeat = start_heartbeat(log, interval=60.0)
     crash_mgr = get_crash_manager()
     health = get_health_monitor()
     health.register("tiktok_bridge", HealthState.STARTING)
+
+    # Register signal handlers for graceful shutdown (especially SIGTERM on Linux).
+    # Without this, SIGTERM kills the process instantly without cleanup.
+    def _bridge_signal_handler(sig: int, frame: object) -> None:
+        sig_name = (
+            _signal_mod.Signals(sig).name
+            if hasattr(_signal_mod, "Signals")
+            else str(sig)
+        )
+        log.info("[SIGNAL] Bridge received %s — initiating graceful stop", sig_name)
+        # Setting this flag causes the reconnect loop to exit cleanly;
+        # the main event loop then runs finally blocks and exits.
+        ctx.disable_tiktok_connect = True
+        # Also try to stop the event loop via KeyboardInterrupt for immediate exit
+        raise KeyboardInterrupt
+
+    _signal_mod.signal(_signal_mod.SIGTERM, _bridge_signal_handler)
+    _signal_mod.signal(_signal_mod.SIGINT, _bridge_signal_handler)
+    if sys.platform != "win32" and hasattr(_signal_mod, "SIGHUP"):
+        _signal_mod.signal(_signal_mod.SIGHUP, _bridge_signal_handler)  # type: ignore[attr-defined]
+
     try:
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

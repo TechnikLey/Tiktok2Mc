@@ -946,29 +946,43 @@ class ProcessSupervisor:
 
         If *restart* is True, the GUI shell is kept alive and the supervisor
         will transition back to RUNNING after restarting backend services.
+
+        This method is idempotent: calling it while already shutting down
+        is a no-op (logged and returned) instead of raising RuntimeError.
         """
         # COUNTDOWN is also allowed because shutdown_countdown calls this after
         # the timer expires, and an immediate shutdown cancels an active countdown.
-        self._assert_state(
-            {
-                SupervisorState.IDLE,
-                SupervisorState.STARTING,
-                SupervisorState.RUNNING,
-                SupervisorState.COUNTDOWN,
-            },
-            "shut down" if not restart else "restart",
-        )
-        if self.state == SupervisorState.COUNTDOWN:
+        allowed = {
+            SupervisorState.IDLE,
+            SupervisorState.STARTING,
+            SupervisorState.RUNNING,
+            SupervisorState.COUNTDOWN,
+        }
+        with self._lock:
+            current = self._state
+
+        # Handle concurrent/repeated calls gracefully — no exception.
+        if current not in allowed:
+            if current in {
+                SupervisorState.SHUTTING_DOWN,
+                SupervisorState.RESTARTING,
+                SupervisorState.COMPLETE,
+            }:
+                log.info(
+                    "[SUPERVISOR] Shutdown/restart already in progress (state=%s) — ignoring",
+                    current.value,
+                )
+                return
+            log.warning(
+                "[SUPERVISOR] Cannot %s in state %s — ignoring",
+                "shut down" if not restart else "restart",
+                current.value,
+            )
+            return
+
+        if current == SupervisorState.COUNTDOWN:
             log.info("[SUPERVISOR] Cancelling active shutdown countdown")
             self.clear_shutdown_status()
-
-        if self.state in {
-            SupervisorState.SHUTTING_DOWN,
-            SupervisorState.RESTARTING,
-            SupervisorState.COMPLETE,
-        }:
-            log.info("[SUPERVISOR] Shutdown/restart already in progress")
-            return
 
         if delay > 0 and not restart:
             # Console countdown handled by caller; just sleep here.

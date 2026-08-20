@@ -107,20 +107,25 @@ def main() -> None:
     if args.gui_hidden:
         log.info("GUI hidden mode — overlay HTML served by API only.")
         # Keep the process alive so the API knows overlay is managed.
-        # Check for a shutdown signal so we don't have to be killed.
-        shutdown_signal = BASE_DIR / "core" / "runtime" / "shutdown"
-        shutdown_now_signal = BASE_DIR / "core" / "runtime" / "shutdown_now"
-        while True:
-            if shutdown_signal.exists() or shutdown_now_signal.exists():
-                log.info("Shutdown signal detected — overlay process exiting.")
-                try:
-                    shutdown_signal.unlink(missing_ok=True)
-                    shutdown_now_signal.unlink(missing_ok=True)
-                except OSError:
-                    pass
-                sys.exit(0)
-            time.sleep(1)
-        return
+        # The supervisor handles shutdown via process termination —
+        # do NOT poll signal files here (that would race with check_and_run
+        # in start.py and potentially consume the signal before the supervisor
+        # sees it). Simply block until the process is killed by the supervisor.
+        import threading
+
+        _shutdown_event = threading.Event()
+
+        def _on_signal(sig: int, frame: object) -> None:
+            log.info("Signal %d received — overlay process exiting.", sig)
+            _shutdown_event.set()
+
+        import signal as _signal_mod
+
+        _signal_mod.signal(_signal_mod.SIGTERM, _on_signal)
+        _signal_mod.signal(_signal_mod.SIGINT, _on_signal)
+        # Block until killed by supervisor or signal
+        _shutdown_event.wait()
+        sys.exit(0)
 
     try:
         import webview

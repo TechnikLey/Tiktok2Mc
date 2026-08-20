@@ -49,7 +49,7 @@ from core.api.server import DEFAULT_PORT  # noqa: E402
 from core.api.updater import set_last_update_result  # noqa: E402
 from core.crash_manager import CrashManager  # noqa: E402
 from core.diagnostics import generate_diagnostics_report  # noqa: E402
-from core.error_codes import CORE_0001, LIFECYCLE_0001  # noqa: E402
+from core.error_codes import CORE_0001, LIFECYCLE_0001, SHUTDOWN_0004  # noqa: E402
 from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
 from core.lifecycle import (  # noqa: E402
     ProcessState,
@@ -73,6 +73,10 @@ from core.port_scanner import (  # noqa: E402
     write_runtime_file,
 )
 from core.sandbox import PluginSandbox  # noqa: E402
+from core.shutdown import (  # noqa: E402
+    ShutdownReason,
+    get_shutdown_controller,
+)
 from core.utils import load_config  # noqa: E402
 from core.validation_framework import (  # noqa: E402
     run_startup_validation,
@@ -131,6 +135,9 @@ UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
 GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
 OVERLAY_EXE_PATH = (BASE_DIR / "core" / f"overlay{SUFFIX}").resolve()
 update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
+
+# Runtime directory for signal files (IPC between processes)
+RUNTIME_DIR = (ROOT_DIR / "core" / "runtime").resolve()
 
 # -----------------------------
 # Load configuration
@@ -492,6 +499,14 @@ else:
 supervisor = get_supervisor()
 supervisor.configure(session_tool=SESSION_TOOL, api_base_url=_API_BASE_URL)
 
+# Forensic diagnostics directory (persists across restarts, unlike core/runtime/)
+DIAGNOSTICS_DIR = (ROOT_DIR / "data" / "diagnostics").resolve()
+
+# Shutdown controller — central coordination for all shutdown requests
+shutdown_ctrl = get_shutdown_controller()
+shutdown_ctrl.set_supervisor(supervisor)
+shutdown_ctrl.set_diagnostics_dir(DIAGNOSTICS_DIR)
+
 
 def _stop_all_atexit():
     """Best-effort cleanup if the interpreter exits normally."""
@@ -758,7 +773,6 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
 # -----------------------------
 # File watcher
 # -----------------------------
-RUNTIME_DIR = (ROOT_DIR / "core" / "runtime").resolve()
 
 
 async def _restart_server_process() -> None:
@@ -800,9 +814,10 @@ async def check_and_run() -> None:
             elif name == "shutdown_now":
                 file.unlink(missing_ok=True)
                 log.info("\nImmediate shutdown signal detected.")
-                supervisor.clear_shutdown_status()
-                shutdown_cancel_event.set()
-                await supervisor.shutdown()
+                shutdown_ctrl.request_shutdown(
+                    reason=ShutdownReason.USER_REQUEST,
+                    source="signal:shutdown_now",
+                )
                 return
 
             elif name == "restart":
@@ -1045,6 +1060,10 @@ async def command_loop() -> None:
             )
             log.info("  mc delete <name>    - Delete a Minecraft plugin permanently")
         elif command == "exit":
+            shutdown_ctrl.request_shutdown(
+                reason=ShutdownReason.USER_REQUEST,
+                source="console:exit",
+            )
             break
         elif command == "stop":
             shutdown_cancel_event.set()
@@ -1109,7 +1128,15 @@ async def command_loop() -> None:
         else:
             log.info("Unknown command: %s (type 'help' for commands)", cmd)
 
-    if supervisor.state != SupervisorState.COMPLETE:
+    if (
+        supervisor.state != SupervisorState.COMPLETE
+        and not shutdown_ctrl.is_shutdown_requested
+    ):
+        # If a shutdown was already requested via the ShutdownController
+        # (e.g. from the "exit" command), the shutdown-watcher task will
+        # call execute_shutdown() → supervisor.shutdown().  Only call
+        # supervisor.shutdown() directly as a fallback when no shutdown
+        # is in progress (e.g. EOFError with no TTY).
         await supervisor.shutdown()
 
 
@@ -1293,6 +1320,9 @@ async def main() -> None:
     supervisor.state = SupervisorState.RUNNING
     log.info("\nAll programs have been started.")
 
+    # Forensic: mark application as running for next-start diagnostics
+    shutdown_ctrl.mark_running()
+
     # Log initial diagnostics
     _log_diagnostics_report()
 
@@ -1304,12 +1334,21 @@ async def main() -> None:
     )
     cmd_task = asyncio.create_task(command_loop(), name="command-loop")
 
+    async def _shutdown_watcher() -> None:
+        """Observe the ShutdownController; when a shutdown is requested,
+        execute it through the controller so the full forensic lifecycle
+        (CLEANUP -> EXITING -> EXITED) runs and the state file is updated."""
+        await shutdown_ctrl.wait_for_shutdown()
+        await shutdown_ctrl.execute_shutdown()
+
+    shutdown_task = asyncio.create_task(_shutdown_watcher(), name="shutdown-watcher")
+
     # Wait for shutdown to complete.
     supervisor._shutdown_complete_event = asyncio.Event()
     await supervisor._shutdown_complete_event.wait()
 
     # Cancel background tasks.
-    for task in (watcher, health, runtime_val, cmd_task):
+    for task in (watcher, health, runtime_val, cmd_task, shutdown_task):
         if not task.done():
             task.cancel()
             try:
@@ -1325,6 +1364,9 @@ async def main() -> None:
 
     # Stop the API server if still running.
     await supervisor.stop_api_server(timeout=5.0)
+
+    # Forensic: mark clean exit
+    shutdown_ctrl.mark_clean_exit()
 
     # Log final diagnostics
     _log_diagnostics_report()
@@ -1454,12 +1496,73 @@ def _cli_delete_mc_plugin(name: str) -> None:
 
 
 if __name__ == "__main__":
+    import signal
+
     crash_mgr.install()
     install_global_exception_hook("start")
     heartbeat = start_heartbeat(log, interval=60.0)
 
     # Register the start process itself
     _health_mon.register("start_process", HealthState.STARTING)
+
+    # Forensic: check if previous shutdown was clean
+    _prev = shutdown_ctrl.consume_previous_shutdown()
+    if _prev is not None:
+        phase = _prev.get("phase", "unknown")
+        reason = _prev.get("reason", "unknown")
+        shutdown_id = _prev.get("shutdown_id", "unknown")
+        if phase not in ("EXITED", "EXITING"):
+            log.warning(
+                "[FORENSIC] Previous shutdown was NOT clean!\n"
+                "  Last Shutdown ID: %s\n"
+                "  Phase at exit: %s\n"
+                "  Reason: %s\n"
+                "  This may indicate an unclean termination.",
+                shutdown_id,
+                phase,
+                reason,
+            )
+            crash_mgr.report_error(
+                SHUTDOWN_0004,
+                detail=f"phase={phase}, reason={reason}, id={shutdown_id}",
+                context_info={"previous_shutdown": _prev},
+            )
+        else:
+            log.info(
+                "[FORENSIC] Previous shutdown was clean (ID: %s, reason: %s)",
+                shutdown_id,
+                reason,
+            )
+
+    # Register signal handlers for graceful shutdown
+    def _signal_handler(sig: int, frame: Any) -> None:
+        """Handle termination signals gracefully.
+
+        For SIGTERM/SIGHUP, this initiates a graceful shutdown via the
+        ShutdownController.  For SIGINT we also raise KeyboardInterrupt so
+        the existing ``except KeyboardInterrupt`` handler in ``__main__``
+        still works (matching Python's default SIGINT behaviour).
+        """
+        import signal as _sig
+
+        sig_name = _sig.Signals(sig).name if hasattr(_sig, "Signals") else str(sig)
+        log.info(
+            "[SIGNAL] Received %s (signal %d) — initiating graceful shutdown",
+            sig_name,
+            sig,
+        )
+        shutdown_ctrl.request_shutdown(
+            reason=ShutdownReason.SIGNAL,
+            source=f"signal:{sig_name}",
+        )
+        if sig == signal.SIGINT:
+            raise KeyboardInterrupt
+
+    # Register handlers for SIGTERM and SIGINT (SIGHUP too on Unix)
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+    if sys.platform != "win32" and hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, _signal_handler)  # type: ignore[attr-defined]
 
     # Windows: use the selector event loop. The default ProactorEventLoop can
     # raise ConnectionResetError from its internal _call_connection_lost when a

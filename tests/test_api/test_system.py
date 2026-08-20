@@ -56,10 +56,12 @@ class TestRestart:
 
 class TestShutdown:
     def test_shutdown_now_returns_requested(self, client):
-        """POST /shutdown/now triggers a hard exit via sys.exit timer."""
+        """POST /shutdown/now requests a graceful shutdown via ShutdownController."""
         resp = client.post("/api/v1/shutdown/now")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "shutdown_requested"}
+        body = resp.json()
+        assert body["status"] == "shutdown_requested"
+        assert "shutdown_id" in body
 
 
 class TestServerRestart:
