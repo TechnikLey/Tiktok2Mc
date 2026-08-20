@@ -1,36 +1,39 @@
 # === CORE DEPENDENCIES ===
-pywebview==6.1
+pywebview==6.2.1
 Flask==3.1.3
 # 0.136.3 carries a WITHDRAWN OSV malware flag (MAL-2026-4750, false positive)
 # that some scanners still report — stay on a clean release.
 fastapi==0.141.1
-starlette==1.1.0
-uvicorn==0.48.0
+starlette==1.6.0
+uvicorn==0.52.4
 pydantic==2.13.4
-requests==2.32.5
-python-multipart==0.0.20
-psutil==7.0.0
+requests==2.34.2
+python-multipart==0.0.32
+psutil==7.2.2
 
 # === STREAMING & INTEGRATION ===
-TikTokLive==6.6.5
+# NOTE: 7.0.0 exists but is a fresh major (Aug 2026) — do not bump without
+# testing against a real livestream; the bridge depends on 6.x event APIs.
+TikTokLive==6.6.6
 mcrcon==0.7.0
 
 # === BUILD & UTILS ===
-pyinstaller==6.13.0
-packaging==26.0
+pyinstaller==6.22.2
+packaging==26.3
 ruamel.yaml==0.19.1
-filelock==3.18.0
+filelock==3.32.3
 
 # === SECURITY ===
-cryptography==44.0.2
+# Fernet/PBKDF2HMAC only (secure_storage) — stable APIs across 44.x-50.x.
+cryptography==50.0.0
 
 # === PYWEBVIEW QT BACKEND ===
 PyQt6==6.11.0
 PyQt6-WebEngine==6.11.0
-qtpy==2.4.1
+qtpy==2.4.3
 
 # === TESTING ===
 PyYAML==6.0.3
-pytest==8.4.1
+pytest==9.1.1
 pytest-timeout==2.4.0
 pytest-asyncio==1.4.0
