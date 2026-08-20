@@ -221,7 +221,7 @@ follow:>>New Follower!|{user} is now following you!|5
 16071:$random
 ```
 
-You can control which triggers are eligible in the Random hook's config file (`hooks/random/config.yaml`). Set `mode: deny-all` to exclude the listed triggers from the random pool, or `mode: allow-only` to only allow the listed triggers.
+You can control which triggers are eligible in the Random hook's config file (`hooks/random/config.yaml`). Set `mode: deny-all` to exclude the listed triggers from the random pool, or `mode: allow-all` to only allow the listed triggers.
 
 To prevent infinite loops, chained triggers are limited to a depth of 3 — if a chain gets deeper (e.g. `$random` keeps picking a trigger that maps back to `$random`), the offending trigger is permanently banned for the session.
 
@@ -340,10 +340,11 @@ Commands are organized into **groups**. Each group has:
 
 ### Default groups
 
-The default `config.yaml` includes two groups:
+Chat commands are configured in `data/comment_commands.yaml`. The default file includes one group:
 
-1. **`#` group** — Minecraft commands via RCON. Only moderators and superfans can use it.
-2. **`$` group** — Spotify control. Anyone can use it.
+1. **`#` group** — Minecraft commands via RCON. Only moderators and superfans can use it. **Disabled by default** (`comment_commands.enabled: false`).
+
+A second group for **Spotify control** (`$` prefix) ships as a commented example in the same file — uncomment it to let viewers control Spotify via chat.
 
 ### Security
 
@@ -355,7 +356,7 @@ Each group can have cooldowns to prevent spam:
 - `cooldown` — seconds between any command in this group
 - `user_cooldown` — seconds the same viewer must wait before their next command
 
-Global cooldowns also exist at the top of the `comment_commands` section and apply across all groups.
+Global cooldowns also exist at the top of the `comment_commands` section in `data/comment_commands.yaml` and apply across all groups.
 
 ### Per-command overrides
 
@@ -376,7 +377,7 @@ commands_config:
 
 Each group has a `trigger_comment_event` setting (default: `true`). When set to `false`, commands in that group won't fire the `comment` trigger in `actions.mca`.
 
-> For full details, read the inline comments in `config.yaml` under `comment_commands`.
+> For full details, read the inline comments in `data/comment_commands.yaml`.
 
 ---
 
@@ -619,7 +620,7 @@ A: Increase the RAM allocation in `config.yaml` under `java.xms` and `java.xmx`.
 
 **Q: Can viewers spam commands?**
 
-A: Use cooldowns in `config.yaml` under `comment_commands` to limit how often commands can be used. You can set per-group and per-user cooldowns.
+A: Use cooldowns in `data/comment_commands.yaml` to limit how often commands can be used. You can set per-group and per-user cooldowns.
 
 **Q: How do I use chroma key / green screen for overlays?**
 

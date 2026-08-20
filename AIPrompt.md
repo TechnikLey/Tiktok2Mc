@@ -24,37 +24,38 @@ The file `data/actions.mca` maps TikTok events to Minecraft commands.
 
 **Format:** `Trigger:Command`
 
-**Trigger types:** `follow`, `join`, `comment`, `share`, `likes`, `like_2`, or a gift ID (e.g. `5655`) or gift name (e.g. `Rosa`).
+**Trigger types:** `follow`, `join`, `comment`, `share`, `likes`, `like_2`, or a gift ID (e.g. `5655`) or gift name (e.g. `Rose`).
 
 **Command types:**
 
 | Prefix | Meaning | Example |
 |--------|---------|---------|
-| `/` | Minecraft command (RCON) | `/give @a minecraft:diamond` |
-| `!` | Plugin command | `!tnt 5 0.5 2` |
-| `$` | Special action (e.g. random) | `$random` |
+| `/` | Minecraft command (datapack function) | `/give @a minecraft:diamond` |
+| `/... !rc` | Minecraft command via RCON | `/say {user} !rc` |
+| `!` | RCON command (direct) | `!tnt 5 0.5 2` |
+| `$` | Hook / script action (e.g. random) | `$random` |
 | `>>` | Overlay text message | `>>New Follower!\|{user}\|5` |
 | `&` | Shell / system command | `&curl ...` |
 
 ## Plugins
 
-Optional features enabled in `config/config.yaml`:
+Optional features managed in the Dashboard (**Plugins** page) or via the API:
 
 - **Timer** – Countdown timer for your stream
 - **Death Counter** – Tracks player deaths
 - **Win Counter** – Tracks wins and losses
 - **Spotify Control** – Viewers control Spotify via TikTok chat
 
-Set `enabled: true` for any plugin you want to use.
+Plugins start disabled; enable them with the toggle on the Plugins page.
 
 ## Comment Commands
 
-Viewers can send commands via TikTok chat. Two default groups exist:
+Viewers can send commands via TikTok chat. Configured in `data/comment_commands.yaml`
+(one disabled default group: `#` prefix, RCON, moderator/superfan only).
+A `$`-prefix Spotify-control group ships as a commented example.
 
-- **`#` prefix** (RCON) – Minecraft commands, moderator/superfan only
-- **`$` prefix** – Spotify control, anyone can use
-
-Configure them under `comment_commands` in `config.yaml`.
+Each group defines its own prefix, allowed roles, mode (`deny-all` = only listed
+commands work), handler (`rcon`, `http`, or `plugin`), and cooldowns.
 
 ## Test Without Going Live
 

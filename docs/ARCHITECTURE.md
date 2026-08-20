@@ -47,10 +47,13 @@ Supervision is handled by `CrashManager` (`src/core/crash_manager.py`) using `as
 In-process publish/subscribe bus (module-level singleton). Used for:
 
 - Bridge → API: `POST /api/v1/events` (TikTok events, plugin state)
-- API → GUI: SSE endpoint `/api/v1/ws` (real-time dashboard updates)
+- API → GUI: WebSocket endpoint `/api/v1/ws` plus SSE streams (`/events/stream`, `/logs/stream`, `/overlay/stream`, `/plugins/{name}/stream`)
 - Internal: overlay state, plugin health, crash notifications
 
-Key topics: `tiktok.*`, `plugin.{name}.state_update`, `overlay.state_update`, `health.*`, `log.*`.
+Key topics: `tiktok.*`, `plugin.{name}.state_update`, `overlay.state_update`,
+`log.unified`, `dashboard.plugin_states`, `dashboard.ecm_diagnostics`,
+`server.started` / `server.stopping` / `server.restarting`,
+`system.tiktok_toggle`, `system.reload_requested`, `server.console`.
 
 ---
 
@@ -86,7 +89,6 @@ TikTokLive Client (thread) → on_gift/on_follow/... → _publish_tiktok_event()
 
 - `ctx.trigger_queue` — trigger execution (bounded, drops logged)
 - `ctx.rcon_queue` — RCON commands (bounded, retries)
-- `ctx.webhook_queue` — outgoing webhook calls
 
 ### Webhook Server (Flask, port 29188)
 
@@ -104,33 +106,45 @@ FastAPI app factory in `server.py`. Routes under `/api/v1` (see `routes/__init__
 |--------|--------|---------|
 | `/health`, `/status`, `/health/extended` | `health.py` | Health checks, bridge metrics |
 | `/diagnostics/*` | `diagnostics.py` | Full reports, error codes, crash history |
-| `/config` | `config.py` | Read/write `config.yaml` (ruamel.yaml, preserves comments) |
+| `/config` | `config.py` | Read/write `config.yaml` (ruamel.yaml, preserves comments; secrets redacted) |
+| `/config-bundle` | `config_bundle.py` | Export/import full config bundles |
 | `/actions` | `actions.py` | Read/write `actions.mca`, gift picker |
 | `/events` | `events.py` | `POST` TikTok events from Bridge |
-| `/ws` | `ws.py` | SSE for GUI real-time updates |
-| `/plugins`, `/plugins/{name}/*` | `plugins.py`, `plugin_overlay.py` | Plugin lifecycle, commands, state, overlays |
+| `/ws` | `ws.py` | WebSocket for GUI real-time updates (SSE: see overlay/logs/plugins routes) |
+| `/logs` | `logs.py` | Unified log stream, crash reports |
+| `/plugins`, `/plugins/{name}/*` | `plugins.py`, `plugin_overlay.py`, `plugin_config.py` | Plugin lifecycle, commands, state, overlays, config |
 | `/hooks` | `hooks.py` | Hook enable/disable, registry |
 | `/overlay` | `overlay.py` | Core overlay HTML, SSE, preview, display |
 | `/backups` | `backups.py` | List/create/restore config backups |
 | `/reactions` | `reactions.py` | Event Reactions editor |
 | `/event_commands` | `event_commands.py` | Event-Command Mapper |
+| `/comment_commands` | `comment_commands.py` | Chat Commands editor (`data/comment_commands.yaml`) |
 | `/servers`, `/server_lifecycle` | `servers.py`, `server_lifecycle.py` | Server Manager (PaperMC instances) |
+| `/mc_plugins` | `mc_plugins.py` | Minecraft server plugin (jar) management |
 | `/updates` | `updater.py` | Version check, update status |
 | `/rcon` | `rcon.py` | RCON test/send |
 | `/triggers` | `triggers.py` | Trigger definitions, test execution |
 | `/versions` | `versions.py` | PaperMC version list |
+| `/reload` | `reload.py` | Runtime reload signals (actions/config) |
+| `/revenue` | `revenue.py` | Gift revenue tracking |
+| `/sessions` | `sessions.py` | Stream session summaries |
+| `/system` | `system.py` | App restart/shutdown |
 
 ### Services (`src/core/api/services/`)
 
 | Service | Purpose |
 |---------|---------|
-| `ApiService` | Config read/write, uptime, plugin registry |
+| `ApiService` | Config read/write, uptime |
+| `ActionsService` | `.mca` parse/serialize via `core.mca_parser` |
 | `TriggerService` | TriggerEngine wrapper for API |
 | `BridgeMetricsService` | Fetch metrics from Bridge `/metrics` |
-| `BackupService` | Config/action/plugin backup & restore |
-| `ReactionCatalogService` | Event-Reaction catalog |
+| `BackupService` | Config/action/plugin backup & restore (facade over `core.backup.BackupManager`) |
+| `ReactionCatalogService` | Event-Reaction catalog (`build_reaction_catalog()`) |
 | `RconService` | RCON connection pool |
-| `PluginDiscovery` | Scan `src/plugins/`, `src/hooks/` |
+| `SessionService` | Stream session persistence |
+| `ConfigBundleService` | Full config bundle export/import |
+| `ConsoleCapture` | Minecraft server console capture (`server.console` events) |
+| `PluginDiscovery` | Manifest scanning (`discover_plugins_from_manifests()`) |
 | `RevenueService` | Gift revenue tracking |
 
 ---
@@ -150,11 +164,11 @@ FastAPI app factory in `server.py`. Routes under `/api/v1` (see `routes/__init__
 
 ### Manifest (`plugin.json`)
 
-Fields: `name`, `version`, `entry_point`, `display_name`, `min_api_version`, `capabilities`, `depends_on`, `accepted_commands`, `emitted_events`, `config_schema`, `update_url`, `comment_handler`.
+Fields: `name`, `version`, `entry_point`, `display_name`, `min_api_version`, `platform`, `capabilities`, `depends_on`, `accepted_commands`, `emitted_events`, `config_schema`, `update_url`.
 
 ### BasePlugin (`src/core/base_plugin.py`)
 
-Provides: `register_handler()`, `push_state()`, `get_overlay_html()`, `run()`, `api_post()`, `send_command()`, `enqueue_trigger()`, config loading with schema validation and healing.
+Provides: `register_handler()`, `push_state()`, `get_overlay_html()`, `run()`, `api_post()`, `send_command()`, config loading with schema validation and healing.
 
 ### Built-in Plugins
 
@@ -171,15 +185,21 @@ Provides: `register_handler()`, `push_state()`, `get_overlay_html()`, `run()`, `
 
 ### In-Process Model
 
-- Hooks run **in the API process** (not subprocesses)
+- Hooks run **in the Bridge process** (loaded by `main.py` at startup, not subprocesses)
 - `hook.json` manifest (similar to plugin.json but simpler)
 - `main.py` exports `register(api: HookAPI)`
 - HookAPI (`src/core/hook_api.py`): `register_action()`, `rcon_enqueue()`, `send_overlay_text()`, `get_config()`, `get_hook_config()`, `enqueue_trigger()`, `api_post()`, `log`
 
-### Security
+### Import restrictions
 
-- AST-based import restriction (`src/core/hook_loader.py`, `src/core/sandbox.py`)
-- Allowed modules: `core.hook_api`, `core.error_codes`, `logging`, `json`, `dataclasses`, `typing`, `re`, `datetime`, `random`, `math`, `collections`, `itertools`, `functools`, `hashlib`, `hmac`, `base64`, `urllib.parse`, `html`
+- AST-based import allowlist (`src/core/hook_loader.py`): hooks may only import
+  `time`, `random`, `logging`, `json`, `urllib`, `requests`, plus the first-party
+  modules `core.hook_api` and `core.plugin_config`. This is a convenience/lint
+  guard against accidental dangerous imports — **not** a security sandbox.
+  Hooks are trusted code: they run with full Python capabilities and read
+  access to the config.
+- OS-level resource limits (CPU/memory) for plugin *subprocesses* live in
+  `src/core/sandbox.py` (`plugin_sandbox` config section).
 
 ---
 
@@ -193,13 +213,16 @@ Provides: `register_handler()`, `push_state()`, `get_overlay_html()`, `run()`, `
 
 ### Key Sections
 
-- `api.port` (29185), `server_host` (127.0.0.1)
+- `api.port` (29185), `server_host` (127.0.0.1), `api_key`
 - `rcon` (enabled, port 25575, password)
 - `minecraft_server_api` (api_port 29187, web_server_port 29188)
-- `tiktok` (user, reconnect_delay, follow_tracking, like_triggers)
-- `comment_commands` (groups with prefix, roles, cooldowns)
+- `tiktok` (user, reconnect_delay_seconds, follow_tracking)
+- `like_triggers` (top-level like milestone config)
 - `overlay` (overlays[], display_mode)
 - `gui`, `update`, `plugin_sandbox`, `shutdown`
+
+Chat Commands live in a separate file: `data/comment_commands.yaml`
+(template: `defaults/comment_commands.yaml`).
 
 ---
 
@@ -340,7 +363,7 @@ Plugin Commands (HTTP POST /api/v1/plugins/{name}/command)
 |----------|-------|
 | `TOOL_VERSION` | `"v1.0.0"` |
 | `API_VERSION` | `"1.0.0"` |
-| `UPDATER_VERSION` | `"v1.4.0"` |
+| `UPDATER_VERSION` | `"v2.0.0"` |
 | `EXPECTED_CONFIG_VERSION` | `"1.0"` |
 
 ---
