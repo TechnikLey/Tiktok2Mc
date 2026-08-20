@@ -76,7 +76,7 @@ async def update_comment_commands(body: CommentCommandsUpdateRequest):
         path = _ensure_data_config()
         save_yaml(
             path,
-            {"comment_commands": body.comment_commands.model_dump()},
+            {"comment_commands": body.comment_commands},
             backup=True,
         )
         log.info("comment_commands updated: %s", path)
