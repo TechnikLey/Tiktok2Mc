@@ -1120,6 +1120,14 @@ def cmd_app(args):
                         "--collect-binaries=PyQt6",
                         "--collect-data=PyQt6",
                     ]
+                if IS_WINDOWS:
+                    # pywebview uses Qt only on Linux (gui.py forces gui="qt"
+                    # there). On Windows the native EdgeChromium/WebView2
+                    # backend runs, so bundling the installed PyQt6/QtWebEngine
+                    # (~180 MB) into every webview-importing binary is dead
+                    # weight — exclude all Qt bindings.
+                    for qt_binding in ("PyQt6", "PyQt5", "PySide6", "PySide2"):
+                        cmd += ["--exclude-module", qt_binding]
                 if item.get("windowed"):
                     cmd.append("--noconsole")
 
