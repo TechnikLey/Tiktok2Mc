@@ -357,6 +357,129 @@ describe('ChatbotEditor', () => {
     });
   });
 
+  /* ─── webview login ─── */
+  describe('webview login', () => {
+    function mockWebviewApi(states) {
+      const queue = [...states];
+      window.pywebview = {
+        api: {
+          open_tiktok_login: vi.fn(async () => 'started'),
+          get_tiktok_login_state: vi.fn(async () => {
+            const next = queue.length > 1 ? queue.shift() : queue[0];
+            return typeof next === 'string'
+              ? { state: next, masked_session_id: 'abcd…wxyz' }
+              : next;
+          }),
+        },
+      };
+      return window.pywebview.api;
+    }
+
+    it('hides the webview button when the bridge lacks open_tiktok_login', async () => {
+      await chatbotEditor.open();
+      expect(document.getElementById('cb-session-webview').classList.contains('hidden')).toBe(true);
+    });
+
+    it('shows the webview button when the desktop app provides the API', async () => {
+      mockWebviewApi(['waiting']);
+      await chatbotEditor.open();
+      expect(document.getElementById('cb-session-webview').classList.contains('hidden')).toBe(false);
+    });
+
+    it('stores credentials and refreshes the badge on success', async () => {
+      let sessionConfigured = false;
+      mockFetch({
+        '/chatbot/config': () => ({ chatbot: SAMPLE_CONFIG }),
+        '/chatbot/status': () => ({ status: null }),
+        '/chatbot/session': () => ({
+          configured: sessionConfigured,
+          masked_session_id: sessionConfigured ? 'abcd…wxyz' : null,
+          tt_target_idc: '',
+          updated: sessionConfigured ? 42 : null,
+        }),
+      });
+      const api = mockWebviewApi(['waiting']);
+      // The Python side stores the cookie before reporting success.
+      api.get_tiktok_login_state = vi.fn(async () => {
+        if (!sessionConfigured) {
+          sessionConfigured = true;
+          return { state: 'waiting' };
+        }
+        return { state: 'success', masked_session_id: 'abcd…wxyz' };
+      });
+      await chatbotEditor.open();
+      chatbotEditor._loginPollIntervalMs = 0;
+
+      await chatbotEditor.webviewLogin();
+
+      expect(api.open_tiktok_login).toHaveBeenCalledTimes(1);
+      expect(api.get_tiktok_login_state).toHaveBeenCalled();
+      // loadSession() ran again and picked up the new state
+      expect(chatbotEditor._sessionInfo.configured).toBe(true);
+      expect(document.getElementById('cb-session-badge').textContent).toContain('abcd…wxyz');
+      expect(document.getElementById('cb-session-webview').disabled).toBe(false);
+    });
+
+    it('disables the button while waiting and restores it afterwards', async () => {
+      mockFetch({
+        '/chatbot/config': () => ({ chatbot: SAMPLE_CONFIG }),
+        '/chatbot/status': () => ({ status: null }),
+        '/chatbot/session': mockSessionRoute(),
+      });
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      window.pywebview = {
+        api: {
+          open_tiktok_login: async () => 'started',
+          get_tiktok_login_state: async () => {
+            await gate;
+            return { state: 'cancelled' };
+          },
+        },
+      };
+      await chatbotEditor.open();
+      chatbotEditor._loginPollIntervalMs = 0;
+
+      const promise = chatbotEditor.webviewLogin();
+      await Promise.resolve();
+      const btn = document.getElementById('cb-session-webview');
+      expect(btn.disabled).toBe(true);
+      expect(btn.textContent).toBe('Waiting for login…');
+
+      release();
+      await promise;
+      expect(btn.disabled).toBe(false);
+      expect(btn.textContent).toBe('Sign in with TikTok');
+    });
+
+    it('does not poll when the login window is already running', async () => {
+      const api = mockWebviewApi(['waiting']);
+      api.open_tiktok_login = vi.fn(async () => 'already_running');
+      await chatbotEditor.open();
+      chatbotEditor._loginPollIntervalMs = 0;
+
+      await chatbotEditor.webviewLogin();
+
+      expect(api.get_tiktok_login_state).not.toHaveBeenCalled();
+      expect(document.getElementById('cb-session-webview').disabled).toBe(false);
+    });
+
+    it('stops polling silently when the state call fails', async () => {
+      window.pywebview = {
+        api: {
+          open_tiktok_login: async () => 'started',
+          get_tiktok_login_state: async () => { throw new Error('bridge gone'); },
+        },
+      };
+      await chatbotEditor.open();
+      chatbotEditor._loginPollIntervalMs = 0;
+
+      await chatbotEditor.webviewLogin();
+
+      expect(document.getElementById('cb-session-webview').disabled).toBe(false);
+    });
+  });
+
   /* ─── placeholder chips ─── */
   describe('insertPlaceholder', () => {
     it('inserts {gift} at the cursor position of the focused field', async () => {

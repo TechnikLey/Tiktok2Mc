@@ -17,6 +17,7 @@ import json
 import logging
 import re
 import time
+from collections.abc import Iterable
 from typing import Any
 
 import core.paths
@@ -158,3 +159,45 @@ def get_chatbot_session_info() -> dict[str, Any]:
         "tt_target_idc": str(record.get("tt_target_idc") or ""),
         "updated": float(updated) if isinstance(updated, (int, float)) else None,
     }
+
+
+def extract_session_cookies(cookies: Iterable[Any]) -> tuple[str, str] | None:
+    """Extract ``(session_id, tt_target_idc)`` from webview cookies.
+
+    Accepts :class:`http.cookiejar.Cookie` objects (what pywebview's
+    ``Window.get_cookies()`` returns) or plain ``{"name", "value"}``
+    dicts.  Returns None when no ``sessionid`` cookie is present —
+    i.e. the user is not logged in yet.
+    """
+    session_id = ""
+    tt_target_idc = ""
+    for cookie in cookies:
+        if isinstance(cookie, dict):
+            name = str(cookie.get("name") or "")
+            value = str(cookie.get("value") or "")
+        else:
+            name = str(getattr(cookie, "name", "") or "")
+            value = str(getattr(cookie, "value", "") or "")
+        if name == "sessionid" and value and not session_id:
+            session_id = value
+        elif name == "tt-target-idc" and value and not tt_target_idc:
+            tt_target_idc = value
+    if not session_id:
+        return None
+    return session_id, tt_target_idc
+
+
+def request_bridge_reload() -> bool:
+    """Drop the ``reload_chatbot`` runtime signal for the bridge.
+
+    Shared by the API routes and the GUI process (webview login) so a
+    saved session/config is picked up without a restart.
+    """
+    signal = core.paths.get_runtime_dir() / "reload_chatbot"
+    try:
+        signal.parent.mkdir(parents=True, exist_ok=True)
+        signal.write_text("reload", encoding="utf-8")
+        return True
+    except OSError as exc:
+        log.warning("[CHATBOT-SESSION] Failed to write reload signal: %s", exc)
+        return False

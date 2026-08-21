@@ -14,6 +14,8 @@ class ChatbotEditor {
     this._keywords = [];
     this._status = null;
     this._sessionInfo = null;
+    this._loginPolling = false;
+    this._loginPollIntervalMs = 1500;
     this._bindEvents();
   }
 
@@ -43,6 +45,7 @@ class ChatbotEditor {
 
   async open() {
     this.el.classList.remove('hidden');
+    this._updateWebviewButton();
     await Promise.all([this.load(), this.loadSession()]);
     // Initial snapshot so the pill is correct before the next SSE event.
     try {
@@ -213,6 +216,91 @@ class ChatbotEditor {
 
   toggleSessionHelp() {
     document.getElementById('cb-session-steps')?.classList.toggle('hidden');
+  }
+
+  /* ─── Webview login (desktop app only, CHATBOT.md §5) ─── */
+
+  _hasWebviewLogin() {
+    const api = window.pywebview && window.pywebview.api;
+    return !!(api && typeof api.open_tiktok_login === 'function');
+  }
+
+  _updateWebviewButton() {
+    const btn = document.getElementById('cb-session-webview');
+    if (!btn) return;
+    btn.classList.toggle('hidden', !this._hasWebviewLogin());
+  }
+
+  async webviewLogin() {
+    if (this._loginPolling) return;
+    const api = window.pywebview && window.pywebview.api;
+    if (!this._hasWebviewLogin()) {
+      showToast(I18N.t('chatbot.webviewUnavailable'), 'warning');
+      return;
+    }
+    let res;
+    try {
+      res = await api.open_tiktok_login();
+    } catch (e) {
+      showToast(I18N.t('chatbot.webviewFailed', { msg: e.message || e }), 'error');
+      return;
+    }
+    if (res !== 'started') {
+      showToast(I18N.t('chatbot.webviewAlreadyRunning'), 'warning');
+      return;
+    }
+    this._setWebviewLoginBusy(true);
+    this._loginPolling = true;
+    try {
+      for (;;) {
+        await new Promise(resolve => setTimeout(resolve, this._loginPollIntervalMs));
+        let state;
+        try {
+          state = await api.get_tiktok_login_state();
+        } catch (_) {
+          break; // bridge died — stop polling silently
+        }
+        if (!state || state.state === 'waiting') continue;
+        await this._handleLoginState(state);
+        break;
+      }
+    } finally {
+      this._loginPolling = false;
+      this._setWebviewLoginBusy(false);
+    }
+  }
+
+  async _handleLoginState(state) {
+    switch (state.state) {
+      case 'success':
+        showToast(I18N.t('chatbot.webviewSuccess', { id: state.masked_session_id || '' }), 'success');
+        await this.loadSession();
+        break;
+      case 'cancelled':
+        showToast(I18N.t('chatbot.webviewCancelled'), 'warning');
+        break;
+      case 'timeout':
+        showToast(I18N.t('chatbot.webviewTimeout'), 'warning');
+        break;
+      case 'error':
+        showToast(I18N.t('chatbot.webviewFailed', { msg: state.error || '?' }), 'error');
+        break;
+      default:
+        break;
+    }
+  }
+
+  _setWebviewLoginBusy(busy) {
+    const btn = document.getElementById('cb-session-webview');
+    if (!btn) return;
+    btn.disabled = busy;
+    if (busy) {
+      btn.dataset.label = btn.textContent;
+      btn.textContent = I18N.t('chatbot.webviewWaiting');
+    } else if (btn.dataset.label) {
+      btn.textContent = btn.dataset.label;
+      delete btn.dataset.label;
+    }
   }
 
   async saveSession() {

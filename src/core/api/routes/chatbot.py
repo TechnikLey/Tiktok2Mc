@@ -27,26 +27,15 @@ from core.chatbot_session import (
     SessionValidationError,
     clear_chatbot_session,
     get_chatbot_session_info,
+    request_bridge_reload,
     save_chatbot_session,
 )
-from core.paths import get_chatbot_config_file, get_runtime_dir
+from core.paths import get_chatbot_config_file
 from core.yaml_utils import load_yaml, save_yaml
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Chatbot"])
-
-
-def _write_reload_signal() -> bool:
-    """Drop the bridge reload signal; returns False on failure."""
-    signal = get_runtime_dir() / "reload_chatbot"
-    try:
-        signal.parent.mkdir(parents=True, exist_ok=True)
-        signal.write_text("reload", encoding="utf-8")
-        return True
-    except OSError as exc:
-        log.warning("Failed to write chatbot reload signal: %s", exc)
-        return False
 
 
 @router.get("/chatbot/config", response_model=ChatbotConfigResponse)
@@ -74,7 +63,7 @@ async def update_chatbot_config(body: ChatbotConfigUpdateRequest):
         log.error("Failed to write chatbot config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
-    reloaded = _write_reload_signal()
+    reloaded = request_bridge_reload()
     return ChatbotConfigResponse(
         path=str(path), chatbot=body.chatbot, reloaded=reloaded
     )
@@ -99,7 +88,7 @@ async def update_chatbot_session(body: ChatbotSessionUpdateRequest):
 
     # The bridge applies credentials at the next connect; the signal also
     # refreshes its config view so an enabled bot picks everything up.
-    reloaded = _write_reload_signal()
+    reloaded = request_bridge_reload()
     if not reloaded:
         log.info("Session saved but bridge reload signal failed")
     return ChatbotSessionResponse(**info)

@@ -105,3 +105,59 @@ class TestInfoView:
         session_path.write_text("{not json", encoding="utf-8")
         info = cs.get_chatbot_session_info()
         assert info["configured"] is False
+
+
+class _FakeCookie:
+    """Mimics http.cookiejar.Cookie (what pywebview's get_cookies returns)."""
+
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+
+class TestExtractSessionCookies:
+    def test_extracts_from_cookiejar_objects(self):
+        cookies = [
+            _FakeCookie("tt-target-idc", "maliva"),
+            _FakeCookie("sessionid", VALID_SID),
+            _FakeCookie("sessionid_ss", "should-be-ignored"),
+            _FakeCookie("other", "x"),
+        ]
+        assert cs.extract_session_cookies(cookies) == (VALID_SID, "maliva")
+
+    def test_extracts_from_plain_dicts(self):
+        cookies = [{"name": "sessionid", "value": VALID_SID}]
+        assert cs.extract_session_cookies(cookies) == (VALID_SID, "")
+
+    def test_missing_sessionid_returns_none(self):
+        cookies = [_FakeCookie("sessionid_ss", "x"), {"name": "foo", "value": "bar"}]
+        assert cs.extract_session_cookies(cookies) is None
+
+    def test_empty_cookie_value_returns_none(self):
+        assert cs.extract_session_cookies([_FakeCookie("sessionid", "")]) is None
+
+    def test_empty_list_returns_none(self):
+        assert cs.extract_session_cookies([]) is None
+
+    def test_first_sessionid_wins(self):
+        cookies = [
+            _FakeCookie("sessionid", VALID_SID),
+            _FakeCookie("sessionid", "zzzzzzzzzzzzzz"),
+        ]
+        assert cs.extract_session_cookies(cookies) == (VALID_SID, "")
+
+
+class TestRequestBridgeReload:
+    def test_writes_reload_signal(self, project_dir):
+        assert cs.request_bridge_reload() is True
+        signal = project_dir / "core" / "runtime" / "reload_chatbot"
+        assert signal.exists()
+
+    def test_creates_runtime_dir_if_missing(self, project_dir):
+        import shutil
+
+        runtime = project_dir / "core" / "runtime"
+        if runtime.exists():
+            shutil.rmtree(runtime)
+        assert cs.request_bridge_reload() is True
+        assert (runtime / "reload_chatbot").exists()

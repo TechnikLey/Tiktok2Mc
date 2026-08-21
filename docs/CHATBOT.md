@@ -1,8 +1,8 @@
 # TikTok-Chatbot — Design & Umsetzungsplan
 
 > Status: **Phase 1–4 umgesetzt** (Kernmodul, Bridge-Wiring, API-Routen,
-> GUI-Tab inkl. Session-Login Variante A). Offen: Webview-Login (Variante B)
-> und Teile von Phase 5 (Doku in dev-book EN+DE).
+> GUI-Tab inkl. Session-Login Variante A + B). Offen: nur noch Teile von
+> Phase 5 (Doku in dev-book EN+DE).
 > Dieses Dokument bündelt alle Erkenntnisse und Entscheidungen zum geplanten
 > TikTok-Chatbot für TikTok2Mc. Es dient als Referenz für die Umsetzung.
 
@@ -74,6 +74,16 @@ abgelaufene Session).
 ---
 
 ## 5. Variante B — Eingebetteter Webview-Login (wie TikFinity)
+
+> **Umgesetzt** (GUI-Prozess, `src/python/gui.py`): „Mit TikTok anmelden"-
+> Button im Chatbot-Tab → `pywebview.api.open_tiktok_login()` öffnet ein
+> pywebview-Fenster auf die TikTok-Login-Seite; ein Worker-Thread pollt
+> `Window.get_cookies()` (Timeout 5 min), extrahiert `sessionid` +
+> `tt-target-idc` via `core.chatbot_session.extract_session_cookies()`,
+> speichert verschlüsselt und setzt das Reload-Signal. Das Dashboard pollt
+> `get_tiktok_login_state()` und aktualisiert Badge/Toast. Ohne Desktop-App
+> (Browser-Dashboard) bleibt der Button ausgeblendet — manuelle Eingabe als
+> Fallback.
 
 Ablauf analog zu TikFinity, aber lokal ohne Fremdserver:
 
@@ -163,10 +173,9 @@ Webview-Flow mal nicht funktioniert).
 
 ## 7. Implementierungsplan
 
-> **Status (2026-08-21):** Phase 1–3 umgesetzt (Kernmodul, Bridge-Wiring,
-> API-Routen, GUI-Tab, Tests). Phase 4 Variante A umgesetzt (manuelle
-> Session-Eingabe, SecureStorage, Status-Rückmeldung). Offen: Variante B
-> (Webview-Login) und dev-book EN+DE.
+> **Status (2026-08-21):** Phase 1–4 umgesetzt (Kernmodul, Bridge-Wiring,
+> API-Routen, GUI-Tab, Tests; Session-Login Variante A manuell + Variante B
+> Webview). Offen: dev-book EN+DE.
 
 ### Phase 1 — Brücke: Chat-Send-Kanal (~100 Zeilen) ✅
 
@@ -234,7 +243,7 @@ Webview-Flow mal nicht funktioniert).
 
 ### Phase 4 — Session-Management (beide Varianten)
 
-> Variante A umgesetzt (2026-08-21). Variante B offen.
+> Variante A umgesetzt (2026-08-21). Variante B umgesetzt (2026-08-21).
 
 9. **Variante A:** ✅ GUI-Feld im Chatbot-Tab (`chatbot-editor.js`) →
    `PUT/GET/DELETE /api/v1/chatbot/session` → verschlüsselter Store in
@@ -242,7 +251,13 @@ Webview-Flow mal nicht funktioniert).
    Fernet — **niemals** Klartext in einer YAML; die API liefert nur eine
    maskierte Vorschau `abcd…wxyz`). Validierung: Länge 10–512, Charset,
    `tt-target-idc` optional.
-10. **Variante B:** Webview-Login-Fenster (siehe §5) — offen
+10. **Variante B:** ✅ Webview-Login-Fenster (siehe §5) —
+    `open_tiktok_login()` / `get_tiktok_login_state()` in `LauncherAPI`
+    (`src/python/gui.py`), Cookie-Extraktion via
+    `core.chatbot_session.extract_session_cookies()` (unit-getestet),
+    Speicherung + Reload-Signal im GUI-Prozess, Dashboard-Polling in
+    `chatbot-editor.js`; Button nur sichtbar, wenn die Desktop-App die
+    Bridge-Methode anbietet
 11. ✅ Bridge liest beim Connect die Session →
     `TikTokChatbot.apply_session_to_client(client)` ruft
     `client.web.set_session(sid, idc)` vor dem Verbinden auf (Wiring in
@@ -321,11 +336,12 @@ beiden Login-Wegen zur Auswahl.
 - [x] Session-Login Variante A umsetzen (Phase 4): SecureStorage +
       `set_session` vor dem Verbinden, Warnung bei fehlender/abgelaufener
       Session
-- [ ] Session-Login Variante B (Webview-Login-Fenster, §5)
+- [x] Session-Login Variante B (Webview-Login-Fenster, §5)
 - [x] Keyword-Befehle: über event_bus abgedeckt (Nativ-Entscheidung,
       `_handle_event` matched Kommentar-Prefix case-insensitive)
-- [ ] PyQt6/pywebview: Cookie-Extraktion aus dem Webview-Profil verifizieren
-      (Variante B machbar?)
+- [x] PyQt6/pywebview: Cookie-Extraktion aus dem Webview-Profil verifizieren
+      (`Window.get_cookies()` existiert seit pywebview 6.x, gepinnt 6.2.1;
+      umgesetzt in `gui.py` + `extract_session_cookies`)
 - [ ] Soll TikTokLive auf 7.x wechseln, sobald der Chatbot kommt?
       (Cookie-Fix betrifft eingeloggte Sessions)
 - [ ] Dev-Books EN+DE ergänzen (Phase 5-Rest)

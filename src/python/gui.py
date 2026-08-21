@@ -12,12 +12,14 @@ import base64
 import os
 import subprocess
 import sys
+import threading
 import time
 import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 # Ensure src/ is on the path for development runs.
 _src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +28,7 @@ if _src not in sys.path:
 
 from core.api.server import DEFAULT_PORT  # noqa: E402
 from core.crash_manager import get_crash_manager  # noqa: E402
+from core.error_codes import CHATBOT_0004  # noqa: E402
 from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
 from core.logger import (  # noqa: E402
     handle_unhandled_exception,
@@ -56,6 +59,109 @@ _full_system_proc = None
 _window = None
 
 GUI_LOCKFILE = (ROOT_DIR / "tmp" / "gui.lock").resolve()
+
+# ── TikTok webview login (docs/CHATBOT.md §5, Variante B) ──
+TIKTOK_LOGIN_URL = "https://www.tiktok.com/login"
+TIKTOK_LOGIN_TIMEOUT_S = 300.0
+_login_lock = threading.Lock()
+_login_state: dict[str, Any] = {
+    "state": "idle",  # idle | waiting | success | cancelled | timeout | error
+    "masked_session_id": None,
+    "error": "",
+}
+
+
+def _set_login_state(state: str, masked: str | None = None, error: str = "") -> None:
+    with _login_lock:
+        _login_state["state"] = state
+        _login_state["masked_session_id"] = masked
+        _login_state["error"] = error
+
+
+def _tiktok_login_worker() -> None:
+    """Open the TikTok login window and capture the session cookies.
+
+    Runs on a supervised thread.  Polls ``Window.get_cookies()`` until a
+    ``sessionid`` cookie appears (successful login), the user closes the
+    window, or the timeout hits.  On success the credentials are stored
+    encrypted via :mod:`core.chatbot_session` — the raw value never
+    reaches JavaScript or the log.
+    """
+    try:
+        import webview
+    except ImportError as exc:
+        _set_login_state("error", error=f"pywebview missing: {exc}")
+        return
+
+    from core.chatbot_session import (
+        extract_session_cookies,
+        request_bridge_reload,
+        save_chatbot_session,
+    )
+
+    closed = threading.Event()
+
+    def _on_closed() -> None:
+        closed.set()
+
+    try:
+        login_window = webview.create_window(
+            "TikTok Login",
+            TIKTOK_LOGIN_URL,
+            width=430,
+            height=760,
+            resizable=True,
+            on_top=True,
+        )
+    except Exception as exc:  # backend may refuse extra windows
+        log.warning("[TIKTOK-LOGIN] Could not open login window: %s", exc)
+        _set_login_state("error", error=f"{type(exc).__name__}: {exc}")
+        return
+    if login_window is None:  # defensive: backend returned no window handle
+        _set_login_state("error", error="window handle missing")
+        return
+
+    login_window.events.closed += _on_closed
+    log.info("[TIKTOK-LOGIN] Login window opened")
+
+    deadline = time.monotonic() + TIKTOK_LOGIN_TIMEOUT_S
+    creds: tuple[str, str] | None = None
+    while time.monotonic() < deadline:
+        if closed.is_set():
+            _set_login_state("cancelled")
+            return
+        try:
+            creds = extract_session_cookies(login_window.get_cookies() or [])
+        except Exception as exc:  # page not loaded yet / backend hiccup
+            log.debug("[TIKTOK-LOGIN] Cookie poll failed: %s", exc)
+        if creds:
+            break
+        time.sleep(1.0)
+
+    try:
+        login_window.destroy()
+    except Exception:  # window may already be gone
+        pass
+
+    if not creds:
+        _set_login_state("timeout")
+        log.warning("[TIKTOK-LOGIN] Timed out without a session cookie")
+        return
+
+    session_id, tt_target_idc = creds
+    try:
+        info = save_chatbot_session(session_id, tt_target_idc)
+    except Exception as exc:  # validation/storage errors surface to the GUI
+        _set_login_state("error", error=f"{type(exc).__name__}: {exc}")
+        get_crash_manager().report_error(
+            CHATBOT_0004, detail=f"{type(exc).__name__}: {exc}"
+        )
+        return
+
+    request_bridge_reload()
+    masked = str(info.get("masked_session_id") or "")
+    _set_login_state("success", masked=masked)
+    log.info("[TIKTOK-LOGIN] Session stored (%s)", masked or "?")
 
 
 def _linux_install_hint() -> str:
@@ -234,6 +340,28 @@ class LauncherAPI:
         if _full_system_proc is not None and _full_system_proc.poll() is None:
             return "starting"
         return "offline"
+
+    # ---- TikTok webview login ----
+    def open_tiktok_login(self) -> str:
+        """Open a TikTok login window; cookies are captured automatically.
+
+        Non-blocking: starts a supervised worker and returns immediately.
+        The dashboard polls :meth:`get_tiktok_login_state` for the result.
+        """
+        with _login_lock:
+            if _login_state["state"] == "waiting":
+                return "already_running"
+            _set_login_state("waiting")
+        t = get_crash_manager().supervised_thread(
+            target=_tiktok_login_worker, name="tiktok-login", daemon=True
+        )
+        t.start()
+        return "started"
+
+    def get_tiktok_login_state(self) -> dict[str, Any]:
+        """Current webview-login state (secret-free, poll from JS)."""
+        with _login_lock:
+            return dict(_login_state)
 
     def connect_remote(self, host: str, port: str = "29185", api_key: str = "") -> str:
         """Verify a remote TikTok2Mc instance and navigate to its dashboard.
