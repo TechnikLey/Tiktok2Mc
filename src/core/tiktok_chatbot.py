@@ -5,9 +5,11 @@ The bot is a first-party core module (see docs/CHATBOT.md §6).  It
 * reads its own config file (``config/chatbot.yaml``),
 * subscribes to ``tiktok.gift`` / ``tiktok.follow`` / ``tiktok.join`` /
   ``tiktok.comment`` events on the in-process :data:`event_bus`,
+* matches each event against the configured reply rules
+  (first match wins), and
 * applies spam protection (min interval, per-minute window, queue cap,
-  duplicate suppression, length cap), and
-* sends the rendered template via the bound :class:`TikTokLiveClient`.
+  duplicate suppression, length cap) before sending the rendered reply
+  via the bound :class:`TikTokLiveClient`.
 
 The client runs on its own dedicated event loop thread (see
 ``main.run_bot``); all sends are scheduled onto that loop with
@@ -41,11 +43,36 @@ from core.yaml_utils import load_yaml
 # effect.  The bridge process initializes logging globally before use.
 log = logging.getLogger(__name__)
 
-DEFAULT_MIN_INTERVAL_S = 5.0
-DEFAULT_MAX_PER_MINUTE = 10
+DEFAULT_MIN_INTERVAL_S = 7.0
+DEFAULT_MAX_PER_MINUTE = 8
 DEFAULT_MAX_QUEUE = 20
 DEFAULT_MAX_LEN = 150
 AUTH_FAILURE_LIMIT = 3
+
+REPLY_EVENTS = ("gift", "follow", "join", "keyword")
+
+
+@dataclass
+class ChatbotReply:
+    """One auto-reply rule — what the bot posts in a given situation.
+
+    ``on`` selects the event type (gift/follow/join/keyword), ``match``
+    narrows it down (gift name or keyword; empty match = any gift) and
+    ``message`` is the template posted to the chat.
+    """
+
+    on: str = "gift"
+    match: str = ""
+    message: str = ""
+
+    def to_dict(self) -> dict[str, str]:
+        return {"on": self.on, "match": self.match, "message": self.message}
+
+
+DEFAULT_REPLIES: list[ChatbotReply] = [
+    ChatbotReply(on="gift", match="", message="Danke {user} für {gift}! 💖"),
+    ChatbotReply(on="follow", match="", message="Danke fürs Folgen, {user}!"),
+]
 
 
 @dataclass
@@ -58,13 +85,9 @@ class ChatbotConfig:
     max_queue: int = DEFAULT_MAX_QUEUE
     dedupe_identical: bool = True
     max_len: int = DEFAULT_MAX_LEN
-    on_gift: bool = True
-    on_follow: bool = True
-    on_join: bool = False
-    gift_thanks: str = "Danke {user} für {gift}! 💖"
-    follow_thanks: str = "Danke fürs Folgen, {user}!"
-    join_welcome: str = ""
-    keyword_replies: dict[str, str] = field(default_factory=dict)
+    replies: list[ChatbotReply] = field(
+        default_factory=lambda: [ChatbotReply(**r.to_dict()) for r in DEFAULT_REPLIES]
+    )
     tt_target_idc: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -77,17 +100,7 @@ class ChatbotConfig:
                 "dedupe_identical": self.dedupe_identical,
                 "max_len": self.max_len,
             },
-            "triggers": {
-                "gift": self.on_gift,
-                "follow": self.on_follow,
-                "join": self.on_join,
-            },
-            "templates": {
-                "gift_thanks": self.gift_thanks,
-                "follow_thanks": self.follow_thanks,
-                "join_welcome": self.join_welcome,
-            },
-            "keyword_replies": dict(self.keyword_replies),
+            "replies": [r.to_dict() for r in self.replies],
             "session": {"tt_target_idc": self.tt_target_idc},
         }
 
@@ -124,25 +137,24 @@ class ChatbotConfig:
             except (TypeError, ValueError):
                 pass
 
-        triggers = data.get("triggers")
-        if isinstance(triggers, dict):
-            cfg.on_gift = bool(triggers.get("gift", cfg.on_gift))
-            cfg.on_follow = bool(triggers.get("follow", cfg.on_follow))
-            cfg.on_join = bool(triggers.get("join", cfg.on_join))
-
-        templates = data.get("templates")
-        if isinstance(templates, dict):
-            cfg.gift_thanks = str(templates.get("gift_thanks", cfg.gift_thanks))
-            cfg.follow_thanks = str(templates.get("follow_thanks", cfg.follow_thanks))
-            cfg.join_welcome = str(templates.get("join_welcome", cfg.join_welcome))
-
-        keywords = data.get("keyword_replies")
-        if isinstance(keywords, dict):
-            cfg.keyword_replies = {
-                str(k).strip().lower(): str(v)
-                for k, v in keywords.items()
-                if str(k).strip() and str(v).strip()
-            }
+        raw_replies = data.get("replies")
+        if isinstance(raw_replies, list):
+            replies: list[ChatbotReply] = []
+            for entry in raw_replies:
+                if not isinstance(entry, dict):
+                    continue
+                on = str(entry.get("on") or "").strip().lower()
+                message = str(entry.get("message") or "")
+                if on not in REPLY_EVENTS or not message.strip():
+                    continue  # unknown event or nothing to post — drop
+                replies.append(
+                    ChatbotReply(
+                        on=on,
+                        match=str(entry.get("match") or "").strip(),
+                        message=message,
+                    )
+                )
+            cfg.replies = replies
 
         session = data.get("session")
         if isinstance(session, dict):
@@ -337,23 +349,42 @@ class TikTokChatbot:
         if not user:
             return
 
-        text: str | None = None
-        if ev_type == "gift" and self.config.on_gift:
-            text = self.config.gift_thanks.format_map(_SafeMap(user=user))
-        elif ev_type == "follow" and self.config.on_follow:
-            text = self.config.follow_thanks.format_map(_SafeMap(user=user))
-        elif ev_type == "join" and self.config.on_join:
-            text = self.config.join_welcome.format_map(_SafeMap(user=user))
-        elif ev_type == "comment":
-            comment = str(data.get("comment") or "").strip().lower()
-            if comment:
-                for keyword, reply in self.config.keyword_replies.items():
-                    if comment == keyword or comment.startswith(keyword + " "):
-                        text = reply.format_map(_SafeMap(user=user))
-                        break
+        comment = str(data.get("comment") or "").strip().lower()
+        gift_name = str(data.get("gift_name") or "").strip().lower()
 
-        if text:
-            self.submit(text)
+        # First matching rule wins — one event never triggers two posts.
+        for reply in self.config.replies:
+            text = self._render_reply(reply, ev_type, user, comment, gift_name)
+            if text is not None:
+                self.submit(text)
+                return
+
+    @staticmethod
+    def _render_reply(
+        reply: ChatbotReply,
+        ev_type: str,
+        user: str,
+        comment: str,
+        gift_name: str,
+    ) -> str | None:
+        """Render *reply* for the event, or None when it doesn't match."""
+        message = reply.message.strip()
+        if not message:
+            return None
+        if reply.on == "gift" and ev_type == "gift":
+            want = reply.match.strip().lower()
+            if want and gift_name != want:
+                return None
+            return message.format_map(_SafeMap(user=user, gift=gift_name))
+        if reply.on == "follow" and ev_type == "follow":
+            return message.format_map(_SafeMap(user=user))
+        if reply.on == "join" and ev_type == "join":
+            return message.format_map(_SafeMap(user=user))
+        if reply.on == "keyword" and ev_type == "comment":
+            keyword = reply.match.strip().lower()
+            if keyword and (comment == keyword or comment.startswith(keyword + " ")):
+                return message.format_map(_SafeMap(user=user, comment=comment))
+        return None
 
     # ------------------------------------------------------------------
     # Sending

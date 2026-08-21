@@ -11,12 +11,37 @@ class ChatbotEditor {
     this.data = {};
     this.original = {};
     this._dirty = false;
-    this._keywords = [];
+    this._rules = [];
     this._status = null;
     this._sessionInfo = null;
     this._loginPolling = false;
     this._loginPollIntervalMs = 1500;
     this._bindEvents();
+    window.addEventListener('pywebviewready', () => this._updateWebviewButton());
+  }
+
+  _betaAcked() {
+    try {
+      return localStorage.getItem('tiktok2mc_chatbot_beta_ack') === '1';
+    } catch (_) {
+      return true; // storage unavailable: never lock the user out
+    }
+  }
+
+  _showBetaModal() {
+    document.getElementById('chatbot-beta-modal')?.classList.remove('hidden');
+  }
+
+  acceptBeta() {
+    try {
+      localStorage.setItem('tiktok2mc_chatbot_beta_ack', '1');
+    } catch (_) { /* ignore */ }
+    document.getElementById('chatbot-beta-modal')?.classList.add('hidden');
+    this.open();
+  }
+
+  declineBeta() {
+    document.getElementById('chatbot-beta-modal')?.classList.add('hidden');
   }
 
   _bindEvents() {
@@ -33,19 +58,24 @@ class ChatbotEditor {
         if (e.target.matches('input, textarea, select')) this._markDirty();
       });
     }
-    const addBtn = document.getElementById('cb-keyword-add');
+    const addBtn = document.getElementById('cb-reply-add');
     if (addBtn) {
-      addBtn.addEventListener('click', () => {
-        this._keywordRows().push({ keyword: '', reply: '' });
-        this.renderKeywords();
-        this._markDirty();
-      });
+      addBtn.addEventListener('click', () => this.addRule());
+    }
+    const enabled = document.getElementById('cb-enabled');
+    if (enabled) {
+      enabled.addEventListener('change', () => this._updateMasterTitle());
     }
   }
 
   async open() {
+    if (!this._betaAcked()) {
+      this._showBetaModal();
+      return;
+    }
     this.el.classList.remove('hidden');
     this._updateWebviewButton();
+    if (!this._hasWebviewLogin()) this._checkWebviewAvailability();
     await Promise.all([this.load(), this.loadSession()]);
     // Initial snapshot so the pill is correct before the next SSE event.
     try {
@@ -69,6 +99,14 @@ class ChatbotEditor {
 
   isDirty() { return this._dirty; }
 
+  /** The master toggle headline reflects the action, not the state. */
+  _updateMasterTitle() {
+    const title = document.getElementById('cb-master-title');
+    if (!title) return;
+    const enabled = document.getElementById('cb-enabled')?.checked;
+    title.textContent = I18N.t(enabled ? 'chatbot.disableBot' : 'chatbot.enableBot');
+  }
+
   async load() {
     let cfg = {};
     try {
@@ -86,13 +124,19 @@ class ChatbotEditor {
 
   async save() {
     const payload = this._collect();
+    const prevEnabled = !!this.original?.enabled;
+    const nextEnabled = !!payload.enabled;
     try {
       const res = await putJSON('/chatbot/config', { chatbot: payload });
       this.data = JSON.parse(JSON.stringify(payload));
       this.original = JSON.parse(JSON.stringify(payload));
       this._dirty = false;
       this._updateSaveButton();
-      if (res && res.reloaded === false) {
+      if (prevEnabled !== nextEnabled) {
+        // The bridge hot-reloads the config; only a missing bridge blocks the change.
+        if (this._status == null) showToast(I18N.t('chatbot.savedToggleNoBridge'), 'warning');
+        else showToast(I18N.t('chatbot.savedToggle'), 'success');
+      } else if (res && res.reloaded === false) {
         showToast(I18N.t('chatbot.savedNoReload'), 'warning');
       } else {
         showToast(I18N.t('chatbot.saved'), 'success');
@@ -107,54 +151,42 @@ class ChatbotEditor {
   _applyToForm() {
     const d = this.data;
     const spam = d.spam_protection || {};
-    const triggers = d.triggers || {};
-    const templates = d.templates || {};
 
     document.getElementById('cb-enabled').checked = !!d.enabled;
-    document.getElementById('cb-on-gift').checked = triggers.gift !== false;
-    document.getElementById('cb-on-follow').checked = triggers.follow !== false;
-    document.getElementById('cb-on-join').checked = triggers.join === true;
-    document.getElementById('cb-gift-thanks').value = templates.gift_thanks ?? '';
-    document.getElementById('cb-follow-thanks').value = templates.follow_thanks ?? '';
-    document.getElementById('cb-join-welcome').value = templates.join_welcome ?? '';
-    document.getElementById('cb-min-interval').value = spam.min_interval_s ?? 5;
-    document.getElementById('cb-max-per-minute').value = spam.max_per_minute ?? 10;
+    document.getElementById('cb-min-interval').value = spam.min_interval_s ?? 7;
+    document.getElementById('cb-max-per-minute').value = spam.max_per_minute ?? 8;
     document.getElementById('cb-max-queue').value = spam.max_queue ?? 20;
     document.getElementById('cb-max-len').value = spam.max_len ?? 150;
     document.getElementById('cb-dedupe').checked = spam.dedupe_identical !== false;
 
-    this._keywords = Object.entries(d.keyword_replies || {}).map(([keyword, reply]) => ({ keyword, reply }));
-    this.renderKeywords();
+    this._rules = (Array.isArray(d.replies) ? d.replies : []).map(r => ({
+      on: r.on || 'gift',
+      match: r.match || '',
+      message: r.message || '',
+    }));
+    this.renderRules();
+    this._updateMasterTitle();
     this._renderSessionWarning();
   }
 
   _collect() {
-    const keywords = {};
-    for (const row of this._keywordRows()) {
-      const k = String(row.keyword || '').trim().toLowerCase();
-      const v = String(row.reply || '').trim();
-      if (k && v) keywords[k] = v;
-    }
+    const replies = this._rules
+      .map(r => ({
+        on: r.on,
+        match: String(r.match || '').trim(),
+        message: String(r.message || '').trim(),
+      }))
+      .filter(r => r.message);
     return {
       enabled: document.getElementById('cb-enabled').checked,
       spam_protection: {
         min_interval_s: parseFloat(document.getElementById('cb-min-interval').value) || 0,
-        max_per_minute: parseInt(document.getElementById('cb-max-per-minute').value, 10) || 10,
+        max_per_minute: parseInt(document.getElementById('cb-max-per-minute').value, 10) || 8,
         max_queue: parseInt(document.getElementById('cb-max-queue').value, 10) || 20,
         max_len: parseInt(document.getElementById('cb-max-len').value, 10) || 150,
         dedupe_identical: document.getElementById('cb-dedupe').checked,
       },
-      triggers: {
-        gift: document.getElementById('cb-on-gift').checked,
-        follow: document.getElementById('cb-on-follow').checked,
-        join: document.getElementById('cb-on-join').checked,
-      },
-      templates: {
-        gift_thanks: document.getElementById('cb-gift-thanks').value.trim(),
-        follow_thanks: document.getElementById('cb-follow-thanks').value.trim(),
-        join_welcome: document.getElementById('cb-join-welcome').value.trim(),
-      },
-      keyword_replies: keywords,
+      replies,
       session: { tt_target_idc: (this.data.session || {}).tt_target_idc || '' },
     };
   }
@@ -175,6 +207,7 @@ class ChatbotEditor {
     const badge = document.getElementById('cb-session-badge');
     const badgeText = document.getElementById('cb-session-badge-text');
     const idcInput = document.getElementById('cb-session-idc');
+    const removeBtn = document.getElementById('cb-session-remove');
     if (!badge || !badgeText) return;
 
     const info = this._sessionInfo;
@@ -185,6 +218,11 @@ class ChatbotEditor {
     } else {
       badge.classList.remove('signed-in');
       badgeText.textContent = I18N.t('chatbot.sessionMissing');
+    }
+    // Signing out makes no sense without a stored login.
+    if (removeBtn) {
+      removeBtn.disabled = !(info && info.configured);
+      removeBtn.title = info && info.configured ? '' : I18N.t('chatbot.sessionRemoveDisabled');
     }
   }
 
@@ -231,6 +269,20 @@ class ChatbotEditor {
     btn.classList.toggle('hidden', !this._hasWebviewLogin());
   }
 
+  /**
+   * pywebview injects its bridge asynchronously after page load — retry a
+   * few times so the button appears even when the editor opens early.
+   */
+  _checkWebviewAvailability(delays = [500, 2000]) {
+    if (this._hasWebviewLogin()) {
+      this._updateWebviewButton();
+      return;
+    }
+    const next = delays.shift();
+    if (next === undefined) return;
+    setTimeout(() => this._checkWebviewAvailability(delays), next);
+  }
+
   async webviewLogin() {
     if (this._loginPolling) return;
     const api = window.pywebview && window.pywebview.api;
@@ -251,6 +303,9 @@ class ChatbotEditor {
     }
     this._setWebviewLoginBusy(true);
     this._loginPolling = true;
+    // Safety net: the Python side times out after 5 min; allow a little
+    // more so a slow login still completes, then stop polling.
+    const deadline = Date.now() + 330000;
     try {
       for (;;) {
         await new Promise(resolve => setTimeout(resolve, this._loginPollIntervalMs));
@@ -260,7 +315,13 @@ class ChatbotEditor {
         } catch (_) {
           break; // bridge died — stop polling silently
         }
-        if (!state || state.state === 'waiting') continue;
+        if (!state || state.state === 'waiting') {
+          if (Date.now() > deadline) {
+            showToast(I18N.t('chatbot.webviewTimeout'), 'warning');
+            break;
+          }
+          continue;
+        }
         await this._handleLoginState(state);
         break;
       }
@@ -358,10 +419,8 @@ class ChatbotEditor {
   /* ─── Placeholder chips ─── */
 
   insertPlaceholder(text) {
-    const activeId = ['cb-gift-thanks', 'cb-follow-thanks', 'cb-join-welcome']
-      .find(id => document.activeElement?.id === id)
-      || 'cb-gift-thanks';
-    const input = document.getElementById(activeId);
+    const msgs = Array.from(document.querySelectorAll('#cb-replies-list .cb-reply-msg'));
+    const input = msgs.find(el => el === document.activeElement) || msgs[0];
     if (!input) return;
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
@@ -371,40 +430,68 @@ class ChatbotEditor {
     this._markDirty();
   }
 
-  /* ─── Keyword rows ─── */
+  /* ─── Reply rules ─── */
 
-  _keywordRows() {
-    if (!this._keywords) this._keywords = [];
-    return this._keywords;
+  _ruleRows() {
+    if (!this._rules) this._rules = [];
+    return this._rules;
   }
 
-  renderKeywords() {
-    const list = document.getElementById('cb-keywords-list');
+  addRule() {
+    this._ruleRows().push({ on: 'gift', match: '', message: '' });
+    this.renderRules();
+    this._markDirty();
+    const rows = document.querySelectorAll('#cb-replies-list .chatbot-reply-row');
+    const last = rows[rows.length - 1];
+    (last?.querySelector('.cb-reply-msg') || last)?.focus?.();
+  }
+
+  removeRule(i) {
+    this._ruleRows().splice(i, 1);
+    this.renderRules();
+    this._markDirty();
+  }
+
+  _matchPlaceholder(on) {
+    if (on === 'keyword') return I18N.t('chatbot.matchKeywordPlaceholder');
+    if (on === 'gift') return I18N.t('chatbot.matchGiftPlaceholder');
+    return '';
+  }
+
+  renderRules() {
+    const list = document.getElementById('cb-replies-list');
     if (!list) return;
-    const rows = this._keywordRows();
+    const rows = this._ruleRows();
     if (!rows.length) {
-      list.innerHTML = `<p class="hint chatbot-no-keywords">${I18N.t('chatbot.noKeywords')}</p>`;
+      list.innerHTML = `<p class="hint chatbot-no-keywords">${I18N.t('chatbot.noReplies')}</p>`;
       return;
     }
     list.innerHTML = rows.map((row, i) => `
-      <div class="chatbot-keyword-row" data-index="${i}">
-        <input type="text" class="cb-kw" placeholder="${I18N.t('chatbot.keywordPlaceholder')}" value="${escapeHtml(row.keyword)}">
+      <div class="chatbot-reply-row" data-index="${i}" data-on="${escapeHtml(row.on)}">
+        <select class="cb-reply-on" aria-label="Event">
+          <option value="gift"${row.on === 'gift' ? ' selected' : ''}>${I18N.t('chatbot.replyOnGift')}</option>
+          <option value="follow"${row.on === 'follow' ? ' selected' : ''}>${I18N.t('chatbot.replyOnFollow')}</option>
+          <option value="join"${row.on === 'join' ? ' selected' : ''}>${I18N.t('chatbot.replyOnJoin')}</option>
+          <option value="keyword"${row.on === 'keyword' ? ' selected' : ''}>${I18N.t('chatbot.replyOnKeyword')}</option>
+        </select>
+        <input type="text" class="cb-reply-match" placeholder="${escapeHtml(this._matchPlaceholder(row.on))}" value="${escapeHtml(row.match)}">
         <span class="chatbot-arrow">→</span>
-        <input type="text" class="cb-reply" placeholder="${I18N.t('chatbot.replyPlaceholder')}" value="${escapeHtml(row.reply)}">
-        <button type="button" class="chatbot-remove-btn" aria-label="Remove" onclick="chatbotEditor.removeKeyword(${i})">✕</button>
+        <input type="text" class="cb-reply-msg" placeholder="${escapeHtml(I18N.t('chatbot.replyMessagePlaceholder'))}" value="${escapeHtml(row.message)}">
+        <button type="button" class="chatbot-remove-btn" aria-label="Remove" onclick="chatbotEditor.removeRule(${i})">✕</button>
       </div>
     `).join('');
-    list.querySelectorAll('.chatbot-keyword-row').forEach(rowEl => {
+    list.querySelectorAll('.chatbot-reply-row').forEach(rowEl => {
       const i = parseInt(rowEl.dataset.index, 10);
-      rowEl.querySelector('.cb-kw').addEventListener('input', e => { this._keywordRows()[i].keyword = e.target.value; this._markDirty(); });
-      rowEl.querySelector('.cb-reply').addEventListener('input', e => { this._keywordRows()[i].reply = e.target.value; this._markDirty(); });
+      rowEl.querySelector('.cb-reply-on').addEventListener('change', e => {
+        this._rules[i].on = e.target.value;
+        rowEl.dataset.on = e.target.value;
+        const match = rowEl.querySelector('.cb-reply-match');
+        match.placeholder = this._matchPlaceholder(e.target.value);
+        this._markDirty();
+      });
+      rowEl.querySelector('.cb-reply-match').addEventListener('input', e => { this._rules[i].match = e.target.value; this._markDirty(); });
+      rowEl.querySelector('.cb-reply-msg').addEventListener('input', e => { this._rules[i].message = e.target.value; this._markDirty(); });
     });
-  }
-
-  removeKeyword(i) {
-    this._keywordRows().splice(i, 1);
-    this.renderKeywords();
-    this._markDirty();
   }
 
   /* ─── Dirty / save button ─── */
@@ -467,14 +554,18 @@ class ChatbotEditor {
     } else {
       pill.textContent = I18N.t('chatbot.stateOff');
       pill.className = 'chatbot-pill offline';
-      heroTitle.textContent = I18N.t('chatbot.heroIdle');
+      heroTitle.textContent = I18N.t('chatbot.heroOffTitle');
       heroDot.className = 'chatbot-pulse-dot';
     }
 
     const subs = [];
-    subs.push(status.connected ? I18N.t('chatbot.subConnected') : I18N.t('chatbot.subDisconnected'));
-    if (status.has_session === false && status.enabled && !status.auto_disabled) {
-      subs.push(I18N.t('chatbot.subNoSession'));
+    if (!status.enabled && !status.auto_disabled) {
+      subs.push(I18N.t('chatbot.heroOffSub'));
+    } else {
+      subs.push(status.connected ? I18N.t('chatbot.subConnected') : I18N.t('chatbot.subDisconnected'));
+      if (status.has_session === false && status.enabled && !status.auto_disabled) {
+        subs.push(I18N.t('chatbot.subNoSession'));
+      }
     }
     heroSub.textContent = subs.join(' · ');
 

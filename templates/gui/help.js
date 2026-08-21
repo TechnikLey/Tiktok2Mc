@@ -289,11 +289,11 @@
           body: {
             en: [
               'The chatbot writes messages into the TikTok live chat on its own: it thanks viewers for gifts and follows, welcomes them to the stream and answers keyword commands (e.g. "!discord").',
-              'Reading events works without a login — but for sending messages the bot needs a one-time TikTok sign-in with a session ID (see below).',
+              'Reading events works without a login, but for sending messages the bot needs a one-time TikTok sign-in with a session ID (see below).',
             ],
             de: [
               'Der Chatbot schreibt selbstständig Nachrichten in den TikTok-Live-Chat: Er bedankt sich bei Geschenken und Follows, heißt Viewer willkommen und beantwortet Keyword-Befehle (z. B. „!discord").',
-              'Das Lesen von Events funktioniert ohne Login — zum Senden braucht der Bot aber eine einmalige TikTok-Anmeldung mit einer Session-ID (siehe unten).',
+              'Das Lesen von Events funktioniert ohne Login, zum Senden braucht der Bot aber eine einmalige TikTok-Anmeldung mit einer Session-ID (siehe unten).',
             ],
           },
         },
@@ -302,11 +302,11 @@
           body: {
             en: [
               'Open tiktok.com in your browser, log in with the account that should post, press F12 \u2192 "Application" \u2192 Cookies \u2192 tiktok.com and copy the value of the "sessionid" row. Paste it in the Chatbot tab and click "Sign in".',
-              'The session ID is as valuable as a password: it is stored encrypted on this device only and never shown in full again. If sends start failing, the session has probably expired — just sign in again.',
+              'The session ID is as valuable as a password: it is stored encrypted on this device only and never shown in full again. If sends start failing, the session has probably expired, just sign in again.',
             ],
             de: [
               'Öffne tiktok.com im Browser, logge dich mit dem Account ein, der schreiben soll, drücke F12 \u2192 „Application" \u2192 Cookies \u2192 tiktok.com und kopiere den Wert der Zeile „sessionid". Füge ihn im Chatbot-Tab ein und klicke auf „Anmelden".',
-              'Die Session-ID ist so wertvoll wie ein Passwort: Sie wird nur verschlüsselt auf diesem Gerät gespeichert und nie wieder vollständig angezeigt. Schlägt das Senden fehl, ist sie vermutlich abgelaufen — einfach neu anmelden.',
+              'Die Session-ID ist so wertvoll wie ein Passwort: Sie wird nur verschlüsselt auf diesem Gerät gespeichert und nie wieder vollständig angezeigt. Schlägt das Senden fehl, ist sie vermutlich abgelaufen, einfach neu anmelden.',
             ],
           },
         },
@@ -315,11 +315,11 @@
           body: {
             en: [
               'TikTok limits chat messages strictly. The built-in protection keeps a minimum interval, a per-minute limit and drops duplicates automatically.',
-              'Automated posts are a grey area in TikTok\u2019s terms of service — keep the limits conservative and prefer a dedicated bot account over your main account.',
+              'Automated posts are a grey area in TikTok\u2019s terms of service, so keep the limits conservative and prefer a dedicated bot account over your main account.',
             ],
             de: [
               'TikTok limitiert Chat-Nachrichten streng. Der eingebaute Schutz hält einen Mindestabstand, ein Minuten-Limit und überspringt Duplikate automatisch.',
-              'Automatisierte Posts sind eine ToS-Grauzone — halte die Limits konservativ und benutze lieber einen eigenen Bot-Account statt des Haupt-Accounts.',
+              'Automatisierte Posts sind eine ToS-Grauzone, halte die Limits also konservativ und benutze lieber einen eigenen Bot-Account statt des Haupt-Accounts.',
             ],
           },
         },

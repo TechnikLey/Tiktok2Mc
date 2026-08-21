@@ -29,6 +29,7 @@ You cannot open the setup wizard from the Dashboard later; it only appears on fi
 - [Actions and Triggers](#actions-and-triggers)
 - [Event-Command Mapper](#event-command-mapper)
 - [Comment Commands](#comment-commands)
+- [TikTok Chatbot](#tiktok-chatbot)
 - [Plugins](#plugins)
 - [Overlays](#overlays)
 - [The Dashboard](#the-dashboard)
@@ -378,6 +379,39 @@ commands_config:
 Each group has a `trigger_comment_event` setting (default: `true`). When set to `false`, commands in that group won't fire the `comment` trigger in `actions.mca`.
 
 > For full details, read the inline comments in `data/comment_commands.yaml`.
+
+---
+
+## TikTok Chatbot
+
+The Chatbot is an **optional** bot that posts automatic messages in your TikTok live chat: it thanks viewers for gifts and follows and can reply to keywords in comments. You set it up entirely in the **Chatbot tab** of the dashboard.
+
+> [!WARNING]
+> **The chatbot is a beta feature.** Automated messages are a grey area in TikTok's terms of service — your account can be banned. Use a dedicated bot account, never your main account.
+
+### Setup
+
+1. Open the **Chatbot** tab and confirm the beta warning (shown once).
+2. Flip the **Enable Bot** switch at the top.
+3. Sign in with the account that should post:
+   - Click **Sign in with TikTok** and log in inside the opening window (easiest), or
+   - Paste the `sessionid` cookie manually — click *How do I get the session ID?* for step-by-step instructions.
+4. Configure your automatic replies (see below) and click **Save Changes**.
+
+Changes apply immediately — no restart needed.
+
+### Automatic replies
+
+You configure what the bot posts as a list of rules. Each rule has a situation, an optional match and a message:
+
+- **On gift** / **On follow** / **On stream join** — reacts to that event
+- **On keyword** — reacts when a comment matches or starts with the given word
+
+The **first matching rule wins**: an event only triggers one reply. Use the `{user}`, `{gift}` and `{comment}` placeholders in your messages (e.g. `Thanks {user} for {gift}!`).
+
+### Spam protection
+
+TikTok limits chat messages strictly. The built-in protection keeps a minimum pause between messages, a per-minute rate limit and drops duplicate messages automatically. Keep these limits conservative to protect your account.
 
 ---
 

@@ -198,16 +198,26 @@ Webview-Flow mal nicht funktioniert).
 3. **Eigene Konfigurationsdatei** `config/chatbot.yaml` (Pfad über
    `core.paths` registrieren) — bewusst **nicht** die globale `config.yaml`:
    - `enabled` (Default: `false`)
-   - **Spam-Protection:** `min_interval_s` (Mindestabstand, Default 5),
-     `max_per_minute` (Nachrichten-Fenster, z. B. 10),
-     `max_queue` (Drop bei Flut), `dedupe_identical` (Default: true),
-     `max_len` (150 Zeichen, TikTok-Limit)
-   - **Antwort-Regeln** (wann der Bot antwortet):
-     `on_gift`, `on_follow`, `on_join` (je an/aus),
-     `keyword_replies` (z. B. `!discord` → Link)
-   - **Antwort-Inhalte** (was er antwortet): Templates
-     `gift_thanks`, `follow_thanks`, `join_welcome` mit Platzhaltern
-     `{user}`, `{gift}`; Keyword-Antworten aus `keyword_replies`
+   - **Spam-Protection:** `min_interval_s` (Mindestpause, Default 7),
+     `max_per_minute` (Fenster-Limit, Default 8 — entspricht ca.
+     „2 Nachrichten alle 15 Sekunden"), `max_queue` (Drop bei Flut),
+     `dedupe_identical` (Default: true), `max_len` (150 Zeichen,
+     TikTok-Limit)
+   - **Antwort-Regeln** (`replies`, Liste — was der Bot in welcher Situation
+     postet; die **erste passende Regel gewinnt**, ein Event löst nie zwei
+     Posts aus):
+     ```yaml
+     replies:
+       - {on: gift,    match: "",       message: "Danke {user} für {gift}! 💖"}
+       - {on: gift,    match: "Rose",   message: "Eine Rose! Danke {user}! 🌹"}
+       - {on: follow,  match: "",       message: "Danke fürs Folgen, {user}!"}
+       - {on: join,    match: "",       message: ""}
+       - {on: keyword, match: "discord", message: "Komm auf unseren Discord, {user}!"}
+     ```
+     `on` ∈ `gift|follow|join|keyword`; `match` = Gift-Name bzw. Keyword
+     (leer = jedes Gift); Platzhalter `{user}`, `{gift}`, `{comment}`.
+     Alte Keys (`triggers`/`templates`/`keyword_replies`) werden **nicht**
+     migriert — ohne `replies` gelten die Defaults (Gift-/Follow-Dank).
 4. Event-Anbindung per **event_bus-Subscription** (Gift/Follow/Comment) —
    nebenläufig zur TriggerEngine, keine Queue-Kopplung, keine
    `actions.mca`-Pflicht für den Nutzer.
@@ -232,14 +242,19 @@ Webview-Flow mal nicht funktioniert).
      `reload_chatbot`-Runtime-Signal für die Bridge
 8. **GUI-Tab „Chatbot"** (`templates/gui/`: Tab in `index.html`, Logik in
    neuem `chatbot-editor.js`, wiederverwendete DOM-Helper aus `app.js`):
-   - **An/Aus**-Schalter (Master-Toggle, schreibt `enabled`)
+   - **Bot aktivieren/deaktivieren** (Master-Toggle mit dynamischem Titel,
+     schreibt `enabled`; Änderung greift sofort — Toast bestätigt das bzw.
+     warnt, wenn die Bridge nicht läuft)
+   - **Beta-Hinweis**: Beim ersten Öffnen des Tabs muss ein Warn-Dialog
+     (ToS-Grauzone, Bann-Risiko, Bot-Account) bestätigt werden
+     (`localStorage`-Ack)
+   - **Automatische Antworten**: einheitliche Regel-Liste `replies`
+     (Situation + optionaler Match + Nachricht; erste passende Regel
+     gewinnt), Platzhalter `{user}`, `{gift}`, `{comment}`
    - **Spam-Protection**: Mindestabstand, Nachrichten/Minute,
-     Warteschlangen-Limit, Dedupe-Haken
-   - **Wann antworten**: Haken für Gift/Follow/Join +
-     Keyword→Antwort-Liste (Editor wie Plugin-Config-Schema)
-   - **Was antworten**: Template-Felder pro Event mit Platzhalter-Hinweis
-     (`{user}`, `{gift}`)
-   - Statuszeile: verbunden/nicht verbunden, Session-Status, letzte Sends
+     Warteschlangen-Limit, Dedupe-Haken (Eingaben mit Einheiten-Suffix)
+   - Statuszeile: verbunden/nicht verbunden, Session-Status, letzte Sends;
+     bei deaktiviertem Bot eigener Hinweis statt „inaktiv"
 
 ### Phase 4 — Session-Management (beide Varianten)
 

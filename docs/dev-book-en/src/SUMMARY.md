@@ -33,6 +33,10 @@
   - [RCON & Minecraft](./ch05-03-rcon-and-minecraft.md)
   - [Overlay System](./ch05-04-overlay-system.md)
 
+# TikTok Chatbot
+
+- [TikTok Chatbot](./ch06-00-tiktok-chatbot.md)
+
 # Appendix
 
 - [Glossary](./glossary.md)

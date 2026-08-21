@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-install updates** — a new config option lets updates install automatically without prompting.
 - **Java detection** — the tool handles Java installation with checksum verification, fallback download mirrors, and a proper progress bar with cancel option in the GUI.
 - **Save/discard prompt** — switching between editor tabs warns you if you have unsaved changes, so nothing gets lost.
+- **TikTok Chatbot** — an optional bot that automatically posts in your TikTok live chat: it thanks viewers for gifts and follows and can reply to keywords. You enable it in the new Chatbot tab.
 
 ### Changed
 

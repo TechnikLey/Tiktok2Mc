@@ -10,7 +10,10 @@ import core.chatbot_session as chatbot_session
 import core.paths
 from core.tiktok_chatbot import (
     AUTH_FAILURE_LIMIT,
+    DEFAULT_MAX_PER_MINUTE,
+    DEFAULT_MIN_INTERVAL_S,
     ChatbotConfig,
+    ChatbotReply,
     TikTokChatbot,
     _SafeMap,
 )
@@ -31,17 +34,15 @@ class TestChatbotConfig:
     def test_defaults(self):
         cfg = ChatbotConfig()
         assert cfg.enabled is False
-        assert cfg.min_interval_s > 0
-        assert cfg.max_per_minute >= 1
+        assert cfg.min_interval_s == DEFAULT_MIN_INTERVAL_S == 7.0
+        assert cfg.max_per_minute == DEFAULT_MAX_PER_MINUTE == 8
         assert cfg.dedupe_identical is True
-        assert cfg.on_gift is True
-        assert cfg.on_follow is True
-        assert cfg.on_join is False
-        assert "{user}" in cfg.gift_thanks
+        # Sensible out-of-the-box rules: gift + follow thanks.
+        assert [r.on for r in cfg.replies] == ["gift", "follow"]
+        assert "{user}" in cfg.replies[0].message
 
     def test_from_dict_none_returns_defaults(self):
-        cfg = ChatbotConfig.from_dict(None)
-        assert cfg == ChatbotConfig()
+        assert ChatbotConfig.from_dict(None) == ChatbotConfig()
 
     def test_from_dict_full_roundtrip(self):
         original = ChatbotConfig(
@@ -51,13 +52,10 @@ class TestChatbotConfig:
             max_queue=9,
             dedupe_identical=False,
             max_len=99,
-            on_gift=False,
-            on_follow=True,
-            on_join=True,
-            gift_thanks="thx {user}",
-            follow_thanks="follow thx",
-            join_welcome="hi",
-            keyword_replies={"discord": "join us"},
+            replies=[
+                ChatbotReply(on="gift", match="rose", message="thx {user}"),
+                ChatbotReply(on="keyword", match="discord", message="join us"),
+            ],
             tt_target_idc="aws",
         )
         restored = ChatbotConfig.from_dict(original.to_dict())
@@ -81,22 +79,44 @@ class TestChatbotConfig:
         assert cfg.max_queue == defaults.max_queue
         assert cfg.max_len == 1
 
-    def test_from_dict_keyword_replies_normalised(self):
+    def test_replies_parsing_normalises_and_skips_invalid(self):
         cfg = ChatbotConfig.from_dict(
-            {"keyword_replies": {"  DISCORD ": "join", "": "skipped", "x": ""}}
+            {
+                "replies": [
+                    {"on": " KEYWORD ", "match": "  discord  ", "message": "hi"},
+                    {"on": "bogus", "message": "ignored"},
+                    "not-a-dict",
+                    {"on": "gift", "match": "", "message": "  "},
+                ]
+            }
         )
-        assert cfg.keyword_replies == {"discord": "join"}
+        assert len(cfg.replies) == 1
+        assert cfg.replies[0] == ChatbotReply(
+            on="keyword", match="discord", message="hi"
+        )
+
+    def test_empty_replies_list_is_respected(self):
+        cfg = ChatbotConfig.from_dict({"replies": []})
+        assert cfg.replies == []
+
+    def test_legacy_keys_are_ignored_no_migration(self):
+        """Old triggers/templates/keyword_replies keys must NOT migrate."""
+        cfg = ChatbotConfig.from_dict(
+            {
+                "triggers": {"gift": True, "follow": True, "join": True},
+                "templates": {
+                    "gift_thanks": "old gift",
+                    "follow_thanks": "old follow",
+                    "join_welcome": "old join",
+                },
+                "keyword_replies": {"discord": "old reply"},
+            }
+        )
+        assert cfg.replies == ChatbotConfig().replies
 
     def test_to_dict_structure(self):
         data = ChatbotConfig(enabled=True).to_dict()
-        assert set(data) == {
-            "enabled",
-            "spam_protection",
-            "triggers",
-            "templates",
-            "keyword_replies",
-            "session",
-        }
+        assert set(data) == {"enabled", "spam_protection", "replies", "session"}
 
 
 class TestSafeMap:
@@ -119,19 +139,24 @@ class TestHandleEvent:
         b._queue = queue
         return b, queue
 
-    def test_gift_event_queues_template(self, tmp_path):
+    def test_gift_event_queues_default_reply(self, tmp_path):
         b, queue = self._bot_with_config(tmp_path, enabled=True)
-        b._handle_event({"data": {"type": "gift", "user": "alice"}})
+        b._handle_event(
+            {"data": {"type": "gift", "user": "alice", "gift_name": "Rose"}}
+        )
         assert queue.qsize() == 1
+        assert queue.get_nowait() == "Danke alice für rose! 💖"
 
     def test_disabled_bot_ignores_events(self, tmp_path):
         b, queue = self._bot_with_config(tmp_path, enabled=False)
         b._handle_event({"data": {"type": "gift", "user": "alice"}})
         assert queue.empty()
 
-    def test_trigger_toggles_respected(self, tmp_path):
-        b, queue = self._bot_with_config(tmp_path, enabled=True, on_follow=False)
-        b._handle_event({"data": {"type": "follow", "user": "bob"}})
+    def test_event_without_matching_rule_is_ignored(self, tmp_path):
+        b, queue = self._bot_with_config(
+            tmp_path, enabled=True, replies=[ChatbotReply(on="follow", message="hi")]
+        )
+        b._handle_event({"data": {"type": "gift", "user": "alice"}})
         assert queue.empty()
 
     def test_missing_user_ignored(self, tmp_path):
@@ -139,23 +164,71 @@ class TestHandleEvent:
         b._handle_event({"data": {"type": "gift", "user": ""}})
         assert queue.empty()
 
+    def test_empty_message_rule_is_skipped(self, tmp_path):
+        b, queue = self._bot_with_config(
+            tmp_path,
+            enabled=True,
+            replies=[
+                ChatbotReply(on="gift", match="", message="   "),
+                ChatbotReply(on="gift", match="", message="real thanks {user}"),
+            ],
+        )
+        b._handle_event({"data": {"type": "gift", "user": "alice"}})
+        assert queue.get_nowait() == "real thanks alice"
+
     def test_comment_keyword_match(self, tmp_path):
         b, queue = self._bot_with_config(
-            tmp_path, enabled=True, keyword_replies={"discord": "join {user}"}
+            tmp_path,
+            enabled=True,
+            replies=[
+                ChatbotReply(on="keyword", match="discord", message="join {user}")
+            ],
         )
         b._handle_event(
             {"data": {"type": "comment", "user": "carl", "comment": "DISCORD please"}}
         )
         assert queue.qsize() == 1
+        assert queue.get_nowait() == "join carl"
 
     def test_comment_non_matching_keyword_ignored(self, tmp_path):
         b, queue = self._bot_with_config(
-            tmp_path, enabled=True, keyword_replies={"discord": "join"}
+            tmp_path,
+            enabled=True,
+            replies=[ChatbotReply(on="keyword", match="discord", message="join")],
         )
         b._handle_event(
             {"data": {"type": "comment", "user": "carl", "comment": "hello there"}}
         )
         assert queue.empty()
+
+    def test_gift_name_filter_only_fires_for_that_gift(self, tmp_path):
+        b, queue = self._bot_with_config(
+            tmp_path,
+            enabled=True,
+            replies=[
+                ChatbotReply(on="gift", match="Rose", message="ROSE for {user}!"),
+                ChatbotReply(on="gift", match="", message="generic thanks {user}"),
+            ],
+        )
+        b._handle_event(
+            {"data": {"type": "gift", "user": "amy", "gift_name": "TikTok"}}
+        )
+        assert queue.get_nowait() == "generic thanks amy"
+        b._handle_event({"data": {"type": "gift", "user": "amy", "gift_name": "rose"}})
+        assert queue.get_nowait() == "ROSE for amy!"
+
+    def test_first_matching_rule_wins_no_double_post(self, tmp_path):
+        b, queue = self._bot_with_config(
+            tmp_path,
+            enabled=True,
+            replies=[
+                ChatbotReply(on="gift", match="rose", message="special!"),
+                ChatbotReply(on="gift", match="", message="generic!"),
+            ],
+        )
+        b._handle_event({"data": {"type": "gift", "user": "amy", "gift_name": "Rose"}})
+        assert queue.qsize() == 1
+        assert queue.get_nowait() == "special!"
 
 
 # ---------------------------------------------------------------------------
@@ -367,10 +440,16 @@ class TestLoadConfig:
         from core.yaml_utils import save_yaml
 
         path = tmp_path / "chatbot.yaml"
-        save_yaml(path, {"enabled": True, "templates": {"gift_thanks": "yo {user}"}})
+        save_yaml(
+            path,
+            {
+                "enabled": True,
+                "replies": [{"on": "gift", "match": "", "message": "yo {user}"}],
+            },
+        )
         bot = TikTokChatbot(config_path=path)
         assert bot.config.enabled is True
-        assert bot.config.gift_thanks == "yo {user}"
+        assert bot.config.replies[0].message == "yo {user}"
 
     def test_invalid_yaml_falls_back_to_defaults(self, tmp_path):
         path = tmp_path / "chatbot.yaml"

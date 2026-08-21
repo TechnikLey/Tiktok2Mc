@@ -9,13 +9,10 @@ const SAMPLE_CONFIG = {
     max_len: 120,
     dedupe_identical: false,
   },
-  triggers: { gift: true, follow: false, join: true },
-  templates: {
-    gift_thanks: 'Thanks {user} for {gift}!',
-    follow_thanks: 'Thanks for the follow, {user}!',
-    join_welcome: 'Welcome!',
-  },
-  keyword_replies: { discord: 'Join our Discord, {user}!' },
+  replies: [
+    { on: 'gift', match: '', message: 'Thanks {user} for {gift}!' },
+    { on: 'keyword', match: 'discord', message: 'Join our Discord, {user}!' },
+  ],
   session: { tt_target_idc: '' },
 };
 
@@ -53,6 +50,12 @@ describe('ChatbotEditor', () => {
       '/chatbot/status': () => ({ status: null }),
       '/chatbot/session': mockSessionRoute(),
     });
+    localStorage.clear();
+    // Most tests exercise the editor itself; opt in to skip the beta modal.
+    localStorage.setItem('tiktok2mc_chatbot_beta_ack', '1');
+    // Reset visibility: the editor DOM leaks between tests within this file.
+    document.getElementById('chatbot-editor')?.classList.add('hidden');
+    document.getElementById('chatbot-beta-modal')?.classList.add('hidden');
     I18N.setLang('en');
   });
 
@@ -62,33 +65,32 @@ describe('ChatbotEditor', () => {
       await chatbotEditor.open();
       expect(chatbotEditor.el.classList.contains('hidden')).toBe(false);
       expect(document.getElementById('cb-enabled').checked).toBe(true);
-      expect(document.getElementById('cb-on-gift').checked).toBe(true);
-      expect(document.getElementById('cb-on-follow').checked).toBe(false);
-      expect(document.getElementById('cb-on-join').checked).toBe(true);
-      expect(document.getElementById('cb-gift-thanks').value).toBe('Thanks {user} for {gift}!');
       expect(document.getElementById('cb-min-interval').value).toBe('4');
       expect(document.getElementById('cb-max-per-minute').value).toBe('8');
       expect(document.getElementById('cb-dedupe').checked).toBe(false);
+      const rows = document.querySelectorAll('.chatbot-reply-row');
+      expect(rows.length).toBe(2);
+      expect(rows[0].querySelector('.cb-reply-msg').value).toBe('Thanks {user} for {gift}!');
     });
 
-    it('treats missing trigger keys as defaults (gift/follow on, join off)', async () => {
+    it('shows default spam values when the config has none', async () => {
       mockFetch({
         '/chatbot/config': () => ({ chatbot: {} }),
         '/chatbot/status': () => ({ status: null }),
         '/chatbot/session': mockSessionRoute(),
       });
       await chatbotEditor.open();
-      expect(document.getElementById('cb-on-gift').checked).toBe(true);
-      expect(document.getElementById('cb-on-follow').checked).toBe(true);
-      expect(document.getElementById('cb-on-join').checked).toBe(false);
+      expect(document.getElementById('cb-min-interval').value).toBe('7');
+      expect(document.getElementById('cb-max-per-minute').value).toBe('8');
     });
 
-    it('renders keyword rows from config', async () => {
+    it('renders reply rules from config with event selects', async () => {
       await chatbotEditor.open();
-      const rows = document.querySelectorAll('.chatbot-keyword-row');
-      expect(rows.length).toBe(1);
-      expect(rows[0].querySelector('.cb-kw').value).toBe('discord');
-      expect(rows[0].querySelector('.cb-reply').value).toBe('Join our Discord, {user}!');
+      const rows = document.querySelectorAll('.chatbot-reply-row');
+      expect(rows.length).toBe(2);
+      expect(rows[0].querySelector('.cb-reply-on').value).toBe('gift');
+      expect(rows[1].querySelector('.cb-reply-on').value).toBe('keyword');
+      expect(rows[1].querySelector('.cb-reply-match').value).toBe('discord');
     });
 
     it('is not dirty after a clean load', async () => {
@@ -99,9 +101,9 @@ describe('ChatbotEditor', () => {
 
     it('typing into config inputs marks dirty but session inputs do not', async () => {
       await chatbotEditor.open();
-      const template = document.getElementById('cb-gift-thanks');
-      template.value = 'changed';
-      template.dispatchEvent(new Event('input', { bubbles: true }));
+      const msg = document.querySelector('.chatbot-reply-row .cb-reply-msg');
+      msg.value = 'changed';
+      msg.dispatchEvent(new Event('input', { bubbles: true }));
       expect(chatbotEditor.isDirty()).toBe(true);
 
       chatbotEditor._dirty = false;
@@ -123,44 +125,68 @@ describe('ChatbotEditor', () => {
       expect(cfg.enabled).toBe(false);
       expect(cfg.spam_protection.min_interval_s).toBe(2.5);
       expect(cfg.spam_protection.max_len).toBe(99);
-      expect(cfg.triggers).toEqual({ gift: true, follow: false, join: true });
-      expect(cfg.templates.gift_thanks).toBe('Thanks {user} for {gift}!');
-      expect(cfg.keyword_replies).toEqual({ discord: 'Join our Discord, {user}!' });
+      expect(cfg.replies).toEqual(SAMPLE_CONFIG.replies);
     });
 
-    it('drops keyword rows with empty keyword or reply', async () => {
+    it('drops rule rows without a message but keeps match-only rows out too', async () => {
       await chatbotEditor.open();
-      chatbotEditor._keywordRows().push({ keyword: '', reply: 'x' });
-      chatbotEditor._keywordRows().push({ keyword: 'hi', reply: '' });
+      chatbotEditor._rules.push({ on: 'join', match: '', message: '' });
+      chatbotEditor._rules.push({ on: 'follow', match: '', message: 'welcome' });
       const cfg = chatbotEditor._collect();
-      expect(cfg.keyword_replies).toEqual({ discord: 'Join our Discord, {user}!' });
+      expect(cfg.replies).toEqual([
+        { on: 'gift', match: '', message: 'Thanks {user} for {gift}!' },
+        { on: 'keyword', match: 'discord', message: 'Join our Discord, {user}!' },
+        { on: 'follow', match: '', message: 'welcome' },
+      ]);
     });
 
-    it('lowercases and trims keywords', () => {
-      chatbotEditor._keywords = [{ keyword: '  DISCORD ', reply: 'yo' }];
+    it('trims match and message values', () => {
+      chatbotEditor._rules = [{ on: 'keyword', match: '  discord  ', message: '  yo  ' }];
       const cfg = chatbotEditor._collect();
-      expect(cfg.keyword_replies.discord).toBe('yo');
+      expect(cfg.replies[0].match).toBe('discord');
+      expect(cfg.replies[0].message).toBe('yo');
     });
   });
 
-  /* ─── keywords ─── */
-  describe('keyword rows', () => {
-    it('removeKeyword drops the row and marks dirty', async () => {
+  /* ─── reply rules ─── */
+  describe('reply rules', () => {
+    it('removeRule drops the row and marks dirty', async () => {
       await chatbotEditor.open();
-      chatbotEditor.removeKeyword(0);
-      expect(chatbotEditor._keywordRows().length).toBe(0);
+      chatbotEditor.removeRule(0);
+      expect(chatbotEditor._rules.length).toBe(1);
       expect(chatbotEditor.isDirty()).toBe(true);
-      expect(document.querySelectorAll('.chatbot-keyword-row').length).toBe(0);
+      expect(document.querySelectorAll('.chatbot-reply-row').length).toBe(1);
     });
 
-    it('shows placeholder text when no keywords exist', async () => {
+    it('addRule appends an empty gift row and marks dirty', async () => {
+      await chatbotEditor.open();
+      chatbotEditor.addRule();
+      expect(chatbotEditor._rules.length).toBe(3);
+      expect(chatbotEditor._rules[2]).toEqual({ on: 'gift', match: '', message: '' });
+      expect(chatbotEditor.isDirty()).toBe(true);
+    });
+
+    it('shows placeholder text when no rules exist', async () => {
       mockFetch({
         '/chatbot/config': () => ({ chatbot: {} }),
         '/chatbot/status': () => ({ status: null }),
         '/chatbot/session': mockSessionRoute(),
       });
       await chatbotEditor.open();
-      expect(document.getElementById('cb-keywords-list').textContent).toContain('No keyword replies');
+      expect(document.getElementById('cb-replies-list').textContent).toContain('No replies configured');
+    });
+
+    it('hides the match input for follow/join rules via data-on attribute', async () => {
+      await chatbotEditor.open();
+      const row = document.querySelectorAll('.chatbot-reply-row')[1];
+      const select = row.querySelector('.cb-reply-on');
+      select.value = 'join';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(row.dataset.on).toBe('join');
+      expect(chatbotEditor._rules[1].on).toBe('join');
+      select.value = 'keyword';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(row.dataset.on).toBe('keyword');
     });
   });
 
@@ -355,6 +381,37 @@ describe('ChatbotEditor', () => {
       chatbotEditor.toggleSessionHelp();
       expect(steps.classList.contains('hidden')).toBe(false);
     });
+
+    it('disables sign-out when not signed in', async () => {
+      await chatbotEditor.open();
+      const removeBtn = document.getElementById('cb-session-remove');
+      expect(removeBtn.disabled).toBe(true);
+      expect(removeBtn.title).toContain('Not signed in');
+    });
+
+    it('enables sign-out when a login is stored', async () => {
+      mockFetch({
+        '/chatbot/config': () => ({ chatbot: SAMPLE_CONFIG }),
+        '/chatbot/status': () => ({ status: null }),
+        '/chatbot/session': mockSessionRoute({ configured: true, masked_session_id: 'abcd…wxyz' }),
+      });
+      await chatbotEditor.open();
+      expect(document.getElementById('cb-session-remove').disabled).toBe(false);
+    });
+  });
+
+  /* ─── master toggle ─── */
+  describe('master toggle', () => {
+    it('shows "Enable Bot" when off and "Disable Bot" when on', async () => {
+      await chatbotEditor.open();
+      const title = document.getElementById('cb-master-title');
+      const enabled = document.getElementById('cb-enabled');
+      expect(enabled.checked).toBe(true);
+      expect(title.textContent).toBe('Disable Bot');
+      enabled.checked = false;
+      enabled.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(title.textContent).toBe('Enable Bot');
+    });
   });
 
   /* ─── webview login ─── */
@@ -482,15 +539,15 @@ describe('ChatbotEditor', () => {
 
   /* ─── placeholder chips ─── */
   describe('insertPlaceholder', () => {
-    it('inserts {gift} at the cursor position of the focused field', async () => {
+    it('inserts {gift} at the cursor position of the focused rule message', async () => {
       await chatbotEditor.open();
-      const giftInput = document.getElementById('cb-gift-thanks');
-      giftInput.focus();
-      giftInput.setSelectionRange(giftInput.value.length, giftInput.value.length);
-      const before = giftInput.value;
+      const msg = document.querySelectorAll('.chatbot-reply-row .cb-reply-msg')[0];
+      msg.focus();
+      msg.setSelectionRange(msg.value.length, msg.value.length);
+      const before = msg.value;
       chatbotEditor.insertPlaceholder('{gift}');
-      expect(giftInput.value.startsWith(before)).toBe(true);
-      expect(giftInput.value.endsWith('{gift}')).toBe(true);
+      expect(msg.value.startsWith(before)).toBe(true);
+      expect(msg.value.endsWith('{gift}')).toBe(true);
       expect(chatbotEditor.isDirty()).toBe(true);
     });
   });
@@ -522,7 +579,8 @@ describe('ChatbotEditor', () => {
       await chatbotEditor.open();
       chatbotEditor._renderStatus({ enabled: false, has_session: false });
       expect(document.getElementById('chatbot-status-pill').className).toContain('offline');
-      expect(document.getElementById('cb-hero-title').textContent).toContain('idle');
+      expect(document.getElementById('cb-hero-title').textContent).toContain('disabled');
+      expect(document.getElementById('cb-hero-sub').textContent).toContain('Enable the bot');
     });
 
     it('shows auto-disabled with error text and error dot', async () => {
@@ -549,6 +607,71 @@ describe('ChatbotEditor', () => {
       await chatbotEditor.open();
       chatbotEditor.close();
       expect(chatbotEditor.el.classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  /* ─── beta consent gate ─── */
+  describe('beta consent gate', () => {
+    it('shows the beta modal instead of the editor on first open', async () => {
+      localStorage.removeItem('tiktok2mc_chatbot_beta_ack');
+      await chatbotEditor.open();
+      const modal = document.getElementById('chatbot-beta-modal');
+      expect(modal.classList.contains('hidden')).toBe(false);
+      expect(chatbotEditor.el.classList.contains('hidden')).toBe(true);
+    });
+
+    it('acceptBeta stores the ack and opens the editor', async () => {
+      localStorage.removeItem('tiktok2mc_chatbot_beta_ack');
+      await chatbotEditor.open();
+      chatbotEditor.acceptBeta();
+      expect(localStorage.getItem('tiktok2mc_chatbot_beta_ack')).toBe('1');
+      expect(document.getElementById('chatbot-beta-modal').classList.contains('hidden')).toBe(true);
+      expect(chatbotEditor.el.classList.contains('hidden')).toBe(false);
+    });
+
+    it('declineBeta closes the modal without storing an ack', async () => {
+      localStorage.removeItem('tiktok2mc_chatbot_beta_ack');
+      await chatbotEditor.open();
+      chatbotEditor.declineBeta();
+      expect(localStorage.getItem('tiktok2mc_chatbot_beta_ack')).toBeNull();
+      expect(document.getElementById('chatbot-beta-modal').classList.contains('hidden')).toBe(true);
+      expect(chatbotEditor.el.classList.contains('hidden')).toBe(true);
+    });
+
+    it('does not show the modal again once acked', async () => {
+      await chatbotEditor.open();
+      expect(document.getElementById('chatbot-beta-modal').classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  /* ─── enable/disable feedback ─── */
+  describe('toggle save feedback', () => {
+    it('shows the immediate-apply toast when the enabled state changes', async () => {
+      mockFetch({
+        '/chatbot/config': () => ({ chatbot: SAMPLE_CONFIG }),
+        'PUT /chatbot/config': () => ({ reloaded: true }),
+        '/chatbot/status': () => ({ status: { enabled: true } }),
+        '/chatbot/session': mockSessionRoute(),
+      });
+      await chatbotEditor.open();
+      document.getElementById('cb-enabled').checked = false;
+      await chatbotEditor.save();
+      const toasts = [...document.querySelectorAll('#toast-container .toast')].map(t => t.textContent);
+      expect(toasts.some(t => t.includes('applies immediately'))).toBe(true);
+    });
+
+    it('warns about a missing bridge when toggling without status', async () => {
+      mockFetch({
+        '/chatbot/config': () => ({ chatbot: SAMPLE_CONFIG }),
+        'PUT /chatbot/config': () => ({ reloaded: true }),
+        '/chatbot/status': () => ({ status: null }),
+        '/chatbot/session': mockSessionRoute(),
+      });
+      await chatbotEditor.open();
+      document.getElementById('cb-enabled').checked = false;
+      await chatbotEditor.save();
+      const toasts = [...document.querySelectorAll('#toast-container .toast')].map(t => t.textContent);
+      expect(toasts.some(t => t.includes('bridge is not running'))).toBe(true);
     });
   });
 });

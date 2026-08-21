@@ -45,6 +45,28 @@ Each hook has its own `config.yaml` in its directory:
 
 The available fields are determined by the `config_schema` in the `hook.json`.
 
+## Chatbot Configuration (`config/chatbot.yaml`)
+
+The TikTok chatbot has its own config file, edited via the Chatbot tab:
+
+```yaml
+enabled: false
+spam_protection:
+  min_interval_s: 7.0    # seconds between two messages
+  max_per_minute: 8      # rate limit
+  max_queue: 20          # pending messages before dropping
+  dedupe_identical: true # skip duplicate consecutive messages
+  max_len: 150           # max message length (chars)
+replies:                 # first matching rule wins
+  - on: gift             # gift | follow | join | keyword
+    match: ""            # empty = any gift; otherwise gift name / keyword
+    message: "Thanks {user} for {gift}!"
+session:
+  tt_target_idc: ""      # optional data-center hint
+```
+
+The encrypted TikTok session itself is **not** stored here — see `data/chatbot_session.json` below. Details in [TikTok Chatbot](./ch06-00-tiktok-chatbot.md).
+
 ## Event Commands (`event_commands.yaml`)
 
 This file defines how events from the EventBus are forwarded to plugins:
@@ -74,6 +96,8 @@ The system creates and uses the following files at runtime:
 | `data/hook_registry.json` | Persisted hook registry |
 | `data/actions.mca` | User-edited actions.mca |
 | `data/event_commands.yaml` | User-edited event commands |
+| `data/chatbot_session.json` | Encrypted TikTok chatbot session (never plaintext) |
+| `core/runtime/reload_chatbot` | Signal file: bridge reloads chatbot config/session |
 | `core/runtime/plugin_start_<name>` | Signal file to start a plugin |
 | `core/runtime/plugin_stop_<name>` | Signal file to stop a plugin |
 

@@ -351,7 +351,12 @@ class LauncherAPI:
         with _login_lock:
             if _login_state["state"] == "waiting":
                 return "already_running"
-            _set_login_state("waiting")
+            # NOTE: _set_login_state() must NOT be called here — it would
+            # re-acquire this non-reentrant lock and deadlock the bridge
+            # call (the button would silently do nothing).
+            _login_state["state"] = "waiting"
+            _login_state["masked_session_id"] = None
+            _login_state["error"] = ""
         t = get_crash_manager().supervised_thread(
             target=_tiktok_login_worker, name="tiktok-login", daemon=True
         )

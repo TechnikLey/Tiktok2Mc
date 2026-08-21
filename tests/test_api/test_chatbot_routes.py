@@ -2,7 +2,7 @@
 
 import json
 
-from core.tiktok_chatbot import ChatbotConfig
+from core.tiktok_chatbot import ChatbotConfig, ChatbotReply
 
 VALID_SID = "abcd1234efgh5678ijkl"
 
@@ -91,7 +91,8 @@ class TestChatbotConfigEndpoints:
 
     def test_get_config_roundtrip(self, client, project_dir):
         original = ChatbotConfig(
-            enabled=True, keyword_replies={"discord": "hi"}
+            enabled=True,
+            replies=[ChatbotReply(on="keyword", match="discord", message="hi")],
         ).to_dict()
         client.put("/api/v1/chatbot/config", json={"chatbot": original})
         resp = client.get("/api/v1/chatbot/config")
