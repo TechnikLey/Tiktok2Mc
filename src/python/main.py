@@ -69,6 +69,7 @@ from core.logger import (
 from core.overlay_utils import send_overlay_text
 from core.paths import get_base_dir, get_runtime_dir
 from core.plugin_config import discover_plugins_dir, load_plugin_manifest
+from core.tiktok_chatbot import get_chatbot
 from core.validator import Severity, print_diagnostics, validate_file
 from core.yaml_utils import load_yaml
 
@@ -88,6 +89,7 @@ RUNTIME_DIR = get_runtime_dir()
 RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
 RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
 RELOAD_COMMENT_COMMANDS_SIGNAL = (RUNTIME_DIR / "reload_comment_commands").resolve()
+RELOAD_CHATBOT_SIGNAL = (RUNTIME_DIR / "reload_chatbot").resolve()
 
 _last_config_version: int = 0
 
@@ -1243,6 +1245,21 @@ def _post_tiktok_status(body: bytes) -> None:
         )
 
 
+def _post_chatbot_status(status: dict) -> None:
+    """Forward chatbot status to the API EventBus (GUI SSE), best-effort."""
+    body = json.dumps({"type": "chatbot.status", "data": status}).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except (OSError, ValueError) as exc:
+        log.debug("[CHATBOT] Status POST failed: %s", exc)
+
+
 def _stop_tiktok_client():
     """Disconnect an active TikTok client on its own event loop (best effort).
 
@@ -2200,8 +2217,8 @@ def create_client(user):
 
         username = get_safe_username(event.user)
         ctx.session_comments += 1
-        _publish_tiktok_event("comment", username)
         comment_text = getattr(event, "comment", "")
+        _publish_tiktok_event("comment", username, comment=comment_text)
 
         is_super_fan = bool(getattr(event, "user_is_super_fan", None))
 
@@ -2521,6 +2538,13 @@ async def _reload_signal_watcher():
                     pass
                 _apply_comment_commands_from_yaml()
                 log.info("[RELOAD] comment_commands reloaded from YAML")
+            if RELOAD_CHATBOT_SIGNAL.exists():
+                try:
+                    RELOAD_CHATBOT_SIGNAL.unlink()
+                except OSError:
+                    pass
+                get_chatbot().reload_config()
+                log.info("[RELOAD] chatbot config reloaded")
         except Exception as e:  # watcher must never die
             log.error("[RELOAD] Signal watcher error: %s", e)
 
@@ -2592,6 +2616,7 @@ async def run_bot():
         RELOAD_CONFIG_SIGNAL,
         RELOAD_ACTIONS_SIGNAL,
         RELOAD_COMMENT_COMMANDS_SIGNAL,
+        RELOAD_CHATBOT_SIGNAL,
     ):
         try:
             sig.unlink(missing_ok=True)
@@ -2601,6 +2626,9 @@ async def run_bot():
     threading.Thread(target=run_signal_server, daemon=True).start()
 
     crash_mgr = get_crash_manager()
+    _chatbot = get_chatbot(
+        status_sink=lambda s: _run_in_background(_post_chatbot_status, s)
+    )
     for name, coro in [
         ("trigger_worker", trigger_worker()),
         ("rcon_worker", rcon_worker()),
@@ -2608,6 +2636,7 @@ async def run_bot():
         ("gift_revenue_counter", gift_revenue_counter()),
         ("_reload_signal_watcher", _reload_signal_watcher()),
         ("_tiktok_status_heartbeat", _tiktok_status_heartbeat()),
+        ("chatbot_worker", _chatbot.run()),
     ]:
         task = asyncio.create_task(coro, name=name)
         crash_mgr.observe_task(task, component="tiktok_bridge")
@@ -2639,6 +2668,7 @@ async def run_bot():
         # thread can disconnect it later via run_coroutine_threadsafe.
         client_loop = asyncio.new_event_loop()
         ctx.tiktok_client_loop = client_loop
+        _chatbot.bind_client(client, client_loop)
 
         try:
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
@@ -2669,6 +2699,7 @@ async def run_bot():
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
+            _chatbot.unbind_client()
             ctx.tiktok_client_loop = None
             ctx.tiktok_live = False
             _publish_tiktok_status(False)

@@ -7513,7 +7513,7 @@ if (typeof pywebview === 'undefined' || !pywebview.api) {
 }
 
 function isAnyEditorDirty() {
-  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || reactionEditor.isDirty() || commentCommandsEditor.isDirty();
+  return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || reactionEditor.isDirty() || commentCommandsEditor.isDirty() || chatbotEditor.isDirty();
 }
 
 /* Detect close requests from pywebview's on_closing (deadlock-free polling) */
@@ -7560,6 +7560,12 @@ async function _saveAllEditors() {
     await commentCommandsEditor.save();
     if (commentCommandsEditor.isDirty()) {
       throw new Error('Comment commands editor could not be saved — check for errors.');
+    }
+  }
+  if (chatbotEditor.isDirty()) {
+    await chatbotEditor.save();
+    if (chatbotEditor.isDirty()) {
+      throw new Error('Chatbot editor could not be saved — check for errors.');
     }
   }
   if (editor.isDirty()) {
@@ -7898,6 +7904,8 @@ function connectLogStream() {
         renderLivePluginGrid(payload.plugins || {});
       } else if (type === 'dashboard.ecm_diagnostics') {
         updateEcmDiagnostics(payload);
+      } else if (type === 'chatbot.status') {
+        chatbotEditor._renderStatus(payload);
       } else if (type === 'update.available') {
         // Auto-install disabled: show notification if not already shown
         if (!_autoInstallEnabled && !_updateNotificationShown) {
@@ -8371,7 +8379,7 @@ function _syncDashboardVisibility() {
   document.getElementById('dashboard').classList.toggle('dashboard-hidden', !!anyOpen);
   // Deactivate editor nav items when no editor is open
   if (!anyOpen) {
-    document.querySelectorAll('.nav-item[data-view="actions"], .nav-item[data-view="reactions"], .nav-item[data-view="settings"]').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item[data-view="actions"], .nav-item[data-view="reactions"], .nav-item[data-view="settings"], .nav-item[data-view="commands"], .nav-item[data-view="chatbot"]').forEach(el => el.classList.remove('active'));
   }
 }
 

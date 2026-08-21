@@ -265,6 +265,7 @@ class TestErrorCodeConstants:
             Subsystem.LIFECYCLE,
             Subsystem.MC,
             Subsystem.TIKTOK,
+            Subsystem.CHATBOT,
             Subsystem.HOOK,
             Subsystem.WATCHER,
             Subsystem.WORKER,

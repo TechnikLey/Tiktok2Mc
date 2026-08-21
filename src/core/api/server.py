@@ -19,6 +19,7 @@ from core.overlay import set_event_loop
 from core.paths import get_root_dir
 
 from .api_key import set_api_key
+from .chatbot_status import get_chatbot_status_tracker
 from .dashboard_publisher import get_dashboard_publisher
 from .eventbus import event_bus
 from .models import API_VERSION
@@ -266,6 +267,7 @@ async def lifespan(app: FastAPI):
     get_event_command_mapper().start()
     get_dashboard_publisher().start()
     get_tiktok_live_tracker().start()
+    get_chatbot_status_tracker().start()
     # Pre-configure RCON from config for the console feature
     try:
         cfg = ApiService().read_config()
@@ -290,6 +292,7 @@ async def lifespan(app: FastAPI):
         await get_rcon_service().disconnect()
         await get_dashboard_publisher().stop()
         await get_tiktok_live_tracker().stop()
+        await get_chatbot_status_tracker().stop()
         await get_event_command_mapper().stop()
         await get_plugin_health_monitor().stop()
         await event_bus.publish("server.stopping", {})

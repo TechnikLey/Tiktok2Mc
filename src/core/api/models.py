@@ -434,6 +434,23 @@ class CommentCommandsUpdateRequest(BaseModel):
     comment_commands: dict[str, Any]
 
 
+# ── Chatbot models ─────────────────────────────────────────────────
+
+
+class ChatbotConfigResponse(BaseModel):
+    path: str
+    chatbot: dict[str, Any]
+    reloaded: bool = True  # False when the bridge reload signal could not be written
+
+
+class ChatbotConfigUpdateRequest(BaseModel):
+    chatbot: dict[str, Any]
+
+
+class ChatbotStatusResponse(BaseModel):
+    status: dict[str, Any] | None
+
+
 class ReactionCatalogResponse(BaseModel):
     """Merged reaction catalog served to the GUI reactions wizard."""
 

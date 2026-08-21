@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from .actions import router as actions_router
 from .backups import router as backups_router
+from .chatbot import router as chatbot_router
 from .comment_commands import router as comment_commands_router
 from .config import router as config_router
 from .config_bundle import router as config_bundle_router
@@ -49,6 +50,7 @@ api_router.include_router(plugin_overlay_router)
 api_router.include_router(hooks_router)
 api_router.include_router(event_commands_router)
 api_router.include_router(comment_commands_router)
+api_router.include_router(chatbot_router)
 api_router.include_router(rcon_router)
 api_router.include_router(reactions_router)
 api_router.include_router(revenue_router)

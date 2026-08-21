@@ -50,6 +50,11 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.commands">Commands</span>
                 </button>
+
+                <button type="button" class="nav-item" data-view="chatbot" onclick="switchToEditor('chatbot', () => chatbotEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2a2 2 0 0 1 2 2c0 .36-.1.7-.27 1H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4.27A2 2 0 0 1 10 4a2 2 0 0 1 2-2zM8.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 15h8v1.5H8V15z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.chatbot">Chatbot</span>
+                </button>
                 <button type="button" class="nav-item" data-view="settings" onclick="switchToEditor('settings', openConfigEditor)">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.settings">Settings</span>
@@ -839,6 +844,102 @@
       </div>
     </div>
 
+    <!-- Chatbot Editor -->
+    <div id="chatbot-editor" class="editor-overlay hidden">
+      <div class="editor-layout">
+        <div class="editor-main">
+          <div class="editor-topbar" id="chatbot-topbar">
+            <h2 data-i18n="chatbot.title">Chatbot</h2>
+            <span id="chatbot-status-pill" class="chatbot-pill offline" data-i18n="chatbot.stateOff">Off</span>
+            <div class="header-actions">
+              <button class="btn btn--primary btn-save-disabled" id="chatbot-save" onclick="chatbotEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+              <button class="btn-help" onclick="Help.openHelp('chatbot')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+            </div>
+          </div>
+          <div class="editor-content chatbot-content" id="chatbot-content">
+
+            <section class="chatbot-section">
+              <h3 data-i18n="chatbot.generalTitle">General</h3>
+              <div class="form-group checkbox-group">
+                <label>
+                  <input type="checkbox" id="cb-enabled">
+                  <span data-i18n="chatbot.enabled">Enable chatbot (auto-reply in TikTok chat)</span>
+                </label>
+              </div>
+              <div class="chatbot-stats" id="chatbot-stats"></div>
+            </section>
+
+            <section class="chatbot-section">
+              <h3 data-i18n="chatbot.triggersTitle">When should the bot reply?</h3>
+              <div class="form-group checkbox-group">
+                <label>
+                  <input type="checkbox" id="cb-on-gift">
+                  <span data-i18n="chatbot.onGift">On gifts</span>
+                </label>
+                <label>
+                  <input type="checkbox" id="cb-on-follow">
+                  <span data-i18n="chatbot.onFollow">On follows</span>
+                </label>
+                <label>
+                  <input type="checkbox" id="cb-on-join">
+                  <span data-i18n="chatbot.onJoin">On stream join</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label for="cb-gift-thanks" data-i18n="chatbot.giftThanks">Gift thank-you message</label>
+                <input type="text" id="cb-gift-thanks" placeholder="Danke {user} für {gift}! 💖">
+                <div class="hint" data-i18n="chatbot.placeholdersHint">Placeholders: {user}, {gift}</div>
+              </div>
+              <div class="form-group">
+                <label for="cb-follow-thanks" data-i18n="chatbot.followThanks">Follow thank-you message</label>
+                <input type="text" id="cb-follow-thanks" placeholder="Danke fürs Folgen, {user}!">
+              </div>
+              <div class="form-group">
+                <label for="cb-join-welcome" data-i18n="chatbot.joinWelcome">Stream welcome message</label>
+                <input type="text" id="cb-join-welcome" placeholder="">
+              </div>
+            </section>
+
+            <section class="chatbot-section">
+              <h3 data-i18n="chatbot.keywordsTitle">Keyword replies</h3>
+              <p class="hint" data-i18n="chatbot.keywordsHint">The bot replies when a comment starts with one of these keywords (case-insensitive).</p>
+              <div id="cb-keywords-list"></div>
+              <button type="button" class="btn btn--secondary" id="cb-keyword-add" data-i18n="chatbot.addKeyword">+ Add keyword</button>
+            </section>
+
+            <section class="chatbot-section">
+              <h3 data-i18n="chatbot.spamTitle">Spam protection</h3>
+              <div class="chatbot-grid">
+                <div class="form-group">
+                  <label for="cb-min-interval" data-i18n="chatbot.minInterval">Minimum interval (seconds)</label>
+                  <input type="number" id="cb-min-interval" min="0" step="0.5">
+                </div>
+                <div class="form-group">
+                  <label for="cb-max-per-minute" data-i18n="chatbot.maxPerMinute">Max messages per minute</label>
+                  <input type="number" id="cb-max-per-minute" min="1" step="1">
+                </div>
+                <div class="form-group">
+                  <label for="cb-max-queue" data-i18n="chatbot.maxQueue">Queue size</label>
+                  <input type="number" id="cb-max-queue" min="1" step="1">
+                </div>
+                <div class="form-group">
+                  <label for="cb-max-len" data-i18n="chatbot.maxLen">Max message length</label>
+                  <input type="number" id="cb-max-len" min="1" step="1">
+                </div>
+              </div>
+              <div class="form-group checkbox-group">
+                <label>
+                  <input type="checkbox" id="cb-dedupe">
+                  <span data-i18n="chatbot.dedupe">Skip identical consecutive messages</span>
+                </label>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Plugin Config Editor -->
     <div id="plugin-config-editor" class="editor-overlay hidden">
         <div class="editor-layout">
@@ -1089,6 +1190,7 @@
     <script src="./shortcuts.js?v=1"></script>
     <script src="./accessibility.js?v=1"></script>
     <script src="./actions-editor.js?v=3"></script>
+    <script src="./chatbot-editor.js?v=1"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="./app.js?v=8"></script>
 </div>

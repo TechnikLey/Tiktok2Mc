@@ -161,7 +161,11 @@ Webview-Flow mal nicht funktioniert).
 
 ## 7. Implementierungsplan
 
-### Phase 1 — Brücke: Chat-Send-Kanal (~100 Zeilen)
+> **Status (2026-08-21):** Phase 1–3 umgesetzt (Kernmodul, Bridge-Wiring,
+> API-Routen, GUI-Tab, Tests). Phase 4 (Session-Login) und Teile von
+> Phase 5 (Doku in dev-book) folgen.
+
+### Phase 1 — Brücke: Chat-Send-Kanal (~100 Zeilen) ✅
 
 1. **Neu** `src/core/tiktok_chatbot.py`: Das Kernmodul (siehe Phase 2) mit
    einer öffentlichen Send-Schnittstelle:
@@ -177,7 +181,7 @@ Webview-Flow mal nicht funktioniert).
    starten. **Einziger main.py-Eingriff (~10 Zeilen)** — Datei ist laut
    AGENTS.md besonders sensibel.
 
-### Phase 2 — Das Kernmodul mit eigener Config (`src/core/tiktok_chatbot.py`)
+### Phase 2 — Das Kernmodul mit eigener Config (`src/core/tiktok_chatbot.py`) ✅
 
 3. **Eigene Konfigurationsdatei** `config/chatbot.yaml` (Pfad über
    `core.paths` registrieren) — bewusst **nicht** die globale `config.yaml`:
@@ -203,16 +207,17 @@ Webview-Flow mal nicht funktioniert).
 6. Live-Reload: GUI speichert → API schreibt `chatbot.yaml` → Bridge re-read
    via bestehendes Runtime-Signal-Muster (`core/runtime/`), kein Neustart.
 
-### Phase 3 — API & eigener GUI-Tab
+### Phase 3 — API & eigener GUI-Tab ✅
 
 7. Backend nach dem Thin-Routes-Muster:
-   - Pydantic-Modelle (`ChatbotConfig`, `ChatbotStatus`) in
-     `src/core/api/models.py`
-   - Logik in `src/core/api/services/chatbot.py` (Lesen/Schreiben von
-     `chatbot.yaml`, Status aus dem Bot-Modul)
+   - Pydantic-Modelle (`ChatbotConfigResponse`, `ChatbotConfigUpdateRequest`,
+     `ChatbotStatusResponse`) in `src/core/api/models.py`
+   - Status-Cache als Tracker-Singleton in `src/core/api/chatbot_status.py`
+     (gleiches Muster wie `tiktok_live.py`, Start/Stop im App-Lifespan)
    - Routes in `src/core/api/routes/chatbot.py`:
      `GET/PUT /api/v1/chatbot/config`, `GET /api/v1/chatbot/status`;
-     Registrierung in `routes/__init__.py`
+     Registrierung in `routes/__init__.py`; PUT schreibt das
+     `reload_chatbot`-Runtime-Signal für die Bridge
 8. **GUI-Tab „Chatbot"** (`templates/gui/`: Tab in `index.html`, Logik in
    neuem `chatbot-editor.js`, wiederverwendete DOM-Helper aus `app.js`):
    - **An/Aus**-Schalter (Master-Toggle, schreibt `enabled`)
@@ -226,21 +231,27 @@ Webview-Flow mal nicht funktioniert).
 
 ### Phase 4 — Session-Management (beide Varianten)
 
+> Noch offen.
+
 9. **Variante A:** GUI-Feld im Chatbot-Tab → API-Route → `SecureStorage`
    (**niemals** Klartext in einer YAML)
 10. **Variante B:** Webview-Login-Fenster (siehe §5)
 11. Bridge liest beim Connect die Session → `client.web.set_session(sid, idc)`
-    vor `start()`; `tt_target_idc` als optionales Config-Feld
+    vor `start()`; `tt_target_idc` als optionales Config-Feld (Feld existiert
+    bereits in `chatbot.yaml` bzw. `ChatbotConfig`)
 12. Status-Rückmeldung: „Session abgelaufen" → Event an EventBus → Warnung
     im Chatbot-Tab (die `sessionid` rotiert gelegentlich!)
 
 ### Phase 5 — Tests & Doku
 
+> pytest (29 Kern- + 6 API-Tests) und vitest (16 GUI-Tests) sind umgesetzt;
+> ruff/pyright/eslint grün. Offen: dev-book EN+DE.
+
 13. Unit-Tests: Limiter, Template-Formatting, Send-Guard, Config-Roundtrip
     (conftest mockt TikTokLive — das Modul importiert den Client nur als
     Typ-Hint, gesendet wird über die gebundene, gemockte Instanz);
-    API-Tests in `tests/test_api/`; GUI-Tests (vitest) für den neuen Tab
-14. Dev-Books **EN + DE** synchron aktualisieren (Pflicht)
+    API-Tests in `tests/test_api/`; GUI-Tests (vitest) für den neuen Tab ✅
+14. Dev-Books **EN + DE** synchron aktualisieren (Pflicht) — offen
 
 ---
 
@@ -294,11 +305,13 @@ beiden Login-Wegen zur Auswahl.
 
 ## 12. Offene Punkte
 
+- [ ] Session-Login umsetzen (Phase 4): SecureStorage + `set_session` vor
+      `start()`, Warnung bei abgelaufener Session
+- [x] Keyword-Befehle: über event_bus abgedeckt (Nativ-Entscheidung,
+      `_handle_event` matched Kommentar-Prefix case-insensitive)
 - [ ] PyQt6/pywebview: Cookie-Extraktion aus dem Webview-Profil verifizieren
       (Variante B machbar?)
 - [ ] Soll TikTokLive auf 7.x wechseln, sobald der Chatbot kommt?
       (Cookie-Fix betrifft eingeloggte Sessions)
-- [ ] Keyword-Befehle: Comment-Listener des Moduls über event_bus abdecken
-      (erledigt durch Nativ-Entscheidung — prüfen, ob Dedupe/Spam-Schutz
-      für Keyword-Replies reicht)
+- [ ] Dev-Books EN+DE ergänzen (Phase 5-Rest)
 - [ ] Ban-Risiko final kommunizieren (Disclaimer im Setup-Dialog?)

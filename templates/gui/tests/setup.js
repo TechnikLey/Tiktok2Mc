@@ -106,6 +106,7 @@ const helpJs = readFileSync(join(__dirname, '..', 'help.js'), 'utf-8');
 const shortcutsJs = readFileSync(join(__dirname, '..', 'shortcuts.js'), 'utf-8');
 const accessibilityJs = readFileSync(join(__dirname, '..', 'accessibility.js'), 'utf-8');
 const actionsEditorJs = readFileSync(join(__dirname, '..', 'actions-editor.js'), 'utf-8');
+const chatbotEditorJs = readFileSync(join(__dirname, '..', 'chatbot-editor.js'), 'utf-8');
 const appJs = readFileSync(join(__dirname, '..', 'app.js'), 'utf-8');
 
 // Evaluate in global scope (i18n first: help.js/app.js/actions-editor.js use I18N;
@@ -115,4 +116,5 @@ const appJs = readFileSync(join(__dirname, '..', 'app.js'), 'utf-8');
 (0, eval)(toGlobalScope(shortcutsJs));
 (0, eval)(toGlobalScope(accessibilityJs));
 (0, eval)(toGlobalScope(actionsEditorJs));
+(0, eval)(toGlobalScope(chatbotEditorJs));
 (0, eval)(toGlobalScope(appJs));

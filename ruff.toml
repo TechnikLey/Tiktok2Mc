@@ -140,6 +140,7 @@ ignore = ["F841"]
 "src/core/event_command_mapper.py" = ["BLE001", "S110"]  # best-effort health reporting on dispatch failure
 "src/core/validation_framework.py" = ["BLE001"]  # purpose: capture any failure from the wrapped op
 "src/core/trigger_engine/engine.py" = ["BLE001"]  # never raise: convert to structured TriggerResult
+"src/core/tiktok_chatbot.py" = ["BLE001"]  # chatbot worker: send/sink failures must never kill the bridge
 
 # API control plane
 "src/core/api/routes/*.py" = ["BLE001", "S110"]  # route handlers convert exceptions to HTTP error responses

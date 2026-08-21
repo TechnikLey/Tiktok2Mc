@@ -18,6 +18,7 @@ Subsystem prefixes:
     LIFECYCLE  Process lifecycle / supervisor
     MC         Minecraft server / RCON
     TIKTOK     TikTok Live connection / events
+    CHATBOT    TikTok chatbot (outgoing chat messages)
     HOOK       Hook system
     WATCHER    File / directory watchers
     WORKER     Background worker threads / tasks
@@ -79,6 +80,7 @@ class Subsystem(str, enum.Enum):
     LIFECYCLE = "LIFECYCLE"
     MC = "MC"
     TIKTOK = "TIKTOK"
+    CHATBOT = "CHATBOT"
     HOOK = "HOOK"
     WATCHER = "WATCHER"
     WORKER = "WORKER"
@@ -979,6 +981,35 @@ TIKTOK_0005 = ErrorCode(
     description="A background worker (trigger, RCON, event bridge) crashed.",
     recovery_hint="Restart the bridge process.",
     impact="Event processing stopped.",
+)
+
+# ------------------------------------------------------------- CHATBOT ----
+CHATBOT_0001 = ErrorCode(
+    code="CHATBOT-0001",
+    subsystem=Subsystem.CHATBOT,
+    severity=Severity.ERROR,
+    message="Chatbot message send failed.",
+    description="Sending a chat message via the TikTok client failed.",
+    recovery_hint="Check the TikTok session (login may have expired) and connection state.",
+    impact="The message was not delivered.",
+)
+CHATBOT_0002 = ErrorCode(
+    code="CHATBOT-0002",
+    subsystem=Subsystem.CHATBOT,
+    severity=Severity.WARNING,
+    message="Chatbot config invalid, defaults used.",
+    description="config/chatbot.yaml could not be parsed or contained invalid values.",
+    recovery_hint="Fix or delete config/chatbot.yaml; defaults are applied meanwhile.",
+    impact="Chatbot runs with default settings.",
+)
+CHATBOT_0003 = ErrorCode(
+    code="CHATBOT-0003",
+    subsystem=Subsystem.CHATBOT,
+    severity=Severity.ERROR,
+    message="Chatbot disabled after repeated send failures.",
+    description="Multiple consecutive chat sends failed (likely an expired session).",
+    recovery_hint="Re-authenticate the chatbot account in the GUI and re-enable the bot.",
+    impact="The chatbot stopped sending messages until re-enabled.",
 )
 
 # ------------------------------------------------------------------ HOOK ----

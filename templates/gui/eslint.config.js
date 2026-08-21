@@ -24,6 +24,8 @@ const appGlobals = {
   hookEditor: "writable",
   reactionEditor: "writable",
   commentCommandsEditor: "writable",
+  chatbotEditor: "writable",
+  ChatbotEditor: "writable",
   actionsEditor: "writable",
   closeServerCreateModal: "writable",
   closeServerDownloadModal: "writable",
@@ -60,7 +62,7 @@ export default defineConfig([
   // from inline HTML handlers and other scripts), so unused-var and
   // redeclaration analysis cannot apply here. Cross-file globals are
   // declared explicitly above. Empty catch blocks swallow errors on purpose.
-  files: ["app.js", "actions-editor.js", "help.js", "shortcuts.js", "accessibility.js"],
+  files: ["app.js", "actions-editor.js", "chatbot-editor.js", "help.js", "shortcuts.js", "accessibility.js"],
     languageOptions: {
       sourceType: "script",
       globals: { ...globals.browser, ...appGlobals },
