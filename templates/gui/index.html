@@ -858,57 +858,168 @@
           </div>
           <div class="editor-content chatbot-content" id="chatbot-content">
 
-            <section class="chatbot-section">
-              <h3 data-i18n="chatbot.generalTitle">General</h3>
-              <div class="form-group checkbox-group">
-                <label>
-                  <input type="checkbox" id="cb-enabled">
-                  <span data-i18n="chatbot.enabled">Enable chatbot (auto-reply in TikTok chat)</span>
-                </label>
+            <!-- Live status hero -->
+            <section class="chatbot-card chatbot-hero">
+              <div class="chatbot-hero-head">
+                <span class="chatbot-pulse-dot" id="cb-hero-dot" aria-hidden="true"></span>
+                <div class="chatbot-hero-text">
+                  <h3 id="cb-hero-title" data-i18n="chatbot.heroIdle">Chatbot is idle</h3>
+                  <p class="chatbot-hero-sub hint" id="cb-hero-sub"></p>
+                </div>
               </div>
               <div class="chatbot-stats" id="chatbot-stats"></div>
+              <div class="chatbot-error hidden" id="chatbot-error"></div>
             </section>
 
-            <section class="chatbot-section">
-              <h3 data-i18n="chatbot.triggersTitle">When should the bot reply?</h3>
-              <div class="form-group checkbox-group">
-                <label>
+            <!-- Master toggle -->
+            <section class="chatbot-card">
+              <div class="chatbot-toggle-row">
+                <div class="chatbot-toggle-info">
+                  <h3 data-i18n="chatbot.masterTitle">Auto-replies</h3>
+                  <p class="hint" data-i18n="chatbot.enabled">Enable chatbot (auto-reply in TikTok chat)</p>
+                </div>
+                <label class="switch" data-i18n-title="chatbot.enabled">
+                  <input type="checkbox" id="cb-enabled">
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </section>
+
+            <!-- TikTok session / login -->
+            <section class="chatbot-card" id="cb-session-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3H9zm3 4a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-1.27A2 2 0 0 1 12 14z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.sessionTitle">TikTok login</h3>
+                  <p class="hint" data-i18n="chatbot.sessionDesc">The bot posts as this account. Paste the sessionid cookie of your bot account — it is stored encrypted and never leaves this device.</p>
+                </div>
+                <span class="chatbot-session-badge" id="cb-session-badge">
+                  <span class="chatbot-session-dot"></span>
+                  <span id="cb-session-badge-text" data-i18n="chatbot.sessionMissing">Not signed in</span>
+                </span>
+              </div>
+
+              <div class="chatbot-warning hidden" id="cb-session-warning"></div>
+
+              <div class="chatbot-session-grid">
+                <div class="form-group">
+                  <label for="cb-session-id" data-i18n="chatbot.sessionIdLabel">Session ID (sessionid cookie)</label>
+                  <div class="chatbot-secret-field">
+                    <input type="password" id="cb-session-id" autocomplete="off" spellcheck="false" data-i18n-placeholder="chatbot.sessionIdPlaceholder" placeholder="Paste sessionid here…">
+                    <button type="button" class="chatbot-eye-btn" id="cb-session-eye" aria-label="Show/Hide" onclick="chatbotEditor.toggleSessionVisibility()">
+                      <svg viewBox="0 0 24 24" class="cb-eye-show"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+                      <svg viewBox="0 0 24 24" class="cb-eye-hide"><path d="M2.1 3.5 3.5 2.1l18.4 18.4-1.4 1.4-3.2-3.2A11.6 11.6 0 0 1 12 19c-5 0-9-4.5-10-7 .5-1.3 1.7-3 3.4-4.4L2.1 3.5zM12 5c1.4 0 2.7.3 3.9.9L14 7.8A4.5 4.5 0 0 0 7.8 14l-2.5-2.5C4 12.4 3.3 13.3 3 13.9 4 15.7 7.6 17 12 17c.9 0 1.7-.1 2.5-.2l-1.8-1.8a4.5 4.5 0 0 1-5.7-5.7L4.6 6.9C3.2 8 2.3 9.2 2 10c1 2.5 5 7 10 7 .5 0 .9 0 1.3-.1z"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group form-group--compact">
+                  <label for="cb-session-idc" data-i18n="chatbot.sessionIdcLabel">Data center (tt-target-idc, optional)</label>
+                  <input type="text" id="cb-session-idc" autocomplete="off" spellcheck="false" placeholder="va">
+                </div>
+              </div>
+
+              <div class="chatbot-session-actions">
+                <button type="button" class="btn btn--primary" id="cb-session-save" onclick="chatbotEditor.saveSession()" data-i18n="chatbot.sessionSave">Sign in</button>
+                <button type="button" class="btn btn--danger-ghost" id="cb-session-remove" onclick="chatbotEditor.clearSession()" data-i18n="chatbot.sessionRemove">Sign out</button>
+                <button type="button" class="btn btn--secondary" id="cb-session-help-btn" onclick="chatbotEditor.toggleSessionHelp()" data-i18n="chatbot.sessionHelpBtn">How do I get the session ID?</button>
+              </div>
+
+              <ol class="chatbot-session-steps hidden" id="cb-session-steps">
+                <li data-i18n="chatbot.step1">Open tiktok.com in your browser and log in with the account the bot should post as.</li>
+                <li data-i18n="chatbot.step2">Press F12 → tab “Application” (Chrome/Edge) or “Storage” (Firefox).</li>
+                <li data-i18n="chatbot.step3">Left side: Cookies → https://www.tiktok.com</li>
+                <li data-i18n="chatbot.step4">Copy the value of the row named sessionid.</li>
+                <li data-i18n="chatbot.step5">Optional: note the value of tt-target-idc and enter it above.</li>
+                <li data-i18n="chatbot.step6">Paste the value here and click “Sign in”. Applies on the next connect.</li>
+              </ol>
+              <p class="chatbot-session-note" data-i18n="chatbot.sessionSecurityNote">🔒 Treat the session ID like a password — only use it on your own devices.</p>
+            </section>
+
+            <!-- Triggers -->
+            <section class="chatbot-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5c-.4.5 0 1.5.7 1.5H11l-2 7.5c-.2.6.6 1 1 .5L20 11c.5-.6.1-1.5-.7-1.5H13l1.5-6.9c.1-.7-.7-1.1-1.5-.6z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.triggersTitle">When should the bot reply?</h3>
+                </div>
+              </div>
+              <div class="chatbot-trigger-grid">
+                <label class="chatbot-trigger-option">
                   <input type="checkbox" id="cb-on-gift">
-                  <span data-i18n="chatbot.onGift">On gifts</span>
+                  <span class="switch-slider" aria-hidden="true"></span>
+                  <span class="chatbot-trigger-label" data-i18n="chatbot.onGift">On gifts</span>
                 </label>
-                <label>
+                <label class="chatbot-trigger-option">
                   <input type="checkbox" id="cb-on-follow">
-                  <span data-i18n="chatbot.onFollow">On follows</span>
+                  <span class="switch-slider" aria-hidden="true"></span>
+                  <span class="chatbot-trigger-label" data-i18n="chatbot.onFollow">On follows</span>
                 </label>
-                <label>
+                <label class="chatbot-trigger-option">
                   <input type="checkbox" id="cb-on-join">
-                  <span data-i18n="chatbot.onJoin">On stream join</span>
+                  <span class="switch-slider" aria-hidden="true"></span>
+                  <span class="chatbot-trigger-label" data-i18n="chatbot.onJoin">On stream join</span>
                 </label>
+              </div>
+            </section>
+
+            <!-- Templates -->
+            <section class="chatbot-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-4.6 3.7c-.6.5-1.4 0-1.4-.7V6a2 2 0 0 1 2-2zm3 5a1 1 0 1 0 0 2h10a1 1 0 1 0 0-2H7zm0 4a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2H7z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.templatesTitle">What should it say?</h3>
+                  <div class="chatbot-chips">
+                    <button type="button" class="chatbot-chip" onclick="chatbotEditor.insertPlaceholder('{user}')">{user}</button>
+                    <button type="button" class="chatbot-chip" onclick="chatbotEditor.insertPlaceholder('{gift}')">{gift}</button>
+                  </div>
+                </div>
               </div>
               <div class="form-group">
                 <label for="cb-gift-thanks" data-i18n="chatbot.giftThanks">Gift thank-you message</label>
                 <input type="text" id="cb-gift-thanks" placeholder="Danke {user} für {gift}! 💖">
-                <div class="hint" data-i18n="chatbot.placeholdersHint">Placeholders: {user}, {gift}</div>
               </div>
               <div class="form-group">
                 <label for="cb-follow-thanks" data-i18n="chatbot.followThanks">Follow thank-you message</label>
                 <input type="text" id="cb-follow-thanks" placeholder="Danke fürs Folgen, {user}!">
               </div>
-              <div class="form-group">
+              <div class="form-group form-group--last">
                 <label for="cb-join-welcome" data-i18n="chatbot.joinWelcome">Stream welcome message</label>
                 <input type="text" id="cb-join-welcome" placeholder="">
               </div>
             </section>
 
-            <section class="chatbot-section">
-              <h3 data-i18n="chatbot.keywordsTitle">Keyword replies</h3>
-              <p class="hint" data-i18n="chatbot.keywordsHint">The bot replies when a comment starts with one of these keywords (case-insensitive).</p>
-              <div id="cb-keywords-list"></div>
-              <button type="button" class="btn btn--secondary" id="cb-keyword-add" data-i18n="chatbot.addKeyword">+ Add keyword</button>
+            <!-- Keyword replies -->
+            <section class="chatbot-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M6 2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6.6l-4.7 3.7c-.6.5-1.7.1-1.7-.8V18H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm1 6a1 1 0 1 0 0 2h10a1 1 0 1 0 0-2H7zm0 4a1 1 0 1 0 0 2h7a1 1 0 1 0 0-2H7z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.keywordsTitle">Keyword replies</h3>
+                  <p class="hint" data-i18n="chatbot.keywordsHint">The bot replies when a comment starts with one of these keywords (case-insensitive).</p>
+                </div>
+                <button type="button" class="btn btn--secondary btn-sm chatbot-add-btn" id="cb-keyword-add" data-i18n="chatbot.addKeyword">+ Add keyword</button>
+              </div>
+              <div class="chatbot-keywords-list" id="cb-keywords-list"></div>
             </section>
 
-            <section class="chatbot-section">
-              <h3 data-i18n="chatbot.spamTitle">Spam protection</h3>
+            <!-- Spam protection -->
+            <section class="chatbot-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm0 4.2 5 1.9V11c0 3.8-2.1 7.3-5 8.5V6.2z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.spamTitle">Spam protection</h3>
+                  <p class="hint" data-i18n="chatbot.spamHint">Keeps the bot within TikTok's rate limits and avoids bans.</p>
+                </div>
+              </div>
               <div class="chatbot-grid">
                 <div class="form-group">
                   <label for="cb-min-interval" data-i18n="chatbot.minInterval">Minimum interval (seconds)</label>
@@ -927,10 +1038,14 @@
                   <input type="number" id="cb-max-len" min="1" step="1">
                 </div>
               </div>
-              <div class="form-group checkbox-group">
-                <label>
-                  <input type="checkbox" id="cb-dedupe">
+              <div class="chatbot-toggle-row chatbot-dedupe-row">
+                <div class="chatbot-toggle-info">
                   <span data-i18n="chatbot.dedupe">Skip identical consecutive messages</span>
+                  <p class="hint" data-i18n="chatbot.dedupeHint">TikTok rejects duplicates — the bot skips them instead of failing.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cb-dedupe">
+                  <span class="switch-slider" aria-hidden="true"></span>
                 </label>
               </div>
             </section>
@@ -1190,7 +1305,7 @@
     <script src="./shortcuts.js?v=1"></script>
     <script src="./accessibility.js?v=1"></script>
     <script src="./actions-editor.js?v=3"></script>
-    <script src="./chatbot-editor.js?v=1"></script>
+    <script src="./chatbot-editor.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="./app.js?v=8"></script>
 </div>

@@ -6,6 +6,8 @@ import time
 
 import pytest
 
+import core.chatbot_session as chatbot_session
+import core.paths
 from core.tiktok_chatbot import (
     AUTH_FAILURE_LIMIT,
     ChatbotConfig,
@@ -257,11 +259,13 @@ class TestStatus:
             "active",
             "auto_disabled",
             "connected",
+            "has_session",
             "sent_count",
             "dropped_count",
             "queue_size",
             "last_error",
         }
+        assert status["has_session"] is False
 
     def test_status_sink_receives_publishes(self, bot):
         seen = []
@@ -286,6 +290,67 @@ class TestStatus:
             assert bot.get_status()["connected"] is False
         finally:
             loop.close()
+
+
+# ---------------------------------------------------------------------------
+# Session application (Phase 4, docs/CHATBOT.md §4)
+# ---------------------------------------------------------------------------
+
+
+class _FakeWeb:
+    def __init__(self):
+        self.calls = []
+
+    def set_session(self, session_id, tt_target_idc):
+        self.calls.append((session_id, tt_target_idc))
+
+
+class TestApplySession:
+    def test_applies_stored_credentials(self, bot, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            core.paths, "get_chatbot_session_file", lambda: tmp_path / "session.json"
+        )
+        monkeypatch.setattr(
+            chatbot_session.core.paths,
+            "get_chatbot_session_file",
+            lambda: tmp_path / "session.json",
+        )
+        chatbot_session.save_chatbot_session("s3cr3tvalue123", "va")
+
+        web = _FakeWeb()
+        client = type("C", (), {"web": web})()
+        assert bot.apply_session_to_client(client) is True
+        assert web.calls == [("s3cr3tvalue123", "va")]
+        assert bot.has_session is True
+        assert bot.get_status()["has_session"] is True
+
+    def test_no_credentials_is_a_noop(self, bot, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            core.paths, "get_chatbot_session_file", lambda: tmp_path / "missing.json"
+        )
+        monkeypatch.setattr(
+            chatbot_session.core.paths,
+            "get_chatbot_session_file",
+            lambda: tmp_path / "missing.json",
+        )
+
+        client = object()
+        assert bot.apply_session_to_client(client) is False
+        assert bot.has_session is False
+
+    def test_client_without_web_api_reports_failure(self, bot, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            core.paths, "get_chatbot_session_file", lambda: tmp_path / "session.json"
+        )
+        monkeypatch.setattr(
+            chatbot_session.core.paths,
+            "get_chatbot_session_file",
+            lambda: tmp_path / "session.json",
+        )
+        chatbot_session.save_chatbot_session("s3cr3tvalue123", "")
+
+        assert bot.apply_session_to_client(object()) is False
+        assert bot.last_error.startswith("session apply failed")
 
 
 # ---------------------------------------------------------------------------

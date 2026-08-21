@@ -32,7 +32,7 @@ from typing import Any
 import core.paths
 from core.api.eventbus import event_bus
 from core.crash_manager import get_crash_manager
-from core.error_codes import CHATBOT_0001, CHATBOT_0002, CHATBOT_0003
+from core.error_codes import CHATBOT_0001, CHATBOT_0002, CHATBOT_0003, CHATBOT_0004
 from core.yaml_utils import load_yaml
 
 # Note: no module-level ``initialize_logging`` here on purpose — this module
@@ -185,6 +185,8 @@ class TikTokChatbot:
         self._consecutive_failures: int = 0
         self._auto_disabled: bool = False
 
+        self.has_session: bool = False
+
         self.sent_count: int = 0
         self.dropped_count: int = 0
         self.last_error: str = ""
@@ -236,6 +238,55 @@ class TikTokChatbot:
         self._client = None
         self._client_loop = None
         self.publish_status()
+
+    # ------------------------------------------------------------------
+    # Session (Phase 4, docs/CHATBOT.md §4)
+    # ------------------------------------------------------------------
+
+    def apply_session_to_client(self, client: Any) -> bool:
+        """Apply stored TikTok login credentials to *client* (best-effort).
+
+        Reads the encrypted session store and calls
+        ``client.web.set_session(session_id, tt_target_idc)`` before the
+        client connects.  Returns True when credentials were applied.
+        Failures never block the read-only connection path.
+        """
+        from core.chatbot_session import load_chatbot_session
+
+        creds: tuple[str, str] | None = None
+        try:
+            creds = load_chatbot_session()
+        except Exception as e:  # storage errors must not kill the bridge
+            log.warning("[CHATBOT] Session store unreadable: %s", e)
+            get_crash_manager().report_error(
+                CHATBOT_0004, detail=f"{type(e).__name__}: {e}"
+            )
+
+        self.has_session = creds is not None
+        if creds is None:
+            return False
+
+        session_id, tt_target_idc = creds
+        try:
+            web = getattr(client, "web", None)
+            set_session = getattr(web, "set_session", None)
+            if not callable(set_session):
+                raise TypeError("client has no web.set_session()")
+            set_session(session_id, tt_target_idc)
+            log.info(
+                "[CHATBOT] TikTok session applied (idc=%s)",
+                tt_target_idc or "default",
+            )
+            return True
+        except Exception as e:
+            self.last_error = f"session apply failed: {type(e).__name__}: {e}"
+            log.warning("[CHATBOT] %s", self.last_error)
+            get_crash_manager().report_exception(
+                CHATBOT_0004, exc=e, context_info={"stage": "apply"}
+            )
+            return False
+        finally:
+            self.publish_status()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -393,6 +444,7 @@ class TikTokChatbot:
             "active": bool(self.config.enabled and not self._auto_disabled),
             "auto_disabled": self._auto_disabled,
             "connected": self._client is not None,
+            "has_session": self.has_session,
             "sent_count": self.sent_count,
             "dropped_count": self.dropped_count,
             "queue_size": self._queue.qsize() if self._queue is not None else 0,

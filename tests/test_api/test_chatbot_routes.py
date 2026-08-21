@@ -1,6 +1,61 @@
-"""Tests for the chatbot config/status API routes."""
+"""Tests for the chatbot config/session/status API routes."""
+
+import json
 
 from core.tiktok_chatbot import ChatbotConfig
+
+VALID_SID = "abcd1234efgh5678ijkl"
+
+
+class TestChatbotSessionEndpoints:
+    def test_get_session_empty_when_not_configured(self, client, project_dir):
+        resp = client.get("/api/v1/chatbot/session")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["configured"] is False
+        assert body["masked_session_id"] is None
+        assert body["tt_target_idc"] == ""
+
+    def test_put_session_stores_encrypted_and_masks(self, client, project_dir):
+        from core.chatbot_session import load_chatbot_session
+
+        resp = client.put(
+            "/api/v1/chatbot/session",
+            json={"session_id": VALID_SID, "tt_target_idc": "va"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["configured"] is True
+        assert body["masked_session_id"] == "abcd…ijkl"
+        assert body["tt_target_idc"] == "va"
+
+        # Raw secret never appears in the stored file.
+        store = project_dir / "data" / "chatbot_session.json"
+        record = json.loads(store.read_text(encoding="utf-8"))
+        assert VALID_SID not in json.dumps(record)
+
+        # But it decrypts correctly for the bridge.
+        assert load_chatbot_session() == (VALID_SID, "va")
+
+    def test_put_session_writes_reload_signal(self, client, project_dir):
+        signal = project_dir / "core" / "runtime" / "reload_chatbot"
+        resp = client.put("/api/v1/chatbot/session", json={"session_id": VALID_SID})
+        assert resp.status_code == 200
+        assert signal.exists()
+
+    def test_put_session_rejects_invalid_input(self, client):
+        resp = client.put(
+            "/api/v1/chatbot/session", json={"session_id": "bad sid with spaces!"}
+        )
+        assert resp.status_code == 422
+
+    def test_delete_session_removes_credentials(self, client):
+        client.put("/api/v1/chatbot/session", json={"session_id": VALID_SID})
+        resp = client.delete("/api/v1/chatbot/session")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["configured"] is False
+        assert client.get("/api/v1/chatbot/session").json()["configured"] is False
 
 
 class TestChatbotConfigEndpoints:

@@ -2669,6 +2669,7 @@ async def run_bot():
         client_loop = asyncio.new_event_loop()
         ctx.tiktok_client_loop = client_loop
         _chatbot.bind_client(client, client_loop)
+        _chatbot.apply_session_to_client(client)
 
         try:
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")

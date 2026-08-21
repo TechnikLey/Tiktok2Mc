@@ -1,5 +1,5 @@
 /**
- * Chatbot editor — config/chatbot.yaml + live status.
+ * Chatbot editor — config/chatbot.yaml, encrypted TikTok session and live status.
  *
  * Reuses shared DOM/API helpers from app.js (fetchJSON, putJSON,
  * showToast, escapeHtml, I18N).  Loaded before app.js like the other
@@ -11,22 +11,39 @@ class ChatbotEditor {
     this.data = {};
     this.original = {};
     this._dirty = false;
+    this._keywords = [];
+    this._status = null;
+    this._sessionInfo = null;
     this._bindEvents();
   }
 
   _bindEvents() {
-    document.getElementById('cb-keyword-add')?.addEventListener('click', () => {
-      this._keywordRows().push({ keyword: '', reply: '' });
-      this.renderKeywords();
-      this._markDirty();
-    });
-    // Mark dirty on any input change inside the editor.
-    this.el?.querySelector('input')?.closest('.editor-content')?.addEventListener('input', () => this._markDirty());
+    // Dirty-tracking for every config input inside the editor. Session
+    // inputs are excluded — they are saved separately via their own API.
+    const content = document.getElementById('chatbot-content');
+    if (content) {
+      content.addEventListener('input', e => {
+        if (e.target.closest('#cb-session-card')) return;
+        if (e.target.matches('input, textarea, select')) this._markDirty();
+      });
+      content.addEventListener('change', e => {
+        if (e.target.closest('#cb-session-card')) return;
+        if (e.target.matches('input, textarea, select')) this._markDirty();
+      });
+    }
+    const addBtn = document.getElementById('cb-keyword-add');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        this._keywordRows().push({ keyword: '', reply: '' });
+        this.renderKeywords();
+        this._markDirty();
+      });
+    }
   }
 
   async open() {
     this.el.classList.remove('hidden');
-    await this.load();
+    await Promise.all([this.load(), this.loadSession()]);
     // Initial snapshot so the pill is correct before the next SSE event.
     try {
       const res = await fetchJSON('/chatbot/status');
@@ -89,7 +106,6 @@ class ChatbotEditor {
     const spam = d.spam_protection || {};
     const triggers = d.triggers || {};
     const templates = d.templates || {};
-    const session = d.session || {};
 
     document.getElementById('cb-enabled').checked = !!d.enabled;
     document.getElementById('cb-on-gift').checked = triggers.gift !== false;
@@ -106,6 +122,7 @@ class ChatbotEditor {
 
     this._keywords = Object.entries(d.keyword_replies || {}).map(([keyword, reply]) => ({ keyword, reply }));
     this.renderKeywords();
+    this._renderSessionWarning();
   }
 
   _collect() {
@@ -139,6 +156,133 @@ class ChatbotEditor {
     };
   }
 
+  /* ─── TikTok session (login) ─── */
+
+  async loadSession() {
+    try {
+      this._sessionInfo = await fetchJSON('/chatbot/session');
+    } catch (_) {
+      this._sessionInfo = null;
+    }
+    this._renderSessionState();
+    this._renderSessionWarning();
+  }
+
+  _renderSessionState() {
+    const badge = document.getElementById('cb-session-badge');
+    const badgeText = document.getElementById('cb-session-badge-text');
+    const idcInput = document.getElementById('cb-session-idc');
+    if (!badge || !badgeText) return;
+
+    const info = this._sessionInfo;
+    if (info && info.configured) {
+      badge.classList.add('signed-in');
+      badgeText.textContent = I18N.t('chatbot.sessionSignedIn', { id: info.masked_session_id || '' });
+      if (idcInput && !idcInput.value) idcInput.value = info.tt_target_idc || '';
+    } else {
+      badge.classList.remove('signed-in');
+      badgeText.textContent = I18N.t('chatbot.sessionMissing');
+    }
+  }
+
+  /**
+   * Warn when the bot would run without a login: sending is impossible
+   * without a session, so an enabled bot without one is a misconfiguration.
+   */
+  _renderSessionWarning() {
+    const warn = document.getElementById('cb-session-warning');
+    if (!warn) return;
+    const enabled = document.getElementById('cb-enabled')?.checked;
+    const signedIn = !!(this._sessionInfo && this._sessionInfo.configured);
+    if (enabled && !signedIn) {
+      warn.textContent = I18N.t('chatbot.sessionWarnNoLogin');
+      warn.classList.remove('hidden');
+    } else {
+      warn.classList.add('hidden');
+    }
+  }
+
+  toggleSessionVisibility() {
+    const field = document.querySelector('#cb-session-card .chatbot-secret-field');
+    const input = document.getElementById('cb-session-id');
+    if (!field || !input) return;
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    field.classList.toggle('revealed', reveal);
+  }
+
+  toggleSessionHelp() {
+    document.getElementById('cb-session-steps')?.classList.toggle('hidden');
+  }
+
+  async saveSession() {
+    const input = document.getElementById('cb-session-id');
+    const idcInput = document.getElementById('cb-session-idc');
+    const sessionId = String(input?.value || '').trim();
+
+    // When nothing new was typed, keep the stored credentials untouched.
+    if (!sessionId) {
+      showToast(I18N.t('chatbot.sessionEmptyHint'), 'warning');
+      return;
+    }
+
+    try {
+      const info = await putJSON('/chatbot/session', {
+        session_id: sessionId,
+        tt_target_idc: String(idcInput?.value || '').trim() || null,
+      });
+      this._sessionInfo = info;
+      if (input) input.value = '';
+      this._renderSessionState();
+      this._renderSessionWarning();
+      this._applyStatusSession(this._status);
+      showToast(I18N.t('chatbot.sessionSaved'), 'success');
+    } catch (e) {
+      showToast(I18N.t('chatbot.sessionSaveFailed', { msg: e.message }), 'error');
+    }
+  }
+
+  async clearSession() {
+    try {
+      const confirmed = await showConfirmDialog(
+        I18N.t('chatbot.sessionRemoveTitle'),
+        I18N.t('chatbot.sessionRemoveConfirm'),
+        I18N.t('common.delete'),
+        'btn-danger'
+      );
+      if (!confirmed) return;
+      this._sessionInfo = await fetch(API + '/chatbot/session', { method: 'DELETE', headers: _withApiKey({}) })
+        .then(async res => {
+          if (!res.ok) await _throwResError(res);
+          return res.json();
+        });
+      const idcInput = document.getElementById('cb-session-idc');
+      if (idcInput) idcInput.value = '';
+      this._renderSessionState();
+      this._renderSessionWarning();
+      this._applyStatusSession(this._status);
+      showToast(I18N.t('chatbot.sessionCleared'), 'success');
+    } catch (e) {
+      showToast(I18N.t('chatbot.sessionSaveFailed', { msg: e.message }), 'error');
+    }
+  }
+
+  /* ─── Placeholder chips ─── */
+
+  insertPlaceholder(text) {
+    const activeId = ['cb-gift-thanks', 'cb-follow-thanks', 'cb-join-welcome']
+      .find(id => document.activeElement?.id === id)
+      || 'cb-gift-thanks';
+    const input = document.getElementById(activeId);
+    if (!input) return;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    input.focus();
+    input.setSelectionRange(start + text.length, start + text.length);
+    this._markDirty();
+  }
+
   /* ─── Keyword rows ─── */
 
   _keywordRows() {
@@ -151,7 +295,7 @@ class ChatbotEditor {
     if (!list) return;
     const rows = this._keywordRows();
     if (!rows.length) {
-      list.innerHTML = `<p class="hint">${I18N.t('chatbot.noKeywords')}</p>`;
+      list.innerHTML = `<p class="hint chatbot-no-keywords">${I18N.t('chatbot.noKeywords')}</p>`;
       return;
     }
     list.innerHTML = rows.map((row, i) => `
@@ -159,7 +303,7 @@ class ChatbotEditor {
         <input type="text" class="cb-kw" placeholder="${I18N.t('chatbot.keywordPlaceholder')}" value="${escapeHtml(row.keyword)}">
         <span class="chatbot-arrow">→</span>
         <input type="text" class="cb-reply" placeholder="${I18N.t('chatbot.replyPlaceholder')}" value="${escapeHtml(row.reply)}">
-        <button type="button" class="btn btn--secondary btn-sm" onclick="chatbotEditor.removeKeyword(${i})">✕</button>
+        <button type="button" class="chatbot-remove-btn" aria-label="Remove" onclick="chatbotEditor.removeKeyword(${i})">✕</button>
       </div>
     `).join('');
     list.querySelectorAll('.chatbot-keyword-row').forEach(rowEl => {
@@ -200,38 +344,79 @@ class ChatbotEditor {
     this._status = status;
     const pill = document.getElementById('chatbot-status-pill');
     const stats = document.getElementById('chatbot-stats');
+    const heroTitle = document.getElementById('cb-hero-title');
+    const heroSub = document.getElementById('cb-hero-sub');
+    const heroDot = document.getElementById('cb-hero-dot');
+    const errorBox = document.getElementById('chatbot-error');
     if (!pill || !stats) return;
+
+    this._renderSessionWarning();
 
     if (!status) {
       pill.textContent = I18N.t('chatbot.stateUnknown');
       pill.className = 'chatbot-pill unknown';
+      heroTitle.textContent = I18N.t('chatbot.stateUnknown');
+      heroSub.textContent = I18N.t('chatbot.heroUnknownSub');
+      heroDot.className = 'chatbot-pulse-dot';
       stats.innerHTML = '';
+      errorBox.classList.add('hidden');
       return;
     }
 
+    this._applyStatusSession(status);
+
+    let heroKey;
     if (status.auto_disabled) {
       pill.textContent = I18N.t('chatbot.stateDisabled');
       pill.className = 'chatbot-pill error';
+      heroTitle.textContent = I18N.t('chatbot.heroDisabledTitle');
+      heroDot.className = 'chatbot-pulse-dot error';
     } else if (status.enabled) {
       pill.textContent = I18N.t('chatbot.stateOn');
       pill.className = 'chatbot-pill online';
+      heroTitle.textContent = I18N.t('chatbot.stateOn');
+      heroDot.className = 'chatbot-pulse-dot on';
     } else {
       pill.textContent = I18N.t('chatbot.stateOff');
       pill.className = 'chatbot-pill offline';
+      heroTitle.textContent = I18N.t('chatbot.heroIdle');
+      heroDot.className = 'chatbot-pulse-dot';
     }
+
+    const subs = [];
+    subs.push(status.connected ? I18N.t('chatbot.subConnected') : I18N.t('chatbot.subDisconnected'));
+    if (status.has_session === false && status.enabled && !status.auto_disabled) {
+      subs.push(I18N.t('chatbot.subNoSession'));
+    }
+    heroSub.textContent = subs.join(' · ');
 
     const items = [
       [I18N.t('chatbot.statSent'), status.sent_count ?? 0],
       [I18N.t('chatbot.statDropped'), status.dropped_count ?? 0],
       [I18N.t('chatbot.statQueued'), status.queue_size ?? 0],
     ];
-    let html = items.map(([label, value]) => `
+    stats.innerHTML = items.map(([label, value]) => `
       <div class="chatbot-stat"><span class="chatbot-stat-value">${escapeHtml(String(value))}</span><span class="chatbot-stat-label">${escapeHtml(label)}</span></div>
     `).join('');
+
     if (status.last_error) {
-      html += `<div class="chatbot-error">${escapeHtml(status.last_error)}</div>`;
+      errorBox.textContent = status.last_error;
+      errorBox.classList.remove('hidden');
+    } else {
+      errorBox.classList.add('hidden');
     }
-    stats.innerHTML = html;
+  }
+
+  /** Sync the topbar/session badge with the bridge-reported session flag. */
+  _applyStatusSession(status) {
+    if (!status || typeof status.has_session !== 'boolean') return;
+    const badge = document.getElementById('cb-session-badge');
+    const badgeText = document.getElementById('cb-session-badge-text');
+    if (!badge || !badgeText) return;
+    if (status.has_session && !(this._sessionInfo && this._sessionInfo.configured)) {
+      badge.classList.add('signed-in');
+      badgeText.textContent = I18N.t('chatbot.sessionSignedInBridge');
+    }
   }
 }
 

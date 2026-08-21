@@ -1,6 +1,8 @@
 # TikTok-Chatbot — Design & Umsetzungsplan
 
-> Status: **Geplant / nicht implementiert**
+> Status: **Phase 1–4 umgesetzt** (Kernmodul, Bridge-Wiring, API-Routen,
+> GUI-Tab inkl. Session-Login Variante A). Offen: Webview-Login (Variante B)
+> und Teile von Phase 5 (Doku in dev-book EN+DE).
 > Dieses Dokument bündelt alle Erkenntnisse und Entscheidungen zum geplanten
 > TikTok-Chatbot für TikTok2Mc. Es dient als Referenz für die Umsetzung.
 
@@ -162,8 +164,9 @@ Webview-Flow mal nicht funktioniert).
 ## 7. Implementierungsplan
 
 > **Status (2026-08-21):** Phase 1–3 umgesetzt (Kernmodul, Bridge-Wiring,
-> API-Routen, GUI-Tab, Tests). Phase 4 (Session-Login) und Teile von
-> Phase 5 (Doku in dev-book) folgen.
+> API-Routen, GUI-Tab, Tests). Phase 4 Variante A umgesetzt (manuelle
+> Session-Eingabe, SecureStorage, Status-Rückmeldung). Offen: Variante B
+> (Webview-Login) und dev-book EN+DE.
 
 ### Phase 1 — Brücke: Chat-Send-Kanal (~100 Zeilen) ✅
 
@@ -231,21 +234,31 @@ Webview-Flow mal nicht funktioniert).
 
 ### Phase 4 — Session-Management (beide Varianten)
 
-> Noch offen.
+> Variante A umgesetzt (2026-08-21). Variante B offen.
 
-9. **Variante A:** GUI-Feld im Chatbot-Tab → API-Route → `SecureStorage`
-   (**niemals** Klartext in einer YAML)
-10. **Variante B:** Webview-Login-Fenster (siehe §5)
-11. Bridge liest beim Connect die Session → `client.web.set_session(sid, idc)`
-    vor `start()`; `tt_target_idc` als optionales Config-Feld (Feld existiert
-    bereits in `chatbot.yaml` bzw. `ChatbotConfig`)
-12. Status-Rückmeldung: „Session abgelaufen" → Event an EventBus → Warnung
-    im Chatbot-Tab (die `sessionid` rotiert gelegentlich!)
+9. **Variante A:** ✅ GUI-Feld im Chatbot-Tab (`chatbot-editor.js`) →
+   `PUT/GET/DELETE /api/v1/chatbot/session` → verschlüsselter Store in
+   `data/chatbot_session.json` (`core/chatbot_session.py`, SecureStorage /
+   Fernet — **niemals** Klartext in einer YAML; die API liefert nur eine
+   maskierte Vorschau `abcd…wxyz`). Validierung: Länge 10–512, Charset,
+   `tt-target-idc` optional.
+10. **Variante B:** Webview-Login-Fenster (siehe §5) — offen
+11. ✅ Bridge liest beim Connect die Session →
+    `TikTokChatbot.apply_session_to_client(client)` ruft
+    `client.web.set_session(sid, idc)` vor dem Verbinden auf (Wiring in
+    `main.run_bot` direkt nach `bind_client`); `tt_target_idc` bleibt
+    optionales Config-Feld
+12. ✅ Status-Rückmeldung: `has_session` im `chatbot.status`-Event →
+     Warnbanner im Chatbot-Tab, wenn der Bot aktiviert, aber ohne Login ist;
+     Auto-Disable nach wiederholten Sendefehlern (CHATBOT_0003) + Fehlerbox;
+     „Session abgelaufen" → erneut anmelden (die `sessionid` rotiert
+     gelegentlich!)
 
 ### Phase 5 — Tests & Doku
 
-> pytest (29 Kern- + 6 API-Tests) und vitest (16 GUI-Tests) sind umgesetzt;
-> ruff/pyright/eslint grün. Offen: dev-book EN+DE.
+> pytest (Kern-, Session- und API-Tests) und vitest (GUI-Tab inkl.
+> Session-Flows) sind umgesetzt; ruff/pyright/eslint grün. Offen:
+> dev-book EN+DE.
 
 13. Unit-Tests: Limiter, Template-Formatting, Send-Guard, Config-Roundtrip
     (conftest mockt TikTokLive — das Modul importiert den Client nur als
@@ -305,8 +318,10 @@ beiden Login-Wegen zur Auswahl.
 
 ## 12. Offene Punkte
 
-- [ ] Session-Login umsetzen (Phase 4): SecureStorage + `set_session` vor
-      `start()`, Warnung bei abgelaufener Session
+- [x] Session-Login Variante A umsetzen (Phase 4): SecureStorage +
+      `set_session` vor dem Verbinden, Warnung bei fehlender/abgelaufener
+      Session
+- [ ] Session-Login Variante B (Webview-Login-Fenster, §5)
 - [x] Keyword-Befehle: über event_bus abgedeckt (Nativ-Entscheidung,
       `_handle_event` matched Kommentar-Prefix case-insensitive)
 - [ ] PyQt6/pywebview: Cookie-Extraktion aus dem Webview-Profil verifizieren

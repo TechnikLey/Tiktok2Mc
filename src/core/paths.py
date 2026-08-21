@@ -42,6 +42,12 @@ def get_chatbot_config_file() -> Path:
     return (root / "config" / "chatbot.yaml").resolve()
 
 
+def get_chatbot_session_file() -> Path:
+    """Return the encrypted chatbot session store (data/chatbot_session.json)."""
+    root = get_root_dir()
+    return (root / "data" / "chatbot_session.json").resolve()
+
+
 def get_runtime_dir() -> Path:
     root = get_root_dir()
     return (root / "core" / "runtime").resolve()

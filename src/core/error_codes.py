@@ -1011,6 +1011,15 @@ CHATBOT_0003 = ErrorCode(
     recovery_hint="Re-authenticate the chatbot account in the GUI and re-enable the bot.",
     impact="The chatbot stopped sending messages until re-enabled.",
 )
+CHATBOT_0004 = ErrorCode(
+    code="CHATBOT-0004",
+    subsystem=Subsystem.CHATBOT,
+    severity=Severity.ERROR,
+    message="Chatbot session storage error.",
+    description="The encrypted chatbot session store could not be read or written.",
+    recovery_hint="Check permissions on data/chatbot_session.json and re-enter the session in the GUI.",
+    impact="The chatbot cannot use a TikTok login for sending messages.",
+)
 
 # ------------------------------------------------------------------ HOOK ----
 HOOK_0001 = ErrorCode(

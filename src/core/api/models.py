@@ -451,6 +451,20 @@ class ChatbotStatusResponse(BaseModel):
     status: dict[str, Any] | None
 
 
+class ChatbotSessionResponse(BaseModel):
+    """Secret-free view of the stored TikTok session credentials."""
+
+    configured: bool = False
+    masked_session_id: str | None = None
+    tt_target_idc: str = ""
+    updated: float | None = None
+
+
+class ChatbotSessionUpdateRequest(BaseModel):
+    session_id: str
+    tt_target_idc: str | None = None
+
+
 class ReactionCatalogResponse(BaseModel):
     """Merged reaction catalog served to the GUI reactions wizard."""
 
