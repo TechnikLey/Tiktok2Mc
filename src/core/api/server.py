@@ -23,6 +23,7 @@ from .chatbot_status import get_chatbot_status_tracker
 from .dashboard_publisher import get_dashboard_publisher
 from .eventbus import event_bus
 from .models import API_VERSION
+from .outbound_dispatcher import get_outbound_dispatcher
 from .plugin_event_bridge import get_plugin_event_bridge
 from .plugin_health import get_plugin_health_monitor
 from .plugin_overlay import command_queue
@@ -267,6 +268,7 @@ async def lifespan(app: FastAPI):
     await get_plugin_health_monitor().start()
     get_event_command_mapper().start()
     get_plugin_event_bridge().start()
+    get_outbound_dispatcher().start()
     get_dashboard_publisher().start()
     get_tiktok_live_tracker().start()
     get_chatbot_status_tracker().start()
@@ -293,6 +295,7 @@ async def lifespan(app: FastAPI):
     finally:
         await get_rcon_service().disconnect()
         await get_plugin_event_bridge().stop()
+        await get_outbound_dispatcher().stop()
         await get_dashboard_publisher().stop()
         await get_tiktok_live_tracker().stop()
         await get_chatbot_status_tracker().stop()

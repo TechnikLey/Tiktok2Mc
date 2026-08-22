@@ -193,6 +193,8 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `GET` | `/plugins/{name}/data/{key}` | Einen Schlüssel aus dem Store lesen |
 | `PUT` | `/plugins/{name}/data/{key}` | Schlüssel schreiben (Body: `{"value": <beliebiges JSON>}`) |
 | `DELETE` | `/plugins/{name}/data/{key}` | Schlüssel aus dem Store löschen |
+| `GET` | `/outbound/channels` | Outbound-Channels mit Status/Countern (URLs maskiert) |
+| `POST` | `/outbound/channels/{name}/test` | Testnachricht durch einen Channel senden |
 | `GET` | `/health` | Health-Status des API-Servers |
 | `GET` | `/diagnostics` | Diagnose-Report (alle Komponenten) |
 
@@ -263,6 +265,48 @@ POST /api/v1/triggers/dispatch
   — `status` ist `"error"` bei Validierungsfehlern oder nicht erreichbarer Bridge
 - Der Aufruf wird **nicht** gedrosselt und **nicht** als Test-Event markiert;
   jeder Dispatch landet in der Trigger-History (`GET /triggers/history`)
+
+### Outbound Webhooks
+
+Der API-Prozess kann Live-Events an externe HTTP-Endpunkte weiterleiten
+(„Outbound-Channels", z. B. Discord-Webhooks). Channels werden in der globalen
+`config.yaml` unter `outbound.channels` konfiguriert; jeder Channel abonniert
+per Event-Patterns (`tiktok.gift`, `tiktok.*`, `*`) mit denselben
+Matching-Regeln wie Plugin-`event_subscriptions`:
+
+```yaml
+outbound:
+  enabled: true          # Hauptschalter für alle Channels
+  max_fails: 3           # Circuit Breaker: Fehler vor Cooldown
+  cooldown: 10           # Circuit Breaker: Pause in Sekunden
+  retries: 1             # zusätzliche Zustellversuche pro Nachricht
+  timeout: 5             # HTTP-Timeout in Sekunden
+  channels:
+    - name: "discord-events"
+      url: "https://discord.com/api/webhooks/..."
+      events: ["tiktok.*"]
+      format: discord    # discord | raw
+      template: "**{user}** hat *{type}* ausgelöst"
+      enabled: true
+```
+
+Zwei Payload-Formate werden unterstützt:
+
+- **raw**: JSON-Envelope `{"type": "...", "data": {...}, "timestamp": ...}`
+- **discord**: Discord-Webhook-Payload `{"content": "<Template>"}` — Templates
+  unterstützen `{user}`, `{type}` und jeden Event-Daten-Platzhalter
+  (`{comment}`, `{gift_id}`, ...); unbekannte Platzhalter werden zu leeren
+  Strings
+
+Jeder Channel hat seinen eigenen Circuit Breaker (gleicher Mechanismus wie bei
+Overlays): Nach `max_fails` aufeinanderfolgenden Fehlzustellungen pausiert der
+Channel für `cooldown` Sekunden und verwirft eingehende Events, statt sie zu
+senden. Fehlgeschlagene Zustellungen werden `retries`-mal wiederholt
+(jeweils 1 s Abstand). Status und Counter pro Channel sind über
+`GET /api/v1/outbound/channels` abrufbar (URLs sind maskiert), ein manueller
+Konnektivitätstest läuft über
+`POST /api/v1/outbound/channels/{name}/test` — die Probe ignoriert
+Event-Patterns und beeinflusst weder Circuit Breaker noch Counter.
 
 ## Nächstes Kapitel
 

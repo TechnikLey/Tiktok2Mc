@@ -292,6 +292,34 @@ overlay:
     background: "#00FF00"
     text: "#ffffff"
 
+# --- OUTBOUND CHANNELS (WEBHOOKS / DISCORD) ---
+# Forwards live events to external HTTP endpoints (e.g. Discord webhooks).
+# Each channel subscribes to event patterns (tiktok.gift, tiktok.*, ...).
+# Formats:
+#   raw     - JSON envelope {"type", "data", "timestamp"}
+#   discord - Discord webhook payload built from a template with
+#             {user}, {type} and any event data placeholder ({comment}, ...)
+outbound:
+  # Master switch for all outbound deliveries.
+  enabled: true
+
+  # Circuit breaker: after max_fails consecutive failed deliveries a
+  # channel pauses for cooldown seconds.
+  max_fails: 3
+  cooldown: 10
+
+  # Additional delivery attempts per message and HTTP timeout in seconds.
+  retries: 1
+  timeout: 5
+
+  channels:
+    - name: "discord-events"
+      url: ""
+      events: ["tiktok.*"]
+      format: "discord"
+      template: "**{user}** triggered *{type}*"
+      enabled: false
+
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.

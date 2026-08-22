@@ -543,6 +543,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "mc_version": str,
     "minecraft_server_api": dict,
     "overlay": dict,
+    "outbound": dict,
     "plugin_sandbox": dict,
     "port_policy": dict,
     "rcon": dict,

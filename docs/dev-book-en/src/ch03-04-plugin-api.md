@@ -193,6 +193,8 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `GET` | `/plugins/{name}/data/{key}` | Read one key from the plugin's store |
 | `PUT` | `/plugins/{name}/data/{key}` | Write one key (body: `{"value": <any JSON>}`) |
 | `DELETE` | `/plugins/{name}/data/{key}` | Delete one key from the plugin's store |
+| `GET` | `/outbound/channels` | Outbound channels with status/counters (URLs masked) |
+| `POST` | `/outbound/channels/{name}/test` | Send a test message through one channel |
 | `GET` | `/health` | API server health status |
 | `GET` | `/diagnostics` | Full diagnostic report |
 
@@ -261,6 +263,46 @@ POST /api/v1/triggers/dispatch
   — `status` is `"error"` for validation failures or an unreachable bridge
 - The call is **not** rate-limited and is **not** marked as a test event;
   every dispatch is recorded in the trigger history (`GET /triggers/history`)
+
+### Outbound Webhooks
+
+The API process can forward live events to external HTTP endpoints
+("outbound channels", e.g. Discord webhooks). Channels are configured in the
+global `config.yaml` under `outbound.channels`; each channel subscribes via
+event patterns (`tiktok.gift`, `tiktok.*`, `*`) with the same matching rules
+as plugin `event_subscriptions`:
+
+```yaml
+outbound:
+  enabled: true          # master switch for all channels
+  max_fails: 3           # circuit breaker: failures before cooldown
+  cooldown: 10           # circuit breaker: pause in seconds
+  retries: 1             # extra delivery attempts per message
+  timeout: 5             # HTTP timeout in seconds
+  channels:
+    - name: "discord-events"
+      url: "https://discord.com/api/webhooks/..."
+      events: ["tiktok.*"]
+      format: discord    # discord | raw
+      template: "**{user}** triggered *{type}*"
+      enabled: true
+```
+
+Two payload formats are supported:
+
+- **raw**: JSON envelope `{"type": "...", "data": {...}, "timestamp": ...}`
+- **discord**: Discord webhook payload `{"content": "<template>"}` — templates
+  support `{user}`, `{type}` and any event data placeholder (`{comment}`,
+  `{gift_id}`, ...); unknown placeholders become empty strings
+
+Every channel has its own circuit breaker (same mechanism as overlays): after
+`max_fails` consecutive failed deliveries the channel pauses for `cooldown`
+seconds and drops incoming events instead of sending. Failed deliveries are
+retried `retries` times (1 s apart). Status and per-channel counters are
+exposed via `GET /api/v1/outbound/channels` (URLs are masked), and a manual
+connectivity probe is available via
+`POST /api/v1/outbound/channels/{name}/test` — the probe ignores event
+patterns and does not touch the circuit breaker or counters.
 
 ## Next Chapter
 

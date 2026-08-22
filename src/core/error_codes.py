@@ -577,6 +577,44 @@ NETWORK_0003 = ErrorCode(
     impact="Comment command was not dispatched.",
 )
 
+# -------------------------------------------------------------- OUTBOUND ----
+OUTBOUND_0001 = ErrorCode(
+    code="OUTBOUND-0001",
+    subsystem=Subsystem.NETWORK,
+    severity=Severity.WARNING,
+    message="Outbound channel configuration invalid.",
+    description="An outbound channel entry in the config could not be parsed.",
+    recovery_hint="Check the 'outbound' section of config.yaml.",
+    impact="The channel entry was skipped and receives no events.",
+)
+OUTBOUND_0002 = ErrorCode(
+    code="OUTBOUND-0002",
+    subsystem=Subsystem.NETWORK,
+    severity=Severity.ERROR,
+    message="Outbound webhook delivery failed.",
+    description="Delivering an event to an outbound channel failed after all retries.",
+    recovery_hint="Check that the webhook target is reachable and the URL is correct.",
+    impact="Event was not delivered to the channel.",
+)
+OUTBOUND_0003 = ErrorCode(
+    code="OUTBOUND-0003",
+    subsystem=Subsystem.NETWORK,
+    severity=Severity.WARNING,
+    message="Outbound channel circuit breaker active.",
+    description="A channel is in cooldown due to repeated delivery failures.",
+    recovery_hint="Wait for the cooldown period to expire or fix the target URL.",
+    impact="Events are being dropped for this channel.",
+)
+OUTBOUND_0004 = ErrorCode(
+    code="OUTBOUND-0004",
+    subsystem=Subsystem.NETWORK,
+    severity=Severity.ERROR,
+    message="Outbound test dispatch failed.",
+    description="A manual test dispatch to an outbound channel failed.",
+    recovery_hint="Check the channel URL and network connectivity.",
+    impact="Test message was not delivered.",
+)
+
 # --------------------------------------------------------------- CONFIG ----
 CONFIG_0001 = ErrorCode(
     code="CONFIG-0001",
