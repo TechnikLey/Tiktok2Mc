@@ -189,12 +189,52 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `PUT` | `/plugins/{name}/config` | Plugin-Konfiguration schreiben |
 | `POST` | `/events` | Eigenes Event auf dem EventBus veröffentlichen |
 | `POST` | `/triggers/dispatch` | actions.mca-Trigger auslösen (ohne Debounce — siehe unten) |
+| `GET` | `/plugins/{name}/data` | Kompletten Persistent Store des Plugins lesen |
+| `GET` | `/plugins/{name}/data/{key}` | Einen Schlüssel aus dem Store lesen |
+| `PUT` | `/plugins/{name}/data/{key}` | Schlüssel schreiben (Body: `{"value": <beliebiges JSON>}`) |
+| `DELETE` | `/plugins/{name}/data/{key}` | Schlüssel aus dem Store löschen |
 | `GET` | `/health` | Health-Status des API-Servers |
 | `GET` | `/diagnostics` | Diagnose-Report (alle Komponenten) |
 
 **Authentifizierung**: Wenn `api_key` in der globalen `config.yaml` gesetzt ist, muss jeder Request den Header `X-API-Key: <key>` enthalten (gilt nur für Requests von außerhalb localhost).
 
 **Basis-URL**: Standard `http://127.0.0.1:29185/api/v1/`, überschreibbar über die Umgebungsvariable `API_BASE_URL`.
+
+### Persistenter Speicher (namespaced)
+
+Jedes Plugin bekommt seine eigene JSON-Datei unter `data/plugin_data/<name>.json`
+— das gemeinsame `data/`-Verzeichnis muss nicht mehr selbst angefasst werden, und
+Kollisionen mit anderen Plugins sind ausgeschlossen. Schlüssel sind flache Strings
+(`[A-Za-z0-9_.-]`, max. 128 Zeichen), Werte sind beliebiges JSON und überleben
+Neustarts.
+
+Python-Plugins nutzen die eingebauten Helfer auf `BasePlugin`:
+
+```python
+class MyPlugin(BasePlugin):
+    PLUGIN_NAME = "leaderboard"
+
+    def on_command(self, command, args):
+        if command == "add_point":
+            scores = self.store_get("scores", {})
+            user = args.get("user", "?")
+            scores[user] = scores.get(user, 0) + 1
+            self.store_set("scores", scores)
+
+        elif command == "reset":
+            self.store_delete("scores")
+```
+
+Erweiterungen in anderen Sprachen nutzen normales HTTP:
+
+```json
+PUT /api/v1/plugins/leaderboard/data/scores.user-1
+{"value": {"points": 10}}
+```
+
+> [!TIP]
+> Lieber viele kleine Schlüssel als ein Riesen-Blob, wenn oft geschrieben wird —
+> jeder Schreibvorgang schreibt die JSON-Datei des Namespace atomar neu.
 
 ### Trigger-Aktionen programmatisch auslösen
 

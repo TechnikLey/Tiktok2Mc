@@ -160,6 +160,38 @@ glob_cfg = api.config
 rcon_host = glob_cfg.get("server_host", "127.0.0.1")
 ```
 
+## Persistenter Speicher
+
+Hooks können Daten in ihrem eigenen Namespace (`data/plugin_data/<hook-name>.json`)
+über die namespaced Store-Endpunkte der API ablegen. Hooks laufen im Bridge-Prozess
+und nutzen deshalb normales HTTP (sowohl `urllib` als auch `requests` sind erlaubt):
+
+```python
+import json
+import urllib.request
+
+def register(api: HookAPI):
+    name = "mein-hook"  # muss mit dem Namen in hook.json übereinstimmen
+    base = "http://127.0.0.1:29185/api/v1"
+
+    def save_count(count):
+        req = urllib.request.Request(
+            f"{base}/plugins/{name}/data/count",
+            data=json.dumps({"value": count}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="PUT",
+        )
+        urllib.request.urlopen(req, timeout=5)
+
+    def load_count():
+        with urllib.request.urlopen(f"{base}/plugins/{name}/data/count", timeout=5) as r:
+            return json.load(r)["value"]
+
+    api.register_action("track", lambda user, trigger, ctx: save_count(load_count() + 1))
+```
+
+Schlüssel müssen dem Muster `[A-Za-z0-9_.-]{1,128}` entsprechen; Werte sind beliebiges JSON.
+
 ## Fehlercodes für Hooks
 
 | Code | Bedeutung |

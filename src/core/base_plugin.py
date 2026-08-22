@@ -168,19 +168,62 @@ class BasePlugin:
 
     def api_post(self, path: str, data: dict[str, Any]) -> bool:
         """POST JSON data to the central API."""
+        return self._api_request("POST", path, data)
+
+    def api_put(self, path: str, data: dict[str, Any]) -> bool:
+        """PUT JSON data to the central API."""
+        return self._api_request("PUT", path, data)
+
+    def api_delete(self, path: str) -> bool:
+        """Send a DELETE request to the central API."""
+        return self._api_request("DELETE", path)
+
+    def _api_request(
+        self,
+        method: str,
+        path: str,
+        data: dict[str, Any] | None = None,
+    ) -> bool:
+        """Generic JSON request helper (returns success flag)."""
         try:
-            body = json.dumps(data).encode("utf-8")
+            body = json.dumps(data).encode("utf-8") if data is not None else None
             req = urllib.request.Request(
                 _api_url(path),
                 data=body,
-                headers={"Content-Type": "application/json"},
-                method="POST",
+                headers={"Content-Type": "application/json"}
+                if body is not None
+                else {},
+                method=method,
             )
             urllib.request.urlopen(req, timeout=5)
             return True
         except (OSError, TypeError) as e:
-            log.warning("[%s] API POST %s failed: %s", self.PLUGIN_NAME, path, e)
+            log.warning("[%s] API %s %s failed: %s", self.PLUGIN_NAME, method, path, e)
             return False
+
+    # -- namespaced persistent store ----------------------------------------
+
+    def store_get(self, key: str, default: Any = None) -> Any:
+        """Read ``key`` from this plugin's persistent store."""
+        result = self.api_get(f"/plugins/{self.PLUGIN_NAME}/data/{key}")
+        if result is None or "value" not in result:
+            return default
+        return result["value"]
+
+    def store_set(self, key: str, value: Any) -> bool:
+        """Persist ``key`` = ``value`` (arbitrary JSON) for this plugin."""
+        return self.api_put(f"/plugins/{self.PLUGIN_NAME}/data/{key}", {"value": value})
+
+    def store_delete(self, key: str) -> bool:
+        """Delete ``key`` from this plugin's persistent store."""
+        return self.api_delete(f"/plugins/{self.PLUGIN_NAME}/data/{key}")
+
+    def store_all(self) -> dict[str, Any]:
+        """Return the whole persistent store of this plugin."""
+        result = self.api_get(f"/plugins/{self.PLUGIN_NAME}/data")
+        if not result or "data" not in result:
+            return {}
+        return result["data"]
 
     def api_get(self, path: str, timeout: int = 5) -> dict[str, Any] | None:
         """GET JSON data from the central API."""

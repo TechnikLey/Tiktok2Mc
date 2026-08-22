@@ -15,6 +15,7 @@ from .logs import router as logs_router
 from .mc_plugins import router as mc_plugins_router
 from .overlay import router as overlay_router
 from .plugin_config import router as plugin_config_router
+from .plugin_data import router as plugin_data_router
 from .plugin_overlay import router as plugin_overlay_router
 from .plugins import router as plugins_router
 from .rcon import router as rcon_router
@@ -38,6 +39,7 @@ api_router.include_router(config_bundle_router)
 api_router.include_router(sessions_router)
 api_router.include_router(plugins_router)
 api_router.include_router(plugin_config_router)
+api_router.include_router(plugin_data_router)
 api_router.include_router(events_router)
 api_router.include_router(ws_router)
 api_router.include_router(updater_router)

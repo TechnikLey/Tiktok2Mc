@@ -189,12 +189,51 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `PUT` | `/plugins/{name}/config` | Write plugin configuration |
 | `POST` | `/events` | Publish a custom event on the EventBus |
 | `POST` | `/triggers/dispatch` | Fire an actions.mca trigger (no debounce — see below) |
+| `GET` | `/plugins/{name}/data` | Read the plugin's whole persistent store |
+| `GET` | `/plugins/{name}/data/{key}` | Read one key from the plugin's store |
+| `PUT` | `/plugins/{name}/data/{key}` | Write one key (body: `{"value": <any JSON>}`) |
+| `DELETE` | `/plugins/{name}/data/{key}` | Delete one key from the plugin's store |
 | `GET` | `/health` | API server health status |
 | `GET` | `/diagnostics` | Full diagnostic report |
 
 **Authentication**: If `api_key` is set in the global `config.yaml`, every request must include the `X-API-Key: <key>` header (only applies to requests from outside localhost).
 
 **Base URL**: Default `http://127.0.0.1:29185/api/v1/`, overridable via the `API_BASE_URL` environment variable.
+
+### Persistent Store (namespaced)
+
+Every plugin gets its own JSON file under `data/plugin_data/<name>.json` —
+you never need to touch the shared `data/` directory yourself, and you cannot
+collide with other plugins. Keys are flat strings (`[A-Za-z0-9_.-]`, max 128
+chars), values are arbitrary JSON and survive restarts.
+
+Python plugins use the built-in helpers on `BasePlugin`:
+
+```python
+class MyPlugin(BasePlugin):
+    PLUGIN_NAME = "leaderboard"
+
+    def on_command(self, command, args):
+        if command == "add_point":
+            scores = self.store_get("scores", {})
+            user = args.get("user", "?")
+            scores[user] = scores.get(user, 0) + 1
+            self.store_set("scores", scores)
+
+        elif command == "reset":
+            self.store_delete("scores")
+```
+
+Non-Python extensions use plain HTTP:
+
+```json
+PUT /api/v1/plugins/leaderboard/data/scores.user-1
+{"value": {"points": 10}}
+```
+
+> [!TIP]
+> Prefer many small keys over one giant blob if you update frequently — each
+> write rewrites the namespace's whole JSON file atomically.
 
 ### Firing Trigger Actions Programmatically
 

@@ -53,6 +53,16 @@ def get_runtime_dir() -> Path:
     return (root / "core" / "runtime").resolve()
 
 
+def get_plugin_data_dir() -> Path:
+    """Return the namespaced per-plugin/hook storage directory.
+
+    Each extension gets its own ``<namespace>.json`` file inside this
+    directory (see ``core.api.services.persistence_service``).
+    """
+    root = get_root_dir()
+    return (root / "data" / "plugin_data").resolve()
+
+
 def get_plugin_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
