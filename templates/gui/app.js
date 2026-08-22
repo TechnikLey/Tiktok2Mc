@@ -3714,8 +3714,8 @@ const SECTION_ORDER = [
   'console','overlay','theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
-  'outbound',
   'port_policy','api_key',
+  'outbound',
   'like_triggers'
 ];
 
@@ -3749,7 +3749,7 @@ const SECTION_META = {
   port_policy: { title: 'Port Policy', desc: 'Controls what happens when a required port is already in use. Can auto-resolve to the next free port.', category: 'System' },
   api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'System' },
   plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' },
-  outbound: { title: 'Outbound Webhooks', desc: 'Forwards live events to external HTTP endpoints such as Discord webhooks. Each channel subscribes via event patterns and has its own circuit breaker.', category: 'Integration' },
+  outbound: { title: 'Outbound Webhooks', desc: 'Send stream events to external services in real time — e.g. announce every gift, follow or subscriber automatically in your Discord server. Add a channel, paste its webhook URL, pick the events and switch it on.', category: 'Integration' },
 };
 
 const SECTION_META_DE = {
@@ -3774,7 +3774,7 @@ const SECTION_META_DE = {
   port_policy: { title: 'Port-Richtlinie', desc: 'Steuert, was passiert, wenn ein benötigter Port bereits belegt ist. Kann automatisch zum nächsten freien Port wechseln.' },
   api_key: { title: 'API-Schlüssel', desc: 'Optionaler API-Schlüssel für die Authentifizierung, wenn der Server über localhost hinaus erreichbar ist.' },
   plugin_sandbox: { title: 'Plugin-Sandbox', desc: 'Beschränkt Ressourcen von Plugin-Subprozessen, um die Auswirkungen fehlerhafter oder kompromittierter Plugins zu begrenzen.' },
-  outbound: { title: 'Outbound-Webhooks', desc: 'Leitet Live-Events an externe HTTP-Endpunkte wie Discord-Webhooks weiter. Jeder Channel abonniert Event-Patterns und hat einen eigenen Schutzschalter.' },
+  outbound: { title: 'Outbound-Webhooks', desc: 'Sendet Live-Events in Echtzeit an externe Dienste — z. B. automatisch jedes Geschenk, jeden Follow oder Subscriber in deinem Discord-Server ankündigen. Channel hinzufügen, Webhook-URL einfügen, Events wählen und einschalten.' },
 };
 
 const CATEGORY_LABELS_DE = {
@@ -3967,12 +3967,13 @@ const FIELD_META = {
   'like_triggers[].payload': { basic: true, type: 'text' },
   'like_triggers[].enabled': { basic: true, type: 'bool' },
 
-  'outbound': { basic: false },
+  'outbound': { basic: true },
   'outbound.enabled': { basic: true, type: 'bool' },
-  'outbound.max_fails': { basic: false, type: 'number', min: 1 },
-  'outbound.cooldown': { basic: false, type: 'number', min: 0 },
-  'outbound.retries': { basic: false, type: 'number', min: 0 },
-  'outbound.timeout': { basic: false, type: 'number', min: 1 },
+  'outbound.max_fails': { basic: true, type: 'number', min: 1 },
+  'outbound.cooldown': { basic: true, type: 'number', min: 0 },
+  'outbound.retries': { basic: true, type: 'number', min: 0 },
+  'outbound.timeout': { basic: true, type: 'number', min: 1 },
+  'outbound.channels': { basic: true, type: 'list' },
 };
 
 function getMeta(path) {
@@ -4287,6 +4288,8 @@ class ConfigEditor {
       body = this.buildThemeEditor(key, value);
     } else if (key === 'overlay') {
       body = this.buildOverlayEditor(key, value);
+    } else if (key === 'outbound') {
+      body = this.buildOutboundEditor(key, value);
     } else if (key === 'like_triggers') {
       body = this.buildLikeTriggersEditor(key, value);
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -4649,6 +4652,43 @@ class ConfigEditor {
       });
     }
     this.setValue(path, triggers);
+  }
+
+  buildOutboundEditor(path, value) {
+    const lang = _editorLangIsDe() ? 'de' : 'en';
+    const T = {
+      en: {
+        title: 'How it works',
+        intro: 'Every matching live event is sent to your webhook in real time — e.g. announce gifts, follows or subscribers automatically in your Discord server.',
+        steps: [
+          'Create a webhook: Discord → Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL.',
+          'Click "+ Add Channel" below, give it a name and paste the URL.',
+          'Choose which events to forward, e.g. "tiktok.gift, tiktok.follow" or "tiktok.*" for everything (comma-separated).',
+          'Keep Format "Discord", adjust the message template ({user}, {type}, {comment} …) and switch the channel ON.',
+        ],
+        note: 'Format "Raw" sends a plain JSON envelope instead — useful for your own scripts and bots. Failed deliveries are retried automatically; a channel that keeps failing pauses itself briefly.',
+      },
+      de: {
+        title: 'So funktioniert es',
+        intro: 'Jedes passende Live-Event wird in Echtzeit an deinen Webhook gesendet — z. B. Geschenke, Follows oder Subscriber automatisch in deinem Discord-Server ankündigen.',
+        steps: [
+          'Webhook erstellen: Discord → Servereinstellungen → Integrationen → Webhooks → Neuer Webhook → Webhook-URL kopieren.',
+          'Unten auf „+ Channel hinzufügen" klicken, Namen vergeben und URL einfügen.',
+          'Events wählen, z. B. „tiktok.gift, tiktok.follow" oder „tiktok.*" für alles (komma-getrennt).',
+          'Format „Discord" lassen, Nachrichtenvorlage anpassen ({user}, {type}, {comment} …) und den Channel einschalten.',
+        ],
+        note: 'Format „Raw" sendet stattdessen einen reinen JSON-Envelope — nützlich für eigene Skripte und Bots. Fehlgeschlagene Zustellungen werden automatisch wiederholt; ein dauerhaft fehlschlagender Channel pausiert sich kurz selbst.',
+      }
+    }[lang];
+    const box = `<div style="background:var(--color-bg);border:1px solid var(--color-border);border-left:3px solid var(--color-accent);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4);">
+      <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.35rem;">${escapeHtml(T.title)}</div>
+      <p style="margin:0 0 0.5rem 0;font-size:0.85rem;color:var(--text-secondary);">${escapeHtml(T.intro)}</p>
+      <ol style="margin:0;padding-left:1.25rem;font-size:0.85rem;color:var(--text-secondary);">
+        ${T.steps.map(s => `<li style="margin-bottom:0.25rem;">${escapeHtml(s)}</li>`).join('')}
+      </ol>
+      <p style="margin:0.5rem 0 0 0;font-size:0.8rem;color:var(--text-secondary);">${escapeHtml(T.note)}</p>
+    </div>`;
+    return box + this.buildObjectFields(path, value);
   }
 
   buildOutboundChannelsEditor(path, channels) {
