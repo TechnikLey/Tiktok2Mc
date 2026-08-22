@@ -188,12 +188,40 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `GET` | `/plugins/{name}/config` | Read plugin configuration |
 | `PUT` | `/plugins/{name}/config` | Write plugin configuration |
 | `POST` | `/events` | Publish a custom event on the EventBus |
+| `POST` | `/triggers/dispatch` | Fire an actions.mca trigger (no debounce — see below) |
 | `GET` | `/health` | API server health status |
 | `GET` | `/diagnostics` | Full diagnostic report |
 
 **Authentication**: If `api_key` is set in the global `config.yaml`, every request must include the `X-API-Key: <key>` header (only applies to requests from outside localhost).
 
 **Base URL**: Default `http://127.0.0.1:29185/api/v1/`, overridable via the `API_BASE_URL` environment variable.
+
+### Firing Trigger Actions Programmatically
+
+`POST /api/v1/triggers/dispatch` executes an `actions.mca` trigger exactly as if
+the corresponding TikTok event had occurred — without the cooldown of the GUI
+Event Tester (`/triggers/execute`). This is the supported way for extensions to
+drive actions.mca on their own schedule (timers, cron, external integrations):
+
+```json
+POST /api/v1/triggers/dispatch
+{
+  "trigger": "bonus_drop",
+  "user": "System",
+  "gift_id": null,
+  "gift_name": null
+}
+```
+
+- **trigger**: Action name from `actions.mca`, a gift ID, or one of the built-in
+  event names (`follow`, `like`, `join`, `share`, `comment`, `gift`)
+- **user**: Username passed as `{user}` (default `"System"`)
+- **gift_id / gift_name**: Optional; for gift triggers (`gift_id` replaces the
+  trigger name on the wire)
+- **Response**: `{"status": "success", "trigger": ..., "user": ..., "message": ...}`
+  — `status` is `"error"` for validation failures or an unreachable bridge
+- The call is **not** rate-limited and is **not** marked as a test event;
+  every dispatch is recorded in the trigger history (`GET /triggers/history`)
 
 ## Next Chapter
 

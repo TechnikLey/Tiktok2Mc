@@ -133,6 +133,29 @@ class TriggerService:
         self._record(result)
         return self._result_to_api_dict(result, trigger, user)
 
+    def dispatch(
+        self,
+        trigger: str,
+        user: str = "System",
+        gift_id: str | None = None,
+        gift_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Execute a trigger WITHOUT debounce.
+
+        This is the programmatic entry point for extensions (plugins, hooks,
+        schedulers).  Unlike ``execute_trigger`` (GUI Event Tester), calls are
+        never rate-limited by the shared GUI cooldown; every call is recorded
+        in history for observability.
+        """
+        result = self._engine.execute_trigger(
+            trigger_name=trigger,
+            user=user,
+            gift_id=gift_id,
+            gift_name=gift_name,
+        )
+        self._record(result)
+        return self._result_to_api_dict(result, trigger, user)
+
     def toggle_tiktok_connection(self) -> dict[str, Any]:
         ok, msg = self.can_execute()
         if not ok:

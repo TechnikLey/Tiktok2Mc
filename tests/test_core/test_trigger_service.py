@@ -145,6 +145,75 @@ class TestTriggerService:
             trigger_name="gift", user="TestUser", gift_id="5655"
         )
 
+
+class TestDispatch:
+    """Programmatic dispatch path — must never be debounced (J.2 #7)."""
+
+    def _make_result(self, name: str) -> TriggerResult:
+        return TriggerResult(
+            success=True,
+            trigger_name=name,
+            status=ExecutionStatus.SUCCESS,
+            execution_time_ms=1.0,
+            payload={"trigger": name, "user": "TestUser"},
+        )
+
+    def test_dispatch_bypasses_debounce(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = self._make_result("bonus_drop")
+        svc = TriggerService(engine=mock_engine)
+        svc._last_execution = time.time()  # tester cooldown is active
+
+        first = svc.dispatch("bonus_drop")
+        second = svc.dispatch("bonus_drop")
+
+        assert first["status"] == "success"
+        assert second["status"] == "success"
+        assert mock_engine.execute_trigger.call_count == 2
+
+    def test_dispatch_passes_gift_fields(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = self._make_result("gift")
+        svc = TriggerService(engine=mock_engine)
+
+        result = svc.dispatch("gift", user="TestUser", gift_id="5655", gift_name="Rose")
+
+        assert result["status"] == "success"
+        mock_engine.execute_trigger.assert_called_once_with(
+            trigger_name="gift",
+            user="TestUser",
+            gift_id="5655",
+            gift_name="Rose",
+        )
+
+    def test_dispatch_records_history(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = self._make_result("follow")
+        svc = TriggerService(engine=mock_engine)
+
+        svc.dispatch("follow", user="Someone")
+
+        history = svc.get_history()
+        assert len(history) == 1
+        assert history[0]["kind"] == "follow"
+        assert history[0]["success"] is True
+
+    def test_dispatch_reports_validation_failure(self):
+        mock_engine = MagicMock(spec=TriggerEngine)
+        mock_engine.execute_trigger.return_value = TriggerResult(
+            success=False,
+            trigger_name="",
+            status=ExecutionStatus.VALIDATION_ERROR,
+            execution_time_ms=0.0,
+            payload={},
+            error_message="Trigger name is required.",
+        )
+        svc = TriggerService(engine=mock_engine)
+
+        result = svc.dispatch("")
+
+        assert result["status"] == "error"
+
     def test_toggle_tiktok_connection(self):
         mock_engine = MagicMock(spec=TriggerEngine)
         mock_engine.execute_trigger.return_value = TriggerResult(

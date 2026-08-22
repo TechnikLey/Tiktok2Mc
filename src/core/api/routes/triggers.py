@@ -19,6 +19,7 @@ from core.api.models import (
     TiktokToggleResponse,
     TriggerCommentRequest,
     TriggerExecuteRequest,
+    TriggerHistoryEntry,
     TriggerHistoryResponse,
     TriggerResponse,
     TriggerTypesResponse,
@@ -74,6 +75,51 @@ async def execute_trigger(body: TriggerExecuteRequest):
         raise
     except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Trigger execution failed")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/triggers/dispatch", response_model=TriggerResponse)
+async def dispatch_trigger(body: TriggerExecuteRequest):
+    """Programmatic trigger execution for extensions (no GUI debounce).
+
+    Unlike ``/triggers/execute`` (Event Tester), this endpoint is never
+    rate-limited by the shared tester cooldown and does not mark the
+    resulting event as a test event.  Intended for plugins/schedulers that
+    fire actions.mca triggers on their own schedule.
+    """
+    try:
+        result = get_trigger_service().dispatch(
+            trigger=body.trigger,
+            user=body.user,
+            gift_id=body.gift_id,
+            gift_name=body.gift_name,
+        )
+
+        if result["status"] != "error":
+            event_type = body.trigger
+            if body.gift_id:
+                event_type = "gift"
+            asyncio.ensure_future(
+                event_bus.publish(
+                    f"tiktok.{event_type}",
+                    {
+                        "user": body.user,
+                        "gift_id": body.gift_id,
+                        "source": "api",
+                    },
+                )
+            )
+
+        return TriggerResponse(
+            status=result.get("status", "error"),
+            message=result.get("message", ""),
+            trigger=body.trigger,
+            user=body.user,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # any unexpected error becomes an HTTP 500
+        log.exception("Trigger dispatch failed")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -142,7 +188,10 @@ async def send_test_comment(body: TriggerCommentRequest):
 @router.get("/triggers/history", response_model=TriggerHistoryResponse)
 async def get_trigger_history():
     try:
-        entries = get_trigger_service().get_history()
+        entries = [
+            TriggerHistoryEntry(**entry)
+            for entry in get_trigger_service().get_history()
+        ]
         return TriggerHistoryResponse(history=entries)
     except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to get trigger history")

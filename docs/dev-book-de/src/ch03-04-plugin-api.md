@@ -188,12 +188,41 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `GET` | `/plugins/{name}/config` | Plugin-Konfiguration lesen |
 | `PUT` | `/plugins/{name}/config` | Plugin-Konfiguration schreiben |
 | `POST` | `/events` | Eigenes Event auf dem EventBus veröffentlichen |
+| `POST` | `/triggers/dispatch` | actions.mca-Trigger auslösen (ohne Debounce — siehe unten) |
 | `GET` | `/health` | Health-Status des API-Servers |
 | `GET` | `/diagnostics` | Diagnose-Report (alle Komponenten) |
 
 **Authentifizierung**: Wenn `api_key` in der globalen `config.yaml` gesetzt ist, muss jeder Request den Header `X-API-Key: <key>` enthalten (gilt nur für Requests von außerhalb localhost).
 
 **Basis-URL**: Standard `http://127.0.0.1:29185/api/v1/`, überschreibbar über die Umgebungsvariable `API_BASE_URL`.
+
+### Trigger-Aktionen programmatisch auslösen
+
+`POST /api/v1/triggers/dispatch` führt einen actions.mca-Trigger genau so aus,
+als hätte das entsprechende TikTok-Event stattgefunden — ohne das Cooldown des
+GUI-Event-Testers (`/triggers/execute`). Das ist der unterstützte Weg für
+Erweiterungen, um actions.mca nach eigenem Zeitplan anzusteuern (Timer, Cron,
+externe Integrationen):
+
+```json
+POST /api/v1/triggers/dispatch
+{
+  "trigger": "bonus_drop",
+  "user": "System",
+  "gift_id": null,
+  "gift_name": null
+}
+```
+
+- **trigger**: Action-Name aus der `actions.mca`, eine Gift-ID oder einer der
+  eingebauten Event-Namen (`follow`, `like`, `join`, `share`, `comment`, `gift`)
+- **user**: Benutzername, der als `{user}` eingesetzt wird (Standard `"System"`)
+- **gift_id / gift_name**: Optional; für Gift-Trigger (`gift_id` ersetzt den
+  Trigger-Namen auf der Leitung)
+- **Antwort**: `{"status": "success", "trigger": ..., "user": ..., "message": ...}`
+  — `status` ist `"error"` bei Validierungsfehlern oder nicht erreichbarer Bridge
+- Der Aufruf wird **nicht** gedrosselt und **nicht** als Test-Event markiert;
+  jeder Dispatch landet in der Trigger-History (`GET /triggers/history`)
 
 ## Nächstes Kapitel
 
