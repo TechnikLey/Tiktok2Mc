@@ -3714,6 +3714,7 @@ const SECTION_ORDER = [
   'console','overlay','theme',
   'update','shutdown','auto_update_config','show_sudo_warning','gui',
   'plugin_sandbox',
+  'outbound',
   'port_policy','api_key',
   'like_triggers'
 ];
@@ -3722,6 +3723,7 @@ const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method','api'],
   'Minecraft': ['java','mc_version','minecraft_server_api'],
   'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
+  'Integration': ['outbound'],
   'Chat & Commands': ['like_triggers']
 };
 
@@ -3747,6 +3749,7 @@ const SECTION_META = {
   port_policy: { title: 'Port Policy', desc: 'Controls what happens when a required port is already in use. Can auto-resolve to the next free port.', category: 'System' },
   api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'System' },
   plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' },
+  outbound: { title: 'Outbound Webhooks', desc: 'Forwards live events to external HTTP endpoints such as Discord webhooks. Each channel subscribes via event patterns and has its own circuit breaker.', category: 'Integration' },
 };
 
 const SECTION_META_DE = {
@@ -3771,12 +3774,14 @@ const SECTION_META_DE = {
   port_policy: { title: 'Port-Richtlinie', desc: 'Steuert, was passiert, wenn ein benötigter Port bereits belegt ist. Kann automatisch zum nächsten freien Port wechseln.' },
   api_key: { title: 'API-Schlüssel', desc: 'Optionaler API-Schlüssel für die Authentifizierung, wenn der Server über localhost hinaus erreichbar ist.' },
   plugin_sandbox: { title: 'Plugin-Sandbox', desc: 'Beschränkt Ressourcen von Plugin-Subprozessen, um die Auswirkungen fehlerhafter oder kompromittierter Plugins zu begrenzen.' },
+  outbound: { title: 'Outbound-Webhooks', desc: 'Leitet Live-Events an externe HTTP-Endpunkte wie Discord-Webhooks weiter. Jeder Channel abonniert Event-Patterns und hat einen eigenen Schutzschalter.' },
 };
 
 const CATEGORY_LABELS_DE = {
   'Connection': 'Verbindung',
   'Minecraft': 'Minecraft',
   'System': 'System',
+  'Integration': 'Integration',
   'Chat & Commands': 'Chat & Befehle',
 };
 
@@ -3833,7 +3838,13 @@ const HELP_TEXT = {
   'plugin_sandbox.max_cpu_time': 'Maximum CPU seconds per plugin (Linux only).',
   'plugin_sandbox.max_files': 'Maximum open file descriptors per plugin (Linux only).',
   'plugin_sandbox.max_processes': 'Maximum child processes per plugin (Linux only).',
-  'plugin_sandbox.priority_class': 'Windows process priority for plugin subprocesses. below_normal reduces impact on the main tool.'
+  'plugin_sandbox.priority_class': 'Windows process priority for plugin subprocesses. below_normal reduces impact on the main tool.',
+  'outbound.enabled': 'Master switch for all outbound channels. When disabled, no events are forwarded.',
+  'outbound.max_fails': 'Consecutive failed deliveries before a channel\'s circuit breaker activates. Same mechanism as the overlay circuit breaker.',
+  'outbound.cooldown': 'Seconds a channel pauses after max_fails failed deliveries. Events arriving during the cooldown are dropped.',
+  'outbound.retries': 'Extra delivery attempts per message after the first failure (1 second apart). 0 = send exactly once.',
+  'outbound.timeout': 'HTTP timeout in seconds per delivery attempt.',
+  'outbound.channels': 'Webhook channels. Each channel POSTs matching events to its URL. Patterns use exact names (tiktok.gift) or wildcards (tiktok.*); * matches everything.'
 };
 
 const HELP_TEXT_DE = {
@@ -3888,7 +3899,13 @@ const HELP_TEXT_DE = {
   'plugin_sandbox.max_cpu_time': 'Maximale CPU-Sekunden pro Plugin (nur Linux).',
   'plugin_sandbox.max_files': 'Maximale offene Dateideskriptoren pro Plugin (nur Linux).',
   'plugin_sandbox.max_processes': 'Maximale Kindprozesse pro Plugin (nur Linux).',
-  'plugin_sandbox.priority_class': 'Windows-Prozesspriorität für Plugin-Subprozesse. below_normal reduziert die Auswirkungen auf das Haupt-Tool.'
+  'plugin_sandbox.priority_class': 'Windows-Prozesspriorität für Plugin-Subprozesse. below_normal reduziert die Auswirkungen auf das Haupt-Tool.',
+  'outbound.enabled': 'Hauptschalter für alle Outbound-Channels. Wenn deaktiviert, werden keine Events weitergeleitet.',
+  'outbound.max_fails': 'Aufeinanderfolgende fehlgeschlagene Zustellungen, bevor der Schutzschalter eines Channels auslöst. Gleicher Mechanismus wie beim Overlay-Schutzschalter.',
+  'outbound.cooldown': 'Sekunden, die ein Channel nach max_fails Fehlzustellungen pausiert. Events während der Pause werden verworfen.',
+  'outbound.retries': 'Zusätzliche Zustellversuche pro Nachricht nach dem ersten Fehlversuch (jeweils 1 Sekunde Abstand). 0 = genau einmal senden.',
+  'outbound.timeout': 'HTTP-Timeout in Sekunden pro Zustellversuch.',
+  'outbound.channels': 'Webhook-Channels. Jeder Channel POSTet passende Events an seine URL. Patterns sind exakte Namen (tiktok.gift) oder Wildcards (tiktok.*); * passt auf alles.'
 };
 
 const FIELD_META = {
@@ -3949,6 +3966,13 @@ const FIELD_META = {
   'like_triggers[].function': { basic: true, type: 'text' },
   'like_triggers[].payload': { basic: true, type: 'text' },
   'like_triggers[].enabled': { basic: true, type: 'bool' },
+
+  'outbound': { basic: false },
+  'outbound.enabled': { basic: true, type: 'bool' },
+  'outbound.max_fails': { basic: false, type: 'number', min: 1 },
+  'outbound.cooldown': { basic: false, type: 'number', min: 0 },
+  'outbound.retries': { basic: false, type: 'number', min: 0 },
+  'outbound.timeout': { basic: false, type: 'number', min: 1 },
 };
 
 function getMeta(path) {
@@ -4306,6 +4330,8 @@ class ConfigEditor {
       } else if (Array.isArray(v)) {
         if (path === 'overlay.overlays') {
           html += this.buildOverlaySlotsEditor(path, v);
+        } else if (path === 'outbound.channels') {
+          html += this.buildOutboundChannelsEditor(path, v);
         } else if (path === 'random_triggers.triggers') {
           html += this.buildTagEditor(path, v, { label: 'Triggers', suggestions: ['likes','like_2','follow','join','comment','gift','share'] });
         } else if (path.endsWith('.commands')) {
@@ -4625,6 +4651,102 @@ class ConfigEditor {
     this.setValue(path, triggers);
   }
 
+  buildOutboundChannelsEditor(path, channels) {
+    const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
+    const help = getHelp(path);
+    const lang = _editorLangIsDe() ? 'de' : 'en';
+    const T = {
+      en: {
+        add: '+ Add Channel', remove: 'Remove channel',
+        name: 'Name', nameHint: 'Unique channel name, e.g. "discord-events".',
+        url: 'Webhook URL', urlHint: 'Full HTTPS URL the events are POSTed to.',
+        format: 'Format', raw: 'Raw (JSON envelope)', discord: 'Discord',
+        template: 'Template', templateHint: 'Discord only. Placeholders: {user}, {type}, {comment}, …',
+        events: 'Event patterns', eventsHint: 'Comma-separated. Exact (tiktok.gift), wildcard (tiktok.*) or * for all.',
+      },
+      de: {
+        add: '+ Channel hinzufügen', remove: 'Channel entfernen',
+        name: 'Name', nameHint: 'Eindeutiger Channel-Name, z. B. "discord-events".',
+        url: 'Webhook-URL', urlHint: 'Vollständige HTTPS-URL, an die Events gesendet werden.',
+        format: 'Format', raw: 'Raw (JSON-Envelope)', discord: 'Discord',
+        template: 'Template', templateHint: 'Nur Discord. Platzhalter: {user}, {type}, {comment}, …',
+        events: 'Event-Patterns', eventsHint: 'Komma-getrennt. Exakt (tiktok.gift), Wildcard (tiktok.*) oder * für alle.',
+      }
+    }[lang];
+    const rows = (channels || []).map((ch, i) => {
+      const enabled = ch.enabled !== false;
+      const fmt = ch.format || 'raw';
+      const eventsVal = Array.isArray(ch.events) ? ch.events.join(', ') : '';
+      return `<div class="like-trigger-card">
+        <div class="like-trigger-header">
+          <span class="like-trigger-number">#${i + 1}</span>
+          <label class="like-trigger-toggle">
+            <input type="checkbox" class="toggle" data-path="${path}[${i}].enabled" data-type="bool" ${enabled ? 'checked' : ''} onchange="this.nextElementSibling.textContent=this.checked?'ON':'OFF'; editor.onFieldInput()">
+            <span class="toggle-label">${enabled ? 'ON' : 'OFF'}</span>
+          </label>
+          <button class="btn-icon" onclick="editor.removeArrayItem('${path}', ${i})" title="${T.remove}">&times;</button>
+        </div>
+        <div class="like-trigger-body">
+          <div class="like-trigger-field">
+            <label>${T.name}</label>
+            <input type="text" value="${escapeHtml(ch.name || '')}" placeholder="discord-events" data-path="${path}[${i}].name" data-type="string" oninput="editor.onFieldInput()">
+            <span class="like-trigger-hint">${T.nameHint}</span>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.url}</label>
+            <input type="text" value="${escapeHtml(ch.url || '')}" placeholder="https://discord.com/api/webhooks/…" data-path="${path}[${i}].url" data-type="string" oninput="editor.onFieldInput()">
+            <span class="like-trigger-hint">${T.urlHint}</span>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.format}</label>
+            <select data-path="${path}[${i}].format" data-type="string" onchange="editor.onFieldInput()">
+              <option value="raw" ${fmt === 'raw' ? 'selected' : ''}>${T.raw}</option>
+              <option value="discord" ${fmt === 'discord' ? 'selected' : ''}>${T.discord}</option>
+            </select>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.template}</label>
+            <input type="text" value="${escapeHtml(ch.template || '')}" placeholder="**{user}** triggered *{type}*" data-path="${path}[${i}].template" data-type="string" oninput="editor.onFieldInput()">
+            <span class="like-trigger-hint">${T.templateHint}</span>
+          </div>
+          <div class="like-trigger-field">
+            <label>${T.events}</label>
+            <input type="text" value="${escapeHtml(eventsVal)}" placeholder="tiktok.*" data-ob-events="${i}" oninput="editor.onFieldInput()">
+            <span class="like-trigger-hint">${T.eventsHint}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="editor-field full-width" data-path="${path}">
+      <div class="field-label" style="font-size:1rem;font-weight:600;">Channels</div>
+      <div class="field-widget">
+        ${help ? `<p class="field-desc" style="margin-bottom:0.75rem;">${escapeHtml(help)}</p>` : ''}
+        <div class="like-trigger-list" id="${id}_list">${rows}</div>
+        <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="editor.addOutboundChannel('${path}')">${T.add}</button>
+      </div>
+    </div>`;
+  }
+
+  addOutboundChannel(path) {
+    const arr = this.getValue(path) || [];
+    arr.push({ name: '', url: '', events: ['tiktok.*'], format: 'raw', template: '', enabled: false });
+    this.setValue(path, arr);
+    this.render();
+  }
+
+  collectOutboundChannels() {
+    const current = this.getValue('outbound.channels');
+    if (!Array.isArray(current)) return;
+    this.content.querySelectorAll('[data-ob-events]').forEach(el => {
+      const idx = parseInt(el.getAttribute('data-ob-events'), 10);
+      if (!current[idx]) return;
+      current[idx].events = String(el.value || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+    });
+  }
+
   buildPrimitiveArray(path, arr) {
     const help = getHelp(path);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
@@ -4807,6 +4929,7 @@ class ConfigEditor {
       }
     });
     this.collectLikeTriggers();
+    this.collectOutboundChannels();
   }
 
   /* ─── Validation ─── */

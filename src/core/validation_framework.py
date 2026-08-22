@@ -540,6 +540,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "control_method": str,
     "gui": dict,
     "java": dict,
+    "like_triggers": list,
     "mc_version": str,
     "minecraft_server_api": dict,
     "overlay": dict,

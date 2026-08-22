@@ -787,6 +787,7 @@
     'config.sec.port_policy': 'Port Policy',
     'config.sec.api_key': 'API Key',
     'config.sec.plugin_sandbox': 'Plugin Sandbox',
+    'config.sec.outbound': 'Outbound Webhooks',
     'config.field.Triggers': 'Triggers',
     'config.field.Commands': 'Commands',
 
@@ -1855,6 +1856,7 @@
     'config.sec.port_policy': 'Port-Richtlinie',
     'config.sec.api_key': 'API-Schlüssel',
     'config.sec.plugin_sandbox': 'Plugin-Sandbox',
+    'config.sec.outbound': 'Outbound-Webhooks',
     'config.field.Triggers': 'Trigger',
     'config.field.Commands': 'Befehle',
 

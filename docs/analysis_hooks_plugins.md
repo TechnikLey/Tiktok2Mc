@@ -202,7 +202,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 **Einzelintegration als Plugin: „Ja, mit Einschränkungen"** (Transport komplett DIY, Inbound nur über Minecraft-branded Webhook mit Kollisionsrisiko).
 **Eine generische „Game-Connector"-Architektur: „Nur mit strukturellen Änderungen":** es fehlen (a) ein typisierter, generischer Inbound, der sowohl Bus **als auch** Trigger-Engine speist, (b) die Entkopplung der Minecraft-Spezialfälle vom Webhook, (c) ein Outbound-Kanal-Konzept (konfigurierbare Ziele inkl. Retry/Breaker).
 
-**Wiederverwendbare Bausteine:** generischer Inbound-Endpoint (Trigger-Dispatch ✅ vorhanden, Outbound-Channels noch offen, J.2 Nr. 6) — identisch nützlich für Discord-Notifier, Home-Assistant, OBS-Steuerung usw.
+**Wiederverwendbare Bausteine:** generischer Inbound-Endpoint (Trigger-Dispatch ✅ vorhanden, Outbound-Channels ✅ `4aa4711`, J.2 Nr. 6) — identisch nützlich für Discord-Notifier, Home-Assistant, OBS-Steuerung usw.
 
 ---
 
@@ -264,7 +264,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 ### J.2 Sinnvoll (hoher Nutzen für mehrere Ideen)
 4. ~~**Veto-/Rückgabevertrag für Hook-Actions**~~ — **[TEILWEISE ✅]** Veto-Vertrag erledigt (`54fdb78`: `False` = Restkette abbrechen); **strukturierter `context` statt `{}` weiterhin offen** (E.5).
 5. **Hook-Runtime-Reload/Lifecycle:** Enable/Disable ohne Bridge-Restart (Reload-Signal-Mechanik erweitern); `on_live_start/end`-Callbacks. *(offen)*
-6. **Generischer Outbound-Kanal:** konfigurierbare HTTP/WS-Ziele mit Retry/Circuit-Breaker (Overlay-Muster generalisieren) — Grundlage für G.3, I.1 und alle externen Integrationen. *(offen)*
+6. ~~**Generischer Outbound-Kanal**~~ — **[✅ `4aa4711`]** `OutboundDispatcher` im API-Prozess: EventBus → konfigurierbare HTTP-Channels (`outbound:` in config.yaml; Formate `raw`/`discord`, Event-Patterns wie `event_subscriptions`), Retry + Circuit-Breaker pro Channel (`OverlayClient` wiederverwendet), Health-Lifecycle; REST `GET /outbound/channels` (URLs maskiert) + `POST /outbound/channels/{name}/test` (reine Probe); dokumentiert in ch03-04 (EN+DE). Grundlage G.3/I.1 geschaffen.
 7. ~~**Trigger-Zugriff für Erweiterungen**~~ — **[✅ `8ea4109`]** `POST /api/v1/triggers/dispatch`: kein Debounce, definierter Payload (`trigger`/`user`/`gift_id`/`gift_name`), History-Aufzeichnung; dokumentiert in ch03-04 (EN+DE). Grundlage I.2 geschaffen.
 8. **Request/Response zwischen Extensions:** Korrelations-IDs/Antwortqueue statt reinem Fire-and-forget. *(offen)*
 9. ~~**Namespaced Persistenz-API pro Plugin/Hook**~~ — **[✅ `022fe7a`]** `PersistenceService` (`data/plugin_data/<name>.json`, atomar), REST `GET/PUT/DELETE /plugins/{name}/data[/{key}]`, `BasePlugin.store_*`-Helper; dokumentiert in ch03-04/ch04-03 (EN+DE).
@@ -289,10 +289,9 @@ Was die versprochene Flexibilität ursprünglich **ausbremste**, waren keine Des
 
 ### Umsetzungsstand (August 2026)
 
-**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, Trigger-Dispatch-Endpoint, namespaced Persistenz-API. Die Ideen F (TTS), H.1/H.2 (Gates/Moderation) und I.1/I.2 (Notifier, Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
+**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord). Die Ideen F (TTS), H.1/H.2 (Gates/Moderation), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
 
 **Verbleibende Roadmap (empfohlene Reihenfolge):**
-1. J.2 Nr. 6 — generischer Outbound-Kanal (unlockt G.3/I.1-QOL und alle externen Integrationen)
-2. J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle
-3. E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context` (unlockt H.3/Gift-Combos endgültig)
-4. J.2 Nr. 8/10 — Request/Response + Capability-Enforcement; danach J.3 nach Bedarf
+1. J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle
+2. E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context` (unlockt H.3/Gift-Combos endgültig)
+3. J.2 Nr. 8/10 — Request/Response + Capability-Enforcement; danach J.3 nach Bedarf
