@@ -161,6 +161,20 @@ class ReactionCommand(BaseModel):
 # ── Plugin Manifest ──────────────────────────────────────────────────
 
 
+class CommentHandlerConfig(BaseModel):
+    """Declares that a plugin receives prefixed TikTok comments.
+
+    See ``docs/dev-book`` ch03-05: comments starting with ``prefix`` are
+    forwarded to the plugin as a ``comment`` command with the prefix
+    stripped from the text.
+    """
+
+    prefix: str = Field(
+        "$", description="Character(s) marking a plugin command comment"
+    )
+    enabled: bool = Field(True, description="Whether the handler is active")
+
+
 class PluginManifest(BaseModel):
     """Declarative plugin metadata from ``plugin.json``.
 
@@ -198,6 +212,10 @@ class PluginManifest(BaseModel):
     event_subscriptions: list[str] = Field(
         default_factory=list,
         description="Event types this plugin wants to receive via CommandQueue. Supports wildcards: tiktok.*, tiktok.gift, etc.",
+    )
+    comment_handler: CommentHandlerConfig | None = Field(
+        None,
+        description="Declares that this plugin receives TikTok comments starting with a prefix via 'comment' commands",
     )
     update_url: str = Field(
         "",

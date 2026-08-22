@@ -272,24 +272,35 @@ class TestReloadOffloadsToThread:
         assert seen.get("validate") != main_thread
         assert seen.get("build") != main_thread
 
-    @pytest.mark.asyncio
-    async def test_reload_config_fetches_subscriptions_in_thread(self, monkeypatch):
+
+# =========================================================================
+# TikTok event publishing
+# =========================================================================
+
+
+class TestPublishTiktokEvent:
+    def test_publish_forwards_event_to_api_bus(self, monkeypatch):
         from src.python import main as main_mod
 
-        seen = {}
-        main_thread = threading.get_ident()
+        submitted = {}
 
-        def fake_load_event_subscriptions():
-            seen["subscriptions"] = threading.get_ident()
-            return {}
+        def fake_run_in_background(fn, *args):
+            submitted["fn"] = fn
+            submitted["args"] = args
 
-        monkeypatch.setattr(
-            main_mod, "_load_event_subscriptions", fake_load_event_subscriptions
-        )
+        monkeypatch.setattr(main_mod, "_run_in_background", fake_run_in_background)
 
-        await main_mod.reload_config()
+        main_mod._publish_tiktok_event("gift", "TestUser", gift_id="5299")
 
-        assert seen.get("subscriptions") != main_thread
+        fn = submitted.get("fn")
+        args = submitted.get("args")
+        assert fn is main_mod._post_tiktok_event_api
+        assert isinstance(args, tuple) and args
+        body = json.loads(args[0])
+        assert body == {
+            "type": "tiktok.gift",
+            "data": {"user": "TestUser", "gift_id": "5299"},
+        }
 
 
 # =========================================================================

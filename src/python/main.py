@@ -43,8 +43,6 @@ from TikTokLive.events import (
     ShareEvent,
 )
 
-from core.api.eventbus import event_bus
-from core.api.plugin_overlay import command_queue
 from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
 from core.error_codes import (
@@ -68,7 +66,6 @@ from core.logger import (
 )
 from core.overlay_utils import send_overlay_text
 from core.paths import get_base_dir, get_runtime_dir
-from core.plugin_config import discover_plugins_dir, load_plugin_manifest
 from core.tiktok_chatbot import get_chatbot
 from core.validator import Severity, print_diagnostics, validate_file
 from core.yaml_utils import load_yaml
@@ -169,9 +166,6 @@ class BotContext:
         self.tiktok_client = None
         self.tiktok_client_loop = None
         self.tiktok_live = False
-
-        # Event bridge subscriptions (reloaded at runtime)
-        self.event_subscriptions = {}
 
         # Gift tracking
         self.gift_value_usd = 0
@@ -1195,18 +1189,19 @@ def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
 
 
 def _publish_tiktok_event(event_type: str, user: str, **extra):
-    """Publish a TikTok event to the EventBus for plugins to consume."""
+    """Publish a TikTok event to the API-side EventBus.
+
+    The API process owns the bus every consumer reads from (plugins via
+    ECM / event_subscriptions, GUI live feed, live tracker), so events are
+    forwarded there over HTTP — the same path used for ``tiktok.live_status``
+    and ``minecraft.*`` webhook events.  Delivery is best-effort and runs in
+    the shared background executor so trigger dispatch never blocks.
+    """
     _record_metrics_event()
-    if ctx.main_loop is not None:
-        data = {"type": event_type, "user": user, **extra}
-        try:
-            asyncio.run_coroutine_threadsafe(
-                event_bus.publish(f"tiktok.{event_type}", data), ctx.main_loop
-            )
-        except (RuntimeError, ValueError) as exc:
-            get_crash_manager().report_exception(
-                TIKTOK_0004, exc=exc, context_info={"event_type": event_type}
-            )
+    body = json.dumps(
+        {"type": f"tiktok.{event_type}", "data": {"user": user, **extra}}
+    ).encode("utf-8")
+    _run_in_background(_post_tiktok_event_api, body)
 
 
 def _publish_tiktok_status(connected: bool):
@@ -1242,6 +1237,23 @@ def _post_tiktok_status(body: bytes) -> None:
         log.warning("Failed to publish TikTok live status to EventBus: %s", exc)
         get_crash_manager().report_exception(
             TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_live_status"}
+        )
+
+
+def _post_tiktok_event_api(body: bytes) -> None:
+    """Deliver a TikTok event body to the API-side EventBus (best-effort)."""
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except (OSError, ValueError) as exc:
+        log.warning("Failed to publish TikTok event to EventBus: %s", exc)
+        get_crash_manager().report_exception(
+            TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_event"}
         )
 
 
@@ -1292,101 +1304,6 @@ async def _tiktok_status_heartbeat():
         except Exception as e:  # heartbeat must never die
             log.debug("[HEARTBEAT] TikTok status publish failed: %s", e)
         await asyncio.sleep(30)
-
-
-def _load_event_subscriptions() -> dict[str, list[str]]:
-    """Scan all plugin manifests and build event_type → [plugin_names] mapping.
-
-    Supports wildcards in subscriptions:
-      "tiktok.*" matches "tiktok.gift", "tiktok.like", etc.
-      "tiktok.gift" matches only "tiktok.gift"
-    """
-    subs: dict[str, list[str]] = {}
-    plugins_dir = discover_plugins_dir()
-    if not plugins_dir.is_dir():
-        return subs
-
-    for child in sorted(plugins_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        manifest = load_plugin_manifest(child)
-        if not manifest:
-            continue
-        plugin_name = manifest.get("name", "")
-        if not plugin_name:
-            continue
-        for pattern in manifest.get("event_subscriptions", []):
-            subs.setdefault(pattern, []).append(plugin_name)
-
-    log.info("[EVENT-BRIDGE] Loaded subscriptions for %d pattern(s)", len(subs))
-    for pattern, names in sorted(subs.items()):
-        log.info("  %s → %s", pattern, names)
-    return subs
-
-
-def _match_event(event_type: str, pattern: str) -> bool:
-    """Check if an event type matches a subscription pattern."""
-    if pattern == event_type:
-        return True
-    if pattern.endswith(".*"):
-        prefix = pattern[:-2]
-        return event_type.startswith(prefix + ".")
-    return False
-
-
-async def _event_bridge_worker():
-    """Declarative event bridge.
-
-    Reads event_subscriptions from every plugin.json manifest.
-    Routes matching TikTok events to all subscribing plugins via
-    CommandQueue with a standardized tiktok_event command.
-
-    No plugin names are hardcoded — third-party plugins work the
-    same way as official ones by declaring subscriptions.
-    """
-    q = event_bus.subscribe()  # all events — tiktok events now have individual types
-    ctx.event_subscriptions = _load_event_subscriptions()
-    log.info("[EVENT-BRIDGE] Started (declarative).")
-    while True:
-        msg = await q.get()
-        try:
-            event_type = msg.get("type", "")
-            if not event_type.startswith("tiktok."):
-                continue
-
-            data = msg.get("data", {})
-            ev_type = data.get("type")
-            user = data.get("user")
-            if not user or not ev_type:
-                continue
-
-            # Normalize event type: gift → tiktok.gift
-            full_event_type = f"tiktok.{ev_type}"
-
-            # Find all plugins that subscribe to this event
-            recipients: set[str] = set()
-            subscriptions = ctx.event_subscriptions
-            for pattern, plugin_names in subscriptions.items():
-                if _match_event(full_event_type, pattern):
-                    recipients.update(plugin_names)
-
-            # Enqueue standardized tiktok_event command to each recipient
-            for plugin_name in recipients:
-                command_queue.enqueue(
-                    plugin_name,
-                    "tiktok_event",
-                    event_type=full_event_type,
-                    user=user,
-                    data={k: v for k, v in data.items() if k not in ("type", "user")},
-                )
-
-        except Exception as e:  # worker must never die
-            log.error(f"[EVENT-BRIDGE] Error handling event: {e}")
-            get_crash_manager().report_exception(
-                TIKTOK_0004, exc=e, context_info={"source": "_event_bridge_worker"}
-            )
-        finally:
-            q.task_done()
 
 
 def _append_follow_tracking(user_lower: str):
@@ -2430,10 +2347,6 @@ async def reload_config():
                 valid_functions=ctx.valid_functions,
             )
 
-        # Network/file fetches run in a thread so the reload never blocks the
-        # main loop; both helpers are pure reads (no ctx mutation).
-        ctx.event_subscriptions = await asyncio.to_thread(_load_event_subscriptions)
-
         # Force the RCON worker to reconnect with the new settings.
         ctx.rcon_connection = None
 
@@ -2632,7 +2545,6 @@ async def run_bot():
     for name, coro in [
         ("trigger_worker", trigger_worker()),
         ("rcon_worker", rcon_worker()),
-        ("_event_bridge_worker", _event_bridge_worker()),
         ("gift_revenue_counter", gift_revenue_counter()),
         ("_reload_signal_watcher", _reload_signal_watcher()),
         ("_tiktok_status_heartbeat", _tiktok_status_heartbeat()),

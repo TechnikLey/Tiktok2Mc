@@ -151,7 +151,7 @@ The Event Bridge delivers the following dictionary to the `tiktok_event` handler
     "user": "TikTokUsername",        # TikTok username
     "data": {                         # Event-specific fields
         # For gift: gift_name, gift_id, count
-        # For comment: (no extra fields)
+        # For comment: comment (full text)
         # For like: delta, total
     }
 }
@@ -164,10 +164,10 @@ The detailed structure can be found in [Receiving Events](./ch03-05-events-and-s
 ```
 TikTok Live → TikTokLive Client (Bridge Process)
     → _publish_tiktok_event("follow", username)
-    → EventBus.publish("tiktok.follow", {type, user})
-    → _event_bridge_worker (filters by tiktok.*)
+    → HTTP POST /api/v1/events  {type: "tiktok.follow", data: {...}}
+    → API Server EventBus.publish("tiktok.follow", ...)
+    → PluginEventBridge (API process, filters by tiktok.*)
     → command_queue.enqueue(plugin, "tiktok_event", event_type, user, data)
-    → API Server (CommandQueue)
     → Plugin Polling Thread (GET /commands?wait=1)
     → self._handlers["tiktok_event"](args)
 ```

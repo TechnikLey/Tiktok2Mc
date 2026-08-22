@@ -66,7 +66,9 @@ The Event Bridge delivers standardized dictionaries:
 {
     "event_type": "tiktok.comment",
     "user": "commenter",
-    "data": {}
+    "data": {
+        "comment": "$play halo"  # Full comment text
+    }
 }
 
 # tiktok.like
@@ -88,10 +90,10 @@ The Event Bridge delivers standardized dictionaries:
 ```
 
 > [!NOTE]
-> The comment text is **not** part of the `tiktok.comment` event (`data` is empty). Comment texts are delivered via the [Comment Handler](#comment-handler-comment_handler) (see below).
+> The comment text is part of the `tiktok.comment` event (`data.comment`). For structured prefix commands (e.g. `$play`), prefer the [Comment Handler](#comment-handler-comment_handler) — it strips the prefix and delivers the command text directly.
 
 > [!NOTE]
-> The Event Bridge publishes TikTok events on the EventBus, filters them in the bridge process (`_event_bridge_worker`), and enqueues the command `"tiktok_event"` in the CommandQueue of the API server.
+> TikTok events are forwarded by the bridge to the API EventBus. The API-side **Plugin Event Bridge** matches them against the `event_subscriptions` declared in every `plugin.json` and enqueues the `"tiktok_event"` command into each subscriber's CommandQueue.
 
 ### Complete Example: Reacting to Multiple Event Types
 
@@ -197,7 +199,7 @@ Plugins can react to TikTok comments with a specific prefix. The declaration is 
 | `prefix` | Character that marks a command (e.g., `$` for `$song`). Default: `"$"`. |
 | `enabled` | Whether the handler is active. Default: `true`. |
 
-When a TikTok comment starts with the prefix (e.g., `$song`), the system forwards the command text **without the prefix** to the plugin via `POST /plugins/{name}/command`. The plugin registers a handler for the `"comment"` command for this:
+When a TikTok comment starts with the prefix (e.g., `$song`), the system enqueues the command text **without the prefix** as a `"comment"` command in the plugin's CommandQueue (the same polled queue used for all plugin commands). The plugin registers a handler for the `"comment"` command for this:
 
 ```python
 self.register_handler("comment", self._on_comment)
@@ -208,7 +210,7 @@ def _on_comment(self, args):
 ```
 
 > [!NOTE]
-> Without the `comment_handler` declaration, the prefix is not registered and the system does not forward the comment to the plugin. The `tiktok.comment` event only contains the username and an empty `data` — the comment text arrives exclusively through this command.
+> Without the `comment_handler` declaration, the prefix is not registered and the system does not forward the comment to the plugin — only the generic `tiktok.comment` event (with the full text in `data.comment`) reaches subscribers of `tiktok.*`. The parsed `"comment"` command with prefix stripped arrives exclusively through this declaration.
 
 ## Common Errors
 

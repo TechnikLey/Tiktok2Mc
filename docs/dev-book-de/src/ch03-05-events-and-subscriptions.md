@@ -66,7 +66,9 @@ Die Event-Bridge liefert standardisierte Dictionaries:
 {
     "event_type": "tiktok.comment",
     "user": "kommentator",
-    "data": {}
+    "data": {
+        "comment": "$play halo"  # Vollständiger Kommentartext
+    }
 }
 
 # tiktok.like
@@ -88,10 +90,10 @@ Die Event-Bridge liefert standardisierte Dictionaries:
 ```
 
 > [!NOTE]
-> Der Kommentartext ist **nicht** Teil des `tiktok.comment`-Events (`data` ist leer). Kommentartexte werden über den [Kommentar-Handler](#kommentar-handler-comment_handler) zugestellt (siehe unten).
+> Der Kommentartext ist Teil des `tiktok.comment`-Events (`data.comment`). Für strukturierte Prefix-Befehle (z. B. `$play`) ist der [Kommentar-Handler](#kommentar-handler-comment_handler) die bessere Wahl — er entfernt den Prefix und stellt den Befehlstext direkt zu.
 
 > [!NOTE]
-> Die Event-Bridge veröffentlicht TikTok-Events auf dem EventBus, filtert sie im Bridge-Prozess (`_event_bridge_worker`) und enqueued den Befehl `"tiktok_event"` in der CommandQueue des API-Servers.
+> TikTok-Events werden von der Bridge an den EventBus der API weitergeleitet. Die API-seitige **Plugin Event Bridge** gleicht sie mit den `event_subscriptions` aus jeder `plugin.json` ab und enqueued den Befehl `"tiktok_event"` in die CommandQueue jedes Abonnenten.
 
 ### Vollständiges Beispiel: Auf mehrere Event-Typen reagieren
 
@@ -197,7 +199,7 @@ Plugins können auf TikTok-Kommentare mit einem bestimmten Prefix reagieren. Die
 | `prefix` | Zeichen, das einen Command markiert (z. B. `$` für `$song`). Standard: `"$"`. |
 | `enabled` | Ob der Handler aktiv ist. Standard: `true`. |
 
-Wenn ein TikTok-Kommentar mit dem Prefix beginnt (z. B. `$song`), leitet das System den Befehlstext **ohne Prefix** per `POST /plugins/{name}/command` an das Plugin weiter. Das Plugin registriert dafür einen Handler für den Befehl `"comment"`:
+Wenn ein TikTok-Kommentar mit dem Prefix beginnt (z. B. `$song`), enqueued das System den Befehlstext **ohne Prefix** als `"comment"`-Befehl in die CommandQueue des Plugins (dieselbe gepollte Queue wie für alle Plugin-Befehle). Das Plugin registriert dafür einen Handler für den Befehl `"comment"`:
 
 ```python
 self.register_handler("comment", self._on_comment)
@@ -208,7 +210,7 @@ def _on_comment(self, args):
 ```
 
 > [!NOTE]
-> Ohne `comment_handler`-Deklaration wird der Prefix nicht registriert und das System leitet den Kommentar nicht an das Plugin weiter. Das `tiktok.comment`-Event enthält ohnehin nur Nutzername und leeres `data` — der Kommentartext kommt ausschließlich über diesen Befehl.
+> Ohne `comment_handler`-Deklaration wird der Prefix nicht registriert und das System leitet den Kommentar nicht an das Plugin weiter — Abonnenten von `tiktok.*` sehen nur das generische `tiktok.comment`-Event (mit dem vollständigen Text in `data.comment`). Den geparsten `"comment"`-Befehl mit entferntem Prefix gibt es ausschließlich über diese Deklaration.
 
 ## Häufige Fehler
 

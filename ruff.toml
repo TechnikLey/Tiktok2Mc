@@ -148,6 +148,7 @@ ignore = ["F841"]
 "src/core/api/server.py" = ["BLE001", "S110"]  # app lifecycle + hook auto-discovery, best-effort
 "src/core/api/eventbus.py" = ["BLE001", "S110"]  # event publishing must never crash the producer
 "src/core/api/dashboard_publisher.py" = ["BLE001"]  # dashboard data is best-effort
+"src/core/api/plugin_event_bridge.py" = ["BLE001", "S110"]  # event routing worker: best-effort dispatch + health reporting
 "src/core/api/services/actions.py" = ["BLE001"]  # script validation must not fail if hooks are unavailable
 
 # Plugins (subprocess resilience)
