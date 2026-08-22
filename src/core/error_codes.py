@@ -1123,6 +1123,15 @@ HOOK_0007 = ErrorCode(
     recovery_hint="Add a register(api) function to the hook.",
     impact="Hook is skipped.",
 )
+HOOK_0008 = ErrorCode(
+    code="HOOK-0008",
+    subsystem=Subsystem.HOOK,
+    severity=Severity.WARNING,
+    message="Hook lifecycle callback failed.",
+    description=("A hook's on_live_start/on_live_end callback raised an exception."),
+    recovery_hint="Check the hook's lifecycle callback implementation.",
+    impact="Other hooks are not affected.",
+)
 
 # -------------------------------------------------------------- WATCHER ----
 WATCHER_0001 = ErrorCode(

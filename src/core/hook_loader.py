@@ -16,8 +16,13 @@ from core.error_codes import (
     HOOK_0004,
     HOOK_0005,
     HOOK_0007,
+    HOOK_0008,
 )
-from core.hook_api import HookAPI
+from core.hook_api import (
+    HOOK_LIFECYCLE,
+    HookAPI,
+    clear_hook_registrations,
+)
 from core.hook_manifest import (
     HookManifest,
     discover_hooks_dirs,
@@ -484,3 +489,65 @@ def load_event_hooks(
         log.info("[HOOK] Removed %d stale registry entr(ies)", cleaned)
 
     return hook_configs
+
+
+def unload_event_hooks() -> int:
+    """Remove all hook registrations and purge loaded hook modules.
+
+    Called before a runtime reload so hooks can re-register cleanly
+    (register() would otherwise collide with the still-registered actions).
+    Returns the number of removed hook actions.
+    """
+    removed = clear_hook_registrations()
+    purged = [
+        mod_name
+        for mod_name in list(sys.modules)
+        if mod_name == "hooks" or mod_name.startswith("hooks.")
+    ]
+    for mod_name in purged:
+        try:
+            del sys.modules[mod_name]
+        except KeyError:  # pragma: no cover - concurrent removal
+            pass
+    return removed
+
+
+def reload_event_hooks(
+    api: HookAPI,
+    config: dict | None = None,
+) -> dict[str, dict]:
+    """Unload and load all event hooks in one step (runtime reload).
+
+    This is the entry point used by the bridge's ``reload_hooks`` signal
+    handler. Hooks read their per-hook config at ``register()`` time, so a
+    full re-registration also applies changed hook configs.
+    """
+    removed = unload_event_hooks()
+    log.info("[HOOK] Runtime reload: unloaded %d action(s), reloading ...", removed)
+    return load_event_hooks(api, config=config)
+
+
+def fire_hook_lifecycle(event: str) -> int:
+    """Call all registered lifecycle callbacks for *event*.
+
+    Supported events: ``"live_start"``, ``"live_end"``. Each callback is
+    isolated — an exception in one hook never prevents the others from being
+    called (reported as HOOK-0008). Returns the number of callbacks invoked.
+    """
+    callbacks = HOOK_LIFECYCLE.get(event)
+    if not callbacks:
+        return 0
+    for hook_name, fn in list(callbacks.items()):
+        try:
+            fn()
+        except Exception as e:  # one broken callback must not affect others
+            log.warning("[HOOK] %s callback of '%s' failed: %s", event, hook_name, e)
+            get_crash_manager().report_exception(
+                HOOK_0008, exc=e, context_info={"hook": hook_name, "event": event}
+            )
+    log.info(
+        "[HOOK] Lifecycle '%s': %d callback(s) executed",
+        event,
+        len(callbacks),
+    )
+    return len(callbacks)

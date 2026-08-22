@@ -33,6 +33,7 @@ class ReloadRequest(BaseModel):
     )
     overlay: bool = Field(True, description="Reload overlay settings in the API")
     rcon: bool = Field(True, description="Update API RCON service configuration")
+    hooks: bool = Field(False, description="Reload all event hooks in the bridge")
     send_minecraft_reload: bool = Field(
         False,
         description="Ask the App bridge to send /reload to the Minecraft server after reloading actions",
@@ -107,6 +108,9 @@ async def reload_runtime(body: ReloadRequest):
     if body.comment_commands:  # noqa: SIM102
         if _write_signal("reload_comment_commands"):
             signals.append("reload_comment_commands")
+
+    if body.hooks and _write_signal("reload_hooks", {"source": "reload_endpoint"}):
+        signals.append("reload_hooks")
 
     if not signals:
         raise HTTPException(status_code=400, detail="No reload targets selected")

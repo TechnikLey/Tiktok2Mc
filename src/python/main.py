@@ -57,7 +57,11 @@ from core.error_codes import (
 )
 from core.health_monitor import HealthState, get_health_monitor
 from core.hook_api import HOOK_ACTIONS, HookAPI
-from core.hook_loader import load_event_hooks
+from core.hook_loader import (
+    fire_hook_lifecycle,
+    load_event_hooks,
+    reload_event_hooks,
+)
 from core.logger import (
     handle_unhandled_exception,
     initialize_logging,
@@ -87,6 +91,7 @@ RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
 RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
 RELOAD_COMMENT_COMMANDS_SIGNAL = (RUNTIME_DIR / "reload_comment_commands").resolve()
 RELOAD_CHATBOT_SIGNAL = (RUNTIME_DIR / "reload_chatbot").resolve()
+RELOAD_HOOKS_SIGNAL = (RUNTIME_DIR / "reload_hooks").resolve()
 
 _last_config_version: int = 0
 
@@ -2198,6 +2203,9 @@ def create_client(user):
         _run_in_background(update_daily_revenue)
         _run_in_background(_save_session_summary, _session_summary_entry())
         _run_in_background(_touch_runtime_shutdown)
+        # Hook lifecycle callbacks run isolated per hook; also offloaded to
+        # the background executor so slow hook code cannot stall live-end.
+        _run_in_background(fire_hook_lifecycle, "live_end")
 
     # =========================
     # Live disconnect events
@@ -2218,6 +2226,7 @@ def create_client(user):
         ctx.tiktok_live = True
         _reset_session()
         _publish_tiktok_status(True)
+        _run_in_background(fire_hook_lifecycle, "live_start")
 
     return client
 
@@ -2419,6 +2428,28 @@ async def reload_actions(send_minecraft_reload: bool = False):
         log.error("[RELOAD] Actions reload failed: %s", e)
 
 
+async def reload_hooks_runtime():
+    """Reload all event hooks at runtime without restarting the bridge.
+
+    Triggered by the ``reload_hooks`` runtime signal (hook enable/disable,
+    hook config save, or POST /reload with ``hooks=true``). Discovery,
+    module (re-)import and register() run in a worker thread so the main
+    loop stays responsive.
+    """
+    if ctx.hook_api is None:
+        log.warning("[RELOAD] Hook reload skipped — hooks not initialized yet")
+        return
+    log.info("[RELOAD] Event hooks reload requested")
+    try:
+        stats = await asyncio.to_thread(reload_event_hooks, ctx.hook_api, ctx.config)
+        log.info(
+            "[RELOAD] Event hooks reloaded (%d hook config(s))",
+            len(stats),
+        )
+    except Exception as e:  # reload is best-effort; previous state stays active
+        log.error("[RELOAD] Event hooks reload failed: %s", e)
+
+
 def _read_signal_options(path: Path) -> dict:
     """Read a JSON signal payload, defaulting to ``send_minecraft_reload=True``."""
     try:
@@ -2470,6 +2501,12 @@ async def _reload_signal_watcher():
                     pass
                 get_chatbot().reload_config()
                 log.info("[RELOAD] chatbot config reloaded")
+            if RELOAD_HOOKS_SIGNAL.exists():
+                try:
+                    RELOAD_HOOKS_SIGNAL.unlink()
+                except OSError:
+                    pass
+                await reload_hooks_runtime()
         except Exception as e:  # watcher must never die
             log.error("[RELOAD] Signal watcher error: %s", e)
 
@@ -2542,6 +2579,7 @@ async def run_bot():
         RELOAD_ACTIONS_SIGNAL,
         RELOAD_COMMENT_COMMANDS_SIGNAL,
         RELOAD_CHATBOT_SIGNAL,
+        RELOAD_HOOKS_SIGNAL,
     ):
         try:
             sig.unlink(missing_ok=True)

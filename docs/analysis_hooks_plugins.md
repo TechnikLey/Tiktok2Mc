@@ -15,7 +15,7 @@
 > | `8ea4109` | **`POST /api/v1/triggers/dispatch`** — programmatische Trigger ohne GUI-Debounce | Grundlage I.2 |
 > | `022fe7a` | **Namespaced Persistenz-API** (`data/plugin_data/<name>.json` + REST + `BasePlugin.store_*`) | Grundlage I.3 |
 >
-> Weiterhin offen: E.5/E.7/E.8, J.2 Nr. 5/6/8/10, alle J.3-Punkte.
+> Weiterhin offen: E.5/E.7/E.8, J.2 Nr. 6/8/10, alle J.3-Punkte.
 
 ---
 
@@ -53,8 +53,8 @@ Zentrale Konsequenz dieses Designs: `event_bus` und `command_queue` (`core.api.e
 ### B.3 Schwächen / harte Grenzen
 1. ~~**Kein Veto**~~ **[✅ ERLEDIGT — `54fdb78`]** Rückgabewerte des Handlers werden jetzt ausgewertet: `False` bricht die Restkette ab (spätere `$`-Actions, Overlay, Vanilla, RCON, Shell), `None`/`True` verhält sich wie bisher (rückwärtskompatibel). Damit sind Filter-/Moderations-Gates (H.1/H.2) möglich.
 2. **Kein Ereigniszugang:** Hooks können nur durch `$`-Zeilen in `actions.mca` feuern. Es gibt kein `subscribe(event)` — Reaktion auf `tiktok.gift` & Co. nur über den Umweg einer `.mca`-Zeile. *(unverändert; gilt weiterhin)*
-3. **Kein Lifecycle:** Keine Callbacks für Stream-Start/-Ende, keine Timer/Hintergrundtasks, keine Initialisierung mit garantiertem Aufrufkontext jenseits von `register()`. *(unverändert → J.2 Nr. 5)*
-4. **Kein Runtime-Reload:** Aktivieren/Deaktivieren erfordert Bridge-Neustart (auch laut `routes/hooks.py`). Die Reload-Signal-Dateien decken nur config/actions/comment_commands/chatbot ab — **nicht Hooks**. *(unverändert → J.2 Nr. 5)*
+3. **Kein Lifecycle:** Keine Callbacks für Stream-Start/-Ende, keine Timer/Hintergrundtasks, keine Initialisierung mit garantiertem Aufrufkontext jenseits von `register()`. **[✅ ERLEDIGT: `api.on_live_start/on_live_end` + `register_lifecycle` in HookAPI, gefeuert aus Bridge on_connect/on_live_end]**
+4. **Kein Runtime-Reload:** Aktivieren/Deaktivieren erfordert Bridge-Neustart (auch laut `routes/hooks.py`). Die Reload-Signal-Dateien decken nur config/actions/comment_commands/chatbot ab — **nicht Hooks**. **[✅ ERLEDIGT: `reload_hooks` Signal + Bridge-Watcher + `_request_hook_reload` in enable/disable/config-PUT + `POST /reload hooks=true`; Full-Reload aller Hooks]**
 5. **Whitelist schneidet legitime Anwendungsfälle ab:** keine `os`/`subprocess`/Audio-/DB-Libs. Gleichzeitig erlaubt `requests` vollen Netzwerkzugriff aus dem Bridge-Prozess — das Sicherheitsversprechen ist also asymmetrisch (Prozess isolation fehlt komplett). *(unverändert → J.2 Nr. 10)*
 6. ~~**Keine Zustands-/Persistenzdienste**~~ **[✅ ERLEDIGT — `022fe7a`]** Hooks nutzen die namespaced Persistenz-API per HTTP (`urllib`/`requests` aus der Whitelist): eigener Namespace unter `data/plugin_data/<hook-name>.json`, dokumentiert in Dev-Book ch04-03.
 7. **Kein Publish:** Ein Hook kann nichts auf den EventBus legen; Kommunikation mit Plugins wäre nur über den undokumentierten Direktaufruf der REST-API per `requests` möglich. *(unverändert)*
@@ -263,7 +263,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 
 ### J.2 Sinnvoll (hoher Nutzen für mehrere Ideen)
 4. ~~**Veto-/Rückgabevertrag für Hook-Actions**~~ — **[TEILWEISE ✅]** Veto-Vertrag erledigt (`54fdb78`: `False` = Restkette abbrechen); **strukturierter `context` statt `{}` weiterhin offen** (E.5).
-5. **Hook-Runtime-Reload/Lifecycle:** Enable/Disable ohne Bridge-Restart (Reload-Signal-Mechanik erweitern); `on_live_start/end`-Callbacks. *(offen)*
+5. **Hook-Runtime-Reload/Lifecycle:** Enable/Disable ohne Bridge-Restart (Reload-Signal-Mechanik erweitern); `on_live_start/end`-Callbacks. **[✅ ERLEDIGT (Commits: HookAPI Lifecycle + Reload + Bridge Watcher + API Endpoints)]**
 6. ~~**Generischer Outbound-Kanal**~~ — **[✅ `4aa4711`]** `OutboundDispatcher` im API-Prozess: EventBus → konfigurierbare HTTP-Channels (`outbound:` in config.yaml; Formate `raw`/`discord`, Event-Patterns wie `event_subscriptions`), Retry + Circuit-Breaker pro Channel (`OverlayClient` wiederverwendet), Health-Lifecycle; REST `GET /outbound/channels` (URLs maskiert) + `POST /outbound/channels/{name}/test` (reine Probe); dokumentiert in ch03-04 (EN+DE). Grundlage G.3/I.1 geschaffen.
 7. ~~**Trigger-Zugriff für Erweiterungen**~~ — **[✅ `8ea4109`]** `POST /api/v1/triggers/dispatch`: kein Debounce, definierter Payload (`trigger`/`user`/`gift_id`/`gift_name`), History-Aufzeichnung; dokumentiert in ch03-04 (EN+DE). Grundlage I.2 geschaffen.
 8. **Request/Response zwischen Extensions:** Korrelations-IDs/Antwortqueue statt reinem Fire-and-forget. *(offen)*
@@ -292,6 +292,6 @@ Was die versprochene Flexibilität ursprünglich **ausbremste**, waren keine Des
 **Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord). Die Ideen F (TTS), H.1/H.2 (Gates/Moderation), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
 
 **Verbleibende Roadmap (empfohlene Reihenfolge):**
-1. J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle
+1. J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle **[✅ ERLEDIGT]**
 2. E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context` (unlockt H.3/Gift-Combos endgültig)
 3. J.2 Nr. 8/10 — Request/Response + Capability-Enforcement; danach J.3 nach Bedarf

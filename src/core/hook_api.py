@@ -13,6 +13,19 @@ log = logging.getLogger(__name__)
 
 HOOK_ACTIONS: dict[str, Callable] = {}
 
+# Action name -> hook manifest name that registered it. Maintained alongside
+# HOOK_ACTIONS so a runtime hook reload can unload exactly what each hook owns.
+HOOK_ACTION_OWNERS: dict[str, str] = {}
+
+# Lifecycle callbacks per event ("live_start" / "live_end"):
+# {event: {hook_name: callable}}
+HOOK_LIFECYCLE: dict[str, dict[str, Callable]] = {
+    "live_start": {},
+    "live_end": {},
+}
+
+LIFECYCLE_EVENTS = tuple(HOOK_LIFECYCLE)
+
 MAX_CHAIN_DEPTH: int = 3
 
 _API_PORT = int(os.environ.get("RESOLVED_PORT_API_PORT", "29185"))
@@ -109,7 +122,35 @@ class HookAPI:
             log.warning(f"[HOOK] Duplicate action '{name}' — first registration kept.")
             return
         HOOK_ACTIONS[name] = fn
+        HOOK_ACTION_OWNERS[name] = self._name or "<unbound>"
         log.info(f"[HOOK] Registered action: {name}")
+
+    def register_lifecycle(self, event: str, fn: Callable) -> None:
+        """Register a lifecycle callback for ``"live_start"`` or ``"live_end"``.
+
+        The callback is called with no arguments when the TikTok connection is
+        established / the live stream ends. Unknown events are rejected.
+        Last registration wins per hook and event.
+        """
+        if event not in HOOK_LIFECYCLE:
+            log.warning(
+                "[HOOK] register_lifecycle: unknown event %r (supported: %s)",
+                event,
+                ", ".join(LIFECYCLE_EVENTS),
+            )
+            return
+        if not callable(fn):
+            log.warning("[HOOK] register_lifecycle(%r): not callable", event)
+            return
+        HOOK_LIFECYCLE[event][self._name or "<unbound>"] = fn
+
+    def on_live_start(self, fn: Callable) -> None:
+        """Shortcut for ``register_lifecycle("live_start", fn)``."""
+        self.register_lifecycle("live_start", fn)
+
+    def on_live_end(self, fn: Callable) -> None:
+        """Shortcut for ``register_lifecycle("live_end", fn)``."""
+        self.register_lifecycle("live_end", fn)
 
     @staticmethod
     def _put_nowait_guarded(queue: asyncio.Queue, item: object, label: str) -> None:
@@ -294,3 +335,17 @@ class HookAPI:
             self._config = config
         if valid_functions is not None:
             self._valid_functions = valid_functions
+
+
+def clear_hook_registrations() -> int:
+    """Remove all hook-registered actions and lifecycle callbacks.
+
+    Used by the runtime hook reload before hooks are loaded again.
+    Returns the number of removed actions.
+    """
+    removed = len(HOOK_ACTIONS)
+    HOOK_ACTIONS.clear()
+    HOOK_ACTION_OWNERS.clear()
+    for callbacks in HOOK_LIFECYCLE.values():
+        callbacks.clear()
+    return removed

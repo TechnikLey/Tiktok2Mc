@@ -191,6 +191,69 @@ Schlüssel müssen dem Muster `[A-Za-z0-9_.-]{1,128}` entsprechen. Werte überle
 Neustarts und werden atomar geschrieben. Das Dashboard kann dieselben Daten über
 `GET /api/v1/plugins/<hook-name>/data` lesen.
 
+## Lifecycle-Callbacks
+
+Hooks können Callbacks registrieren, die feuern, wenn die TikTok-Live-Verbindung
+hergestellt wird oder wenn der Live-Stream endet. Nützlich für Start-/Shutdown-
+Ankündigungen, Reset internen States oder Synchronisation mit externen Diensten.
+
+```python
+def register(api: HookAPI):
+    def on_start():
+        api.send_overlay_text("Stream Online!", "Hooks sind aktiv", 5)
+        api.log("TikTok-Verbindung hergestellt — Hook bereit")
+
+    def on_end():
+        api.send_overlay_text("Stream Offline", "Bis zum nächsten Mal!", 5)
+        api.log("TikTok-Stream beendet — Hook fährt herunter")
+
+    api.on_live_start(on_start)
+    api.on_live_end(on_end)
+```
+
+- **`on_live_start(fn)`** — Wird einmal aufgerufen, wenn die Bridge erfolgreich
+  mit dem TikTok-Live-Stream verbunden ist (`ConnectEvent`). Läuft in einem
+  Hintergrund-Executor; Exceptions in einem Hook blockieren andere Hooks nie.
+- **`on_live_end(fn)`** — Wird einmal aufgerufen, wenn der Live-Stream endet
+  (`LiveEndEvent`). Ebenfalls im Hintergrund-Executor.
+- Die generische Form ist `api.register_lifecycle(event, fn)` mit `event`
+  als `"live_start"` oder `"live_end"`. Die Convenience-Methoden sind empfohlen.
+
+> [!NOTE]
+> Callbacks sind synchron (kein `async def`). Sie laufen in einem Thread-Pool,
+> um den TikTok-Client-Thread nicht zu blockieren. Halte sie kurz; schwere
+> Arbeit sollte via `api.rcon_enqueue`, `api.enqueue_trigger` oder HTTP-Calls
+> ausgelagert werden.
+
+## Hook-Runtime-Reload
+
+**Hooks aktivieren/deaktivieren oder deren Config ändern — ohne Bridge-Restart.**
+
+Wenn du:
+- einen Hook im Dashboard aktivierst/deaktivierst (`POST /hooks/{name}/enable|disable`)
+- die Hook-Config speicherst (`PUT /hooks/{name}/config`)
+- `POST /reload` mit `"hooks": true` aufrufst
+
+nimmt die Bridge das `reload_hooks`-Signal innerhalb von ~1 Sekunde auf und
+registriert alle aktiven Hooks neu. Dein `register()` läuft erneut, liest also
+die frische Config und registriert Actions neu.
+
+> [!IMPORTANT]
+> - `register()` wird **bei jedem Reload** aufgerufen, nicht nur einmal. Schreibe
+>   es idempotent (z. B. `register_action` ignoriert Duplikate, daher ist
+>   erneutes Registrieren desselben Action-Namens sicher).
+> - Per-Hook-Config wird beim Reload neu via `get_hook_config()` eingelesen.
+> - Wenn dein Hook externe Ressourcen hält (Dateien, Verbindungen), kannst du
+>   Reloads detektieren. Ein Muster:
+>   ```python
+>   def register(api: HookAPI):
+>       if not hasattr(register, "_first_run"):
+>           register._first_run = True
+>           # Einmaliges Setup (Verbindung öffnen, etc.)
+>       # Actions neu registrieren (wiederholbar sicher)
+>       api.register_action("meine_action", handler)
+>   ```
+
 ## Fehlercodes für Hooks
 
 | Code | Bedeutung |

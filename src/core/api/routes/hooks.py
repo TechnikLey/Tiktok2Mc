@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from ruamel.yaml.error import YAMLError
 
+from core.api.routes.reload import _write_signal
 from core.hook_manifest import (
     HookManifest,
     discover_hooks_dirs,
@@ -75,6 +76,21 @@ def _serialize_hook(reg: HookRegistration) -> dict:
         if d.get("error"):
             d["error"] = ""
     return d
+
+
+def _request_hook_reload(reason: str, hook_name: str) -> bool:
+    """Tell the bridge process to re-register all hooks at runtime.
+
+    Hooks read their config and register actions once at load time, so any
+    enable/disable/config change needs a hook reload to take effect. The
+    bridge picks the signal up within ~1 second; no restart required.
+    """
+    ok = _write_signal("reload_hooks", {"reason": reason, "hook": hook_name})
+    if not ok:
+        log.warning(
+            "[HOOK] Could not write reload signal — change applies after restart"
+        )
+    return ok
 
 
 # ── List / Discover ────────────────────────────────────────────────────
@@ -184,7 +200,7 @@ async def get_hook(name: str):
 
 @router.post("/hooks/{name}/enable")
 async def enable_hook(name: str):
-    """Enable a hook. Requires a restart to take effect."""
+    """Enable a hook. Takes effect immediately via runtime reload."""
     registry = get_hook_registry()
     hook = registry.get(name)
     if hook is None:
@@ -193,12 +209,13 @@ async def enable_hook(name: str):
         return {"status": "already_enabled", "name": name}
     registry.set_enabled(name, True)
     _invalidate_hook_cache()
-    return {"status": "enabled", "name": name}
+    _request_hook_reload("enable", name)
+    return {"status": "enabled", "name": name, "runtime_reload": "requested"}
 
 
 @router.post("/hooks/{name}/disable")
 async def disable_hook(name: str):
-    """Disable a hook. Requires a restart to take effect."""
+    """Disable a hook. Takes effect immediately via runtime reload."""
     registry = get_hook_registry()
     hook = registry.get(name)
     if hook is None:
@@ -207,7 +224,8 @@ async def disable_hook(name: str):
         return {"status": "already_disabled", "name": name}
     registry.set_enabled(name, False)
     _invalidate_hook_cache()
-    return {"status": "disabled", "name": name}
+    _request_hook_reload("disable", name)
+    return {"status": "disabled", "name": name, "runtime_reload": "requested"}
 
 
 # ── Config ─────────────────────────────────────────────────────────────
@@ -234,7 +252,10 @@ async def get_hook_config(name: str):
 
 @router.put("/hooks/{name}/config")
 async def update_hook_config(name: str, body: dict):
-    """Update the per-hook config for a named hook."""
+    """Update the per-hook config for a named hook.
+
+    Triggers a runtime hook reload so the new config is read by the hook.
+    """
     hook_dir = _find_hook_dir(name)
     if hook_dir is None:
         raise HTTPException(status_code=404, detail=f"Hook '{name}' not found on disk")
@@ -245,7 +266,8 @@ async def update_hook_config(name: str, body: dict):
     except (OSError, ValueError, YAMLError) as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save config: {exc}")
 
-    return {"status": "saved", "name": name}
+    _request_hook_reload("config_change", name)
+    return {"status": "saved", "name": name, "runtime_reload": "requested"}
 
 
 @router.get("/hooks/{name}/config/schema")
