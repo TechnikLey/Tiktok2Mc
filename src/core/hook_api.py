@@ -63,6 +63,10 @@ class HookAPI:
         Register a handler under the given name.
         The name must match the $-command in actions.mca.
         First registration wins — duplicates are ignored with a warning.
+
+        Veto contract: the bridge calls ``fn(user, trigger, context)`` and
+        aborts the rest of the trigger chain when the handler returns
+        ``False``. Returning ``None`` (the default) or ``True`` continues.
         """
         if not isinstance(name, str) or not name.strip():
             log.info(f"[HOOK] register_action: invalid name: {name!r}")

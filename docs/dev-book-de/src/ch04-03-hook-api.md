@@ -23,7 +23,7 @@ api.register_action("superjump", mein_handler)
 ```
 
 - **name**: Muss mit dem Namen nach `$` in der `actions.mca` übereinstimmen
-- **fn**: `(user: str, trigger: str, context: dict) -> None`
+- **fn**: `(user: str, trigger: str, context: dict) -> bool | None`
 - Doppelte Registrierung wird ignoriert (erster Aufruf gewinnt)
 
 ```python
@@ -32,6 +32,42 @@ def register(api: HookAPI):
         api.rcon_enqueue([f"say {user} löste {trigger} aus!"])
 
     api.register_action("mein-befehl", handler)
+```
+
+### Rückgabewert — Veto-Vertrag
+
+Eine Hook-Action kann den auslösenden Trigger durch die Rückgabe von `False` blockieren (Veto):
+
+| Rückgabewert | Wirkung |
+|--------------|--------|
+| `None` (Standard) / `True` | Kette läuft wie gewohnt weiter |
+| `False` | Der Rest der Trigger-Kette wird abgebrochen |
+
+Gibt ein Hook `False` zurück, werden alle folgenden `$`-Aktionen derselben
+Trigger-Zeile übersprungen; Overlay-, Vanilla-, RCON- und Shell-Aktionen des
+Triggers werden nicht ausgeführt. Bereits von früheren Hooks enqueued Trigger
+(via `enqueue_trigger`) bleiben unberührt.
+
+Damit lassen sich Gate-Hooks wie Rate-Limiter oder Schimpfwortfilter umsetzen:
+
+```python
+def register(api: HookAPI):
+    recent: list[float] = []
+
+    def anti_spam(user, trigger, context):
+        now = time.time()
+        recent[:] = [t for t in recent if now - t < 5]
+        if len(recent) >= 10:
+            return False  # zu viele Events — ganzen Trigger blockieren
+        recent.append(now)
+
+    api.register_action("gate", anti_spam)
+```
+
+In der `data/actions.mca` steht das Gate an erster Stelle, damit es vor allem anderen läuft:
+
+```mca
+gift:$gate|$say_thanks
 ```
 
 ## rcon_enqueue(commands)

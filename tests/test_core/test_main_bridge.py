@@ -405,6 +405,120 @@ class TestHookActionOffload:
         assert calls[0][1] == ("viewer", "myaction", {})
 
 
+class TestHookVeto:
+    """Veto contract: a hook action returning False aborts the trigger chain."""
+
+    def _setup_trigger(self, monkeypatch, main_mod, actions):
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "valid_functions", {"mytrigger"})
+        monkeypatch.setattr(ctx, "script_actions", {"mytrigger": list(actions)})
+        monkeypatch.setattr(ctx, "overlay_actions", {})
+        monkeypatch.setattr(ctx, "vanilla_functions", set())
+        monkeypatch.setattr(ctx, "rcon_only_actions", {})
+        monkeypatch.setattr(ctx, "shell_actions_cache", {})
+        monkeypatch.setattr(ctx, "hook_api", MagicMock())
+
+        main_loop = MagicMock()
+        monkeypatch.setattr(ctx, "main_loop", main_loop)
+        return main_loop
+
+    def test_veto_false_aborts_chain_and_enqueue(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import execute_global_command
+
+        calls = []
+        monkeypatch.setattr(
+            main_mod,
+            "HOOK_ACTIONS",
+            {
+                "gate": lambda *a: False,
+                "after": lambda *a: calls.append("after"),
+            },
+        )
+
+        async def fake_to_thread(fn, *args):
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        main_loop = self._setup_trigger(monkeypatch, main_mod, ["gate", "after"])
+
+        asyncio.run(execute_global_command("mytrigger", "viewer"))
+
+        # Later hook never ran, nothing enqueued to RCON.
+        assert calls == []
+        main_loop.call_soon_threadsafe.assert_not_called()
+
+    def test_none_return_continues(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import ctx, execute_global_command
+
+        monkeypatch.setattr(
+            main_mod,
+            "HOOK_ACTIONS",
+            {"gate": lambda *a: None},
+        )
+
+        async def fake_to_thread(fn, *args):
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        rcon_queue = asyncio.Queue(maxsize=100)
+        monkeypatch.setattr(ctx, "rcon_queue", rcon_queue)
+        main_loop = self._setup_trigger(monkeypatch, main_mod, ["gate"])
+        # vanilla command so commands_to_send is non-empty → enqueue path runs
+        monkeypatch.setattr(ctx, "vanilla_functions", {"mytrigger"})
+        monkeypatch.setattr(ctx, "namespace", "tiktok")
+
+        assert rcon_queue.empty()
+        asyncio.run(execute_global_command("mytrigger", "viewer"))
+
+        main_loop.call_soon_threadsafe.assert_called_once()
+        # the enqueued closure puts the command tuple on the queue
+        enqueue_fn = main_loop.call_soon_threadsafe.call_args[0][0]
+        enqueue_fn()
+        cmds, user = rcon_queue.get_nowait()
+        assert cmds == ["execute as @a run function tiktok:mytrigger"]
+        assert user == "viewer"
+
+    def test_exception_does_not_veto(self, monkeypatch):
+        """An erroring hook is reported but must not veto the chain."""
+        import src.python.main as main_mod
+        from src.python.main import execute_global_command
+
+        calls = []
+
+        def broken(*_a):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(
+            main_mod,
+            "HOOK_ACTIONS",
+            {
+                "broken": broken,
+                "after": lambda *a: calls.append("after"),
+            },
+        )
+        monkeypatch.setattr(
+            main_mod,
+            "get_crash_manager",
+            MagicMock(),
+        )
+
+        async def fake_to_thread(fn, *args):
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        self._setup_trigger(monkeypatch, main_mod, ["broken", "after"])
+
+        asyncio.run(execute_global_command("mytrigger", "viewer"))
+
+        assert calls == ["after"]
+
+
 # =========================================================================
 # Runtime reload signal watcher
 # =========================================================================

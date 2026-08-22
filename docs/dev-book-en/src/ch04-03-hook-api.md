@@ -23,7 +23,7 @@ api.register_action("superjump", my_handler)
 ```
 
 - **name**: Must match the name after `$` in `actions.mca`
-- **fn**: `(user: str, trigger: str, context: dict) -> None`
+- **fn**: `(user: str, trigger: str, context: dict) -> bool | None`
 - Duplicate registration is ignored (first call wins)
 
 ```python
@@ -32,6 +32,42 @@ def register(api: HookAPI):
         api.rcon_enqueue([f"say {user} triggered {trigger}!"])
 
     api.register_action("my-command", handler)
+```
+
+### Return Value — Veto Contract
+
+A hook action may veto the trigger that called it by returning `False`:
+
+| Return value | Effect |
+|--------------|--------|
+| `None` (default) / `True` | Chain continues as usual |
+| `False` | The rest of this trigger's chain is aborted |
+
+When a hook returns `False`, all following `$` actions of the same trigger
+line are skipped, and overlay, vanilla, RCON and shell actions of that
+trigger are not executed. Triggers already enqueued by earlier hooks
+(via `enqueue_trigger`) are unaffected.
+
+This enables gate-style hooks such as rate limiters or profanity filters:
+
+```python
+def register(api: HookAPI):
+    recent: list[float] = []
+
+    def anti_spam(user, trigger, context):
+        now = time.time()
+        recent[:] = [t for t in recent if now - t < 5]
+        if len(recent) >= 10:
+            return False  # too many events — block the whole trigger
+        recent.append(now)
+
+    api.register_action("gate", anti_spam)
+```
+
+In `data/actions.mca`, put the gate first so it runs before everything else:
+
+```mca
+gift:$gate|$say_thanks
 ```
 
 ## rcon_enqueue(commands)

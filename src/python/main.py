@@ -904,6 +904,7 @@ async def execute_global_command(
     commands_to_send = []
 
     if name in ctx.script_actions:
+        vetoed_by: str | None = None
         for action in ctx.script_actions[name]:
             if action in HOOK_ACTIONS:
                 try:
@@ -911,9 +912,16 @@ async def execute_global_command(
                     # Hook actions are sync callables that may block (plugin
                     # I/O); run them on the executor so script triggers never
                     # stall the main loop.
-                    await asyncio.to_thread(
+                    result = await asyncio.to_thread(
                         HOOK_ACTIONS[action], source_user, action, {}
                     )
+                    # Veto contract: a hook returning False aborts the rest of
+                    # this trigger's chain — later hooks, overlays, vanilla,
+                    # RCON and shell actions are all skipped. Returning True
+                    # or None (the default) continues as before.
+                    if result is False:
+                        vetoed_by = action
+                        break
                 except (
                     Exception
                 ) as e:  # third-party hook action must not crash the bridge
@@ -925,6 +933,10 @@ async def execute_global_command(
                     )
             elif action:
                 log.warning(f"[HOOK] Unknown script action: '{action}'")
+
+        if vetoed_by is not None:
+            log.info(f"[HOOK] Trigger '{trigger_name}' vetoed by action '{vetoed_by}'")
+            return
 
     # --- 0. OVERLAY TEXT ---
 

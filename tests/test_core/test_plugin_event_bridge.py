@@ -250,3 +250,94 @@ class TestLifecycle:
 
         # Cleanup: mark stopped so health monitor state stays sane
         bridge._running = False
+
+
+# =========================================================================
+# End-to-end: real EventBus → bridge loop → real CommandQueue
+# =========================================================================
+
+
+class TestEndToEndDelivery:
+    """Integration test (J.1 #3): a real tiktok.comment published on the
+    API-side EventBus must land as commands in the CommandQueue plugins poll."""
+
+    @pytest.mark.asyncio
+    async def test_real_comment_reaches_plugin_queue(self):
+        import asyncio
+        import contextlib
+        import time
+
+        from core.api.eventbus import event_bus
+        from core.api.plugin_event_bridge import PluginEventBridge
+        from core.api.plugin_overlay import command_queue
+
+        command_queue.clear("e2e-tts")
+
+        bridge = PluginEventBridge()
+        bridge._subscriptions = {"tiktok.comment": ["e2e-tts"]}
+        bridge._comment_handlers = {"e2e-tts": {"prefix": "$"}}
+        bridge._running = True
+
+        task = asyncio.create_task(bridge._loop())
+        cmds: list[dict] = []
+        try:
+            # Yield once so the loop task reaches its subscribe() call.
+            await asyncio.sleep(0)
+            await event_bus.publish(
+                "tiktok.comment", {"user": "fan", "comment": "$play halo"}
+            )
+            deadline = time.time() + 2.0
+            while time.time() < deadline:
+                cmds = command_queue.dequeue_all("e2e-tts")
+                if len(cmds) >= 2:
+                    break
+                await asyncio.sleep(0.02)
+        finally:
+            bridge._running = False
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+        by_cmd = {c["command"]: c for c in cmds}
+        assert "tiktok_event" in by_cmd, f"commands seen: {cmds}"
+        assert "comment" in by_cmd, f"commands seen: {cmds}"
+
+        ev = by_cmd["tiktok_event"]
+        assert ev["args"]["event_type"] == "tiktok.comment"
+        assert ev["args"]["user"] == "fan"
+        assert ev["args"]["data"] == {"comment": "$play halo"}
+        assert all(k in ev for k in ("id", "timestamp"))
+
+        comment = by_cmd["comment"]
+        assert comment["args"] == {"text": "play halo", "username": "fan"}
+
+    @pytest.mark.asyncio
+    async def test_unsubscribed_plugin_receives_nothing(self):
+        import asyncio
+        import contextlib
+
+        from core.api.eventbus import event_bus
+        from core.api.plugin_event_bridge import PluginEventBridge
+        from core.api.plugin_overlay import command_queue
+
+        command_queue.clear("e2e-other")
+        bridge = PluginEventBridge()
+        bridge._subscriptions = {"tiktok.gift": ["e2e-other"]}
+        bridge._running = True
+
+        task = asyncio.create_task(bridge._loop())
+        try:
+            await asyncio.sleep(0)
+            await event_bus.publish(
+                "tiktok.comment", {"user": "fan", "comment": "hello"}
+            )
+            for _ in range(5):
+                await asyncio.sleep(0.03)
+            cmds = command_queue.dequeue_all("e2e-other")
+        finally:
+            bridge._running = False
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+        assert cmds == []
