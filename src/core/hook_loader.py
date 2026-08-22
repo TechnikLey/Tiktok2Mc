@@ -303,7 +303,9 @@ def _load_single_hook(
 
     if hasattr(module, "register") and callable(module.register):
         try:
-            module.register(api)
+            # Per-hook view: binds the manifest name so persistent-store
+            # helpers target this hook's own namespace.
+            module.register(api.for_hook(manifest.name))
             log.info("[HOOK] Loaded: %s v%s", manifest.name, manifest.version)
             return True
         except Exception as e:  # hook code runs here — must never crash the loader

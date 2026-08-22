@@ -11,6 +11,10 @@ All methods your hook can use via the `api` object in the `register()` function.
 | `enqueue_trigger(action_name, user="hook")` | Trigger another action (chained) |
 | `get_hook_config(name)` | Read per-hook configuration |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Display overlay text |
+| `store_get(key, default=None)` | Read from this hook's persistent store |
+| `store_set(key, value)` | Write to this hook's persistent store |
+| `store_delete(key)` | Delete a key from the persistent store |
+| `store_all()` | Read the whole persistent store |
 | `log(msg)` | Log hook-specific message |
 | `config` (Property) | Read global config (copy) |
 
@@ -162,35 +166,30 @@ rcon_host = glob_cfg.get("server_host", "127.0.0.1")   # RCON host
 
 ## Persistent Store
 
-Hooks can persist data in their own namespace (`data/plugin_data/<hook-name>.json`)
-via the API's namespaced store endpoints. Hooks run inside the bridge process,
-so they use plain HTTP (both `urllib` and `requests` are whitelisted):
+Every hook automatically gets its own namespace in the API's namespaced
+persistent store (`data/plugin_data/<hook-name>.json`). The `api` object
+handed to `register()` is already bound to your hook's name — no HTTP
+boilerplate needed:
 
 ```python
-import json
-import urllib.request
-
 def register(api: HookAPI):
-    name = "my-hook"  # must match the name in hook.json
-    base = "http://127.0.0.1:29185/api/v1"
+    def track(user, trigger, context):
+        count = api.store_get("count", 0)
+        api.store_set("count", count + 1)
 
-    def save_count(count):
-        req = urllib.request.Request(
-            f"{base}/plugins/{name}/data/count",
-            data=json.dumps({"value": count}).encode(),
-            headers={"Content-Type": "application/json"},
-            method="PUT",
-        )
-        urllib.request.urlopen(req, timeout=5)
-
-    def load_count():
-        with urllib.request.urlopen(f"{base}/plugins/{name}/data/count", timeout=5) as r:
-            return json.load(r)["value"]
-
-    api.register_action("track", lambda user, trigger, ctx: save_count(load_count() + 1))
+    api.register_action("track", track)
 ```
 
-Keys must match `[A-Za-z0-9_.-]{1,128}`; values are arbitrary JSON.
+| Method | Behavior |
+|--------|----------|
+| `store_get(key, default=None)` | Returns the value, or `default` if the key does not exist / the store is unreachable |
+| `store_set(key, value)` | Persists any JSON-serializable value; returns `True`/`False` |
+| `store_delete(key)` | Deletes a key; returns `True` when it existed |
+| `store_all()` | Returns all key/value pairs as a dict |
+
+Keys must match `[A-Za-z0-9_.-]{1,128}`. Values survive restarts and are
+written atomically. The dashboard can read the same data via
+`GET /api/v1/plugins/<hook-name>/data`.
 
 ## Error Codes for Hooks
 

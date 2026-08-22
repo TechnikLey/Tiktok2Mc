@@ -8,10 +8,14 @@ Alle Methoden, die dein Hook über das `api`-Objekt in der `register()`-Funktion
 |---------|--------------|
 | `register_action(name, fn)` | Handler für `$`-Befehle registrieren |
 | `rcon_enqueue(commands)` | Minecraft-Befehle ausführen |
-| `enqueue_trigger(action_name, user="hook")` | Einen anderen Trigger auslösen (verkettet) |
+| `enqueue_trigger(action_name, user="hook")` | anderen Trigger auslösen (verkettet) |
 | `get_hook_config(name)` | Per-Hook-Konfiguration lesen |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Overlay-Text anzeigen |
-| `log(msg)` | Hook-spezifisch loggen |
+| `store_get(key, default=None)` | Aus dem persistenten Store dieses Hooks lesen |
+| `store_set(key, value)` | In den persistenten Store schreiben |
+| `store_delete(key)` | Schlüssel aus dem Store löschen |
+| `store_all()` | Kompletten Store lesen |
+| `log(msg)` | Hook-spezifische Meldung loggen |
 | `config` (Property) | Globale Config lesen (Kopie) |
 
 ## register_action(name, fn)
@@ -162,35 +166,30 @@ rcon_host = glob_cfg.get("server_host", "127.0.0.1")
 
 ## Persistenter Speicher
 
-Hooks können Daten in ihrem eigenen Namespace (`data/plugin_data/<hook-name>.json`)
-über die namespaced Store-Endpunkte der API ablegen. Hooks laufen im Bridge-Prozess
-und nutzen deshalb normales HTTP (sowohl `urllib` als auch `requests` sind erlaubt):
+Jeder Hook bekommt automatisch seinen eigenen Namespace im namespaced
+persistenten Store der API (`data/plugin_data/<hook-name>.json`). Das `api`-Objekt,
+das an `register()` übergeben wird, ist bereits an den Namen deines Hooks gebunden
+— kein HTTP-Boilerplate nötig:
 
 ```python
-import json
-import urllib.request
-
 def register(api: HookAPI):
-    name = "mein-hook"  # muss mit dem Namen in hook.json übereinstimmen
-    base = "http://127.0.0.1:29185/api/v1"
+    def track(user, trigger, context):
+        count = api.store_get("count", 0)
+        api.store_set("count", count + 1)
 
-    def save_count(count):
-        req = urllib.request.Request(
-            f"{base}/plugins/{name}/data/count",
-            data=json.dumps({"value": count}).encode(),
-            headers={"Content-Type": "application/json"},
-            method="PUT",
-        )
-        urllib.request.urlopen(req, timeout=5)
-
-    def load_count():
-        with urllib.request.urlopen(f"{base}/plugins/{name}/data/count", timeout=5) as r:
-            return json.load(r)["value"]
-
-    api.register_action("track", lambda user, trigger, ctx: save_count(load_count() + 1))
+    api.register_action("track", track)
 ```
 
-Schlüssel müssen dem Muster `[A-Za-z0-9_.-]{1,128}` entsprechen; Werte sind beliebiges JSON.
+| Methode | Verhalten |
+|--------|----------|
+| `store_get(key, default=None)` | Liefert den Wert, oder `default`, wenn der Schlüssel fehlt / der Store nicht erreichbar ist |
+| `store_set(key, value)` | Speichert beliebige JSON-serialisierbare Daten; gibt `True`/`False` zurück |
+| `store_delete(key)` | Löscht einen Schlüssel; `True` wenn er existierte |
+| `store_all()` | Liefert alle Schlüssel/Werte als Dict |
+
+Schlüssel müssen dem Muster `[A-Za-z0-9_.-]{1,128}` entsprechen. Werte überleben
+Neustarts und werden atomar geschrieben. Das Dashboard kann dieselben Daten über
+`GET /api/v1/plugins/<hook-name>/data` lesen.
 
 ## Fehlercodes für Hooks
 

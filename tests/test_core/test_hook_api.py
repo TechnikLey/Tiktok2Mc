@@ -23,7 +23,7 @@ def api():
     rcon_q = asyncio.Queue()
     trigger_q = asyncio.Queue()
     # Make call_soon_threadsafe invoke the callback synchronously
-    loop.call_soon_threadsafe = lambda cb, *args: cb(*args)
+    loop.call_soon_threadsafe = lambda cb, *args: cb(*args)  # type: ignore[method-assign]
     return HookAPI(rcon_q, trigger_q, loop, {"key": "val"}, {"valid_fn"}, {})
 
 
@@ -166,3 +166,98 @@ class TestHookAPI:
     def test_set_depth(self, api):
         api.set_depth(2)
         assert api._current_depth == 2
+
+
+class _FakeResponse:
+    def __init__(self, payload: dict, status: int = 200):
+        self._payload = payload
+        self.status = status
+
+    def read(self) -> bytes:
+        import json
+
+        return json.dumps(self._payload).encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+class TestForHook:
+    def test_for_hook_binds_name_and_shares_queues(self, api):
+        clone = api.for_hook("my-hook")
+        assert isinstance(clone, type(api))
+        assert clone.name == "my-hook"
+        assert clone._rcon_queue is api._rcon_queue
+        assert clone._trigger_queue is api._trigger_queue
+        assert clone._config is api._config
+        assert clone._valid_functions is api._valid_functions
+        assert api.name == ""  # root stays unbound
+
+    def test_unbound_api_store_set_fails(self, api):
+        assert api.store_set("k", 1) is False
+        assert api.store_get("k", "d") == "d"
+        assert api.store_delete("k") is False
+        assert api.store_all() == {}
+
+
+class TestHookStore:
+    """Persistent-store helpers (HTTP against the API's plugin data routes)."""
+
+    @pytest.fixture
+    def hook_api(self, api):
+        return api.for_hook("my-hook")
+
+    def test_store_set_puts_json_value(self, hook_api):
+        with patch("core.hook_api.urllib.request.urlopen") as mock_open:
+            assert hook_api.store_set("count", {"n": 3}) is True
+        req = mock_open.call_args.args[0]
+        assert req.get_method() == "PUT"
+        assert "/plugins/my-hook/data/count" in req.full_url
+        import json
+
+        assert json.loads(req.data.decode()) == {"value": {"n": 3}}
+
+    def test_store_get_returns_value(self, hook_api):
+        with patch(
+            "core.hook_api.urllib.request.urlopen",
+            return_value=_FakeResponse({"name": "my-hook", "key": "count", "value": 7}),
+        ):
+            assert hook_api.store_get("count") == 7
+
+    def test_store_get_404_returns_default(self, hook_api):
+        import urllib.error
+        from email.message import Message
+
+        err = urllib.error.HTTPError("url", 404, "Not Found", Message(), None)
+        with patch("core.hook_api.urllib.request.urlopen", side_effect=err):
+            assert hook_api.store_get("missing", "fallback") == "fallback"
+
+    def test_store_get_network_error_returns_default(self, hook_api):
+        with patch("core.hook_api.urllib.request.urlopen", side_effect=OSError("down")):
+            assert hook_api.store_get("k", None) is None
+
+    def test_store_delete_true_on_success(self, hook_api):
+        with patch(
+            "core.hook_api.urllib.request.urlopen",
+            return_value=_FakeResponse({}, status=200),
+        ) as mock_open:
+            assert hook_api.store_delete("k") is True
+        assert mock_open.call_args.args[0].get_method() == "DELETE"
+
+    def test_store_delete_false_on_404(self, hook_api):
+        import urllib.error
+        from email.message import Message
+
+        err = urllib.error.HTTPError("url", 404, "Not Found", Message(), None)
+        with patch("core.hook_api.urllib.request.urlopen", side_effect=err):
+            assert hook_api.store_delete("gone") is False
+
+    def test_store_all_returns_data_dict(self, hook_api):
+        with patch(
+            "core.hook_api.urllib.request.urlopen",
+            return_value=_FakeResponse({"name": "my-hook", "data": {"a": 1}}),
+        ):
+            assert hook_api.store_all() == {"a": 1}
