@@ -67,7 +67,7 @@ def register(api: HookAPI):
 In der `data/actions.mca` steht das Gate an erster Stelle, damit es vor allem anderen läuft:
 
 ```mca
-gift:$gate|$say_thanks
+gift:$gate;$say_thanks
 ```
 
 ## rcon_enqueue(commands)
