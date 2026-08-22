@@ -30,15 +30,28 @@ from core.plugin_config import load_plugin_config
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Allowed imports for event hook scripts — AST-checked at load time
-# ---------------------------------------------------------------------------
-
+# Allowed imports for event hook scripts — AST-checked at load time.
+#
+# Stdlib only (plus `requests`, which ships with the app) — every module here
+# MUST be importable inside the bridge process, because hook code is loaded
+# into it and cannot install anything itself.
+#
+#   core data/log/time basics : time, random, logging, json, datetime
+#   text/number processing    : re (regex filters), math
+#   rate windows/aggregation  : collections (Counter/deque), itertools, functools
+#   network                   : urllib, requests
 ALLOWED_IMPORTS: frozenset[str] = frozenset(
     {
         "time",
         "random",
         "logging",
         "json",
+        "datetime",
+        "re",
+        "math",
+        "collections",
+        "itertools",
+        "functools",
         "urllib",
         "requests",
     }

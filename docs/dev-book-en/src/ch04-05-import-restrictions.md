@@ -4,18 +4,27 @@ Hooks run directly in the bridge process. For security reasons, hooks are not al
 
 ## Allowed Imports
 
-The following modules may be used in hooks:
+The following modules may be used in hooks (all are part of the Python standard library, except `requests`, which ships with the app — so they are always available):
 
 | Module | Purpose |
 |---|---|
 | `time` | Time delays and timestamps |
+| `datetime` | Dates, time windows, daily resets |
 | `random` | Random values |
 | `logging` | Logging |
 | `json` | JSON processing |
+| `re` | Regular expressions (e.g. text filters) |
+| `math` | Numeric helpers (rounding, clamping) |
+| `collections` | `Counter`, `defaultdict`, `deque` (e.g. rate-limit windows) |
+| `itertools` | Iteration and grouping helpers |
+| `functools` | `partial`, caching helpers |
 | `urllib` | HTTP requests (limited) |
 | `requests` | HTTP requests (if installed) |
 | `core.hook_api` | Hook API import for type annotations |
 | `core.plugin_config` | Plugin configuration (if needed) |
+
+Submodules of allowed top-level modules are also permitted
+(e.g. `import urllib.request` or `from collections import defaultdict`).
 
 ## Why This Restriction?
 
