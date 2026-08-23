@@ -36,7 +36,7 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 | `homepage` | Projekt-URL (z. B. GitHub-Repository) |
 | `min_api_version` | Mindestversion der Plugin-API (aktuell `1.0.0`, siehe `src/core/version.py`). Bei Inkompatibilität wird das Plugin nicht gestartet. |
 | `max_api_version` | Höchste unterstützte API-Version. Fehlt das Feld oder ist es `null`, gibt es keine Obergrenze. |
-| `event_subscriptions` | Liste von Event-Typen, die das Plugin über den EventBus empfangen will. Unterstützt Wildcards wie `"tiktok.*"`. **Ohne dieses Feld werden keine Events zugestellt.** |
+| `event_subscriptions` | Liste von Event-Typen, die das Plugin über den EventBus empfangen will. Unterstützt exakte Typen (`"tiktok.gift"`), Prefix-Wildcards (`"tiktok.*"`, `"minecraft.*"`) und den Catch-all `"*"`. TikTok-Events kommen als `tiktok_event` an, alle anderen Quellen als `bus_event`. **Ohne dieses Feld werden keine Events zugestellt.** |
 | `depends_on` | Liste von Plugin-Namen, die aktiviert sein müssen. Sind Abhängigkeiten nicht aktiv oder nicht registriert, schlägt das Aktivieren fehl (HTTP 422). |
 | `capabilities` | Liste von Fähigkeiten, die das Plugin bereitstellt. Wird vom System zur Discovery verwendet, z. B. `["timer:countdown"]`. Andere Plugins können per API nach Plugins mit bestimmten Capabilities suchen. |
 | `config_schema` | Schema für die Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |

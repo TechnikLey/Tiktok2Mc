@@ -7,9 +7,10 @@ Events sind der zentrale Kommunikationsweg. Dieses Kapitel zeigt, wie dein Plugi
 | Weg | Quelle | Einrichtung | Handler-Name |
 |-----|--------|-------------|--------------|
 | **Event-Bridge** | TikTok-Events (Gift, Follow, Like, Comment, Join, Share) | `event_subscriptions` in `plugin.json` | `"tiktok_event"` |
+| **Event-Bridge (generisch)** | Alle anderen EventBus-Ereignisse (`minecraft.*`, `timer.*`, `server.*`, Plugin-Events) | `event_subscriptions` in `plugin.json` | `"bus_event"` |
 | **Event-Command-Mapper** | Alle EventBus-Ereignisse (TikTok, Plugins, System) | `event_commands.yaml` | Beliebig, definiert in der YAML |
 
-**Warum zwei Wege?** Die Event-Bridge ist der schnelle Einstieg für TikTok — Plugins erhalten TikTok-Events ohne zusätzliche Konfiguration, indem sie `event_subscriptions` setzen. Der Event-Command-Mapper (ECM) ist das flexible Werkzeug für lose Kopplung: Ein Event kann mehrere Plugins ansprechen, und Plugins müssen sich nicht kennen. In der Praxis nutzt ein TikTok-Plugin meist die Bridge; der ECM verbindet Plugins untereinander (z. B. Timer → WinCounter).
+**Warum zwei Wege?** Die Event-Bridge ist der schnelle Einstieg — Plugins erhalten Events ohne zusätzliche Konfiguration, indem sie `event_subscriptions` setzen. Der Event-Command-Mapper (ECM) ist das flexible Werkzeug für lose Kopplung: Ein Event kann mehrere Plugins ansprechen, und Plugins müssen sich nicht kennen. In der Praxis nutzt ein TikTok-Plugin meist die Bridge; der ECM verbindet Plugins untereinander (z. B. Timer → WinCounter).
 
 ## Weg 1: Event-Bridge (TikTok-Events)
 
@@ -23,7 +24,31 @@ In der `plugin.json`:
 }
 ```
 
-Die Event-Bridge liefert ausschließlich TikTok-Events (`tiktok.*`-Namespace). Abonniert werden exakte Typen wie `"tiktok.follow"` oder der Prefix-Wildcard `"tiktok.*"`. Events anderer Plugins oder des Systems werden **nicht** über `event_subscriptions` zugestellt — dafür nutzt du den [Event-Command-Mapper](./ch05-02-event-command-mapper.md) (`event_commands.yaml`). Eigene Events haben den Namespace `plugin-name.ereignis` (siehe unten).
+Der Wildcard `"tiktok.*"` abonniert alle TikTok-Events.
+
+### Generische Bus-Events
+
+Abonnements sind **nicht** auf den `tiktok.`-Namespace beschränkt: Jedes
+EventBus-Ereignis kann abonniert werden — exakte Typen wie
+`"minecraft.player_death"`, Prefix-Wildcards wie `"minecraft.*"` oder
+`"timer.*"`, oder der Catch-all `"*"` für jedes Event auf dem Bus.
+
+Nicht-TikTok-Abos werden als **`bus_event`**-Kommando zugestellt:
+
+```python
+class DeathUI(BasePlugin):
+    def __init__(self):
+        super().__init__()
+        self.register_handler("bus_event", self._on_bus_event)
+
+    def _on_bus_event(self, args):
+        event_type = args.get("event_type", "")   # "minecraft.player_death"
+        data = args.get("data", {})               # {"player": "Steve", ...}
+```
+
+Anders als `tiktok_event` tragen diese Payloads kein `user`-Feld — nur
+`event_type` und `data`. TikTok-Events behalten ihren eigenen
+[`tiktok_event`-Vertrag](#weg-1-event-bridge-tiktok-events).
 
 ### Handler registrieren
 
@@ -93,7 +118,7 @@ Die Event-Bridge liefert standardisierte Dictionaries:
 > Der Kommentartext ist Teil des `tiktok.comment`-Events (`data.comment`). Für strukturierte Prefix-Befehle (z. B. `$play`) ist der [Kommentar-Handler](#kommentar-handler-comment_handler) die bessere Wahl — er entfernt den Prefix und stellt den Befehlstext direkt zu.
 
 > [!NOTE]
-> TikTok-Events werden von der Bridge an den EventBus der API weitergeleitet. Die API-seitige **Plugin Event Bridge** gleicht sie mit den `event_subscriptions` aus jeder `plugin.json` ab und enqueued den Befehl `"tiktok_event"` in die CommandQueue jedes Abonnenten.
+> Events werden von der Bridge an den EventBus der API weitergeleitet. Die API-seitige **Plugin Event Bridge** gleicht sie mit den `event_subscriptions` aus jeder `plugin.json` ab: TikTok-Events kommen als `"tiktok_event"` an, jede andere Bus-Quelle als [`"bus_event"`](#generische-bus-events).
 
 ### Vollständiges Beispiel: Auf mehrere Event-Typen reagieren
 

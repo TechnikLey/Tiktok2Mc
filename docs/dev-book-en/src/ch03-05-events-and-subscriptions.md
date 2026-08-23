@@ -7,9 +7,10 @@ Events are the central communication path. This chapter shows how your plugin re
 | Path | Source | Setup | Handler Name |
 |-----|--------|-------------|--------------|
 | **Event Bridge** | TikTok events (Gift, Follow, Like, Comment, Join, Share) | `event_subscriptions` in `plugin.json` | `"tiktok_event"` |
+| **Event Bridge (generic)** | All other EventBus events (`minecraft.*`, `timer.*`, `server.*`, plugin events) | `event_subscriptions` in `plugin.json` | `"bus_event"` |
 | **Event-Command-Mapper** | All EventBus events (TikTok, Plugins, System) | `event_commands.yaml` | Any, defined in the YAML |
 
-**Why two paths?** The Event Bridge is the quick start for TikTok — plugins receive TikTok events without additional setup by setting `event_subscriptions`. The Event-Command-Mapper (ECM) is the flexible tool for loose coupling: one event can trigger multiple plugins, and plugins don't need to know about each other. In practice, a TikTok plugin usually uses the Bridge; the ECM connects plugins together (e.g., Timer → WinCounter).
+**Why two paths?** The Event Bridge is the quick start — plugins receive events without additional setup by setting `event_subscriptions`. The Event-Command-Mapper (ECM) is the flexible tool for loose coupling: one event can trigger multiple plugins, and plugins don't need to know about each other. In practice, a TikTok plugin usually uses the Bridge; the ECM connects plugins together (e.g., Timer → WinCounter).
 
 ## Path 1: Event Bridge (TikTok Events)
 
@@ -23,7 +24,31 @@ In the `plugin.json`:
 }
 ```
 
-Wildcard `"tiktok.*"` subscribes to all TikTok events. The Event Bridge only delivers TikTok events, so subscriptions use the `tiktok.` namespace (either exact types like `"tiktok.follow"` or the prefix wildcard `"tiktok.*"`). Events from other plugins or the system are **not** delivered via `event_subscriptions` — use the [Event-Command-Mapper](./ch05-02-event-command-mapper.md) (`event_commands.yaml`) for those. Your own published events use the namespace `plugin-name.event`.
+Wildcard `"tiktok.*"` subscribes to all TikTok events.
+
+### Generic Bus Events (J.3 #14)
+
+Subscriptions are **not** limited to the `tiktok.` namespace: any EventBus
+event can be subscribed to — exact types like `"minecraft.player_death"`,
+prefix wildcards like `"minecraft.*"` or `"timer.*"`, or the catch-all
+`"*"` for every event on the bus.
+
+Non-TikTok subscriptions are delivered as a **`bus_event`** command:
+
+```python
+class DeathUI(BasePlugin):
+    def __init__(self):
+        super().__init__()
+        self.register_handler("bus_event", self._on_bus_event)
+
+    def _on_bus_event(self, args):
+        event_type = args.get("event_type", "")   # "minecraft.player_death"
+        data = args.get("data", {})               # {"player": "Steve", ...}
+```
+
+Unlike `tiktok_event`, these payloads carry no `user` field — only
+`event_type` and `data`. TikTok events keep their dedicated
+[`tiktok_event`](#path-1-event-bridge-tiktok-events) contract.
 
 ### Register Handler
 
@@ -93,7 +118,7 @@ The Event Bridge delivers standardized dictionaries:
 > The comment text is part of the `tiktok.comment` event (`data.comment`). For structured prefix commands (e.g. `$play`), prefer the [Comment Handler](#comment-handler-comment_handler) — it strips the prefix and delivers the command text directly.
 
 > [!NOTE]
-> TikTok events are forwarded by the bridge to the API EventBus. The API-side **Plugin Event Bridge** matches them against the `event_subscriptions` declared in every `plugin.json` and enqueues the `"tiktok_event"` command into each subscriber's CommandQueue.
+> Events are forwarded by the bridge to the API EventBus. The API-side **Plugin Event Bridge** matches them against the `event_subscriptions` declared in every `plugin.json`: TikTok events arrive as `"tiktok_event"`, every other bus source as [`"bus_event"`](#generic-bus-events-j3-14).
 
 ### Complete Example: Reacting to Multiple Event Types
 

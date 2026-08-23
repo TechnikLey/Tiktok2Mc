@@ -19,8 +19,9 @@
 | *(aktuell)* | **Capability-Enforcement**: neues Manifest-Feld `permissions` (`rcon`/`triggers`/`overlay`/`store`) wird in `for_hook()`-Views erzwungen; verweigerte Aufrufe → `HOOK-0009` + sicherer Rückgabewert; `capabilities` bleiben Discovery-Tags; Shipped-Manifeste deklarieren ihre Berechtigungen | E.8 / J.2 Nr. 10: Isolation ist wirksam statt nur deklarativ |
 | *(aktuell)* | **`api.request()`-Helper**: synchroner JSON-Request/Response gegen die Control Plane (GET/POST/PUT), geparster Body oder `None`, Permission `network`; Spotify-Control-Hook umgestellt (urllib-Boilerplate entfernt) | J.2 Nr. 8 (pragmatisch): Hooks können Zustand abfragen ohne DIY-HTTP |
 | *(aktuell)* | **Webhook-Minecraft-Semantik konfigurierbar**: `minecraft_server_api.queue_pause_on_death` (Default `true`) gated die Queue-Pause bei `player_death`/`player_respawn`; Logik in testbarem `_apply_mc_queue_semantics()` | E.7: Fremdspiel mit gleichnamigen Events verfälscht die Queue nicht mehr |
+| *(aktuell)* | **Generisches Event-Abo**: `event_subscriptions` akzeptiert jede Bus-Quelle (`minecraft.*`, `timer.*`, `server.*`, Plugin-Events, Catch-all `"*"`); Nicht-TikTok-Quellen kommen als `bus_event`-Kommando ohne `user`-Pflicht an | J.3 Nr. 14: Plugins hören auf System-/Plugin-Events ohne zentrale ECM-YAML-Pflege |
 >
-> Weiterhin offen: alle J.3-Punkte (J.2 Nr. 8/E.7/E.8 erledigt).
+> Weiterhin offen: J.3 Nr. 11/12/13.
 
 ---
 
@@ -280,7 +281,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 11. Dashboard-UI-Erweiterungspunkte (Tabs/Routen für Plugins) — löst I.3s UI-Anteil.
 12. Einheitliches Event-Schema/-Katalog mit Versionierung; `emitted_events`/`accepted_commands` für Delivery statt nur GUI-Katalog nutzen.
 13. Notification-Dispatcher (Overlay/Sound/TTS/Discord als austauschbare Kanäle).
-14. Generisches Event-Abo über **alle** Quellen (heute: `event_subscriptions` nur für `tiktok.*`, sonst zwingend zentrale ECM-YAML-Handpflege).
+14. ~~**Generisches Event-Abo über alle Quellen** (heute: `event_subscriptions` nur für `tiktok.*`, sonst zwingend zentrale ECM-YAML-Handpflege).~~ **[✅ ERLEDIGT]** `event_subscriptions` akzeptiert jetzt **jede** Bus-Quelle (exakt, Prefix-Wildcard oder Catch-all `"*"`); TikTok-Events bleiben beim `tiktok_event`-Vertrag (mit `user`), alle anderen Quellen (`minecraft.*`, `timer.*`, `server.*`, Plugin-Events) kommen als neues `bus_event`-Kommando (`event_type` + `data`, kein `user`) in die CommandQueue. ECM bleibt für Aktionsverkettung; Docs ch03-02/ch03-05 (EN+DE) aktualisiert.
 
 ---
 
@@ -295,11 +296,11 @@ Was die versprochene Flexibilität ursprünglich **ausbremste**, waren keine Des
 
 ### Umsetzungsstand (August 2026)
 
-**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext (`HookContext`), Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle, Capability-Enforcement (`permissions`), Request/Response-Helper (`api.request()`), Webhook-Minecraft-Semantik (Config-Gate). Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) kann Zustand jetzt per `api.request()` abfragen.
+**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext (`HookContext`), Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle, Capability-Enforcement (`permissions`), Request/Response-Helper (`api.request()`), Webhook-Minecraft-Semantik (Config-Gate), generisches Event-Abo (`bus_event`). Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) kann Zustand jetzt per `api.request()` abfragen und System-Events per `bus_event` empfangen.
 
 **Verbleibende Roadmap (empfohlene Reihenfolge):**
 1. ~~J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle~~ **[✅ ERLEDIGT]**
 2. ~~E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context`~~ **[✅ ERLEDIGT]** (inkl. `HookContext`-Typ + Kommentar-Sonderfall aufgelöst)
 3. ~~J.2 Nr. 10 — Capability-Enforcement~~ **[✅ ERLEDIGT]** (`permissions`-Feld, API-Ebene; Prozess-Sandbox bleibt offen)
 4. ~~J.2 Nr. 8 — Request/Response (`api.request()`-Helper) + E.7 (Webhook-Semantik)~~ **[✅ ERLEDIGT]**
-5. J.3 nach Bedarf (Nr. 11–14); E.7-Restthema „Prozess-Sandbox-Profile" nur bei Bedarf
+5. ~~J.3 nach Bedarf (Nr. 11–14)~~ → **Nr. 14 [✅ ERLEDIGT]** (generisches Event-Abo); offen: Nr. 11 (Dashboard-UI-Erweiterungspunkte), Nr. 12 (Event-Schema-Katalog), Nr. 13 (Notification-Dispatcher); E.7-Restthema „Prozess-Sandbox-Profile" nur bei Bedarf

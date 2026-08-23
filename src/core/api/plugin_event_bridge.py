@@ -1,8 +1,11 @@
 """Declarative plugin event bridge (API process).
 
-Routes TikTok events from the EventBus to plugins that declare
-``event_subscriptions`` in their ``plugin.json``, and delivers prefixed
-comments to plugins that declare a ``comment_handler``.
+Routes EventBus events to plugins that declare ``event_subscriptions`` in
+their ``plugin.json``, and delivers prefixed comments to plugins that
+declare a ``comment_handler``. TikTok events arrive as a standardized
+``tiktok_event`` command; every other bus source (Minecraft webhooks,
+timers, server lifecycle, plugin-emitted events) arrives as a generic
+``bus_event`` command.
 
 This service intentionally runs in the **API process** — the same process
 that owns the polled ``command_queue`` — so dispatched commands actually
@@ -13,7 +16,12 @@ declared subscriptions were silently never delivered.
 Delivery contracts (docs/dev-book ``ch03-05``):
 
 * ``event_subscriptions: ["tiktok.gift", "tiktok.*"]`` → a standardized
-  ``tiktok_event`` command carrying ``event_type`` / ``user`` / ``data``.
+  ``tiktok_event`` command carrying ``event_type`` / ``user`` / ``data``
+  (TikTok events always carry a ``user``).
+* Subscriptions to **any other bus source** (``minecraft.*``, ``timer.*``,
+  ``server.*``, plugin-emitted events, or the catch-all ``*``) → a
+  ``bus_event`` command carrying ``event_type`` / ``data`` — no ``user``
+  is required for these sources.
 * ``comment_handler: {"prefix": "$", "enabled": true}`` → a ``comment``
   command carrying ``text`` (prefix stripped) and ``username`` for every
   ``tiktok.comment`` whose text starts with the prefix.
@@ -37,9 +45,11 @@ DEFAULT_COMMENT_PREFIX = "$"
 def match_event(event_type: str, pattern: str) -> bool:
     """Return whether *event_type* matches a subscription *pattern*.
 
-    Supports exact names (``tiktok.gift``) and trailing wildcards
-    (``tiktok.*`` matches every ``tiktok.<suffix>``).
+    Supports the catch-all (``*``), exact names (``tiktok.gift``) and
+    trailing wildcards (``tiktok.*`` matches every ``tiktok.<suffix>``).
     """
+    if pattern == "*":
+        return True
     if pattern == event_type:
         return True
     if pattern.endswith(".*"):
@@ -139,39 +149,56 @@ class PluginEventBridge:
 
     def _dispatch(self, event_type: str, event_data: dict[str, Any]) -> None:
         """Route one bus event to all matching plugins (pure logic, no loop)."""
-        if not event_type.startswith("tiktok."):
-            return
-        user = event_data.get("user")
-        if not user:
-            return
-
         from core.api.plugin_overlay import command_queue
 
-        data = {k: v for k, v in event_data.items() if k != "user"}
+        if event_type.startswith("tiktok."):
+            user = event_data.get("user")
+            if not user:
+                return
 
-        for plugin_name in self._recipients_for(event_type):
+            data = {k: v for k, v in event_data.items() if k != "user"}
+
+            for plugin_name in self._recipients_for(event_type):
+                command_queue.enqueue(
+                    plugin_name,
+                    "tiktok_event",
+                    event_type=event_type,
+                    user=user,
+                    data=data,
+                )
+                log.debug(
+                    "[EVENT-BRIDGE] %s → %s (tiktok_event)", event_type, plugin_name
+                )
+
+            if event_type == "tiktok.comment":
+                comment_text = str(data.get("comment", ""))
+                if comment_text:
+                    for plugin_name, stripped in self._comment_recipients(comment_text):
+                        command_queue.enqueue(
+                            plugin_name,
+                            "comment",
+                            text=stripped,
+                            username=user,
+                        )
+                        log.debug(
+                            "[EVENT-BRIDGE] comment → %s (user=%s)", plugin_name, user
+                        )
+            return
+
+        # Generic bus sources (minecraft.*, timer.*, server.*, plugin events):
+        # deliver as ``bus_event`` without requiring a ``user`` field.
+        recipients = self._recipients_for(event_type)
+        if not recipients:
+            return
+        data = dict(event_data)
+        for plugin_name in recipients:
             command_queue.enqueue(
                 plugin_name,
-                "tiktok_event",
+                "bus_event",
                 event_type=event_type,
-                user=user,
                 data=data,
             )
-            log.debug("[EVENT-BRIDGE] %s → %s (tiktok_event)", event_type, plugin_name)
-
-        if event_type == "tiktok.comment":
-            comment_text = str(data.get("comment", ""))
-            if comment_text:
-                for plugin_name, stripped in self._comment_recipients(comment_text):
-                    command_queue.enqueue(
-                        plugin_name,
-                        "comment",
-                        text=stripped,
-                        username=user,
-                    )
-                    log.debug(
-                        "[EVENT-BRIDGE] comment → %s (user=%s)", plugin_name, user
-                    )
+            log.debug("[EVENT-BRIDGE] %s → %s (bus_event)", event_type, plugin_name)
 
     # ------------------------------------------------------------------
     #  Background loop

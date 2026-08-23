@@ -46,6 +46,14 @@ class TestMatchEvent:
 
         assert match_event("tiktok.gift", "tiktok.*") is True
         assert match_event("tiktok.comment", "tiktok.*") is True
+        assert match_event("minecraft.player_death", "minecraft.*") is True
+
+    def test_catch_all_match(self):
+        from core.api.plugin_event_bridge import match_event
+
+        assert match_event("tiktok.gift", "*") is True
+        assert match_event("server.started", "*") is True
+        assert match_event("anything", "*") is True
 
     def test_no_match(self):
         from core.api.plugin_event_bridge import match_event
@@ -147,8 +155,44 @@ class TestDispatch:
         )
         return calls
 
-    def test_ignores_non_tiktok_events(self, bridge, enqueued):
-        bridge._dispatch("minecraft.player_death", {"user": "Steve"})
+    def test_non_tiktok_event_delivered_as_bus_event(self, bridge, enqueued):
+        """J.3 #14: generic bus sources reach subscribers without a user."""
+        bridge._subscriptions = {"minecraft.player_death": ["death-ui"]}
+
+        bridge._dispatch(
+            "minecraft.player_death", {"player": "Steve", "message": "died"}
+        )
+
+        assert len(enqueued) == 1
+        cmd = enqueued[0]
+        assert cmd["target"] == "death-ui"
+        assert cmd["command"] == "bus_event"
+        assert cmd["event_type"] == "minecraft.player_death"
+        assert cmd["data"] == {"player": "Steve", "message": "died"}
+
+    def test_bus_wildcard_subscription(self, bridge, enqueued):
+        bridge._subscriptions = {"minecraft.*": ["mc-logger"]}
+
+        bridge._dispatch("minecraft.player_respawn", {"player": "Steve"})
+
+        assert len(enqueued) == 1
+        assert enqueued[0]["target"] == "mc-logger"
+        assert enqueued[0]["command"] == "bus_event"
+
+    def test_catch_all_subscription_receives_everything(self, bridge, enqueued):
+        bridge._subscriptions = {"*": ["audit-log"]}
+
+        bridge._dispatch("server.started", {"port": 25565})
+        bridge._dispatch("tiktok.gift", {"user": "fan", "gift_id": "5299"})
+
+        commands = [c["command"] for c in enqueued]
+        assert commands.count("bus_event") == 1
+        assert commands.count("tiktok_event") == 1
+
+    def test_unsubscribed_bus_event_ignored(self, bridge, enqueued):
+        bridge._subscriptions = {"tiktok.*": ["alpha"]}
+
+        bridge._dispatch("timer.tick", {"name": "pomodoro"})
         assert enqueued == []
 
     def test_dispatches_to_subscribers(self, bridge, enqueued):
@@ -341,3 +385,44 @@ class TestEndToEndDelivery:
                 await task
 
         assert cmds == []
+
+    @pytest.mark.asyncio
+    async def test_real_minecraft_event_reaches_plugin_queue(self):
+        """J.3 #14: a non-TikTok bus event lands as ``bus_event``."""
+        import asyncio
+        import contextlib
+        import time
+
+        from core.api.eventbus import event_bus
+        from core.api.plugin_event_bridge import PluginEventBridge
+        from core.api.plugin_overlay import command_queue
+
+        command_queue.clear("e2e-mc")
+        bridge = PluginEventBridge()
+        bridge._subscriptions = {"minecraft.player_death": ["e2e-mc"]}
+        bridge._running = True
+
+        task = asyncio.create_task(bridge._loop())
+        cmds: list[dict] = []
+        try:
+            await asyncio.sleep(0)
+            await event_bus.publish(
+                "minecraft.player_death", {"player": "Steve", "message": "boom"}
+            )
+            deadline = time.time() + 2.0
+            while time.time() < deadline:
+                cmds = command_queue.dequeue_all("e2e-mc")
+                if cmds:
+                    break
+                await asyncio.sleep(0.02)
+        finally:
+            bridge._running = False
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+        assert len(cmds) == 1
+        cmd = cmds[0]
+        assert cmd["command"] == "bus_event"
+        assert cmd["args"]["event_type"] == "minecraft.player_death"
+        assert cmd["args"]["data"] == {"player": "Steve", "message": "boom"}
