@@ -66,6 +66,7 @@ self.push_state()  # liest über thread-safes self.state
 | `self.send_command(target, command, args)` | Sendet Befehl an ein anderes Plugin per `POST /plugins/{target}/command`. Gibt `True`/`False` zurück. |
 | `self.api_post(path, data)` | Sendet HTTP-POST an `http://127.0.0.1:29185/api/v1/{path}`. Gibt `True`/`False` zurück. |
 | `self.api_get(path, timeout=5)` | Sendet HTTP-GET. Gibt das JSON-Objekt oder `None` bei Fehlern zurück. |
+| `self.api_request(path, payload=None, method=None, timeout=5)` | Vollwertiges Request/Response: gibt den **geparsten JSON-Body** zurück (`dict`/`list`/str/...), oder `None` bei leerem Body/Fehlern. Mit `payload=None` wird ein GET gesendet; mit Payload geht sie als JSON per POST (überschreibbar mit `method="PUT"` etc.). Wirft nie. |
 
 > [!NOTE]
 > Die API-Basis-URL kann über die Umgebungsvariable `API_BASE_URL` überschrieben werden (z. B. für abweichende Host/Port-Konfiguration). Standard: `http://127.0.0.1:29185/api/v1`.
@@ -82,6 +83,13 @@ self.api_post("/events", {
 
 # Plugin-Liste abfragen
 plugins = self.api_get("/plugins")
+
+# Request/Response mit Body-Zugriff (PUT + geparste Antwort)
+result = self.api_request(
+    "plugins/mein-plugin/data/counter",
+    payload={"value": 42},
+    method="PUT",
+)
 ```
 
 ## Befehls-Handler
@@ -317,7 +325,7 @@ eigenen Channel-Einstellungen inline mit** — eine globale Konfiguration ist
 nicht nötig. Plugins nutzen die `BasePlugin`-API-Helper:
 
 ```python
-self.api_post("notifications", {
+result = self.api_request("notifications", payload={
     "title": "Backup fertig",
     "channels": {
         "overlay": {"duration": 4},                    # OBS-Overlay-Text
@@ -325,8 +333,12 @@ self.api_post("notifications", {
         "tts":     {"rate": 0},                        # Windows-SAPI-Sprache
         "discord": {"webhook_url": "https://discord.com/api/webhooks/..."},
     },
-})  # -> True bei HTTP 2xx (api_post liefert nur einen Erfolgs-Flag)
+})  # -> {"sent": [...], "failed": [...], "skipped": [...]}
 ```
+
+Für reines Fire-and-forget funktioniert auch
+`self.api_post("notifications", {...})` — liefert dann nur einen
+Erfolgs-Flag statt des Bodys.
 
 Eingebaute Channels: `log` (immer verfügbar), `overlay`, `sound`,
 `tts`, `discord`. Weitere Channel-Handler lassen sich in
@@ -343,9 +355,9 @@ Ohne `channels` wird an die optional global konfigurierten Channels
 zugestellt (sonst `log`); unbekannte Channel-Namen loggen `NOTIF-0002` und
 erscheinen als `skipped`. Ein Channel, der bei der Zustellung scheitert
 (fehlende Datei, Webhook-Fehler, ...), wird als `failed` gemeldet (in den
-API-Logs mit `NOTIF-0001`) — Zustellungsprobleme werfen nie Exceptions,
-und `api_post` bleibt trotzdem True (gescheiterte Channels stehen in
-Log/Response, nicht im Fehlerstatus).
+API-Logs mit `NOTIF-0001`) — Zustellungsprobleme werfen nie Exceptions und
+ändern nicht den HTTP-Status; du siehst sie nur in der Rückgabe
+(`failed`/`skipped`).
 
 #### Empfohlenes Muster: autarke Plugin-Einstellungen
 

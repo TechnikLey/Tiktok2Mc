@@ -235,6 +235,58 @@ class BasePlugin:
             log.warning("[%s] API GET %s failed: %s", self.PLUGIN_NAME, path, e)
             return None
 
+    def api_request(
+        self,
+        path: str,
+        payload: dict[str, Any] | list[Any] | None = None,
+        method: str | None = None,
+        timeout: float = 5,
+    ) -> Any:
+        """Call a control-plane endpoint and return the parsed JSON body.
+
+        Mirrors ``HookAPI.request`` for plugins: ``path`` is relative to
+        the API base (``/api/v1``). With ``payload=None`` the request is a
+        GET; passing a payload sends it as a JSON body via POST (override
+        with ``method``, e.g. ``"PUT"``). Returns the decoded JSON value
+        (dict/list/str/...), or ``None`` when the body is empty or the
+        request fails — failures are logged, never raised.
+        """
+        verb = method.upper() if method else ("GET" if payload is None else "POST")
+        data: bytes | None = None
+        headers: dict[str, str] = {}
+        if payload is not None:
+            try:
+                data = json.dumps(payload).encode("utf-8")
+            except (TypeError, ValueError) as e:
+                log.warning(
+                    "[%s] API %s %s: unserializable payload: %s",
+                    self.PLUGIN_NAME,
+                    verb,
+                    path,
+                    e,
+                )
+                return None
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(
+            _api_url(path), data=data, headers=headers, method=verb
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8")
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as exc:
+            log.warning(
+                "[%s] API %s %s failed: HTTP %s",
+                self.PLUGIN_NAME,
+                verb,
+                path,
+                exc.code,
+            )
+            return None
+        except (OSError, ValueError) as exc:
+            log.warning("[%s] API %s %s failed: %s", self.PLUGIN_NAME, verb, path, exc)
+            return None
+
     def push_state(self) -> None:
         """Push current ``self.state`` to the API state endpoint."""
         self.api_post(f"/plugins/{self.PLUGIN_NAME}/state", {"state": self.state})

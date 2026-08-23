@@ -66,6 +66,7 @@ self.push_state()  # reads via thread-safe self.state
 | `self.send_command(target, command, args)` | Sends a command to another plugin via `POST /plugins/{target}/command`. Returns `True`/`False`. |
 | `self.api_post(path, data)` | Sends HTTP POST to `http://127.0.0.1:29185/api/v1/{path}`. Returns `True`/`False`. |
 | `self.api_get(path, timeout=5)` | Sends HTTP GET. Returns the JSON object or `None` on errors. |
+| `self.api_request(path, payload=None, method=None, timeout=5)` | Full request/response: returns the **parsed JSON body** (`dict`/`list`/str/...), or `None` on empty body/errors. With `payload=None` it sends a GET; passing a payload sends JSON via POST (override with `method="PUT"` etc.). Never raises. |
 
 > [!NOTE]
 > The API base URL can be overridden via the environment variable `API_BASE_URL` (e.g., for different host/port configuration). Default: `http://127.0.0.1:29185/api/v1`.
@@ -82,6 +83,13 @@ self.api_post("/events", {
 
 # Query plugin list
 plugins = self.api_get("/plugins")
+
+# Request/response with body access (PUT + parsed response)
+result = self.api_request(
+    "plugins/my-plugin/data/counter",
+    payload={"value": 42},
+    method="PUT",
+)
 ```
 
 ## Command Handlers
@@ -312,7 +320,7 @@ appear. Senders pass **their own channel settings inline** — no global
 configuration required. Plugins use the `BasePlugin` API helpers:
 
 ```python
-self.api_post("notifications", {
+result = self.api_request("notifications", payload={
     "title": "Backup done",
     "channels": {
         "overlay": {"duration": 4},                    # OBS overlay text
@@ -320,8 +328,11 @@ self.api_post("notifications", {
         "tts":     {"rate": 0},                        # Windows SAPI speech
         "discord": {"webhook_url": "https://discord.com/api/webhooks/..."},
     },
-})  # -> True on HTTP 2xx (api_post returns a success flag)
+})  # -> {"sent": [...], "failed": [...], "skipped": [...]}
 ```
+
+For pure fire-and-forget, `self.api_post("notifications", {...})` also works
+and returns a success flag instead of the body.
 
 Built-in channels: `log` (always available), `overlay`, `sound`,
 `tts`, `discord`. Additional channel handlers can be registered in
@@ -337,8 +348,8 @@ Omitting `channels` delivers to the optionally globally configured channels
 (or `log` when none are); naming unknown channels logs `NOTIF-0002` and
 reports them as `skipped`. A channel that fails during delivery (missing
 file, webhook error, ...) is reported as `failed` with `NOTIF-0001` in the
-API log — delivery problems never raise, and `api_post` still returns True
-(failed channels are reported in the log/response, not via error status).
+API log — delivery problems never raise and don't change the HTTP status;
+you only see them in the response (`failed`/`skipped`).
 
 #### Recommended pattern: self-contained plugin settings
 

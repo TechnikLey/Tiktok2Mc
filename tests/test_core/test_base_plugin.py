@@ -145,6 +145,123 @@ class TestBasePluginAPIHelpers:
         result = p.api_get("/test")
         assert result == {"ok": True}
 
+    # -- api_request (HookAPI.request parity) --------------------------------
+
+    def test_api_request_get_returns_parsed_body(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        seen = {}
+
+        def mock_urlopen(req, timeout=None):
+            seen["method"] = req.method
+            seen["url"] = req.full_url
+            m = MagicMock()
+            m.read.return_value = json.dumps({"sent": ["log"]}).encode()
+            m.__enter__ = MagicMock(return_value=m)
+            m.__exit__ = MagicMock(return_value=None)
+            return m
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+        result = p.api_request("/notifications/channels")
+        assert result == {"sent": ["log"]}
+        assert seen["method"] == "GET"
+        assert "/api/v1/notifications/channels" in seen["url"]
+
+    def test_api_request_post_sends_json_payload(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        seen = {}
+
+        def mock_urlopen(req, timeout=None):
+            seen["method"] = req.method
+            seen["data"] = req.data
+            seen["content_type"] = req.headers.get("Content-type")
+            m = MagicMock()
+            m.read.return_value = json.dumps(
+                {"sent": ["discord"], "failed": [], "skipped": []}
+            ).encode()
+            m.__enter__ = MagicMock(return_value=m)
+            m.__exit__ = MagicMock(return_value=None)
+            return m
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+        payload = {
+            "title": "Clip archived",
+            "channels": {"discord": {"webhook_url": "https://x/y"}},
+        }
+        result = p.api_request("notifications", payload=payload)
+        assert result == {"sent": ["discord"], "failed": [], "skipped": []}
+        assert seen["method"] == "POST"
+        assert json.loads(seen["data"]) == payload
+        assert seen["content_type"] == "application/json"
+
+    def test_api_request_method_override(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+
+        def mock_urlopen(req, timeout=None):
+            m = MagicMock()
+            m.read.return_value = b'{"ok": true}'
+            m.__enter__ = MagicMock(return_value=m)
+            m.__exit__ = MagicMock(return_value=None)
+            return m
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+        assert p.api_request(
+            "plugins/fake/data/counter",
+            payload={"value": 42},
+            method="PUT",
+        ) == {"ok": True}
+
+    def test_api_request_empty_body_returns_none(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+
+        def mock_urlopen(req, timeout=None):
+            m = MagicMock()
+            m.read.return_value = b""
+            m.__enter__ = MagicMock(return_value=m)
+            m.__exit__ = MagicMock(return_value=None)
+            return m
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+        assert p.api_request("/no-content") is None
+
+    def test_api_request_failure_returns_none(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+
+        def mock_urlopen(req, timeout=None):
+            raise ConnectionError("fail")
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+        assert p.api_request("/test") is None
+
+    def test_api_request_http_error_returns_none(self, tmp_path, monkeypatch):
+        import email.message
+        import io
+        import urllib.error
+
+        p = self._make_plugin(tmp_path, monkeypatch)
+
+        def mock_urlopen(req, timeout=None):
+            raise urllib.error.HTTPError(
+                req.full_url,
+                404,
+                "Not Found",
+                email.message.Message(),
+                io.BytesIO(b""),
+            )
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+        assert p.api_request("/missing") is None
+
+    def test_api_request_unserializable_payload_returns_none(
+        self, tmp_path, monkeypatch
+    ):
+        p = self._make_plugin(tmp_path, monkeypatch)
+
+        def fail_urlopen(req, timeout=None):
+            raise AssertionError("must not be called")
+
+        monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+        assert p.api_request("/test", payload={"bad": object()}) is None
+
     def test_push_state(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         p.state = {"x": 1}
