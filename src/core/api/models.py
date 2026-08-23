@@ -289,6 +289,11 @@ class PluginRegistration(BaseModel):
         default=False,
         description="Plugin provides a dashboard tab (manifest 'dashboard_ui')",
     )
+    queries: list[str] = Field(
+        default_factory=list,
+        description="Declared query names for POST /plugins/{name}/query "
+        "(manifest 'queries'; refreshed per request)",
+    )
 
     @classmethod
     def from_manifest(

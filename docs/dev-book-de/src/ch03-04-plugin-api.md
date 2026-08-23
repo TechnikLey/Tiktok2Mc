@@ -229,7 +229,8 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
-| `GET` | `/plugins` | Alle registrierten Plugins auflisten |
+| `GET` | `/plugins` | Alle registrierten Plugins auflisten (enthält pro Plugin das `queries`-Feld) |
+| `GET` | `/plugins/queries` | Query-Discovery: alle deklarierten Query-Namen pro Plugin |
 | `POST` | `/plugins/{name}/command` | Befehl an ein Plugin senden |
 | `POST` | `/plugins/{name}/query` | Plugin abfragen (Request/Response — siehe unten) |
 | `POST` | `/plugins/{name}/query-response` | Plugin-intern: Query-Antwort zustellen |
@@ -303,6 +304,28 @@ Antworten: `200 {"id": ..., "result": ...}` bei Erfolg; `504 PLUGIN-0018`,
 wenn das Plugin nicht rechtzeitig antwortet; `502 PLUGIN-0019`, wenn der
 Handler eine Exception wirft. Befehle (`!`-Zeilen, Reactions) bleiben
 Fire-and-forget — Queries sind für Lesezugriffe mit Ergebnis da.
+
+#### Query-Discovery
+
+Da Queries ein bewusster Vertrag zwischen zwei Plugins sind, legt die API
+offen, was existiert: `GET /plugins/queries` liest jede `plugin.json` und
+liefert alle deklarierten Query-Namen inklusive Aktiv-Status des Plugins:
+
+```json
+{
+  "total": 1,
+  "plugins": [
+    { "name": "deathcounter", "queries": ["deaths"], "enabled": true }
+  ]
+}
+```
+
+Plugins ohne `queries`-Deklaration werden weggelassen (ihre Queries
+bekämen beim Aufruf ohnehin einen 404). Dieselbe Information liefert das
+`queries`-Feld von `GET /plugins` pro Plugin. Der Aufruf einer nicht
+deklarierten Query schlägt sofort mit einem 404 fehl, dessen Detail die
+deklarierten Queries des Plugins auflistet — ein Tippfehler verrät also
+sofort, was tatsächlich verfügbar ist.
 
 Referenzimplementierung: das mitgelieferte **death-counter**-Plugin
 beantwortet die Query `"deaths"`.

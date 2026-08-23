@@ -101,8 +101,11 @@ class TestPluginQuery:
     def test_query_handler_error_502(self, client, project_dir, query_plugin):
         """A failed handler surfaces as 502 PLUGIN-0019 with the error."""
         t = _drain_and_respond(client, error="boom")
+        # Generous caller timeout: under a fully loaded test suite the
+        # answering thread can lag; only the explicit-timeout test (below)
+        # must produce a 504.
         resp = client.post(
-            "/api/v1/plugins/qtest/query", json={"query": "top", "timeout": 3}
+            "/api/v1/plugins/qtest/query", json={"query": "top", "timeout": 20}
         )
         t.join(timeout=5)
         assert resp.status_code == 502
@@ -146,3 +149,78 @@ class TestPluginQuery:
             assert "not in accepted_commands" not in caplog.text
         finally:
             routes_mod.invalidate_accepted_commands_cache("qtest")
+
+
+class TestQueryDiscovery:
+    def _write_plugin(self, plugins_dir, name, manifest):
+        d = plugins_dir / name
+        d.mkdir()
+        (d / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return d
+
+    def test_lists_declared_queries(self, client, project_dir):
+        self._write_plugin(
+            project_dir / "src" / "plugins",
+            "disc",
+            {"name": "disc", "version": "1.0.0", "queries": ["stats", "top"]},
+        )
+        resp = client.get("/api/v1/plugins/queries")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert data["plugins"] == [
+            {"name": "disc", "queries": ["stats", "top"], "enabled": False}
+        ]
+
+    def test_plugins_without_queries_omitted(self, client, project_dir):
+        plugins_dir = project_dir / "src" / "plugins"
+        self._write_plugin(plugins_dir, "noq", {"name": "noq", "version": "1.0.0"})
+        self._write_plugin(
+            plugins_dir, "emptyq", {"name": "emptyq", "version": "1.0.0", "queries": []}
+        )
+        resp = client.get("/api/v1/plugins/queries")
+        assert resp.status_code == 200
+        assert resp.json() == {"total": 0, "plugins": []}
+
+    def test_broken_manifest_skipped(self, client, project_dir):
+        plugins_dir = project_dir / "src" / "plugins"
+        self._write_plugin(
+            plugins_dir, "good", {"name": "good", "version": "1.0.0", "queries": ["x"]}
+        )
+        broken = plugins_dir / "broken"
+        broken.mkdir()
+        (broken / "plugin.json").write_text("{not json", encoding="utf-8")
+        resp = client.get("/api/v1/plugins/queries")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [p["name"] for p in data["plugins"]] == ["good"]
+
+    def test_enabled_flag_from_registry(self, client, project_dir, query_plugin):
+        resp = client.get("/api/v1/plugins/queries")
+        assert resp.status_code == 200
+        data = resp.json()
+        entry = next(p for p in data["plugins"] if p["name"] == "qtest")
+        assert entry["queries"] == ["stats", "top"]
+        assert entry["enabled"] is True
+
+    def test_list_endpoint_includes_queries_field(
+        self, client, project_dir, query_plugin
+    ):
+        """GET /plugins exposes the declared queries per plugin."""
+        resp = client.get("/api/v1/plugins")
+        assert resp.status_code == 200
+        entry = next(p for p in resp.json()["plugins"] if p["name"] == "qtest")
+        assert entry["queries"] == ["stats", "top"]
+
+    def test_list_endpoint_without_manifest_empty(self, client, project_dir):
+        """Registered plugins without a manifest report no queries."""
+        from core.api.models import PluginRegistration
+        from core.api.registry import get_registry
+
+        get_registry().register(
+            PluginRegistration(name="bare", path="", entry_point="", enabled=True)
+        )
+        resp = client.get("/api/v1/plugins")
+        assert resp.status_code == 200
+        entry = next(p for p in resp.json()["plugins"] if p["name"] == "bare")
+        assert entry["queries"] == []

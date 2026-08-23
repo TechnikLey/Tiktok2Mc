@@ -28,7 +28,10 @@ from core.api.models import (
     PluginUpdateStatus,
 )
 from core.api.registry import get_registry
-from core.api.services.plugin_discovery import discover_plugins_from_manifests
+from core.api.services.plugin_discovery import (
+    discover_plugins_from_manifests,
+    discover_queries_from_manifests,
+)
 from core.api.updater import PluginUpdateChecker
 
 log = logging.getLogger(__name__)
@@ -66,6 +69,14 @@ def _clean_plugin_signals(plugin_name: str) -> None:
                 p.unlink()
         except OSError as exc:
             log.warning("Failed to clean signal %s: %s", p, exc)
+
+
+def _queries_from_manifest(raw: dict) -> list[str]:
+    """Extract the sorted ``queries`` declaration from a raw manifest."""
+    qs = raw.get("queries")
+    if not isinstance(qs, list):
+        return []
+    return sorted({str(q) for q in qs if q})
 
 
 router = APIRouter(tags=["Plugins"])
@@ -148,6 +159,15 @@ async def list_plugins():
                     if Path(plugin.path).is_file()
                     else Path(plugin.path)
                 )
+                if not plugin_dir.is_dir():
+                    # Stale/missing executable path — fall back to the
+                    # conventional <plugins_dir>/<name> location so the
+                    # fresh manifest data still shows up.
+                    from core.plugin_config import discover_plugins_dir
+
+                    candidate = discover_plugins_dir() / plugin.name
+                    if candidate.is_dir():
+                        plugin_dir = candidate
                 if plugin_dir.is_dir():
                     manifest_path = plugin_dir / "plugin.json"
                     if manifest_path.exists():
@@ -155,6 +175,7 @@ async def list_plugins():
                             with manifest_path.open("r", encoding="utf-8") as fh:
                                 raw = json.load(fh)
                             plugin.dashboard_ui = bool(raw.get("dashboard_ui", False))
+                            plugin.queries = _queries_from_manifest(raw)
                         except (json.JSONDecodeError, OSError) as exc:
                             plugin.error = str(exc)
 
@@ -205,6 +226,7 @@ async def list_plugins():
                         last_heartbeat=None,
                         platform="all",
                         dashboard_ui=bool(raw.get("dashboard_ui", False)),
+                        queries=_queries_from_manifest(raw),
                     )
                 )
 
@@ -322,6 +344,44 @@ async def discover_plugins():
         entry.pop("enabled_by_registry", None)
 
     return {"plugins": discovered}
+
+
+# ── Query discovery ───────────────────────────────────────────────────
+
+
+@router.get("/plugins/queries")
+async def list_plugin_queries():
+    """List every plugin's declared query names (C.3 #3 discovery).
+
+    Reads the ``queries`` declaration from each ``plugin.json`` on the
+    filesystem so callers can find out which queries exist before
+    calling ``POST /plugins/{name}/query``. Plugins without a
+    ``queries`` declaration are omitted (their queries would 404 at
+    call time anyway). Read-only — fresh per request, manifest edits
+    take effect immediately.
+    """
+    try:
+        from core.plugin_config import discover_plugins_dir
+
+        plugins_dir = discover_plugins_dir()
+        discovered = discover_queries_from_manifests(str(plugins_dir))
+    except Exception as e:  # any unexpected error becomes an HTTP 500
+        log.exception("Failed to list plugin queries")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Merge registry state (best-effort, read-only)
+    try:
+        registry = get_registry()
+        registry_plugins = {p.name: p for p in registry.list()}
+    except Exception:  # discovery result is still returned without it
+        registry_plugins = {}
+
+    for entry in discovered:
+        reg = registry_plugins.get(entry["name"])
+        entry["enabled"] = reg.enabled if reg is not None else False
+
+    total = sum(len(entry["queries"]) for entry in discovered)
+    return {"total": total, "plugins": discovered}
 
 
 # ── Enable / Disable ─────────────────────────────────────────────────
