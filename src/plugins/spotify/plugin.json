@@ -14,7 +14,9 @@
     "spotify:control",
     "spotify:queue"
   ],
-  "permissions": ["events"],
+  "permissions": [
+    "events"
+  ],
   "depends_on": [],
   "icon": "🎵",
   "emitted_events": [
@@ -23,24 +25,55 @@
       "name": "Track Changed",
       "desc": "When the currently playing Spotify track changes",
       "icon": "🎵",
-      "name_i18n": { "en": "Track Changed", "de": "Track gewechselt" },
-      "desc_i18n": { "en": "When the currently playing Spotify track changes", "de": "Wenn sich der aktuelle Spotify-Track ändert" }
+      "name_i18n": {
+        "en": "Track Changed",
+        "de": "Track gewechselt"
+      },
+      "desc_i18n": {
+        "en": "When the currently playing Spotify track changes",
+        "de": "Wenn sich der aktuelle Spotify-Track ändert"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "track",
+          "type": "string",
+          "desc": "Track name"
+        },
+        {
+          "key": "artist",
+          "type": "string",
+          "desc": "Artist name"
+        }
+      ]
     },
     {
       "key": "spotify.play",
       "name": "Playback Started",
       "desc": "When Spotify playback starts",
       "icon": "▶️",
-      "name_i18n": { "en": "Playback Started", "de": "Wiedergabe gestartet" },
-      "desc_i18n": { "en": "When Spotify playback starts", "de": "Wenn die Spotify-Wiedergabe startet" }
+      "name_i18n": {
+        "en": "Playback Started",
+        "de": "Wiedergabe gestartet"
+      },
+      "desc_i18n": {
+        "en": "When Spotify playback starts",
+        "de": "Wenn die Spotify-Wiedergabe startet"
+      }
     },
     {
       "key": "spotify.pause",
       "name": "Playback Paused",
       "desc": "When Spotify playback is paused",
       "icon": "⏸️",
-      "name_i18n": { "en": "Playback Paused", "de": "Wiedergabe pausiert" },
-      "desc_i18n": { "en": "When Spotify playback is paused", "de": "Wenn die Spotify-Wiedergabe pausiert wird" }
+      "name_i18n": {
+        "en": "Playback Paused",
+        "de": "Wiedergabe pausiert"
+      },
+      "desc_i18n": {
+        "en": "When Spotify playback is paused",
+        "de": "Wenn die Spotify-Wiedergabe pausiert wird"
+      }
     }
   ],
   "accepted_commands": {
@@ -48,29 +81,53 @@
       "name": "Play Music",
       "desc": "Start or resume playback",
       "args": {},
-      "name_i18n": { "en": "Play Music", "de": "Musik abspielen" },
-      "desc_i18n": { "en": "Start or resume playback", "de": "Wiedergabe starten oder fortsetzen" }
+      "name_i18n": {
+        "en": "Play Music",
+        "de": "Musik abspielen"
+      },
+      "desc_i18n": {
+        "en": "Start or resume playback",
+        "de": "Wiedergabe starten oder fortsetzen"
+      }
     },
     "pause": {
       "name": "Pause Music",
       "desc": "Pause the current track",
       "args": {},
-      "name_i18n": { "en": "Pause Music", "de": "Musik pausieren" },
-      "desc_i18n": { "en": "Pause the current track", "de": "Aktuellen Track pausieren" }
+      "name_i18n": {
+        "en": "Pause Music",
+        "de": "Musik pausieren"
+      },
+      "desc_i18n": {
+        "en": "Pause the current track",
+        "de": "Aktuellen Track pausieren"
+      }
     },
     "next": {
       "name": "Next Track",
       "desc": "Skip to the next song",
       "args": {},
-      "name_i18n": { "en": "Next Track", "de": "Nächster Track" },
-      "desc_i18n": { "en": "Skip to the next song", "de": "Zum nächsten Song springen" }
+      "name_i18n": {
+        "en": "Next Track",
+        "de": "Nächster Track"
+      },
+      "desc_i18n": {
+        "en": "Skip to the next song",
+        "de": "Zum nächsten Song springen"
+      }
     },
     "previous": {
       "name": "Previous Track",
       "desc": "Go back to the previous song",
       "args": {},
-      "name_i18n": { "en": "Previous Track", "de": "Vorheriger Track" },
-      "desc_i18n": { "en": "Go back to the previous song", "de": "Zum vorherigen Song zurückgehen" }
+      "name_i18n": {
+        "en": "Previous Track",
+        "de": "Vorheriger Track"
+      },
+      "desc_i18n": {
+        "en": "Go back to the previous song",
+        "de": "Zum vorherigen Song zurückgehen"
+      }
     },
     "volume": {
       "name": "Set Volume",
@@ -82,46 +139,85 @@
           "default": 50,
           "min": 0,
           "max": 100,
-          "label_i18n": { "en": "Volume level (0–100)", "de": "Lautstärke (0–100)" }
+          "label_i18n": {
+            "en": "Volume level (0–100)",
+            "de": "Lautstärke (0–100)"
+          }
         }
       },
-      "name_i18n": { "en": "Set Volume", "de": "Lautstärke einstellen" },
-      "desc_i18n": { "en": "Change playback volume", "de": "Wiedergabelautstärke ändern" }
+      "name_i18n": {
+        "en": "Set Volume",
+        "de": "Lautstärke einstellen"
+      },
+      "desc_i18n": {
+        "en": "Change playback volume",
+        "de": "Wiedergabelautstärke ändern"
+      }
     },
     "volume_up": {
       "name": "Volume Up",
       "desc": "Increase the volume",
       "args": {},
-      "name_i18n": { "en": "Volume Up", "de": "Lauter" },
-      "desc_i18n": { "en": "Increase the volume", "de": "Lautstärke erhöhen" }
+      "name_i18n": {
+        "en": "Volume Up",
+        "de": "Lauter"
+      },
+      "desc_i18n": {
+        "en": "Increase the volume",
+        "de": "Lautstärke erhöhen"
+      }
     },
     "volume_down": {
       "name": "Volume Down",
       "desc": "Decrease the volume",
       "args": {},
-      "name_i18n": { "en": "Volume Down", "de": "Leiser" },
-      "desc_i18n": { "en": "Decrease the volume", "de": "Lautstärke verringern" }
+      "name_i18n": {
+        "en": "Volume Down",
+        "de": "Leiser"
+      },
+      "desc_i18n": {
+        "en": "Decrease the volume",
+        "de": "Lautstärke verringern"
+      }
     },
     "shuffle": {
       "name": "Toggle Shuffle",
       "desc": "Turn shuffle on or off",
       "args": {},
-      "name_i18n": { "en": "Toggle Shuffle", "de": "Zufallswiedergabe umschalten" },
-      "desc_i18n": { "en": "Turn shuffle on or off", "de": "Zufallswiedergabe ein- oder ausschalten" }
+      "name_i18n": {
+        "en": "Toggle Shuffle",
+        "de": "Zufallswiedergabe umschalten"
+      },
+      "desc_i18n": {
+        "en": "Turn shuffle on or off",
+        "de": "Zufallswiedergabe ein- oder ausschalten"
+      }
     },
     "repeat": {
       "name": "Toggle Repeat",
       "desc": "Turn repeat on or off",
       "args": {},
-      "name_i18n": { "en": "Toggle Repeat", "de": "Wiederholung umschalten" },
-      "desc_i18n": { "en": "Turn repeat on or off", "de": "Wiederholung ein- oder ausschalten" }
+      "name_i18n": {
+        "en": "Toggle Repeat",
+        "de": "Wiederholung umschalten"
+      },
+      "desc_i18n": {
+        "en": "Turn repeat on or off",
+        "de": "Wiederholung ein- oder ausschalten"
+      }
     },
     "save": {
       "name": "Save Track",
       "desc": "Save the currently playing song to your library",
       "args": {},
-      "name_i18n": { "en": "Save Track", "de": "Track speichern" },
-      "desc_i18n": { "en": "Save the currently playing song to your library", "de": "Aktuellen Song in der Bibliothek speichern" }
+      "name_i18n": {
+        "en": "Save Track",
+        "de": "Track speichern"
+      },
+      "desc_i18n": {
+        "en": "Save the currently playing song to your library",
+        "de": "Aktuellen Song in der Bibliothek speichern"
+      }
     },
     "playtrack": {
       "name": "Play Specific Track",
@@ -132,11 +228,20 @@
           "label": "Song name or URL",
           "default": "",
           "placeholder": "Never Gonna Give You Up",
-          "label_i18n": { "en": "Song name or URL", "de": "Songname oder URL" }
+          "label_i18n": {
+            "en": "Song name or URL",
+            "de": "Songname oder URL"
+          }
         }
       },
-      "name_i18n": { "en": "Play Specific Track", "de": "Bestimmten Track abspielen" },
-      "desc_i18n": { "en": "Search for and play a song", "de": "Nach einem Song suchen und abspielen" }
+      "name_i18n": {
+        "en": "Play Specific Track",
+        "de": "Bestimmten Track abspielen"
+      },
+      "desc_i18n": {
+        "en": "Search for and play a song",
+        "de": "Nach einem Song suchen und abspielen"
+      }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",

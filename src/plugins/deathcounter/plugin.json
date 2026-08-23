@@ -10,13 +10,17 @@
   "bundled": true,
   "platform": "all",
   "dashboard_ui": true,
-  "queries": ["deaths"],
+  "queries": [
+    "deaths"
+  ],
   "capabilities": [
     "death-counter:count",
     "death-counter:milestones",
     "death-counter:events"
   ],
-  "permissions": ["events"],
+  "permissions": [
+    "events"
+  ],
   "depends_on": [],
   "icon": "💀",
   "emitted_events": [
@@ -25,8 +29,28 @@
       "name": "Death Milestone Reached",
       "desc": "When the death count reaches a configured milestone",
       "icon": "💀",
-      "name_i18n": { "en": "Death Milestone Reached", "de": "Todes-Meilenstein erreicht" },
-      "desc_i18n": { "en": "When the death count reaches a configured milestone", "de": "Wenn die Todesanzahl einen konfigurierten Meilenstein erreicht" }
+      "name_i18n": {
+        "en": "Death Milestone Reached",
+        "de": "Todes-Meilenstein erreicht"
+      },
+      "desc_i18n": {
+        "en": "When the death count reaches a configured milestone",
+        "de": "Wenn die Todesanzahl einen konfigurierten Meilenstein erreicht"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "deaths",
+          "type": "number",
+          "required": true,
+          "desc": "Death count that reached the milestone"
+        },
+        {
+          "key": "needed",
+          "type": "number",
+          "desc": "Wins needed for the next milestone"
+        }
+      ]
     }
   ],
   "accepted_commands": {
@@ -34,8 +58,14 @@
       "name": "Count Death",
       "desc": "Increase the death counter",
       "args": {},
-      "name_i18n": { "en": "Count Death", "de": "Tod zählen" },
-      "desc_i18n": { "en": "Increase the death counter", "de": "Todeszähler erhöhen" }
+      "name_i18n": {
+        "en": "Count Death",
+        "de": "Tod zählen"
+      },
+      "desc_i18n": {
+        "en": "Increase the death counter",
+        "de": "Todeszähler erhöhen"
+      }
     },
     "add_death": {
       "name": "Add Deaths",
@@ -46,18 +76,33 @@
           "label": "How many deaths",
           "default": 1,
           "min": 1,
-          "label_i18n": { "en": "How many deaths", "de": "Wie viele Tode" }
+          "label_i18n": {
+            "en": "How many deaths",
+            "de": "Wie viele Tode"
+          }
         }
       },
-      "name_i18n": { "en": "Add Deaths", "de": "Tode hinzufügen" },
-      "desc_i18n": { "en": "Add deaths to the counter", "de": "Tode zum Zähler hinzufügen" }
+      "name_i18n": {
+        "en": "Add Deaths",
+        "de": "Tode hinzufügen"
+      },
+      "desc_i18n": {
+        "en": "Add deaths to the counter",
+        "de": "Tode zum Zähler hinzufügen"
+      }
     },
     "reset": {
       "name": "Reset Counter",
       "desc": "Reset the death counter to zero",
       "args": {},
-      "name_i18n": { "en": "Reset Counter", "de": "Zähler zurücksetzen" },
-      "desc_i18n": { "en": "Reset the death counter to zero", "de": "Todeszähler auf Null zurücksetzen" }
+      "name_i18n": {
+        "en": "Reset Counter",
+        "de": "Zähler zurücksetzen"
+      },
+      "desc_i18n": {
+        "en": "Reset the death counter to zero",
+        "de": "Todeszähler auf Null zurücksetzen"
+      }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",

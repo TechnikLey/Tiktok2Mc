@@ -7,7 +7,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from starlette.responses import StreamingResponse
 
 from core.api.eventbus import event_bus
-from core.error_codes import API_0009
+from core.api.services.reaction_catalog import validate_event_payload
+from core.error_codes import API_0009, API_0010
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,22 @@ def _check_reserved_type(event_type: str, source_header: str | None) -> None:
                 f"Event family '{event_type.rsplit('.', 1)[0]}.*' is reserved; "
                 f"publish under your own namespace instead."
             ),
+        )
+
+
+def _validate_payload(event_type: str, data: dict) -> None:
+    """Reject payloads violating the declaring plugin's data_schema."""
+    violations = validate_event_payload(event_type, data)
+    if violations:
+        log.warning(
+            "%s: payload for '%s' rejected: %s",
+            API_0010.code,
+            event_type,
+            "; ".join(violations),
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=(f"{API_0010.code} {API_0010.message}: " + "; ".join(violations)),
         )
 
 
@@ -123,6 +140,7 @@ async def inject_event(
         if not isinstance(data, dict):
             raise HTTPException(status_code=422, detail="'data' must be a dict")
         _check_reserved_type(event_type, x_t2m_source)
+        _validate_payload(event_type, data)
         await event_bus.publish(event_type, data)
         return {"status": "ok", "event": event_type}
     except HTTPException:
@@ -170,6 +188,7 @@ async def ingest_event(
         data = body.get("data", {})
         if not isinstance(data, dict):
             raise HTTPException(status_code=422, detail="'data' must be a dict")
+        _validate_payload(event_type, data)
 
         await event_bus.publish(event_type, data)
 

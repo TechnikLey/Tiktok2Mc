@@ -31,6 +31,7 @@
 > | *(aktuell)* | **Event-Namespace-Schutz auf der API**: `POST /events` lehnt die reservierten Kernfamilien `tiktok.*`/`minecraft.*` ohne Header `X-T2M-Source: bridge` ab (`403`, neuer Code `API-0009`); Bridge sendet den Header in allen Publishern | Plugins können Kern-Events nicht mehr fälschen — dieselbe Garantie, die Hooks schon auf HookAPI-Ebene hatten |
 > | *(aktuell)* | **Permission-Modell für Plugins (Pflicht, Default-Deny)**: `permissions` in plugin.json (`store`, `network`, `plugins`, `events`) wirkt als Whitelist auf die BasePlugin-API-Oberfläche (`api_*`, `store_*`, `send_command`/`query_plugin`, `publish_event`); **fehlende Deklaration = alles abgelehnt** (Breaking Change v1.0.0, gleiche Semantik wie Hooks); Verweigerung = `PLUGIN-0020` + sicherer Fallback; eigene Kernkanäle (Polling, Heartbeat, Overlay/Dashboard-Registrierung, `push_state`) bleiben ungesperrt; alle mitgelieferten Plugins deklarieren ihre Permissions und nutzen `publish_event`; Feld auch im `PluginManifest`/Registry-Modell; Smoke-Test verifiziert Deklarationen gegen tatsächliche Code-Nutzung | Volle Konsistenz mit dem Hook-System: dasselbe Berechtigungsversprechen auf beiden Erweiterungsebenen |
 > | *(aktuell)* | **Eigene Endpunkte pro Plugin (generisches RPC)**: `POST /plugins/{name}/rpc` (`method`/`path`/`body`/`timeout`) stellt REST-artige Aufrufe als reserviertes Kommando `__rpc__` zu und antwortet über den Query-Response-Kanal (Korrelations-IDs, 504/502 wie Queries); BasePlugin-Seite ist der überschreibbare Vertrag `on_rpc(method, path, body)` | Jede Erweiterung hat eine eigene REST-Oberfläche ohne Server-Änderungen — Dashboard-Callbacks, Webhooks in Plugins und reiche Interaktionen passen nicht mehr ins Command-Schema |
+> | *(aktuell)* | **Event-Payload-Schemata + Versionsvertrag**: `emitted_events` in plugin.json kann pro Event `version` (Integer) und `data_schema` (Felder `{key, type, desc, required}`; Typen string/number/boolean/object/array/any) deklarieren; Publishing über `POST /events` und `/events/ingest` validiert gegen das Schema und lehnt Verletzungen mit `422 API-0010` ab; Zusatzschlüssel erlaubt, undeklarierte Typen unvalidiert; Vertrag im Reaktions-Katalog (`GET /reactions/catalog`) veröffentlicht; TTL-Cache, Invalidation bei Plugin-Install/Update; mitgelieferte Plugins deklarieren Schemas (timer/death/win/spotify) | Konsumenten können sich auf Event-Payloads verlassen statt Felder zu raten — Grundlage für Erweiterungs-Ökosystem |
 >
 > Weiterhin offen: nichts aus dieser Liste.
 
@@ -315,6 +316,5 @@ Die Ideen TTS (Kommentar-Vorlesen), Rate-Limit-Gate, Schimpfwort-Moderator, Gift
 
 **Verbleibende Roadmap (aus der Capability-Matrix):**
 1. WebSocket-Anschluss pro Erweiterung (HIGH; eigentliche Routen sind über den generischen RPC-Kanal abgedeckt)
-2. Event-Payload-Schemata + Versionsvertrag im Event-Katalog (HIGH)
-3. Netzwerk-Client-Bibliothek (Retry/Circuit-Breaker) als Plugin-API exportieren (MEDIUM)
-4. UI-Extension-Points für Hooks; Hook↔Hook-Query (MEDIUM/LOW)
+2. Netzwerk-Client-Bibliothek (Retry/Circuit-Breaker) als Plugin-API exportieren (MEDIUM)
+3. UI-Extension-Points für Hooks; Hook↔Hook-Query (MEDIUM/LOW)

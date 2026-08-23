@@ -204,6 +204,40 @@ Namenskonvention: `plugin-name.ereignis` (Namespace mit Punkt).
 > `POST /events` publiziert, erhält `403` (`API-0009`). Nutze deinen
 > eigenen Namespace — für Konsumenten ist der Unterschied nicht erkennbar.
 
+## Payload-Schemata & Versionierung
+
+Events, die du in `emitted_events` deklarierst, können einen
+**Payload-Vertrag** tragen: ein `version`-Feld und ein `data_schema`, das die
+Datenfelder beschreibt. Das Schema wird serverseitig erzwungen — Wer das Event
+mit fehlenden Pflichtfeldern oder falschen Typen publiziert, erhält
+`422 API-0010`; Konsumenten können sich auf den Payload verlassen:
+
+```json
+{
+  "emitted_events": [
+    {
+      "key": "mein-plugin.level_up",
+      "name": "Level Up",
+      "version": 1,
+      "data_schema": [
+        { "key": "player", "type": "string", "required": true },
+        { "key": "level", "type": "number", "required": true },
+        { "key": "hardcore", "type": "boolean" }
+      ]
+    }
+  ]
+}
+```
+
+- `type` ist eines von `string`, `number`, `boolean`, `object`, `array`, `any`.
+- Zusätzliche Schlüssel über das Schema hinaus sind erlaubt (Konsumenten dürfen
+  Payloads erweitern).
+- Nicht deklarierte Event-Typen werden nicht validiert.
+- Der vollständige Vertrag steht in
+  `GET /api/v1/reactions/catalog` (`events -> version` / `data_schema`) —
+  Konsumenten sollten auf `version` verzweigen statt zu raten.
+- Erhöhe `version`, wenn du das Schema auf brechende Weise änderst.
+
 ## Delivery-Garantien
 
 | Aspekt | Garantie |

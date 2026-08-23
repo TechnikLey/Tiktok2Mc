@@ -62,6 +62,10 @@ def invalidate_accepted_commands_cache(name: str | None = None) -> None:
         _accepted_commands_cache.clear()
     else:
         _accepted_commands_cache.pop(name, None)
+    # Event payload schemas come from the same manifests — keep them fresh.
+    from core.api.services.reaction_catalog import invalidate_event_schema_cache
+
+    invalidate_event_schema_cache()
 
 
 @router.post("/plugins/{name}/overlay-html")

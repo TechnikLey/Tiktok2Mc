@@ -8,6 +8,7 @@ appear in the wizard.
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -201,6 +202,96 @@ def collect_known_event_keys(plugins_dir: Path | None = None) -> set[str]:
         for ev in manifest.emitted_events:
             known.add(ev.key)
     return known
+
+
+# ---------------------------------------------------------------------------
+# Event payload schemas (versioned contract)
+# ---------------------------------------------------------------------------
+
+_SCHEMA_TTL = 30.0
+_schema_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def get_event_schemas(plugins_dir: Path | None = None) -> dict[str, Any]:
+    """Return ``{event_key: {"plugin", "version", "data_schema"}}`` for
+    every declared event that carries a payload contract.
+
+    TTL-cached like the accepted_commands registry; an empty dict means
+    no schemas are declared and validation is a no-op.
+    """
+    now = time.monotonic()
+    cache_key = str(plugins_dir) if plugins_dir else "<default>"
+    cached = _schema_cache.get(cache_key)
+    if cached and now - cached[0] < _SCHEMA_TTL:
+        return cached[1]
+
+    result: dict[str, Any] = {}
+    plugins_dir = plugins_dir or _plugins_dir()
+    if plugins_dir is not None and plugins_dir.is_dir():
+        launcher = PluginLauncher(plugins_dir=plugins_dir)
+        try:
+            manifests = launcher._discover_from_manifests()
+        except Exception as exc:  # never break publishing on a broken manifest
+            log.warning("Failed to scan plugin manifests for event schemas: %s", exc)
+            manifests = []
+        for manifest in manifests:
+            for ev in manifest.emitted_events:
+                if ev.data_schema:
+                    result[ev.key] = {
+                        "plugin": manifest.name,
+                        "version": ev.version,
+                        "data_schema": [f.model_dump() for f in ev.data_schema],
+                    }
+    _schema_cache[cache_key] = (now, result)
+    return result
+
+
+def invalidate_event_schema_cache() -> None:
+    """Drop the schema cache (call after plugin installs/updates)."""
+    _schema_cache.clear()
+
+
+def validate_event_payload(
+    event_type: str, data: dict[str, Any], plugins_dir: Path | None = None
+) -> list[str]:
+    """Check *data* against the declaring plugin's ``data_schema``.
+
+    Returns a list of violation messages (empty = valid or no schema
+    declared). Only declared events are validated; unknown/undeclared
+    event types pass through untouched. Extra keys beyond the schema are
+    allowed so consumers can extend payloads without breaking publishers.
+    """
+    schemas = get_event_schemas(plugins_dir)
+    contract = schemas.get(event_type)
+    if not contract:
+        return []
+    violations: list[str] = []
+    for field in contract["data_schema"]:
+        key = field["key"]
+        if key not in data:
+            if field.get("required"):
+                violations.append(f"missing required key '{key}'")
+            continue
+        expected = field["type"]
+        value = data[key]
+        ok = True
+        if expected == "boolean":
+            ok = isinstance(value, bool)
+        elif expected == "number":
+            # bool is a subclass of int — reject it explicitly
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif expected == "string":
+            ok = isinstance(value, str)
+        elif expected == "object":
+            ok = isinstance(value, dict)
+        elif expected == "array":
+            ok = isinstance(value, list)
+        # "any" accepts everything
+        if not ok:
+            violations.append(
+                f"'{key}' must be {expected} (got {type(value).__name__})"
+            )
+    return violations
 
 
 def _available_templates(

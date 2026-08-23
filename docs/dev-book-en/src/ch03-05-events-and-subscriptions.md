@@ -204,6 +204,39 @@ Naming convention: `plugin-name.event` (namespace with dot).
 > bridge marker is rejected with `403` (`API-0009`). Use your own
 > namespace — consumers cannot tell the difference.
 
+## Payload Schemas & Versioning
+
+Events you declare in `emitted_events` can carry a **payload contract**:
+a `version` and a `data_schema` describing the data fields. The schema is
+enforced server-side — publishing the event with missing required keys or
+mistyped values is rejected with `422 API-0010`, so consumers can rely on
+the payload:
+
+```json
+{
+  "emitted_events": [
+    {
+      "key": "my-plugin.level_up",
+      "name": "Level Up",
+      "version": 1,
+      "data_schema": [
+        { "key": "player", "type": "string", "required": true },
+        { "key": "level", "type": "number", "required": true },
+        { "key": "hardcore", "type": "boolean" }
+      ]
+    }
+  ]
+}
+```
+
+- `type` is one of `string`, `number`, `boolean`, `object`, `array`, `any`.
+- Extra keys beyond the schema are allowed (consumers may extend payloads).
+- Undeclared event types are not validated.
+- The full contract is published in
+  `GET /api/v1/reactions/catalog` (`events -> version` / `data_schema`) —
+  consumers should branch on `version` instead of guessing.
+- Bump `version` when you change the schema in a breaking way.
+
 ## Delivery Guarantees
 
 | Aspect | Guarantee |

@@ -609,6 +609,23 @@ API_0009 = ErrorCode(
     ),
     impact="The event was not published to the EventBus.",
 )
+API_0010 = ErrorCode(
+    code="API-0010",
+    subsystem=Subsystem.API,
+    severity=Severity.WARNING,
+    message="Event payload violates declared schema.",
+    description=(
+        "A publisher posted an event type whose plugin manifest declares a "
+        "data_schema, but the payload is missing required keys or carries "
+        "values of the wrong type."
+    ),
+    recovery_hint=(
+        "Align the payload with the schema published in "
+        "GET /api/v1/reactions/catalog (events -> data_schema) or bump the "
+        "event version if the change is intentional."
+    ),
+    impact="The event was rejected and not published to the EventBus.",
+)
 
 # --------------------------------------------------------------- NETWORK ----
 NETWORK_0001 = ErrorCode(

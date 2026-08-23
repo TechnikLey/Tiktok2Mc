@@ -83,6 +83,13 @@ The complete, machine-readable list is available via `GET /api/v1/diagnostics/er
 | `PLUGIN-0017` | Plugin command queue full | Plugin's command queue reached maximum capacity |
 | `PLUGIN-0020` | Plugin permission denied | A gated BasePlugin helper was called without the matching `permissions` entry in `plugin.json` |
 
+### API (Control Plane)
+
+| Code | Message | Description |
+|------|---------|--------------|
+| `API-0009` | Reserved event type rejected | Reserved core event family published without the trusted bridge marker |
+| `API-0010` | Event payload violates declared schema | Missing required keys or mistyped values against the event's `data_schema` |
+
 ### CONFIG (Configuration)
 
 | Code | Message | Description |

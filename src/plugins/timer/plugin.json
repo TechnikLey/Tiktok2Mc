@@ -16,7 +16,9 @@
     "timer:status",
     "timer:events"
   ],
-  "permissions": ["events"],
+  "permissions": [
+    "events"
+  ],
   "depends_on": [],
   "icon": "⏱️",
   "emitted_events": [
@@ -25,56 +27,137 @@
       "name": "Timer Starts",
       "desc": "When the countdown timer starts",
       "icon": "▶️",
-      "name_i18n": { "en": "Timer Starts", "de": "Timer gestartet" },
-      "desc_i18n": { "en": "When the countdown timer starts", "de": "Wenn der Countdown-Timer startet" }
+      "name_i18n": {
+        "en": "Timer Starts",
+        "de": "Timer gestartet"
+      },
+      "desc_i18n": {
+        "en": "When the countdown timer starts",
+        "de": "Wenn der Countdown-Timer startet"
+      }
     },
     {
       "key": "timer.paused",
       "name": "Timer Pauses",
       "desc": "When the countdown timer is paused",
       "icon": "⏸️",
-      "name_i18n": { "en": "Timer Pauses", "de": "Timer pausiert" },
-      "desc_i18n": { "en": "When the countdown timer is paused", "de": "Wenn der Countdown-Timer pausiert wird" }
+      "name_i18n": {
+        "en": "Timer Pauses",
+        "de": "Timer pausiert"
+      },
+      "desc_i18n": {
+        "en": "When the countdown timer is paused",
+        "de": "Wenn der Countdown-Timer pausiert wird"
+      }
     },
     {
       "key": "timer.resumed",
       "name": "Timer Resumes",
       "desc": "When the countdown timer resumes",
       "icon": "▶️",
-      "name_i18n": { "en": "Timer Resumes", "de": "Timer fortgesetzt" },
-      "desc_i18n": { "en": "When the countdown timer resumes", "de": "Wenn der Countdown-Timer fortgesetzt wird" }
+      "name_i18n": {
+        "en": "Timer Resumes",
+        "de": "Timer fortgesetzt"
+      },
+      "desc_i18n": {
+        "en": "When the countdown timer resumes",
+        "de": "Wenn der Countdown-Timer fortgesetzt wird"
+      }
     },
     {
       "key": "timer.reset",
       "name": "Timer Resets",
       "desc": "When the countdown timer is reset",
       "icon": "🔄",
-      "name_i18n": { "en": "Timer Resets", "de": "Timer zurückgesetzt" },
-      "desc_i18n": { "en": "When the countdown timer is reset", "de": "Wenn der Countdown-Timer zurückgesetzt wird" }
+      "name_i18n": {
+        "en": "Timer Resets",
+        "de": "Timer zurückgesetzt"
+      },
+      "desc_i18n": {
+        "en": "When the countdown timer is reset",
+        "de": "Wenn der Countdown-Timer zurückgesetzt wird"
+      }
     },
     {
       "key": "timer.tick",
       "name": "Timer Ticks",
       "desc": "Every second while the timer is running",
       "icon": "⏱️",
-      "name_i18n": { "en": "Timer Ticks", "de": "Timer-Tick" },
-      "desc_i18n": { "en": "Every second while the timer is running", "de": "Jede Sekunde solange der Timer läuft" }
+      "name_i18n": {
+        "en": "Timer Ticks",
+        "de": "Timer-Tick"
+      },
+      "desc_i18n": {
+        "en": "Every second while the timer is running",
+        "de": "Jede Sekunde solange der Timer läuft"
+      }
     },
     {
       "key": "timer.zero",
       "name": "Timer Hits Zero",
       "desc": "When the countdown reaches zero",
       "icon": "⏰",
-      "name_i18n": { "en": "Timer Hits Zero", "de": "Timer erreicht Null" },
-      "desc_i18n": { "en": "When the countdown reaches zero", "de": "Wenn der Countdown Null erreicht" }
+      "name_i18n": {
+        "en": "Timer Hits Zero",
+        "de": "Timer erreicht Null"
+      },
+      "desc_i18n": {
+        "en": "When the countdown reaches zero",
+        "de": "Wenn der Countdown Null erreicht"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "current",
+          "type": "number",
+          "required": true,
+          "desc": "Current timer value (0)"
+        },
+        {
+          "key": "initial",
+          "type": "number",
+          "required": true,
+          "desc": "Configured start time"
+        },
+        {
+          "key": "direction",
+          "type": "string",
+          "required": true,
+          "desc": "'up' or 'down'"
+        }
+      ]
     },
     {
       "key": "timer.milestone",
       "name": "Timer Milestone",
       "desc": "When the timer passes a configured milestone",
       "icon": "🎯",
-      "name_i18n": { "en": "Timer Milestone", "de": "Timer-Meilenstein" },
-      "desc_i18n": { "en": "When the timer passes a configured milestone", "de": "Wenn der Timer einen konfigurierten Meilenstein überschreitet" }
+      "name_i18n": {
+        "en": "Timer Milestone",
+        "de": "Timer-Meilenstein"
+      },
+      "desc_i18n": {
+        "en": "When the timer passes a configured milestone",
+        "de": "Wenn der Timer einen konfigurierten Meilenstein überschreitet"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "current",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "initial",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "direction",
+          "type": "string",
+          "required": true
+        }
+      ]
     }
   ],
   "accepted_commands": {
@@ -82,29 +165,53 @@
       "name": "Start Timer",
       "desc": "Begin the countdown from the current time",
       "args": {},
-      "name_i18n": { "en": "Start Timer", "de": "Timer starten" },
-      "desc_i18n": { "en": "Begin the countdown from the current time", "de": "Countdown ab der aktuellen Zeit beginnen" }
+      "name_i18n": {
+        "en": "Start Timer",
+        "de": "Timer starten"
+      },
+      "desc_i18n": {
+        "en": "Begin the countdown from the current time",
+        "de": "Countdown ab der aktuellen Zeit beginnen"
+      }
     },
     "pause": {
       "name": "Pause Timer",
       "desc": "Pause the countdown",
       "args": {},
-      "name_i18n": { "en": "Pause Timer", "de": "Timer pausieren" },
-      "desc_i18n": { "en": "Pause the countdown", "de": "Countdown pausieren" }
+      "name_i18n": {
+        "en": "Pause Timer",
+        "de": "Timer pausieren"
+      },
+      "desc_i18n": {
+        "en": "Pause the countdown",
+        "de": "Countdown pausieren"
+      }
     },
     "resume": {
       "name": "Resume Timer",
       "desc": "Continue a paused countdown",
       "args": {},
-      "name_i18n": { "en": "Resume Timer", "de": "Timer fortsetzen" },
-      "desc_i18n": { "en": "Continue a paused countdown", "de": "Pausierten Countdown fortsetzen" }
+      "name_i18n": {
+        "en": "Resume Timer",
+        "de": "Timer fortsetzen"
+      },
+      "desc_i18n": {
+        "en": "Continue a paused countdown",
+        "de": "Pausierten Countdown fortsetzen"
+      }
     },
     "reset": {
       "name": "Reset Timer",
       "desc": "Reset the timer to its starting value",
       "args": {},
-      "name_i18n": { "en": "Reset Timer", "de": "Timer zurücksetzen" },
-      "desc_i18n": { "en": "Reset the timer to its starting value", "de": "Timer auf Ausgangswert zurücksetzen" }
+      "name_i18n": {
+        "en": "Reset Timer",
+        "de": "Timer zurücksetzen"
+      },
+      "desc_i18n": {
+        "en": "Reset the timer to its starting value",
+        "de": "Timer auf Ausgangswert zurücksetzen"
+      }
     },
     "add_time": {
       "name": "Add Time",
@@ -115,11 +222,20 @@
           "label": "Seconds to add",
           "default": 10,
           "min": 1,
-          "label_i18n": { "en": "Seconds to add", "de": "Sekunden hinzufügen" }
+          "label_i18n": {
+            "en": "Seconds to add",
+            "de": "Sekunden hinzufügen"
+          }
         }
       },
-      "name_i18n": { "en": "Add Time", "de": "Zeit hinzufügen" },
-      "desc_i18n": { "en": "Add seconds to the current timer", "de": "Sekunden zum aktuellen Timer hinzufügen" }
+      "name_i18n": {
+        "en": "Add Time",
+        "de": "Zeit hinzufügen"
+      },
+      "desc_i18n": {
+        "en": "Add seconds to the current timer",
+        "de": "Sekunden zum aktuellen Timer hinzufügen"
+      }
     },
     "set_time": {
       "name": "Set Time",
@@ -130,11 +246,20 @@
           "label": "Seconds to set",
           "default": 60,
           "min": 0,
-          "label_i18n": { "en": "Seconds to set", "de": "Sekunden einstellen" }
+          "label_i18n": {
+            "en": "Seconds to set",
+            "de": "Sekunden einstellen"
+          }
         }
       },
-      "name_i18n": { "en": "Set Time", "de": "Zeit einstellen" },
-      "desc_i18n": { "en": "Set the timer to a specific number of seconds", "de": "Timer auf eine bestimmte Anzahl Sekunden setzen" }
+      "name_i18n": {
+        "en": "Set Time",
+        "de": "Zeit einstellen"
+      },
+      "desc_i18n": {
+        "en": "Set the timer to a specific number of seconds",
+        "de": "Timer auf eine bestimmte Anzahl Sekunden setzen"
+      }
     }
   },
   "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",

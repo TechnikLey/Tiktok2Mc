@@ -98,6 +98,25 @@ class StatusDetail(BaseModel):
 # ── Reaction Catalog ─────────────────────────────────────────────────
 
 
+EVENT_DATA_TYPES = ("string", "number", "boolean", "object", "array", "any")
+
+
+class EventDataField(BaseModel):
+    """A single field of an event payload schema (``data_schema``)."""
+
+    key: str = Field(
+        ...,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+        description="Payload key, e.g. 'count'",
+    )
+    type: str = Field(
+        "any",
+        description=f"One of: {', '.join(EVENT_DATA_TYPES)}",
+    )
+    desc: str = Field("", description="Short human-readable description")
+    required: bool = Field(False, description="Whether publishers must include the key")
+
+
 class ReactionEvent(BaseModel):
     """An event a plugin publishes to the EventBus — a reaction trigger.
 
@@ -109,6 +128,22 @@ class ReactionEvent(BaseModel):
     name: str = Field("", description="Human-readable name shown in the GUI")
     desc: str = Field("", description="Short description shown in the GUI")
     icon: str = Field("⚡", description="Emoji icon shown in the GUI")
+    version: int = Field(
+        1,
+        ge=1,
+        description=(
+            "Payload contract version. Bump when data_schema changes in a "
+            "breaking way; consumers can branch on it."
+        ),
+    )
+    data_schema: list[EventDataField] = Field(
+        default_factory=list,
+        description=(
+            "Declared payload fields. Publishers posting this event type "
+            "with missing/mistyped required fields are rejected with "
+            "422 API-0010."
+        ),
+    )
     name_i18n: dict[str, str] = Field(
         default_factory=dict,
         description='Optional localized names keyed by language code (e.g. {"de": "Neuer Follower"}). '
