@@ -135,6 +135,35 @@ def register(api: HookAPI):
 gift:$combo_check;$say_thanks
 ```
 
+## Permissions
+
+Side-effecting API calls are guarded by **permissions** declared in your
+`hook.json` (separate from `capabilities`, which are discovery tags):
+
+| Permission | Grants |
+|------------|--------|
+| `rcon` | `rcon_enqueue` |
+| `triggers` | `enqueue_trigger` |
+| `overlay` | `send_overlay_text` |
+| `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
+
+Ungated methods that always work: `register_action`,
+`register_lifecycle`/`on_live_start`/`on_live_end`, `log`,
+`get_hook_config`, `config`, `get_valid_functions`.
+
+- A call without the matching permission is **denied** (logged as
+  `HOOK-0009`) and returns its safe fallback (`None`, `False`, `{}` or
+  the given default) — the hook keeps running, nothing crashes.
+- Unknown permission names in `hook.json` produce a warning at load time.
+- Declare only what you use:
+
+```json
+{
+  "name": "jump",
+  "permissions": ["rcon", "overlay"]
+}
+```
+
 ## rcon_enqueue(commands)
 
 Adds a list of Minecraft commands to the RCON queue.
@@ -329,6 +358,8 @@ again, so it reads the fresh config and re-registers its actions.
 | `HOOK-0005` | Hook registration failed |
 | `HOOK-0006` | Hook script action failed |
 | `HOOK-0007` | Hook has no `register()` function |
+| `HOOK-0008` | Hook lifecycle callback failed |
+| `HOOK-0009` | Hook permission denied (missing entry in `permissions`) |
 
 ## Next Chapter
 

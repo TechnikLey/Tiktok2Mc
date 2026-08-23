@@ -238,6 +238,74 @@ class TestHookContext:
         assert result[3].source == "hook"
 
 
+class TestPermissions:
+    """Capability enforcement: guarded API calls need manifest permissions."""
+
+    def test_root_instance_is_unrestricted(self, api):
+        api.rcon_enqueue(["say hi"])
+        cmds, _user = api._rcon_queue.get_nowait()
+        assert cmds == ["say hi"]
+
+    def test_bound_without_permissions_denies_rcon(self, api):
+        clone = api.for_hook("my_hook", permissions=[])
+        clone.rcon_enqueue(["say hi"])
+        assert api._rcon_queue.empty()
+
+    def test_bound_with_permission_allows_rcon(self, api):
+        clone = api.for_hook("my_hook", permissions=["rcon"])
+        clone.rcon_enqueue(["say hi"])
+        assert not api._rcon_queue.empty()
+
+    def test_bound_without_permissions_denies_triggers(self, api):
+        clone = api.for_hook("my_hook", permissions=[])
+        clone.enqueue_trigger("chained")
+        assert api._trigger_queue.empty()
+
+    def test_bound_with_permission_allows_triggers(self, api):
+        clone = api.for_hook("my_hook", permissions=["triggers"])
+        clone.enqueue_trigger("chained")
+        assert not api._trigger_queue.empty()
+
+    def test_denied_overlay_returns_false(self, api):
+        clone = api.for_hook("my_hook", permissions=[])
+        assert clone.send_overlay_text("Title") is False
+
+    def test_denied_store_returns_defaults(self, api):
+        clone = api.for_hook("my_hook", permissions=[])
+        assert clone.store_get("k", "fallback") == "fallback"
+        assert clone.store_set("k", 1) is False
+        assert clone.store_delete("k") is False
+        assert clone.store_all() == {}
+
+    def test_granted_store_passes_guard_reaches_http(self, api):
+        # granted + valid namespace -> the guard passes and the HTTP layer
+        # is reached (fails here with a connection error, not a denial).
+        clone = api.for_hook("my_hook", permissions=["store"])
+        assert clone.store_set("k", 1) is False  # network failure, not denial
+        assert clone._allow("store", "store_get") is True
+
+    def test_unknown_permissions_warn_once_at_view_creation(self, api, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="core.hook_api"):
+            api.for_hook("my_hook", permissions=["rcon", "teleport"])
+        assert "teleport" in caplog.text
+
+    def test_denial_logs_hook_0009(self, api, caplog):
+        import logging
+
+        clone = api.for_hook("my_hook", permissions=[])
+        with caplog.at_level(logging.WARNING, logger="core.hook_api"):
+            clone.rcon_enqueue(["say hi"])
+        assert "HOOK-0009" in caplog.text
+
+    def test_none_keeps_view_unrestricted(self, api):
+        clone = api.for_hook("my_hook")
+        assert clone._permissions is None
+        clone.enqueue_trigger("chained")
+        assert not api._trigger_queue.empty()
+
+
 class _FakeResponse:
     def __init__(self, payload: dict, status: int = 200):
         self._payload = payload

@@ -1132,6 +1132,21 @@ HOOK_0008 = ErrorCode(
     recovery_hint="Check the hook's lifecycle callback implementation.",
     impact="Other hooks are not affected.",
 )
+HOOK_0009 = ErrorCode(
+    code="HOOK-0009",
+    subsystem=Subsystem.HOOK,
+    severity=Severity.WARNING,
+    message="Hook permission denied.",
+    description=(
+        "A hook called a HookAPI method whose required permission is not "
+        "declared in the hook's manifest (hook.json 'permissions')."
+    ),
+    recovery_hint=(
+        "Declare the needed permission in hook.json 'permissions' "
+        "(one of: rcon, triggers, overlay, store)."
+    ),
+    impact="The denied call is ignored; the hook keeps running restricted.",
+)
 
 # -------------------------------------------------------------- WATCHER ----
 WATCHER_0001 = ErrorCode(

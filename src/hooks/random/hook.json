@@ -6,6 +6,7 @@
   "author": "TikTok2Mc",
   "min_api_version": "1.0.0",
   "capabilities": ["hook:random"],
+  "permissions": ["triggers"],
   "update_url": "",
   "config_schema": {
     "version": 1,

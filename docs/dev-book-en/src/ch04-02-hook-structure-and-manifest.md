@@ -26,7 +26,8 @@ src/hooks/<name>/
 | `description` | String | Short description |
 | `author` | String | Developer name |
 | `min_api_version` | String | Minimum Hook API version (currently `1.0.0`, see `src/core/version.py`) |
-| `capabilities` | Array | List of capabilities, e.g., `["hook:random"]` |
+| `capabilities` | Array | List of capabilities, e.g., `["hook:random"]` — discovery/advertising tags, not permissions |
+| `permissions` | Array | Granted API permissions: any of `"rcon"`, `"triggers"`, `"overlay"`, `"store"` (see [Hook API](./ch04-03-hook-api.md)); guarded calls without a matching permission are denied |
 | `depends_on` | Array | List of plugin names that must be active |
 | `plugin` | String | For plugin-bundled hooks: the plugin name |
 | `config_schema` | Object | Schema for the hook configuration (see [Configuration](./ch03-03-configuration.md)) |
@@ -43,6 +44,7 @@ src/hooks/<name>/
   "author": "Your Name",
   "min_api_version": "1.0.0",
   "capabilities": ["hook:jump"],
+  "permissions": ["rcon", "overlay"],
   "config_schema": {
     "version": 1,
     "fields": [

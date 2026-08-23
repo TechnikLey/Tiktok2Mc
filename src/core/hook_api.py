@@ -28,6 +28,18 @@ LIFECYCLE_EVENTS = tuple(HOOK_LIFECYCLE)
 
 MAX_CHAIN_DEPTH: int = 3
 
+# Canonical permissions enforced on per-hook API views (see ``for_hook``).
+# ``capabilities`` in hook.json are discovery/advertising tags; these
+# ``permissions`` are what a hook may actually call.
+HOOK_PERMISSIONS: frozenset[str] = frozenset(
+    {
+        "rcon",  # rcon_enqueue
+        "triggers",  # enqueue_trigger
+        "overlay",  # send_overlay_text
+        "store",  # store_get / store_set / store_delete / store_all
+    }
+)
+
 _API_PORT = int(os.environ.get("RESOLVED_PORT_API_PORT", "29185"))
 _API_BASE = os.environ.get("API_BASE_URL", f"http://127.0.0.1:{_API_PORT}/api/v1")
 
@@ -83,17 +95,26 @@ class HookAPI:
         self._current_depth: int = 0
         self._banned_triggers: set[str] = set()
         self._name: str = ""
+        # ``None`` = unrestricted (root instance / tests); a bound view
+        # carries the exact grants from its hook manifest.
+        self._permissions: frozenset[str] | None = None
 
     # --------------------------------------------------
     # Public API
     # --------------------------------------------------
 
-    def for_hook(self, name: str) -> HookAPI:
+    def for_hook(self, name: str, permissions: list[str] | None = None) -> HookAPI:
         """Return a per-hook view of this shared API bound to *name*.
 
         Used by the loader so each hook's ``register()`` gets an API whose
         persistent-store helpers target the hook's own namespace.  All other
         methods share the same queues/config references as the root instance.
+
+        ``permissions`` carries the grants from the hook's manifest. When a
+        list is given, guarded API calls (``rcon_enqueue``, ``enqueue_trigger``,
+        ``send_overlay_text``, ``store_*``) are denied unless the required
+        permission is included; unknown permission names are warned about.
+        Passing ``None`` keeps the view unrestricted (bridge-internal use).
         """
         clone = HookAPI(
             self._rcon_queue,
@@ -104,7 +125,34 @@ class HookAPI:
             self._hook_configs,
         )
         clone._name = name
+        if permissions is not None:
+            granted = frozenset(permissions)
+            unknown = sorted(granted - HOOK_PERMISSIONS)
+            if unknown:
+                log.warning(
+                    "[HOOK] '%s' declares unknown permission(s): %s (supported: %s)",
+                    name,
+                    ", ".join(unknown),
+                    ", ".join(sorted(HOOK_PERMISSIONS)),
+                )
+            clone._permissions = granted
         return clone
+
+    def _allow(self, permission: str, method: str) -> bool:
+        """Check a guarded call against this view's grants.
+
+        Unrestricted views (``_permissions is None``) always pass. Denied
+        calls are logged as HOOK-0009 and rejected with a safe return value.
+        """
+        if self._permissions is None or permission in self._permissions:
+            return True
+        log.warning(
+            "[HOOK-0009] '%s' denied %s — missing permission '%s' in hook.json",
+            self._name or "<unbound>",
+            method,
+            permission,
+        )
+        return False
 
     @property
     def config(self) -> dict:
@@ -197,6 +245,8 @@ class HookAPI:
     def rcon_enqueue(self, commands: list[str]) -> None:
         if not commands:
             return
+        if not self._allow("rcon", "rcon_enqueue"):
+            return
         self._enqueue_threadsafe(
             self._rcon_queue, (commands, "hook"), f"rcon:{commands!r}"
         )
@@ -211,6 +261,8 @@ class HookAPI:
         actions receive as their third handler argument. When omitted, the
         new chain starts with a fresh ``{"source": "hook"}`` context.
         """
+        if not self._allow("triggers", "enqueue_trigger"):
+            return
         if action_name in self._banned_triggers:
             log.error(
                 f"[HOOK] enqueue_trigger('{action_name}') permanently blocked "
@@ -247,6 +299,8 @@ class HookAPI:
         duration: int | None = 3,
         overlay_name: str | None = "default",
     ) -> bool:
+        if not self._allow("overlay", "send_overlay_text"):
+            return False
         try:
             from core.overlay_utils import send_overlay_text as _send_overlay
 
@@ -281,13 +335,21 @@ class HookAPI:
             )
         return self._name
 
+    def _store_allowed(self, method: str) -> bool:
+        if not self._allow("store", method):
+            return False
+        try:
+            self._require_namespace()
+            return True
+        except ValueError as exc:
+            log.warning("[HOOK] %s: %s", method, exc)
+            return False
+
     def store_get(self, key: str, default: object = None) -> object:
         """Read ``key`` from this hook's persistent store (default when absent)."""
-        try:
-            name = self._require_namespace()
-        except ValueError as exc:
-            log.warning("[HOOK] store_get('%s'): %s", key, exc)
+        if not self._store_allowed("store_get"):
             return default
+        name = self._name
         url = f"{_API_BASE}/plugins/{name}/data/{key}"
         try:
             with urllib.request.urlopen(url, timeout=_STORE_TIMEOUT) as resp:
@@ -302,11 +364,9 @@ class HookAPI:
 
     def store_set(self, key: str, value: object) -> bool:
         """Persist ``key`` = ``value`` (any JSON-serializable data)."""
-        try:
-            name = self._require_namespace()
-        except ValueError as exc:
-            log.warning("[HOOK] store_set('%s'): %s", key, exc)
+        if not self._store_allowed("store_set"):
             return False
+        name = self._name
         url = f"{_API_BASE}/plugins/{name}/data/{key}"
         body = json.dumps({"value": value}).encode("utf-8")
         req = urllib.request.Request(
@@ -324,11 +384,9 @@ class HookAPI:
 
     def store_delete(self, key: str) -> bool:
         """Delete ``key``; returns ``False`` when it did not exist."""
-        try:
-            name = self._require_namespace()
-        except ValueError as exc:
-            log.warning("[HOOK] store_delete('%s'): %s", key, exc)
+        if not self._store_allowed("store_delete"):
             return False
+        name = self._name
         url = f"{_API_BASE}/plugins/{name}/data/{key}"
         req = urllib.request.Request(url, method="DELETE")
         try:
@@ -344,11 +402,9 @@ class HookAPI:
 
     def store_all(self) -> dict:
         """Return the whole persistent store of this hook (empty dict if none)."""
-        try:
-            name = self._require_namespace()
-        except ValueError as exc:
-            log.warning("[HOOK] store_all(): %s", exc)
+        if not self._store_allowed("store_all"):
             return {}
+        name = self._name
         url = f"{_API_BASE}/plugins/{name}/data"
         try:
             with urllib.request.urlopen(url, timeout=_STORE_TIMEOUT) as resp:

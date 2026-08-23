@@ -23,6 +23,7 @@ class HookManifest:
         self.author: str = data.get("author", "")
         self.min_api_version: str = data.get("min_api_version", "1.0.0")
         self.capabilities: list[str] = data.get("capabilities", [])
+        self.permissions: list[str] = data.get("permissions", [])
         self.plugin: str = data.get("plugin", "")
         self.config_schema: dict | None = data.get("config_schema")
         self.update_url: str = data.get("update_url", "")

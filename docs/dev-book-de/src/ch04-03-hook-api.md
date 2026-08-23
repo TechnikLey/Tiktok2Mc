@@ -135,6 +135,36 @@ def register(api: HookAPI):
 gift:$combo_check;$say_thanks
 ```
 
+## Permissions (Berechtigungen)
+
+Seiteneffektbehaftete API-Aufrufe sind durch **Permissions** geschützt,
+die in deiner `hook.json` deklariert werden (getrennt von `capabilities`,
+den Discovery-Tags):
+
+| Permission | Gewährt |
+|------------|--------|
+| `rcon` | `rcon_enqueue` |
+| `triggers` | `enqueue_trigger` |
+| `overlay` | `send_overlay_text` |
+| `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
+
+Ungesperrte Methoden, die immer funktionieren: `register_action`,
+`register_lifecycle`/`on_live_start`/`on_live_end`, `log`,
+`get_hook_config`, `config`, `get_valid_functions`.
+
+- Ein Aufruf ohne passende Berechtigung wird **abgelehnt** (geloggt als
+  `HOOK-0009`) und liefert seinen sicheren Rückgabewert (`None`, `False`,
+  `{}` oder den übergebenen Default) — der Hook läuft weiter, nichts crasht.
+- Unbekannte Permission-Namen in der `hook.json` erzeugen beim Laden eine Warnung.
+- Deklariere nur, was du nutzt:
+
+```json
+{
+  "name": "sprung",
+  "permissions": ["rcon", "overlay"]
+}
+```
+
 ## rcon_enqueue(commands)
 
 Fügt eine Liste von Minecraft-Befehlen in die RCON-Warteschlange ein.
@@ -329,6 +359,8 @@ die frische Config und registriert Actions neu.
 | `HOOK-0005` | Registrierung fehlgeschlagen (`register()` warf Exception) |
 | `HOOK-0006` | Hook-Action fehlgeschlagen (Exception bei Ausführung) |
 | `HOOK-0007` | `register()`-Funktion fehlt |
+| `HOOK-0008` | Lifecycle-Callback fehlgeschlagen |
+| `HOOK-0009` | Hook-Berechtigung verweigert (Eintrag in `permissions` fehlt) |
 
 ## Nächstes Kapitel
 

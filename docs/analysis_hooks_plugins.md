@@ -15,8 +15,10 @@
 > | `8ea4109` | **`POST /api/v1/triggers/dispatch`** — programmatische Trigger ohne GUI-Debounce | Grundlage I.2 |
 > | `022fe7a` | **Namespaced Persistenz-API** (`data/plugin_data/<name>.json` + REST + `BasePlugin.store_*`) | Grundlage I.3 |
 > | *(aktuell)* | **Strukturierter Hook-Kontext**: Event-Quellen bauen `_make_hook_context(...)` (gift/follow/like/comment/join/share/webhook/hook), Trigger-Queue trägt 4-Tupel mit Context, `execute_global_command(context)` reicht ihn an Hook-Actions weiter (+ `chain_depth`); `enqueue_trigger(context=...)` propagiert Daten in Folgetriggers | E.5 / J.2 Nr. 4 (Kontext-Teil): unlockt H.3 (Gift-Combos), Rollenfilter für H.2 |
+| *(aktuell)* | **HookContext-Typ + Kommentar-Sonderfall aufgelöst**: Kontext ist `dict`-Subklasse mit fail-fast Attribut-Zugriff; `user` immer String, Kommentartext nur im Kontext; `{comment}`-Overlay liest aus dem Kontext | E.5 abgeschlossen; Datenvertrag konsistent über alle Events |
+| *(aktuell)* | **Capability-Enforcement**: neues Manifest-Feld `permissions` (`rcon`/`triggers`/`overlay`/`store`) wird in `for_hook()`-Views erzwungen; verweigerte Aufrufe → `HOOK-0009` + sicherer Rückgabewert; `capabilities` bleiben Discovery-Tags; Shipped-Manifeste deklarieren ihre Berechtigungen | E.8 / J.2 Nr. 10: Isolation ist wirksam statt nur deklarativ |
 >
-> Weiterhin offen: E.7/E.8, J.2 Nr. 8/10, alle J.3-Punkte.
+> Weiterhin offen: E.7, J.2 Nr. 8, alle J.3-Punkte.
 
 ---
 
@@ -156,7 +158,7 @@ Belegstellen (aktuell): `_publish_tiktok_event` (`main.py`) forwarded per HTTP v
 | E.5 | **Hook-Kontext immer `{}`**, keine strukturierten Ereignisdaten. | `main.py` (`execute_global_command(..., {})`) | Hooks können nicht datengetrieben arbeiten | **[✅ ERLEDIGT]** `_make_hook_context` an allen Event-Quellen, 4-Tupel in der Trigger-Queue, Kontext inkl. `chain_depth` an Hook-Actions; `enqueue_trigger(context=...)` für Verkettung |
 | E.6 | **Kein Veto-/Rückgabevertrag** für Hook-Actions. | `hook_api.execute_global_command` ignoriert Rückgaben | Filter/Moderation als Hook unmöglich | **[✅ ERLEDIGT `54fdb78`]** Veto-Vertrag: `False` = Restkette abbrechen; Kontext-Teil durch den strukturierten Context ebenfalls erledigt |
 | E.7 | Minecraft-Semantik im generischen Webhook: `player_death`/`player_respawn` pausieren die MC-Queue **unabhängig von der Quelle**. | Bridge `/webhook`-Handler | Fremdspiel, das gleichnamige Events sendet, verfälscht das Verhalten | offen |
-| E.8 | `capabilities` werden nicht erzwungen; Sandbox default aus; Hooks dürfen `requests`. | `sandbox.py`, `hook_loader.py` | Isolation ist deklarativ, nicht wirksam | offen (J.2 Nr. 10) |
+| E.8 | ~~`capabilities` werden nicht erzwungen; Sandbox default aus; Hooks dürfen `requests`.~~ **[✅ TEIL-ERLEDIGT]** Neues Feld `permissions` (`rcon`/`triggers`/`overlay`/`store`) wird pro Hook-View erzwungen (`HOOK-0009`, sicherer Rückgabewert); `capabilities` bleiben Discovery-Tags. Direkter `requests`/urllib-Netzzugriff bleibt erlaubt (dokumentiert) — echte Sandbox weiterhin offen. | `sandbox.py`, `hook_loader.py` | ~~Isolation ist deklarativ, nicht wirksam~~ API-Isolation jetzt wirksam; Prozess-Sandbox unangetastet | **[✅ API-Ebene]** |
 
 ---
 
@@ -270,7 +272,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 7. ~~**Trigger-Zugriff für Erweiterungen**~~ — **[✅ `8ea4109`]** `POST /api/v1/triggers/dispatch`: kein Debounce, definierter Payload (`trigger`/`user`/`gift_id`/`gift_name`), History-Aufzeichnung; dokumentiert in ch03-04 (EN+DE). Grundlage I.2 geschaffen.
 8. **Request/Response zwischen Extensions:** Korrelations-IDs/Antwortqueue statt reinem Fire-and-forget. *(offen)*
 9. ~~**Namespaced Persistenz-API pro Plugin/Hook**~~ — **[✅ `022fe7a`]** `PersistenceService` (`data/plugin_data/<name>.json`, atomar), REST `GET/PUT/DELETE /plugins/{name}/data[/{key}]`, `BasePlugin.store_*`-Helper; dokumentiert in ch03-04/ch04-03 (EN+DE).
-10. **Capability-Enforcement:** `capabilities` prüfen oder streichen; Sandbox-Profile; Hook-Netzzugriff bewusst entscheiden (B.3.5/E.8). *(offen)*
+10. ~~**Capability-Enforcement:** `capabilities` prüfen oder streichen; Sandbox-Profile; Hook-Netzzugriff bewusst entscheiden (B.3.5/E.8).~~ **[✅ ERLEDIGT (API-Ebene)]** Neues Feld `permissions` in hook.json (`rcon`/`triggers`/`overlay`/`store`) wird in den `for_hook()`-Views erzwungen — verweigerte Aufrufe loggen `HOOK-0009` und liefern sichere Rückgabewerte. `capabilities` bleiben unverändert Discovery-Tags (Saubere Trennung: Angebot vs. Rechte). Direkter Netzzugriff via `requests`/urllib bleibt erlaubt und dokumentiert; Prozess-Sandbox-Profile weiterhin offen.
 
 ### J.3 Nice-to-have (QOL+)
 11. Dashboard-UI-Erweiterungspunkte (Tabs/Routen für Plugins) — löst I.3s UI-Anteil.
@@ -291,9 +293,10 @@ Was die versprochene Flexibilität ursprünglich **ausbremste**, waren keine Des
 
 ### Umsetzungsstand (August 2026)
 
-**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext, Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle. Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
+**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext (`HookContext`), Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle, Capability-Enforcement (`permissions`). Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
 
 **Verbleibende Roadmap (empfohlene Reihenfolge):**
 1. ~~J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle~~ **[✅ ERLEDIGT]**
-2. ~~E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context`~~ **[✅ ERLEDIGT]**
-3. J.2 Nr. 8/10 — Request/Response + Capability-Enforcement; danach J.3 nach Bedarf
+2. ~~E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context`~~ **[✅ ERLEDIGT]** (inkl. `HookContext`-Typ + Kommentar-Sonderfall aufgelöst)
+3. ~~J.2 Nr. 10 — Capability-Enforcement~~ **[✅ ERLEDIGT]** (`permissions`-Feld, API-Ebene; Prozess-Sandbox bleibt offen)
+4. J.2 Nr. 8 — Request/Response (pragmatisch: `api.request()`-Helper); E.7 als Quick-Win; danach J.3 nach Bedarf

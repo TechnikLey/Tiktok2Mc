@@ -6,5 +6,6 @@
   "author": "TikTok2Mc",
   "min_api_version": "1.0.0",
   "capabilities": [],
+  "permissions": ["rcon", "overlay"],
   "update_url": ""
 }

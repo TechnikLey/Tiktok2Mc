@@ -12,6 +12,7 @@ class TestHookManifest:
         assert m.description == ""
         assert m.author == ""
         assert m.capabilities == []
+        assert m.permissions == []
         assert m.config_schema is None
         assert m.depends_on == []
 
@@ -25,6 +26,7 @@ class TestHookManifest:
             "description": "A test hook",
             "author": "dev",
             "capabilities": ["chat", "events"],
+            "permissions": ["rcon", "overlay"],
             "config_schema": {"type": "object"},
             "depends_on": ["other_hook"],
             "update_url": "https://example.com",
@@ -34,6 +36,7 @@ class TestHookManifest:
         assert m.version == "2.0.0"
         assert m.display_name == "Test Hook"
         assert len(m.capabilities) == 2
+        assert m.permissions == ["rcon", "overlay"]
         assert m.config_schema == {"type": "object"}
         assert m.update_url == "https://example.com"
 
