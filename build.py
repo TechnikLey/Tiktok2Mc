@@ -506,6 +506,17 @@ def cmd_app(args):
     MAX_THREADS = getattr(args, "threads", None) or min(16, (os.cpu_count() or 4))
     MAX_COPY_THREADS = min(32, (os.cpu_count() or 4) * 4)
 
+    ICON_BY_NAME = {
+        "app": "tiktok2mc.ico",
+        "gui": "tiktok2mc.ico",
+        "start": "tiktok2mc.ico",
+        "update": "tiktok2mc-update.ico",
+        "server": "tiktok2mc-tool.ico",
+        "overlay": "tiktok2mc-tool.ico",
+        "test_trigger": "tiktok2mc-tool.ico",
+    }
+    ICONS_DIR = SCRIPT_DIR / "assets" / "icons"
+
     CORE_EXECUTABLES = [
         {"name": "app", "src": "src/python/main.py", "dest": "core"},
         {"name": "gui", "src": "src/python/gui.py", "dest": "core", "windowed": True},
@@ -574,6 +585,9 @@ def cmd_app(args):
             }
             if item.get("windowed"):
                 task["windowed"] = True
+            icon_file = ICON_BY_NAME.get(item["name"])
+            if icon_file:
+                task["icon"] = icon_file
             all_build_tasks.append(task)
 
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
@@ -1017,6 +1031,11 @@ def cmd_app(args):
                     dep_hasher.update(b"")
             if build_py.exists():
                 dep_hasher.update(sha256_file(build_py).encode())
+            icon_file = item.get("icon")
+            if icon_file:
+                icon_path = ICONS_DIR / icon_file
+                if icon_path.exists():
+                    dep_hasher.update(sha256_file(icon_path).encode())
             combined_hash = dep_hasher.hexdigest()
 
             target_dir = OUT_DIR if not item["dest"] else OUT_DIR / item["dest"]
@@ -1130,6 +1149,11 @@ def cmd_app(args):
                         cmd += ["--exclude-module", qt_binding]
                 if item.get("windowed"):
                     cmd.append("--noconsole")
+                icon_file = item.get("icon")
+                if IS_WINDOWS and icon_file:
+                    icon_path = ICONS_DIR / icon_file
+                    if icon_path.exists():
+                        cmd += ["--icon", str(icon_path)]
 
                 try:
                     with open(log_file, "w", encoding="utf-8") as lf:
