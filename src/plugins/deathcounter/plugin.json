@@ -9,6 +9,7 @@
   "min_api_version": "1.0.0",
   "platform": "all",
   "dashboard_ui": true,
+  "queries": ["deaths"],
   "capabilities": [
     "death-counter:count",
     "death-counter:milestones",

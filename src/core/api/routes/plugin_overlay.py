@@ -3,6 +3,7 @@ import html
 import json
 import logging
 import time
+import uuid
 
 from fastapi import APIRouter, HTTPException
 from starlette.responses import HTMLResponse, StreamingResponse
@@ -12,8 +13,10 @@ from core.api.plugin_overlay import (
     command_queue,
     dashboard_html_store,
     overlay_html_store,
+    query_store,
     state_store,
 )
+from core.error_codes import PLUGIN_0018, PLUGIN_0019
 
 log = logging.getLogger(__name__)
 
@@ -172,7 +175,7 @@ async def enqueue_command(name: str, body: dict):
     if not cmd:
         raise HTTPException(status_code=422, detail="Missing 'command' field")
     declared = _accepted_commands_for(name)
-    if declared and cmd not in declared:
+    if declared and cmd not in declared and cmd != "__query__":
         log.warning(
             "[CMD-QUEUE] Command '%s' not in accepted_commands of plugin '%s' "
             "(declared: %s) — delivering anyway",
@@ -223,6 +226,130 @@ async def get_plugin_state(name: str):
     if state is None:
         return {"state": None}
     return {"state": state}
+
+
+# ─── Queries (C.3 #3: request/response with correlation ids) ──────────────
+
+_QUERY_TIMEOUT_MIN = 0.5
+_QUERY_TIMEOUT_MAX = 30.0
+
+
+def _queries_declared_for(name: str) -> set[str] | None:
+    """Return the plugin's declared ``queries`` names, or None when unknown.
+
+    Same best-effort contract as ``_accepted_commands_for``: ``None``
+    means no declaration available and validation is skipped.
+    """
+    try:
+        from core.plugin_config import discover_plugins_dir, load_plugin_manifest
+
+        plugin_dir = discover_plugins_dir() / name
+        manifest = load_plugin_manifest(plugin_dir) if plugin_dir.is_dir() else None
+        raw = (manifest or {}).get("queries")
+        result: set[str] | None = (
+            {str(q) for q in raw} if isinstance(raw, list) and raw else None
+        )
+    except Exception as exc:
+        log.debug("queries lookup failed for '%s': %s", name, exc)
+        return None
+    return result
+
+
+@router.post("/plugins/{name}/query")
+async def query_plugin(name: str, body: dict):
+    """Send a query to a plugin and wait for its response.
+
+    Request/response channel for extensions (C.3 #3): the query is
+    delivered to the plugin through its command queue as the reserved
+    command ``__query__`` with a correlation id; BasePlugin routes it to
+    ``on_query()`` and POSTs the answer back, which resolves this HTTP
+    request. Requires the plugin process to be running.
+    """
+    query = body.get("query")
+    if not query or not isinstance(query, str):
+        raise HTTPException(status_code=422, detail="Missing 'query' field")
+    args = body.get("args") or {}
+    if not isinstance(args, dict):
+        raise HTTPException(status_code=422, detail="'args' must be an object")
+
+    from core.api.registry import get_registry
+
+    if get_registry().get(name) is None:
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
+    declared = _queries_declared_for(name)
+    if declared is not None and query not in declared:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Plugin '{name}' does not declare query '{query}' "
+                f"(declared: {', '.join(sorted(declared))})"
+            ),
+        )
+
+    try:
+        timeout = min(
+            _QUERY_TIMEOUT_MAX,
+            max(_QUERY_TIMEOUT_MIN, float(body.get("timeout", 5))),
+        )
+    except (TypeError, ValueError):
+        timeout = 5.0
+
+    query_id = str(uuid.uuid4())
+    future: asyncio.Future = asyncio.get_running_loop().create_future()
+    query_store.register(query_id, name, future)
+    command_queue.enqueue(name, "__query__", _query_id=query_id, _query=query, **args)
+
+    log.info("[QUERY] '%s' sent to plugin '%s' (id=%s)", query, name, query_id)
+    try:
+        outcome = await asyncio.wait_for(future, timeout=timeout)
+    except asyncio.TimeoutError:
+        log.warning(
+            "[QUERY] %s timed out waiting for '%s' from plugin '%s'",
+            PLUGIN_0018.code,
+            query,
+            name,
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"{PLUGIN_0018.code} {PLUGIN_0018.message}",
+        )
+    finally:
+        query_store.abandon(query_id)
+
+    if not outcome.get("ok", False):
+        error = outcome.get("error", "unknown error")
+        log.warning(
+            "[QUERY] %s handler failed for '%s' on plugin '%s': %s",
+            PLUGIN_0019.code,
+            query,
+            name,
+            error,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"{PLUGIN_0019.code} {PLUGIN_0019.message}: {error}",
+        )
+    return {"id": query_id, "result": outcome.get("result")}
+
+
+@router.post("/plugins/{name}/query-response")
+async def query_plugin_response(name: str, body: dict):
+    """Deliver a plugin's answer for a pending query.
+
+    Called by the plugin process after ``on_query()`` returns. Unknown or
+    already-timed-out correlation ids are accepted silently so late
+    responses don't error in the plugin's polling thread.
+    """
+    query_id = body.get("id")
+    if not isinstance(query_id, str):
+        raise HTTPException(status_code=422, detail="Missing 'id' field")
+    resolved = (
+        query_store.resolve(query_id, body.get("result"))
+        if body.get("ok", True)
+        else query_store.fail(query_id, str(body.get("error", "unknown")))
+    )
+    return {"status": "ok", "resolved": resolved}
 
 
 @router.post("/plugins/{name}/state")

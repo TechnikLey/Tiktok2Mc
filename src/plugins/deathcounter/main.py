@@ -198,6 +198,12 @@ class DeathCounterPlugin(BasePlugin):
 </body>
 </html>"""
 
+    def on_query(self, query: str, args: dict):
+        """Serve queries (see manifest 'queries'), e.g. for dashboards."""
+        if query == "deaths":
+            return self._manager.get_data()
+        return None
+
     def get_state(self):
         return self._manager.get_data()
 

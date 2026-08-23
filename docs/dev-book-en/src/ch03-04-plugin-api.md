@@ -106,6 +106,7 @@ class MyPlugin(BasePlugin):
 | Method | Description |
 |---------|--------------|
 | `self.send_command(target, command, args)` | Sends a command to another plugin via `POST /plugins/{target}/command`. Returns `True`/`False`. |
+| `self.query_plugin(target, query, args=None, timeout=5)` | Sends a query to another plugin and returns the parsed response (`{"id": ..., "result": ...}`), or `None` on timeout/error. See [Querying Plugins](#querying-plugins-requestresponse). |
 | `self.api_post(path, data)` | Sends HTTP POST to `http://127.0.0.1:29185/api/v1/{path}`. Returns `True`/`False`. |
 | `self.api_get(path, timeout=5)` | Sends HTTP GET. Returns the JSON object or `None` on errors. |
 | `self.api_request(path, payload=None, method=None, timeout=5)` | Full request/response: returns the **parsed JSON body** (`dict`/`list`/str/...), or `None` on empty body/errors. With `payload=None` it sends a GET; passing a payload sends JSON via POST (override with `method="PUT"` etc.). Never raises. |
@@ -230,6 +231,8 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 |--------|------|-------------|
 | `GET` | `/plugins` | List all registered plugins |
 | `POST` | `/plugins/{name}/command` | Send a command to a plugin |
+| `POST` | `/plugins/{name}/query` | Query a plugin (request/response — see below) |
+| `POST` | `/plugins/{name}/query-response` | Plugin-internal: deliver a query answer |
 | `GET` | `/plugins/{name}/commands?wait=1` | Poll for pending commands (long-polling) |
 | `POST` | `/plugins/{name}/state` | Update plugin state (for SSE) |
 | `GET` | `/plugins/{name}/stream` | SSE stream for state updates |
@@ -271,6 +274,48 @@ Console view uses.
 > security/stability default); set it to `true` to enable it — the dashboard
 > Console tab requires this. When disabled, requests are rejected with
 > `403 MC-0012` while the queue path keeps working.
+
+### Querying Plugins (Request/Response)
+
+Plugins can expose **server-side queries** — request/response with
+correlation ids, e.g. a leaderboard answering `"top"`. This is the
+supported way to read structured data *from* a plugin process (the
+dashboard and other extensions call it like any REST endpoint):
+
+1. Override `on_query(query, args) -> Any` in your plugin class. The
+   return value is JSON-serialized to the caller; raise an exception to
+   report an error.
+2. Optionally declare the supported query names in `plugin.json` under
+   `"queries": ["top", "stats"]` — callers then get an instant 404 for
+   unknown queries instead of waiting for the timeout.
+
+Callers use `POST /plugins/{name}/query` with body
+`{"query": "top", "args": {}, "timeout": 5}` (timeout clamped to
+0.5–30 s). The query is delivered to the plugin through its command
+queue as the reserved command `__query__` with a correlation id; the
+BasePlugin polling loop routes it to `on_query()` automatically and
+POSTs the answer back. Python plugins simply call
+`self.query_plugin(target, query, args)`.
+
+Responses: `200 {"id": ..., "result": ...}` on success; `504 PLUGIN-0018`
+if the plugin doesn't answer in time; `502 PLUGIN-0019` if the handler
+raised. Commands (`!`-lines, reactions) remain fire-and-forget — queries
+are for reads that need a result.
+
+Reference implementation: the shipped **death-counter** plugin answers
+the `"deaths"` query.
+
+```python
+class MyPlugin(BasePlugin):
+    PLUGIN_NAME = "leaderboard"
+
+    def on_query(self, query: str, args: dict):
+        if query == "top":
+            scores = self.store_get("scores", {})
+            top = sorted(scores.items(), key=lambda kv: -kv[1])[:10]
+            return [{"user": u, "points": p} for u, p in top]
+        return None
+```
 
 ### Persistent Store (namespaced)
 

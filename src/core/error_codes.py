@@ -427,6 +427,32 @@ PLUGIN_0017 = ErrorCode(
     recovery_hint="Commands will be dropped until queue drains.",
     impact="Some commands to the plugin may be lost.",
 )
+PLUGIN_0018 = ErrorCode(
+    code="PLUGIN-0018",
+    subsystem=Subsystem.PLUGIN,
+    severity=Severity.WARNING,
+    message="Plugin query timed out.",
+    description=(
+        "A query sent to a plugin (POST /plugins/{name}/query) was not "
+        "answered within the requested timeout."
+    ),
+    recovery_hint=(
+        "Check that the plugin is running and implements on_query() for "
+        "the requested query. Increase the timeout if the plugin is slow."
+    ),
+    impact="The caller received no result for the query.",
+)
+PLUGIN_0019 = ErrorCode(
+    code="PLUGIN-0019",
+    subsystem=Subsystem.PLUGIN,
+    severity=Severity.WARNING,
+    message="Plugin query handler failed.",
+    description=(
+        "The plugin's on_query() handler raised an exception while processing a query."
+    ),
+    recovery_hint="Check the plugin log for the handler traceback.",
+    impact="The caller received an error instead of a result.",
+)
 
 # ------------------------------------------------------------------- GUI ----
 GUI_0001 = ErrorCode(

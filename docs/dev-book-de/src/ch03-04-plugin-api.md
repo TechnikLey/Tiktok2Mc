@@ -106,6 +106,7 @@ class MyPlugin(BasePlugin):
 | Methode | Beschreibung |
 |---------|--------------|
 | `self.send_command(target, command, args)` | Sendet Befehl an ein anderes Plugin per `POST /plugins/{target}/command`. Gibt `True`/`False` zurück. |
+| `self.query_plugin(target, query, args=None, timeout=5)` | Fragt ein anderes Plugin ab und gibt die geparste Antwort zurück (`{"id": ..., "result": ...}`), bei Timeout/Fehler `None`. Siehe [Plugins abfragen](#plugins-abfragen-requestresponse). |
 | `self.api_post(path, data)` | Sendet HTTP-POST an `http://127.0.0.1:29185/api/v1/{path}`. Gibt `True`/`False` zurück. |
 | `self.api_get(path, timeout=5)` | Sendet HTTP-GET. Gibt das JSON-Objekt oder `None` bei Fehlern zurück. |
 | `self.api_request(path, payload=None, method=None, timeout=5)` | Vollwertiges Request/Response: gibt den **geparsten JSON-Body** zurück (`dict`/`list`/str/...), oder `None` bei leerem Body/Fehlern. Mit `payload=None` wird ein GET gesendet; mit Payload geht sie als JSON per POST (überschreibbar mit `method="PUT"` etc.). Wirft nie. |
@@ -230,6 +231,8 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 |---------|------|--------------|
 | `GET` | `/plugins` | Alle registrierten Plugins auflisten |
 | `POST` | `/plugins/{name}/command` | Befehl an ein Plugin senden |
+| `POST` | `/plugins/{name}/query` | Plugin abfragen (Request/Response — siehe unten) |
+| `POST` | `/plugins/{name}/query-response` | Plugin-intern: Query-Antwort zustellen |
 | `GET` | `/plugins/{name}/commands?wait=1` | Befehle vom System abholen (Long-Polling) |
 | `POST` | `/plugins/{name}/state` | Plugin-Zustand aktualisieren (für SSE) |
 | `GET` | `/plugins/{name}/stream` | SSE-Stream für Zustands-Updates |
@@ -272,6 +275,49 @@ Konsole im Web-Dashboard nutzt.
 > um ihn zu aktivieren — der Konsole-Tab im Dashboard benötigt dies. Bei
 > Deaktivierung werden direkte Befehle mit `403 MC-0012` abgelehnt,
 > während der Queue-Pfad weiterarbeitet.
+
+### Plugins abfragen (Request/Response)
+
+Plugins können **serverseitige Abfragen** bereitstellen — Request/Response
+mit Korrelations-IDs, z. B. ein Leaderboard, das auf `"top"` antwortet.
+Das ist der unterstützte Weg, um strukturierte Daten *aus* einem
+Plugin-Prozess zu lesen (Dashboard und andere Erweiterungen rufen es wie
+einen normalen REST-Endpunkt auf):
+
+1. `on_query(query, args) -> Any` in der Plugin-Klasse überschreiben. Der
+   Rückgabewert wird JSON-serialisiert an den Aufrufer geliefert; eine
+   Exception meldet einen Fehler.
+2. Optional die unterstützten Query-Namen in der `plugin.json` unter
+   `"queries": ["top", "stats"]` deklarieren — unbekannte Queries bekommen
+   dann sofort einen 404 statt bis zum Timeout zu warten.
+
+Aufrufer nutzen `POST /plugins/{name}/query` mit Body
+`{"query": "top", "args": {}, "timeout": 5}` (Timeout geklemmt auf
+0,5–30 s). Die Query wird über die Command-Queue als reservierter Befehl
+`__query__` mit Korrelations-ID zugestellt; die Polling-Loop des
+BasePlugin leitet sie automatisch an `on_query()` weiter und POSTet die
+Antwort zurück. Python-Plugins rufen einfach
+`self.query_plugin(target, query, args)` auf.
+
+Antworten: `200 {"id": ..., "result": ...}` bei Erfolg; `504 PLUGIN-0018`,
+wenn das Plugin nicht rechtzeitig antwortet; `502 PLUGIN-0019`, wenn der
+Handler eine Exception wirft. Befehle (`!`-Zeilen, Reactions) bleiben
+Fire-and-forget — Queries sind für Lesezugriffe mit Ergebnis da.
+
+Referenzimplementierung: das mitgelieferte **death-counter**-Plugin
+beantwortet die Query `"deaths"`.
+
+```python
+class MyPlugin(BasePlugin):
+    PLUGIN_NAME = "leaderboard"
+
+    def on_query(self, query: str, args: dict):
+        if query == "top":
+            scores = self.store_get("scores", {})
+            top = sorted(scores.items(), key=lambda kv: -kv[1])[:10]
+            return [{"user": u, "points": p} for u, p in top]
+        return None
+```
 
 ### Persistenter Speicher (namespaced)
 Jedes Plugin bekommt seine eigene JSON-Datei unter `data/plugin_data/<name>.json`

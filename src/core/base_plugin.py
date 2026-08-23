@@ -298,6 +298,23 @@ class BasePlugin:
         payload = {"command": command, "args": args or {}}
         return self.api_post(f"/plugins/{target_plugin}/command", payload)
 
+    def query_plugin(
+        self,
+        target_plugin: str,
+        query: str,
+        args: dict[str, Any] | None = None,
+        timeout: float = 5,
+    ) -> Any:
+        """Query another plugin and return its result.
+
+        Request/response with correlation ids (C.3 #3): the target must
+        implement ``on_query()``. Returns ``{"id": ..., "result": ...}``
+        on success, or ``None`` when the target is unreachable, unknown
+        or times out / reports an error.
+        """
+        payload = {"query": query, "args": args or {}, "timeout": timeout}
+        return self.api_request(f"/plugins/{target_plugin}/query", payload=payload)
+
     def register_overlay(self, html: str) -> None:
         """Register overlay HTML with the central API."""
         self.api_post(f"/plugins/{self.PLUGIN_NAME}/overlay-html", {"html": html})
@@ -328,6 +345,10 @@ class BasePlugin:
             for entry in result.get("commands", []):
                 cmd = entry.get("command", "")
                 args = entry.get("args", {})
+                if cmd == "__query__":
+                    # Reserved command (C.3 #3): never reaches user handlers
+                    self._handle_query(args)
+                    continue
                 handler = self._handlers.get(cmd)
                 if handler:
                     try:
@@ -344,6 +365,41 @@ class BasePlugin:
                 else:
                     # Fall through to subclass ``on_command`` override
                     self.on_command(cmd, args)
+
+    # -- queries (C.3 #3: request/response with correlation ids) ------------
+
+    def on_query(self, query: str, args: dict[str, Any]) -> Any:
+        """Answer a query sent via ``POST /plugins/{name}/query``.
+
+        Opt-in: override this and (optionally) declare the supported
+        query names in ``plugin.json`` under ``"queries"`` so callers get
+        fast feedback for unknown queries. The return value is JSON-
+        serialized to the caller; raise an exception to report an error.
+        """
+        log.debug("[%s] Unhandled query: %s %s", self.PLUGIN_NAME, query, args)
+        return None
+
+    def _handle_query(self, args: dict[str, Any]) -> None:
+        """Dispatch a ``__query__`` command entry and POST back the answer."""
+        query_id = str(args.get("_query_id", ""))
+        query = str(args.get("_query", ""))
+        payload_args = {k: v for k, v in args.items() if not k.startswith("_")}
+        try:
+            result = self.on_query(query, payload_args)
+            self.api_post(
+                f"/plugins/{self.PLUGIN_NAME}/query-response",
+                {"id": query_id, "ok": True, "result": result},
+            )
+        except Exception as e:  # user code — must never kill the polling loop
+            log.exception("[%s] Query '%s' failed", self.PLUGIN_NAME, query)
+            if self._health:
+                self._health.record_error(
+                    f"plugin.{self.PLUGIN_NAME}", f"query '{query}' failed: {e}"
+                )
+            self.api_post(
+                f"/plugins/{self.PLUGIN_NAME}/query-response",
+                {"id": query_id, "ok": False, "error": str(e)},
+            )
 
     # -- tick loop ----------------------------------------------------------
 

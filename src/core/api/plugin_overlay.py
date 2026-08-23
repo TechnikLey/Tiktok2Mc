@@ -110,6 +110,62 @@ class CommandQueue:
 command_queue = CommandQueue()
 
 
+class QueryStore:
+    """Tracks in-flight plugin queries awaiting the plugin's response.
+
+    A query is delivered to the plugin through the regular command queue
+    (reserved command ``__query__``) and carries a correlation id. The
+    HTTP caller awaits a ``asyncio.Future`` here; the plugin's answer
+    arrives via ``POST /plugins/{name}/query-response`` which resolves
+    the future again. Thread-safe; futures are resolved via
+    ``call_soon_threadsafe`` so responses may arrive from any thread.
+    """
+
+    def __init__(self) -> None:
+        self._pending: dict[str, tuple[str, asyncio.Future]] = {}
+        self._lock = threading.Lock()
+
+    def register(self, query_id: str, plugin_name: str, future: asyncio.Future) -> None:
+        with self._lock:
+            self._pending[query_id] = (plugin_name, future)
+
+    def resolve(self, query_id: str, result: Any) -> bool:
+        """Resolve a pending query successfully. Returns False if unknown/done."""
+        return self._settle(query_id, {"ok": True, "result": result})
+
+    def fail(self, query_id: str, error: str) -> bool:
+        """Resolve a pending query with an error. Returns False if unknown/done."""
+        return self._settle(query_id, {"ok": False, "error": error})
+
+    def abandon(self, query_id: str) -> None:
+        """Drop tracking for a query (e.g. after the caller timed out)."""
+        with self._lock:
+            self._pending.pop(query_id, None)
+
+    def _settle(self, query_id: str, outcome: dict[str, Any]) -> bool:
+        with self._lock:
+            entry = self._pending.pop(query_id, None)
+        if entry is None:
+            return False
+        _, future = entry
+        if future.done():
+            return False
+
+        def _deliver() -> None:
+            if not future.done():
+                future.set_result(outcome)
+
+        loop = future.get_loop()
+        if loop.is_running():
+            loop.call_soon_threadsafe(_deliver)
+        else:
+            _deliver()
+        return True
+
+
+query_store = QueryStore()
+
+
 class OverlayHtmlStore:
     """Caches rendered overlay HTML for each plugin.
 
