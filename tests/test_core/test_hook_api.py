@@ -277,6 +277,89 @@ class TestPermissions:
         assert clone.store_delete("k") is False
         assert clone.store_all() == {}
 
+    def test_denied_request_returns_none(self, api):
+        clone = api.for_hook("my_hook", permissions=[])
+        assert clone.request("plugins/x/state") is None
+
+    def test_request_invalid_path_returns_none(self, api):
+        clone = api.for_hook("my_hook", permissions=["network"])
+        assert clone.request("") is None
+        assert clone.request("   ") is None
+        assert clone.request(None) is None
+
+    def test_request_get_reaches_http_layer(self, api, caplog):
+        # granted -> the guard passes and the HTTP layer is reached; without
+        # a live API this fails as a connection error (returns None), not a
+        # permission denial.
+        import logging
+
+        clone = api.for_hook("my_hook", permissions=["network"])
+        with caplog.at_level(logging.WARNING, logger="core.hook_api"):
+            result = clone.request("plugins/spotify/state")
+        assert result is None
+        assert "GET plugins/spotify/state" in caplog.text
+
+    def test_request_post_sends_json_payload(self, api):
+        import urllib.request
+
+        sent = {}
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b'{"status": "ok"}'
+
+        def fake_urlopen(req, timeout=None):
+            sent["url"] = req.full_url
+            sent["method"] = req.get_method()
+            sent["body"] = req.data
+            return FakeResp()
+
+        monkey_urlopen = urllib.request.urlopen
+        urllib.request.urlopen = fake_urlopen
+        try:
+            clone = api.for_hook("my_hook", permissions=["network"])
+            result = clone.request(
+                "plugins/spotify/command",
+                payload={"command": "play"},
+                method="PUT",
+            )
+        finally:
+            urllib.request.urlopen = monkey_urlopen
+        assert result == {"status": "ok"}
+        assert sent["method"] == "PUT"
+        assert sent["url"].endswith("/api/v1/plugins/spotify/command")
+        import json
+
+        assert json.loads(sent["body"].decode()) == {"command": "play"}
+
+    def test_request_empty_body_returns_none(self, api):
+        import urllib.request
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b""
+
+        monkey_urlopen = urllib.request.urlopen
+        urllib.request.urlopen = lambda req, timeout=None: FakeResp()
+        try:
+            clone = api.for_hook("my_hook", permissions=["network"])
+            result = clone.request("health")
+        finally:
+            urllib.request.urlopen = monkey_urlopen
+        assert result is None
+
     def test_granted_store_passes_guard_reaches_http(self, api):
         # granted + valid namespace -> the guard passes and the HTTP layer
         # is reached (fails here with a connection error, not a denial).

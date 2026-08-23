@@ -146,6 +146,7 @@ Side-effecting API calls are guarded by **permissions** declared in your
 | `triggers` | `enqueue_trigger` |
 | `overlay` | `send_overlay_text` |
 | `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
+| `network` | `request` (control-plane HTTP helper) |
 
 Ungated methods that always work: `register_action`,
 `register_lifecycle`/`on_live_start`/`on_live_end`, `log`,
@@ -155,13 +156,40 @@ Ungated methods that always work: `register_action`,
   `HOOK-0009`) and returns its safe fallback (`None`, `False`, `{}` or
   the given default) — the hook keeps running, nothing crashes.
 - Unknown permission names in `hook.json` produce a warning at load time.
-- Declare only what you use:
+- Declare only what you use. Note: permissions guard the **HookAPI
+  surface** only — a hook may still import raw `urllib`/`requests`
+  directly; process-level sandboxing is a separate topic.
 
 ```json
 {
   "name": "jump",
   "permissions": ["rcon", "overlay"]
 }
+```
+
+## request(path, payload=None, method=None, timeout=5)
+
+Synchronous request/response against the control plane (`J.2 Nr. 8`).
+Returns the **parsed JSON body** (`dict`/`list`/str/...), or `None` when
+the body is empty or the call fails — failures are logged, never raised.
+
+- `path` is relative to the API base `/api/v1`, e.g.
+  `"plugins/spotify/state"`.
+- `payload=None` sends a GET; passing a payload sends it as JSON via POST
+  (override with `method="PUT"` etc.).
+- Requires the `network` permission.
+
+```python
+def register(api: HookAPI):
+    def handler(user, trigger, context):
+        state = api.request("plugins/spotify/state")
+        track = (state or {}).get("state", {})
+        if track.get("name"):
+            api.send_overlay_text(title=track["name"], subtitle=track["artists"])
+        else:
+            api.send_overlay_text(title="Spotify", subtitle="No active track")
+
+    api.register_action("spotify_current", handler)
 ```
 
 ## rcon_enqueue(commands)

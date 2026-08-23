@@ -37,6 +37,7 @@ HOOK_PERMISSIONS: frozenset[str] = frozenset(
         "triggers",  # enqueue_trigger
         "overlay",  # send_overlay_text
         "store",  # store_get / store_set / store_delete / store_all
+        "network",  # request (control-plane HTTP helper)
     }
 )
 
@@ -424,6 +425,57 @@ class HookAPI:
             self._config = config
         if valid_functions is not None:
             self._valid_functions = valid_functions
+
+    # --------------------------------------------------
+    # Control-plane requests (Request/Response, J.2 Nr. 8)
+    # --------------------------------------------------
+
+    def request(
+        self,
+        path: str,
+        payload: dict | list | None = None,
+        method: str | None = None,
+        timeout: float = _STORE_TIMEOUT,
+    ) -> object | None:
+        """Call a control-plane API endpoint and return the parsed JSON body.
+
+        ``path`` is relative to the API base (``/api/v1``), e.g.
+        ``"plugins/spotify/state"``. With ``payload=None`` the request is a
+        GET; passing a payload sends it as a JSON body via POST (override
+        with ``method``, e.g. ``"PUT"``). Returns the decoded JSON value
+        (dict/list/str/...), or ``None`` when the body is empty or the
+        request fails — failures are logged, never raised.
+
+        Requires the ``network`` permission in hook.json. Note that this is
+        an ergonomic gate on the HookAPI surface only: hooks may still use
+        raw ``urllib``/``requests`` directly (see sandbox notes in the dev
+        book).
+        """
+        if not self._allow("network", "request"):
+            return None
+        if not isinstance(path, str) or not path.strip():
+            log.warning("[HOOK] request: invalid path %r", path)
+            return None
+        clean = path.strip().lstrip("/")
+        verb = method.upper() if method else ("GET" if payload is None else "POST")
+        data = None
+        headers: dict[str, str] = {}
+        if payload is not None:
+            data = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(
+            f"{_API_BASE}/{clean}", data=data, headers=headers, method=verb
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8")
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as exc:
+            log.warning("[HOOK] request %s %s failed: HTTP %s", verb, clean, exc.code)
+            return None
+        except (OSError, ValueError) as exc:
+            log.warning("[HOOK] request %s %s failed: %s", verb, clean, exc)
+            return None
 
 
 def clear_hook_registrations() -> int:

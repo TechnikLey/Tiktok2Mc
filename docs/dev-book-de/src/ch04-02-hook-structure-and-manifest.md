@@ -27,7 +27,7 @@ src/hooks/<name>/
 | `author` | String | Entwickler-Name |
 | `min_api_version` | String | Mindest-Hook-API-Version (aktuell `1.0.0`, siehe `src/core/version.py`) |
 | `capabilities` | Array | Liste von Fähigkeiten, z. B. `["hook:random"]` — Discovery-/Angebots-Tags, keine Rechte |
-| `permissions` | Array | Gewährte API-Berechtigungen: `"rcon"`, `"triggers"`, `"overlay"` oder `"store"` (siehe [Hook-API](./ch04-03-hook-api.md)); bewachte Aufrufe ohne passende Berechtigung werden abgelehnt |
+| `permissions` | Array | Gewährte API-Berechtigungen: `"rcon"`, `"triggers"`, `"overlay"`, `"store"` oder `"network"` (siehe [Hook-API](./ch04-03-hook-api.md)); bewachte Aufrufe ohne passende Berechtigung werden abgelehnt |
 | `depends_on` | Array | Liste von Plugin-Namen, die aktiviert sein müssen |
 | `plugin` | String | Bei Plugin-gebündelten Hooks: der Plugin-Name |
 | `config_schema` | Objekt | Schema für die Hook-Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |

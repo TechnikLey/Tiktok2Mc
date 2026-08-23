@@ -119,6 +119,70 @@ class TestWebhook:
         assert data["event"] == "player_respawn"
 
 
+class TestWebhookQueueSemantics:
+    """E.7: queue pause/resume is config-gated, not unconditional."""
+
+    def test_death_pauses_when_enabled(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "queue_pause_on_death", True)
+        monkeypatch.setattr(ctx, "queue_active", True)
+        main_mod._apply_mc_queue_semantics("player_death")
+        assert ctx.queue_active is False
+
+    def test_respawn_resumes_when_enabled(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "queue_pause_on_death", True)
+        monkeypatch.setattr(ctx, "queue_active", False)
+        main_mod._apply_mc_queue_semantics("player_respawn")
+        assert ctx.queue_active is True
+
+    def test_death_ignored_when_disabled(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "queue_pause_on_death", False)
+        monkeypatch.setattr(ctx, "queue_active", True)
+        main_mod._apply_mc_queue_semantics("player_death")
+        assert ctx.queue_active is True
+
+    def test_respawn_ignored_when_disabled(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "queue_pause_on_death", False)
+        monkeypatch.setattr(ctx, "queue_active", False)
+        main_mod._apply_mc_queue_semantics("player_respawn")
+        assert ctx.queue_active is False
+
+    def test_other_events_do_not_touch_queue(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "queue_pause_on_death", True)
+        monkeypatch.setattr(ctx, "queue_active", True)
+        main_mod._apply_mc_queue_semantics("server_start")
+        main_mod._apply_mc_queue_semantics("player_join")
+        assert ctx.queue_active is True
+
+    def test_apply_config_reads_gate_default_true(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import BotContext, _apply_config
+
+        bc = BotContext()
+        monkeypatch.setattr(main_mod, "ctx", bc)
+        # _apply_config ends with datapack_root.mkdir — keep it off the real FS
+        monkeypatch.setattr(Path, "mkdir", lambda self, *a, **k: None)
+
+        _apply_config({})
+        assert bc.queue_pause_on_death is True
+        _apply_config({"minecraft_server_api": {"queue_pause_on_death": False}})
+        assert bc.queue_pause_on_death is False
+
+
 # =========================================================================
 # Duplicate config detection
 # =========================================================================

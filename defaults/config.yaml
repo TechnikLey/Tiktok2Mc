@@ -256,6 +256,10 @@ console:
 minecraft_server_api:
   api_port: 29187
   web_server_port: 29188
+  # Pause the TikTok command queue while the tracked player is dead and
+  # resume it on respawn. Disable if a foreign game sends player_death /
+  # player_respawn webhooks that must not affect the Minecraft queue.
+  queue_pause_on_death: true
 
 # --- GUI ---
 # The graphical user interface is served by the central API server

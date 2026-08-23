@@ -192,6 +192,7 @@ class BotContext:
         self.main_loop = None
         self.hook_api = None
         self.queue_active = True
+        self.queue_pause_on_death = True
         self.config = {}
         self.runtime_path_shutdown = (BASE_DIR / "runtime" / "shutdown").resolve()
 
@@ -444,6 +445,9 @@ def _apply_config(config: dict) -> None:
             "RESOLVED_PORT_WEBHOOK_PORT",
             config.get("minecraft_server_api", {}).get("web_server_port", 29188),
         )
+    )
+    ctx.queue_pause_on_death = bool(
+        config.get("minecraft_server_api", {}).get("queue_pause_on_death", True)
     )
     ctx.autosave_interval_seconds = config.get("tiktok", {}).get(
         "autosave_interval_seconds", 60
@@ -1192,6 +1196,23 @@ def _record_metrics_event():
         handle_metrics._event_timestamps = [ts for ts in timestamps if ts > cutoff]
 
 
+def _apply_mc_queue_semantics(event: str) -> None:
+    """Apply Minecraft queue semantics for a webhook event (E.7).
+
+    Pauses the TikTok command queue while the tracked player is dead and
+    resumes it on respawn — but only when the user opted in via
+    ``minecraft_server_api.queue_pause_on_death``. The webhook payload has
+    no server identity, so this config gate scopes the behavior to the real
+    Minecraft setup instead of any same-named event from a foreign game.
+    """
+    if event == "player_death" and ctx.queue_pause_on_death:
+        ctx.queue_active = False
+        log.info("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
+    elif event == "player_respawn" and ctx.queue_pause_on_death:
+        ctx.queue_active = True
+        log.info("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
+
+
 @app.route("/webhook", methods=["POST"])
 def handle_minecraft_events():
     try:
@@ -1207,13 +1228,8 @@ def handle_minecraft_events():
     if not event:
         return {"status": "no event"}, 400
 
-    # Legacy: local TikTok queue pause / resume
-    if event == "player_death":
-        ctx.queue_active = False
-        log.info("\n[STATUS] [DEAD] Player died! Queue PAUSED.")
-    elif event == "player_respawn":
-        ctx.queue_active = True
-        log.info("\n[STATUS] [OK] Player respawned! Queue RESUMED.")
+    # Minecraft queue semantics (config-gated, see _apply_mc_queue_semantics)
+    _apply_mc_queue_semantics(event)
 
     # Publish every Minecraft event to the central EventBus generically.
     # Any plugin, hook, or the Event-Command Mapper can react without

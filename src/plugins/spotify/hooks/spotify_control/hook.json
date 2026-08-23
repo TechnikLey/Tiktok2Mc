@@ -7,7 +7,7 @@
   "min_api_version": "1.0.0",
   "plugin": "spotify-control",
   "capabilities": ["spotify:control"],
-  "permissions": ["overlay"],
+  "permissions": ["overlay", "network"],
   "update_url": "",
   "depends_on": ["spotify-control"]
 }

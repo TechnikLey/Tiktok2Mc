@@ -147,6 +147,7 @@ den Discovery-Tags):
 | `triggers` | `enqueue_trigger` |
 | `overlay` | `send_overlay_text` |
 | `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
+| `network` | `request` (HTTP-Helper für die Control Plane) |
 
 Ungesperrte Methoden, die immer funktionieren: `register_action`,
 `register_lifecycle`/`on_live_start`/`on_live_end`, `log`,
@@ -156,13 +157,41 @@ Ungesperrte Methoden, die immer funktionieren: `register_action`,
   `HOOK-0009`) und liefert seinen sicheren Rückgabewert (`None`, `False`,
   `{}` oder den übergebenen Default) — der Hook läuft weiter, nichts crasht.
 - Unbekannte Permission-Namen in der `hook.json` erzeugen beim Laden eine Warnung.
-- Deklariere nur, was du nutzt:
+- Deklariere nur, was du nutzt. Hinweis: Permissions schützen nur die
+  **HookAPI-Oberfläche** — ein Hook darf weiterhin direkt `urllib`/`requests`
+  importieren; Prozess-Sandboxing ist ein eigenes Thema.
 
 ```json
 {
   "name": "sprung",
   "permissions": ["rcon", "overlay"]
 }
+```
+
+## request(path, payload=None, method=None, timeout=5)
+
+Synchrone Request/Response-Aufrufe gegen die Control Plane (`J.2 Nr. 8`).
+Liefert den **geparsten JSON-Body** (`dict`/`list`/str/...) zurück, oder
+`None`, wenn der Body leer ist oder der Aufruf fehlschlägt — Fehler werden
+geloggt, nie geworfen.
+
+- `path` ist relativ zur API-Basis `/api/v1`, z. B.
+  `"plugins/spotify/state"`.
+- `payload=None` sendet ein GET; mit Payload wird sie als JSON per POST
+  gesendet (überschreibbar mit `method="PUT"` etc.).
+- Benötigt die `network`-Permission.
+
+```python
+def register(api: HookAPI):
+    def handler(user, trigger, context):
+        state = api.request("plugins/spotify/state")
+        track = (state or {}).get("state", {})
+        if track.get("name"):
+            api.send_overlay_text(title=track["name"], subtitle=track["artists"])
+        else:
+            api.send_overlay_text(title="Spotify", subtitle="No active track")
+
+    api.register_action("spotify_current", handler)
 ```
 
 ## rcon_enqueue(commands)

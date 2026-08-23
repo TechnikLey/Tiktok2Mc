@@ -17,8 +17,10 @@
 > | *(aktuell)* | **Strukturierter Hook-Kontext**: Event-Quellen bauen `_make_hook_context(...)` (gift/follow/like/comment/join/share/webhook/hook), Trigger-Queue trägt 4-Tupel mit Context, `execute_global_command(context)` reicht ihn an Hook-Actions weiter (+ `chain_depth`); `enqueue_trigger(context=...)` propagiert Daten in Folgetriggers | E.5 / J.2 Nr. 4 (Kontext-Teil): unlockt H.3 (Gift-Combos), Rollenfilter für H.2 |
 | *(aktuell)* | **HookContext-Typ + Kommentar-Sonderfall aufgelöst**: Kontext ist `dict`-Subklasse mit fail-fast Attribut-Zugriff; `user` immer String, Kommentartext nur im Kontext; `{comment}`-Overlay liest aus dem Kontext | E.5 abgeschlossen; Datenvertrag konsistent über alle Events |
 | *(aktuell)* | **Capability-Enforcement**: neues Manifest-Feld `permissions` (`rcon`/`triggers`/`overlay`/`store`) wird in `for_hook()`-Views erzwungen; verweigerte Aufrufe → `HOOK-0009` + sicherer Rückgabewert; `capabilities` bleiben Discovery-Tags; Shipped-Manifeste deklarieren ihre Berechtigungen | E.8 / J.2 Nr. 10: Isolation ist wirksam statt nur deklarativ |
+| *(aktuell)* | **`api.request()`-Helper**: synchroner JSON-Request/Response gegen die Control Plane (GET/POST/PUT), geparster Body oder `None`, Permission `network`; Spotify-Control-Hook umgestellt (urllib-Boilerplate entfernt) | J.2 Nr. 8 (pragmatisch): Hooks können Zustand abfragen ohne DIY-HTTP |
+| *(aktuell)* | **Webhook-Minecraft-Semantik konfigurierbar**: `minecraft_server_api.queue_pause_on_death` (Default `true`) gated die Queue-Pause bei `player_death`/`player_respawn`; Logik in testbarem `_apply_mc_queue_semantics()` | E.7: Fremdspiel mit gleichnamigen Events verfälscht die Queue nicht mehr |
 >
-> Weiterhin offen: E.7, J.2 Nr. 8, alle J.3-Punkte.
+> Weiterhin offen: alle J.3-Punkte (J.2 Nr. 8/E.7/E.8 erledigt).
 
 ---
 
@@ -85,7 +87,7 @@ Zentrale Konsequenz dieses Designs: `event_bus` und `command_queue` (`core.api.e
 ### C.3 Schwächen / harte Grenzen
 1. ~~**Der dokumentierte Ereignispfad 1 ist tot**~~ **[✅ ERLEDIGT — `f409595`]** Der Bridge published echte `tiktok.*`-Events per HTTP (`POST /api/v1/events`, gleiches Muster wie `minecraft.*`) auf den API-Bus; der neue **PluginEventBridge**-Service (API-Prozess) matcht `event_subscriptions` (exakt + `prefix.*`) und legt `tiktok_event`-Kommandos in die CommandQueue, die Plugins pollen. Integrationstest deckt den Pfad ab.
 2. ~~**Kommentarfeed nicht abonnierbar / `comment_handler` nur Doku**~~ **[✅ ERLEDIGT — `f409595`]** `comment_handler: {prefix, enabled}` ist implementiert: Bei `tiktok.comment` wird ein `comment`-Kommando mit `{text, username}` (Präfix gestript, Default `$`) zugestellt; dokumentiert in ch03-05/ch03-01.
-3. **Fire-and-forget überall:** `send_command` hat keine Antwortwarteschlange, keine Korrelations-IDs; Request/Response zwischen Extensions ist nicht modelliert. *(unverändert → J.2 Nr. 8)*
+3. **Fire-and-forget überall:** `send_command` hat keine Antwortwarteschlange, keine Korrelations-IDs; Request/Response zwischen Extensions ist nicht modelliert. *(Hook→Control-Plane inzwischen via `api.request()` gelöst → J.2 Nr. 8; Plugin↔Plugin-Korrelations-IDs bleiben offen)*
 4. **Keine eigenen Endpunkte:** Das REST-Interface pro Plugin ist fix (commands/overlay/stream/state/config). Eigene Abfrage-Routen („gib mir das Leaderboard") sind nicht möglich; interaktive UIs bleiben auf statisches Overlay-HTML + SSE-State beschränkt. *(unverändert)*
 5. **Keine Dashboard-Integrationspunkte:** Plugins bekommen keine Tabs/Routen im Web-Dashboard — nur Overlay-Seiten und Schema-Config-Seiten. *(unverändert → J.3 Nr. 11)*
 6. ~~**Persistenz DIY und kollisionsgefährdet**~~ **[✅ ERLEDIGT — `022fe7a`]** Namespaced Persistenz-API: je Extension eine JSON-Datei unter `data/plugin_data/<name>.json`; REST (`GET/PUT/DELETE /plugins/{name}/data[/{key}]`) + `BasePlugin.store_get/store_set/store_delete/store_all`.
@@ -157,7 +159,7 @@ Belegstellen (aktuell): `_publish_tiktok_event` (`main.py`) forwarded per HTTP v
 | E.4 | Kein shipped Plugin nutzt `event_subscriptions`; keine Tests zu `_event_bridge_worker`. | grep in `src/plugins`, `tests` | Defekt blieb unbemerkt | **[✅ ERLEDIGT `54fdb78`]** Integrationstest + Unit-Tests für die Zustellung (`test_plugin_event_bridge.py`) |
 | E.5 | **Hook-Kontext immer `{}`**, keine strukturierten Ereignisdaten. | `main.py` (`execute_global_command(..., {})`) | Hooks können nicht datengetrieben arbeiten | **[✅ ERLEDIGT]** `_make_hook_context` an allen Event-Quellen, 4-Tupel in der Trigger-Queue, Kontext inkl. `chain_depth` an Hook-Actions; `enqueue_trigger(context=...)` für Verkettung |
 | E.6 | **Kein Veto-/Rückgabevertrag** für Hook-Actions. | `hook_api.execute_global_command` ignoriert Rückgaben | Filter/Moderation als Hook unmöglich | **[✅ ERLEDIGT `54fdb78`]** Veto-Vertrag: `False` = Restkette abbrechen; Kontext-Teil durch den strukturierten Context ebenfalls erledigt |
-| E.7 | Minecraft-Semantik im generischen Webhook: `player_death`/`player_respawn` pausieren die MC-Queue **unabhängig von der Quelle**. | Bridge `/webhook`-Handler | Fremdspiel, das gleichnamige Events sendet, verfälscht das Verhalten | offen |
+| E.7 | ~~Minecraft-Semantik im generischen Webhook: `player_death`/`player_respawn` pausieren die MC-Queue **unabhängig von der Quelle**.~~ **[✅ ERLEDIGT]** Neuer Config-Gate `minecraft_server_api.queue_pause_on_death` (Default `true`, rückwärtskompatibel): ohne Opt-in keine Queue-Pause; `minecraft.{event}` wird weiterhin generisch publiziert, Semantik liegt in `_apply_mc_queue_semantics()` (unit-testbar). | Bridge `/webhook`-Handler | ~~Fremdspiel, das gleichnamige Events sendet, verfälscht das Verhalten~~ | **[✅ ERLEDIGT]** |
 | E.8 | ~~`capabilities` werden nicht erzwungen; Sandbox default aus; Hooks dürfen `requests`.~~ **[✅ TEIL-ERLEDIGT]** Neues Feld `permissions` (`rcon`/`triggers`/`overlay`/`store`) wird pro Hook-View erzwungen (`HOOK-0009`, sicherer Rückgabewert); `capabilities` bleiben Discovery-Tags. Direkter `requests`/urllib-Netzzugriff bleibt erlaubt (dokumentiert) — echte Sandbox weiterhin offen. | `sandbox.py`, `hook_loader.py` | ~~Isolation ist deklarativ, nicht wirksam~~ API-Isolation jetzt wirksam; Prozess-Sandbox unangetastet | **[✅ API-Ebene]** |
 
 ---
@@ -270,7 +272,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 5. **Hook-Runtime-Reload/Lifecycle:** Enable/Disable ohne Bridge-Restart (Reload-Signal-Mechanik erweitern); `on_live_start/end`-Callbacks. **[✅ ERLEDIGT (Commits: HookAPI Lifecycle + Reload + Bridge Watcher + API Endpoints)]**
 6. ~~**Generischer Outbound-Kanal**~~ — **[✅ `4aa4711`]** `OutboundDispatcher` im API-Prozess: EventBus → konfigurierbare HTTP-Channels (`outbound:` in config.yaml; Formate `raw`/`discord`, Event-Patterns wie `event_subscriptions`), Retry + Circuit-Breaker pro Channel (`OverlayClient` wiederverwendet), Health-Lifecycle; REST `GET /outbound/channels` (URLs maskiert) + `POST /outbound/channels/{name}/test` (reine Probe); dokumentiert in ch03-04 (EN+DE). Grundlage G.3/I.1 geschaffen.
 7. ~~**Trigger-Zugriff für Erweiterungen**~~ — **[✅ `8ea4109`]** `POST /api/v1/triggers/dispatch`: kein Debounce, definierter Payload (`trigger`/`user`/`gift_id`/`gift_name`), History-Aufzeichnung; dokumentiert in ch03-04 (EN+DE). Grundlage I.2 geschaffen.
-8. **Request/Response zwischen Extensions:** Korrelations-IDs/Antwortqueue statt reinem Fire-and-forget. *(offen)*
+8. ~~**Request/Response zwischen Extensions:** Korrelations-IDs/Antwortqueue statt reinem Fire-and-forget.~~ **[✅ ERLEDIGT (pragmatisch)]** `api.request(path, payload=None, method=None, timeout=5)` im HookAPI: synchroner JSON-Call gegen die Control Plane (GET ohne Payload, POST/PUT mit), geparster Body oder `None`, nie Exceptions; Permission `network`; Spotify-Control-Hook nutzt ihn bereits (Boilerplate-urllib entfernt). Volle Korrelations-IDs/Antwortqueues zwischen Plugins bleiben Zukunftsthema — für Hook→Control-Plane-Abfragen reicht das.
 9. ~~**Namespaced Persistenz-API pro Plugin/Hook**~~ — **[✅ `022fe7a`]** `PersistenceService` (`data/plugin_data/<name>.json`, atomar), REST `GET/PUT/DELETE /plugins/{name}/data[/{key}]`, `BasePlugin.store_*`-Helper; dokumentiert in ch03-04/ch04-03 (EN+DE).
 10. ~~**Capability-Enforcement:** `capabilities` prüfen oder streichen; Sandbox-Profile; Hook-Netzzugriff bewusst entscheiden (B.3.5/E.8).~~ **[✅ ERLEDIGT (API-Ebene)]** Neues Feld `permissions` in hook.json (`rcon`/`triggers`/`overlay`/`store`) wird in den `for_hook()`-Views erzwungen — verweigerte Aufrufe loggen `HOOK-0009` und liefern sichere Rückgabewerte. `capabilities` bleiben unverändert Discovery-Tags (Saubere Trennung: Angebot vs. Rechte). Direkter Netzzugriff via `requests`/urllib bleibt erlaubt und dokumentiert; Prozess-Sandbox-Profile weiterhin offen.
 
@@ -288,15 +290,16 @@ Die Zwei-Ebenen-Architektur ist im Kern **richtig und durchdacht**: Hooks für s
 
 Was die versprochene Flexibilität ursprünglich **ausbremste**, waren keine Designfehler, sondern:
 1. **Zwei Zustellungsdefekte** (E.1/E.2), die die dokumentierte Ereignisfähigkeit faktisch abschalteten — mit einem Fix adressierbar;
-2. **fehlende Verträge** (Veto ~~und Kontext~~ ✅, Request/Response; Persistenz/Outbound ✅), die jede ernsthaftere Idee in DIY-Treibhausarbeit trieben (F, G, H, I belegen das einzeln);
+2. **fehlende Verträge** (Veto ~~und Kontext~~ ✅, ~~Request/Response~~ ✅ via `api.request()`; Persistenz/Outbound ✅), die jede ernsthaftere Idee in DIY-Treibhausarbeit trieben (F, G, H, I belegen das einzeln);
 3. **Doku-/Code-Drift** (`comment_handler`, tote Pfade), die Vertrauen in die Erweiterungsversprechen untergräbt.
 
 ### Umsetzungsstand (August 2026)
 
-**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext (`HookContext`), Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle, Capability-Enforcement (`permissions`). Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
+**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext (`HookContext`), Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle, Capability-Enforcement (`permissions`), Request/Response-Helper (`api.request()`), Webhook-Minecraft-Semantik (Config-Gate). Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) kann Zustand jetzt per `api.request()` abfragen.
 
 **Verbleibende Roadmap (empfohlene Reihenfolge):**
 1. ~~J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle~~ **[✅ ERLEDIGT]**
 2. ~~E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context`~~ **[✅ ERLEDIGT]** (inkl. `HookContext`-Typ + Kommentar-Sonderfall aufgelöst)
 3. ~~J.2 Nr. 10 — Capability-Enforcement~~ **[✅ ERLEDIGT]** (`permissions`-Feld, API-Ebene; Prozess-Sandbox bleibt offen)
-4. J.2 Nr. 8 — Request/Response (pragmatisch: `api.request()`-Helper); E.7 als Quick-Win; danach J.3 nach Bedarf
+4. ~~J.2 Nr. 8 — Request/Response (`api.request()`-Helper) + E.7 (Webhook-Semantik)~~ **[✅ ERLEDIGT]**
+5. J.3 nach Bedarf (Nr. 11–14); E.7-Restthema „Prozess-Sandbox-Profile" nur bei Bedarf
