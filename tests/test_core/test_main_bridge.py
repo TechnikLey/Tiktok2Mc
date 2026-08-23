@@ -339,7 +339,21 @@ class TestCommentWorker:
         main_mod._comment_queue.join()
 
         assert seen.get("thread") not in (None, main_thread)
-        assert enqueued == [("comment", {"user": "tester", "comment": "!hi"})]
+        assert enqueued == [
+            (
+                "comment",
+                {"user": "tester", "comment": "!hi"},
+                0,
+                {
+                    "event": "comment",
+                    "source": "tiktok",
+                    "comment": "!hi",
+                    "is_moderator": False,
+                    "is_super_fan": False,
+                    "in_fanclub": False,
+                },
+            )
+        ]
 
 
 # =========================================================================
@@ -402,6 +416,8 @@ class TestHookActionOffload:
 
         assert len(calls) == 1
         assert calls[0][0] is fake_action
+        # Context stays empty when no source context was provided — no
+        # internal machinery (chain depth) leaks into the hook contract.
         assert calls[0][1] == ("viewer", "myaction", {})
 
 
@@ -517,6 +533,125 @@ class TestHookVeto:
         asyncio.run(execute_global_command("mytrigger", "viewer"))
 
         assert calls == ["after"]
+
+
+# =========================================================================
+# Structured hook context (E.5)
+# =========================================================================
+
+
+class TestHookContext:
+    """Structured context flows from the event source to hook actions."""
+
+    def _setup_trigger(self, monkeypatch, main_mod, actions):
+        from src.python.main import ctx
+
+        monkeypatch.setattr(ctx, "valid_functions", {"mytrigger"})
+        monkeypatch.setattr(ctx, "script_actions", {"mytrigger": list(actions)})
+        monkeypatch.setattr(ctx, "overlay_actions", {})
+        monkeypatch.setattr(ctx, "vanilla_functions", set())
+        monkeypatch.setattr(ctx, "rcon_only_actions", {})
+        monkeypatch.setattr(ctx, "shell_actions_cache", {})
+        monkeypatch.setattr(ctx, "hook_api", MagicMock())
+
+    def test_context_passed_to_hook_action(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import execute_global_command
+
+        received = {}
+
+        def capture(user, trigger, context):
+            received.update(context)
+
+        monkeypatch.setattr(main_mod, "HOOK_ACTIONS", {"act": capture})
+
+        async def fake_to_thread(fn, *args):
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        self._setup_trigger(monkeypatch, main_mod, ["act"])
+
+        context = main_mod._make_hook_context(
+            "gift", gift_name="Rose", gift_id="5", streak=10, combo=True
+        )
+        asyncio.run(execute_global_command("mytrigger", "viewer", 2, context))
+
+        # The context reaches hooks unchanged — no internal machinery
+        # (chain_depth) leaks into the event contract.
+        assert received == {
+            "event": "gift",
+            "source": "tiktok",
+            "gift_name": "Rose",
+            "gift_id": "5",
+            "streak": 10,
+            "combo": True,
+        }
+
+    def test_caller_context_not_mutated(self, monkeypatch):
+        """The shared context object must stay untouched across dispatches."""
+        import src.python.main as main_mod
+        from src.python.main import execute_global_command
+
+        monkeypatch.setattr(main_mod, "HOOK_ACTIONS", {"act": lambda *a: None})
+        self._setup_trigger(monkeypatch, main_mod, ["act"])
+
+        async def fake_to_thread(fn, *args):
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        context = main_mod._make_hook_context("join")
+        asyncio.run(execute_global_command("mytrigger", "viewer", 2, context))
+
+        assert context == {"event": "join", "source": "tiktok"}
+
+    def test_unpack_trigger_item_shapes(self):
+        import src.python.main as main_mod
+
+        assert main_mod._unpack_trigger_item(("t", "u")) == ("t", "u", 0, {})
+        assert main_mod._unpack_trigger_item(("t", "u", 1)) == ("t", "u", 1, {})
+        item4 = ("t", "u", 2, {"event": "gift"})
+        assert main_mod._unpack_trigger_item(item4) == item4
+        # non-dict context degrades to empty dict
+        assert main_mod._unpack_trigger_item(("t", "u", 2, None)) == ("t", "u", 2, {})
+
+    def test_make_hook_context_drops_none_values(self):
+        import src.python.main as main_mod
+
+        ctx_data = main_mod._make_hook_context("comment", comment=None, count=0)
+        assert ctx_data == {"event": "comment", "source": "tiktok", "count": 0}
+
+    @pytest.mark.asyncio
+    async def test_worker_delivers_4_tuple_context(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import ctx
+
+        received = {}
+
+        async def fake_execute(trigger, user, depth, context):
+            received.update(trigger=trigger, user=user, depth=depth, context=context)
+
+        monkeypatch.setattr(main_mod, "execute_global_command", fake_execute)
+        monkeypatch.setattr(main_mod, "get_crash_manager", lambda: MagicMock())
+        queue = asyncio.Queue()
+        await queue.put(("gift", "viewer", 0, {"event": "gift", "streak": 5}))
+        monkeypatch.setattr(ctx, "trigger_queue", queue)
+
+        worker = asyncio.create_task(main_mod.trigger_worker())
+        try:
+            await asyncio.wait_for(queue.join(), timeout=2)
+        finally:
+            worker.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await worker
+
+        assert received == {
+            "trigger": "gift",
+            "user": "viewer",
+            "depth": 0,
+            "context": {"event": "gift", "streak": 5},
+        }
 
 
 # =========================================================================
@@ -684,6 +819,17 @@ class TestEnqueueLikeTriggers:
         _enqueue_like_triggers(total, user)
         return calls
 
+    def _expected_like_item(self, function, payload, total, every, rule_id):
+        """Queue item expected for a like milestone trigger."""
+        context = {
+            "event": "like",
+            "source": "tiktok",
+            "total_since_start": total,
+            "milestone_every": every,
+            "milestone_rule": rule_id,
+        }
+        return (function, payload, 0, context)
+
     def test_likes_fires_once_per_milestone(self, monkeypatch):
         from src.python.main import ctx, prepare_like_triggers
 
@@ -697,7 +843,14 @@ class TestEnqueueLikeTriggers:
         monkeypatch.setattr(ctx, "valid_functions", {"likes"})
         monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
         calls = self._call(monkeypatch, 150, "viewer")  # 1 milestone crossed
-        assert calls == [(("likes", "Community"), "like:likes_standard")]
+        assert calls == [
+            (
+                self._expected_like_item(
+                    "likes", "Community", 150, 100, "likes_standard"
+                ),
+                "like:likes_standard",
+            )
+        ]
 
         calls = self._call(monkeypatch, 150, "viewer")
         assert calls == []  # same milestone: no duplicate
@@ -717,7 +870,14 @@ class TestEnqueueLikeTriggers:
         prepared[0]["last_blocks"] = 1
         monkeypatch.setattr(ctx, "like_triggers", prepared)
         calls = self._call(monkeypatch, 250, "viewer")  # milestone 2 > 1
-        assert calls == [(("likes", "Community"), "like:likes_standard")]
+        assert calls == [
+            (
+                self._expected_like_item(
+                    "likes", "Community", 250, 100, "likes_standard"
+                ),
+                "like:likes_standard",
+            )
+        ]
 
     def test_catches_up_when_multiple_milestones_crossed(self, monkeypatch):
         from src.python.main import ctx, prepare_like_triggers
@@ -732,11 +892,11 @@ class TestEnqueueLikeTriggers:
         monkeypatch.setattr(ctx, "valid_functions", {"likes"})
         monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
         calls = self._call(monkeypatch, 350, "viewer")  # milestones 1,2,3
-        assert calls == [
-            (("likes", "Community"), "like:likes_standard"),
-            (("likes", "Community"), "like:likes_standard"),
-            (("likes", "Community"), "like:likes_standard"),
-        ]
+        item = (
+            self._expected_like_item("likes", "Community", 350, 100, "likes_standard"),
+            "like:likes_standard",
+        )
+        assert calls == [item, item, item]
 
     def test_like_2_fires_once_at_mega(self, monkeypatch):
         from src.python.main import ctx, prepare_like_triggers
@@ -751,7 +911,14 @@ class TestEnqueueLikeTriggers:
         monkeypatch.setattr(ctx, "valid_functions", {"like_2"})
         monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
         calls = self._call(monkeypatch, 100_000, "viewer")
-        assert calls == [(("like_2", "Community"), "like:likes_100k")]
+        assert calls == [
+            (
+                self._expected_like_item(
+                    "like_2", "Community", 100_000, 100_000, "likes_100k"
+                ),
+                "like:likes_100k",
+            )
+        ]
 
         calls = self._call(monkeypatch, 150_000, "viewer")
         assert calls == []  # already fired

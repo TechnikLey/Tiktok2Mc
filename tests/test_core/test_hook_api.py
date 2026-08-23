@@ -107,6 +107,32 @@ class TestHookAPI:
         assert result[0] == "some_action"
         assert result[1] == "test_user"
         assert result[2] == 1
+        assert result[3] == {"source": "hook"}
+
+    def test_enqueue_trigger_with_context(self, api):
+        api.enqueue_trigger(
+            "combo_bonus",
+            user="viewer",
+            context={"event": "gift", "gift_name": "Rose", "streak": 5},
+        )
+        result = api._trigger_queue.get_nowait()
+        assert result[3] == {
+            "source": "hook",
+            "event": "gift",
+            "gift_name": "Rose",
+            "streak": 5,
+        }
+
+    def test_enqueue_trigger_context_bound_hook_name(self, api):
+        clone = api.for_hook("my_hook")
+        clone.enqueue_trigger("chained")
+        result = api._trigger_queue.get_nowait()
+        assert result[3] == {"source": "hook", "hook": "my_hook"}
+
+    def test_enqueue_trigger_context_source_not_overwritten(self, api):
+        api.enqueue_trigger("chained", context={"source": "tiktok"})
+        result = api._trigger_queue.get_nowait()
+        assert result[3] == {"source": "tiktok"}
 
     def test_enqueue_trigger_depth_check(self, api):
         api.set_depth(3)

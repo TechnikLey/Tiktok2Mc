@@ -321,6 +321,43 @@ def enqueue_threadsafe(
         return False
 
 
+def _make_hook_context(event: str, source: str = "tiktok", **extra) -> dict:
+    """Build the structured hook-action context for a queued trigger.
+
+    Hook handlers receive this dict as their third argument
+    (``fn(user, trigger, context)``). ``event`` is the trigger family
+    ("gift", "follow", "like", "comment", "join", "share"), ``source``
+    where the trigger originated ("tiktok", "webhook", "hook"). Extra
+    keyword arguments are event-specific payload fields; ``None`` values
+    are dropped so hooks can rely on present keys being meaningful.
+    """
+    data: dict = {"event": event, "source": source}
+    for key, value in extra.items():
+        if value is not None:
+            data[key] = value
+    return data
+
+
+def _unpack_trigger_item(item: tuple) -> tuple[str, str | dict, int, dict]:
+    """Normalize a trigger-queue item to ``(trigger, user, depth, context)``.
+
+    Supports legacy 2-tuples ``(trigger, user)`` and 3-tuples
+    ``(trigger, user, depth)`` alongside the current 4-tuple form with a
+    structured hook context.
+    """
+    if len(item) == 4:
+        trigger, source_user, chain_depth, context = item
+        return (
+            trigger,
+            source_user,
+            chain_depth,
+            context if isinstance(context, dict) else {},
+        )
+    if len(item) == 3:
+        return item[0], item[1], item[2], {}
+    return item[0], item[1], 0, {}
+
+
 def _validate_dup_cmd_config():
     """Validate raw YAML for duplicate keys in commands_config sections.
 
@@ -891,9 +928,18 @@ async def rcon_worker():
 
 
 async def execute_global_command(
-    trigger_name: str, source_user: str | dict, chain_depth: int = 0
+    trigger_name: str,
+    source_user: str | dict,
+    chain_depth: int = 0,
+    context: dict | None = None,
 ):
-    """Resolves a trigger name into RCON commands and enqueues them."""
+    """Resolves a trigger name into RCON commands and enqueues them.
+
+    ``context`` is the structured hook context built by the event source
+    (see :func:`_make_hook_context`). It is passed unchanged to every hook
+    action of the chain as the third handler argument. ``chain_depth``
+    stays internal queue/loop-guard machinery and is not exposed to hooks.
+    """
     name = sanitize_filename(trigger_name)
 
     if name not in ctx.valid_functions:
@@ -905,6 +951,12 @@ async def execute_global_command(
     else:
         comment_text = None
         user_display = source_user
+
+    # Structured context for hook actions. Always a fresh dict — the caller's
+    # context object may be shared across several queued copies of this
+    # trigger (e.g. combo gifts enqueue one item per gift) and must never be
+    # mutated during dispatch.
+    hook_context = dict(context) if isinstance(context, dict) else {}
 
     commands_to_send = []
 
@@ -918,7 +970,7 @@ async def execute_global_command(
                     # I/O); run them on the executor so script triggers never
                     # stall the main loop.
                     result = await asyncio.to_thread(
-                        HOOK_ACTIONS[action], source_user, action, {}
+                        HOOK_ACTIONS[action], source_user, action, hook_context
                     )
                     # Veto contract: a hook returning False aborts the rest of
                     # this trigger's chain — later hooks, overlays, vanilla,
@@ -1018,13 +1070,11 @@ async def trigger_worker():
     while True:
         try:
             item = await ctx.trigger_queue.get()
-            if len(item) == 3:
-                trigger, source_user, chain_depth = item
-            else:
-                trigger, source_user = item
-                chain_depth = 0
+            trigger, source_user, chain_depth, hook_context = _unpack_trigger_item(item)
             try:
-                await execute_global_command(trigger, source_user, chain_depth)
+                await execute_global_command(
+                    trigger, source_user, chain_depth, hook_context
+                )
             except Exception as e:  # a failing trigger must not kill the worker
                 log.error(
                     f"[TRIGGER WORKER ERROR] Error processing {trigger}/{source_user}: {e}"
@@ -1338,7 +1388,7 @@ def _touch_runtime_shutdown():
         log.warning(f"[LIVE] Could not write shutdown signal: {e}")
 
 
-def _process_follow(username: str, persist: bool = True):
+def _process_follow(username: str, persist: bool = True, context: dict | None = None):
     """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user."""
     user_lower = username.lower()
     with ctx.follow_lock:
@@ -1351,7 +1401,13 @@ def _process_follow(username: str, persist: bool = True):
         # above, so an async write can never produce a duplicate trigger.
         _run_in_background(_append_follow_tracking, user_lower)
     if "follow" in ctx.valid_functions:
-        enqueue_threadsafe(("follow", username), label="follow")
+        hook_context = (
+            context if isinstance(context, dict) else _make_hook_context("follow")
+        )
+        enqueue_threadsafe(
+            ("follow", username, 0, hook_context),
+            label="follow",
+        )
 
 
 def validate_like_triggers(raw_triggers: object) -> list[dict]:
@@ -1481,7 +1537,17 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
                 )
                 for _ in range(diff):
                     enqueue_threadsafe(
-                        (rule["function"], rule["payload"]),
+                        (
+                            rule["function"],
+                            rule["payload"],
+                            0,
+                            _make_hook_context(
+                                "like",
+                                total_since_start=total_since_start,
+                                milestone_every=every,
+                                milestone_rule=rule["id"],
+                            ),
+                        ),
                         label=f"like:{rule['id']}",
                     )
 
@@ -1797,7 +1863,18 @@ def _handle_comment_event(
 
     if "comment" in ctx.valid_functions and not suppress_comment_trigger:
         enqueue_threadsafe(
-            ("comment", {"user": username, "comment": comment_text}),
+            (
+                "comment",
+                {"user": username, "comment": comment_text},
+                0,
+                _make_hook_context(
+                    "comment",
+                    comment=comment_text,
+                    is_moderator=is_moderator,
+                    is_super_fan=is_super_fan,
+                    in_fanclub=in_fanclub,
+                ),
+            ),
             label="comment",
         )
 
@@ -1919,7 +1996,11 @@ def handle_custom_trigger():
         # Route 'follow' through the shared dedup logic so custom_trigger respects _followed_cache
         # persist=False damit Test-User nicht in followed_users.txt landen
         if sanitized == "follow":
-            _process_follow(user, persist=False)
+            _process_follow(
+                user,
+                persist=False,
+                context=_make_hook_context("follow", source="webhook"),
+            )
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         if ctx.main_loop is None:
@@ -1933,7 +2014,10 @@ def handle_custom_trigger():
                     "status": "error",
                     "message": "Trigger queue is full. Try again later.",
                 }, 503
-            enqueue_threadsafe((sanitized, user), label=f"custom_trigger:{sanitized}")
+            enqueue_threadsafe(
+                (sanitized, user, 0, _make_hook_context(sanitized, source="webhook")),
+                label=f"custom_trigger:{sanitized}",
+            )
             log.info(f"[CUSTOM TRIGGER] Injected: '{sanitized}' (user: {user})")
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
@@ -2077,8 +2161,17 @@ def create_client(user):
             if not target:
                 return
 
+            gift_context = _make_hook_context(
+                "gift",
+                gift_name=gift_name,
+                gift_id=gift_id,
+                streak=count,
+                combo=bool(getattr(event.gift, "combo", False)),
+            )
             for _ in range(count):
-                enqueue_threadsafe((target, username), label=f"gift:{target}")
+                enqueue_threadsafe(
+                    (target, username, 0, gift_context), label=f"gift:{target}"
+                )
 
         except Exception as exc:  # TikTok event handler must not crash the client
             log.exception("ERROR IN ON_GIFT EVENT")
@@ -2136,7 +2229,9 @@ def create_client(user):
         ctx.session_joins += 1
         _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
-            enqueue_threadsafe(("join", username), label="join")
+            enqueue_threadsafe(
+                ("join", username, 0, _make_hook_context("join")), label="join"
+            )
 
     # =========================
     # COMMENT events
@@ -2186,7 +2281,9 @@ def create_client(user):
         ctx.session_shares += 1
         _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
-            enqueue_threadsafe(("share", username), label="share")
+            enqueue_threadsafe(
+                ("share", username, 0, _make_hook_context("share")), label="share"
+            )
 
     # =========================
     # Live end events

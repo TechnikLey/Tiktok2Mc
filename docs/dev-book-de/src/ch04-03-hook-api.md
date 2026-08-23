@@ -8,7 +8,7 @@ Alle Methoden, die dein Hook über das `api`-Objekt in der `register()`-Funktion
 |---------|--------------|
 | `register_action(name, fn)` | Handler für `$`-Befehle registrieren |
 | `rcon_enqueue(commands)` | Minecraft-Befehle ausführen |
-| `enqueue_trigger(action_name, user="hook")` | anderen Trigger auslösen (verkettet) |
+| `enqueue_trigger(action_name, user="hook", context=None)` | anderen Trigger auslösen (verkettet) |
 | `get_hook_config(name)` | Per-Hook-Konfiguration lesen |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Overlay-Text anzeigen |
 | `store_get(key, default=None)` | Aus dem persistenten Store dieses Hooks lesen |
@@ -27,7 +27,7 @@ api.register_action("superjump", mein_handler)
 ```
 
 - **name**: Muss mit dem Namen nach `$` in der `actions.mca` übereinstimmen
-- **fn**: `(user: str, trigger: str, context: dict) -> bool | None`
+- **fn**: `(user: str | dict, trigger: str, context: dict) -> bool | None`
 - Doppelte Registrierung wird ignoriert (erster Aufruf gewinnt)
 
 ```python
@@ -74,6 +74,57 @@ In der `data/actions.mca` steht das Gate an erster Stelle, damit es vor allem an
 gift:$gate;$say_thanks
 ```
 
+## Handler-Kontext — strukturierte Ereignisdaten
+
+Das dritte Handler-Argument ist ein **strukturiertes Kontext-Dict**, das das
+Ereignis beschreibt, mit dem die Kette gestartet wurde. Es wird von der
+Ereignisquelle gebaut und enthält mindestens:
+
+| Schlüssel | Typ | Bedeutung |
+|-----|------|---------|
+| `event` | `str` | Trigger-Familie: `"gift"`, `"follow"`, `"like"`, `"comment"`, `"join"`, `"share"` bzw. der Trigger-Name bei Webhook-/Hook-Quellen |
+| `source` | `str` | Herkunft des Triggers: `"tiktok"`, `"webhook"` (custom_trigger/Test/API-Dispatch) oder `"hook"` |
+
+Ereignisspezifische Schlüssel kommen hinzu:
+
+| Ereignis | Zusätzliche Schlüssel |
+|-------|------------|
+| `gift` | `gift_name`, `gift_id`, `streak` (Combo-Länge; `1` bei Nicht-Combo-Gifts), `combo` |
+| `comment` | `comment`, `is_moderator`, `is_super_fan`, `in_fanclub` |
+| `like` | `total_since_start`, `milestone_every`, `milestone_rule` |
+| Hook-verkettet (`enqueue_trigger`) | `hook` (Name deines Hooks) plus alles, was du per `context=` übergibst |
+
+Schlüssel sind nur vorhanden, wenn sie bedeutungsvoll sind (z. B. fehlt
+`combo` bei Nicht-Gift-Events) — lies sie daher mit `context.get(...)`
+und Defaults. Interne Mechanik wie die Verkettungstiefe ist bewusst
+**nicht** Teil des Kontexts — er beschreibt das Ereignis, nicht den Dispatcher.
+
+### Beispiel: Gift-Combo-Bonus
+
+Da der Kontext die fertige Streak-Länge enthält, ist ein Combo-Bonus nur
+noch ein einfacher Schwellwert-Check — Combo-Gifts feuern einmal beim
+Ende der Streak, mit `streak` als Gesamtzahl der Gifts:
+
+```python
+def register(api: HookAPI):
+    def combo_bonus(user, trigger, context):
+        if context.get("event") != "gift":
+            return
+        if context.get("gift_name") == "Rose" and context.get("streak", 0) >= 10:
+            api.rcon_enqueue([f"say {user} hat eine {context['streak']}x Rosen-Combo geschickt!"])
+            api.enqueue_trigger(
+                "mega_celebration", user,
+                context={"event": "gift", "gift_name": "Rose",
+                         "streak": context["streak"]},
+            )
+
+    api.register_action("combo_check", combo_bonus)
+```
+
+```mca
+gift:$combo_check;$say_thanks
+```
+
 ## rcon_enqueue(commands)
 
 Fügt eine Liste von Minecraft-Befehlen in die RCON-Warteschlange ein.
@@ -89,7 +140,7 @@ api.rcon_enqueue([
 - Die Queue ist asynchron: Die Funktion blockiert nicht
 - Bei voller Queue werden Befehle stillschweigend verworfen
 
-## enqueue_trigger(action_name, user="hook")
+## enqueue_trigger(action_name, user="hook", context=None)
 
 Löst einen anderen Action-Namen aus (verkettete Trigger).
 
@@ -100,6 +151,9 @@ api.enqueue_trigger("explosion", user)
 - Ruft `execute_global_command(action_name, user)` auf
 - **Maximale Verkettungstiefe**: 3 (danach wird der Trigger gesperrt)
 - Bei Überschreitung wird der Action-Name **dauerhaft für die Session** blockiert
+- **context**: optionales Dict, das an die Hook-Actions der neuen Kette
+  weitergereicht wird (siehe [Handler-Kontext](#handler-kontext--strukturierte-ereignisdaten)).
+  Ohne Angabe startet die neue Kette mit `{"source": "hook", "hook": <name>}`.
 
 ### Beispiel: Verkettung
 

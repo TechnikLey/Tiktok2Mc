@@ -183,7 +183,16 @@ class HookAPI:
             self._rcon_queue, (commands, "hook"), f"rcon:{commands!r}"
         )
 
-    def enqueue_trigger(self, action_name: str, user: str = "hook") -> None:
+    def enqueue_trigger(
+        self, action_name: str, user: str = "hook", context: dict | None = None
+    ) -> None:
+        """Enqueue another trigger chain.
+
+        ``context`` optionally carries structured event data (see the hook
+        context contract in the dev book) that the target chain's hook
+        actions receive as their third handler argument. When omitted, the
+        new chain starts with a fresh ``{"source": "hook"}`` context.
+        """
         if action_name in self._banned_triggers:
             log.error(
                 f"[HOOK] enqueue_trigger('{action_name}') permanently blocked "
@@ -200,8 +209,14 @@ class HookAPI:
                 f"Possible infinite loop."
             )
             return
+        ctx_data = dict(context) if isinstance(context, dict) else {}
+        ctx_data.setdefault("source", "hook")
+        if self._name:
+            ctx_data.setdefault("hook", self._name)
         self._enqueue_threadsafe(
-            self._trigger_queue, (action_name, user, depth), f"trigger:{action_name}"
+            self._trigger_queue,
+            (action_name, user, depth, ctx_data),
+            f"trigger:{action_name}",
         )
 
     def log(self, msg: str) -> None:

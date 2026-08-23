@@ -8,7 +8,7 @@ All methods your hook can use via the `api` object in the `register()` function.
 |---------|--------------|
 | `register_action(name, fn)` | Register handler for `$` commands |
 | `rcon_enqueue(commands)` | Execute Minecraft commands |
-| `enqueue_trigger(action_name, user="hook")` | Trigger another action (chained) |
+| `enqueue_trigger(action_name, user="hook", context=None)` | Trigger another action (chained) |
 | `get_hook_config(name)` | Read per-hook configuration |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Display overlay text |
 | `store_get(key, default=None)` | Read from this hook's persistent store |
@@ -27,7 +27,7 @@ api.register_action("superjump", my_handler)
 ```
 
 - **name**: Must match the name after `$` in `actions.mca`
-- **fn**: `(user: str, trigger: str, context: dict) -> bool | None`
+- **fn**: `(user: str | dict, trigger: str, context: dict) -> bool | None`
 - Duplicate registration is ignored (first call wins)
 
 ```python
@@ -74,6 +74,57 @@ In `data/actions.mca`, put the gate first so it runs before everything else:
 gift:$gate;$say_thanks
 ```
 
+## Handler Context — Structured Event Data
+
+The third handler argument is a **structured context dict** describing the
+event that started the chain. It is built by the event source and always
+contains at least:
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `event` | `str` | Trigger family: `"gift"`, `"follow"`, `"like"`, `"comment"`, `"join"`, `"share"` or the trigger name for webhook/hook sources |
+| `source` | `str` | Where the trigger came from: `"tiktok"`, `"webhook"` (custom_trigger/test/API dispatch) or `"hook"` |
+
+Event-specific keys are added on top:
+
+| Event | Extra keys |
+|-------|------------|
+| `gift` | `gift_name`, `gift_id`, `streak` (combo length; `1` for non-combo gifts), `combo` |
+| `comment` | `comment`, `is_moderator`, `is_super_fan`, `in_fanclub` |
+| `like` | `total_since_start`, `milestone_every`, `milestone_rule` |
+| hook-enqueued (`enqueue_trigger`) | `hook` (your hook's name), plus whatever you pass via `context=` |
+
+Keys are only present when meaningful (e.g. `combo` is absent for
+non-gift events), so use `context.get(...)` with defaults. Internal
+machinery such as the trigger chain depth is deliberately **not** part of
+the context — it describes the event, not the dispatcher.
+
+### Example: Gift Combo Bonus
+
+Because the context carries the finished streak length, a combo bonus is
+a simple threshold check — combo gifts fire once when the streak ends,
+with `streak` holding the total number of gifts:
+
+```python
+def register(api: HookAPI):
+    def combo_bonus(user, trigger, context):
+        if context.get("event") != "gift":
+            return
+        if context.get("gift_name") == "Rose" and context.get("streak", 0) >= 10:
+            api.rcon_enqueue([f"say {user} sent a {context['streak']}x Rose combo!"])
+            api.enqueue_trigger(
+                "mega_celebration", user,
+                context={"event": "gift", "gift_name": "Rose",
+                         "streak": context["streak"]},
+            )
+
+    api.register_action("combo_check", combo_bonus)
+```
+
+```mca
+gift:$combo_check;$say_thanks
+```
+
 ## rcon_enqueue(commands)
 
 Adds a list of Minecraft commands to the RCON queue.
@@ -89,7 +140,7 @@ api.rcon_enqueue([
 - The queue is asynchronous: the function does not block
 - If the queue is full, commands are dropped and a `[HOOK] ... queue full` warning is logged
 
-## enqueue_trigger(action_name, user="hook")
+## enqueue_trigger(action_name, user="hook", context=None)
 
 Triggers another action name (chained triggers).
 
@@ -100,6 +151,9 @@ api.enqueue_trigger("explosion", user)
 - Calls `execute_global_command(action_name, user)`
 - **Maximum chain depth**: 3 (after which the trigger is locked)
 - If exceeded, the action name is **permanently blocked for the session**
+- **context**: optional dict forwarded to the new chain's hook actions
+  (see [Handler Context](#handler-context--structured-event-data)). When
+  omitted, the new chain starts with `{"source": "hook", "hook": <name>}`.
 
 ### Example: Chaining
 

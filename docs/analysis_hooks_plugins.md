@@ -14,8 +14,9 @@
 > | `54fdb78` | **Veto-Vertrag** für Hook-Actions (`False` = Restkette abbrechen) + Integrationstest echte Zustellung | E.6, J.1 #3 |
 > | `8ea4109` | **`POST /api/v1/triggers/dispatch`** — programmatische Trigger ohne GUI-Debounce | Grundlage I.2 |
 > | `022fe7a` | **Namespaced Persistenz-API** (`data/plugin_data/<name>.json` + REST + `BasePlugin.store_*`) | Grundlage I.3 |
+> | *(aktuell)* | **Strukturierter Hook-Kontext**: Event-Quellen bauen `_make_hook_context(...)` (gift/follow/like/comment/join/share/webhook/hook), Trigger-Queue trägt 4-Tupel mit Context, `execute_global_command(context)` reicht ihn an Hook-Actions weiter (+ `chain_depth`); `enqueue_trigger(context=...)` propagiert Daten in Folgetriggers | E.5 / J.2 Nr. 4 (Kontext-Teil): unlockt H.3 (Gift-Combos), Rollenfilter für H.2 |
 >
-> Weiterhin offen: E.5/E.7/E.8, J.2 Nr. 6/8/10, alle J.3-Punkte.
+> Weiterhin offen: E.7/E.8, J.2 Nr. 8/10, alle J.3-Punkte.
 
 ---
 
@@ -41,7 +42,7 @@ Zentrale Konsequenz dieses Designs: `event_bus` und `command_queue` (`core.api.e
 - Discovery über `src/hooks/*/hook.json` sowie mit Plugins gebündelte Hooks; AST-Statische Prüfung der Imports (`core.hook_loader.ALLOWED_IMPORTS`): **nur** `time`, `random`, `logging`, `json`, `urllib`, `requests` plus `core.hook_api` / `core.plugin_config`.
 - Ein Hook implementiert `register(api: HookAPI)` und registriert benannte Actions: `api.register_action(name, fn)`. Diese landen im globalen Dict `HOOK_ACTIONS` (erstes Registrieren gewinnt, kein Unregister).
 - Ausführung: Eine Zeile `trigger:$mein_hook` in `data/actions.mca` ruft die Action synchron (via `asyncio.to_thread`) während des Trigger-Dispatch auf.
-- Handler-Signatur: `(user, trigger, context)` — **`context` wird von `main.py` immer als leeres `{}` übergeben.** Strukturierte Ereignisdaten (Giftname, Anzahl, Combo-Flags, Rollen) sind nicht verfügbar. Einzige Ausnahme: Beim Kommentar-Trigger ist `user` ein Dict `{user, comment}` — der Kommentartext ist also indirekt erreichbar.
+- Handler-Signatur: `(user, trigger, context)` — **[✅ ERLEDIGT: strukturierter `context`]** Die Event-Quellen (Gift/Follow/Like/Kommentar/Join/Share/Webhook) bauen einen strukturierten Kontext (`event`, `source`, `chain_depth` + ereignisspezifische Keys wie `gift_name`/`count`/`combo`, `comment`/Rollen-Flags, Like-Milestone-Daten), der an jede Hook-Action als drittes Argument übergeben wird; Details in Dev-Book ch04-03. Beim Kommentar-Trigger ist zusätzlich `user` ein Dict `{user, comment}` — der Kommentartext ist also auch indirekt erreichbar.
 - Verfügbare Fähigkeiten via `HookAPI`: `rcon_enqueue`, `enqueue_trigger` (max. Ketten­tiefe 3, Banliste für `tiktok`/`connect`/`disconnect`), `send_overlay_text` (HTTP), `log`, Config-Kopie (`get_hook_config`, `config`), `get_valid_functions`.
 
 ### B.2 Stärken
@@ -59,7 +60,7 @@ Zentrale Konsequenz dieses Designs: `event_bus` und `command_queue` (`core.api.e
 6. ~~**Keine Zustands-/Persistenzdienste**~~ **[✅ ERLEDIGT — `022fe7a`]** Hooks nutzen die namespaced Persistenz-API per HTTP (`urllib`/`requests` aus der Whitelist): eigener Namespace unter `data/plugin_data/<hook-name>.json`, dokumentiert in Dev-Book ch04-03.
 7. **Kein Publish:** Ein Hook kann nichts auf den EventBus legen; Kommunikation mit Plugins wäre nur über den undokumentierten Direktaufruf der REST-API per `requests` möglich. *(unverändert)*
 
-**Fazit Hook-System:** Als schneller, einfacher Aktions-Erweiterungspunkt gut gelungen; als *Ereignis*-Erweiterungsebene ungeeignet (keine Events, kein Kontext) — **Veto existiert inzwischen**, wodurch Aktion-Gates und Moderationsfilter realistisch geworden sind. Die Doku positioniert Hooks korrekt als „Aktionen statt Reaktionen".
+**Fazit Hook-System:** Als schneller, einfacher Aktions-Erweiterungspunkt gut gelungen; als *Ereignis*-Erweiterungsebene ungeeignet (kein `subscribe`) — **Veto und strukturierter Kontext existieren inzwischen**, wodurch Aktion-Gates, Moderationsfilter und datengetriebene Hooks (Combos, Milestones) realistisch geworden sind. Die Doku positioniert Hooks korrekt als „Aktionen statt Reaktionen".
 
 ---
 
@@ -152,8 +153,8 @@ Belegstellen (aktuell): `_publish_tiktok_event` (`main.py`) forwarded per HTTP v
 | E.2 | **Echte `tiktok.*`-Events erreichen den API-Bus nie.** Nur Test-Trigger erscheinen dort (direkter Publish in `routes/triggers.py`). | grep `publish` in `main.py` vs. `routes/triggers.py` L55–57/85/116 | ECM-Mappings für `tiktok.comment` etc. feuern bei **Testkommentaren, aber nie bei echten** — tückische Inkonsistenz; GUI-Livefeed/TikTokLiveTracker sehen Realverkehr nicht | **[✅ ERLEDIGT `f409595`]** echte Events landen auf dem Bus (`source: "bridge"`) |
 | E.3 | **`comment_handler` dokumentiert, nicht implementiert.** | Dev-Book ch03-05/ch03-02 vs. grep in `src/**.py`: 0 Treffer | Doku verspricht Feature, das es nicht gibt | **[✅ ERLEDIGT `f409595`]** implementiert (`CommentHandlerConfig`, Prefix-Strip, Default `$`) |
 | E.4 | Kein shipped Plugin nutzt `event_subscriptions`; keine Tests zu `_event_bridge_worker`. | grep in `src/plugins`, `tests` | Defekt blieb unbemerkt | **[✅ ERLEDIGT `54fdb78`]** Integrationstest + Unit-Tests für die Zustellung (`test_plugin_event_bridge.py`) |
-| E.5 | **Hook-Kontext immer `{}`**, keine strukturierten Ereignisdaten. | `main.py` (`execute_global_command(..., {})`) | Hooks können nicht datengetrieben arbeiten | offen (J.2 Nr. 4, Kontext-Teil) |
-| E.6 | **Kein Veto-/Rückgabevertrag** für Hook-Actions. | `hook_api.execute_global_command` ignoriert Rückgaben | Filter/Moderation als Hook unmöglich | **[✅ ERLEDIGT `54fdb78`]** Veto-Vertrag: `False` = Restkette abbrechen; Kontext-Teil weiterhin offen |
+| E.5 | **Hook-Kontext immer `{}`**, keine strukturierten Ereignisdaten. | `main.py` (`execute_global_command(..., {})`) | Hooks können nicht datengetrieben arbeiten | **[✅ ERLEDIGT]** `_make_hook_context` an allen Event-Quellen, 4-Tupel in der Trigger-Queue, Kontext inkl. `chain_depth` an Hook-Actions; `enqueue_trigger(context=...)` für Verkettung |
+| E.6 | **Kein Veto-/Rückgabevertrag** für Hook-Actions. | `hook_api.execute_global_command` ignoriert Rückgaben | Filter/Moderation als Hook unmöglich | **[✅ ERLEDIGT `54fdb78`]** Veto-Vertrag: `False` = Restkette abbrechen; Kontext-Teil durch den strukturierten Context ebenfalls erledigt |
 | E.7 | Minecraft-Semantik im generischen Webhook: `player_death`/`player_respawn` pausieren die MC-Queue **unabhängig von der Quelle**. | Bridge `/webhook`-Handler | Fremdspiel, das gleichnamige Events sendet, verfälscht das Verhalten | offen |
 | E.8 | `capabilities` werden nicht erzwungen; Sandbox default aus; Hooks dürfen `requests`. | `sandbox.py`, `hook_loader.py` | Isolation ist deklarativ, nicht wirksam | offen (J.2 Nr. 10) |
 
@@ -218,16 +219,17 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 ### H.2 Schimpfwort-Moderator für Kommentarzeilen
 - **Idee:** `$profanity_check` vor Kommentar-Reaktionen; soll unangebrachte Kommentare von allen Folgeaktionen ausschließen.
 - **Technik:** Text erreichbar (H-Kontext-Exception bei `comment:`-Triggern, `user["comment"]`), Regex-Listen in hook.json-Config ladbar.
-- ~~**Blocker:** Veto-Vertrag fehlte~~ **[GELÖST `54fdb78`]**; strukturierte Rollen-Flags im Kontext fehlen weiterhin (E.5).
+- ~~**Blocker:** Veto-Vertrag fehlte~~ **[GELÖST `54fdb78`]**; ~~strukturierte Rollen-Flags im Kontext fehlen~~ **[GELÖST: strukturierter Kontext liefert `is_moderator`/`is_super_fan`/`in_fanclub`]**.
 - **Original-Urteil:** „Nur mit strukturellen Änderungen" (Veto + Kommentar-Datenvertrag).
-- **[AKTUALISIERT] Urteil: „Ja, mit Einschränkungen"** — Veto funktioniert, Kommentartext ist erreichbar; wer Rollenfilter braucht, wartet auf den strukturierten Kontext (J.2 Nr. 4, Kontext-Teil).
+- **[AKTUALISIERT] Urteil: „Ja"** — Veto funktioniert, Kommentartext und Rollen-Flags liegen strukturiert im Kontext (`comment`, `is_moderator`, `is_super_fan`, `in_fanclub`).
 
 ### H.3 Gift-Combo-Detektor (Milestone-in-Fenster)
 - **Idee:** Erkennt „X gleiche Gifts in Y Sekunden durch Nutzer Z" und stößt Bonus-Trigger an.
-- **Technik:** Zeitfenster-Logik ideal für in-process Hook; Auslösen per `enqueue_trigger` vorhanden.
-- **Blocker:** Hook sieht **keine** Giftmetadaten (Name, Anzahl, `repeat_end`-Flag) — `context={}`, `user`=String (E.5). Kombos sind ohne Eingabedaten nicht erkennbar.
-- **Urteil: „Aktuell nicht sinnvoll möglich"** als Hook; nach Einführung eines strukturierten Action-Kontexts: „Ja".
-- **Lehrstück:** zeigt exemplarisch, dass dem Hook-System der **Datenvertrag** fehlt, nicht die Rechenlogik.
+- **Technik:** Zeitfenster-Logik ideal für in-process Hook; Auslösen per `enqueue_trigger` vorhanden; Beispiel in Dev-Book ch04-03 (EN+DE).
+- ~~**Blocker:** Hook sieht **keine** Giftmetadaten (Name, Anzahl, Combo-Flag) — `context={}`~~ **[GELÖST: strukturierter Kontext]** — `context` enthält jetzt `event: "gift"`, `gift_name`, `gift_id`, `streak` (Combo-Länge), `combo`; Bonus-Ketten können ihre eigenen Daten per `enqueue_trigger(context=...)` mitnehmen.
+- **Original-Urteil:** „Aktuell nicht sinnvoll möglich"; nach Einführung eines strukturierten Action-Kontexts: „Ja".
+- **[AKTUALISIERT] Urteil: „Ja"** — alle benötigten Eingabedaten liegen im Kontext.
+- **Lehrstück:** zeigt exemplarisch, dass dem Hook-System der **Datenvertrag** fehlte, nicht die Rechenlogik.
 
 ---
 
@@ -262,7 +264,7 @@ Original-Urteil war **„Nur mit strukturellen Änderungen"** — der fehlende K
 3. ~~**Tests für die Ereigniszustellung**~~ **[✅ `54fdb78`]** Integrationstest (echter EventBus → Bridge-Loop → echte CommandQueue) + Unit-Tests in `tests/test_core/test_plugin_event_bridge.py`.
 
 ### J.2 Sinnvoll (hoher Nutzen für mehrere Ideen)
-4. ~~**Veto-/Rückgabevertrag für Hook-Actions**~~ — **[TEILWEISE ✅]** Veto-Vertrag erledigt (`54fdb78`: `False` = Restkette abbrechen); **strukturierter `context` statt `{}` weiterhin offen** (E.5).
+4. ~~**Veto-/Rückgabevertrag für Hook-Actions**~~ — **[✅ ERLEDIGT]** Veto-Vertrag (`54fdb78`: `False` = Restkette abbrechen) **plus strukturierter `context` statt `{}`**: Event-Quellen bauen `_make_hook_context(...)` (gift/follow/like/comment/join/share, `source: tiktok|webhook|hook`), die Trigger-Queue trägt 4-Tupel `(trigger, user, depth, context)`, `execute_global_command` reichert ihn mit `chain_depth` an und übergibt ihn an jede Hook-Action; `HookAPI.enqueue_trigger(context=...)` propagiert Daten in Folgetriggers. Unlockt H.3 endgültig + Rollenfilter für H.2.
 5. **Hook-Runtime-Reload/Lifecycle:** Enable/Disable ohne Bridge-Restart (Reload-Signal-Mechanik erweitern); `on_live_start/end`-Callbacks. **[✅ ERLEDIGT (Commits: HookAPI Lifecycle + Reload + Bridge Watcher + API Endpoints)]**
 6. ~~**Generischer Outbound-Kanal**~~ — **[✅ `4aa4711`]** `OutboundDispatcher` im API-Prozess: EventBus → konfigurierbare HTTP-Channels (`outbound:` in config.yaml; Formate `raw`/`discord`, Event-Patterns wie `event_subscriptions`), Retry + Circuit-Breaker pro Channel (`OverlayClient` wiederverwendet), Health-Lifecycle; REST `GET /outbound/channels` (URLs maskiert) + `POST /outbound/channels/{name}/test` (reine Probe); dokumentiert in ch03-04 (EN+DE). Grundlage G.3/I.1 geschaffen.
 7. ~~**Trigger-Zugriff für Erweiterungen**~~ — **[✅ `8ea4109`]** `POST /api/v1/triggers/dispatch`: kein Debounce, definierter Payload (`trigger`/`user`/`gift_id`/`gift_name`), History-Aufzeichnung; dokumentiert in ch03-04 (EN+DE). Grundlage I.2 geschaffen.
@@ -284,14 +286,14 @@ Die Zwei-Ebenen-Architektur ist im Kern **richtig und durchdacht**: Hooks für s
 
 Was die versprochene Flexibilität ursprünglich **ausbremste**, waren keine Designfehler, sondern:
 1. **Zwei Zustellungsdefekte** (E.1/E.2), die die dokumentierte Ereignisfähigkeit faktisch abschalteten — mit einem Fix adressierbar;
-2. **fehlende Verträge** (Veto, Kontext, Request/Response, Persistenz, Outbound), die jede ernsthaftere Idee in DIY-Treibhausarbeit trieben (F, G, H, I belegen das einzeln);
+2. **fehlende Verträge** (Veto ~~und Kontext~~ ✅, Request/Response; Persistenz/Outbound ✅), die jede ernsthaftere Idee in DIY-Treibhausarbeit trieben (F, G, H, I belegen das einzeln);
 3. **Doku-/Code-Drift** (`comment_handler`, tote Pfade), die Vertrauen in die Erweiterungsversprechen untergräbt.
 
 ### Umsetzungsstand (August 2026)
 
-**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord). Die Ideen F (TTS), H.1/H.2 (Gates/Moderation), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
+**Erledigt:** alle J.1-Pflicht-Fixes (Event-Zustellung, `comment_handler`, Integrationstest), Veto-Vertrag, strukturierter Hook-Kontext, Trigger-Dispatch-Endpoint, namespaced Persistenz-API, generischer Outbound-Kanal (Webhooks/Discord), Hook-Runtime-Reload/Lifecycle. Die Ideen F (TTS), H.1–H.3 (Gates/Moderation/Combos), I.1 (Notifier via Outbound) und I.2 (Scheduler) sind damit **praktisch umsetzbar**; I.3 (Leaderboard) fehlt nur noch ein Query/UI-Punkt.
 
 **Verbleibende Roadmap (empfohlene Reihenfolge):**
-1. J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle **[✅ ERLEDIGT]**
-2. E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context` (unlockt H.3/Gift-Combos endgültig)
+1. ~~J.2 Nr. 5 — Hook-Runtime-Reload/Lifecycle~~ **[✅ ERLEDIGT]**
+2. ~~E.5/J.2 Nr. 4-Rest — strukturierter Hook-`context`~~ **[✅ ERLEDIGT]**
 3. J.2 Nr. 8/10 — Request/Response + Capability-Enforcement; danach J.3 nach Bedarf
