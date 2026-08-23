@@ -198,6 +198,12 @@ self.api_post("/events", {
 
 Namenskonvention: `plugin-name.ereignis` (Namespace mit Punkt).
 
+> [!IMPORTANT]
+> Die Kern-Event-Familien `tiktok.*` und `minecraft.*` sind **der Bridge
+> vorbehalten**. Wer sie ohne den vertrauenswürdigen Bridge-Marker über
+> `POST /events` publiziert, erhält `403` (`API-0009`). Nutze deinen
+> eigenen Namespace — für Konsumenten ist der Unterschied nicht erkennbar.
+
 ## Delivery-Garantien
 
 | Aspekt | Garantie |

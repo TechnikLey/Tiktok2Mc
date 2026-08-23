@@ -581,6 +581,116 @@ class TestTimerPlugin:
 
     def test_should_signal(self, tmp_path, monkeypatch):
         t = self._make_timer(tmp_path, monkeypatch, signal_on=["tick", "zero"])
-        assert t._should_signal("tick")
         assert t._should_signal("zero")
+        assert t._should_signal("tick")
         assert not t._should_signal("started")
+
+
+class TestBasePluginGracefulShutdown:
+    """on_stop() contract: reserved __shutdown__ command and atexit fallback."""
+
+    class _ProcessExited(Exception):
+        pass
+
+    def _plugin_class(self):
+        from core.base_plugin import BasePlugin
+
+        class P(BasePlugin):
+            PLUGIN_NAME = "fake"
+
+            def get_overlay_html(self):
+                return ""
+
+        return P
+
+    def _make_plugin(self, tmp_path, monkeypatch, plugin_cls=None):
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+        if plugin_cls is None:
+            plugin_cls = self._plugin_class()
+        return plugin_cls()
+
+    def test_shutdown_command_calls_on_stop_and_exits(self, tmp_path, monkeypatch):
+        from core.base_plugin import SHUTDOWN_COMMAND
+
+        calls = []
+
+        class P(self._plugin_class()):
+            def on_stop(self):
+                calls.append("stopped")
+
+        p = self._make_plugin(tmp_path, monkeypatch, plugin_cls=P)
+        monkeypatch.setattr(
+            "core.base_plugin.os._exit",
+            lambda code: (_ for _ in ()).throw(self._ProcessExited(code)),
+        )
+        with pytest.raises(self._ProcessExited):
+            p._handle_shutdown_command()
+        assert calls == ["stopped"]
+        assert p._shutdown_started is True
+        assert p._running is False
+        assert SHUTDOWN_COMMAND == "__shutdown__"
+
+    def test_shutdown_runs_exactly_once(self, tmp_path, monkeypatch):
+        calls = []
+
+        class P(self._plugin_class()):
+            def on_stop(self):
+                calls.append(1)
+
+        p = self._make_plugin(tmp_path, monkeypatch, plugin_cls=P)
+        monkeypatch.setattr(
+            "core.base_plugin.os._exit",
+            lambda code: None,
+        )
+        p._handle_shutdown_command()
+        p._handle_shutdown_command()  # second call is a no-op
+        assert len(calls) == 1
+
+    def test_broken_on_stop_does_not_prevent_exit(self, tmp_path, monkeypatch):
+        class P(self._plugin_class()):
+            def on_stop(self):
+                raise RuntimeError("boom")
+
+        p = self._make_plugin(tmp_path, monkeypatch, plugin_cls=P)
+        exited = []
+        monkeypatch.setattr(
+            "core.base_plugin.os._exit", lambda code: exited.append(code)
+        )
+        p._handle_shutdown_command()
+        assert exited == [0]
+
+    def test_polling_loop_intercepts_shutdown_command(self, tmp_path, monkeypatch):
+        calls = []
+
+        class P(self._plugin_class()):
+            def on_stop(self):
+                calls.append("stop")
+
+        p = self._make_plugin(tmp_path, monkeypatch, plugin_cls=P)
+        monkeypatch.setattr(
+            "core.base_plugin.os._exit",
+            lambda code: (_ for _ in ()).throw(self._ProcessExited(code)),
+        )
+
+        def mock_get(path, timeout=None):
+            return {"commands": [{"command": "__shutdown__", "args": {}}]}
+
+        monkeypatch.setattr(p, "api_get", mock_get)
+        p._running = True
+        with pytest.raises(self._ProcessExited):
+            p._command_polling_loop()
+        assert calls == ["stop"]
+
+    def test_atexit_fallback_calls_on_stop_once(self, tmp_path, monkeypatch):
+        calls = []
+
+        class P(self._plugin_class()):
+            def on_stop(self):
+                calls.append(1)
+
+        p = self._make_plugin(tmp_path, monkeypatch, plugin_cls=P)
+        p._atexit_stop()
+        p._atexit_stop()
+        assert len(calls) == 1

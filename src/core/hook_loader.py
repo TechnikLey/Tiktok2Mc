@@ -5,6 +5,8 @@ import importlib.util
 import json
 import logging
 import sys
+import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -18,10 +20,12 @@ from core.error_codes import (
     HOOK_0005,
     HOOK_0007,
     HOOK_0008,
+    HOOK_0010,
 )
 from core.hook_api import (
     HOOK_EVENT_SUBSCRIPTIONS,
     HOOK_LIFECYCLE,
+    HOOK_TIMERS,
     HookAPI,
     clear_hook_registrations,
 )
@@ -488,6 +492,10 @@ def load_event_hooks(
         skipped,
     )
 
+    # Periodic work registered via api.register_timer() runs on the shared
+    # scheduler thread; no-op when no hook registered a timer.
+    start_timer_scheduler()
+
     # Clean stale registry entries
     active_names = {info["name"] for info in discovered}
     cleaned = registry.clean_stale(active_names)
@@ -502,8 +510,13 @@ def unload_event_hooks() -> int:
 
     Called before a runtime reload so hooks can re-register cleanly
     (register() would otherwise collide with the still-registered actions).
-    Returns the number of removed hook actions.
+    The ``unload`` lifecycle callbacks (registered via
+    ``api.on_unload(...)``) run **before** anything is cleared, so hooks
+    can flush state or release resources. Also stops the hook timer
+    scheduler. Returns the number of removed hook actions.
     """
+    fire_hook_lifecycle("unload")
+    _stop_timer_thread()
     removed = clear_hook_registrations()
     purged = [
         mod_name
@@ -557,6 +570,84 @@ def fire_hook_lifecycle(event: str) -> int:
         len(callbacks),
     )
     return len(callbacks)
+
+
+# ---------------------------------------------------------------------------
+# Hook timer scheduler
+# ---------------------------------------------------------------------------
+#
+# Hooks cannot import ``threading`` (import whitelist), so periodic work is
+# registered via ``HookAPI.register_timer(interval, fn)`` and executed here on
+# a single daemon thread owned by the loader. One broken callback never
+# affects others (reported as HOOK-0010). The scheduler runs only while hooks
+# with timers are loaded; a runtime reload stops it before registrations are
+# cleared.
+
+_timer_thread: threading.Thread | None = None
+_timer_stop_event: threading.Event | None = None
+
+_TIMER_POLL_INTERVAL = 0.05
+
+
+def _timer_scheduler_loop(stop: threading.Event) -> None:
+    """Run due hook timer callbacks until *stop* is set."""
+    while not stop.wait(_TIMER_POLL_INTERVAL):
+        now = time.monotonic()
+        for hook_name, timers in list(HOOK_TIMERS.items()):
+            for entry in list(timers):
+                if now < entry["next"]:
+                    continue
+                # Reschedule before running so a slow callback cannot spin
+                # hot; if we fell far behind, skip missed ticks entirely.
+                interval = entry["interval"]
+                entry["next"] = (
+                    now + interval
+                    if now - entry["next"] >= interval
+                    else entry["next"] + interval
+                )
+                try:
+                    entry["fn"]()
+                except Exception as e:  # one broken timer must not affect others
+                    log.warning(
+                        "[HOOK] timer callback of '%s' failed: %s", hook_name, e
+                    )
+                    get_crash_manager().report_exception(
+                        HOOK_0010, exc=e, context_info={"hook": hook_name}
+                    )
+
+
+def start_timer_scheduler() -> None:
+    """Start the shared timer scheduler thread if any timers exist.
+
+    Called after hooks are loaded; no-op when no hook registered a timer
+    or the thread is already running.
+    """
+    global _timer_thread, _timer_stop_event
+    if not HOOK_TIMERS:
+        return
+    if _timer_thread is not None and _timer_thread.is_alive():
+        return
+    _timer_stop_event = threading.Event()
+    _timer_thread = threading.Thread(
+        target=_timer_scheduler_loop,
+        args=(_timer_stop_event,),
+        name="hook-timers",
+        daemon=True,
+    )
+    _timer_thread.start()
+    total = sum(len(t) for t in HOOK_TIMERS.values())
+    log.info("[HOOK] Timer scheduler started (%d timer(s))", total)
+
+
+def _stop_timer_thread() -> None:
+    """Stop the timer scheduler thread (runtime reload / shutdown)."""
+    global _timer_thread, _timer_stop_event
+    if _timer_stop_event is not None:
+        _timer_stop_event.set()
+    if _timer_thread is not None and _timer_thread.is_alive():
+        _timer_thread.join(timeout=2.0)
+    _timer_thread = None
+    _timer_stop_event = None
 
 
 def _event_pattern_matches(pattern: str, event_type: str) -> bool:

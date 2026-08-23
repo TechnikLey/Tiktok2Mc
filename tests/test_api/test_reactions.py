@@ -113,7 +113,9 @@ class TestReactionCatalogEndpoint:
         body = resp.json()
         matching = [t for t in body["templates"] if t["plugin"] == "spotify-control"]
         assert len(matching) >= 1
-        assert all("event" in t and "plugin" in t and "command" in t for t in body["templates"])
+        assert all(
+            "event" in t and "plugin" in t and "command" in t for t in body["templates"]
+        )
 
 
 class TestCatalogVersioning:

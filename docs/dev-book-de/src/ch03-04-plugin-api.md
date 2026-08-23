@@ -180,6 +180,31 @@ def on_tick(self):
 
 **Threading-Hinweis**: `on_tick()` läuft im Tick-Thread. Handler laufen im Polling-Thread. `self._state` (direkter Zugriff) und `self.state` (Property) sind unter CPython für einzelne Zuweisungen sicher (GIL garantiert atomare dict-Operationen).
 
+### `on_stop()`
+
+Wird genau einmal aufgerufen, wenn das Plugin ordnungsgemäß heruntergefahren
+wird — also beim Deaktivieren, Neustarten oder Löschen über Dashboard/API
+(die API stellt dem Plugin vor dem Prozessstopp ein reserviertes internes
+Kommando zu) sowie als `atexit`-Fallback beim normalen Interpreter-Ende.
+Überschreibe es, um Queues zu leeren, Dateien/Verbindungen zu schließen
+oder den finalen Zustand zu persistieren:
+
+```python
+def __init__(self):
+    super().__init__()
+    self._events: list[dict] = []
+
+def on_stop(self):
+    self.pending_events_flushen()
+    self.push_state()
+```
+
+- Exceptions in `on_stop()` werden geloggt, verhindern aber nie den Exit.
+- Das reservierte Shutdown-Kommando erreicht deine Command-Handler nie.
+- Ein harter Kill (z. B. eingefrorener Prozess) kann `on_stop()` nicht
+  ausführen — halte kritischen Zustand kontinuierlich über den persistenten
+  Store (`store_set`) fest, nicht nur beim Herunterfahren.
+
 ## Verzeichnisse
 
 | Eigenschaft | Typ | Beschreibung |
@@ -211,17 +236,17 @@ theme_file = self._plugin_dir / "theme.json"
 4. python main.py → if __name__ → MeinPlugin().run()
 5. run() registriert Overlay, startet Threads
 6. Polling-Thread empfängt Befehle → Handler wird aufgerufen
-7. Benutzer deaktiviert → Signal-Datei → Supervisor beendet Prozess (SIGTERM)
+7. Benutzer deaktiviert → API liefert Shutdown-Kommando → on_stop() läuft
+   → Prozess beendet sich sauber (harter Stopp nur falls noch am Leben)
 ```
 
 > [!NOTE]
-> Der Supervisor beendet den Plugin-Prozess per `SIGTERM`. Hintergrund-Threads sind als `daemon=True` gestartet und werden automatisch beendet. Für eigene Betriebsmittel (Dateien, Netzwerkverbindungen) `atexit`-Handler registrieren:
-> ```python
-> import atexit
-> def cleanup():
->     self._file.close()
-> atexit.register(cleanup)
-> ```
+> Disable/Restart/Unregister stellen dem Plugin zuerst ein reserviertes
+> Shutdown-Kommando zu und warten kurz (~1 s Schonfrist), bevor das harte
+> Stoppsignal geschrieben wird — so kann `on_stop()` den Zustand flushen.
+> Hintergrund-Threads sind als `daemon=True` gestartet; eigene
+> `atexit`-Handler brauchst du nicht mehr — überschreibe stattdessen
+> `on_stop()` (siehe oben).
 
 ## REST-API-Endpunkte (für Nicht-Python-Plugins)
 
@@ -247,6 +272,7 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `PUT` | `/plugins/{name}/config` | Plugin-Konfiguration schreiben |
 | `POST` | `/events` | Eigenes Event auf dem EventBus veröffentlichen |
 | `POST` | `/triggers/dispatch` | actions.mca-Trigger auslösen (ohne Debounce — siehe unten) |
+| `POST` | `/events/ingest` | Namespaced Event publizieren und optional Trigger auslösen in einem Aufruf (siehe unten) |
 | `GET` | `/plugins/{name}/data` | Kompletten Persistent Store des Plugins lesen |
 | `GET` | `/plugins/{name}/data/{key}` | Einen Schlüssel aus dem Store lesen |
 | `PUT` | `/plugins/{name}/data/{key}` | Schlüssel schreiben (Body: `{"value": <beliebiges JSON>}`) |
@@ -404,6 +430,41 @@ POST /api/v1/triggers/dispatch
   — `status` ist `"error"` bei Validierungsfehlern oder nicht erreichbarer Bridge
 - Der Aufruf wird **nicht** gedrosselt und **nicht** als Test-Event markiert;
   jeder Dispatch landet in der Trigger-History (`GET /triggers/history`)
+
+### Generischer Event-Ingest (Bus + Trigger in einem Aufruf)
+
+`POST /api/v1/events/ingest` ist der strukturierte Inbound für Erweiterungen
+und externe Systeme (Spiele, OBS-Bots, Home Assistant, Automation). Er
+publiziert ein namespaced Event auf den EventBus — erreicht also Plugins via
+`event_subscriptions`, Hooks via `register_event`, den Outbound-Dispatcher
+und den GUI-Livefeed — und löst optional im selben Aufruf eine
+actions.mca-Triggerkette aus:
+
+```json
+POST /api/v1/events/ingest
+{
+  "type": "mygame.player_death",
+  "data": {"player": "Notch", "level": 42},
+  "trigger": "on_death",
+  "user": "Notch"
+}
+```
+
+| Feld | Pflicht | Bedeutung |
+|-------|----------|---------|
+| `type` | ja | Namespaced Event-Typ `<quelle>.<event>` (z. B. `mygame.player_death`) |
+| `data` | nein | Freies Payload-Dict (Standard `{}`) |
+| `trigger` | nein | actions.mca-Action-Name, der zusätzlich ausgeführt wird |
+| `user` / `gift_id` / `gift_name` | nein | Payload für den optionalen Trigger; fällt auf die gleichnamigen `data`-Schlüssel zurück |
+
+- **Antwort**: `{"status": "ok", "event": ..., "trigger": {...}}` — der
+  `trigger`-Schlüssel erscheint nur, wenn ein Trigger ausgelöst wurde,
+  und trägt dasselbe Format wie `/triggers/dispatch`.
+- Reservierte Kernfamilien (`tiktok.*`, `minecraft.*`) werden abgelehnt
+  (`403`, `API-0009`) — publiziere unter dem eigenen Namespace.
+- Nutze diesen Endpunkt statt des Minecraft-branded Bridge-Webhooks, wenn du
+  ein eigenes Spiel anbindest: keine Queue-Pause-Nebeneffekte, keine
+  Namenskollisionen, volle Kontrolle über den Event-Namen.
 
 ### Outbound Webhooks
 

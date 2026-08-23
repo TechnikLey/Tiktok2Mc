@@ -5,6 +5,7 @@ flow.  Plugins now register via the API, which persists to its own
 JSON store (``data/api_plugin_registry.json``).
 """
 
+import asyncio
 import json
 import logging
 import sys
@@ -27,16 +28,34 @@ from core.api.models import (
     PluginUpdatesResponse,
     PluginUpdateStatus,
 )
+from core.api.plugin_overlay import command_queue
 from core.api.registry import get_registry
 from core.api.services.plugin_discovery import (
     discover_plugins_from_manifests,
     discover_queries_from_manifests,
 )
 from core.api.updater import PluginUpdateChecker
+from core.base_plugin import SHUTDOWN_COMMAND
 
 log = logging.getLogger(__name__)
 
 _HEALTH_POLL_TIMEOUT = 30.0
+# How long disable/restart/unregister wait after delivering the reserved
+# ``__shutdown__`` command before the hard stop signal is written, so a
+# well-behaved plugin can run on_stop() and flush (bounded — an old plugin
+# that ignores the command only delays the stop by this much).
+SHUTDOWN_GRACE_SECONDS = 1.0
+
+
+async def _request_graceful_shutdown(plugin_name: str) -> None:
+    """Deliver the reserved ``__shutdown__`` command and give the plugin
+    a short grace period to flush before the process is stopped."""
+    try:
+        command_queue.enqueue(plugin_name, SHUTDOWN_COMMAND)
+    except Exception as exc:  # best-effort: the hard signal follows anyway
+        log.warning("Failed to enqueue shutdown command for '%s': %s", plugin_name, exc)
+        return
+    await asyncio.sleep(SHUTDOWN_GRACE_SECONDS)
 
 
 def _runtime_dir() -> Path:
@@ -469,6 +488,9 @@ async def disable_plugin(name: str):
         if not plugin.enabled:
             log.info("Plugin '%s' is already disabled — returning current state", name)
             return plugin
+        # Graceful stop first: deliver __shutdown__ so the plugin can flush,
+        # then write the hard signal for start.py.
+        await _request_graceful_shutdown(name)
         # Write signal FIRST so start.py sees it immediately
         if not _write_plugin_signal(name, "stop"):
             raise HTTPException(
@@ -575,6 +597,7 @@ async def restart_plugin(name: str):
             raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
 
         _clean_plugin_signals(name)
+        await _request_graceful_shutdown(name)
         _write_plugin_signal(name, "stop")
         _write_plugin_signal(name, "start")
 
@@ -594,7 +617,9 @@ async def restart_plugin(name: str):
 async def unregister_plugin(name: str):
     """Remove a plugin from the registry, stop its process, and clean up signals."""
     try:
-        # 1. Write stop signal so start.py terminates the running process
+        # Graceful stop first, then the stop signal so start.py terminates
+        # the running process if it is still alive after the grace period.
+        await _request_graceful_shutdown(name)
         _write_plugin_signal(name, "stop")
         _clean_plugin_signals(name)
 

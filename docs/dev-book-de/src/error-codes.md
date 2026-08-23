@@ -56,6 +56,9 @@ Die vollständige, maschinenlesbare Liste liefert `GET /api/v1/diagnostics/error
 | `HOOK-0005` | Hook registration failed | Die `register()`-Funktion warf eine Exception |
 | `HOOK-0006` | Hook script action failed | Eine Hook-Aktion warf während der Ausführung eine Exception |
 | `HOOK-0007` | Hook has no register() function | `main.py` definiert keine `register()`-Funktion |
+| `HOOK-0008` | Hook lifecycle callback failed | Ein `on_live_start`/`on_live_end`/`on_unload`-Callback warf eine Exception |
+| `HOOK-0009` | Hook permission denied | Ein geschützter HookAPI-Aufruf fehlte den nötigen `permissions`-Eintrag in der `hook.json` |
+| `HOOK-0010` | Hook timer callback failed | Ein `register_timer()`-Callback warf eine Exception; der Timer läuft weiter |
 
 ### PLUGIN (Plugin-System)
 

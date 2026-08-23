@@ -17,11 +17,12 @@ HOOK_ACTIONS: dict[str, Callable] = {}
 # HOOK_ACTIONS so a runtime hook reload can unload exactly what each hook owns.
 HOOK_ACTION_OWNERS: dict[str, str] = {}
 
-# Lifecycle callbacks per event ("live_start" / "live_end"):
+# Lifecycle callbacks per event ("live_start" / "live_end" / "unload"):
 # {event: {hook_name: callable}}
 HOOK_LIFECYCLE: dict[str, dict[str, Callable]] = {
     "live_start": {},
     "live_end": {},
+    "unload": {},
 }
 
 LIFECYCLE_EVENTS = tuple(HOOK_LIFECYCLE)
@@ -32,6 +33,15 @@ LIFECYCLE_EVENTS = tuple(HOOK_LIFECYCLE)
 # Callbacks are called as ``fn(event_type, data)`` from the bridge's
 # background executor — never on the trigger/TikTok threads.
 HOOK_EVENT_SUBSCRIPTIONS: dict[str, dict[str, Callable]] = {}
+
+# Registered timers per hook: hook_name -> [timer_entry, ...] where each
+# entry is ``{"interval": float, "fn": callable, "next": float}`` and
+# ``next`` is a ``time.monotonic()`` deadline managed by the bridge's timer
+# scheduler (see core.hook_loader). Hooks cannot import ``threading``
+# (import whitelist), so periodic work goes through this API instead.
+HOOK_TIMERS: dict[str, list[dict]] = {}
+
+MIN_TIMER_INTERVAL: float = 0.1
 
 MAX_CHAIN_DEPTH: int = 3
 
@@ -201,10 +211,12 @@ class HookAPI:
         log.info(f"[HOOK] Registered action: {name}")
 
     def register_lifecycle(self, event: str, fn: Callable) -> None:
-        """Register a lifecycle callback for ``"live_start"`` or ``"live_end"``.
+        """Register a lifecycle callback.
 
-        The callback is called with no arguments when the TikTok connection is
-        established / the live stream ends. Unknown events are rejected.
+        Supported events: ``"live_start"`` (TikTok connection established),
+        ``"live_end"`` (live stream ended) and ``"unload"`` (this hook is
+        being unloaded before a runtime reload or shutdown — release
+        resources here). Unknown events are rejected.
         Last registration wins per hook and event.
         """
         if event not in HOOK_LIFECYCLE:
@@ -226,6 +238,62 @@ class HookAPI:
     def on_live_end(self, fn: Callable) -> None:
         """Shortcut for ``register_lifecycle("live_end", fn)``."""
         self.register_lifecycle("live_end", fn)
+
+    def on_unload(self, fn: Callable) -> None:
+        """Register a dispose callback run when this hook is unloaded.
+
+        Called with no arguments before the hook's registrations are
+        cleared (runtime reload or bridge shutdown). Use it to close
+        files/connections or flush in-memory state — there is no other
+        teardown signal for hooks.
+        """
+        self.register_lifecycle("unload", fn)
+
+    def register_timer(self, interval: float, fn: Callable) -> bool:
+        """Run ``fn()`` periodically every *interval* seconds.
+
+        The callback takes no arguments and runs on the bridge's shared
+        timer scheduler thread (never on the trigger/TikTok threads).
+        Exceptions are isolated and reported as HOOK-0010; the timer
+        keeps running. Intervals below ``MIN_TIMER_INTERVAL`` (0.1 s)
+        are clamped. Returns ``True`` when the timer was registered,
+        ``False`` on invalid input. Timers are removed automatically on
+        unload/reload of the hook.
+        """
+        if not callable(fn):
+            log.warning(
+                "[HOOK] register_timer(%s): not callable (hook '%s')",
+                interval,
+                self._name or "<unbound>",
+            )
+            return False
+        try:
+            interval_f = float(interval)
+        except (TypeError, ValueError):
+            log.warning("[HOOK] register_timer: invalid interval %r", interval)
+            return False
+        if interval_f < MIN_TIMER_INTERVAL:
+            log.warning(
+                "[HOOK] register_timer: interval %s below minimum %ss — clamped",
+                interval_f,
+                MIN_TIMER_INTERVAL,
+            )
+            interval_f = MIN_TIMER_INTERVAL
+        import time as _time
+
+        HOOK_TIMERS.setdefault(self._name or "<unbound>", []).append(
+            {
+                "interval": interval_f,
+                "fn": fn,
+                "next": _time.monotonic() + interval_f,
+            }
+        )
+        log.info(
+            "[HOOK] Registered timer (%ss) for '%s'",
+            interval_f,
+            self._name or "<unbound>",
+        )
+        return True
 
     def register_event(self, event_pattern: str, fn: Callable) -> None:
         """Subscribe this hook to bus events matching *event_pattern*.
@@ -550,8 +618,8 @@ class HookAPI:
 
 
 def clear_hook_registrations() -> int:
-    """Remove all hook-registered actions, lifecycle callbacks and
-    event subscriptions.
+    """Remove all hook-registered actions, lifecycle callbacks, event
+    subscriptions and timers.
 
     Used by the runtime hook reload before hooks are loaded again.
     Returns the number of removed actions.
@@ -562,4 +630,5 @@ def clear_hook_registrations() -> int:
     for callbacks in HOOK_LIFECYCLE.values():
         callbacks.clear()
     HOOK_EVENT_SUBSCRIPTIONS.clear()
+    HOOK_TIMERS.clear()
     return removed

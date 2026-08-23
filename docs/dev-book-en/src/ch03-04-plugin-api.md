@@ -180,6 +180,30 @@ def on_tick(self):
 
 **Threading Note**: `on_tick()` runs in the tick thread. Handlers run in the polling thread. `self._state` (direct access) and `self.state` (property) are safe under CPython for individual assignments (GIL guarantees atomic dict operations).
 
+### `on_stop()`
+
+Called exactly once when the plugin is shut down gracefully — i.e., when it
+is disabled, restarted or unregistered via the dashboard/API (the API
+delivers a reserved internal command to the plugin before the process is
+stopped), and as an `atexit` fallback on normal interpreter exit.
+Override it to flush queues, close files/connections or persist final state:
+
+```python
+def __init__(self):
+    super().__init__()
+    self._events: list[dict] = []
+
+def on_stop(self):
+    self.flush_pending_events()
+    self.push_state()
+```
+
+- Exceptions in `on_stop()` are logged but never prevent the exit.
+- The reserved shutdown command never reaches your command handlers.
+- A hard kill (e.g., frozen process) cannot run `on_stop()` — keep critical
+  state persisted continuously via the persistent store (`store_set`) rather
+  than only at shutdown.
+
 ## Directories
 
 | Property | Type | Description |
@@ -211,17 +235,16 @@ theme_file = self._plugin_dir / "theme.json"
 4. python main.py → if __name__ → MyPlugin().run()
 5. run() registers overlay, starts threads
 6. Polling thread receives commands → Handler is called
-7. User disables → Signal file → Supervisor terminates process (SIGTERM)
+7. User disables → API delivers shutdown command → on_stop() runs
+   → process exits cleanly (hard stop signal only if still alive)
 ```
 
 > [!NOTE]
-> The supervisor terminates the plugin process via `SIGTERM`. Background threads are started as `daemon=True` and are terminated automatically. For own resources (files, network connections), register `atexit` handlers:
-> ```python
-> import atexit
-> def cleanup():
->     self._file.close()
-> atexit.register(cleanup)
-> ```
+> Disable/restart/unregister deliver a reserved shutdown command to the
+> plugin first and wait briefly (~1 s grace) before writing the hard stop
+> signal — so `on_stop()` can flush state. Background threads are started
+> as `daemon=True`; you do not need your own `atexit` handlers anymore —
+> override `on_stop()` instead (see above).
 
 ## REST API Endpoints (for Non-Python Plugins)
 
@@ -247,6 +270,7 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `PUT` | `/plugins/{name}/config` | Write plugin configuration |
 | `POST` | `/events` | Publish a custom event on the EventBus |
 | `POST` | `/triggers/dispatch` | Fire an actions.mca trigger (no debounce — see below) |
+| `POST` | `/events/ingest` | Publish a namespaced event and optionally fire a trigger in one call (see below) |
 | `GET` | `/plugins/{name}/data` | Read the plugin's whole persistent store |
 | `GET` | `/plugins/{name}/data/{key}` | Read one key from the plugin's store |
 | `PUT` | `/plugins/{name}/data/{key}` | Write one key (body: `{"value": <any JSON>}`) |
@@ -400,6 +424,41 @@ POST /api/v1/triggers/dispatch
   — `status` is `"error"` for validation failures or an unreachable bridge
 - The call is **not** rate-limited and is **not** marked as a test event;
   every dispatch is recorded in the trigger history (`GET /triggers/history`)
+
+### Generic Event Ingest (Bus + Trigger in One Call)
+
+`POST /api/v1/events/ingest` is the structured inbound for extensions and
+external systems (games, OBS bots, Home Assistant, automation). It publishes
+a namespaced event on the EventBus — reaching plugins via
+`event_subscriptions`, hooks via `register_event`, the outbound dispatcher
+and the GUI live feed — and optionally fires an `actions.mca` trigger chain
+in the same call:
+
+```json
+POST /api/v1/events/ingest
+{
+  "type": "mygame.player_death",
+  "data": {"player": "Notch", "level": 42},
+  "trigger": "on_death",
+  "user": "Notch"
+}
+```
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `type` | yes | Namespaced event type `<source>.<event>` (e.g. `mygame.player_death`) |
+| `data` | no | Free-form payload dict (default `{}`) |
+| `trigger` | no | `actions.mca` action name to dispatch as well |
+| `user` / `gift_id` / `gift_name` | no | Payload for the optional trigger; falls back to the matching `data` keys |
+
+- **Response**: `{"status": "ok", "event": ..., "trigger": {...}}` — the
+  `trigger` key only appears when a trigger was dispatched and carries the
+  same shape as `/triggers/dispatch`.
+- Reserved core families (`tiktok.*`, `minecraft.*`) are rejected (`403`,
+  `API-0009`) — publish under your own namespace.
+- Use this endpoint instead of the minecraft-branded bridge webhook when
+  integrating your own game: no queue-pause side effects, no naming
+  collisions, full control over the event name.
 
 ### Outbound Webhooks
 

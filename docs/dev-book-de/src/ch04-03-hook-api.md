@@ -9,6 +9,7 @@ Alle Methoden, die dein Hook über das `api`-Objekt in der `register()`-Funktion
 | `register_action(name, fn)` | Handler für `$`-Befehle registrieren |
 | `rcon_enqueue(commands)` | Minecraft-Befehle ausführen |
 | `enqueue_trigger(action_name, user="hook", context=None)` | anderen Trigger auslösen (verkettet) |
+| `register_timer(interval, fn)` | `fn()` periodisch ausführen (ohne `threading`) |
 | `get_hook_config(name)` | Per-Hook-Konfiguration lesen |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Overlay-Text anzeigen |
 | `store_get(key, default=None)` | Aus dem persistenten Store dieses Hooks lesen |
@@ -151,8 +152,9 @@ den Discovery-Tags):
 | `events` | `publish_event` (eigene Events auf dem API-EventBus) |
 
 Ungesperrte Methoden, die immer funktionieren: `register_action`,
-`register_lifecycle`/`on_live_start`/`on_live_end`, `register_event`,
-`log`, `get_hook_config`, `config`, `get_valid_functions`.
+`register_lifecycle`/`on_live_start`/`on_live_end`/`on_unload`,
+`register_timer`, `register_event`, `log`, `get_hook_config`, `config`,
+`get_valid_functions`.
 
 - Ein Aufruf ohne passende Berechtigung wird **abgelehnt** (geloggt als
   `HOOK-0009`) und liefert seinen sicheren Rückgabewert (`None`, `False`,
@@ -341,8 +343,9 @@ Neustarts und werden atomar geschrieben. Das Dashboard kann dieselben Daten übe
 ## Lifecycle-Callbacks
 
 Hooks können Callbacks registrieren, die feuern, wenn die TikTok-Live-Verbindung
-hergestellt wird oder wenn der Live-Stream endet. Nützlich für Start-/Shutdown-
-Ankündigungen, Reset internen States oder Synchronisation mit externen Diensten.
+hergestellt wird, wenn der Live-Stream endet und wenn der Hook entladen wird.
+Nützlich für Start-/Shutdown-Ankündigungen, Reset internen States oder
+Synchronisation mit externen Diensten.
 
 ```python
 def register(api: HookAPI):
@@ -364,13 +367,67 @@ def register(api: HookAPI):
 - **`on_live_end(fn)`** — Wird einmal aufgerufen, wenn der Live-Stream endet
   (`LiveEndEvent`). Ebenfalls im Hintergrund-Executor.
 - Die generische Form ist `api.register_lifecycle(event, fn)` mit `event`
-  als `"live_start"` oder `"live_end"`. Die Convenience-Methoden sind empfohlen.
+  als `"live_start"`, `"live_end"` oder `"unload"`. Die Convenience-Methoden
+  sind empfohlen.
+
+### Unload-Callbacks (`api.on_unload(fn)`)
+
+Der `unload`-Callback läuft **bevor** die Registrierungen deines Hooks
+gelöscht werden — beim Runtime-Reload (Enable/Disable/Config-Änderung) und
+beim Herunterfahren der Bridge. Hier gibst du Ressourcen frei:
+
+```python
+def register(api: HookAPI):
+    state_file = open("state.json", "a")
+
+    def aufraeumen():
+        state_file.close()
+        api.log("Hook entladen — Ressourcen freigegeben")
+
+    api.on_unload(aufraeumen)
+```
+
+- Wird ohne Argumente aufgerufen; läuft vor dem erneuten `register()` beim
+  nächsten Laden.
+- Exceptions sind pro Hook isoliert (gemeldet als `HOOK-0008`) und blockieren
+  weder den Reload noch andere Hooks.
 
 > [!NOTE]
 > Callbacks sind synchron (kein `async def`). Sie laufen in einem Thread-Pool,
 > um den TikTok-Client-Thread nicht zu blockieren. Halte sie kurz; schwere
 > Arbeit sollte via `api.rcon_enqueue`, `api.enqueue_trigger` oder HTTP-Calls
 > ausgelagert werden.
+
+## Timer (`api.register_timer(interval, fn)`)
+
+Hooks dürfen `threading` nicht importieren (siehe
+[Import-Restriktionen](./ch04-05-import-restrictions.md)). Für periodische
+Arbeit — Aggregationsfenster, Debouncer, geplante Prüfungen, Cache-Ablauf —
+gibt es stattdessen `register_timer`:
+
+```python
+def register(api: HookAPI):
+    pending: list[str] = []
+
+    def flush_pending():
+        if not pending:
+            return
+        api.rcon_enqueue([f"say {len(pending)} Events gepuffert"])
+        pending.clear()
+
+    api.register_timer(30.0, flush_pending)   # alle 30 Sekunden
+```
+
+- **`interval`**: Sekunden zwischen den Läufen; Werte unter `0.1` werden auf
+  `0.1` geklemmt.
+- **`fn`**: wird ohne Argumente im gemeinsamen Timer-Scheduler-Thread der
+  Bridge aufgerufen — nie auf den Trigger-/TikTok-Threads.
+- Exceptions sind pro Timer isoliert (gemeldet als `HOOK-0010`); der Timer
+  läuft mit seinem nächsten Tick weiter. Fällt ein Lauf deutlich hinten
+  nach, werden verpasste Ticks übersprungen statt nachgeholt.
+- Gibt bei Erfolg `True` zurück, bei ungültigen Eingaben `False`.
+- Timer werden beim Entladen/Reload des Hooks automatisch entfernt —
+  registriere sie in `register()` (das ohnehin bei jedem Reload neu läuft).
 
 ## Event-Abos & Publishing
 
@@ -430,14 +487,12 @@ die frische Config und registriert Actions neu.
 >   es idempotent (z. B. `register_action` ignoriert Duplikate, daher ist
 >   erneutes Registrieren desselben Action-Namens sicher).
 > - Per-Hook-Config wird beim Reload neu via `get_hook_config()` eingelesen.
-> - Wenn dein Hook externe Ressourcen hält (Dateien, Verbindungen), kannst du
->   Reloads detektieren. Ein Muster:
+> - Registriere einen `api.on_unload(fn)`-Callback, um Ressourcen (Dateien,
+>   Verbindungen) zwischen Reloads freizugeben — siehe
+>   [Unload-Callbacks](#unload-callbacks-apion_unloadfn).
 >   ```python
 >   def register(api: HookAPI):
->       if not hasattr(register, "_first_run"):
->           register._first_run = True
->           # Einmaliges Setup (Verbindung öffnen, etc.)
->       # Actions neu registrieren (wiederholbar sicher)
+>       # Ressourcen des vorherigen Laufs freigeben, dann neu aufsetzen
 >       api.register_action("meine_action", handler)
 >   ```
 
@@ -454,6 +509,7 @@ die frische Config und registriert Actions neu.
 | `HOOK-0007` | `register()`-Funktion fehlt |
 | `HOOK-0008` | Lifecycle-Callback fehlgeschlagen |
 | `HOOK-0009` | Hook-Berechtigung verweigert (Eintrag in `permissions` fehlt) |
+| `HOOK-0010` | Hook-Timer-Callback fehlgeschlagen (Timer läuft weiter) |
 
 ## Nächstes Kapitel
 

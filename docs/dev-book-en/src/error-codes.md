@@ -56,6 +56,9 @@ The complete, machine-readable list is available via `GET /api/v1/diagnostics/er
 | `HOOK-0005` | Hook registration failed | The `register()` function raised an exception |
 | `HOOK-0006` | Hook script action failed | A hook script action raised an exception during execution |
 | `HOOK-0007` | Hook has no register() function | `main.py` does not define a `register()` function |
+| `HOOK-0008` | Hook lifecycle callback failed | An `on_live_start`/`on_live_end`/`on_unload` callback raised an exception |
+| `HOOK-0009` | Hook permission denied | A guarded HookAPI call lacked the required `permissions` entry in `hook.json` |
+| `HOOK-0010` | Hook timer callback failed | A `register_timer()` callback raised an exception; the timer keeps running |
 
 ### PLUGIN (Plugin System)
 

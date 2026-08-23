@@ -21,6 +21,7 @@ Usage
 
 from __future__ import annotations
 
+import atexit
 import inspect
 import json
 import logging
@@ -38,6 +39,11 @@ from core.plugin_config import load_plugin_config
 from core.theme import load_plugin_theme, theme_css
 
 log = logging.getLogger(__name__)
+
+# Reserved command delivered via the command queue when the API disables /
+# restarts / unregisters the plugin. The BasePlugin polling loop intercepts
+# it (never reaches user handlers), calls ``on_stop()`` and exits cleanly.
+SHUTDOWN_COMMAND = "__shutdown__"
 
 # ---------------------------------------------------------------------------
 #  Helpers
@@ -104,6 +110,11 @@ class BasePlugin:
 
         # Command dispatch table — subclasses register handlers here
         self._handlers: dict[str, Any] = {}
+
+        # Set once the graceful shutdown sequence has started (reserved
+        # ``__shutdown__`` command or interpreter exit) so on_stop() runs
+        # exactly once.
+        self._shutdown_started = False
 
         # Register with health monitor
         try:
@@ -345,6 +356,10 @@ class BasePlugin:
             for entry in result.get("commands", []):
                 cmd = entry.get("command", "")
                 args = entry.get("args", {})
+                if cmd == SHUTDOWN_COMMAND:
+                    # Reserved command: graceful stop — never reaches handlers
+                    self._handle_shutdown_command()
+                    return
                 if cmd == "__query__":
                     # Reserved command: never reaches user handlers
                     self._handle_query(args)
@@ -365,6 +380,56 @@ class BasePlugin:
                 else:
                     # Fall through to subclass ``on_command`` override
                     self.on_command(cmd, args)
+
+    # -- graceful shutdown ---------------------------------------------------
+
+    def on_stop(self) -> None:
+        """Called once when the plugin is shut down gracefully.
+
+        The API delivers a reserved ``__shutdown__`` command when the
+        plugin is disabled, restarted or unregistered; the polling loop
+        intercepts it, calls this method and then exits the process
+        cleanly. Also invoked via ``atexit`` on normal interpreter exit.
+        Override to flush queues, close files/connections or persist
+        final state. Exceptions are logged but never prevent the exit.
+        """
+
+    def _handle_shutdown_command(self) -> None:
+        """Run the graceful shutdown sequence exactly once, then exit."""
+        if self._shutdown_started:
+            return
+        self._shutdown_started = True
+        self._running = False
+        log.info("[%s] Shutdown command received — calling on_stop()", self.PLUGIN_NAME)
+        try:
+            self.on_stop()
+        except Exception as e:  # user code — must never block the process exit
+            log.exception("[%s] on_stop() failed", self.PLUGIN_NAME)
+            if self._health:
+                self._health.record_error(
+                    f"plugin.{self.PLUGIN_NAME}", f"on_stop failed: {e}"
+                )
+        if self._health:
+            try:
+                self._health.set_state(
+                    f"plugin.{self.PLUGIN_NAME}", HealthState.STOPPED
+                )
+            except Exception as exc:  # best-effort health reporting on the way out
+                log.debug("[%s] Health state update failed: %s", self.PLUGIN_NAME, exc)
+        os._exit(0)
+
+    def _atexit_stop(self) -> None:
+        """Fallback: run ``on_stop()`` on normal interpreter exit."""
+        if self._shutdown_started:
+            return
+        self._shutdown_started = True
+        self._running = False
+        try:
+            self.on_stop()
+        except Exception:  # never raise out of an atexit handler
+            log.exception(
+                "[%s] on_stop() failed during interpreter exit", self.PLUGIN_NAME
+            )
 
     # -- queries (request/response with correlation ids) -------------------
 
@@ -486,6 +551,10 @@ class BasePlugin:
 
     def run(self) -> None:
         """Main entry point: register overlay, start threads, open window."""
+        # Graceful-shutdown fallback: if the process exits normally (window
+        # closed, gui_hidden tick thread ended) on_stop() still runs once.
+        atexit.register(self._atexit_stop)
+
         if self._health:
             self._health.set_state(f"plugin.{self.PLUGIN_NAME}", HealthState.RUNNING)
             self._health.record_heartbeat(f"plugin.{self.PLUGIN_NAME}")

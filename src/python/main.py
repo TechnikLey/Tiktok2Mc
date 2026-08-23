@@ -1132,7 +1132,9 @@ def _publish_event(event_type: str, event_data: dict) -> None:
         req = urllib.request.Request(
             f"{API_BASE}/events",
             data=body,
-            headers={"Content-Type": "application/json"},
+            # Trusted-publisher marker: reserved core event families
+            # (minecraft.*, tiktok.*) are rejected without it.
+            headers={"Content-Type": "application/json", "X-T2M-Source": "bridge"},
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
@@ -1325,7 +1327,7 @@ def _post_tiktok_status(body: bytes) -> None:
         req = urllib.request.Request(
             f"{API_BASE}/events",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "X-T2M-Source": "bridge"},
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
@@ -1342,7 +1344,7 @@ def _post_tiktok_event_api(body: bytes) -> None:
         req = urllib.request.Request(
             f"{API_BASE}/events",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "X-T2M-Source": "bridge"},
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)

@@ -574,6 +574,24 @@ API_0008 = ErrorCode(
     recovery_hint="This may be transient. Retry the operation.",
     impact="Event was lost.",
 )
+API_0009 = ErrorCode(
+    code="API-0009",
+    subsystem=Subsystem.API,
+    severity=Severity.WARNING,
+    message="Reserved event type rejected.",
+    description=(
+        "A caller tried to publish an event whose type uses a reserved core "
+        "family (tiktok.*, minecraft.*) via POST /api/v1/events without the "
+        "trusted 'X-T2M-Source: bridge' marker. Core event families can only "
+        "be published by the bridge; extensions must namespace their own "
+        "event types."
+    ),
+    recovery_hint=(
+        "Publish under your own namespace (e.g. '<my-extension>.<event>') "
+        "instead of a reserved core family."
+    ),
+    impact="The event was not published to the EventBus.",
+)
 
 # --------------------------------------------------------------- NETWORK ----
 NETWORK_0001 = ErrorCode(
@@ -1188,6 +1206,18 @@ HOOK_0009 = ErrorCode(
         "(one of: rcon, triggers, overlay, store, network)."
     ),
     impact="The denied call is ignored; the hook keeps running restricted.",
+)
+HOOK_0010 = ErrorCode(
+    code="HOOK-0010",
+    subsystem=Subsystem.HOOK,
+    severity=Severity.WARNING,
+    message="Hook timer callback failed.",
+    description=(
+        "A callback registered via HookAPI.register_timer() raised an "
+        "exception during execution in the hook timer scheduler."
+    ),
+    recovery_hint="Check the hook's timer callback implementation.",
+    impact="The current tick was skipped; the timer continues with its next run.",
 )
 
 # --------------------------------------------------------------- NOTIF -----

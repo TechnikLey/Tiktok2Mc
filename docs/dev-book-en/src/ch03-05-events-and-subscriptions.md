@@ -198,6 +198,12 @@ self.api_post("/events", {
 
 Naming convention: `plugin-name.event` (namespace with dot).
 
+> [!IMPORTANT]
+> The core event families `tiktok.*` and `minecraft.*` are **reserved for
+> the bridge**. Publishing them via `POST /events` without the trusted
+> bridge marker is rejected with `403` (`API-0009`). Use your own
+> namespace — consumers cannot tell the difference.
+
 ## Delivery Guarantees
 
 | Aspect | Guarantee |

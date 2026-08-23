@@ -144,6 +144,17 @@ class TestPluginEndpoints:
         assert resp.status_code == 200
         assert resp.json()["enabled"] is False
 
+    def test_disable_delivers_shutdown_command(self, client):
+        """Disable must deliver the reserved __shutdown__ command before
+        the hard stop signal so the plugin can run on_stop()."""
+        from core.api.plugin_overlay import command_queue
+
+        client.post("/api/v1/plugins/register", json=self.PLUGIN)
+        resp = client.post("/api/v1/plugins/test-plugin/disable")
+        assert resp.status_code == 200
+        cmds = command_queue.dequeue_all("test-plugin")
+        assert any(c["command"] == "__shutdown__" for c in cmds)
+
     def test_enable_plugin_not_found(self, client):
         resp = client.post("/api/v1/plugins/nonexistent/enable")
         assert resp.status_code == 404
