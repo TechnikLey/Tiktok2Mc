@@ -41,6 +41,9 @@ def query_plugin(project_dir):
 
 def _drain_and_respond(client, result=None, error=None, delay=0.0):
     """Simulate the plugin process: poll commands, answer the first query."""
+    # Drain stale entries from earlier tests synchronously, before the
+    # fresh query is even enqueued.
+    client.get("/api/v1/plugins/qtest/commands")
 
     def worker():
         if delay:

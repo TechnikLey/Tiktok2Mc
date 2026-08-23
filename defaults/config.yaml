@@ -354,6 +354,10 @@ update:
 # misbehaving or compromised plugins.
 #
 #   enabled:        true/false to enable sandboxing
+#   profile:        Built-in profile name: "light", "moderate" or "strict".
+#                   When set, it overrides the raw values below. Individual
+#                   plugins can override it via "sandbox_profile" in their
+#                   plugin.json.
 #   max_memory_mb:  Maximum RAM per plugin (Linux direct / Windows job)
 #   max_cpu_time:   Maximum CPU seconds per plugin (Linux only)
 #   max_files:      Maximum open file descriptors (Linux only)
@@ -361,6 +365,7 @@ update:
 #   priority_class: Windows process priority (below_normal / idle)
 plugin_sandbox:
   enabled: false
+  profile: ""
   max_memory_mb: 512
   max_cpu_time: 3600
   max_files: 256

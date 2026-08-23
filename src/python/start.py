@@ -72,7 +72,7 @@ from core.port_scanner import (  # noqa: E402
     scan_bind_ports,
     write_runtime_file,
 )
-from core.sandbox import PluginSandbox  # noqa: E402
+from core.sandbox import PluginSandbox, resolve_plugin_sandbox  # noqa: E402
 from core.shutdown import (  # noqa: E402
     ShutdownReason,
     get_shutdown_controller,
@@ -163,13 +163,7 @@ if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
 # -----------------------------
 _sandbox_cfg = cfg.get("plugin_sandbox", {})
 _plugin_sandbox = (
-    PluginSandbox(
-        max_memory_mb=_sandbox_cfg.get("max_memory_mb"),
-        max_cpu_time=_sandbox_cfg.get("max_cpu_time"),
-        max_files=_sandbox_cfg.get("max_files", 256),
-        max_processes=_sandbox_cfg.get("max_processes", 32),
-        priority_class=_sandbox_cfg.get("priority_class", "below_normal"),
-    )
+    PluginSandbox.from_config(_sandbox_cfg)
     if _sandbox_cfg.get("enabled", False)
     else None
 )
@@ -639,8 +633,10 @@ def _register_plugins(plugins: list[AppConfig]) -> None:
         if app.ics and CONTROL_METHOD == "DCS":
             cmd.append("--gui-hidden")
 
+        sb = resolve_plugin_sandbox(_plugin_sandbox, app.name, path.parent)
+
         post_spawn = None
-        if _plugin_sandbox and IS_WINDOWS:
+        if sb and IS_WINDOWS:
 
             def make_post_spawn(sb):
                 def _post_spawn(proc):
@@ -648,7 +644,7 @@ def _register_plugins(plugins: list[AppConfig]) -> None:
 
                 return _post_spawn
 
-            post_spawn = make_post_spawn(_plugin_sandbox)
+            post_spawn = make_post_spawn(sb)
 
         supervisor.register(
             app.name,

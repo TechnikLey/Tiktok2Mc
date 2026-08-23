@@ -45,12 +45,31 @@ Dies ist die Erkennungsdatei. Der `PluginWatcher` scannt beim Start `src/plugins
 | `platform` | Zielplattform: `"all"` (Standard), `"linux"` oder `"windows"`. Inkompatible Plugins können nicht über die GUI oder API aktiviert werden. |
 | `dashboard_ui` | `true`, wenn das Plugin eine Dashboard-Seite bereitstellt (Override `get_dashboard_html()` in der Plugin-Klasse). Das Web-Dashboard zeigt dann einen Tab mit der Plugin-Seite. Siehe [Plugin-API](./ch03-04-plugin-api.md#dashboard-seiten). |
 | `queries` | Liste von Query-Namen, die das Plugin per `on_query()` beantwortet (Request/Response-Kanal), z. B. `["top", "stats"]`. Unbekannte Queries bekommen sofort einen 404; ohne dieses Feld wird jeder Name versucht. Siehe [Plugins abfragen](./ch03-04-plugin-api.md#plugins-abfragen-requestresponse). |
+| `sandbox_profile` | `"light"`, `"moderate"` oder `"strict"` — überschreibt das globale Sandbox-Profil für den Prozess dieses Plugins. Wirkt nur, wenn Sandboxing in der `config.yaml` aktiviert ist (`plugin_sandbox.enabled`). Siehe [Sandbox-Profile](#sandbox-profile). |
 | `icon` | Emoji, das in der GUI angezeigt wird (Reactions-Tab). Standard `"🔌"`. |
 | `emitted_events` | Liste von Events, die dieses Plugin an den EventBus sendet. Jeder Eintrag: `key` (Event-ID, z. B. `"mein-plugin.thing"`), `name`, `desc`, `icon`. Diese erscheinen als Trigger-Optionen im „Create Reaction"-Wizard der GUI und werden automatisch unter dem Plugin-Namen gruppiert. Optional: `name_i18n` (Objekt mit Sprachcodes als Schlüssel, z. B. `{"de": "Neues Ding"}`) und `desc_i18n` für lokalisierte Anzeige. |
 | `accepted_commands` | Objekt mit Kommandos, die dieses Plugin über die CommandQueue akzeptiert. Jedes Kommando: `name`, `desc`, `args` (Objekt aus Argument-Schemas mit `type`, `label`, `default`, `min`, `max`, `options`, `placeholder`, `hint`). Diese erscheinen als Aktions-Optionen im „Create Reaction"-Wizard der GUI. Optional: `name_i18n`, `desc_i18n` für lokalisierte Anzeige. |
 
 > [!NOTE]
 > Die internen Felder `ics` (Boolean, Standard `true`) und `level` (Integer 1–4, Standard `4`) werden automatisch gesetzt. In der Regel musst du sie nicht in der `plugin.json` angeben.
+
+### Sandbox-Profile
+
+Plugin-Subprozesse lassen sich mit Ressourcenlimits einschränken
+(`plugin_sandbox.enabled: true` in der `config.yaml`). Statt Rohwerte zu
+tunen, wählst du ein **Built-in-Profil** über `plugin_sandbox.profile`:
+
+| Profil | RAM | CPU-Zeit | Dateien | Prozesse | Priorität |
+|--------|-----|----------|---------|----------|-----------|
+| `light` | 1 GB | unbegrenzt | 256 | 64 | below normal |
+| `moderate` *(Standardwerte)* | 512 MB | 1 h | 256 | 32 | below normal |
+| `strict` | 256 MB | 15 min | 128 | 8 | idle |
+
+Einzelne Plugins können das globale Profil pro Prozess überschreiben, indem
+sie `"sandbox_profile": "strict"` in ihre `plugin.json` aufnehmen.
+Unbekannte Namen fallen auf die globale Konfiguration zurück. Hinweis:
+RAM-Limits greifen unter Linux direkt und unter Windows über ein Job
+Object; CPU-/Datei-/Prozess-Limits sind nur Linux.
 
 ### Vollständiges Beispiel
 

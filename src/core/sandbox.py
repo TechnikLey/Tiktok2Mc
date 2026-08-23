@@ -15,9 +15,38 @@ import logging
 import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+# Built-in sandbox profiles (J.2 Nr. 10-Rest). Select one globally via
+# ``plugin_sandbox.profile`` in config.yaml, or per plugin via
+# ``"sandbox_profile"`` in its plugin.json. An empty name keeps the
+# legacy behaviour (raw flat keys from config.yaml).
+SANDBOX_PROFILES: dict[str, dict[str, Any]] = {
+    "light": {
+        "max_memory_mb": 1024,
+        "max_cpu_time": None,  # no CPU cap
+        "max_files": 256,
+        "max_processes": 64,
+        "priority_class": "below_normal",
+    },
+    "moderate": {
+        "max_memory_mb": 512,
+        "max_cpu_time": 3600,
+        "max_files": 256,
+        "max_processes": 32,
+        "priority_class": "below_normal",
+    },
+    "strict": {
+        "max_memory_mb": 256,
+        "max_cpu_time": 900,
+        "max_files": 128,
+        "max_processes": 8,
+        "priority_class": "idle",
+    },
+}
 
 
 class PluginSandbox:
@@ -36,6 +65,42 @@ class PluginSandbox:
         self.max_files = max_files
         self.max_processes = max_processes
         self.priority_class = priority_class
+
+    @classmethod
+    def from_profile(cls, profile: str) -> PluginSandbox | None:
+        """Build a sandbox from a built-in profile name.
+
+        Returns ``None`` for unknown names so callers can fall back to
+        the legacy flat config keys with a warning.
+        """
+        preset = SANDBOX_PROFILES.get(str(profile or "").strip().lower())
+        if preset is None:
+            return None
+        return cls(**preset)
+
+    @classmethod
+    def from_config(cls, cfg: dict[str, Any]) -> PluginSandbox | None:
+        """Build a sandbox from a ``plugin_sandbox`` config section.
+
+        When ``profile`` names a built-in profile it wins over the flat
+        keys; otherwise the raw values are used (legacy behaviour).
+        """
+        profile = str(cfg.get("profile", "") or "").strip()
+        if profile:
+            sb = cls.from_profile(profile)
+            if sb is not None:
+                return sb
+            log.warning(
+                "[SANDBOX] Unknown plugin_sandbox.profile %r — using flat keys",
+                profile,
+            )
+        return cls(
+            max_memory_mb=cfg.get("max_memory_mb"),
+            max_cpu_time=cfg.get("max_cpu_time"),
+            max_files=cfg.get("max_files", 256),
+            max_processes=cfg.get("max_processes", 32),
+            priority_class=cfg.get("priority_class", "below_normal"),
+        )
 
     # -----------------------------------------------------------------
     # Windows helpers
@@ -160,3 +225,45 @@ class PluginSandbox:
         """Apply restrictions that must be set after the process starts."""
         if sys.platform == "win32" and self.max_memory_mb:
             self._apply_windows_job(proc)
+
+
+def resolve_plugin_sandbox(
+    global_sandbox: PluginSandbox | None,
+    plugin_name: str,
+    plugin_dir,
+) -> PluginSandbox | None:
+    """Resolve the sandbox for a single plugin (J.2 Nr. 10-Rest).
+
+    A valid ``"sandbox_profile"`` in the plugin's ``plugin.json`` overrides
+    the global profile/config. Returns ``None`` when sandboxing is off
+    (``global_sandbox is None``). Manifest problems fall back to the
+    global sandbox so plugins always launch.
+    """
+    if global_sandbox is None:
+        return None
+    try:
+        manifest_file = Path(plugin_dir) / "plugin.json"
+        if manifest_file.is_file():
+            import json
+
+            with manifest_file.open("r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+            profile = str(raw.get("sandbox_profile", "") or "").strip()
+            if profile:
+                sb = PluginSandbox.from_profile(profile)
+                if sb is not None:
+                    log.info(
+                        "[SANDBOX] Plugin '%s' uses profile '%s'",
+                        plugin_name,
+                        profile,
+                    )
+                    return sb
+                log.warning(
+                    "[SANDBOX] Plugin '%s' declares unknown sandbox_profile %r "
+                    "— falling back to global config",
+                    plugin_name,
+                    profile,
+                )
+    except (OSError, ValueError) as exc:
+        log.warning("[SANDBOX] Manifest read failed for '%s': %s", plugin_name, exc)
+    return global_sandbox
