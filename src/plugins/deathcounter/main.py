@@ -144,6 +144,60 @@ class DeathCounterPlugin(BasePlugin):
 </body>
 </html>"""
 
+    def get_dashboard_html(self) -> str:
+        """Dashboard tab (embedded in the web dashboard via iframe).
+
+        Same origin as the API, so relative ``/api/v1/...`` paths work.
+        """
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+{self.theme_style}
+        body {{
+            background: var(--background); color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            margin: 0; padding: 24px; user-select: none;
+        }}
+        .count {{ font-size: 96px; font-weight: 900; line-height: 1; margin: 8px 0 20px; }}
+        .label {{ font-size: 13px; font-weight: 700; letter-spacing: 2px; opacity: 0.6; text-transform: uppercase; }}
+        .row {{ display: flex; gap: 8px; flex-wrap: wrap; }}
+        button {{
+            background: var(--accent); color: var(--background);
+            border: 0; border-radius: 6px; cursor: pointer;
+            font: inherit; font-weight: 700; padding: 10px 18px;
+        }}
+        button:hover {{ filter: brightness(1.15); }}
+    </style>
+</head>
+<body>
+    <div class="label">Deaths</div>
+    <div id="counter" class="count">0</div>
+    <div class="row">
+        <button onclick="cmd('add_death', {{ amount: 1 }})">+1</button>
+        <button onclick="cmd('add_death', {{ amount: 10 }})">+10</button>
+        <button onclick="cmd('reset', {{}})">Reset</button>
+    </div>
+    <script>
+        const counter = document.getElementById('counter');
+        function connect() {{
+            const es = new EventSource("/api/v1/plugins/death-counter/stream");
+            es.onmessage = (e) => {{ counter.innerText = JSON.parse(e.data).deaths; }};
+            es.onerror = () => {{ es.close(); setTimeout(connect, 2000); }};
+        }}
+        connect();
+        function cmd(command, args) {{
+            fetch('/api/v1/plugins/death-counter/command', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{ command, args }})
+            }});
+        }}
+    </script>
+</body>
+</html>"""
+
     def get_state(self):
         return self._manager.get_data()
 

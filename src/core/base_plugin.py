@@ -302,6 +302,14 @@ class BasePlugin:
         """Register overlay HTML with the central API."""
         self.api_post(f"/plugins/{self.PLUGIN_NAME}/overlay-html", {"html": html})
 
+    def register_dashboard(self, html: str) -> None:
+        """Register dashboard page HTML with the central API.
+
+        Only called by ``run()`` when ``get_dashboard_html()`` returns
+        non-empty content (opt-in via manifest ``dashboard_ui: true``).
+        """
+        self.api_post(f"/plugins/{self.PLUGIN_NAME}/dashboard-html", {"html": html})
+
     # -- command polling ----------------------------------------------------
 
     def register_handler(self, command: str, callback):
@@ -397,6 +405,17 @@ class BasePlugin:
         """
         raise NotImplementedError("Subclasses must implement get_overlay_html()")
 
+    def get_dashboard_html(self) -> str:
+        """Return the HTML string for the plugin's dashboard tab.
+
+        Opt-in: return a full HTML page and declare ``"dashboard_ui": true``
+        in ``plugin.json``.  The page is served at
+        ``/api/v1/plugins/{name}/dashboard`` (same origin as the API, so
+        relative ``/api/v1/...`` calls work — state SSE, commands, store)
+        and embedded as a tab in the web dashboard.  Default: no page.
+        """
+        return ""
+
     # -- window / run -------------------------------------------------------
 
     def _start_threads(self):
@@ -417,6 +436,10 @@ class BasePlugin:
 
         html = self.get_overlay_html()
         self.register_overlay(html)
+
+        dashboard_html = self.get_dashboard_html()
+        if dashboard_html:
+            self.register_dashboard(dashboard_html)
 
         tick_thread, _poll_thread = self._start_threads()
 

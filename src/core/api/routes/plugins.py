@@ -138,7 +138,9 @@ async def list_plugins():
         registry = get_registry()
         plugins = registry.list()
 
-        # Check each registered plugin's manifest for errors
+        # Check each registered plugin's manifest for errors and the
+        # dashboard_ui declaration (J.3 #11 — read fresh per request so
+        # manifest edits take effect without re-registering).
         for plugin in plugins:
             if plugin.path:
                 plugin_dir = (
@@ -151,7 +153,8 @@ async def list_plugins():
                     if manifest_path.exists():
                         try:
                             with manifest_path.open("r", encoding="utf-8") as fh:
-                                json.load(fh)
+                                raw = json.load(fh)
+                            plugin.dashboard_ui = bool(raw.get("dashboard_ui", False))
                         except (json.JSONDecodeError, OSError) as exc:
                             plugin.error = str(exc)
 
@@ -170,6 +173,7 @@ async def list_plugins():
                 if any(p.name == name for p in plugins):
                     continue
                 error = ""
+                raw: dict = {}
                 try:
                     with manifest_file.open("r", encoding="utf-8") as fh:
                         raw = json.load(fh)
@@ -200,6 +204,7 @@ async def list_plugins():
                         health_status="unknown",
                         last_heartbeat=None,
                         platform="all",
+                        dashboard_ui=bool(raw.get("dashboard_ui", False)),
                     )
                 )
 

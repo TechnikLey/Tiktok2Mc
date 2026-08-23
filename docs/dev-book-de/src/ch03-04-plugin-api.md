@@ -21,6 +21,10 @@ Muss exakt mit dem `name`-Feld in der `plugin.json` übereinstimmen. Wird für A
 
 Muss überschrieben werden. Gibt den HTML-String für das Overlay zurück. Wird von `run()` beim Start einmal aufgerufen. Für Plugins ohne Overlay reicht eine minimale Rückgabe: `return "<html><body></body></html>"` oder `return ""`.
 
+### `get_dashboard_html() -> str`
+
+Optional. Gibt eine vollständige HTML-Seite zurück, die das Web-Dashboard als Tab einbettet. Registriert wird sie nur bei nicht-leerer Rückgabe — deklariere zusätzlich `"dashboard_ui": true` in der `plugin.json`, damit der Tab erscheint. Siehe [Dashboard-Seiten](#dashboard-seiten).
+
 ## Konfiguration
 
 | Methode | Beschreibung |
@@ -58,6 +62,44 @@ self.push_state()  # liest über thread-safes self.state
 | `self.register_overlay(html)` | Ersetzt das Overlay-HTML zur Laufzeit per `POST /plugins/{name}/overlay-html`. |
 | `self.theme_style` | Gibt die CSS-Variablen des Plugin-Themes als String zurück. Welche Variablen existieren, hängt vom `theme:`-Abschnitt der Plugin-Konfiguration ab (z. B. `--background`, `--text`, `--accent`). |
 | `self.gui_hidden` | `True`, wenn `--gui-hidden` gesetzt ist. |
+
+## Dashboard-Seiten
+
+Plugins können eine eigene Seite im Web-Dashboard bereitstellen (Tab in der
+Sidebar neben den festen Ansichten). Das ist Opt-in:
+
+1. `"dashboard_ui": true` in der `plugin.json` deklarieren.
+2. `get_dashboard_html()` überschreiben und ein vollständiges HTML-Dokument zurückgeben.
+
+`run()` registriert die Seite dann automatisch (zur Laufzeit geht auch
+`self.register_dashboard(html)`). Das Dashboard bettet sie als Iframe unter
+`/api/v1/plugins/{name}/dashboard` ein; der Tab erscheint nur, solange das
+Plugin aktiviert ist.
+
+Da die Seite dieselbe Origin wie die API hat, funktionieren relative
+`/api/v1/...`-Aufrufe — dieselben Bausteine wie bei Overlays:
+
+- `EventSource("/api/v1/plugins/{name}/stream")` für Live-State (`push_state()`)
+- `POST /api/v1/plugins/{name}/command` zum Auslösen eigener Command-Handler
+- `GET/PUT /api/v1/plugins/{name}/data[/{key}]` für den persistenten Store
+
+Referenzimplementierung: das mitgelieferte **death-counter**-Plugin
+(Zähler-Ansicht mit +1/+10/Reset-Buttons).
+
+```python
+class MyPlugin(BasePlugin):
+    PLUGIN_NAME = "my-plugin"
+
+    def get_dashboard_html(self) -> str:
+        return """<!DOCTYPE html>
+<html><body>
+  <div id="out">...</div>
+  <script>
+    const es = new EventSource("/api/v1/plugins/my-plugin/stream");
+    es.onmessage = (e) => { out.textContent = JSON.parse(e.data).value; };
+  </script>
+</body></html>"""
+```
 
 ## Kommunikation
 
@@ -193,6 +235,8 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `GET` | `/plugins/{name}/stream` | SSE-Stream für Zustands-Updates |
 | `POST` | `/plugins/{name}/overlay-html` | Overlay-HTML setzen |
 | `GET` | `/plugins/{name}/overlay` | Overlay-HTML abrufen |
+| `POST` | `/plugins/{name}/dashboard-html` | Dashboard-Seiten-HTML setzen (Manifest: `dashboard_ui`) |
+| `GET` | `/plugins/{name}/dashboard` | Dashboard-Seiten-HTML abrufen |
 | `GET` | `/plugins/{name}/config` | Plugin-Konfiguration lesen |
 | `PUT` | `/plugins/{name}/config` | Plugin-Konfiguration schreiben |
 | `POST` | `/events` | Eigenes Event auf dem EventBus veröffentlichen |

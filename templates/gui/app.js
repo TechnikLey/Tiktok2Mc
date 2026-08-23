@@ -891,6 +891,7 @@ async function loadPlugins() {
     currentPlugins = data.plugins || [];
     renderPluginManager();
     renderOverlayUrls();
+    renderPluginPagesNav();
   } catch (e) {
     log('Plugins load failed: ' + e.message, 'err');
   }
@@ -2473,10 +2474,65 @@ function renderPluginManager() {
   tableDiv.innerHTML = html;
 }
 
+/* ─── Plugin Dashboard Pages (manifest: dashboard_ui) ─── */
+
+const PLUGIN_PAGE_PREFIX = 'plugindash-';
+
+const _PLUGIN_PAGE_ICON = '<svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>';
+
+function pluginPageViewId(name) {
+  return PLUGIN_PAGE_PREFIX + name;
+}
+
+function renderPluginPagesNav() {
+  document.querySelectorAll('.nav-item[data-plugin-page]').forEach(el => el.remove());
+  document.querySelectorAll('.view[data-plugin-page]').forEach(el => el.remove());
+  const nav = document.querySelector('.sidebar-nav');
+  const main = document.getElementById('dashboard');
+  if (!nav || !main) return;
+  const pages = currentPlugins.filter(p => p.dashboard_ui && p.enabled && !p.error);
+  for (const p of pages) {
+    const label = p.display_name || p.name;
+    const viewId = pluginPageViewId(p.name);
+    const url = API + '/plugins/' + encodeURIComponent(p.name) + '/dashboard';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nav-item';
+    btn.setAttribute('data-view', viewId);
+    btn.setAttribute('data-plugin-page', '1');
+    btn.title = label;
+    btn.innerHTML = _PLUGIN_PAGE_ICON +
+      '<span class="nav-label">' + escapeHtml(label) + '</span>';
+    btn.onclick = () => openPluginDashboard(p.name);
+    nav.appendChild(btn);
+
+    const view = document.createElement('div');
+    view.className = 'view';
+    view.id = 'view-' + viewId;
+    view.setAttribute('data-plugin-page', '1');
+    view.innerHTML =
+      '<div class="view-header"><h2>' + escapeHtml(label) + '</h2>' +
+      '<a class="btn btn--secondary" href="' + url + '" target="_blank" rel="noopener">' +
+      I18N.t('plugins.pageOpenExternal') + '</a></div>' +
+      '<iframe class="plugin-page-frame" title="' + escapeHtml(label) + '" loading="lazy"></iframe>';
+    const frame = view.querySelector('iframe');
+    if (frame) frame.dataset.src = url; // lazy-load on first open
+    main.appendChild(view);
+  }
+}
+
+function openPluginDashboard(name) {
+  const view = document.getElementById('view-' + pluginPageViewId(name));
+  if (!view) return;
+  const frame = view.querySelector('iframe');
+  if (frame && !frame.src && frame.dataset.src) frame.src = frame.dataset.src;
+  switchView(pluginPageViewId(name));
+}
+
 /* ─── Plugin View ─── */
 
-function openInlinePluginConfig(pluginName, displayName) {
-  _hideAllEditors();
+function openInlinePluginConfig(pluginName, displayName) {  _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
   pluginEditor.openInline(pluginName, displayName);

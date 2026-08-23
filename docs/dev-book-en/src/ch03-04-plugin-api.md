@@ -21,6 +21,10 @@ Must match exactly the `name` field in the `plugin.json`. Used for API endpoints
 
 Must be overridden. Returns the HTML string for the overlay. Called once by `run()` on startup. For plugins without an overlay, a minimal return is sufficient: `return "<html><body></body></html>"` or `return ""`.
 
+### `get_dashboard_html() -> str`
+
+Optional. Returns a full HTML page that the web dashboard embeds as a tab. Only registered when it returns non-empty content — declare `"dashboard_ui": true` in `plugin.json` so the tab appears. See [Dashboard Pages](#dashboard-pages).
+
 ## Configuration
 
 | Method | Description |
@@ -58,6 +62,44 @@ self.push_state()  # reads via thread-safe self.state
 | `self.register_overlay(html)` | Replaces the overlay HTML at runtime via `POST /plugins/{name}/overlay-html`. |
 | `self.theme_style` | Returns the plugin theme's CSS variables as a string. Which variables exist depends on the `theme:` section of the plugin configuration (e.g. `--background`, `--text`, `--accent`). |
 | `self.gui_hidden` | `True` if `--gui-hidden` is set. |
+
+## Dashboard Pages
+
+Plugins can provide their own page inside the web dashboard (a tab in the
+sidebar next to the fixed views). This is opt-in:
+
+1. Declare `"dashboard_ui": true` in `plugin.json`.
+2. Override `get_dashboard_html()` and return a full HTML document.
+
+`run()` then registers the page automatically (or at runtime via
+`self.register_dashboard(html)`). The dashboard embeds it as an iframe under
+`/api/v1/plugins/{name}/dashboard`; the tab only appears while the plugin is
+enabled.
+
+Because the page shares the origin with the API, it can use relative
+`/api/v1/...` calls — the same building blocks as overlays:
+
+- `EventSource("/api/v1/plugins/{name}/stream")` for live state (`push_state()`)
+- `POST /api/v1/plugins/{name}/command` to trigger your own command handlers
+- `GET/PUT /api/v1/plugins/{name}/data[/{key}]` for the persistent store
+
+Reference implementation: the shipped **death-counter** plugin (counter view
+with +1/+10/Reset buttons).
+
+```python
+class MyPlugin(BasePlugin):
+    PLUGIN_NAME = "my-plugin"
+
+    def get_dashboard_html(self) -> str:
+        return """<!DOCTYPE html>
+<html><body>
+  <div id="out">...</div>
+  <script>
+    const es = new EventSource("/api/v1/plugins/my-plugin/stream");
+    es.onmessage = (e) => { out.textContent = JSON.parse(e.data).value; };
+  </script>
+</body></html>"""
+```
 
 ## Communication
 
@@ -193,6 +235,8 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `GET` | `/plugins/{name}/stream` | SSE stream for state updates |
 | `POST` | `/plugins/{name}/overlay-html` | Set overlay HTML |
 | `GET` | `/plugins/{name}/overlay` | Retrieve overlay HTML |
+| `POST` | `/plugins/{name}/dashboard-html` | Set dashboard page HTML (manifest: `dashboard_ui`) |
+| `GET` | `/plugins/{name}/dashboard` | Retrieve dashboard page HTML |
 | `GET` | `/plugins/{name}/config` | Read plugin configuration |
 | `PUT` | `/plugins/{name}/config` | Write plugin configuration |
 | `POST` | `/events` | Publish a custom event on the EventBus |

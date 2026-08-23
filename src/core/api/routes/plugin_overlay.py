@@ -10,6 +10,7 @@ from starlette.responses import HTMLResponse, StreamingResponse
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import (
     command_queue,
+    dashboard_html_store,
     overlay_html_store,
     state_store,
 )
@@ -86,6 +87,39 @@ async def serve_overlay(name: str):
         raise HTTPException(
             status_code=404,
             detail=f"No overlay registered for plugin '{name}' — is the plugin running?",
+        )
+    return HTMLResponse(html)
+
+
+@router.post("/plugins/{name}/dashboard-html")
+async def register_dashboard_html(name: str, body: dict):
+    """Register the dashboard page HTML for a plugin.
+
+    Called by the plugin process on startup when its manifest declares
+    ``dashboard_ui: true``.  The Main API serves the page at
+    ``GET /plugins/{name}/dashboard`` and the GUI embeds it as a tab.
+    """
+    html = body.get("html")
+    if not html:
+        raise HTTPException(status_code=422, detail="Missing 'html' field")
+    dashboard_html_store.set_html(name, html)
+    log.info("Dashboard HTML registered for plugin '%s' (%d bytes)", name, len(html))
+    return {"status": "ok"}
+
+
+@router.get("/plugins/{name}/dashboard")
+async def serve_dashboard(name: str):
+    """Serve the dashboard page HTML for a plugin.
+
+    Embedded as an iframe tab in the web dashboard; same origin as the
+    API, so the page can use relative ``/api/v1/...`` calls (state SSE,
+    commands, store).
+    """
+    html = dashboard_html_store.get_html(name)
+    if html is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No dashboard registered for plugin '{name}' — is the plugin running?",
         )
     return HTMLResponse(html)
 

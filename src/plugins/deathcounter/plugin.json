@@ -8,6 +8,7 @@
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
   "platform": "all",
+  "dashboard_ui": true,
   "capabilities": [
     "death-counter:count",
     "death-counter:milestones",

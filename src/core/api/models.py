@@ -285,6 +285,10 @@ class PluginRegistration(BaseModel):
         "all",
         description="Target platform: 'all', 'linux', or 'windows'",
     )
+    dashboard_ui: bool = Field(
+        default=False,
+        description="Plugin provides a dashboard tab (manifest 'dashboard_ui')",
+    )
 
     @classmethod
     def from_manifest(
