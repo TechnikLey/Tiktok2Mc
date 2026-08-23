@@ -301,6 +301,7 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `POST` | `/plugins/{name}/command` | Befehl an ein Plugin senden |
 | `POST` | `/plugins/{name}/query` | Plugin abfragen (Request/Response — siehe unten) |
 | `POST` | `/plugins/{name}/query-response` | Plugin-intern: Query-Antwort zustellen |
+| `POST` | `/plugins/{name}/rpc` | Generischen Custom-Endpunkt des Plugins aufrufen (`on_rpc()`) — siehe unten |
 | `GET` | `/plugins/{name}/commands?wait=1` | Befehle vom System abholen (Long-Polling) |
 | `POST` | `/plugins/{name}/state` | Plugin-Zustand aktualisieren (für SSE) |
 | `GET` | `/plugins/{name}/stream` | SSE-Stream für Zustands-Updates |
@@ -409,6 +410,44 @@ class MyPlugin(BasePlugin):
             return [{"user": u, "points": p} for u, p in top]
         return None
 ```
+
+### Custom-Endpunkte (`on_rpc()` — generisches RPC)
+
+Wenn die `commands`-/`queries`-Schemata nicht reichen, bekommt jedes Plugin
+eine REST-artige Oberfläche — ganz ohne Server-Änderungen:
+
+```python
+def on_rpc(self, method: str, path: str, body: dict) -> Any:
+    """Wird bei POST /api/v1/plugins/<name>/rpc aufgerufen."""
+    if method == "POST" and path == "/songs":
+        song = erstelle_song(body)
+        return {"id": song.id}
+    if method == "GET" and path.startswith("/songs/"):
+        return finde_song(path.rsplit("/", 1)[1])
+    raise ValueError(f"keine Route: {method} {path}")
+```
+
+Aufruf aus Dashboards, externen Tools oder anderen Plugins:
+
+```json
+POST /api/v1/plugins/spotify/rpc
+{
+  "method": "POST",
+  "path": "/queue/play",
+  "body": {"uri": "spotify:track:..."},
+  "timeout": 5
+}
+```
+
+- **Antwort**: `{"id": ..., "result": ...}` bei Erfolg; `504 PLUGIN-0018`
+  bei Timeout; `502 PLUGIN-0019`, wenn `on_rpc()` eine Exception wirft.
+- Die Zustellung nutzt denselben reservierten Befehlskanal wie Queries
+  (`__rpc__`, Korrelations-ID über den Query-Store) und antwortet über den
+  gemeinsamen Query-Response-Endpunkt.
+- `method` ist GET/POST/PUT/DELETE/PATCH, `path` muss mit `/` beginnen und
+  ist plugin-definiert, `body` ist ein optionales JSON-Objekt (leer bei GET).
+- Der Rückgabewert muss JSON-serialisierbar sein; eine Exception meldet dem
+  Aufrufer einen Fehler, ohne die Polling-Loop zu beenden.
 
 ### Persistenter Speicher (namespaced)
 Jedes Plugin bekommt seine eigene JSON-Datei unter `data/plugin_data/<name>.json`

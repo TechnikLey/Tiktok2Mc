@@ -738,6 +738,106 @@ class TestBasePluginPermissions:
         assert p._load_permissions() is None
 
 
+class TestBasePluginRpc:
+    """Generic custom endpoint: reserved __rpc__ command -> on_rpc()."""
+
+    def _make(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+        from core.base_plugin import BasePlugin
+
+        class P(BasePlugin):
+            PLUGIN_NAME = "fake"
+
+            def get_overlay_html(self):
+                return ""
+
+        return P()
+
+    def _posted(self, p, monkeypatch):
+        posted = []
+
+        def capture(method, path, data):
+            posted.append((path, data))
+            return True
+
+        monkeypatch.setattr(p, "_api_request", capture)
+        return posted
+
+    def test_on_rpc_success_posts_result(self, tmp_path, monkeypatch):
+        from typing import Any as _Any
+
+        p = self._make(tmp_path, monkeypatch)
+        seen: list[tuple] = []
+
+        def handler(method: str, path: str, body: _Any):
+            seen.append((method, path, body))
+            return {"echo": path}
+
+        p.on_rpc = handler  # type: ignore[method-assign]
+        posted = self._posted(p, monkeypatch)
+        p._handle_rpc(
+            {
+                "_rpc_id": "id-1",
+                "_rpc_method": "POST",
+                "_rpc_path": "/things/42",
+                "name": "x",
+            }
+        )
+        assert seen == [("POST", "/things/42", {"name": "x"})]
+        path, data = posted[0]
+        assert path == "/plugins/fake/query-response"
+        assert data == {"id": "id-1", "ok": True, "result": {"echo": "/things/42"}}
+
+    def test_on_rpc_error_posts_failure(self, tmp_path, monkeypatch):
+        p = self._make(tmp_path, monkeypatch)
+
+        def broken(method, path, body):
+            raise RuntimeError("boom")
+
+        p.on_rpc = broken  # type: ignore[method-assign]
+        posted = self._posted(p, monkeypatch)
+        p._handle_rpc({"_rpc_id": "id-2", "_rpc_method": "GET", "_rpc_path": "/x"})
+        _, data = posted[0]
+        assert data["ok"] is False
+        assert "boom" in data["error"]
+
+    def test_polling_loop_intercepts_rpc(self, tmp_path, monkeypatch):
+        p = self._make(tmp_path, monkeypatch)
+        commands_seen = []
+        monkeypatch.setattr(
+            p,
+            "on_command",
+            lambda cmd, args: commands_seen.append(cmd),
+        )
+        calls = []
+
+        def mock_get(path, timeout=None):
+            if not calls:
+                calls.append(1)
+                return {
+                    "commands": [
+                        {
+                            "command": "__rpc__",
+                            "args": {
+                                "_rpc_id": "id-3",
+                                "_rpc_method": "GET",
+                                "_rpc_path": "/y",
+                            },
+                        }
+                    ]
+                }
+            p._running = False
+            return {"commands": []}
+
+        monkeypatch.setattr(p, "_http_get", mock_get)
+        monkeypatch.setattr(p, "_handle_rpc", lambda args: None)  # skip HTTP
+        p._running = True
+        p._command_polling_loop()
+        assert commands_seen == []  # reserved command never reaches handlers
+
+
 class TestBasePluginGracefulShutdown:
     """on_stop() contract: reserved __shutdown__ command and atexit fallback."""
 

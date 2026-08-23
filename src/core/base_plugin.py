@@ -528,6 +528,11 @@ class BasePlugin:
                     # Reserved command: never reaches user handlers
                     self._handle_query(args)
                     continue
+                if cmd == "__rpc__":
+                    # Reserved command: generic custom endpoint — never
+                    # reaches user handlers
+                    self._handle_rpc(args)
+                    continue
                 handler = self._handlers.get(cmd)
                 if handler:
                     try:
@@ -630,6 +635,49 @@ class BasePlugin:
                 "POST",
                 f"/plugins/{self.PLUGIN_NAME}/query-response",
                 {"id": query_id, "ok": False, "error": str(e)},
+            )
+
+    # -- custom endpoints (generic RPC) --------------------------------------
+
+    def on_rpc(self, method: str, path: str, body: dict[str, Any]) -> Any:
+        """Handle a call to this plugin's generic endpoint
+        (``POST /api/v1/plugins/<name>/rpc``).
+
+        Opt-in: override to give external clients and the dashboard a
+        REST-style surface into this plugin without server changes.
+        ``method`` is one of GET/POST/PUT/DELETE/PATCH, ``path`` starts
+        with ``"/"`` and is plugin-defined (e.g. ``"/songs/42"``),
+        ``body`` carries the JSON request object (empty dict for GET).
+        The return value must be JSON-serializable; raise an exception
+        to report an error (HTTP 502 to the caller).
+        """
+        log.debug("[%s] Unhandled RPC: %s %s", self.PLUGIN_NAME, method, path)
+        return None
+
+    def _handle_rpc(self, args: dict[str, Any]) -> None:
+        """Dispatch an ``__rpc__`` command entry and POST back the answer."""
+        rpc_id = str(args.get("_rpc_id", ""))
+        method = str(args.get("_rpc_method", "GET"))
+        path = str(args.get("_rpc_path", "/"))
+        body = {k: v for k, v in args.items() if not k.startswith("_")}
+        try:
+            result = self.on_rpc(method, path, body)
+            self._api_request(
+                "POST",
+                f"/plugins/{self.PLUGIN_NAME}/query-response",
+                {"id": rpc_id, "ok": True, "result": result},
+            )
+        except Exception as e:  # user code — must never kill the polling loop
+            log.exception("[%s] RPC %s %s failed", self.PLUGIN_NAME, method, path)
+            if self._health:
+                self._health.record_error(
+                    f"plugin.{self.PLUGIN_NAME}",
+                    f"rpc {method} {path} failed: {e}",
+                )
+            self._api_request(
+                "POST",
+                f"/plugins/{self.PLUGIN_NAME}/query-response",
+                {"id": rpc_id, "ok": False, "error": str(e)},
             )
 
     # -- tick loop ----------------------------------------------------------

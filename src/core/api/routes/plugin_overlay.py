@@ -333,6 +333,92 @@ async def query_plugin(name: str, body: dict):
     return {"id": query_id, "result": outcome.get("result")}
 
 
+@router.post("/plugins/{name}/rpc")
+async def plugin_rpc(name: str, body: dict):
+    """Generic custom endpoint for a plugin (request/response).
+
+    Gives every extension its own REST-style surface without server
+    changes: the call is delivered to the running plugin process as the
+    reserved command ``__rpc__`` (correlation id via the query store);
+    BasePlugin routes it to ``on_rpc(method, path, body)`` and POSTs the
+    answer back through the same response channel as queries. Use it for
+    interactions that do not fit the ``commands``/``queries`` schema —
+    e.g. REST resources, webhooks into a plugin, or rich dashboard
+    callbacks.
+    """
+    method = str(body.get("method", "GET")).upper()
+    if method not in ("GET", "POST", "PUT", "DELETE", "PATCH"):
+        raise HTTPException(status_code=422, detail=f"Invalid 'method': {method}")
+    path = body.get("path")
+    if not isinstance(path, str) or not path.startswith("/") or len(path) > 512:
+        raise HTTPException(
+            status_code=422,
+            detail="'path' must be a string starting with '/' (max 512 chars)",
+        )
+    rpc_body = body.get("body")
+    if rpc_body is not None and not isinstance(rpc_body, dict):
+        raise HTTPException(status_code=422, detail="'body' must be an object")
+
+    from core.api.registry import get_registry
+
+    if get_registry().get(name) is None:
+        raise HTTPException(status_code=404, detail=f"Plugin '{name}' not found")
+
+    try:
+        timeout = min(
+            _QUERY_TIMEOUT_MAX,
+            max(_QUERY_TIMEOUT_MIN, float(body.get("timeout", 5))),
+        )
+    except (TypeError, ValueError):
+        timeout = 5.0
+
+    rpc_id = str(uuid.uuid4())
+    future: asyncio.Future = asyncio.get_running_loop().create_future()
+    query_store.register(rpc_id, name, future)
+    command_queue.enqueue(
+        name,
+        "__rpc__",
+        _rpc_id=rpc_id,
+        _rpc_method=method,
+        _rpc_path=path,
+        _rpc_body=rpc_body or {},
+    )
+
+    log.info("[RPC] %s %s sent to plugin '%s' (id=%s)", method, path, name, rpc_id)
+    try:
+        outcome = await asyncio.wait_for(future, timeout=timeout)
+    except asyncio.TimeoutError:
+        log.warning(
+            "[RPC] %s timed out waiting for %s %s on plugin '%s'",
+            PLUGIN_0018.code,
+            method,
+            path,
+            name,
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"{PLUGIN_0018.code} {PLUGIN_0018.message}",
+        )
+    finally:
+        query_store.abandon(rpc_id)
+
+    if not outcome.get("ok", False):
+        error = outcome.get("error", "unknown error")
+        log.warning(
+            "[RPC] %s handler failed for %s %s on plugin '%s': %s",
+            PLUGIN_0019.code,
+            method,
+            path,
+            name,
+            error,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"{PLUGIN_0019.code} {PLUGIN_0019.message}: {error}",
+        )
+    return {"id": rpc_id, "result": outcome.get("result")}
+
+
 @router.post("/plugins/{name}/query-response")
 async def query_plugin_response(name: str, body: dict):
     """Deliver a plugin's answer for a pending query.

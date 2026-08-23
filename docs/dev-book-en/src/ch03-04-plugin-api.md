@@ -298,6 +298,7 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `POST` | `/plugins/{name}/command` | Send a command to a plugin |
 | `POST` | `/plugins/{name}/query` | Query a plugin (request/response — see below) |
 | `POST` | `/plugins/{name}/query-response` | Plugin-internal: deliver a query answer |
+| `POST` | `/plugins/{name}/rpc` | Call the plugin's generic custom endpoint (`on_rpc()`) — see below |
 | `GET` | `/plugins/{name}/commands?wait=1` | Poll for pending commands (long-polling) |
 | `POST` | `/plugins/{name}/state` | Update plugin state (for SSE) |
 | `GET` | `/plugins/{name}/stream` | SSE stream for state updates |
@@ -403,6 +404,44 @@ class MyPlugin(BasePlugin):
             return [{"user": u, "points": p} for u, p in top]
         return None
 ```
+
+### Custom Endpoints (`on_rpc()` — generic RPC)
+
+When the `commands`/`queries` schemas are not enough, every plugin gets a
+REST-style surface without any server changes:
+
+```python
+def on_rpc(self, method: str, path: str, body: dict) -> Any:
+    """Called for POST /api/v1/plugins/<name>/rpc calls."""
+    if method == "POST" and path == "/songs":
+        song = create_song(body)
+        return {"id": song.id}
+    if method == "GET" and path.startswith("/songs/"):
+        return lookup_song(path.rsplit("/", 1)[1])
+    raise ValueError(f"no route: {method} {path}")
+```
+
+Call it from dashboards, external tools or other plugins:
+
+```json
+POST /api/v1/plugins/spotify/rpc
+{
+  "method": "POST",
+  "path": "/queue/play",
+  "body": {"uri": "spotify:track:..."},
+  "timeout": 5
+}
+```
+
+- **Response**: `{"id": ..., "result": ...}` on success; `504 PLUGIN-0018`
+  on timeout; `502 PLUGIN-0019` when `on_rpc()` raised.
+- Delivery uses the same reserved-command channel as queries
+  (`__rpc__`, correlation id via the query store) and reuses the
+  query-response endpoint for the answer.
+- `method` is GET/POST/PUT/DELETE/PATCH, `path` must start with `/` and is
+  plugin-defined, `body` is an optional JSON object (empty for GET).
+- Return value must be JSON-serializable; raising reports an error to the
+  caller without killing the polling loop.
 
 ### Persistent Store (namespaced)
 
