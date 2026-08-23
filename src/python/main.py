@@ -56,7 +56,7 @@ from core.error_codes import (
     TIKTOK_0005,
 )
 from core.health_monitor import HealthState, get_health_monitor
-from core.hook_api import HOOK_ACTIONS, HookAPI
+from core.hook_api import HOOK_ACTIONS, HookAPI, HookContext
 from core.hook_loader import (
     fire_hook_lifecycle,
     load_event_hooks,
@@ -321,41 +321,56 @@ def enqueue_threadsafe(
         return False
 
 
-def _make_hook_context(event: str, source: str = "tiktok", **extra) -> dict:
+def _make_hook_context(event: str, source: str = "tiktok", **extra) -> HookContext:
     """Build the structured hook-action context for a queued trigger.
 
-    Hook handlers receive this dict as their third argument
+    Hook handlers receive this context as their third argument
     (``fn(user, trigger, context)``). ``event`` is the trigger family
     ("gift", "follow", "like", "comment", "join", "share"), ``source``
     where the trigger originated ("tiktok", "webhook", "hook"). Extra
     keyword arguments are event-specific payload fields; ``None`` values
     are dropped so hooks can rely on present keys being meaningful.
     """
-    data: dict = {"event": event, "source": source}
+    data = HookContext(event=event, source=source)
     for key, value in extra.items():
         if value is not None:
             data[key] = value
     return data
 
 
-def _unpack_trigger_item(item: tuple) -> tuple[str, str | dict, int, dict]:
-    """Normalize a trigger-queue item to ``(trigger, user, depth, context)``.
+def _unpack_trigger_item(item: tuple) -> tuple[str, str, int, HookContext]:
+    """Normalize a trigger-queue item to ``(trigger, user, depth, context)``."""
 
-    Supports legacy 2-tuples ``(trigger, user)`` and 3-tuples
-    ``(trigger, user, depth)`` alongside the current 4-tuple form with a
-    structured hook context.
-    """
+    def _as_hook_context(context: object) -> HookContext:
+        if isinstance(context, HookContext):
+            return context
+        if isinstance(context, dict):
+            return HookContext(context)
+        return HookContext()
+
     if len(item) == 4:
         trigger, source_user, chain_depth, context = item
         return (
             trigger,
-            source_user,
+            source_user if isinstance(source_user, str) else str(source_user),
             chain_depth,
-            context if isinstance(context, dict) else {},
+            _as_hook_context(context),
         )
     if len(item) == 3:
-        return item[0], item[1], item[2], {}
-    return item[0], item[1], 0, {}
+        trigger, source_user, chain_depth = item
+        return (
+            trigger,
+            source_user if isinstance(source_user, str) else str(source_user),
+            chain_depth,
+            HookContext(),
+        )
+    trigger, source_user = item
+    return (
+        trigger,
+        source_user if isinstance(source_user, str) else str(source_user),
+        0,
+        HookContext(),
+    )
 
 
 def _validate_dup_cmd_config():
@@ -929,34 +944,33 @@ async def rcon_worker():
 
 async def execute_global_command(
     trigger_name: str,
-    source_user: str | dict,
+    source_user: str,
     chain_depth: int = 0,
-    context: dict | None = None,
+    context: HookContext | dict | None = None,
 ):
     """Resolves a trigger name into RCON commands and enqueues them.
 
-    ``context`` is the structured hook context built by the event source
-    (see :func:`_make_hook_context`). It is passed unchanged to every hook
-    action of the chain as the third handler argument. ``chain_depth``
-    stays internal queue/loop-guard machinery and is not exposed to hooks.
+    ``source_user`` is always the plain username string; event payloads
+    (e.g. the comment text) live in the structured ``context`` built by
+    the event source (see :func:`_make_hook_context`). The context is
+    passed unchanged to every hook action of the chain as the third
+    handler argument. ``chain_depth`` stays internal queue/loop-guard
+    machinery and is not exposed to hooks.
     """
     name = sanitize_filename(trigger_name)
 
     if name not in ctx.valid_functions:
         return
 
-    if isinstance(source_user, dict):
-        comment_text = source_user.get("comment", "")
-        user_display = source_user.get("user", "")
-    else:
-        comment_text = None
-        user_display = source_user
+    user_display = source_user
 
-    # Structured context for hook actions. Always a fresh dict — the caller's
-    # context object may be shared across several queued copies of this
-    # trigger (e.g. combo gifts enqueue one item per gift) and must never be
-    # mutated during dispatch.
-    hook_context = dict(context) if isinstance(context, dict) else {}
+    # Structured context for hook actions. Always a fresh HookContext — the
+    # caller's context object may be shared across several queued copies of
+    # this trigger (e.g. combo gifts enqueue one item per gift) and must
+    # never be mutated during dispatch. The comment text for {comment}
+    # overlay placeholders also comes from here.
+    hook_context = HookContext(context) if isinstance(context, dict) else HookContext()
+    comment_text: str | None = hook_context.get("comment")
 
     commands_to_send = []
 
@@ -1865,7 +1879,7 @@ def _handle_comment_event(
         enqueue_threadsafe(
             (
                 "comment",
-                {"user": username, "comment": comment_text},
+                username,
                 0,
                 _make_hook_context(
                     "comment",

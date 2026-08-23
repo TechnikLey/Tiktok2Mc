@@ -65,9 +65,6 @@ def _cmd_current(api, user):
 def register(api: HookAPI):
     def _make_handler(command, action_title):
         def handler(user, trigger, context):
-            if isinstance(user, dict):
-                _cmd_post(api, user.get("user", "Unknown"), command, action_title)
-                return
             _cmd_post(api, str(user), command, action_title)
 
         return handler
@@ -86,10 +83,7 @@ def register(api: HookAPI):
     api.register_action("spotify_repeat", _make_handler("repeat", "Repeat"))
 
     def current_handler(user, trigger, context):
-        if isinstance(user, dict):
-            _cmd_current(api, user.get("user", "Unknown"))
-        else:
-            _cmd_current(api, str(user))
+        _cmd_current(api, str(user))
 
     api.register_action("spotify_current", current_handler)
 

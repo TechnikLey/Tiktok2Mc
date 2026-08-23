@@ -194,6 +194,50 @@ class TestHookAPI:
         assert api._current_depth == 2
 
 
+class TestHookContext:
+    """HookContext: dict subclass with fail-fast attribute access."""
+
+    def test_attribute_access_reads_keys(self):
+        from core.hook_api import HookContext
+
+        ctx = HookContext(event="gift", streak=10)
+        assert ctx.event == "gift"
+        assert ctx.streak == 10
+
+    def test_unknown_attribute_raises(self):
+        from core.hook_api import HookContext
+
+        ctx = HookContext(event="gift")
+        with pytest.raises(AttributeError):
+            _ = ctx.gift_nane  # typo — must fail fast, not return None
+
+    def test_get_still_works_for_optional_keys(self):
+        from core.hook_api import HookContext
+
+        ctx = HookContext(event="gift")
+        assert ctx.get("combo", False) is False
+
+    def test_dict_compatibility(self):
+        import json as _json
+
+        from core.hook_api import HookContext
+
+        ctx = HookContext(event="gift", streak=5)
+        # plain-dict interop stays intact
+        assert isinstance(ctx, dict)
+        assert ctx == {"event": "gift", "streak": 5}
+        assert "streak" in ctx
+        assert _json.dumps(ctx) == '{"event": "gift", "streak": 5}'
+
+    def test_enqueue_trigger_produces_hook_context(self, api):
+        api.enqueue_trigger("chained")
+        result = api._trigger_queue.get_nowait()
+        from core.hook_api import HookContext
+
+        assert isinstance(result[3], HookContext)
+        assert result[3].source == "hook"
+
+
 class _FakeResponse:
     def __init__(self, payload: dict, status: int = 200):
         self._payload = payload

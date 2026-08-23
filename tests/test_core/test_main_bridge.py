@@ -339,10 +339,12 @@ class TestCommentWorker:
         main_mod._comment_queue.join()
 
         assert seen.get("thread") not in (None, main_thread)
+        # user is always the plain username string; the comment text lives
+        # only in the structured context.
         assert enqueued == [
             (
                 "comment",
-                {"user": "tester", "comment": "!hi"},
+                "tester",
                 0,
                 {
                     "event": "comment",
@@ -588,6 +590,33 @@ class TestHookContext:
             "combo": True,
         }
 
+    def test_context_is_hook_context_type(self, monkeypatch):
+        """Hooks always receive a HookContext (dict subclass)."""
+        import src.python.main as main_mod
+        from core.hook_api import HookContext
+        from src.python.main import execute_global_command
+
+        seen = {}
+
+        def capture(user, trigger, context):
+            seen["user"] = user
+            seen["context"] = context
+
+        monkeypatch.setattr(main_mod, "HOOK_ACTIONS", {"act": capture})
+
+        async def fake_to_thread(fn, *args):
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        self._setup_trigger(monkeypatch, main_mod, ["act"])
+
+        asyncio.run(execute_global_command("mytrigger", "viewer", 0, None))
+
+        assert isinstance(seen["context"], HookContext)
+        assert isinstance(seen["context"], dict)
+        assert seen["user"] == "viewer"
+
     def test_caller_context_not_mutated(self, monkeypatch):
         """The shared context object must stay untouched across dispatches."""
         import src.python.main as main_mod
@@ -798,6 +827,39 @@ class TestExecuteGlobalCommandOverlay:
         fn, args = calls[0]
         assert fn is main_mod.send_overlay_text
         assert args == ("Title", "Subtitle", 5, "default")
+
+    def test_overlay_comment_placeholder_from_context(self, monkeypatch):
+        """{comment} comes from the structured context, not the user param."""
+        import src.python.main as main_mod
+        from src.python.main import ctx, execute_global_command
+
+        monkeypatch.setattr(ctx, "valid_functions", {"overlaytest"})
+        monkeypatch.setattr(
+            ctx,
+            "overlay_actions",
+            {"overlaytest": [("default", "{user}|{comment}|5")]},
+        )
+        monkeypatch.setattr(ctx, "script_actions", {})
+        monkeypatch.setattr(ctx, "vanilla_functions", set())
+        monkeypatch.setattr(ctx, "rcon_only_actions", {})
+        monkeypatch.setattr(ctx, "shell_actions_cache", {})
+        monkeypatch.setattr(ctx, "namespace", "ns")
+
+        calls: list[tuple] = []
+
+        async def fake_to_thread(fn, *args):
+            calls.append((fn, args))
+            return fn(*args)
+
+        monkeypatch.setattr(main_mod.asyncio, "to_thread", fake_to_thread)
+
+        context = main_mod._make_hook_context("comment", comment="hello world")
+        # user is always the plain username string now
+        asyncio.run(execute_global_command("overlaytest", "tester", 0, context))
+
+        assert len(calls) == 1
+        _, args = calls[0]
+        assert args == ("tester", "hello world", 5, "default")
 
 
 # =========================================================================

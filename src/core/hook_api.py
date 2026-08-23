@@ -35,6 +35,24 @@ _STORE_TIMEOUT = 5
 _NAMESPACE_OK = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
+class HookContext(dict):
+    """Structured event context passed to hook actions.
+
+    A plain ``dict`` subclass: all values stay accessible via ``.get()`` /
+    ``in`` / iteration / ``json.dumps``. On top, required keys can be read
+    as attributes — ``context.gift_name`` instead of
+    ``context["gift_name"]``. Attribute access fails fast with an
+    ``AttributeError`` on unknown keys (typo protection), while optional
+    keys should be read via ``.get(key, default)`` as usual.
+    """
+
+    def __getattr__(self, key: str) -> object:
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key) from None
+
+
 class HookAPI:
     """
     Runtime API passed to every event_hook script via its ``register()`` function.
@@ -209,7 +227,7 @@ class HookAPI:
                 f"Possible infinite loop."
             )
             return
-        ctx_data = dict(context) if isinstance(context, dict) else {}
+        ctx_data = HookContext(context) if isinstance(context, dict) else HookContext()
         ctx_data.setdefault("source", "hook")
         if self._name:
             ctx_data.setdefault("hook", self._name)

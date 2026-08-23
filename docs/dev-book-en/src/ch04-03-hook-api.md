@@ -27,7 +27,9 @@ api.register_action("superjump", my_handler)
 ```
 
 - **name**: Must match the name after `$` in `actions.mca`
-- **fn**: `(user: str | dict, trigger: str, context: dict) -> bool | None`
+- **fn**: `(user: str, trigger: str, context: HookContext) -> bool | None`
+  — `user` is always the plain username string; event data lives in
+  `context` (see below)
 - Duplicate registration is ignored (first call wins)
 
 ```python
@@ -76,9 +78,9 @@ gift:$gate;$say_thanks
 
 ## Handler Context — Structured Event Data
 
-The third handler argument is a **structured context dict** describing the
-event that started the chain. It is built by the event source and always
-contains at least:
+The third handler argument is a **`HookContext`** — a `dict` subclass
+describing the event that started the chain. It is built by the event
+source and always contains at least:
 
 | Key | Type | Meaning |
 |-----|------|---------|
@@ -95,9 +97,17 @@ Event-specific keys are added on top:
 | hook-enqueued (`enqueue_trigger`) | `hook` (your hook's name), plus whatever you pass via `context=` |
 
 Keys are only present when meaningful (e.g. `combo` is absent for
-non-gift events), so use `context.get(...)` with defaults. Internal
-machinery such as the trigger chain depth is deliberately **not** part of
-the context — it describes the event, not the dispatcher.
+non-gift events). Read required keys as attributes and optional keys via
+`.get()`:
+
+- `context.event`, `context.streak` — attribute access, fails fast with
+  an `AttributeError` on unknown keys (typo protection)
+- `context.get("combo", False)` — optional keys with defaults
+- Full dict compatibility stays intact: `in`, iteration,
+  `json.dumps(context)` all work
+
+Internal machinery such as the trigger chain depth is deliberately
+**not** part of the context — it describes the event, not the dispatcher.
 
 ### Example: Gift Combo Bonus
 
@@ -108,14 +118,14 @@ with `streak` holding the total number of gifts:
 ```python
 def register(api: HookAPI):
     def combo_bonus(user, trigger, context):
-        if context.get("event") != "gift":
+        if context.event != "gift":
             return
-        if context.get("gift_name") == "Rose" and context.get("streak", 0) >= 10:
-            api.rcon_enqueue([f"say {user} sent a {context['streak']}x Rose combo!"])
+        if context.gift_name == "Rose" and context.streak >= 10:
+            api.rcon_enqueue([f"say {user} sent a {context.streak}x Rose combo!"])
             api.enqueue_trigger(
                 "mega_celebration", user,
                 context={"event": "gift", "gift_name": "Rose",
-                         "streak": context["streak"]},
+                         "streak": context.streak},
             )
 
     api.register_action("combo_check", combo_bonus)

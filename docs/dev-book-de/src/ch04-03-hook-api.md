@@ -27,7 +27,9 @@ api.register_action("superjump", mein_handler)
 ```
 
 - **name**: Muss mit dem Namen nach `$` in der `actions.mca` übereinstimmen
-- **fn**: `(user: str | dict, trigger: str, context: dict) -> bool | None`
+- **fn**: `(user: str, trigger: str, context: HookContext) -> bool | None`
+  — `user` ist immer der reine Benutzername-String; Ereignisdaten liegen
+  in `context` (siehe unten)
 - Doppelte Registrierung wird ignoriert (erster Aufruf gewinnt)
 
 ```python
@@ -76,8 +78,8 @@ gift:$gate;$say_thanks
 
 ## Handler-Kontext — strukturierte Ereignisdaten
 
-Das dritte Handler-Argument ist ein **strukturiertes Kontext-Dict**, das das
-Ereignis beschreibt, mit dem die Kette gestartet wurde. Es wird von der
+Das dritte Handler-Argument ist ein **`HookContext`** — eine `dict`-Unterklasse,
+die das Ereignis beschreibt, mit dem die Kette gestartet wurde. Sie wird von der
 Ereignisquelle gebaut und enthält mindestens:
 
 | Schlüssel | Typ | Bedeutung |
@@ -95,9 +97,17 @@ Ereignisspezifische Schlüssel kommen hinzu:
 | Hook-verkettet (`enqueue_trigger`) | `hook` (Name deines Hooks) plus alles, was du per `context=` übergibst |
 
 Schlüssel sind nur vorhanden, wenn sie bedeutungsvoll sind (z. B. fehlt
-`combo` bei Nicht-Gift-Events) — lies sie daher mit `context.get(...)`
-und Defaults. Interne Mechanik wie die Verkettungstiefe ist bewusst
-**nicht** Teil des Kontexts — er beschreibt das Ereignis, nicht den Dispatcher.
+`combo` bei Nicht-Gift-Events). Pflicht-Schlüssel liest du als Attribute,
+optionale via `.get()`:
+
+- `context.event`, `context.streak` — Attribut-Zugriff, fail-fast mit
+  `AttributeError` bei unbekannten Schlüsseln (Tippfehler-Schutz)
+- `context.get("combo", False)` — optionale Schlüssel mit Defaults
+- Volle Dict-Kompatibilität bleibt erhalten: `in`, Iteration,
+  `json.dumps(context)` funktionieren wie gewohnt
+
+Interne Mechanik wie die Verkettungstiefe ist bewusst **nicht** Teil des
+Kontexts — er beschreibt das Ereignis, nicht den Dispatcher.
 
 ### Beispiel: Gift-Combo-Bonus
 
@@ -108,14 +118,14 @@ Ende der Streak, mit `streak` als Gesamtzahl der Gifts:
 ```python
 def register(api: HookAPI):
     def combo_bonus(user, trigger, context):
-        if context.get("event") != "gift":
+        if context.event != "gift":
             return
-        if context.get("gift_name") == "Rose" and context.get("streak", 0) >= 10:
-            api.rcon_enqueue([f"say {user} hat eine {context['streak']}x Rosen-Combo geschickt!"])
+        if context.gift_name == "Rose" and context.streak >= 10:
+            api.rcon_enqueue([f"say {user} hat eine {context.streak}x Rosen-Combo geschickt!"])
             api.enqueue_trigger(
                 "mega_celebration", user,
                 context={"event": "gift", "gift_name": "Rose",
-                         "streak": context["streak"]},
+                         "streak": context.streak},
             )
 
     api.register_action("combo_check", combo_bonus)

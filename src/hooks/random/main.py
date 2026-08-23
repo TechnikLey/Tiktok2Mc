@@ -37,11 +37,7 @@ def register(api: HookAPI):
             return
 
         chosen = random.choice(candidates)
-        if isinstance(user, dict):
-            username = user.get("user") or "Unknown"
-        else:
-            username = str(user) or "Unknown"
-
+        username = str(user) or "Unknown"
         api.enqueue_trigger(chosen, username)
 
     api.register_action("random", random_handler)
