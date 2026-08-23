@@ -268,12 +268,13 @@ class TestBasePluginAPIHelpers:
 
         posted = {}
 
-        def capture(path, data):
+        def capture(method, path, data):
             posted["path"] = path
             posted["data"] = data
             return True
 
-        monkeypatch.setattr(p, "api_post", capture)
+        # push_state uses the ungated raw helper internally
+        monkeypatch.setattr(p, "_api_request", capture)
         p.push_state()
         assert posted["data"]["state"]["x"] == 1
 
@@ -310,7 +311,7 @@ class TestBasePluginCommandPolling:
             p._running = False
             return {"commands": []}
 
-        monkeypatch.setattr(p, "api_get", mock_get)
+        monkeypatch.setattr(p, "_http_get", mock_get)
         p._running = True
         p._command_polling_loop()
         assert len(calls) == 1
@@ -346,7 +347,7 @@ class TestBasePluginCommandPolling:
             p._running = False
             return {"commands": []}
 
-        monkeypatch.setattr(p, "api_get", mock_get)
+        monkeypatch.setattr(p, "_http_get", mock_get)
         p._running = True
         p._command_polling_loop()
         assert ("unknown", {}) in p.seen
@@ -366,7 +367,7 @@ class TestBasePluginCommandPolling:
             p._running = False
             return {"commands": []}
 
-        monkeypatch.setattr(p, "api_get", mock_get)
+        monkeypatch.setattr(p, "_http_get", mock_get)
         p._running = True
         p._command_polling_loop()
         assert calls == [2]
@@ -586,6 +587,157 @@ class TestTimerPlugin:
         assert not t._should_signal("started")
 
 
+class TestBasePluginPermissions:
+    """Opt-in permission model: manifest 'permissions' gates the public
+    api_*/store_*/send_command/query_plugin/publish_event helpers while
+    BasePlugin's own machinery (polling, heartbeat, overlay registration)
+    stays ungated."""
+
+    def _plugin_class(self):
+        from core.base_plugin import BasePlugin
+
+        class P(BasePlugin):
+            PLUGIN_NAME = "fake"
+
+            def get_overlay_html(self):
+                return ""
+
+        return P
+
+    def _make_plugin(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+        return self._plugin_class()()
+
+    @staticmethod
+    def _mock_urlopen(monkeypatch, calls=None, response=None):
+        def mock_urlopen(req, timeout=None):
+            if calls is not None:
+                calls.append(req)
+            m = MagicMock()
+            m.__enter__ = MagicMock(return_value=m)
+            m.__exit__ = MagicMock(return_value=None)
+            if response is not None:
+                m.read.return_value = json.dumps(response).encode()
+            return m
+
+        monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+
+    def test_unrestricted_by_default(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        assert p._permissions is None
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        assert p.api_post("/anything", {}) is True
+        assert len(calls) == 1
+
+    def test_network_gate_blocks_generic_helpers(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"store"}
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        assert p.api_post("/anything", {}) is False
+        assert p.api_put("/anything", {}) is False
+        assert p.api_delete("/anything") is False
+        assert p.api_get("/anything") is None
+        assert p.api_request("/anything", payload={}) is None
+        assert calls == []  # no HTTP traffic at all
+
+    def test_store_gate(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"network"}
+        self._mock_urlopen(monkeypatch)
+        assert (
+            p.store_get("k") == "default_x"
+            or p.store_get("k", "default_x") == "default_x"
+        )
+        assert p.store_set("k", 1) is False
+        assert p.store_delete("k") is False
+        assert p.store_all() == {}
+        # network still works
+        assert p.api_post("/anything", {}) is True
+
+    def test_plugins_gate_blocks_cross_plugin_calls(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"store"}
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        assert p.send_command("other", "cmd") is False
+        assert p.query_plugin("other", "q") is None
+        assert calls == []
+
+    def test_send_command_allowed_with_permission(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"plugins"}
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        assert p.send_command("other", "cmd", {"n": 1}) is True
+        assert len(calls) == 1
+        assert "/plugins/other/command" in calls[0].full_url
+
+    def test_events_publish_event_namespaced(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"events"}
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        assert p.publish_event("fake.thing", {"n": 1}) is True
+        body = json.loads(calls[0].data.decode())
+        assert body == {"type": "fake.thing", "data": {"n": 1}}
+
+    def test_events_publish_warns_on_foreign_namespace_but_sends(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        import logging as _logging
+
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"events"}
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        with caplog.at_level(_logging.WARNING):
+            assert p.publish_event("tiktok.gift", {}) is True
+        assert any("namespace" in r.message for r in caplog.records)
+
+    def test_publish_event_invalid_type(self, tmp_path, monkeypatch):
+        from typing import Any as _Any
+
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._permissions = {"events"}
+        calls = []
+        self._mock_urlopen(monkeypatch, calls)
+        assert p.publish_event("", {}) is False
+        bad: _Any = None  # deliberately invalid input
+        assert p.publish_event(bad, {}) is False
+        assert calls == []
+
+    def test_load_permissions_missing_manifest(self, tmp_path, monkeypatch):
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._plugin_dir = tmp_path / "nope"
+        assert p._load_permissions() is None
+
+    def test_load_permissions_reads_manifest(self, tmp_path, monkeypatch):
+        plugin_dir = tmp_path / "plug"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"name": "plug", "permissions": ["store", "bogus"]}),
+            encoding="utf-8",
+        )
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._plugin_dir = plugin_dir
+        perms = p._load_permissions()
+        assert perms == {"store"}  # unknown names are ignored (with warning)
+
+    def test_load_permissions_empty_list_is_unrestricted(self, tmp_path, monkeypatch):
+        plugin_dir = tmp_path / "plug"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"name": "plug", "permissions": []}), encoding="utf-8"
+        )
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._plugin_dir = plugin_dir
+        assert p._load_permissions() is None
+
+
 class TestBasePluginGracefulShutdown:
     """on_stop() contract: reserved __shutdown__ command and atexit fallback."""
 
@@ -677,7 +829,7 @@ class TestBasePluginGracefulShutdown:
         def mock_get(path, timeout=None):
             return {"commands": [{"command": "__shutdown__", "args": {}}]}
 
-        monkeypatch.setattr(p, "api_get", mock_get)
+        monkeypatch.setattr(p, "_http_get", mock_get)
         p._running = True
         with pytest.raises(self._ProcessExited):
             p._command_polling_loop()

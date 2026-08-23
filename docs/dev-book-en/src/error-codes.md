@@ -81,6 +81,7 @@ The complete, machine-readable list is available via `GET /api/v1/diagnostics/er
 | `PLUGIN-0015` | Plugin heartbeat missing | Plugin stopped sending heartbeat pings |
 | `PLUGIN-0016` | Plugin failed to stop gracefully | Plugin did not stop within the expected timeout |
 | `PLUGIN-0017` | Plugin command queue full | Plugin's command queue reached maximum capacity |
+| `PLUGIN-0020` | Plugin permission denied | A gated BasePlugin helper was called without the matching `permissions` entry in `plugin.json` |
 
 ### CONFIG (Configuration)
 

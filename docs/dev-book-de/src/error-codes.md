@@ -81,6 +81,7 @@ Die vollständige, maschinenlesbare Liste liefert `GET /api/v1/diagnostics/error
 | `PLUGIN-0015` | Plugin heartbeat missing | Plugin sendet keine Heartbeats mehr |
 | `PLUGIN-0016` | Plugin failed to stop gracefully | Plugin stoppte nicht innerhalb des Timeouts |
 | `PLUGIN-0017` | Plugin command queue full | Plugin-Command-Queue ist voll |
+| `PLUGIN-0020` | Plugin permission denied | Ein gesperrter BasePlugin-Helfer wurde ohne passenden `permissions`-Eintrag in der `plugin.json` aufgerufen |
 
 ### CONFIG (Konfiguration)
 

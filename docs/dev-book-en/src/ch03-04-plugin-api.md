@@ -151,6 +151,47 @@ def on_command(self, command, args):
     log.warning(f"Unknown command: {command}")
 ```
 
+## Permissions (opt-in)
+
+Like hooks, plugins can declare which capabilities of the plugin API they
+use. Add a `permissions` list to your `plugin.json`:
+
+```json
+{
+  "name": "my-plugin",
+  "permissions": ["store", "events"]
+}
+```
+
+| Permission | Grants |
+|------------|--------|
+| `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
+| `network` | Generic control-plane HTTP: `api_get`, `api_post`, `api_put`, `api_delete`, `api_request` |
+| `plugins` | Cross-plugin communication: `send_command`, `query_plugin` |
+| `events` | `publish_event(type, data)` — publish on the EventBus |
+
+> [!IMPORTANT]
+> **A missing or empty `permissions` list means the plugin runs
+> unrestricted** — this keeps all existing plugins working. Once you declare
+> the field, it acts as a whitelist: every gated helper outside the list is
+> denied with its safe fallback (`False`/`None`/`{}`/default) and logged as
+> `PLUGIN-0020`; the plugin keeps running.
+
+Not gated (always available — these are the plugin's own core channels):
+command polling and handlers, heartbeat, `push_state`,
+`register_overlay`, `register_dashboard`, `on_stop`.
+
+Notes:
+
+- Unknown permission names are ignored with a warning at startup.
+- Permissions guard the **BasePlugin API surface only** — a plugin process is
+  full Python and can still open raw sockets itself. For hard isolation use
+  [sandbox profiles](./ch03-02-plugin-structure.md#sandbox-profiles).
+- `publish_event` should use your own namespace (`"<plugin-name>.<thing>"`);
+  non-namespaced types produce a warning, and reserved core families
+  (`tiktok.*`/`minecraft.*`) are rejected server-side (`403 API-0009`)
+  regardless of permissions.
+
 ## Lifecycle
 
 ### `run()`

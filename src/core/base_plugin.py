@@ -45,6 +45,15 @@ log = logging.getLogger(__name__)
 # it (never reaches user handlers), calls ``on_stop()`` and exits cleanly.
 SHUTDOWN_COMMAND = "__shutdown__"
 
+# Known permission names for the opt-in permission model. A manifest
+# WITHOUT a ``permissions`` entry runs unrestricted (backward compatible);
+# once a non-empty list is declared, every gated helper outside it is
+# denied (logged as PLUGIN-0020, safe fallback returned) — mirroring the
+# hook system's ``permissions`` semantics. Note: this guards the
+# BasePlugin API surface only; a plugin process can still open raw
+# sockets/urllib itself.
+PLUGIN_PERMISSIONS = ("store", "network", "plugins", "events")
+
 # ---------------------------------------------------------------------------
 #  Helpers
 # ---------------------------------------------------------------------------
@@ -99,6 +108,10 @@ class BasePlugin:
 
         self._cfg = load_plugin_config(self._plugin_dir)
         self._server_host = _SERVER_HOST
+
+        # Opt-in permissions from plugin.json ("permissions"); None means
+        # unrestricted (no declaration or empty list).
+        self._permissions = self._load_permissions()
 
         self._theme = load_plugin_theme(self._cfg, self.PLUGIN_NAME)
         self._theme_style = theme_css(self._theme)
@@ -175,69 +188,78 @@ class BasePlugin:
         except (OSError, TypeError) as e:
             log.warning("[%s] Failed to save window state: %s", self.PLUGIN_NAME, e)
 
-    # -- API helpers --------------------------------------------------------
+    # -- permissions ---------------------------------------------------------
 
-    def api_post(self, path: str, data: dict[str, Any]) -> bool:
-        """POST JSON data to the central API."""
-        return self._api_request("POST", path, data)
+    def _load_permissions(self) -> set[str] | None:
+        """Read ``permissions`` from the plugin manifest.
 
-    def api_put(self, path: str, data: dict[str, Any]) -> bool:
-        """PUT JSON data to the central API."""
-        return self._api_request("PUT", path, data)
-
-    def api_delete(self, path: str) -> bool:
-        """Send a DELETE request to the central API."""
-        return self._api_request("DELETE", path)
-
-    def _api_request(
-        self,
-        method: str,
-        path: str,
-        data: dict[str, Any] | None = None,
-    ) -> bool:
-        """Generic JSON request helper (returns success flag)."""
+        Returns ``None`` when unrestricted (no manifest, missing key or
+        empty list) — backward compatible with all existing plugins.
+        Unknown permission names produce a warning and are ignored.
+        """
+        manifest_path = self._plugin_dir / "plugin.json"
         try:
-            body = json.dumps(data).encode("utf-8") if data is not None else None
-            req = urllib.request.Request(
-                _api_url(path),
-                data=body,
-                headers={"Content-Type": "application/json"}
-                if body is not None
-                else {},
-                method=method,
+            with manifest_path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except FileNotFoundError:
+            return None
+        except (json.JSONDecodeError, OSError) as e:
+            log.warning(
+                "[%s] Cannot read plugin.json for permissions: %s", self.PLUGIN_NAME, e
             )
-            urllib.request.urlopen(req, timeout=5)
+            return None
+        raw_perms = raw.get("permissions")
+        if not isinstance(raw_perms, list) or not raw_perms:
+            return None
+        perms: set[str] = set()
+        for entry in raw_perms:
+            if entry in PLUGIN_PERMISSIONS:
+                perms.add(entry)
+            else:
+                log.warning(
+                    "[%s] Unknown permission '%s' in plugin.json — ignored (valid: %s)",
+                    self.PLUGIN_NAME,
+                    entry,
+                    ", ".join(PLUGIN_PERMISSIONS),
+                )
+        log.info(
+            "[%s] Permissions declared: %s", self.PLUGIN_NAME, ", ".join(sorted(perms))
+        )
+        return perms
+
+    def _has_permission(self, permission: str) -> bool:
+        """Check a gated helper against the manifest's ``permissions``.
+
+        Unrestricted plugins (``self._permissions is None``) always pass.
+        A denied call is logged as PLUGIN-0020; the caller returns its
+        safe fallback — the plugin keeps running.
+        """
+        if self._permissions is None or permission in self._permissions:
             return True
-        except (OSError, TypeError) as e:
-            log.warning("[%s] API %s %s failed: %s", self.PLUGIN_NAME, method, path, e)
-            return False
+        log.warning(
+            "[%s] %s: permission '%s' not declared in plugin.json (declared: %s)",
+            self.PLUGIN_NAME,
+            "PLUGIN-0020",
+            permission,
+            ", ".join(sorted(self._permissions)) or "<none>",
+        )
+        if self._health:
+            self._health.record_error(
+                f"plugin.{self.PLUGIN_NAME}",
+                f"permission '{permission}' denied (PLUGIN-0020)",
+            )
+        return False
 
-    # -- namespaced persistent store ----------------------------------------
+    # -- raw HTTP helpers (internal, never permission-gated) -----------------
+    #
+    # All of BasePlugin's own machinery (command polling, heartbeat,
+    # overlay/dashboard registration, query responses) runs through these
+    # ungated helpers. The public ``api_*`` wrappers below add permission
+    # checks for plugin code; internals must bypass them so a restricted
+    # plugin keeps its core channels working.
 
-    def store_get(self, key: str, default: Any = None) -> Any:
-        """Read ``key`` from this plugin's persistent store."""
-        result = self.api_get(f"/plugins/{self.PLUGIN_NAME}/data/{key}")
-        if result is None or "value" not in result:
-            return default
-        return result["value"]
-
-    def store_set(self, key: str, value: Any) -> bool:
-        """Persist ``key`` = ``value`` (arbitrary JSON) for this plugin."""
-        return self.api_put(f"/plugins/{self.PLUGIN_NAME}/data/{key}", {"value": value})
-
-    def store_delete(self, key: str) -> bool:
-        """Delete ``key`` from this plugin's persistent store."""
-        return self.api_delete(f"/plugins/{self.PLUGIN_NAME}/data/{key}")
-
-    def store_all(self) -> dict[str, Any]:
-        """Return the whole persistent store of this plugin."""
-        result = self.api_get(f"/plugins/{self.PLUGIN_NAME}/data")
-        if not result or "data" not in result:
-            return {}
-        return result["data"]
-
-    def api_get(self, path: str, timeout: int = 5) -> dict[str, Any] | None:
-        """GET JSON data from the central API."""
+    def _http_get(self, path: str, timeout: int = 5) -> dict[str, Any] | None:
+        """Raw GET JSON from the central API (no permission check)."""
         try:
             req = urllib.request.Request(_api_url(path))
             with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -246,22 +268,14 @@ class BasePlugin:
             log.warning("[%s] API GET %s failed: %s", self.PLUGIN_NAME, path, e)
             return None
 
-    def api_request(
+    def _request_json(
         self,
         path: str,
         payload: dict[str, Any] | list[Any] | None = None,
         method: str | None = None,
         timeout: float = 5,
     ) -> Any:
-        """Call a control-plane endpoint and return the parsed JSON body.
-
-        Mirrors ``HookAPI.request`` for plugins: ``path`` is relative to
-        the API base (``/api/v1``). With ``payload=None`` the request is a
-        GET; passing a payload sends it as a JSON body via POST (override
-        with ``method``, e.g. ``"PUT"``). Returns the decoded JSON value
-        (dict/list/str/...), or ``None`` when the body is empty or the
-        request fails — failures are logged, never raised.
-        """
+        """Raw request returning the parsed JSON body (no permission check)."""
         verb = method.upper() if method else ("GET" if payload is None else "POST")
         data: bytes | None = None
         headers: dict[str, str] = {}
@@ -298,16 +312,159 @@ class BasePlugin:
             log.warning("[%s] API %s %s failed: %s", self.PLUGIN_NAME, verb, path, exc)
             return None
 
+    # -- public API helpers (permission-gated: ``network``) -------------------
+
+    def api_post(self, path: str, data: dict[str, Any]) -> bool:
+        """POST JSON data to the central API. Requires ``network``."""
+        if not self._has_permission("network"):
+            return False
+        return self._api_request("POST", path, data)
+
+    def api_put(self, path: str, data: dict[str, Any]) -> bool:
+        """PUT JSON data to the central API. Requires ``network``."""
+        if not self._has_permission("network"):
+            return False
+        return self._api_request("PUT", path, data)
+
+    def api_delete(self, path: str) -> bool:
+        """Send a DELETE request to the central API. Requires ``network``."""
+        if not self._has_permission("network"):
+            return False
+        return self._api_request("DELETE", path)
+
+    def _api_request(
+        self,
+        method: str,
+        path: str,
+        data: dict[str, Any] | None = None,
+    ) -> bool:
+        """Raw JSON request helper returning a success flag (no permission
+        check — used internally and by the gated ``api_*`` wrappers)."""
+        try:
+            body = json.dumps(data).encode("utf-8") if data is not None else None
+            req = urllib.request.Request(
+                _api_url(path),
+                data=body,
+                headers={"Content-Type": "application/json"}
+                if body is not None
+                else {},
+                method=method,
+            )
+            urllib.request.urlopen(req, timeout=5)
+            return True
+        except (OSError, TypeError) as e:
+            log.warning("[%s] API %s %s failed: %s", self.PLUGIN_NAME, method, path, e)
+            return False
+
+    # -- namespaced persistent store (permission-gated: ``store``) -----------
+
+    def store_get(self, key: str, default: Any = None) -> Any:
+        """Read ``key`` from this plugin's persistent store. Requires ``store``."""
+        if not self._has_permission("store"):
+            return default
+        result = self._http_get(f"/plugins/{self.PLUGIN_NAME}/data/{key}")
+        if result is None or "value" not in result:
+            return default
+        return result["value"]
+
+    def store_set(self, key: str, value: Any) -> bool:
+        """Persist ``key`` = ``value`` (arbitrary JSON). Requires ``store``."""
+        if not self._has_permission("store"):
+            return False
+        return self._api_request(
+            "PUT", f"/plugins/{self.PLUGIN_NAME}/data/{key}", {"value": value}
+        )
+
+    def store_delete(self, key: str) -> bool:
+        """Delete ``key`` from this plugin's store. Requires ``store``."""
+        if not self._has_permission("store"):
+            return False
+        return self._api_request("DELETE", f"/plugins/{self.PLUGIN_NAME}/data/{key}")
+
+    def store_all(self) -> dict[str, Any]:
+        """Return this plugin's whole persistent store. Requires ``store``."""
+        if not self._has_permission("store"):
+            return {}
+        result = self._http_get(f"/plugins/{self.PLUGIN_NAME}/data")
+        if not result or "data" not in result:
+            return {}
+        return result["data"]
+
+    def api_get(self, path: str, timeout: int = 5) -> dict[str, Any] | None:
+        """GET JSON data from the central API. Requires ``network``."""
+        if not self._has_permission("network"):
+            return None
+        return self._http_get(path, timeout=timeout)
+
+    def api_request(
+        self,
+        path: str,
+        payload: dict[str, Any] | list[Any] | None = None,
+        method: str | None = None,
+        timeout: float = 5,
+    ) -> Any:
+        """Call a control-plane endpoint and return the parsed JSON body.
+
+        Mirrors ``HookAPI.request`` for plugins: ``path`` is relative to
+        the API base (``/api/v1``). With ``payload=None`` the request is a
+        GET; passing a payload sends it as a JSON body via POST (override
+        with ``method``, e.g. ``"PUT"``). Returns the decoded JSON value
+        (dict/list/str/...), or ``None`` when the body is empty or the
+        request fails — failures are logged, never raised.
+        Requires the ``network`` permission.
+        """
+        if not self._has_permission("network"):
+            return None
+        return self._request_json(path, payload=payload, method=method, timeout=timeout)
+
     def push_state(self) -> None:
         """Push current ``self.state`` to the API state endpoint."""
-        self.api_post(f"/plugins/{self.PLUGIN_NAME}/state", {"state": self.state})
+        self._api_request(
+            "POST", f"/plugins/{self.PLUGIN_NAME}/state", {"state": self.state}
+        )
+
+    def publish_event(
+        self, event_type: str, data: dict[str, Any] | None = None
+    ) -> bool:
+        """Publish an event on the central EventBus. Requires ``events``.
+
+        Event types should be namespaced under your plugin's name
+        (``"<plugin-name>.<thing>"``); reserved core families
+        (``tiktok.*``/``minecraft.*``) are rejected server-side with
+        ``403 API-0009`` regardless of permissions. Returns ``True``
+        when the event was accepted by the API.
+        """
+        if not isinstance(event_type, str) or not event_type.strip():
+            log.warning(
+                "[%s] publish_event: invalid event type %r",
+                self.PLUGIN_NAME,
+                event_type,
+            )
+            return False
+        event_type = event_type.strip()
+        namespace = f"{self.PLUGIN_NAME}."
+        if not event_type.startswith(namespace):
+            log.warning(
+                "[%s] publish_event: type '%s' is outside your own "
+                "namespace '%s*' — prefer namespaced types",
+                self.PLUGIN_NAME,
+                event_type,
+                namespace,
+            )
+        if not self._has_permission("events"):
+            return False
+        return self._api_request(
+            "POST", "/events", {"type": event_type, "data": data or {}}
+        )
 
     def send_command(
         self, target_plugin: str, command: str, args: dict[str, Any] | None = None
     ) -> bool:
-        """Send a command to another plugin via the API."""
+        """Send a command to another plugin via the API. Requires ``plugins``."""
+        if not self._has_permission("plugins"):
+            return False
         payload = {"command": command, "args": args or {}}
-        return self.api_post(f"/plugins/{target_plugin}/command", payload)
+        return self._api_request("POST", f"/plugins/{target_plugin}/command", payload)
 
     def query_plugin(
         self,
@@ -322,13 +479,18 @@ class BasePlugin:
         implement ``on_query()``. Returns ``{"id": ..., "result": ...}``
         on success, or ``None`` when the target is unreachable, unknown
         or times out / reports an error.
+        Requires the ``plugins`` permission.
         """
+        if not self._has_permission("plugins"):
+            return None
         payload = {"query": query, "args": args or {}, "timeout": timeout}
-        return self.api_request(f"/plugins/{target_plugin}/query", payload=payload)
+        return self._request_json(f"/plugins/{target_plugin}/query", payload=payload)
 
     def register_overlay(self, html: str) -> None:
         """Register overlay HTML with the central API."""
-        self.api_post(f"/plugins/{self.PLUGIN_NAME}/overlay-html", {"html": html})
+        self._api_request(
+            "POST", f"/plugins/{self.PLUGIN_NAME}/overlay-html", {"html": html}
+        )
 
     def register_dashboard(self, html: str) -> None:
         """Register dashboard page HTML with the central API.
@@ -336,7 +498,9 @@ class BasePlugin:
         Only called by ``run()`` when ``get_dashboard_html()`` returns
         non-empty content (opt-in via manifest ``dashboard_ui: true``).
         """
-        self.api_post(f"/plugins/{self.PLUGIN_NAME}/dashboard-html", {"html": html})
+        self._api_request(
+            "POST", f"/plugins/{self.PLUGIN_NAME}/dashboard-html", {"html": html}
+        )
 
     # -- command polling ----------------------------------------------------
 
@@ -347,7 +511,7 @@ class BasePlugin:
     def _command_polling_loop(self):
         """Background thread: long-poll commands from the API and dispatch."""
         while self._running:
-            result = self.api_get(
+            result = self._http_get(
                 f"/plugins/{self.PLUGIN_NAME}/commands?wait=1", timeout=35
             )
             if not result:
@@ -451,7 +615,8 @@ class BasePlugin:
         payload_args = {k: v for k, v in args.items() if not k.startswith("_")}
         try:
             result = self.on_query(query, payload_args)
-            self.api_post(
+            self._api_request(
+                "POST",
                 f"/plugins/{self.PLUGIN_NAME}/query-response",
                 {"id": query_id, "ok": True, "result": result},
             )
@@ -461,7 +626,8 @@ class BasePlugin:
                 self._health.record_error(
                     f"plugin.{self.PLUGIN_NAME}", f"query '{query}' failed: {e}"
                 )
-            self.api_post(
+            self._api_request(
+                "POST",
                 f"/plugins/{self.PLUGIN_NAME}/query-response",
                 {"id": query_id, "ok": False, "error": str(e)},
             )
@@ -493,7 +659,7 @@ class BasePlugin:
             if heartbeat_counter >= self._HEARTBEAT_INTERVAL:
                 heartbeat_counter = 0
                 try:
-                    self.api_get(
+                    self._http_get(
                         f"/plugins/{self.PLUGIN_NAME}/commands?wait=0",
                         timeout=5,
                     )

@@ -453,6 +453,24 @@ PLUGIN_0019 = ErrorCode(
     recovery_hint="Check the plugin log for the handler traceback.",
     impact="The caller received an error instead of a result.",
 )
+PLUGIN_0020 = ErrorCode(
+    code="PLUGIN-0020",
+    subsystem=Subsystem.PLUGIN,
+    severity=Severity.WARNING,
+    message="Plugin permission denied.",
+    description=(
+        "A plugin called a BasePlugin helper whose required permission is "
+        "not declared in the plugin manifest (plugin.json 'permissions'). "
+        "Permissions are opt-in: a manifest without a 'permissions' entry "
+        "grants everything."
+    ),
+    recovery_hint=(
+        "Declare the needed permission in plugin.json 'permissions' "
+        "(one of: store, network, plugins, events) or remove the "
+        "declaration to run unrestricted."
+    ),
+    impact="The denied call returns its safe fallback; the plugin keeps running.",
+)
 
 # ------------------------------------------------------------------- GUI ----
 GUI_0001 = ErrorCode(

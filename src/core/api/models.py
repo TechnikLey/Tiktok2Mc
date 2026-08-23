@@ -205,6 +205,14 @@ class PluginManifest(BaseModel):
         default_factory=list,
         description="Feature flags for EventBus routing",
     )
+    permissions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Opt-in capability restrictions for the BasePlugin API surface "
+            "(store, network, plugins, events). An empty list means the "
+            "plugin runs unrestricted (backward compatible)."
+        ),
+    )
     depends_on: list[str] = Field(
         default_factory=list,
         description="Plugins that must be running first",
@@ -262,6 +270,13 @@ class PluginRegistration(BaseModel):
     capabilities: list[str] = Field(
         default_factory=list,
         description="Feature flags for EventBus routing",
+    )
+    permissions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Opt-in capability restrictions for the BasePlugin API surface "
+            "(store, network, plugins, events). Empty = unrestricted."
+        ),
     )
     depends_on: list[str] = Field(
         default_factory=list,
