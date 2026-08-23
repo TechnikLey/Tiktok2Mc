@@ -308,43 +308,49 @@ patterns and does not touch the circuit breaker or counters.
 
 The notification dispatcher is the unified way to surface user-facing
 messages (status updates, warnings, results) without caring *where* they
-appear. Plugins and hooks send one request and the dispatcher fans it out
-to all channels configured in the global `config.yaml`:
+appear. Senders pass **their own channel settings inline** — no global
+configuration required. Plugins use the `BasePlugin` API helpers:
 
-```yaml
-notifications:
-  enabled: true
-  channels:
-    overlay: { overlay_name: default, duration: 4 }   # OBS overlay text
-    sound:   { file: data/sounds/alert.wav }          # .wav (Windows)
-    tts:     { rate: 0, timeout: 15 }                 # Windows SAPI speech
-    discord: { webhook_url: "https://discord.com/api/webhooks/..." }
+```python
+self.api_post("notifications", {
+    "title": "Backup done",
+    "channels": {
+        "overlay": {"duration": 4},                    # OBS overlay text
+        "sound":   {"file": "data/sounds/alert.wav"},  # .wav (Windows)
+        "tts":     {"rate": 0},                        # Windows SAPI speech
+        "discord": {"webhook_url": "https://discord.com/api/webhooks/..."},
+    },
+})  # -> True on HTTP 2xx (api_post returns a success flag)
 ```
 
 Built-in channels: `log` (always available), `overlay`, `sound`,
 `tts`, `discord`. Additional channel handlers can be registered in
 `core/api/notification_dispatcher.py` (`CHANNEL_HANDLERS`) — making this an
-exchangeable-channel system rather than a fixed list.
+exchangeable-channel system rather than a fixed list. Every request carries
+its own parameters, so different actions can target **different webhooks,
+sounds or overlays** within the same session; each call is independent.
+(Optionally, a `notifications:` section in the global `config.yaml` can
+provide default params for callers that only name a channel — plugins never
+rely on it.)
 
-Sending from a plugin or hook via the HTTP bridge (requires the `network`
-permission for hooks):
+Omitting `channels` delivers to the optionally globally configured channels
+(or `log` when none are); naming unknown channels logs `NOTIF-0002` and
+reports them as `skipped`. A channel that fails during delivery (missing
+file, webhook error, ...) is reported as `failed` with `NOTIF-0001` in the
+API log — delivery problems never raise, and `api_post` still returns True
+(failed channels are reported in the log/response, not via error status).
 
-```python
-result = api.request(
-    "notifications",
-    payload={"title": "Backup done", "body": "42 clips archived",
-             "level": "info", "channels": ["overlay", "discord"]},
-)  # -> {"sent": [...], "failed": [...], "skipped": [...]}
-```
+#### Recommended pattern: self-contained plugin settings
 
-Omitting `channels` delivers to every configured channel; naming unknown
-channels logs `NOTIF-0002` and reports them as `skipped`. A channel that
-fails during delivery (missing file, webhook error, ...) is reported as
-`failed` with `NOTIF-0001` in the API log — delivery problems never raise.
+Expose every delivery setting (webhook URL, sound file, overlay duration,
+...) through your plugin's own `config_schema`, pass it inline as shown
+above, and mention it in your plugin README ("configure it in the plugin
+settings") — end users then never touch YAML or the global config.
 
 REST endpoints: `POST /api/v1/notifications` (send), 
-`GET /api/v1/notifications/channels` (enabled state + configured channels),
-`POST /api/v1/notifications/reload` (re-read the config section after edits).
+`GET /api/v1/notifications/channels` (enabled state + built-in/configured
+channels), `POST /api/v1/notifications/reload` (re-read the optional global
+config section after edits).
 
 ## Next Chapter
 

@@ -192,6 +192,28 @@ def register(api: HookAPI):
     api.register_action("spotify_current", handler)
 ```
 
+Example — send a notification with self-contained channel settings.
+Built-in channels are `log`, `overlay`, `sound`, `tts` and `discord`;
+each entry carries its own parameters inline:
+
+```python
+result = api.request("notifications", payload={
+    "title": f"Thanks for the follow, {user}!",
+    "channels": {"discord": {"webhook_url": webhook_from_hook_config}},
+})
+# result -> {"sent": [...], "failed": [...], "skipped": [...]} or None
+```
+
+- `overlay`: `{"overlay_name": "default", "duration": 4}` — OBS overlay text
+- `sound`: `{"file": "data/sounds/alert.wav"}` — plays a .wav file (Windows)
+- `tts`: `{"rate": 0, "timeout": 15}` — speaks the text via Windows SAPI
+- `discord`: `{"webhook_url": "https://discord.com/api/webhooks/..."}`
+
+Every request carries its own parameters, so different actions can target
+different webhooks or sounds independently; unknown channel names come back
+as `skipped` (with a `NOTIF-0002` warning in the API log), failed
+deliveries as `failed` (`NOTIF-0001`) — neither ever raises.
+
 ## rcon_enqueue(commands)
 
 Adds a list of Minecraft commands to the RCON queue.

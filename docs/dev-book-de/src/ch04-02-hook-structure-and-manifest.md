@@ -30,7 +30,7 @@ src/hooks/<name>/
 | `permissions` | Array | Gewährte API-Berechtigungen: `"rcon"`, `"triggers"`, `"overlay"`, `"store"` oder `"network"` (siehe [Hook-API](./ch04-03-hook-api.md)); bewachte Aufrufe ohne passende Berechtigung werden abgelehnt |
 | `depends_on` | Array | Liste von Plugin-Namen, die aktiviert sein müssen |
 | `plugin` | String | Bei Plugin-gebündelten Hooks: der Plugin-Name |
-| `config_schema` | Objekt | Schema für die Hook-Konfiguration (siehe [Konfiguration](./ch03-03-configuration.md)) |
+| `config_schema` | Objekt | Schema für die Hook-Konfiguration (siehe [Hook-Konfiguration](./ch04-04-hook-configuration.md)) |
 | `update_url` | String | URL für Auto-Updates, z. B. `"https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest"` |
 
 ### Vollständiges Beispiel

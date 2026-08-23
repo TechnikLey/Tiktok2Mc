@@ -312,45 +312,53 @@ Event-Patterns und beeinflusst weder Circuit Breaker noch Counter.
 
 Der Notification-Dispatcher ist der einheitliche Weg, nutzergerichtete
 Meldungen (Statusupdates, Warnungen, Ergebnisse) sichtbar zu machen, ohne
-sich darum kümmern zu müssen, *wo* sie erscheinen. Plugins und Hooks senden
-einen Request, und der Dispatcher verteilt ihn an alle in der globalen
-`config.yaml` konfigurierten Channels:
+sich darum kümmern zu müssen, *wo* sie erscheinen. Sender geben **ihre
+eigenen Channel-Einstellungen inline mit** — eine globale Konfiguration ist
+nicht nötig. Plugins nutzen die `BasePlugin`-API-Helper:
 
-```yaml
-notifications:
-  enabled: true
-  channels:
-    overlay: { overlay_name: default, duration: 4 }   # OBS-Overlay-Text
-    sound:   { file: data/sounds/alert.wav }          # .wav (Windows)
-    tts:     { rate: 0, timeout: 15 }                 # Windows-SAPI-Sprache
-    discord: { webhook_url: "https://discord.com/api/webhooks/..." }
+```python
+self.api_post("notifications", {
+    "title": "Backup fertig",
+    "channels": {
+        "overlay": {"duration": 4},                    # OBS-Overlay-Text
+        "sound":   {"file": "data/sounds/alert.wav"},  # .wav (Windows)
+        "tts":     {"rate": 0},                        # Windows-SAPI-Sprache
+        "discord": {"webhook_url": "https://discord.com/api/webhooks/..."},
+    },
+})  # -> True bei HTTP 2xx (api_post liefert nur einen Erfolgs-Flag)
 ```
 
 Eingebaute Channels: `log` (immer verfügbar), `overlay`, `sound`,
 `tts`, `discord`. Weitere Channel-Handler lassen sich in
 `core/api/notification_dispatcher.py` registrieren (`CHANNEL_HANDLERS`) —
 das System ist damit austauschbar statt auf eine feste Liste beschränkt.
+Jeder Request trägt seine eigenen Parameter — verschiedene Aktionen können
+so innerhalb einer Session **unterschiedliche Webhooks, Sounds oder
+Overlays** ansprechen; jeder Aufruf ist unabhängig. (Optional kann ein
+`notifications:`-Abschnitt in der globalen `config.yaml` Standard-Parameter
+für Aufrufe bereitstellen, die nur einen Channel-Namen nennen — Plugins
+verlassen sich nie darauf.)
 
-Versand aus einem Plugin oder Hook über die HTTP-Bridge (Hooks benötigen die
-`network`-Berechtigung):
+Ohne `channels` wird an die optional global konfigurierten Channels
+zugestellt (sonst `log`); unbekannte Channel-Namen loggen `NOTIF-0002` und
+erscheinen als `skipped`. Ein Channel, der bei der Zustellung scheitert
+(fehlende Datei, Webhook-Fehler, ...), wird als `failed` gemeldet (in den
+API-Logs mit `NOTIF-0001`) — Zustellungsprobleme werfen nie Exceptions,
+und `api_post` bleibt trotzdem True (gescheiterte Channels stehen in
+Log/Response, nicht im Fehlerstatus).
 
-```python
-result = api.request(
-    "notifications",
-    payload={"title": "Backup fertig", "body": "42 Clips archiviert",
-             "level": "info", "channels": ["overlay", "discord"]},
-)  # -> {"sent": [...], "failed": [...], "skipped": [...]}
-```
+#### Empfohlenes Muster: autarke Plugin-Einstellungen
 
-Ohne `channels` wird an alle konfigurierten Channels zugestellt; unbekannte
-Channel-Namen loggen `NOTIF-0002` und erscheinen als `skipped`. Ein Channel,
-der bei der Zustellung scheitert (fehlende Datei, Webhook-Fehler, ...),
-wird als `failed` gemeldet (in den API-Logs mit `NOTIF-0001`) —
-Zustellungsprobleme werfen nie Exceptions.
+Alle Versand-Einstellungen (Webhook-URL, Sound-Datei, Overlay-Dauer, ...)
+über das eigene `config_schema` des Plugins anbieten, wie oben gezeigt
+inline mitgeben und in der Plugin-README erwähnen („in den
+Plugin-Einstellungen konfigurierbar") — Enduser kommen so nie mit YAML oder
+der globalen Config in Berührung.
 
 REST-Endpunkte: `POST /api/v1/notifications` (senden),
-`GET /api/v1/notifications/channels` (Aktiv-Status + konfigurierte Channels),
-`POST /api/v1/notifications/reload` (Config-Abschnitt neu einlesen).
+`GET /api/v1/notifications/channels` (Aktiv-Status + eingebaute/konfigurierte
+Channels), `POST /api/v1/notifications/reload` (optionalen globalen
+Config-Abschnitt neu einlesen).
 
 ## Nächstes Kapitel
 

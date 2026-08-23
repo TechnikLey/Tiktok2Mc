@@ -189,10 +189,33 @@ def register(api: HookAPI):
         if track.get("name"):
             api.send_overlay_text(title=track["name"], subtitle=track["artists"])
         else:
-            api.send_overlay_text(title="Spotify", subtitle="No active track")
+            api.send_overlay_text(title="Spotify", subtitle="Kein aktiver Track")
 
     api.register_action("spotify_current", handler)
 ```
+
+Beispiel — Benachrichtigung mit autarken Channel-Einstellungen senden.
+Eingebaute Channels sind `log`, `overlay`, `sound`, `tts` und `discord`;
+jeder Eintrag trägt seine eigenen Parameter inline:
+
+```python
+result = api.request("notifications", payload={
+    "title": f"Danke für den Follow, {user}!",
+    "channels": {"discord": {"webhook_url": webhook_aus_hook_config}},
+})
+# result -> {"sent": [...], "failed": [...], "skipped": [...]} oder None
+```
+
+- `overlay`: `{"overlay_name": "default", "duration": 4}` — OBS-Overlay-Text
+- `sound`: `{"file": "data/sounds/alert.wav"}` — spielt eine .wav-Datei (Windows)
+- `tts`: `{"rate": 0, "timeout": 15}` — spricht den Text via Windows SAPI
+- `discord`: `{"webhook_url": "https://discord.com/api/webhooks/..."}`
+
+Jeder Request trägt seine eigenen Parameter — verschiedene Aktionen können
+unterschiedliche Webhooks oder Sounds unabhängig ansprechen; unbekannte
+Channel-Namen erscheinen als `skipped` (mit `NOTIF-0002`-Warnung im
+API-Log), gescheiterte Zustellungen als `failed` (`NOTIF-0001`) — beides
+wirft nie Exceptions.
 
 ## rcon_enqueue(commands)
 
