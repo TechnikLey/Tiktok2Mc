@@ -121,6 +121,34 @@ class PluginEventBridge:
         with self._lock:
             self._subscriptions = subscriptions
             self._comment_handlers = comment_handlers
+        self._warn_unknown_subscriptions(subscriptions)
+
+    @staticmethod
+    def _warn_unknown_subscriptions(subscriptions: dict[str, list[str]]) -> None:
+        """Warn about exact-name subscriptions no source declares (J.3 #12).
+
+        Uses the unified event catalog (core events + every plugin's
+        ``emitted_events``) as the delivery registry. Wildcards are never
+        flagged — they intentionally cover events that may appear later.
+        Best-effort: catalog failures must not affect delivery.
+        """
+        try:
+            from core.api.services.reaction_catalog import collect_known_event_keys
+
+            known = collect_known_event_keys()
+        except Exception as exc:
+            log.debug("[EVENT-BRIDGE] Event catalog unavailable: %s", exc)
+            return
+        for pattern, names in sorted(subscriptions.items()):
+            if pattern == "*" or pattern.endswith(".*"):
+                continue
+            if pattern not in known:
+                log.warning(
+                    "[EVENT-BRIDGE] Plugin(s) %s subscribe to unknown event '%s' "
+                    "(no core event or emitted_events declaration matches)",
+                    ", ".join(sorted(set(names))),
+                    pattern,
+                )
 
     # ------------------------------------------------------------------
     #  Dispatch

@@ -18,6 +18,47 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Plugin Overlay"])
 
+# TTL cache for declared accepted_commands (J.3 #12 delivery validation).
+# Manifest scans are only needed to produce warnings; the cache keeps the
+# command route cheap even under frequent reaction triggers.
+_ACCEPTED_COMMANDS_TTL = 30.0
+_accepted_commands_cache: dict[str, tuple[float, set[str] | None]] = {}
+
+
+def _accepted_commands_for(name: str) -> set[str] | None:
+    """Return the plugin's declared command names, or None when unknown.
+
+    ``None`` means "no declaration available" (missing manifest or scan
+    error) — validation is skipped in that case so nothing breaks for
+    plugins without an ``accepted_commands`` section.
+    """
+    now = time.monotonic()
+    cached = _accepted_commands_cache.get(name)
+    if cached and now - cached[0] < _ACCEPTED_COMMANDS_TTL:
+        return cached[1]
+    try:
+        from core.plugin_config import discover_plugins_dir, load_plugin_manifest
+
+        plugin_dir = discover_plugins_dir() / name
+        manifest = load_plugin_manifest(plugin_dir) if plugin_dir.is_dir() else None
+        raw = (manifest or {}).get("accepted_commands")
+        result: set[str] | None = (
+            set(raw.keys()) if isinstance(raw, dict) and raw else None
+        )
+    except Exception as exc:  # validation is best-effort, never blocking
+        log.debug("accepted_commands lookup failed for '%s': %s", name, exc)
+        result = None
+    _accepted_commands_cache[name] = (now, result)
+    return result
+
+
+def invalidate_accepted_commands_cache(name: str | None = None) -> None:
+    """Drop cached declarations (call after plugin installs/updates)."""
+    if name is None:
+        _accepted_commands_cache.clear()
+    else:
+        _accepted_commands_cache.pop(name, None)
+
 
 @router.post("/plugins/{name}/overlay-html")
 async def register_overlay_html(name: str, body: dict):
@@ -96,6 +137,15 @@ async def enqueue_command(name: str, body: dict):
     cmd = body.get("command")
     if not cmd:
         raise HTTPException(status_code=422, detail="Missing 'command' field")
+    declared = _accepted_commands_for(name)
+    if declared and cmd not in declared:
+        log.warning(
+            "[CMD-QUEUE] Command '%s' not in accepted_commands of plugin '%s' "
+            "(declared: %s) — delivering anyway",
+            cmd,
+            name,
+            ", ".join(sorted(declared)),
+        )
     cmd_id = command_queue.enqueue(name, cmd, **body.get("args", {}))
     log.info("Command '%s' enqueued for plugin '%s' (id=%s)", cmd, name, cmd_id)
     return {"status": "ok", "command_id": cmd_id}

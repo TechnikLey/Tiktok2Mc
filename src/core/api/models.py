@@ -486,6 +486,7 @@ class ChatbotSessionUpdateRequest(BaseModel):
 class ReactionCatalogResponse(BaseModel):
     """Merged reaction catalog served to the GUI reactions wizard."""
 
+    version: int
     events: dict[str, dict[str, Any]]
     plugins: dict[str, dict[str, Any]]
     commands: dict[str, dict[str, Any]]

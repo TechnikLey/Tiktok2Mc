@@ -16,6 +16,11 @@ from core.api.launcher import PluginLauncher
 
 log = logging.getLogger(__name__)
 
+# Version of the unified event catalog schema. Bump when the shape of
+# ``build_reaction_catalog()`` changes in a breaking way so consumers
+# (GUI wizards, external tools) can detect and adapt.
+CATALOG_VERSION = 1
+
 # Built-in events that are not owned by a plugin (TikTok, Minecraft, Server).
 CORE_EVENTS: dict[str, dict[str, Any]] = {
     # TikTok
@@ -171,6 +176,30 @@ def _plugins_dir() -> Path | None:
     return None
 
 
+def collect_known_event_keys(plugins_dir: Path | None = None) -> set[str]:
+    """Return every event key known to the system (J.3 #12 delivery registry).
+
+    Merges the built-in core events with every plugin's declared
+    ``emitted_events``. The PluginEventBridge uses this to warn about
+    subscriptions pointing at unknown event names (typo protection).
+    """
+    known = set(CORE_EVENTS)
+    plugins_dir = plugins_dir or _plugins_dir()
+    if plugins_dir is None or not plugins_dir.is_dir():
+        return known
+
+    launcher = PluginLauncher(plugins_dir=plugins_dir)
+    try:
+        manifests = launcher._discover_from_manifests()
+    except Exception as exc:  # catalog must never break on a broken manifest
+        log.warning("Failed to scan plugin manifests for emitted events: %s", exc)
+        return known
+    for manifest in manifests:
+        for ev in manifest.emitted_events:
+            known.add(ev.key)
+    return known
+
+
 def build_reaction_catalog() -> dict[str, Any]:
     """Assemble the full reaction catalog from core + plugin manifests.
 
@@ -189,6 +218,7 @@ def build_reaction_catalog() -> dict[str, Any]:
             "Plugins directory not found — reaction catalog has core events only"
         )
         return {
+            "version": CATALOG_VERSION,
             "events": events,
             "plugins": plugins,
             "commands": commands,
@@ -213,6 +243,7 @@ def build_reaction_catalog() -> dict[str, Any]:
             }
 
     return {
+        "version": CATALOG_VERSION,
         "events": events,
         "plugins": plugins,
         "commands": commands,

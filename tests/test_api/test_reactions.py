@@ -95,3 +95,35 @@ class TestReactionCatalogEndpoint:
         assert all(
             "event" in t and "plugin" in t and "command" in t for t in body["templates"]
         )
+
+
+class TestCatalogVersioning:
+    """J.3 #12: unified catalog carries a schema version."""
+
+    def test_catalog_has_version(self, client):
+        from core.api.services.reaction_catalog import CATALOG_VERSION
+
+        body = client.get("/api/v1/reactions/catalog").json()
+        assert body["version"] == CATALOG_VERSION
+
+    def test_collect_known_event_keys_merges_core_and_plugins(self, project_dir):
+        plugins_dir = project_dir / "src" / "plugins"
+        plugin_dir = plugins_dir / "emitter"
+        plugin_dir.mkdir()
+        manifest = {
+            "name": "emitter",
+            "version": "1.0.0",
+            "display_name": "Emitter",
+            "entry_point": "src/plugins/emitter/main.py",
+            "emitted_events": [
+                {"key": "emitter.boom", "name": "Boom", "desc": "", "icon": "*"}
+            ],
+        }
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        from core.api.services.reaction_catalog import collect_known_event_keys
+
+        known = collect_known_event_keys(plugins_dir)
+        assert "tiktok.gift" in known
+        assert "minecraft.player_death" in known
+        assert "emitter.boom" in known

@@ -103,6 +103,8 @@ This is the recognition file. The `PluginWatcher` scans `src/plugins/*/plugin.js
 
 > [!NOTE]
 > The `emitted_events` and `accepted_commands` fields power the **Reactions tab** in the dashboard. The GUI fetches them via `GET /api/v1/reactions/catalog`, which merges every plugin's declarations with the built-in core events (TikTok, Minecraft, Server). Plugin events are grouped under the plugin's own name in the "Create Reaction" wizard — a new plugin shows up automatically, no GUI code changes required.
+>
+> **Delivery-side use:** the declarations are also used at runtime (J.3 #12). Subscriptions in `event_subscriptions` are checked against the unified event catalog (core events + all `emitted_events`) — an exact event name nobody declares produces a warning in the API log (typo protection; wildcards are never flagged). Likewise, commands delivered via `POST /plugins/{name}/command` that are not in `accepted_commands` are logged as a warning but still delivered. The catalog response carries a `version` field so tools can detect schema changes.
 
 > [!NOTE]
 > **Language of plugin content:** The application interface is available in English and German. However, text provided by plugins (event names, descriptions, command labels, config help text, overlay content) may appear in the plugin author's language if they have not been translated. Plugin authors can optionally provide localized strings via `name_i18n` / `desc_i18n` fields in `emitted_events` and `accepted_commands`, but this is not required. When no translation is available for the selected language, the original plugin string is shown.

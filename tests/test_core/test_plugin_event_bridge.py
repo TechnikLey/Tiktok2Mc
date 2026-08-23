@@ -267,6 +267,32 @@ class TestLifecycle:
 
         assert get_plugin_event_bridge() is get_plugin_event_bridge()
 
+    def test_unknown_exact_subscription_warns(self, monkeypatch, caplog):
+        """J.3 #12: exact subscriptions unknown to the catalog are flagged."""
+        import logging
+
+        from core.api.plugin_event_bridge import PluginEventBridge
+
+        monkeypatch.setattr(
+            "core.api.services.reaction_catalog.collect_known_event_keys",
+            lambda: {"tiktok.gift", "demo.thing"},
+        )
+        bridge = PluginEventBridge()
+        bridge._subscriptions = {
+            "tiktok.gifft": ["typo-plugin"],
+            "tiktok.gift": ["good-plugin"],
+            "demo.*": ["wild-plugin"],
+            "*": ["catchall"],
+        }
+        with caplog.at_level(logging.WARNING, logger="core.api.plugin_event_bridge"):
+            bridge._warn_unknown_subscriptions(bridge._subscriptions)
+
+        assert "tiktok.gifft" in caplog.text
+        assert "typo-plugin" in caplog.text
+        assert "tiktok.gift" not in caplog.text
+        assert "wild-plugin" not in caplog.text
+        assert "catchall" not in caplog.text
+
     def test_start_loads_subscriptions(self, monkeypatch, tmp_path):
         import asyncio
 
