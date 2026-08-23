@@ -208,9 +208,9 @@ class PluginManifest(BaseModel):
     permissions: list[str] = Field(
         default_factory=list,
         description=(
-            "Opt-in capability restrictions for the BasePlugin API surface "
-            "(store, network, plugins, events). An empty list means the "
-            "plugin runs unrestricted (backward compatible)."
+            "Mandatory capability declarations for the BasePlugin API "
+            "surface (store, network, plugins, events). Undeclared "
+            "families are denied by default."
         ),
     )
     depends_on: list[str] = Field(
@@ -274,8 +274,9 @@ class PluginRegistration(BaseModel):
     permissions: list[str] = Field(
         default_factory=list,
         description=(
-            "Opt-in capability restrictions for the BasePlugin API surface "
-            "(store, network, plugins, events). Empty = unrestricted."
+            "Mandatory capability declarations for the BasePlugin API "
+            "surface (store, network, plugins, events); undeclared "
+            "families are denied by default."
         ),
     )
     depends_on: list[str] = Field(

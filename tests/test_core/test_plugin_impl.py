@@ -95,7 +95,9 @@ class TestWinCounterPlugin:
         p = self._make_plugin(tmp_path, monkeypatch)
         p._manager.wins = 3
         signals = []
-        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        monkeypatch.setattr(
+            p, "_api_request", lambda method, path, data: signals.append(data) or True
+        )
         p._on_add_win({"amount": 1})
         assert p._manager.wins == 4
         assert not any(s.get("type") == "win.milestone" for s in signals)
@@ -104,7 +106,9 @@ class TestWinCounterPlugin:
         p = self._make_plugin(tmp_path, monkeypatch)
         p._manager.wins = 9
         signals = []
-        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        monkeypatch.setattr(
+            p, "_api_request", lambda method, path, data: signals.append(data) or True
+        )
         p._on_add_win({"amount": 3})
         assert p._manager.wins == 2
         assert p._manager.needed == 20
@@ -115,7 +119,9 @@ class TestWinCounterPlugin:
         p._manager.record_low = -10
         p._manager.wins = 0
         signals = []
-        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        monkeypatch.setattr(
+            p, "_api_request", lambda method, path, data: signals.append(data) or True
+        )
         p._on_remove_win({"amount": 1})
         assert not any(s.get("type") == "win.record_low" for s in signals)
 
@@ -123,7 +129,9 @@ class TestWinCounterPlugin:
         p = self._make_plugin(tmp_path, monkeypatch)
         p._manager.record_low = 0
         signals = []
-        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        monkeypatch.setattr(
+            p, "_api_request", lambda method, path, data: signals.append(data) or True
+        )
         p._on_remove_win({"amount": 5})
         assert p._manager.record_low == -5
         assert any(s.get("type") == "win.record_low" for s in signals)
@@ -232,7 +240,9 @@ class TestDeathCounterPlugin:
         p._data_dir.mkdir(parents=True, exist_ok=True)
         p._manager._stats_path = p._data_dir / "deaths.json"
         signals = []
-        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        monkeypatch.setattr(
+            p, "_api_request", lambda method, path, data: signals.append(data) or True
+        )
         p._on_death({"amount": 5})
         assert p._manager._count == 5
         assert any(s.get("type") == "death.milestone" for s in signals)
@@ -252,7 +262,9 @@ class TestDeathCounterPlugin:
         p._manager._stats_path = p._data_dir / "deaths.json"
         p._milestones_sent.add(5)
         signals = []
-        monkeypatch.setattr(p, "api_post", lambda path, data: signals.append(data))
+        monkeypatch.setattr(
+            p, "_api_request", lambda method, path, data: signals.append(data) or True
+        )
         p._on_death({"amount": 10})
         assert not any(s.get("type") == "death.milestone" for s in signals)
 

@@ -461,13 +461,12 @@ PLUGIN_0020 = ErrorCode(
     description=(
         "A plugin called a BasePlugin helper whose required permission is "
         "not declared in the plugin manifest (plugin.json 'permissions'). "
-        "Permissions are opt-in: a manifest without a 'permissions' entry "
-        "grants everything."
+        "Permissions are mandatory since v1.0.0: undeclared families are "
+        "denied by default."
     ),
     recovery_hint=(
         "Declare the needed permission in plugin.json 'permissions' "
-        "(one of: store, network, plugins, events) or remove the "
-        "declaration to run unrestricted."
+        "(one of: store, network, plugins, events)."
     ),
     impact="The denied call returns its safe fallback; the plugin keeps running.",
 )

@@ -108,7 +108,9 @@ class TestBasePluginAPIHelpers:
             def get_overlay_html(self):
                 return ""
 
-        return P()
+        p = P()
+        p._permissions = {"network", "store", "plugins"}  # exercise HTTP, not gating
+        return p
 
     def test_api_post_success(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
@@ -523,11 +525,11 @@ class TestTimerPlugin:
         t._current = 1
         events = []
 
-        def capture(path, data):
+        def capture(method, path, data):
             events.append((path, data))
             return True
 
-        monkeypatch.setattr(t, "api_post", capture)
+        monkeypatch.setattr(t, "_api_request", capture)
         monkeypatch.setattr(t, "push_state", lambda: None)
         t.on_tick()
         assert len(events) >= 1
@@ -544,11 +546,11 @@ class TestTimerPlugin:
         t._current = 10
         events = []
 
-        def capture(path, data):
+        def capture(method, path, data):
             events.append((path, data))
             return True
 
-        monkeypatch.setattr(t, "api_post", capture)
+        monkeypatch.setattr(t, "_api_request", capture)
         monkeypatch.setattr(t, "push_state", lambda: None)
         t.on_tick()  # 10 -> 9, should trigger milestone 10 for down direction
         assert any(
@@ -588,7 +590,8 @@ class TestTimerPlugin:
 
 
 class TestBasePluginPermissions:
-    """Opt-in permission model: manifest 'permissions' gates the public
+    """Mandatory permission model (default deny): the manifest's
+    'permissions' whitelist gates the public
     api_*/store_*/send_command/query_plugin/publish_event helpers while
     BasePlugin's own machinery (polling, heartbeat, overlay registration)
     stays ungated."""
@@ -624,13 +627,17 @@ class TestBasePluginPermissions:
 
         monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
 
-    def test_unrestricted_by_default(self, tmp_path, monkeypatch):
+    def test_default_deny_without_declaration(self, tmp_path, monkeypatch):
+        """Breaking change (v1.0.0): no 'permissions' key denies every
+        gated helper — same semantics as hooks."""
         p = self._make_plugin(tmp_path, monkeypatch)
-        assert p._permissions is None
+        assert p._permissions == set()
         calls = []
         self._mock_urlopen(monkeypatch, calls)
-        assert p.api_post("/anything", {}) is True
-        assert len(calls) == 1
+        assert p.api_post("/anything", {}) is False
+        assert p.store_set("k", 1) is False
+        assert p.publish_event("fake.thing", {}) is False
+        assert calls == []  # no HTTP traffic at all
 
     def test_network_gate_blocks_generic_helpers(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
@@ -713,7 +720,7 @@ class TestBasePluginPermissions:
     def test_load_permissions_missing_manifest(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         p._plugin_dir = tmp_path / "nope"
-        assert p._load_permissions() is None
+        assert p._load_permissions() == set()
 
     def test_load_permissions_reads_manifest(self, tmp_path, monkeypatch):
         plugin_dir = tmp_path / "plug"
@@ -727,7 +734,7 @@ class TestBasePluginPermissions:
         perms = p._load_permissions()
         assert perms == {"store"}  # unknown names are ignored (with warning)
 
-    def test_load_permissions_empty_list_is_unrestricted(self, tmp_path, monkeypatch):
+    def test_load_permissions_empty_list_is_default_deny(self, tmp_path, monkeypatch):
         plugin_dir = tmp_path / "plug"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.json").write_text(
@@ -735,7 +742,54 @@ class TestBasePluginPermissions:
         )
         p = self._make_plugin(tmp_path, monkeypatch)
         p._plugin_dir = plugin_dir
-        assert p._load_permissions() is None
+        assert p._load_permissions() == set()
+
+    def test_load_permissions_missing_key_warns(self, tmp_path, monkeypatch):
+        plugin_dir = tmp_path / "plug"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"name": "plug"}), encoding="utf-8"
+        )
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._plugin_dir = plugin_dir
+        assert p._load_permissions() == set()
+
+    def test_bundled_plugins_declare_needed_permissions(self):
+        """Every bundled plugin's declared permissions must cover the gated
+        helpers its code actually calls (smoke check via source scan)."""
+        import re
+        from pathlib import Path
+
+        plugins_root = Path(__file__).resolve().parents[2] / "src" / "plugins"
+        gated = {
+            "api_": "network",
+            "store_get": "store",
+            "store_set": "store",
+            "store_delete": "store",
+            "store_all": "store",
+            "send_command": "plugins",
+            "query_plugin": "plugins",
+            "publish_event": "events",
+        }
+        for plugin_dir in sorted(plugins_root.iterdir()):
+            manifest_file = plugin_dir / "plugin.json"
+            main_file = plugin_dir / "main.py"
+            if not manifest_file.is_file() or not main_file.is_file():
+                continue
+            import json as _json
+
+            manifest = _json.loads(manifest_file.read_text(encoding="utf-8"))
+            declared = set(manifest.get("permissions", []))
+            source = main_file.read_text(encoding="utf-8")
+            for pattern, needed in gated.items():
+                if needed in declared:
+                    continue
+                # publish_event/api_* called on self with the exact name
+                if re.search(rf"self\.{pattern}", source):
+                    pytest.fail(
+                        f"{manifest.get('name')}: uses '{pattern}' helpers but "
+                        f"does not declare permission '{needed}'"
+                    )
 
 
 class TestBasePluginRpc:

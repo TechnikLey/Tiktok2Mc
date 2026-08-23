@@ -16,6 +16,7 @@
     "timer:status",
     "timer:events"
   ],
+  "permissions": ["events"],
   "depends_on": [],
   "icon": "⏱️",
   "emitted_events": [

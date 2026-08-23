@@ -45,13 +45,12 @@ log = logging.getLogger(__name__)
 # it (never reaches user handlers), calls ``on_stop()`` and exits cleanly.
 SHUTDOWN_COMMAND = "__shutdown__"
 
-# Known permission names for the opt-in permission model. A manifest
-# WITHOUT a ``permissions`` entry runs unrestricted (backward compatible);
-# once a non-empty list is declared, every gated helper outside it is
-# denied (logged as PLUGIN-0020, safe fallback returned) — mirroring the
-# hook system's ``permissions`` semantics. Note: this guards the
-# BasePlugin API surface only; a plugin process can still open raw
-# sockets/urllib itself.
+# Known permission names for the mandatory permission model (same
+# semantics as the hook system): a plugin MUST declare every gated
+# helper family it uses in ``plugin.json`` under ``"permissions"``;
+# anything else is denied (logged as PLUGIN-0020, safe fallback
+# returned). Note: this guards the BasePlugin API surface only; a
+# plugin process can still open raw sockets/urllib itself.
 PLUGIN_PERMISSIONS = ("store", "network", "plugins", "events")
 
 # ---------------------------------------------------------------------------
@@ -109,8 +108,9 @@ class BasePlugin:
         self._cfg = load_plugin_config(self._plugin_dir)
         self._server_host = _SERVER_HOST
 
-        # Opt-in permissions from plugin.json ("permissions"); None means
-        # unrestricted (no declaration or empty list).
+        # Mandatory permissions from plugin.json ("permissions"); an empty
+        # set (missing key / no declaration) denies every gated helper
+        # (default deny, same semantics as hooks).
         self._permissions = self._load_permissions()
 
         self._theme = load_plugin_theme(self._cfg, self.PLUGIN_NAME)
@@ -190,27 +190,43 @@ class BasePlugin:
 
     # -- permissions ---------------------------------------------------------
 
-    def _load_permissions(self) -> set[str] | None:
+    def _load_permissions(self) -> set[str]:
         """Read ``permissions`` from the plugin manifest.
 
-        Returns ``None`` when unrestricted (no manifest, missing key or
-        empty list) — backward compatible with all existing plugins.
-        Unknown permission names produce a warning and are ignored.
+        Mandatory since v1.0.0: a missing key, an empty list or an
+        unreadable manifest yields an **empty set** — every gated helper
+        is then denied (default deny, same semantics as hooks). Unknown
+        permission names produce a warning and are ignored.
         """
         manifest_path = self._plugin_dir / "plugin.json"
         try:
             with manifest_path.open("r", encoding="utf-8") as f:
                 raw = json.load(f)
         except FileNotFoundError:
-            return None
+            log.warning(
+                "[%s] plugin.json not found — no permissions granted (default deny)",
+                self.PLUGIN_NAME,
+            )
+            return set()
         except (json.JSONDecodeError, OSError) as e:
             log.warning(
                 "[%s] Cannot read plugin.json for permissions: %s", self.PLUGIN_NAME, e
             )
-            return None
+            return set()
         raw_perms = raw.get("permissions")
-        if not isinstance(raw_perms, list) or not raw_perms:
-            return None
+        if raw_perms is None:
+            log.warning(
+                "[%s] No 'permissions' declared in plugin.json — all gated "
+                "helpers denied (default deny)",
+                self.PLUGIN_NAME,
+            )
+            return set()
+        if not isinstance(raw_perms, list):
+            log.warning(
+                "[%s] 'permissions' must be a list — ignoring invalid value",
+                self.PLUGIN_NAME,
+            )
+            return set()
         perms: set[str] = set()
         for entry in raw_perms:
             if entry in PLUGIN_PERMISSIONS:
@@ -223,18 +239,19 @@ class BasePlugin:
                     ", ".join(PLUGIN_PERMISSIONS),
                 )
         log.info(
-            "[%s] Permissions declared: %s", self.PLUGIN_NAME, ", ".join(sorted(perms))
+            "[%s] Permissions declared: %s",
+            self.PLUGIN_NAME,
+            ", ".join(sorted(perms)),
         )
         return perms
 
     def _has_permission(self, permission: str) -> bool:
         """Check a gated helper against the manifest's ``permissions``.
 
-        Unrestricted plugins (``self._permissions is None``) always pass.
-        A denied call is logged as PLUGIN-0020; the caller returns its
-        safe fallback — the plugin keeps running.
+        Default deny: undeclared families are rejected with PLUGIN-0020;
+        the caller returns its safe fallback — the plugin keeps running.
         """
-        if self._permissions is None or permission in self._permissions:
+        if permission in self._permissions:
             return True
         log.warning(
             "[%s] %s: permission '%s' not declared in plugin.json (declared: %s)",

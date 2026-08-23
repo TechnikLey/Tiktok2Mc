@@ -16,6 +16,7 @@
     "death-counter:milestones",
     "death-counter:events"
   ],
+  "permissions": ["events"],
   "depends_on": [],
   "icon": "💀",
   "emitted_events": [

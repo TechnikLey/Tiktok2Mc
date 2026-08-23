@@ -151,10 +151,10 @@ def on_command(self, command, args):
     log.warning(f"Unbekannter Befehl: {command}")
 ```
 
-## Permissions (opt-in)
+## Permissions (Pflicht)
 
-Wie Hooks können Plugins deklarieren, welche Fähigkeiten der Plugin-API sie
-nutzen. Dazu eine `permissions`-Liste in der `plugin.json`:
+Wie Hooks deklarieren Plugins, welche Fähigkeiten der Plugin-API sie nutzen.
+Dazu eine `permissions`-Liste in der `plugin.json`:
 
 ```json
 {
@@ -171,11 +171,10 @@ nutzen. Dazu eine `permissions`-Liste in der `plugin.json`:
 | `events` | `publish_event(type, data)` — Events auf den EventBus publizieren |
 
 > [!IMPORTANT]
-> **Fehlt die `permissions`-Liste oder ist sie leer, läuft das Plugin
-> unbeschränkt** — alle bestehenden Plugins funktionieren weiter. Sobald das
-> Feld deklariert ist, wirkt es als Whitelist: Jeder gesperrte Helfer außerhalb
-> der Liste wird mit seinem sicheren Rückgabewert abgelehnt (`False`/`None`/
-> `{}`/Default) und als `PLUGIN-0020` geloggt; das Plugin läuft weiter.
+> **Default-Deny (Breaking Change seit v1.0.0):** Jeder gesperrte Helfer,
+> dessen Familie nicht deklariert ist, wird mit seinem sicheren Rückgabewert
+> abgelehnt (`False`/`None`/`{}`/Default) und als `PLUGIN-0020` geloggt;
+> das Plugin läuft weiter. Deklariere genau das, was du nutzt.
 
 Nicht gesperrt (immer verfügbar — das sind die eigenen Kernkanäle des
 Plugins): Command-Polling und Handler, Heartbeat, `push_state`,
@@ -188,10 +187,10 @@ Hinweise:
   Plugin-Prozess ist volles Python und könnte weiterhin selbst Sockets öffnen.
   Für harte Isolation gibt es die
   [Sandbox-Profile](./ch03-02-plugin-structure.md#sandbox-profiles).
-- `publish_event` sollte den eigenen Namespace nutzen
-  (`"<plugin-name>.<ding>"`); nicht namespaced Typen erzeugen eine Warnung,
-  und reservierte Kernfamilien (`tiktok.*`/`minecraft.*`) werden serverseitig
-  abgelehnt (`403 API-0009`) — unabhängig von Permissions.
+- Bevorzuge `publish_event` statt rohem `api_post("/events", ...)` — es
+  braucht nur die `events`-Permission und validiert deinen Namespace
+  (`"<plugin-name>.<ding>"`; reservierte Kernfamilien `tiktok.*`/
+  `minecraft.*` werden serverseitig mit `403 API-0009` abgelehnt).
 
 ## Lebenszyklus
 

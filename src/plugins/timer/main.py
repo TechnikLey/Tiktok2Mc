@@ -60,7 +60,7 @@ class TimerPlugin(BasePlugin):
     def _publish(self, event_type: str, data: dict):
         """Broadcast an event to the central EventBus (no coupling)."""
         try:
-            self.api_post("/events", {"type": event_type, "data": data})
+            self.publish_event(event_type, data)
         except (OSError, TypeError) as e:
             log.warning("[TIMER] Failed to publish event %s: %s", event_type, e)
 

@@ -64,7 +64,7 @@ class DeathCounterPlugin(BasePlugin):
             data = self._manager.get_data()
             if extra:
                 data.update(extra)
-            self.api_post("/events", {"type": f"death.{event_type}", "data": data})
+            self.publish_event(f"death.{event_type}", data)
 
     # -- command handlers ---------------------------------------------------
 

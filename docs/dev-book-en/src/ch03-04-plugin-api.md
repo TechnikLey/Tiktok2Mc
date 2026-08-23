@@ -151,10 +151,10 @@ def on_command(self, command, args):
     log.warning(f"Unknown command: {command}")
 ```
 
-## Permissions (opt-in)
+## Permissions (mandatory)
 
-Like hooks, plugins can declare which capabilities of the plugin API they
-use. Add a `permissions` list to your `plugin.json`:
+Like hooks, plugins declare which capabilities of the plugin API they use.
+Add a `permissions` list to your `plugin.json`:
 
 ```json
 {
@@ -171,11 +171,10 @@ use. Add a `permissions` list to your `plugin.json`:
 | `events` | `publish_event(type, data)` — publish on the EventBus |
 
 > [!IMPORTANT]
-> **A missing or empty `permissions` list means the plugin runs
-> unrestricted** — this keeps all existing plugins working. Once you declare
-> the field, it acts as a whitelist: every gated helper outside the list is
-> denied with its safe fallback (`False`/`None`/`{}`/default) and logged as
-> `PLUGIN-0020`; the plugin keeps running.
+> **Default deny (breaking since v1.0.0):** every gated helper whose family
+> is not declared is rejected with its safe fallback (`False`/`None`/`{}`/
+> default) and logged as `PLUGIN-0020`; the plugin keeps running. Declare
+> exactly what you use.
 
 Not gated (always available — these are the plugin's own core channels):
 command polling and handlers, heartbeat, `push_state`,
@@ -187,10 +186,10 @@ Notes:
 - Permissions guard the **BasePlugin API surface only** — a plugin process is
   full Python and can still open raw sockets itself. For hard isolation use
   [sandbox profiles](./ch03-02-plugin-structure.md#sandbox-profiles).
-- `publish_event` should use your own namespace (`"<plugin-name>.<thing>"`);
-  non-namespaced types produce a warning, and reserved core families
-  (`tiktok.*`/`minecraft.*`) are rejected server-side (`403 API-0009`)
-  regardless of permissions.
+- Prefer `publish_event` over raw `api_post("/events", ...)` — it only needs
+  the `events` permission and validates your namespace (`"<plugin-name>.<thing>"`;
+  reserved core families `tiktok.*`/`minecraft.*` are rejected server-side
+  with `403 API-0009`).
 
 ## Lifecycle
 

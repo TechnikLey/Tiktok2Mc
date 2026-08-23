@@ -363,7 +363,7 @@ class SpotifyControlPlugin(BasePlugin):
             data = {}
             if extra:
                 data.update(extra)
-            self.api_post("/events", {"type": f"spotify.{event_type}", "data": data})
+            self.publish_event(f"spotify.{event_type}", data)
 
     # -- tick (overlay polling) -------------------------------------------
 

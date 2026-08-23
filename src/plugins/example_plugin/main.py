@@ -205,17 +205,14 @@ class ExamplePlugin(BasePlugin):
     # ═══════════════════════════════════════════════════════════════
     #  7. EVENT PUBLISHING
     # ═══════════════════════════════════════════════════════════════
-    # api_post("/events", ...) broadcasts an event to the central
-    # EventBus. Other plugins, hooks, or the dashboard can react
-    # without any direct coupling.
+    # publish_event(...) broadcasts an event to the central EventBus
+    # (requires the "events" permission in plugin.json). Other plugins,
+    # hooks, or the dashboard can react without any direct coupling.
     # ═══════════════════════════════════════════════════════════════
     def _publish_event(self, event_type: str, data: dict | None = None) -> None:
         """Send an event to the EventBus (e.g. "counter.auto_tick_changed")."""
-        payload: dict[str, Any] = {"type": f"counter.{event_type}"}
-        if data:
-            payload["data"] = data
         try:
-            self.api_post("/events", payload)
+            self.publish_event(f"counter.{event_type}", data)
         except (OSError, TypeError) as e:
             log.warning("[%s] Event publish failed: %s", self.PLUGIN_NAME, e)
 

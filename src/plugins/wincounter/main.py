@@ -92,7 +92,7 @@ class WinCounterPlugin(BasePlugin):
             data = self._manager.get_data()
             if extra:
                 data.update(extra)
-            self.api_post("/events", {"type": f"win.{event_type}", "data": data})
+            self.publish_event(f"win.{event_type}", data)
 
     # -- command handlers ---------------------------------------------------
 
