@@ -13,6 +13,7 @@ from .health import router as health_router
 from .hooks import router as hooks_router
 from .logs import router as logs_router
 from .mc_plugins import router as mc_plugins_router
+from .notifications import router as notifications_router
 from .outbound import router as outbound_router
 from .overlay import router as overlay_router
 from .plugin_config import router as plugin_config_router
@@ -50,6 +51,7 @@ api_router.include_router(actions_router)
 api_router.include_router(backups_router)
 api_router.include_router(overlay_router)
 api_router.include_router(outbound_router)
+api_router.include_router(notifications_router)
 api_router.include_router(plugin_overlay_router)
 api_router.include_router(hooks_router)
 api_router.include_router(event_commands_router)

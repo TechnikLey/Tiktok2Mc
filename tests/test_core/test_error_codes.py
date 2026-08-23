@@ -278,6 +278,7 @@ class TestErrorCodeConstants:
             Subsystem.BACKUP,
             Subsystem.UPDATE,
             Subsystem.HEARTBEAT,
+            Subsystem.NOTIF,
         }
         assert subsystems_used == expected
 

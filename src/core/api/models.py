@@ -483,6 +483,23 @@ class ChatbotSessionUpdateRequest(BaseModel):
     tt_target_idc: str | None = None
 
 
+class NotificationRequest(BaseModel):
+    """Body for ``POST /notifications`` (J.3 Nr. 13)."""
+
+    title: str
+    body: str = ""
+    level: str = "info"
+    channels: list[str] | None = None  # None = configured default channels
+
+
+class NotificationResponse(BaseModel):
+    """Per-outcome channel lists after a notification fan-out."""
+
+    sent: list[str] = []
+    failed: list[str] = []
+    skipped: list[str] = []
+
+
 class ReactionCatalogResponse(BaseModel):
     """Merged reaction catalog served to the GUI reactions wizard."""
 

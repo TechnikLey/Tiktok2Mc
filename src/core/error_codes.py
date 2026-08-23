@@ -93,6 +93,7 @@ class Subsystem(str, enum.Enum):
     UPDATE = "UPDATE"
     SANDBOX = "SANDBOX"
     HEARTBEAT = "HEARTBEAT"
+    NOTIF = "NOTIF"
 
     @classmethod
     def from_string(cls, s: str) -> Subsystem:
@@ -1143,9 +1144,36 @@ HOOK_0009 = ErrorCode(
     ),
     recovery_hint=(
         "Declare the needed permission in hook.json 'permissions' "
-        "(one of: rcon, triggers, overlay, store)."
+        "(one of: rcon, triggers, overlay, store, network)."
     ),
     impact="The denied call is ignored; the hook keeps running restricted.",
+)
+
+# --------------------------------------------------------------- NOTIF -----
+NOTIF_0001 = ErrorCode(
+    code="NOTIF-0001",
+    subsystem=Subsystem.NOTIF,
+    severity=Severity.WARNING,
+    message="Notification channel delivery failed.",
+    description=(
+        "A notification could not be delivered to one of the configured "
+        "channels (e.g. overlay unreachable, sound file missing, TTS or "
+        "webhook error)."
+    ),
+    recovery_hint="Check the channel configuration in config.yaml 'notifications'.",
+    impact="Other channels are not affected.",
+)
+NOTIF_0002 = ErrorCode(
+    code="NOTIF-0002",
+    subsystem=Subsystem.NOTIF,
+    severity=Severity.WARNING,
+    message="Unknown notification channel requested.",
+    description=(
+        "A notification request named a channel that is neither built-in "
+        "nor configured in config.yaml 'notifications.channels'."
+    ),
+    recovery_hint="Use one of the configured channels or add it to the config.",
+    impact="The notification is delivered to the remaining channels only.",
 )
 
 # -------------------------------------------------------------- WATCHER ----

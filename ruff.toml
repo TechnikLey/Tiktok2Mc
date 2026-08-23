@@ -150,6 +150,7 @@ ignore = ["F841"]
 "src/core/api/dashboard_publisher.py" = ["BLE001"]  # dashboard data is best-effort
 "src/core/api/plugin_event_bridge.py" = ["BLE001", "S110"]  # event routing worker: best-effort dispatch + health reporting
 "src/core/api/outbound_dispatcher.py" = ["BLE001", "S110"]  # webhook worker: delivery retries must never kill the loop
+"src/core/api/notification_dispatcher.py" = ["BLE001"]  # one broken notification channel must not kill the fan-out
 "src/core/api/services/actions.py" = ["BLE001"]  # script validation must not fail if hooks are unavailable
 "src/core/api/services/reaction_catalog.py" = ["BLE001"]  # catalog assembly must survive broken plugin manifests
 

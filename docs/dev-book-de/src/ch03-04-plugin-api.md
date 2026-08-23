@@ -308,6 +308,50 @@ Konnektivitätstest läuft über
 `POST /api/v1/outbound/channels/{name}/test` — die Probe ignoriert
 Event-Patterns und beeinflusst weder Circuit Breaker noch Counter.
 
+### Benachrichtigungen
+
+Der Notification-Dispatcher ist der einheitliche Weg, nutzergerichtete
+Meldungen (Statusupdates, Warnungen, Ergebnisse) sichtbar zu machen, ohne
+sich darum kümmern zu müssen, *wo* sie erscheinen. Plugins und Hooks senden
+einen Request, und der Dispatcher verteilt ihn an alle in der globalen
+`config.yaml` konfigurierten Channels:
+
+```yaml
+notifications:
+  enabled: true
+  channels:
+    overlay: { overlay_name: default, duration: 4 }   # OBS-Overlay-Text
+    sound:   { file: data/sounds/alert.wav }          # .wav (Windows)
+    tts:     { rate: 0, timeout: 15 }                 # Windows-SAPI-Sprache
+    discord: { webhook_url: "https://discord.com/api/webhooks/..." }
+```
+
+Eingebaute Channels: `log` (immer verfügbar), `overlay`, `sound`,
+`tts`, `discord`. Weitere Channel-Handler lassen sich in
+`core/api/notification_dispatcher.py` registrieren (`CHANNEL_HANDLERS`) —
+das System ist damit austauschbar statt auf eine feste Liste beschränkt.
+
+Versand aus einem Plugin oder Hook über die HTTP-Bridge (Hooks benötigen die
+`network`-Berechtigung):
+
+```python
+result = api.request(
+    "notifications",
+    payload={"title": "Backup fertig", "body": "42 Clips archiviert",
+             "level": "info", "channels": ["overlay", "discord"]},
+)  # -> {"sent": [...], "failed": [...], "skipped": [...]}
+```
+
+Ohne `channels` wird an alle konfigurierten Channels zugestellt; unbekannte
+Channel-Namen loggen `NOTIF-0002` und erscheinen als `skipped`. Ein Channel,
+der bei der Zustellung scheitert (fehlende Datei, Webhook-Fehler, ...),
+wird als `failed` gemeldet (in den API-Logs mit `NOTIF-0001`) —
+Zustellungsprobleme werfen nie Exceptions.
+
+REST-Endpunkte: `POST /api/v1/notifications` (senden),
+`GET /api/v1/notifications/channels` (Aktiv-Status + konfigurierte Channels),
+`POST /api/v1/notifications/reload` (Config-Abschnitt neu einlesen).
+
 ## Nächstes Kapitel
 
 Lerne, wie du [Events empfängst](./ch03-05-events-and-subscriptions.md) — sowohl von TikTok als auch über den Event-Command-Mapper.

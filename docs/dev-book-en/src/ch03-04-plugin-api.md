@@ -304,6 +304,48 @@ connectivity probe is available via
 `POST /api/v1/outbound/channels/{name}/test` — the probe ignores event
 patterns and does not touch the circuit breaker or counters.
 
+### Notifications
+
+The notification dispatcher is the unified way to surface user-facing
+messages (status updates, warnings, results) without caring *where* they
+appear. Plugins and hooks send one request and the dispatcher fans it out
+to all channels configured in the global `config.yaml`:
+
+```yaml
+notifications:
+  enabled: true
+  channels:
+    overlay: { overlay_name: default, duration: 4 }   # OBS overlay text
+    sound:   { file: data/sounds/alert.wav }          # .wav (Windows)
+    tts:     { rate: 0, timeout: 15 }                 # Windows SAPI speech
+    discord: { webhook_url: "https://discord.com/api/webhooks/..." }
+```
+
+Built-in channels: `log` (always available), `overlay`, `sound`,
+`tts`, `discord`. Additional channel handlers can be registered in
+`core/api/notification_dispatcher.py` (`CHANNEL_HANDLERS`) — making this an
+exchangeable-channel system rather than a fixed list.
+
+Sending from a plugin or hook via the HTTP bridge (requires the `network`
+permission for hooks):
+
+```python
+result = api.request(
+    "notifications",
+    payload={"title": "Backup done", "body": "42 clips archived",
+             "level": "info", "channels": ["overlay", "discord"]},
+)  # -> {"sent": [...], "failed": [...], "skipped": [...]}
+```
+
+Omitting `channels` delivers to every configured channel; naming unknown
+channels logs `NOTIF-0002` and reports them as `skipped`. A channel that
+fails during delivery (missing file, webhook error, ...) is reported as
+`failed` with `NOTIF-0001` in the API log — delivery problems never raise.
+
+REST endpoints: `POST /api/v1/notifications` (send), 
+`GET /api/v1/notifications/channels` (enabled state + configured channels),
+`POST /api/v1/notifications/reload` (re-read the config section after edits).
+
 ## Next Chapter
 
 Learn how to [Receive Events](./ch03-05-events-and-subscriptions.md) — both from TikTok and via the Event-Command-Mapper.
