@@ -2550,11 +2550,11 @@ function copyUrl(btn, url) {
   });
 }
 
-const BUILTIN_PLUGINS = ['deathcounter', 'wincounter', 'timer', 'spotify', 'spotifycontrol'];
-
 function isBuiltinPlugin(name) {
-  const normalized = name.toLowerCase().replace(/[-_]/g, '');
-  return BUILTIN_PLUGINS.includes(normalized);
+  // Bundled status comes from the plugin manifest ("bundled": true) via
+  // GET /plugins — the frontend must not hardcode plugin names.
+  const plugin = currentPlugins.find(p => p.name === name);
+  return !!(plugin && plugin.bundled);
 }
 
 async function promptEnablePlugin(name, displayName) {
@@ -4590,21 +4590,32 @@ class ConfigEditor {
   }
 
   buildThemeEditor(path, theme) {
-    const pluginKeys = new Set(['death_counter','win_counter','timer','spotify']);
+    // Structural rendering only: nested objects are colour groups, plain
+    // strings are single colours. No hardcoded consumer names — the
+    // frontend must not know individual plugins.
     let html = '';
-    for (const [plugin, colors] of Object.entries(theme || {})) {
-      if (pluginKeys.has(plugin)) continue; // plugin colors are managed in their own configs
-      html += `<div style="margin-bottom:1.5rem;"><strong style="font-size:0.95rem;color:var(--text);display:block;margin-bottom:0.5rem;">${escapeHtml(toTitle(plugin))}</strong>`;
-      for (const [ckey, cval] of Object.entries(colors)) {
-        const p = `${path}.${plugin}.${ckey}`;
+    for (const [group, value] of Object.entries(theme || {})) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        html += `<div style="margin-bottom:1.5rem;"><strong style="font-size:0.95rem;color:var(--text);display:block;margin-bottom:0.5rem;">${escapeHtml(toTitle(group))}</strong>`;
+        for (const [ckey, cval] of Object.entries(value)) {
+          const p = `${path}.${group}.${ckey}`;
+          const id = 'f_' + p.replace(/[^a-zA-Z0-9]/g, '_');
+          html += `<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+            <span style="font-size:0.85rem;color:var(--text-secondary);min-width:100px;">${escapeHtml(toTitle(ckey))}</span>
+            <input type="color" id="${id}" value="${cval}" data-path="${p}" data-type="string" oninput="document.getElementById('${id}_hex').value=this.value">
+            <input type="text" id="${id}_hex" value="${escapeHtml(cval)}" style="width:120px;padding:0.45rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;" oninput="document.getElementById('${id}').value=this.value">
+          </div>`;
+        }
+        html += '</div>';
+      } else if (typeof value === 'string') {
+        const p = `${path}.${group}`;
         const id = 'f_' + p.replace(/[^a-zA-Z0-9]/g, '_');
         html += `<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
-          <span style="font-size:0.85rem;color:var(--text-secondary);min-width:100px;">${escapeHtml(toTitle(ckey))}</span>
-          <input type="color" id="${id}" value="${cval}" data-path="${p}" data-type="string" oninput="document.getElementById('${id}_hex').value=this.value">
-          <input type="text" id="${id}_hex" value="${escapeHtml(cval)}" style="width:120px;padding:0.45rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;" oninput="document.getElementById('${id}').value=this.value">
+          <span style="font-size:0.85rem;color:var(--text-secondary);min-width:100px;">${escapeHtml(toTitle(group))}</span>
+          <input type="color" id="${id}" value="${value}" data-path="${p}" data-type="string" oninput="document.getElementById('${id}_hex').value=this.value">
+          <input type="text" id="${id}_hex" value="${escapeHtml(value)}" style="width:120px;padding:0.45rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;" oninput="document.getElementById('${id}').value=this.value">
         </div>`;
       }
-      html += '</div>';
     }
     return html;
   }
@@ -6062,56 +6073,17 @@ class ReactionEditor {
       // Minecraft
       'minecraft.player_death': { name: 'Player Dies', name_i18n: { en: 'Player Dies', de: 'Spieler stirbt' }, desc: 'When you or another player dies', desc_i18n: { en: 'When you or another player dies', de: 'Du oder ein anderer Spieler stirbt' }, category: 'minecraft', icon: '💀' },
       'minecraft.player_respawn': { name: 'Player Respawns', name_i18n: { en: 'Player Respawns', de: 'Spieler spawnt neu' }, desc: 'When a player respawns after dying', desc_i18n: { en: 'When a player respawns after dying', de: 'Ein Spieler spawnt nach dem Tod neu' }, category: 'minecraft', icon: '✨' },
-      // Timer
-      'timer.started': { name: 'Timer Starts', desc: 'When the countdown timer starts', category: 'timer', icon: '▶️' },
-      'timer.paused': { name: 'Timer Pauses', desc: 'When the countdown timer is paused', category: 'timer', icon: '⏸️' },
-      'timer.resumed': { name: 'Timer Resumes', desc: 'When the countdown timer resumes', category: 'timer', icon: '▶️' },
-      'timer.reset': { name: 'Timer Resets', desc: 'When the countdown timer is reset', category: 'timer', icon: '🔄' },
-      'timer.tick': { name: 'Timer Ticks', desc: 'Every second while the timer is running', category: 'timer', icon: '⏱️' },
-      'timer.zero': { name: 'Timer Hits Zero', desc: 'When the countdown reaches zero', category: 'timer', icon: '⏰' },
-      'timer.milestone': { name: 'Timer Milestone', desc: 'When the timer passes a configured milestone', category: 'timer', icon: '🎯' },
       // Server
       'server.started': { name: 'Server Starts', name_i18n: { en: 'Server Starts', de: 'Server startet' }, desc: 'When the Minecraft server finishes starting', desc_i18n: { en: 'When the Minecraft server finishes starting', de: 'Der Minecraft-Server hat erfolgreich gestartet' }, category: 'server', icon: '🟢' },
       'server.stopping': { name: 'Server Stopping', name_i18n: { en: 'Server Stopping', de: 'Server stoppt' }, desc: 'When the Minecraft server begins to shut down', desc_i18n: { en: 'When the Minecraft server begins to shut down', de: 'Der Minecraft-Server fährt herunter' }, category: 'server', icon: '🛑' },
     };
 
-    this.pluginCatalog = {
-      'timer': { name: 'Timer', desc: 'Countdown or count-up timer overlay', icon: '⏱️' },
-      'spotify-control': { name: 'Spotify', desc: 'Control music playback', icon: '🎵' },
-      'win-counter': { name: 'Win Counter', desc: 'Track wins or scores', icon: '🏆' },
-      'death-counter': { name: 'Death Counter', desc: 'Count player deaths', icon: '💀' },
-    };
+    // Plugin/command catalogs start empty: everything plugin-owned comes
+    // from GET /api/v1/reactions/catalog (assembled from each plugin's own
+    // plugin.json). The frontend must not hardcode plugin metadata.
+    this.pluginCatalog = {};
 
-    this.commandCatalog = {
-      'timer': {
-        'start': { name: 'Start Timer', desc: 'Begin the countdown from the current time', args: {} },
-        'pause': { name: 'Pause Timer', desc: 'Pause the countdown', args: {} },
-        'resume': { name: 'Resume Timer', desc: 'Continue a paused countdown', args: {} },
-        'reset': { name: 'Reset Timer', desc: 'Reset the timer to its starting value', args: {} },
-        'add_time': { name: 'Add Time', desc: 'Add seconds to the current timer', args: { seconds: { type: 'number', label: 'Seconds to add', default: 10, min: 1 } } },
-        'set_time': { name: 'Set Time', desc: 'Set the timer to a specific number of seconds', args: { seconds: { type: 'number', label: 'Seconds to set', default: 60, min: 0 } } },
-      },
-      'spotify-control': {
-        'play': { name: 'Play Music', desc: 'Start or resume playback', args: {} },
-        'pause': { name: 'Pause Music', desc: 'Pause the current track', args: {} },
-        'next': { name: 'Next Track', desc: 'Skip to the next song', args: {} },
-        'previous': { name: 'Previous Track', desc: 'Go back to the previous song', args: {} },
-        'volume': { name: 'Set Volume', desc: 'Change playback volume', args: { level: { type: 'number', label: 'Volume level (0–100)', default: 50, min: 0, max: 100 } } },
-        'volume_up': { name: 'Volume Up', desc: 'Increase the volume', args: {} },
-        'volume_down': { name: 'Volume Down', desc: 'Decrease the volume', args: {} },
-        'shuffle': { name: 'Toggle Shuffle', desc: 'Turn shuffle on or off', args: {} },
-        'repeat': { name: 'Toggle Repeat', desc: 'Turn repeat on or off', args: {} },
-        'save': { name: 'Save Track', desc: 'Save the currently playing song to your library', args: {} },
-        'playtrack': { name: 'Play Specific Track', desc: 'Search for and play a song', args: { query: { type: 'string', label: 'Song name or URL', default: '', placeholder: 'Never Gonna Give You Up' } } },
-      },
-      'win-counter': {
-        'add_win': { name: 'Add Win', desc: 'Increase the win count', args: { amount: { type: 'number', label: 'How many wins', default: 1, min: 1 } } },
-        'remove_win': { name: 'Remove Win', desc: 'Decrease the win count', args: { amount: { type: 'number', label: 'How many to remove', default: 1, min: 1 } } },
-      },
-      'death-counter': {
-        'player_death': { name: 'Count Death', desc: 'Increase the death counter', args: {} },
-      },
-    };
+    this.commandCatalog = {};
 
     this.templates = [];
 

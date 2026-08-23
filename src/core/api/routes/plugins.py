@@ -150,8 +150,8 @@ async def list_plugins():
         plugins = registry.list()
 
         # Check each registered plugin's manifest for errors and the
-        # dashboard_ui declaration (J.3 #11 — read fresh per request so
-        # manifest edits take effect without re-registering).
+        # dashboard_ui/bundled/queries declarations (read fresh per request
+        # so manifest edits take effect without re-registering).
         for plugin in plugins:
             if plugin.path:
                 plugin_dir = (
@@ -175,6 +175,7 @@ async def list_plugins():
                             with manifest_path.open("r", encoding="utf-8") as fh:
                                 raw = json.load(fh)
                             plugin.dashboard_ui = bool(raw.get("dashboard_ui", False))
+                            plugin.bundled = bool(raw.get("bundled", False))
                             plugin.queries = _queries_from_manifest(raw)
                         except (json.JSONDecodeError, OSError) as exc:
                             plugin.error = str(exc)
@@ -226,6 +227,7 @@ async def list_plugins():
                         last_heartbeat=None,
                         platform="all",
                         dashboard_ui=bool(raw.get("dashboard_ui", False)),
+                        bundled=bool(raw.get("bundled", False)),
                         queries=_queries_from_manifest(raw),
                     )
                 )
@@ -351,7 +353,7 @@ async def discover_plugins():
 
 @router.get("/plugins/queries")
 async def list_plugin_queries():
-    """List every plugin's declared query names (C.3 #3 discovery).
+    """List every plugin's declared query names discovery.
 
     Reads the ``queries`` declaration from each ``plugin.json`` on the
     filesystem so callers can find out which queries exist before

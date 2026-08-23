@@ -170,7 +170,7 @@ Ungated methods that always work: `register_action`,
 
 ## request(path, payload=None, method=None, timeout=5)
 
-Synchronous request/response against the control plane (`J.2 Nr. 8`).
+Synchronous request/response against the control plane.
 Returns the **parsed JSON body** (`dict`/`list`/str/...), or `None` when
 the body is empty or the call fails — failures are logged, never raised.
 
@@ -371,7 +371,7 @@ def register(api: HookAPI):
 
 ## Event Subscriptions & Publishing
 
-Hooks can **subscribe to bus events** (`B.3 Nr. 2`) — reaction without a
+Hooks can **subscribe to bus events** — reaction without a
 `$`-line in `actions.mca`:
 
 ```python

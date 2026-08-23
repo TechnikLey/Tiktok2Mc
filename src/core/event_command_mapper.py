@@ -8,13 +8,11 @@ Config format (YAML)::_
 
     event_commands:
       minecraft.player_death:
-        - target: timer
+        - target: my-timer-plugin
           command: pause
-        - target: spotify-control
-          command: pause
-      timer.zero:
-        - target: win-counter
-          command: add_win
+      some-plugin.countdown_finished:
+        - target: my-scoreboard-plugin
+          command: add_point
           args: {amount: 1}
 """
 

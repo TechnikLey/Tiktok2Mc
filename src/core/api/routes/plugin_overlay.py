@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Plugin Overlay"])
 
-# TTL cache for declared accepted_commands (J.3 #12 delivery validation).
+# TTL cache for declared accepted_commands (delivery validation).
 # Manifest scans are only needed to produce warnings; the cache keeps the
 # command route cheap even under frequent reaction triggers.
 _ACCEPTED_COMMANDS_TTL = 30.0
@@ -228,7 +228,7 @@ async def get_plugin_state(name: str):
     return {"state": state}
 
 
-# ─── Queries (C.3 #3: request/response with correlation ids) ──────────────
+# ─── Queries (request/response with correlation ids) ─────────────────────
 
 _QUERY_TIMEOUT_MIN = 0.5
 _QUERY_TIMEOUT_MAX = 30.0
@@ -259,7 +259,7 @@ def _queries_declared_for(name: str) -> set[str] | None:
 async def query_plugin(name: str, body: dict):
     """Send a query to a plugin and wait for its response.
 
-    Request/response channel for extensions (C.3 #3): the query is
+    Request/response channel for extensions: the query is
     delivered to the plugin through its command queue as the reserved
     command ``__query__`` with a correlation id; BasePlugin routes it to
     ``on_query()`` and POSTs the answer back, which resolves this HTTP

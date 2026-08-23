@@ -1,4 +1,4 @@
-"""Notification endpoints (J.3 Nr. 13).
+"""Notification endpoints.
 
 Plugins, hooks and the GUI fan out user-facing notifications through
 ``POST /notifications``; the dispatcher delivers them to the channels

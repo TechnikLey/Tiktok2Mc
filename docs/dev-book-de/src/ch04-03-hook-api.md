@@ -171,7 +171,7 @@ Ungesperrte Methoden, die immer funktionieren: `register_action`,
 
 ## request(path, payload=None, method=None, timeout=5)
 
-Synchrone Request/Response-Aufrufe gegen die Control Plane (`J.2 Nr. 8`).
+Synchrone Request/Response-Aufrufe gegen die Control Plane.
 Liefert den **geparsten JSON-Body** (`dict`/`list`/str/...) zurück, oder
 `None`, wenn der Body leer ist oder der Aufruf fehlschlägt — Fehler werden
 geloggt, nie geworfen.
@@ -374,7 +374,7 @@ def register(api: HookAPI):
 
 ## Event-Abos & Publishing
 
-Hooks können **Bus-Events abonnieren** (`B.3 Nr. 2`) — Reaktion ganz ohne
+Hooks können **Bus-Events abonnieren** — Reaktion ganz ohne
 `$`-Zeile in `actions.mca`:
 
 ```python

@@ -1199,7 +1199,7 @@ def _record_metrics_event():
 
 
 def _apply_mc_queue_semantics(event: str) -> None:
-    """Apply Minecraft queue semantics for a webhook event (E.7).
+    """Apply Minecraft queue semantics for a webhook event.
 
     Pauses the TikTok command queue while the tracked player is dead and
     resumes it on respawn — but only when the user opted in via
@@ -1354,7 +1354,7 @@ def _post_tiktok_event_api(body: bytes) -> None:
 
 
 def _notify_hooks_of_event(event_type: str, data: dict) -> None:
-    """Fan a published bus event out to subscribed hooks (B.3 #2).
+    """Fan a published bus event out to subscribed hooks.
 
     Runs in the shared background executor — hook code must never block
     the trigger/TikTok threads. ``fire_hook_event`` isolates handler

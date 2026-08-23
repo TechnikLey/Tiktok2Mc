@@ -307,7 +307,7 @@ class BasePlugin:
     ) -> Any:
         """Query another plugin and return its result.
 
-        Request/response with correlation ids (C.3 #3): the target must
+        Request/response with correlation ids: the target must
         implement ``on_query()``. Returns ``{"id": ..., "result": ...}``
         on success, or ``None`` when the target is unreachable, unknown
         or times out / reports an error.
@@ -346,7 +346,7 @@ class BasePlugin:
                 cmd = entry.get("command", "")
                 args = entry.get("args", {})
                 if cmd == "__query__":
-                    # Reserved command (C.3 #3): never reaches user handlers
+                    # Reserved command: never reaches user handlers
                     self._handle_query(args)
                     continue
                 handler = self._handlers.get(cmd)
@@ -366,7 +366,7 @@ class BasePlugin:
                     # Fall through to subclass ``on_command`` override
                     self.on_command(cmd, args)
 
-    # -- queries (C.3 #3: request/response with correlation ids) ------------
+    # -- queries (request/response with correlation ids) -------------------
 
     def on_query(self, query: str, args: dict[str, Any]) -> Any:
         """Answer a query sent via ``POST /plugins/{name}/query``.

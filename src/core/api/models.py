@@ -289,6 +289,10 @@ class PluginRegistration(BaseModel):
         default=False,
         description="Plugin provides a dashboard tab (manifest 'dashboard_ui')",
     )
+    bundled: bool = Field(
+        default=False,
+        description="Plugin ships with the application (manifest 'bundled')",
+    )
     queries: list[str] = Field(
         default_factory=list,
         description="Declared query names for POST /plugins/{name}/query "
@@ -493,7 +497,7 @@ class ChatbotSessionUpdateRequest(BaseModel):
 
 
 class NotificationRequest(BaseModel):
-    """Body for ``POST /notifications`` (J.3 Nr. 13).
+    """Body for ``POST /notifications``.
 
     ``channels`` selects the delivery targets: either a list of channel
     names (global config params apply) or a mapping of channel name to

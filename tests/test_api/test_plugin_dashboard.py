@@ -77,3 +77,32 @@ class TestDashboardRoutes:
         assert listed.status_code == 200
         entry = next(p for p in listed.json()["plugins"] if p["name"] == "dashy")
         assert entry["dashboard_ui"] is True
+
+    def test_bundled_flag_exposed_and_default_false(self, client, project_dir):
+        """'bundled' comes from the manifest; third-party plugins default to False."""
+        plugins_dir = project_dir / "src" / "plugins"
+        for name, bundled in (("coreplug", True), ("external", None)):
+            plugin_dir = plugins_dir / name
+            plugin_dir.mkdir()
+            manifest: dict = {"name": name, "version": "1.0.0"}
+            if bundled is not None:
+                manifest["bundled"] = bundled
+            (plugin_dir / "plugin.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            (plugin_dir / "main.py").write_text("# stub\n", encoding="utf-8")
+            resp = client.post(
+                "/api/v1/plugins/register",
+                json={
+                    "name": name,
+                    "path": str(plugin_dir / "main.py"),
+                    "entry_point": f"src/plugins/{name}/main.py",
+                    "enabled": True,
+                },
+            )
+            assert resp.status_code == 201
+
+        listed = client.get("/api/v1/plugins").json()["plugins"]
+        by_name = {p["name"]: p for p in listed}
+        assert by_name["coreplug"]["bundled"] is True
+        assert by_name["external"]["bundled"] is False

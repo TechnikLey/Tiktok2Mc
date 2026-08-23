@@ -581,7 +581,7 @@ def matching_event_hooks(event_type: str) -> list[tuple[str, Callable]]:
 
 
 def fire_hook_event(event_type: str, data: dict | None = None) -> int:
-    """Dispatch a bus event to all subscribed hooks (B.3 #2).
+    """Dispatch a bus event to all subscribed hooks.
 
     Called from the bridge's background executor whenever it publishes
     ``tiktok.*`` / ``minecraft.*`` events. Each callback is isolated —

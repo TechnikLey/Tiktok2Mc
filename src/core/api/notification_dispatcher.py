@@ -1,7 +1,7 @@
 """Notification dispatcher (API process).
 
 Unified fan-out for user-facing notifications to exchangeable channels
-(J.3 Nr. 13).  Channels are configured in the global ``config.yaml``::
+Channels are configured in the global ``config.yaml``::
 
     notifications:
       enabled: true

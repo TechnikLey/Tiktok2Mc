@@ -125,7 +125,7 @@ class PluginEventBridge:
 
     @staticmethod
     def _warn_unknown_subscriptions(subscriptions: dict[str, list[str]]) -> None:
-        """Warn about exact-name subscriptions no source declares (J.3 #12).
+        """Warn about exact-name subscriptions no source declares.
 
         Uses the unified event catalog (core events + every plugin's
         ``emitted_events``) as the delivery registry. Wildcards are never

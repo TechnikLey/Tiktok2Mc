@@ -26,7 +26,7 @@ HOOK_LIFECYCLE: dict[str, dict[str, Callable]] = {
 
 LIFECYCLE_EVENTS = tuple(HOOK_LIFECYCLE)
 
-# Bus-event subscriptions (B.3 #2): pattern -> {hook_name: callback}.
+# Bus-event subscriptions: pattern -> {hook_name: callback}.
 # Patterns follow the plugin ``event_subscriptions`` semantics: exact type
 # ("tiktok.gift"), trailing prefix wildcard ("tiktok.*") or the catch-all "*".
 # Callbacks are called as ``fn(event_type, data)`` from the bridge's
@@ -449,7 +449,7 @@ class HookAPI:
             return {}
 
     def publish_event(self, event_type: str, data: dict | None = None) -> bool:
-        """Publish a custom event on the API EventBus (B.3 #7).
+        """Publish a custom event on the API EventBus.
 
         The event type **must** be namespaced under the hook's own name
         (``"<hook-name>.<thing>"``) so hooks cannot spoof core event
@@ -498,7 +498,7 @@ class HookAPI:
             self._valid_functions = valid_functions
 
     # --------------------------------------------------
-    # Control-plane requests (Request/Response, J.2 Nr. 8)
+    # Control-plane requests (request/response)
     # --------------------------------------------------
 
     def request(
@@ -511,7 +511,7 @@ class HookAPI:
         """Call a control-plane API endpoint and return the parsed JSON body.
 
         ``path`` is relative to the API base (``/api/v1``), e.g.
-        ``"plugins/spotify/state"``. With ``payload=None`` the request is a
+        ``"plugins/some-plugin/state"``. With ``payload=None`` the request is a
         GET; passing a payload sends it as a JSON body via POST (override
         with ``method``, e.g. ``"PUT"``). Returns the decoded JSON value
         (dict/list/str/...), or ``None`` when the body is empty or the

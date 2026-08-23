@@ -26,7 +26,7 @@ In the `plugin.json`:
 
 Wildcard `"tiktok.*"` subscribes to all TikTok events.
 
-### Generic Bus Events (J.3 #14)
+### Generic Bus Events
 
 Subscriptions are **not** limited to the `tiktok.` namespace: any EventBus
 event can be subscribed to — exact types like `"minecraft.player_death"`,

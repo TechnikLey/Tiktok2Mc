@@ -192,7 +192,7 @@ class OverlayHtmlStore:
 
 overlay_html_store = OverlayHtmlStore()
 
-# Same store mechanism for plugin dashboard pages (J.3 #11): plugins POST
+# Same store mechanism for plugin dashboard pages: plugins POST
 # their dashboard HTML on startup, the API serves it at
 # ``/api/v1/plugins/{name}/dashboard`` and the GUI embeds it as a tab.
 dashboard_html_store = OverlayHtmlStore()

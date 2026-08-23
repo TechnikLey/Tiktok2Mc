@@ -20,7 +20,7 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-# Built-in sandbox profiles (J.2 Nr. 10-Rest). Select one globally via
+# Built-in sandbox profiles. Select one globally via
 # ``plugin_sandbox.profile`` in config.yaml, or per plugin via
 # ``"sandbox_profile"`` in its plugin.json. An empty name keeps the
 # legacy behaviour (raw flat keys from config.yaml).
@@ -232,7 +232,7 @@ def resolve_plugin_sandbox(
     plugin_name: str,
     plugin_dir,
 ) -> PluginSandbox | None:
-    """Resolve the sandbox for a single plugin (J.2 Nr. 10-Rest).
+    """Resolve the sandbox for a single plugin.
 
     A valid ``"sandbox_profile"`` in the plugin's ``plugin.json`` overrides
     the global profile/config. Returns ``None`` when sandboxing is off

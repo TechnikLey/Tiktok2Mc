@@ -138,7 +138,10 @@ CORE_EVENTS: dict[str, dict[str, Any]] = {
     },
 }
 
-# Quick-start presets shown on the empty reactions screen.
+# Quick-start presets shown on the empty reactions screen. These reference
+# the plugins bundled with the app by name; presets whose plugin is not
+# installed are filtered out at build time, so removing a plugin never
+# leaves dead suggestions and no code change is required.
 CORE_TEMPLATES: list[dict[str, Any]] = [
     {
         "event": "minecraft.player_death",
@@ -177,7 +180,7 @@ def _plugins_dir() -> Path | None:
 
 
 def collect_known_event_keys(plugins_dir: Path | None = None) -> set[str]:
-    """Return every event key known to the system (J.3 #12 delivery registry).
+    """Return every event key known to the system (delivery registry).
 
     Merges the built-in core events with every plugin's declared
     ``emitted_events``. The PluginEventBridge uses this to warn about
@@ -200,13 +203,21 @@ def collect_known_event_keys(plugins_dir: Path | None = None) -> set[str]:
     return known
 
 
+def _available_templates(
+    templates: list[dict[str, Any]], installed: set[str]
+) -> list[dict[str, Any]]:
+    """Keep only presets whose target plugin is actually installed."""
+    return [t for t in templates if t.get("plugin") in installed]
+
+
 def build_reaction_catalog() -> dict[str, Any]:
     """Assemble the full reaction catalog from core + plugin manifests.
 
     Returns ``{"events": ..., "plugins": ..., "commands": ...,
     "templates": [...]}``.  Plugin-declared entries always override any
     core entry with the same key so plugins can extend or replace the
-    built-in catalog.
+    built-in catalog.  Quick-start presets referencing an uninstalled
+    plugin are dropped.
     """
     events: dict[str, dict[str, Any]] = dict(CORE_EVENTS)
     plugins: dict[str, dict[str, Any]] = {}
@@ -222,7 +233,7 @@ def build_reaction_catalog() -> dict[str, Any]:
             "events": events,
             "plugins": plugins,
             "commands": commands,
-            "templates": CORE_TEMPLATES,
+            "templates": [],
         }
 
     launcher = PluginLauncher(plugins_dir=plugins_dir)
@@ -247,5 +258,5 @@ def build_reaction_catalog() -> dict[str, Any]:
         "events": events,
         "plugins": plugins,
         "commands": commands,
-        "templates": CORE_TEMPLATES,
+        "templates": _available_templates(CORE_TEMPLATES, set(plugins)),
     }

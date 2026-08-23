@@ -88,13 +88,32 @@ class TestReactionCatalogEndpoint:
         # Overridden core event is re-categorized under the plugin's name.
         assert body["events"]["tiktok.gift"]["category"] == "tweaker"
 
-    def test_catalog_templates_present(self, client):
+    def test_catalog_templates_present(self, client, project_dir):
+        """Presets are only offered when their target plugin is installed."""
+        plugins_dir = project_dir / "src" / "plugins"
+
+        # No matching plugin installed -> the preset is filtered out.
         resp = client.get("/api/v1/reactions/catalog")
         body = resp.json()
-        assert len(body["templates"]) >= 3
-        assert all(
-            "event" in t and "plugin" in t and "command" in t for t in body["templates"]
-        )
+        assert all(t["plugin"] != "spotify-control" for t in body["templates"])
+
+        # Install a plugin that one of the presets targets -> preset appears.
+        plugin_dir = plugins_dir / "spotify-control"
+        plugin_dir.mkdir()
+        manifest = {
+            "name": "spotify-control",
+            "version": "1.0.0",
+            "entry_point": "src/plugins/spotify-control/main.py",
+            "display_name": "Spotify Control",
+            "accepted_commands": {"pause": {"name": "Pause", "desc": "", "args": {}}},
+        }
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        resp = client.get("/api/v1/reactions/catalog")
+        body = resp.json()
+        matching = [t for t in body["templates"] if t["plugin"] == "spotify-control"]
+        assert len(matching) >= 1
+        assert all("event" in t and "plugin" in t and "command" in t for t in body["templates"])
 
 
 class TestCatalogVersioning:
