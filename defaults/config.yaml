@@ -166,6 +166,13 @@ rcon:
   # RCON port (default: 25575)
   port: 25575
 
+  # Direct RCON command endpoint (POST /api/v1/rcon/command) for the
+  # dashboard console and extensions. Disabled by default for security and
+  # stability — direct commands bypass the bridge's RCON queue and
+  # throttling. Set to true to enable it (the dashboard Console tab needs
+  # it); the queue path keeps working either way.
+  http_command_api: false
+
 # ===========================================================================
 #  TIKTOK LIVE
 # ===========================================================================

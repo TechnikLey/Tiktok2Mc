@@ -3854,6 +3854,7 @@ const HELP_TEXT = {
   'rcon.enabled': 'RCON allows the tool to send commands to your Minecraft server. IMPORTANT: Keep this enabled — disabling it breaks most functionality.',
   'rcon.password': 'Set a secure password. The tool will ask you to set one on first start if this is left empty.',
   'rcon.port': 'RCON port. Default: 25575. Only change if you changed it in server.properties.',
+  'rcon.http_command_api': 'Direct command endpoint (POST /api/v1/rcon/command) used by the dashboard Console tab. Disabled by default for security and stability — direct commands bypass the bridge\'s RCON queue and throttling. Enable only if you use the console or extensions need it; trigger actions keep working via the queue either way.',
   'tiktok.user': 'Your TikTok username — without the @ symbol. This is required for the tool to connect to your live stream.',
   'tiktok.reconnect_delay_seconds': 'Seconds to wait before attempting to reconnect after a connection loss.',
   'tiktok.autosave_interval_seconds': 'How often (in seconds) the gift revenue log file is saved to disk. The log is stored at data/gift_revenue_log.jsonl.',
@@ -3916,6 +3917,7 @@ const HELP_TEXT_DE = {
   'rcon.enabled': 'RCON erlaubt dem Tool, Befehle an deinen Minecraft-Server zu senden. WICHTIG: Lasse dies aktiviert — Deaktivieren bricht die meisten Funktionen.',
   'rcon.password': 'Lege ein sicheres Passwort fest. Das Tool fragt dich beim ersten Start danach, wenn dieses Feld leer bleibt.',
   'rcon.port': 'RCON-Port. Standard: 25575. Nur ändern, wenn du ihn in server.properties geändert hast.',
+  'rcon.http_command_api': 'Direkter Befehls-Endpunkt (POST /api/v1/rcon/command), den der Konsole-Tab im Dashboard nutzt. Aus Sicherheits- und Stabilitätsgründen standardmäßig deaktiviert — direkte Befehle umgehen die RCON-Queue und das Throttling der Bridge. Aktiviere ihn nur, wenn du die Konsole nutzt oder Erweiterungen ihn brauchen; Trigger-Aktionen funktionieren über die Queue weiterhin.',
   'tiktok.user': 'Dein TikTok-Benutzername — ohne das @-Zeichen. Dies ist erforderlich, damit sich das Tool mit deinem Live-Stream verbinden kann.',
   'tiktok.reconnect_delay_seconds': 'Sekunden, die vor dem erneuten Verbindungsversuch nach einem Verbindungsverlust gewartet werden.',
   'tiktok.autosave_interval_seconds': 'Wie oft (in Sekunden) die Geschenk-Umsatzlog-Datei auf der Festplatte gespeichert wird. Die Log-Datei liegt unter data/gift_revenue_log.jsonl.',
@@ -3978,6 +3980,7 @@ const FIELD_META = {
   'rcon.enabled': { basic: true, type: 'bool' },
   'rcon.password': { basic: true, type: 'password', required: true },
   'rcon.port': { basic: false, type: 'number', min: 1, max: 65535 },
+  'rcon.http_command_api': { basic: true, type: 'bool' },
   'tiktok.user': { basic: true, type: 'text', required: true },
   'tiktok.reconnect_delay_seconds': { basic: true, type: 'number', min: 0 },
   'tiktok.autosave_interval_seconds': { basic: true, type: 'number', min: 1 },
@@ -8457,7 +8460,11 @@ const consoleTerminal = {
         this._print(data.response, 'output');
       }
     } catch (e) {
-      this._print(I18N.t('console.error', { msg: e.message }), 'error');
+      if (e.message.includes('MC-0012')) {
+        this._print(I18N.t('console.commandApiDisabled'), 'error');
+      } else {
+        this._print(I18N.t('console.error', { msg: e.message }), 'error');
+      }
       if (e.message.includes('Not connected') || e.message.includes('RCON not connected')) {
         this._connected = false;
         const status = document.getElementById('console-status');

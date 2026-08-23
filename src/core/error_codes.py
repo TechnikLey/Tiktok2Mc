@@ -974,6 +974,21 @@ MC_0011 = ErrorCode(
     recovery_hint="Check file permissions.",
     impact="Server settings may not be applied.",
 )
+MC_0012 = ErrorCode(
+    code="MC-0012",
+    subsystem=Subsystem.MC,
+    severity=Severity.WARNING,
+    message="Direct RCON command endpoint disabled.",
+    description=(
+        "A client tried to send a command via POST /api/v1/rcon/command "
+        "while rcon.http_command_api is disabled in config.yaml."
+    ),
+    recovery_hint=(
+        "Enable rcon.http_command_api in config.yaml, or route commands "
+        "through the bridge RCON queue instead."
+    ),
+    impact="The direct command was rejected (HTTP 403).",
+)
 
 # --------------------------------------------------------------- TIKTOK ----
 TIKTOK_0001 = ErrorCode(

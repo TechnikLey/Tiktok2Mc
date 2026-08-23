@@ -237,6 +237,8 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 | `GET` | `/plugins/{name}/overlay` | Retrieve overlay HTML |
 | `POST` | `/plugins/{name}/dashboard-html` | Set dashboard page HTML (manifest: `dashboard_ui`) |
 | `GET` | `/plugins/{name}/dashboard` | Retrieve dashboard page HTML |
+| `GET` | `/rcon/status` | RCON connection status (read-only) |
+| `POST` | `/rcon/command` | Execute a Minecraft command directly (`{"command": "..."}`) — see below |
 | `GET` | `/plugins/{name}/config` | Read plugin configuration |
 | `PUT` | `/plugins/{name}/config` | Write plugin configuration |
 | `POST` | `/events` | Publish a custom event on the EventBus |
@@ -253,6 +255,22 @@ Plugins in other languages communicate directly via HTTP with the API server (`h
 **Authentication**: If `api_key` is set in the global `config.yaml`, every request must include the `X-API-Key: <key>` header (only applies to requests from outside localhost).
 
 **Base URL**: Default `http://127.0.0.1:29185/api/v1/`, overridable via the `API_BASE_URL` environment variable.
+
+### Direct RCON Access
+
+`POST /api/v1/rcon/command` with body `{"command": "say hello"}` executes a
+Minecraft command **directly** from the API process and returns the server's
+response (`{"response": "..."}`). This is the same endpoint the dashboard
+Console view uses.
+
+> [!WARNING]
+> Unlike `!`-lines in `actions.mca`, this path **bypasses the bridge's RCON
+> queue, throttling and retries**. Use it for interactive queries and rare
+> administrative actions — not for high-frequency trigger commands. It is
+> **disabled by default** (`rcon.http_command_api: false` in `config.yaml`,
+> security/stability default); set it to `true` to enable it — the dashboard
+> Console tab requires this. When disabled, requests are rejected with
+> `403 MC-0012` while the queue path keeps working.
 
 ### Persistent Store (namespaced)
 

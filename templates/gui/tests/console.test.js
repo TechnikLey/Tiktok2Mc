@@ -135,4 +135,22 @@ describe('Console terminal', () => {
       expect(Array.isArray(saved)).toBe(true);
     });
   });
+
+  describe('Disabled RCON command API', () => {
+    it('shows a settings hint when the API answers with MC-0012', async () => {
+      const prevFetch = window.fetch;
+      window.fetch = async () => ({
+        ok: false,
+        status: 403,
+        json: async () => ({ detail: 'MC-0012 Direct RCON command endpoint disabled.' }),
+      });
+      try {
+        await consoleTerminal.sendCommand('say hi');
+      } finally {
+        window.fetch = prevFetch;
+      }
+      const output = document.getElementById('console-output').textContent;
+      expect(output).toContain('Direct RCON commands are disabled');
+    });
+  });
 });

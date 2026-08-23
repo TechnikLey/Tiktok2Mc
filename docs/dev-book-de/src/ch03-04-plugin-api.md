@@ -237,6 +237,8 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 | `GET` | `/plugins/{name}/overlay` | Overlay-HTML abrufen |
 | `POST` | `/plugins/{name}/dashboard-html` | Dashboard-Seiten-HTML setzen (Manifest: `dashboard_ui`) |
 | `GET` | `/plugins/{name}/dashboard` | Dashboard-Seiten-HTML abrufen |
+| `GET` | `/rcon/status` | RCON-Verbindungsstatus (read-only) |
+| `POST` | `/rcon/command` | Minecraft-Befehl direkt ausführen (`{"command": "..."}`) — siehe unten |
 | `GET` | `/plugins/{name}/config` | Plugin-Konfiguration lesen |
 | `PUT` | `/plugins/{name}/config` | Plugin-Konfiguration schreiben |
 | `POST` | `/events` | Eigenes Event auf dem EventBus veröffentlichen |
@@ -254,8 +256,24 @@ Plugins in anderen Sprachen kommunizieren direkt per HTTP mit dem API-Server (`h
 
 **Basis-URL**: Standard `http://127.0.0.1:29185/api/v1/`, überschreibbar über die Umgebungsvariable `API_BASE_URL`.
 
-### Persistenter Speicher (namespaced)
+### Direkter RCON-Zugriff
 
+`POST /api/v1/rcon/command` mit Body `{"command": "say hello"}` führt einen
+Minecraft-Befehl **direkt** aus dem API-Prozess aus und gibt die Antwort des
+Servers zurück (`{"response": "..."}`). Das ist derselbe Endpunkt, den die
+Konsole im Web-Dashboard nutzt.
+
+> [!WARNING]
+> Anders als `!`-Zeilen in `actions.mca` umgeht dieser Pfad **RCON-Queue,
+> Throttling und Retries der Bridge**. Für interaktive Abfragen und seltene
+> Admin-Aktionen gedacht — nicht für häufige Trigger-Befehle. Er ist
+> **standardmäßig deaktiviert** (`rcon.http_command_api: false` in der
+> `config.yaml`, Sicherheits-/Stabilitäts-Standard); setze ihn auf `true`,
+> um ihn zu aktivieren — der Konsole-Tab im Dashboard benötigt dies. Bei
+> Deaktivierung werden direkte Befehle mit `403 MC-0012` abgelehnt,
+> während der Queue-Pfad weiterarbeitet.
+
+### Persistenter Speicher (namespaced)
 Jedes Plugin bekommt seine eigene JSON-Datei unter `data/plugin_data/<name>.json`
 — das gemeinsame `data/`-Verzeichnis muss nicht mehr selbst angefasst werden, und
 Kollisionen mit anderen Plugins sind ausgeschlossen. Schlüssel sind flache Strings
