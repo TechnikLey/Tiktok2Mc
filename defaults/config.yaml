@@ -324,28 +324,6 @@ outbound:
       template: "**{user}** triggered *{type}*"
       enabled: false
 
-# --- NOTIFICATIONS ---
-# Unified notification fan-out (POST /api/v1/notifications). Plugins,
-# hooks and the GUI send a {title, body} and the dispatcher delivers it
-# to the channels below. Per-request channel overrides are possible.
-# Built-in channels:
-#   log     - always available, writes to the API log
-#   overlay - OBS overlay text (overlay_name, duration)
-#   sound   - plays a .wav file via winsound (Windows only)
-#   tts     - speaks the text via Windows SAPI (PowerShell; rate -10..10)
-#   discord - posts to a Discord webhook
-notifications:
-  enabled: true
-
-  # Channels used when a request does not name its own list.
-  # Example:
-  #   channels:
-  #     overlay: { overlay_name: default, duration: 4 }
-  #     sound:   { file: data/sounds/alert.wav }
-  #     tts:     { rate: 0, timeout: 15 }
-  #     discord: { webhook_url: "https://discord.com/api/webhooks/..." }
-  channels: {}
-
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.

@@ -17,6 +17,11 @@ can be registered there at runtime (exchangeable-channel design). TTS as
 a full feature (queueing, voices, per-viewer messages) remains plugin
 territory — this channel only speaks one-shot texts.
 
+Requests may pass ``channels`` either as a list of names (global config
+applies) or as a mapping ``{name: params}`` whose values are merged over
+the global channel config — so plugins/hooks can stay fully self-contained
+by passing their own settings (e.g. a webhook URL from their own config).
+
 REST surface (``routes/notifications.py``):
 
 * ``POST /api/v1/notifications``          → fan out one notification
@@ -288,20 +293,44 @@ class NotificationDispatcher:
                 skipped.append(name)
         return deliverable, skipped
 
+    @staticmethod
+    def _normalize_channels(
+        channels: list[str] | dict[str, dict[str, Any]] | None,
+    ) -> tuple[list[str], dict[str, dict[str, Any]]]:
+        """Split a request's ``channels`` value into names + inline params.
+
+        ``["overlay", "discord"]``      → names only, global config applies
+        ``{"discord": {...}}``          → names + inline params per channel
+        """
+        if channels is None:
+            return [], {}
+        if isinstance(channels, dict):
+            return [str(name) for name in channels], {
+                str(name): (params if isinstance(params, dict) else {})
+                for name, params in channels.items()
+            }
+        return [str(name) for name in channels], {}
+
     async def notify(
         self,
         title: str,
         body: str = "",
         level: str = "info",
-        channels: list[str] | None = None,
+        channels: list[str] | dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, list[str]]:
-        """Fan out one notification. Returns per-outcome channel lists."""
+        """Fan out one notification. Returns per-outcome channel lists.
+
+        Inline params (``channels`` as mapping) are merged over the global
+        channel config — inline wins — so callers can stay self-contained
+        without touching the global config.
+        """
         _, configured = self._snapshot()
-        targets, skipped = self.resolve_channels(channels)
+        names, inline = self._normalize_channels(channels)
+        targets, skipped = self.resolve_channels(names or None)
 
         async def _deliver(name: str) -> tuple[str, bool]:
             handler = CHANNEL_HANDLERS[name]
-            cfg = configured.get(name, {})
+            cfg = {**configured.get(name, {}), **inline.get(name, {})}
             try:
                 ok = await asyncio.to_thread(handler, title, body, level, cfg)
             except Exception as exc:  # one broken channel must not kill fan-out

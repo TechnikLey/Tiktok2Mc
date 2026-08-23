@@ -25,23 +25,24 @@ def dispatcher(monkeypatch):
 
 @pytest.fixture
 def fake_handlers(monkeypatch):
-    """Replace built-in handlers with recorders; returns (calls, factory)."""
+    """Replace built-in handlers with recorders.
+
+    Returns ``{"calls": [...], "install": fn}`` — each call is recorded as
+    ``(title, body, level, config)`` with a copy of the received params.
+    """
     import core.api.notification_dispatcher as mod
 
-    calls: list[tuple[str, str, str, str]] = []
+    calls: list[tuple[str, str, str, dict]] = []
 
     def make(ok: bool):
         def handler(title, body, level, config):
-            calls.append((title, body, level, config.get("tag", "")))
+            calls.append((title, body, level, dict(config)))
             return ok
 
         return handler
 
-    registry: dict[str, object] = {}
-
     def install(name: str, ok: bool = True):
         handler = make(ok)
-        registry[name] = handler
         monkeypatch.setitem(mod.CHANNEL_HANDLERS, name, handler)
         return handler
 
@@ -113,6 +114,68 @@ class TestNotify:
         result = await dispatcher.notify("Hi", channels=["exploding"])
         assert result["failed"] == ["exploding"]
         assert result["sent"] == []
+
+
+class TestInlineChannelParams:
+    """Per-request params let plugins/hooks stay self-contained."""
+
+    @pytest.mark.asyncio
+    async def test_inline_params_reach_handler(self, dispatcher, fake_handlers):
+        fake_handlers["install"]("discord")
+
+        result = await dispatcher.notify(
+            "Hi",
+            channels={"discord": {"webhook_url": "https://example.com/hook"}},
+        )
+
+        assert result == {"sent": ["discord"], "failed": [], "skipped": []}
+        _, _, _, cfg = fake_handlers["calls"][0]
+        assert cfg == {"webhook_url": "https://example.com/hook"}
+
+    @pytest.mark.asyncio
+    async def test_inline_params_override_global(self, monkeypatch):
+        import core.api.notification_dispatcher as mod
+
+        monkeypatch.setattr(
+            mod,
+            "load_notification_config",
+            lambda: {
+                "enabled": True,
+                "channels": {"overlay": {"duration": 4, "overlay_name": "default"}},
+            },
+        )
+        dispatcher = mod.NotificationDispatcher()
+        captured: dict = {}
+
+        def handler(title, body, level, config):
+            captured.update(config)
+            return True
+
+        monkeypatch.setitem(mod.CHANNEL_HANDLERS, "overlay", handler)
+        await dispatcher.notify("Hi", channels={"overlay": {"duration": 9}})
+        assert captured == {"duration": 9, "overlay_name": "default"}
+
+    @pytest.mark.asyncio
+    async def test_unknown_channel_in_dict_skipped(
+        self, dispatcher, fake_handlers, caplog
+    ):
+        import logging
+
+        fake_handlers["install"]("log")
+        with caplog.at_level(logging.WARNING):
+            result = await dispatcher.notify(
+                "Hi", channels={"log": {}, "smoke-signal": {}}
+            )
+        assert result["sent"] == ["log"]
+        assert result["skipped"] == ["smoke-signal"]
+        assert "NOTIF-0002" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_empty_params_dict_is_valid(self, dispatcher, fake_handlers):
+        handler = fake_handlers["install"]("sound")
+        result = await dispatcher.notify("Hi", channels={"sound": {}})
+        assert result["sent"] == ["sound"]
+        assert fake_handlers["calls"][0][3] == {}
 
 
 class TestBuiltInHandlers:
@@ -191,6 +254,26 @@ class TestNotificationRoutes:
         }
         # Touch the singleton so it exists in this process.
         assert get_notification_dispatcher() is not None
+
+    def test_send_notification_accepts_inline_channels(self, client, monkeypatch):
+        from core.api.notification_dispatcher import NotificationDispatcher
+
+        captured: dict = {}
+
+        async def fake_notify(self, title, body="", level="info", channels=None):
+            captured["channels"] = channels
+            return {"sent": ["discord"], "failed": [], "skipped": []}
+
+        monkeypatch.setattr(NotificationDispatcher, "notify", fake_notify)
+        resp = client.post(
+            "/api/v1/notifications",
+            json={
+                "title": "T",
+                "channels": {"discord": {"webhook_url": "https://x/y"}},
+            },
+        )
+        assert resp.status_code == 200
+        assert captured["channels"] == {"discord": {"webhook_url": "https://x/y"}}
 
     def test_channels_endpoint(self, client):
         resp = client.get("/api/v1/notifications/channels")

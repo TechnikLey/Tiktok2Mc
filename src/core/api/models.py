@@ -484,12 +484,18 @@ class ChatbotSessionUpdateRequest(BaseModel):
 
 
 class NotificationRequest(BaseModel):
-    """Body for ``POST /notifications`` (J.3 Nr. 13)."""
+    """Body for ``POST /notifications`` (J.3 Nr. 13).
+
+    ``channels`` selects the delivery targets: either a list of channel
+    names (global config params apply) or a mapping of channel name to
+    inline params (merged over the global config) so plugins/hooks can
+    stay fully self-contained.
+    """
 
     title: str
     body: str = ""
     level: str = "info"
-    channels: list[str] | None = None  # None = configured default channels
+    channels: list[str] | dict[str, dict[str, Any]] | None = None
 
 
 class NotificationResponse(BaseModel):
