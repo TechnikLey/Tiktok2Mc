@@ -5,6 +5,7 @@ import importlib.util
 import json
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from ruamel.yaml.error import YAMLError
@@ -19,6 +20,7 @@ from core.error_codes import (
     HOOK_0008,
 )
 from core.hook_api import (
+    HOOK_EVENT_SUBSCRIPTIONS,
     HOOK_LIFECYCLE,
     HookAPI,
     clear_hook_registrations,
@@ -555,3 +557,58 @@ def fire_hook_lifecycle(event: str) -> int:
         len(callbacks),
     )
     return len(callbacks)
+
+
+def _event_pattern_matches(pattern: str, event_type: str) -> bool:
+    """Match a subscription pattern against an event type.
+
+    Same semantics as plugin ``event_subscriptions``: exact match,
+    catch-all ``"*"``, or trailing prefix wildcard ``"prefix.*"``.
+    """
+    if pattern == "*" or pattern == event_type:
+        return True
+    return pattern.endswith(".*") and event_type.startswith(pattern[:-1])
+
+
+def matching_event_hooks(event_type: str) -> list[tuple[str, Callable]]:
+    """Return ``(hook_name, callback)`` pairs subscribed to *event_type*."""
+    matches: list[tuple[str, Callable]] = []
+    for pattern, hooks in list(HOOK_EVENT_SUBSCRIPTIONS.items()):
+        if _event_pattern_matches(pattern, event_type):
+            for hook_name, fn in list(hooks.items()):
+                matches.append((hook_name, fn))
+    return matches
+
+
+def fire_hook_event(event_type: str, data: dict | None = None) -> int:
+    """Dispatch a bus event to all subscribed hooks (B.3 #2).
+
+    Called from the bridge's background executor whenever it publishes
+    ``tiktok.*`` / ``minecraft.*`` events. Each callback is isolated —
+    an exception in one hook never prevents the others (reported as
+    HOOK-0008). Returns the number of callbacks invoked.
+    """
+    matches = matching_event_hooks(event_type)
+    payload = data if isinstance(data, dict) else {}
+    for hook_name, fn in matches:
+        try:
+            fn(event_type, dict(payload))
+        except Exception as e:  # one broken hook must not affect others
+            log.warning(
+                "[HOOK] event '%s' handler of '%s' failed: %s",
+                event_type,
+                hook_name,
+                e,
+            )
+            get_crash_manager().report_exception(
+                HOOK_0008,
+                exc=e,
+                context_info={"hook": hook_name, "event": event_type},
+            )
+    if matches:
+        log.info(
+            "[HOOK] Event '%s': %d subscription(s) executed",
+            event_type,
+            len(matches),
+        )
+    return len(matches)

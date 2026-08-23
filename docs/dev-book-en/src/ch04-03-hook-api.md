@@ -147,10 +147,11 @@ Side-effecting API calls are guarded by **permissions** declared in your
 | `overlay` | `send_overlay_text` |
 | `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
 | `network` | `request` (control-plane HTTP helper) |
+| `events` | `publish_event` (custom events on the API EventBus) |
 
 Ungated methods that always work: `register_action`,
-`register_lifecycle`/`on_live_start`/`on_live_end`, `log`,
-`get_hook_config`, `config`, `get_valid_functions`.
+`register_lifecycle`/`on_live_start`/`on_live_end`, `register_event`,
+`log`, `get_hook_config`, `config`, `get_valid_functions`.
 
 - A call without the matching permission is **denied** (logged as
   `HOOK-0009`) and returns its safe fallback (`None`, `False`, `{}` or
@@ -367,6 +368,45 @@ def register(api: HookAPI):
 > Callbacks are synchronous (no `async def`). They run in a thread pool to
 > avoid blocking the TikTok client thread. Keep them short; heavy work should
 > be offloaded via `api.rcon_enqueue`, `api.enqueue_trigger`, or HTTP calls.
+
+## Event Subscriptions & Publishing
+
+Hooks can **subscribe to bus events** (`B.3 Nr. 2`) — reaction without a
+`$`-line in `actions.mca`:
+
+```python
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        # data carries the event payload, e.g. {"user": ..., "gift_name": ...}
+        api.log(f"{data.get('user')} sent {data.get('gift_name')}")
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+- Patterns follow the plugin `event_subscriptions` semantics: exact type
+  (`"tiktok.gift"`), trailing prefix wildcard (`"tiktok.*"`,
+  `"minecraft.*"`) or the catch-all `"*"`.
+- Handlers run as `fn(event_type, data)` in the bridge's background
+  executor; exceptions are isolated per hook.
+- Re-register after a runtime hook reload (your `register()` runs again).
+
+Hooks can also **publish custom events** on the EventBus (`api.publish_event`),
+requires the `events` permission:
+
+```python
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        api.publish_event("combo-hook.gift_combo", {"count": 2})
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+> [!NOTE]
+> Event types must be namespaced under your hook's own name
+> (`"<hook-name>.<thing>"`) so hooks cannot spoof core event types like
+> `tiktok.gift` — other types are rejected with a warning. Downstream,
+> plugins can consume these events via their manifest's
+> `event_subscriptions`, exactly like built-in ones.
 
 ## Runtime Hook Reload
 

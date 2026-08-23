@@ -26,6 +26,13 @@ HOOK_LIFECYCLE: dict[str, dict[str, Callable]] = {
 
 LIFECYCLE_EVENTS = tuple(HOOK_LIFECYCLE)
 
+# Bus-event subscriptions (B.3 #2): pattern -> {hook_name: callback}.
+# Patterns follow the plugin ``event_subscriptions`` semantics: exact type
+# ("tiktok.gift"), trailing prefix wildcard ("tiktok.*") or the catch-all "*".
+# Callbacks are called as ``fn(event_type, data)`` from the bridge's
+# background executor — never on the trigger/TikTok threads.
+HOOK_EVENT_SUBSCRIPTIONS: dict[str, dict[str, Callable]] = {}
+
 MAX_CHAIN_DEPTH: int = 3
 
 # Canonical permissions enforced on per-hook API views (see ``for_hook``).
@@ -38,6 +45,7 @@ HOOK_PERMISSIONS: frozenset[str] = frozenset(
         "overlay",  # send_overlay_text
         "store",  # store_get / store_set / store_delete / store_all
         "network",  # request (control-plane HTTP helper)
+        "events",  # publish_event (custom events on the API EventBus)
     }
 )
 
@@ -218,6 +226,31 @@ class HookAPI:
     def on_live_end(self, fn: Callable) -> None:
         """Shortcut for ``register_lifecycle("live_end", fn)``."""
         self.register_lifecycle("live_end", fn)
+
+    def register_event(self, event_pattern: str, fn: Callable) -> None:
+        """Subscribe this hook to bus events matching *event_pattern*.
+
+        Patterns follow the plugin ``event_subscriptions`` semantics:
+        exact type (``"tiktok.gift"``), trailing prefix wildcard
+        (``"tiktok.*"``, ``"minecraft.*"``) or the catch-all ``"*"``.
+        The callback is called as ``fn(event_type, data)`` from the
+        bridge's background executor. Last registration wins per hook
+        and pattern; re-register after a runtime reload.
+        """
+        if not isinstance(event_pattern, str) or not event_pattern.strip():
+            log.warning("[HOOK] register_event: invalid pattern %r", event_pattern)
+            return
+        if not callable(fn):
+            log.warning("[HOOK] register_event(%r): not callable", event_pattern)
+            return
+        HOOK_EVENT_SUBSCRIPTIONS.setdefault(event_pattern.strip(), {})[
+            self._name or "<unbound>"
+        ] = fn
+        log.info(
+            "[HOOK] Registered event subscription: %s (hook '%s')",
+            event_pattern.strip(),
+            self._name or "<unbound>",
+        )
 
     @staticmethod
     def _put_nowait_guarded(queue: asyncio.Queue, item: object, label: str) -> None:
@@ -415,6 +448,44 @@ class HookAPI:
             log.warning("[HOOK] store_all() failed: %s", exc)
             return {}
 
+    def publish_event(self, event_type: str, data: dict | None = None) -> bool:
+        """Publish a custom event on the API EventBus (B.3 #7).
+
+        The event type **must** be namespaced under the hook's own name
+        (``"<hook-name>.<thing>"``) so hooks cannot spoof core event
+        types like ``tiktok.gift``; other types are rejected with a
+        warning. Requires the ``events`` permission in hook.json. The
+        POST is best-effort — returns ``True`` when delivered.
+        """
+        if not self._allow("events", "publish_event"):
+            return False
+        if not isinstance(event_type, str) or not event_type.strip():
+            log.warning("[HOOK] publish_event: invalid type %r", event_type)
+            return False
+        clean = event_type.strip()
+        prefix = f"{self._name}." if self._name else ""
+        if prefix and not clean.startswith(prefix):
+            log.warning(
+                "[HOOK] publish_event('%s') rejected — hook events must be "
+                "namespaced under '%s*' to avoid spoofing core event types",
+                clean,
+                prefix,
+            )
+            return False
+        body = json.dumps({"type": clean, "data": data or {}}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{_API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=_STORE_TIMEOUT):
+                return True
+        except (urllib.error.HTTPError, OSError, ValueError) as exc:
+            log.warning("[HOOK] publish_event('%s') failed: %s", clean, exc)
+            return False
+
     def update_runtime_state(
         self,
         config: dict | None = None,
@@ -479,7 +550,8 @@ class HookAPI:
 
 
 def clear_hook_registrations() -> int:
-    """Remove all hook-registered actions and lifecycle callbacks.
+    """Remove all hook-registered actions, lifecycle callbacks and
+    event subscriptions.
 
     Used by the runtime hook reload before hooks are loaded again.
     Returns the number of removed actions.
@@ -489,4 +561,5 @@ def clear_hook_registrations() -> int:
     HOOK_ACTION_OWNERS.clear()
     for callbacks in HOOK_LIFECYCLE.values():
         callbacks.clear()
+    HOOK_EVENT_SUBSCRIPTIONS.clear()
     return removed

@@ -58,6 +58,7 @@ from core.error_codes import (
 from core.health_monitor import HealthState, get_health_monitor
 from core.hook_api import HOOK_ACTIONS, HookAPI, HookContext
 from core.hook_loader import (
+    fire_hook_event,
     fire_hook_lifecycle,
     load_event_hooks,
     reload_event_hooks,
@@ -1125,6 +1126,7 @@ API_BASE = "http://127.0.0.1:{}/api/v1".format(
 # ==========================================
 def _publish_event(event_type: str, event_data: dict) -> None:
     """Forward a Minecraft event to the central EventBus via API."""
+    _run_in_background(_notify_hooks_of_event, event_type, dict(event_data))
     body = json.dumps({"type": event_type, "data": event_data}).encode("utf-8")
     try:
         req = urllib.request.Request(
@@ -1295,9 +1297,9 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
     the shared background executor so trigger dispatch never blocks.
     """
     _record_metrics_event()
-    body = json.dumps(
-        {"type": f"tiktok.{event_type}", "data": {"user": user, **extra}}
-    ).encode("utf-8")
+    data = {"user": user, **extra}
+    _run_in_background(_notify_hooks_of_event, f"tiktok.{event_type}", data)
+    body = json.dumps({"type": f"tiktok.{event_type}", "data": data}).encode("utf-8")
     _run_in_background(_post_tiktok_event_api, body)
 
 
@@ -1308,16 +1310,13 @@ def _publish_tiktok_status(connected: bool):
     asyncio loop (heartbeat) or the TikTok client thread never block on the
     network call.
     """
-    body = json.dumps(
-        {
-            "type": "tiktok.live_status",
-            "data": {
-                "connected": bool(connected),
-                "disabled": bool(ctx.disable_tiktok_connect),
-                "source": "tiktok_bridge",
-            },
-        }
-    ).encode("utf-8")
+    data = {
+        "connected": bool(connected),
+        "disabled": bool(ctx.disable_tiktok_connect),
+        "source": "tiktok_bridge",
+    }
+    _run_in_background(_notify_hooks_of_event, "tiktok.live_status", data)
+    body = json.dumps({"type": "tiktok.live_status", "data": data}).encode("utf-8")
     _run_in_background(_post_tiktok_status, body)
 
 
@@ -1352,6 +1351,19 @@ def _post_tiktok_event_api(body: bytes) -> None:
         get_crash_manager().report_exception(
             TIKTOK_0004, exc=exc, context_info={"target": "eventbus_api_event"}
         )
+
+
+def _notify_hooks_of_event(event_type: str, data: dict) -> None:
+    """Fan a published bus event out to subscribed hooks (B.3 #2).
+
+    Runs in the shared background executor — hook code must never block
+    the trigger/TikTok threads. ``fire_hook_event`` isolates handler
+    exceptions, so nothing extra needed here.
+    """
+    try:
+        fire_hook_event(event_type, data)
+    except Exception as exc:  # defensive: executor job must never raise
+        log.warning("[HOOK] event fan-out for '%s' failed: %s", event_type, exc)
 
 
 def _post_chatbot_status(status: dict) -> None:
