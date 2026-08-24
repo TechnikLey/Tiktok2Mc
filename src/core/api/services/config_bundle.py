@@ -29,6 +29,10 @@ from typing import Any
 from ruamel.yaml.error import YAMLError
 
 import core.paths
+from core.api.services import (
+    REDACTED_PLACEHOLDER,
+    _is_secret_key,
+)
 from core.api.services.actions import ActionsService
 from core.backup import get_backup_manager
 from core.diagnostics import Severity
@@ -45,6 +49,49 @@ BUNDLE_MANIFEST = "bundle.json"
 # Bundle-internal names are matched against these allow-listed patterns.
 _PLUGIN_RE = re.compile(r"^plugins/([A-Za-z0-9_-]+)/config\.yaml$")
 _HOOK_RE = re.compile(r"^hooks/([A-Za-z0-9_-]+)/config\.yaml$")
+
+
+def _redact_in_place(value: Any) -> None:
+    """Replace secret leaves with the placeholder, preserving YAML comments."""
+    if isinstance(value, dict):
+        for key, val in list(value.items()):
+            if _is_secret_key(key) and isinstance(val, str) and val:
+                value[key] = REDACTED_PLACEHOLDER
+            else:
+                _redact_in_place(val)
+    elif isinstance(value, list):
+        for item in value:
+            _redact_in_place(item)
+
+
+def _restore_secrets_in_place(incoming: Any, stored: Any) -> bool:
+    """Copy real secret values from *stored* into placeholder leaves.
+
+    Returns ``True`` when at least one placeholder was replaced.
+    """
+    replaced = False
+    if isinstance(incoming, dict):
+        for key in list(incoming.keys()):
+            val = incoming[key]
+            if (
+                _is_secret_key(key)
+                and val == REDACTED_PLACEHOLDER
+                and isinstance(stored, dict)
+                and stored.get(key) != REDACTED_PLACEHOLDER
+                and stored.get(key) is not None
+            ):
+                incoming[key] = stored[key]
+                replaced = True
+            else:
+                sub = stored.get(key) if isinstance(stored, dict) else None
+                replaced = _restore_secrets_in_place(val, sub) or replaced
+    elif isinstance(incoming, list):
+        for idx, item in enumerate(incoming):
+            sub = (
+                stored[idx] if isinstance(stored, list) and idx < len(stored) else None
+            )
+            replaced = _restore_secrets_in_place(item, sub) or replaced
+    return replaced
 
 
 def _standalone_hooks_dir() -> Path | None:
@@ -115,10 +162,24 @@ class ConfigBundleService:
             zf.writestr(BUNDLE_MANIFEST, json.dumps(manifest, indent=2))
             for name, path in sorted(files.items()):
                 try:
-                    zf.write(path, arcname=name)
+                    if name == "config/config.yaml":
+                        # Never ship raw secrets: redact placeholder-style so
+                        # an import can restore the values from the target.
+                        zf.writestr(name, self._redacted_config_yaml(path))
+                    else:
+                        zf.write(path, arcname=name)
                 except OSError as exc:
                     log.warning("Skipping %s in bundle: %s", path, exc)
         return buffer.getvalue()
+
+    @staticmethod
+    def _redacted_config_yaml(path: Path) -> str:
+        """Return *path*'s YAML with secret values replaced by placeholders."""
+        data = create_yaml_rt().load(path.read_text(encoding="utf-8"))
+        _redact_in_place(data)
+        stream = io.StringIO()
+        create_yaml_rt().dump(data, stream)
+        return stream.getvalue()
 
     # ------------------------------------------------------------------
     # Import
@@ -165,6 +226,10 @@ class ConfigBundleService:
                 target = self._target_for(name)
                 assert target is not None
                 category = self._category_for(name)
+                if name == "config/config.yaml" and target.exists():
+                    # Exported bundles carry placeholders instead of secrets —
+                    # restore the values already stored on the target machine.
+                    data = self._restore_stored_secrets(target, data)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 try:
                     get_backup_manager().create_backup(target, category=category)
@@ -268,6 +333,28 @@ class ConfigBundleService:
                 ConfigBundleService._load_yaml_text(text)
             except ValueError as exc:
                 raise ValueError(f"{name}: invalid YAML: {exc}") from exc
+
+    @staticmethod
+    def _restore_stored_secrets(target: Path, data: bytes) -> bytes:
+        """Replace placeholder secrets in *data* with values stored in *target*.
+
+        Exported bundles never contain real secrets (see
+        :meth:`_redacted_config_yaml`); importing such a bundle must not
+        wipe the machine's stored credentials.
+        """
+        try:
+            incoming = create_yaml_rt().load(data.decode("utf-8"))
+            stored = create_yaml_rt().load(target.read_text(encoding="utf-8"))
+        except (YAMLError, UnicodeDecodeError, OSError) as exc:
+            log.warning("Cannot restore stored secrets for %s: %s", target, exc)
+            return data
+
+        if not _restore_secrets_in_place(incoming, stored):
+            return data
+
+        stream = io.StringIO()
+        create_yaml_rt().dump(incoming, stream)
+        return stream.getvalue().encode("utf-8")
 
     @staticmethod
     def _atomic_write_bytes(path: Path, data: bytes) -> None:

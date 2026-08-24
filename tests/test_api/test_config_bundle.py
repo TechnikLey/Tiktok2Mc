@@ -217,3 +217,39 @@ class TestImport:
         assert (project_dir / "data" / "actions.mca").read_text(
             encoding="utf-8"
         ) == MINIMAL_ACTIONS
+
+
+class TestSecretRedaction:
+    def test_export_redacts_secrets(self, client, project_dir):
+        (project_dir / "config.yaml").write_text(
+            'config_version: "1.0"\nrcon:\n  password: "super-secret"\n',
+            encoding="utf-8",
+        )
+        files = _read_zip(client.get("/api/v1/config-bundle").content)
+        content = files["config/config.yaml"].decode("utf-8")
+        assert "super-secret" not in content
+        assert "__REDACTED__" in content
+
+    def test_import_restores_placeholder_secrets_from_target(self, client, project_dir):
+        # Stored machine config has a real secret; the bundle carries the
+        # placeholder — importing must keep the stored value.
+        (project_dir / "config.yaml").write_text(
+            'config_version: "1.0"\nrcon:\n  password: "stored-secret"\n',
+            encoding="utf-8",
+        )
+        bundle = _make_bundle(
+            {
+                "config/config.yaml": (
+                    'config_version: "1.0"\nserver_host: "127.0.0.1"\n'
+                    "rcon:\n  password: __REDACTED__\n"
+                ),
+            }
+        )
+        resp = client.post(
+            "/api/v1/config-bundle/import",
+            files={"file": ("bundle.zip", bundle, "application/zip")},
+        )
+        assert resp.status_code == 200
+        restored = (project_dir / "config.yaml").read_text(encoding="utf-8")
+        assert "stored-secret" in restored
+        assert "__REDACTED__" not in restored
