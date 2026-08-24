@@ -1578,3 +1578,83 @@ class TestCommentCommandNamespace:
         cmds, user = bc.rcon_queue.get_nowait()
         assert cmds == ["tp 100 64 100"]
         assert user == "viewer"
+
+
+class TestBridgeOriginGuard:
+    """Cross-site browser requests against the bridge port must be rejected."""
+
+    def _make_request(
+        self, remote_addr="127.0.0.1", host="127.0.0.1:29188", headers=None
+    ):
+        hdrs = {"host": host}
+        hdrs.update(headers or {})
+        return SimpleNamespace(remote_addr=remote_addr, host=host, headers=hdrs)
+
+    def test_cross_origin_from_localhost_rejected(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "request",
+            self._make_request(headers={"origin": "https://evil.example"}),
+        )
+        resp = main_mod._bridge_origin_check()
+        assert resp is not None and resp[1] == 403
+
+    def test_same_host_origin_allowed(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "request",
+            self._make_request(headers={"origin": "http://127.0.0.1:29188"}),
+        )
+        assert main_mod._bridge_origin_check() is None
+
+    def test_cross_site_fetch_without_origin_rejected(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "request",
+            self._make_request(headers={"sec-fetch-site": "cross-site"}),
+        )
+        resp = main_mod._bridge_origin_check()
+        assert resp is not None and resp[1] == 403
+
+    def test_non_browser_client_unaffected(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod, "request", self._make_request())
+        assert main_mod._bridge_origin_check() is None
+
+    def test_dns_rebinding_host_rejected(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(
+            main_mod, "request", self._make_request(host="attacker.example")
+        )
+        resp = main_mod._bridge_origin_check()
+        assert resp is not None and resp[1] == 403
+
+    def test_own_hostname_allowed(self, monkeypatch):
+        import socket as socket_mod
+
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "request",
+            self._make_request(host=f"{socket_mod.gethostname()}:29188"),
+        )
+        assert main_mod._bridge_origin_check() is None
+
+    def test_non_localhost_remote_skips_host_check(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(
+            main_mod,
+            "request",
+            self._make_request(remote_addr="192.168.1.50", host="192.168.1.50:29188"),
+        )
+        assert main_mod._bridge_origin_check() is None

@@ -12,6 +12,7 @@
 import asyncio
 import concurrent.futures
 import datetime
+import ipaddress
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ import re
 import secrets
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -239,7 +241,83 @@ def _bridge_auth_check():
         }, 401
 
 
+def _same_host_origin(origin: str, host: str) -> bool:
+    """True when an Origin's netloc matches the request Host.
+
+    Mirrors core/api/server.py (_same_host_origin).
+    """
+    if not origin or not host:
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(origin)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    return parsed.netloc == host
+
+
+def _is_local_machine_host(hostname: str | None) -> bool:
+    """Whether a Host-header name refers to this machine.
+
+    Mirrors core/api/server.py (_is_local_machine_host): loopback names
+    and any IP literal pass; DNS names only when they are this machine's
+    own hostname (detects DNS rebinding to 127.0.0.1).
+    """
+    if not hostname:
+        return False
+    if hostname in _LOCALHOSTS:
+        return True
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        return True
+    return hostname.lower() == socket.gethostname().lower()
+
+
+def _bridge_origin_check():
+    """Reject browser requests that did not originate from a local client.
+
+    Mirrors LocalOriginGuardMiddleware (core/api/server.py). A malicious
+    web page can fire cross-site POSTs at http://127.0.0.1:29188 — such
+    requests carry a foreign Origin header (and/or Sec-Fetch-Site:
+    cross-site) and are rejected with 403 before any side effect runs.
+    DNS-rebound requests arrive from localhost but with the attacker's
+    hostname in the Host header. Non-browser clients (the control plane,
+    plugins, curl) send neither header and are unaffected.
+    """
+    origin = request.headers.get("origin")
+    if origin is not None and not _same_host_origin(origin, request.host):
+        return {
+            "status": "error",
+            "message": "Cross-origin request rejected.",
+        }, 403
+
+    if request.headers.get("sec-fetch-site") == "cross-site":
+        return {
+            "status": "error",
+            "message": "Cross-site request rejected.",
+        }, 403
+
+    if request.remote_addr in _LOCALHOSTS:
+        hostname = (
+            urllib.parse.urlsplit(f"//{request.host}").hostname
+            if request.host
+            else None
+        )
+        if not _is_local_machine_host(hostname):
+            return {
+                "status": "error",
+                "message": "Invalid Host header.",
+            }, 403
+
+    return None
+
+
 app.before_request(_bridge_auth_check)
+app.before_request(_bridge_origin_check)
 
 werkzeug_log = logging.getLogger("werkzeug")
 werkzeug_log.setLevel(logging.WARNING)
