@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import urllib.request
@@ -101,7 +102,7 @@ async def list_versions():
     cfg = svc.read_config()
     current_version = cfg.get("mc_version", "1.21.11")
 
-    data = _fetch_json(PAPER_API)
+    data = await asyncio.to_thread(_fetch_json, PAPER_API)
     raw_versions = (
         _flatten_versions(data.get("versions", {})) if isinstance(data, dict) else []
     )
@@ -139,7 +140,7 @@ async def set_version(body: SetVersionRequest):
             detail=f"Version '{requested}' is not supported. Minimum supported version is {_MIN_SUPPORTED_MAJOR}.{_MIN_SUPPORTED_MINOR}+.",
         )
 
-    data = _fetch_json(PAPER_API)
+    data = await asyncio.to_thread(_fetch_json, PAPER_API)
     raw_versions = (
         _flatten_versions(data.get("versions", {})) if isinstance(data, dict) else []
     )

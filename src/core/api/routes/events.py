@@ -202,7 +202,8 @@ async def ingest_event(
             # engine; events routes stay usable without it in tests.
             from core.api.services.trigger_service import get_trigger_service
 
-            dispatch_result = get_trigger_service().dispatch(
+            dispatch_result = await asyncio.to_thread(
+                get_trigger_service().dispatch,
                 trigger=trigger_name.strip(),
                 user=str(user),
                 gift_id=str(gift_id) if gift_id is not None else None,

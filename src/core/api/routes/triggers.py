@@ -44,7 +44,10 @@ async def list_trigger_types():
 @router.post("/triggers/execute", response_model=TriggerResponse)
 async def execute_trigger(body: TriggerExecuteRequest):
     try:
-        result = get_trigger_service().execute_trigger(
+        # The engine POSTs to the bridge synchronously (up to bridge_timeout).
+        # Run it in a thread so a slow/dead bridge cannot stall the event loop.
+        result = await asyncio.to_thread(
+            get_trigger_service().execute_trigger,
             trigger=body.trigger,
             user=body.user,
             gift_id=body.gift_id,
@@ -88,7 +91,8 @@ async def dispatch_trigger(body: TriggerExecuteRequest):
     fire actions.mca triggers on their own schedule.
     """
     try:
-        result = get_trigger_service().dispatch(
+        result = await asyncio.to_thread(
+            get_trigger_service().dispatch,
             trigger=body.trigger,
             user=body.user,
             gift_id=body.gift_id,
@@ -126,7 +130,7 @@ async def dispatch_trigger(body: TriggerExecuteRequest):
 @router.post("/triggers/tiktok-connection", response_model=TiktokToggleResponse)
 async def toggle_tiktok_connection():
     try:
-        result = get_trigger_service().toggle_tiktok_connection()
+        result = await asyncio.to_thread(get_trigger_service().toggle_tiktok_connection)
         asyncio.ensure_future(
             event_bus.publish(
                 "system.tiktok_toggle",
@@ -151,7 +155,8 @@ async def toggle_tiktok_connection():
 @router.post("/triggers/comment", response_model=TriggerResponse)
 async def send_test_comment(body: TriggerCommentRequest):
     try:
-        result = get_trigger_service().send_comment(
+        result = await asyncio.to_thread(
+            get_trigger_service().send_comment,
             user=body.user,
             text=body.text,
             moderator=body.moderator,

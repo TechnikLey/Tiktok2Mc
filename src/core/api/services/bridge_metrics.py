@@ -1,7 +1,9 @@
 """Bridge metrics service — fetches live metrics from the TikTok bridge."""
 
+import asyncio
 import json
 import logging
+import time
 import urllib.request
 from typing import Any
 
@@ -39,10 +41,14 @@ class BridgeMetricsService:
             log.debug("Failed to read bridge metrics URL from config: %s", exc)
         return "http://127.0.0.1:29188/metrics"
 
+    def _fetch(self, url: str) -> dict[str, Any]:
+        """Blocking HTTP GET of the bridge metrics endpoint (runs in a thread)."""
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
     async def get_metrics(self, use_cache: bool = True) -> dict[str, Any]:
         """Fetch metrics from the bridge."""
-        import time
-
         now = time.time()
 
         if use_cache and self._cache and (now - self._cache_time) < self._cache_ttl:
@@ -50,12 +56,13 @@ class BridgeMetricsService:
 
         url = self._get_bridge_url()
         try:
-            req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                self._cache = data
-                self._cache_time = now
-                return data
+            # The blocking urlopen must not run on the event loop — a slow
+            # or dead bridge would stall every concurrent request for up
+            # to the full 3 s timeout.
+            data = await asyncio.to_thread(self._fetch, url)
+            self._cache = data
+            self._cache_time = now
+            return data
         except (OSError, ValueError) as exc:
             log.debug("Failed to fetch bridge metrics from %s: %s", url, exc)
             return {}

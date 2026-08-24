@@ -719,7 +719,9 @@ async def download_version(body: DownloadRequest):
 
     # Verify version exists on PaperMC with a STABLE build
     try:
-        builds = _fetch_json(f"{PAPER_API}/versions/{version}/builds")
+        builds = await asyncio.to_thread(
+            _fetch_json, f"{PAPER_API}/versions/{version}/builds"
+        )
     except HTTPException:
         raise HTTPException(
             status_code=400,
