@@ -31,6 +31,7 @@ describe('Help', () => {
     expect(Help.topics).toContain('overlays');
     expect(Help.topics).toContain('actions');
     expect(Help.topics).toContain('reactions');
+    expect(Help.topics).toContain('commentCommands');
     expect(Help.topics).toContain('settings');
     expect(Help.topics).toContain('log');
     expect(Help.topics).toContain('console');

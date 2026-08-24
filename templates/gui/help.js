@@ -96,10 +96,10 @@
           h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
           body: {
             en: [
-              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+              'Ctrl+S saves the current changes.',
             ],
             de: [
-              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+              'Ctrl+S speichert die aktuellen Änderungen.',
             ],
           },
         },
@@ -137,10 +137,10 @@
           h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
           body: {
             en: [
-              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+              'Ctrl+S saves the current changes.',
             ],
             de: [
-              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+              'Ctrl+S speichert die aktuellen Änderungen.',
             ],
           },
         },
@@ -187,7 +187,7 @@
           body: {
             en: [
               'Actions define what happens when a TikTok event occurs: a Follow, a Like, a Comment, a Gift or a custom event. Every trigger has a name, a status and a list of commands that run when it fires.',
-              'Disabled triggers (## in the file) are skipped. Duplicate enabled triggers are rejected when saving.',
+              'Disabled triggers are skipped. Duplicate enabled triggers are rejected when saving.',
             ],
             de: [
               'Aktionen legen fest, was passiert, wenn ein TikTok-Event eintritt: ein Follow, ein Like, ein Kommentar, ein Geschenk oder ein benutzerdefiniertes Event. Jeder Trigger hat einen Namen, einen Status und eine Liste von Befehlen, die beim Auslösen laufen.',
@@ -230,10 +230,10 @@
           h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
           body: {
             en: [
-              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+              'Ctrl+S saves the current changes.',
             ],
             de: [
-              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+              'Ctrl+S speichert die aktuellen Änderungen.',
             ],
           },
         },
@@ -260,10 +260,10 @@
           h: { en: 'Testing', de: 'Testen' },
           body: {
             en: [
-              'The "Test" button sends a test event through the EventBus so you can verify a reaction without waiting for a real event. The plugin must be enabled for the reaction to fire.',
+              'The "Test" button sends a test event so you can verify a reaction without waiting for a real event. The plugin must be enabled for the reaction to fire.',
             ],
             de: [
-              'Der „Testen"-Button sendet ein Test-Event über den EventBus, damit du eine Reaktion verifizieren kannst, ohne auf ein echtes Event zu warten. Damit die Reaktion ausgelöst wird, muss das Plugin aktiviert sein.',
+              'Der „Testen"-Button sendet ein Test-Event, damit du eine Reaktion verifizieren kannst, ohne auf ein echtes Event zu warten. Damit die Reaktion ausgelöst wird, muss das Plugin aktiviert sein.',
             ],
           },
         },
@@ -271,10 +271,55 @@
           h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
           body: {
             en: [
-              'Ctrl+S saves the current changes. Press ? for an overview of all shortcuts.',
+              'Ctrl+S saves the current changes.',
             ],
             de: [
-              'Ctrl+S speichert die aktuellen Änderungen. Drücke ? für eine Übersicht aller Kürzel.',
+              'Ctrl+S speichert die aktuellen Änderungen.',
+            ],
+          },
+        },
+      ],
+    },
+
+    commentCommands: {
+      title: { en: 'Comment Commands', de: 'Kommentar-Befehle' },
+      sections: [
+        {
+          h: { en: 'What are Comment Commands?', de: 'Was sind Kommentar-Befehle?' },
+          body: {
+            en: [
+              'Comment commands let viewers run actions via the TikTok live chat: when a viewer types a registered command (for example "!discord"), the configured handler answers automatically.',
+              'Use "+ Add Command Group" to create a group in three steps: basic data (prefix and handler), access (enabled state, allowed roles, mode) and the commands with their responses.',
+            ],
+            de: [
+              'Kommentar-Befehle lassen Viewer über den TikTok-Live-Chat Aktionen auslösen: Tippt ein Viewer einen registrierten Befehl (z. B. „!discord"), antwortet der konfigurierte Handler automatisch.',
+              'Mit „+ Befehlsgruppe hinzufügen" legst du eine Gruppe in drei Schritten an: Basisdaten (Präfix und Handler), Zugriff (Aktiv-Status, erlaubte Rollen, Modus) und die Befehle mit ihren Antworten.',
+            ],
+          },
+        },
+        {
+          h: { en: 'Handlers & Overrides', de: 'Handler & Overrides' },
+          body: {
+            en: [
+              'Each group has a handler: RCON runs a command on your Minecraft server, HTTP sends a request to a web URL and Plugin routes the command to an installed plugin.',
+              'Per command you can set overrides that replace the group defaults — for example an extra cooldown, restricted roles or a different handler. Use the search box to filter groups.',
+            ],
+            de: [
+              'Jede Gruppe hat einen Handler: RCON führt einen Befehl auf deinem Minecraft-Server aus, HTTP sendet eine Anfrage an eine Web-URL und Plugin leitet den Befehl an ein installiertes Plugin weiter.',
+              'Pro Befehl kannst du Overrides setzen, die die Gruppen-Standards ersetzen — z. B. einen zusätzlichen Cooldown, eingeschränkte Rollen oder einen anderen Handler. Über die Suche filterst du die Gruppen.',
+            ],
+          },
+        },
+        {
+          h: { en: 'Master Switch & Cooldowns', de: 'Hauptschalter & Cooldowns' },
+          body: {
+            en: [
+              'The "Enable all command groups" switch at the top turns every group on or off at once. The global cooldown limits how often any command may fire, the global user cooldown how often a single viewer may trigger one.',
+              'Remember to save your changes with "Save Changes" or Ctrl+S.',
+            ],
+            de: [
+              'Der Schalter „Alle Befehlsgruppen aktivieren" oben schaltet alle Gruppen gleichzeitig ein oder aus. Der globale Cooldown begrenzt, wie oft überhaupt ein Befehl ausgelöst werden darf, der globale Benutzer-Cooldown, wie oft ein einzelner Viewer einen auslösen kann.',
+              'Vergiss nicht, deine Änderungen mit „Änderungen speichern" oder Ctrl+S zu sichern.',
             ],
           },
         },
@@ -301,11 +346,11 @@
           h: { en: 'TikTok sign-in (session ID)', de: 'TikTok-Anmeldung (Session-ID)' },
           body: {
             en: [
-              'Open tiktok.com in your browser, log in with the account that should post, press F12 \u2192 "Application" \u2192 Cookies \u2192 tiktok.com and copy the value of the "sessionid" row. Paste it in the Chatbot tab and click "Sign in".',
+              'To let the bot post, copy the session ID of your logged-in TikTok account from your browser and paste it into the field in the Chatbot tab, then click "Sign in".',
               'The session ID is as valuable as a password: it is stored encrypted on this device only and never shown in full again. If sends start failing, the session has probably expired, just sign in again.',
             ],
             de: [
-              'Öffne tiktok.com im Browser, logge dich mit dem Account ein, der schreiben soll, drücke F12 \u2192 „Application" \u2192 Cookies \u2192 tiktok.com und kopiere den Wert der Zeile „sessionid". Füge ihn im Chatbot-Tab ein und klicke auf „Anmelden".',
+              'Damit der Bot schreiben kann, kopiere die Session-ID deines eingeloggten TikTok-Accounts aus dem Browser und füge sie in das Feld im Chatbot-Tab ein. Klicke dann auf „Anmelden".',
               'Die Session-ID ist so wertvoll wie ein Passwort: Sie wird nur verschlüsselt auf diesem Gerät gespeichert und nie wieder vollständig angezeigt. Schlägt das Senden fehl, ist sie vermutlich abgelaufen, einfach neu anmelden.',
             ],
           },
@@ -357,10 +402,10 @@
           h: { en: 'Keyboard Shortcuts', de: 'Tastenkürzel' },
           body: {
             en: [
-              'Ctrl+S saves the current changes, / focuses the search box and ? opens the shortcut reference.',
+              'Ctrl+S saves the current changes and / focuses the search box.',
             ],
             de: [
-              'Ctrl+S speichert die aktuellen Änderungen, / fokussiert das Suchfeld und ? öffnet die Kürzel-Übersicht.',
+              'Ctrl+S speichert die aktuellen Änderungen und / fokussiert das Suchfeld.',
             ],
           },
         },
@@ -405,7 +450,7 @@
           body: {
             en: [
               'The console opens an RCON session to a Minecraft server so you can send commands directly. Select a server from the dropdown and click "Connect".',
-              'RCON must be enabled in the server\u2019s server.properties and in the TikTok2Mc settings (Settings → Minecraft → RCON).',
+              'RCON must be enabled in the TikTok2Mc settings (Settings → Minecraft → RCON) and on the server you want to connect to.',
             ],
             de: [
               'Die Konsole öffnet eine RCON-Sitzung zu einem Minecraft-Server, damit du Befehle direkt senden kannst. Wähle einen Server aus der Liste und klicke auf „Verbinden".',
@@ -561,10 +606,10 @@
           h: { en: 'Automatic Backups', de: 'Automatische Backups' },
           body: {
             en: [
-              'A backup is created automatically whenever you save your configuration, your actions (actions.mca), plugin settings or the plugin registry. All backups are stored under data/backups/ and the newest ones are kept automatically (older copies are cleaned up).',
+              'A backup is created automatically whenever you save your configuration, your actions, plugin settings or the plugin registry. All backups are managed automatically and older copies are cleaned up.',
             ],
             de: [
-              'Bei jedem Speichern deiner Konfiguration, deiner Aktionen (actions.mca), von Plugin-Einstellungen oder der Plugin-Registry wird automatisch ein Backup erstellt. Alle Backups liegen unter data/backups/, die neuesten werden automatisch vorgehalten (ältere Kopien werden bereinigt).',
+              'Bei jedem Speichern deiner Konfiguration, deiner Aktionen, von Plugin-Einstellungen oder der Plugin-Registry wird automatisch ein Backup erstellt. Alle Backups werden automatisch verwaltet, ältere Kopien werden bereinigt.',
             ],
           },
         },
@@ -612,9 +657,11 @@
           body: {
             en: [
               'The dashboard supports keyboard shortcuts for the most common actions. They work in every view and in the editors.',
+              'The "/" shortcut works on every keyboard layout, even when producing the character requires Shift (for example on German keyboards).',
             ],
             de: [
               'Das Dashboard unterstützt Tastenkürzel für die häufigsten Aktionen. Sie funktionieren in jeder Ansicht und in den Editoren.',
+              'Das Kürzel „/" funktioniert auf jedem Tastaturlayout, auch wenn das Zeichen nur mit Umschalttaste erreichbar ist (z. B. auf deutschen Tastaturen).',
             ],
           },
           list: {
@@ -622,13 +669,11 @@
               '<kbd>Ctrl</kbd> + <kbd>S</kbd> — Save the current changes in the active editor',
               '<kbd>/</kbd> — Focus the search field of the current view',
               '<kbd>Esc</kbd> — Close the topmost dialog / overlay',
-              '<kbd>?</kbd> — Open this shortcut reference',
             ],
             de: [
               '<kbd>Ctrl</kbd> + <kbd>S</kbd> — Aktuelle Änderungen im aktiven Editor speichern',
               '<kbd>/</kbd> — Suchfeld der aktuellen Ansicht fokussieren',
               '<kbd>Esc</kbd> — Obersten Dialog / Overlay schließen',
-              '<kbd>?</kbd> — Diese Kürzel-Übersicht öffnen',
             ],
           },
         },

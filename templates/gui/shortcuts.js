@@ -1,8 +1,8 @@
 /* ─── Global Keyboard Shortcuts ───
  * Ctrl+S   Save changes in the active editor
- * /        Focus the search field of the current view
+ * /        Focus the search field of the current view (works on every
+ *          keyboard layout, even when "/" requires Shift, e.g. QWERTZ)
  * Esc      Close the topmost dialog / overlay
- * ?        Open the shortcut reference (help topic "shortcuts")
  *
  * Shortcuts never fire while the user is typing in an input field, unless the
  * binding is explicitly marked `whenTyping` (Ctrl+S and Esc are the only ones).
@@ -46,8 +46,12 @@ const Shortcuts = (() => {
     const wantAlt = parts.includes('alt');
     const key = parts[parts.length - 1];
     if (wantCtrl !== (e.ctrlKey || e.metaKey)) return false;
-    if (wantShift !== e.shiftKey) return false;
     if (wantAlt !== e.altKey) return false;
+    // Shift is only enforced when the binding explicitly requires it. Many
+    // layouts need Shift to produce a character at all (e.g. "/" = Shift+7 on
+    // German QWERTZ); `e.key` already contains the produced character, so it
+    // decides the match instead of the raw Shift state.
+    if (wantShift && !e.shiftKey) return false;
     return _keyName(e) === key;
   }
 
@@ -180,7 +184,6 @@ const Shortcuts = (() => {
   bind('ctrl+s', saveActiveEditor, { whenTyping: true, descKey: 'shortcuts.save' });
   bind('/', focusSearch, { descKey: 'shortcuts.search' });
   bind('escape', _closeTopModal, { whenTyping: true, descKey: 'shortcuts.close' });
-  bind('shift+?', () => { if (window.Help) Help.openHelp('shortcuts'); }, { descKey: 'shortcuts.help' });
 
   function install() {
     document.addEventListener('keydown', _handleKeydown);

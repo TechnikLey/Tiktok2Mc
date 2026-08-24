@@ -47,7 +47,6 @@ describe('Shortcuts', () => {
     expect(combos).toContain('ctrl+s');
     expect(combos).toContain('/');
     expect(combos).toContain('escape');
-    expect(combos).toContain('shift+?');
   });
 
   it('finds a default list() with descriptions', () => {
@@ -58,19 +57,18 @@ describe('Shortcuts', () => {
     }
   });
 
-  it('finds "?" opens the shortcuts help topic', () => {
+  it('does not bind "?" to anything', () => {
     fire('?', { shiftKey: true });
-    expect(Help.isOpen()).toBe(true);
-    expect(document.getElementById('help-modal-title').textContent).toBe('Keyboard Shortcuts');
+    expect(Help.isOpen()).toBe(false);
   });
 
-  it('does not open help while typing "?" in an input', () => {
-    const input = document.createElement('input');
-    document.body.appendChild(input);
-    input.focus();
-    fireOn(input, '?', { shiftKey: true });
-    expect(Help.isOpen()).toBe(false);
-    input.remove();
+  it('focuses the search field on "/" even when produced via Shift (German layout)', () => {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-log').classList.add('active');
+    // On QWERTZ, "/" is Shift+7: the keydown carries key="/" and shiftKey=true
+    fire('/', { shiftKey: true });
+    expect(document.activeElement.id).toBe('log-search');
+    fire('Escape');
   });
 
   it('focuses the search field of the active view on "/"', () => {
