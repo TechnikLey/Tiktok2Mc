@@ -7959,9 +7959,10 @@ async function checkAllUpdates() {
   if (detail) detail.classList.add('hidden');
 
   try {
-    const [toolData, pluginData, lastResult, autoInstallData] = await Promise.all([
+    const [toolData, pluginData, hookData, lastResult, autoInstallData] = await Promise.all([
       fetchJSON('/updates/check').catch(() => null),
       fetchJSON('/plugins/updates').catch(() => null),
+      fetchJSON('/hooks/updates').catch(() => null),
       fetchJSON('/updates/result').catch(() => null),
       fetchJSON('/updates/auto_install').catch(() => null),
     ]);
@@ -7970,7 +7971,7 @@ async function checkAllUpdates() {
       _autoInstallEnabled = autoInstallData.auto_install;
     }
 
-    _updateData = { tool: toolData, plugins: pluginData, lastResult };
+    _updateData = { tool: toolData, plugins: pluginData, hooks: hookData, lastResult };
     if (lastResult && lastResult.exit_code !== null && lastResult.ok === false) {
       if (_lastResultToastCode !== lastResult.exit_code) {
         _lastResultToastCode = lastResult.exit_code;
@@ -7996,9 +7997,14 @@ function _renderUpdateResults() {
 
   const tool = _updateData?.tool;
   const plugins = _updateData?.plugins;
+  const hooks = _updateData?.hooks;
   const toolAvail = tool && tool.update_available;
   const pluginAvail = plugins && plugins.updates_available > 0;
-  const total = (toolAvail ? 1 : 0) + (pluginAvail ? plugins.updates_available : 0);
+  const hookAvail = hooks && hooks.updates_available > 0;
+  const total =
+    (toolAvail ? 1 : 0) +
+    (pluginAvail ? plugins.updates_available : 0) +
+    (hookAvail ? hooks.updates_available : 0);
 
   let html = '<div class="update-actions">' +
     '<button class="btn btn--primary" onclick="checkAllUpdates()">' + I18N.t('updates.check') + '</button>' +
@@ -8014,7 +8020,7 @@ function _renderUpdateResults() {
       '</div></div>';
   }
 
-  if (!toolAvail && !pluginAvail) {
+  if (!toolAvail && !pluginAvail && !hookAvail) {
     html +=
       '<div class="update-status update-status--ok">' +
       '<span class="update-status__icon">✓</span>' +
@@ -8067,32 +8073,67 @@ function _renderUpdateResults() {
         '</div>';
     }
   }
+  if (hookAvail && hooks.hooks) {
+    for (const h of hooks.hooks) {
+      if (!h.update_available) continue;
+      detailHtml +=
+        '<div class="update-item">' +
+        '<div class="update-item__info">' +
+        '<strong>' + escapeHtml(h.display_name || h.name) + '</strong>' +
+        '<span class="update-item__version">' + h.current_version + ' → <strong>' + h.latest_version + '</strong></span>' +
+        '</div>' +
+        (h.error ? '<span class="log-err">' + escapeHtml(h.error) + '</span>' : '') +
+        '</div>';
+    }
+  }
   detail.innerHTML = detailHtml;
   detail.classList.remove('hidden');
 }
 
 async function applyUpdates() {
   log(I18N.t('updates.installing'), 'info');
-  let result = null;
+  let installed = 0;
+  const failures = [];
   try {
-    result = await postJSON('/plugins/updates/install', {});
+    const result = await postJSON('/plugins/updates/install', {});
     if (result.installed > 0) {
+      installed += result.installed;
       log(I18N.t('updates.installedOk', { count: result.installed }), 'info');
     }
     if (result.failed > 0) {
       log(I18N.t('updates.installedFailed', { count: result.failed }), 'err');
       for (const r of result.results) {
-        if (!r.success) showToast(I18N.t('updates.installFailed', { name: r.display_name || r.name, msg: r.error || I18N.t('common.unknownError') }), 'error');
+        if (!r.success) failures.push(r);
       }
     }
   } catch (e) {
     log('Plugin update install failed: ' + e.message, 'err');
     showToast(I18N.t('updates.installFailedGeneric', { msg: e.message }), 'error');
   }
+  try {
+    // Hooks may not have pending updates or the endpoint may be absent
+    // in older installs — both are non-fatal.
+    const hookResult = await postJSON('/hooks/updates/install', {});
+    if (hookResult.installed > 0) {
+      installed += hookResult.installed;
+      log(I18N.t('updates.installedOk', { count: hookResult.installed }), 'info');
+    }
+    if (hookResult.failed > 0) {
+      log(I18N.t('updates.installedFailed', { count: hookResult.failed }), 'err');
+      for (const r of hookResult.results || []) {
+        if (!r.success) failures.push(r);
+      }
+    }
+  } catch (e) {
+    log('Hook update install failed: ' + e.message, 'err');
+  }
+  for (const r of failures) {
+    showToast(I18N.t('updates.installFailed', { name: r.display_name || r.name, msg: r.error || I18N.t('common.unknownError') }), 'error');
+  }
   showRestartDialog(
     I18N.t('updates.applyTitle'),
-    result && result.installed > 0
-      ? I18N.t('updates.installedRestart', { count: result.installed })
+    installed > 0
+      ? I18N.t('updates.installedRestart', { count: installed })
       : I18N.t('updates.restartToApply')
   );
 }
@@ -8754,16 +8795,28 @@ function switchToEditor(viewId, openFn) {
 }
 
 function switchToEditorNow(viewId, openFn) {
+  const prevNav = document.querySelector('.nav-item.active');
+  const prevOverlay = document.querySelector('.editor-overlay:not(.hidden)');
   _hideAllEditors();
   closeMobileSidebar();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navItem = document.querySelector(`.nav-item[data-view="${viewId}"]`);
   navItem?.classList.add('active');
-  openFn();
+  let aborted = false;
+  // An editor's open() may abort by resolving `false` (e.g. the chatbot beta
+  // consent gate). Restore the previous nav item / editor instead of leaving
+  // the target nav highlighted above the old dashboard view.
+  Promise.resolve(openFn()).then(result => {
+    if (result !== false) return;
+    aborted = true;
+    navItem?.classList.remove('active');
+    if (prevNav && prevNav.isConnected) prevNav.classList.add('active');
+    if (prevOverlay && prevOverlay.isConnected) prevOverlay.classList.remove('hidden');
+  });
   // Re-assert active class after editor opens to handle race condition
   // where MutationObserver might clear it before editor overlay is visible
   setTimeout(() => {
-    navItem?.classList.add('active');
+    if (!aborted) navItem?.classList.add('active');
   }, 0);
 }
 
