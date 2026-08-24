@@ -191,6 +191,67 @@ Notes:
   reserved core families `tiktok.*`/`minecraft.*` are rejected server-side
   with `403 API-0009`).
 
+## External Networking (retry + circuit breaker)
+
+For talking to third-party services (Discord bots, game servers, external
+APIs) plugins get shared infrastructure instead of building their own:
+
+### `http_request(url, method="GET", *, headers=None, json_body=None, data=None, timeout=10.0, retries=2, retry_backoff=0.5)`
+
+```python
+resp = self.http_request(
+    "https://api.example.test/v1/things",
+    method="POST",
+    json_body={"name": "x"},
+)
+if resp is None:
+    ...  # network exhausted or breaker open — handle offline case
+elif resp["status"] >= 400:
+    ...
+else:
+    payload = resp["json"]  # parsed automatically when response is JSON
+```
+
+- Retries connection errors and `5xx` with exponential backoff; `4xx`
+  returns immediately (caller error).
+- Per-URL circuit breaker: after 5 consecutive failures the URL is skipped
+  locally for 30 s (`None` return instead of hammering a dead endpoint);
+  any success resets it.
+- Returns `{"status", "json", "text"}` for HTTP responses, `None` when the
+  request could not be completed.
+
+### `ws_connect(url, on_message, *, name=None, headers=None, reconnect_delay=5.0)` / `ws_close()`
+
+Managed WebSocket client threads with auto-reconnect (requires the bundled
+`websocket-client` package):
+
+```python
+def start(self):  # e.g. from __init__ or a command handler
+    self.ws_connect(
+        "wss://game.example.test/feed",
+        self.on_game_message,
+        name="game",
+    )
+
+def on_game_message(self, data):
+    # data is str (or bytes); runs in the client thread
+    event = json.loads(data)
+    ...
+
+def on_stop(self):
+    self.ws_close()  # all clients; ws_close("game") for one
+```
+
+- Auto-reconnects every `reconnect_delay` seconds until closed or the
+  plugin shuts down (all clients are stopped automatically on shutdown).
+- Handler exceptions are isolated and reported to the health monitor.
+- Duplicate `name` while running → returns `False`.
+
+> [!NOTE]
+> These helpers are **not** permission-gated: a plugin process can always
+> open raw sockets itself, so gating would only add friction without real
+> security. The value is shared retry/breaker/reconnect infrastructure.
+
 ## Lifecycle
 
 ### `run()`

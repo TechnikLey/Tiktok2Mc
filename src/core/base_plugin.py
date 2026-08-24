@@ -71,6 +71,37 @@ def _api_url(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+class _CircuitBreaker:
+    """Minimal per-endpoint circuit breaker.
+
+    After ``max_fails`` consecutive failures the breaker opens for
+    ``cooldown`` seconds; calls during that window are dropped locally
+    instead of hammering a dead endpoint. A successful call resets the
+    failure count.
+    """
+
+    __slots__ = ("_fails", "_open_until", "cooldown", "max_fails")
+
+    def __init__(self, max_fails: int = 5, cooldown: float = 30.0) -> None:
+        self.max_fails = max(1, int(max_fails))
+        self.cooldown = float(cooldown)
+        self._fails = 0
+        self._open_until = 0.0
+
+    def allow(self) -> bool:
+        return time.monotonic() >= self._open_until
+
+    def mark_success(self) -> None:
+        self._fails = 0
+        self._open_until = 0.0
+
+    def mark_failure(self) -> None:
+        self._fails += 1
+        if self._fails >= self.max_fails:
+            self._open_until = time.monotonic() + self.cooldown
+            self._fails = 0
+
+
 class BasePlugin:
     """Abstract base for TikTok2MC plugins.
 
@@ -128,6 +159,12 @@ class BasePlugin:
         # ``__shutdown__`` command or interpreter exit) so on_stop() runs
         # exactly once.
         self._shutdown_started = False
+
+        # External networking: per-URL circuit breakers and managed
+        # WebSocket client threads (see http_request / ws_connect).
+        self._breakers: dict[str, _CircuitBreaker] = {}
+        self._ws_clients: dict[str, dict[str, Any]] = {}
+        self._ws_lock = threading.Lock()
 
         # Register with health monitor
         try:
@@ -586,6 +623,7 @@ class BasePlugin:
             return
         self._shutdown_started = True
         self._running = False
+        self._close_ws_clients()
         log.info("[%s] Shutdown command received — calling on_stop()", self.PLUGIN_NAME)
         try:
             self.on_stop()
@@ -610,12 +648,282 @@ class BasePlugin:
             return
         self._shutdown_started = True
         self._running = False
+        self._close_ws_clients()
         try:
             self.on_stop()
         except Exception:  # never raise out of an atexit handler
             log.exception(
                 "[%s] on_stop() failed during interpreter exit", self.PLUGIN_NAME
             )
+
+    # -- external networking (retry + circuit breaker) -----------------------
+    #
+    # Helpers for talking to third-party services from plugin code. They
+    # are NOT permission-gated: a plugin process can always open sockets
+    # itself, so gating would only create false security. The value here
+    # is shared infrastructure — retries, backoff and a per-endpoint
+    # circuit breaker that every extension gets for free.
+
+    def http_request(
+        self,
+        url: str,
+        method: str = "GET",
+        *,
+        headers: dict[str, str] | None = None,
+        json_body: Any = None,
+        data: bytes | None = None,
+        timeout: float = 10.0,
+        retries: int = 2,
+        retry_backoff: float = 0.5,
+    ) -> dict[str, Any] | None:
+        """HTTP request to an external service with retry + circuit breaker.
+
+        Retries connection errors and 5xx responses (exponential backoff
+        starting at ``retry_backoff`` seconds); 4xx responses return
+        immediately without retrying. Each URL has its own breaker: after
+        5 consecutive failures it opens for 30 s and further calls to
+        that URL fail fast with ``None`` instead of hammering the dead
+        endpoint.
+
+        Returns ``{"status": int, "json": parsed-or-None, "text": str}``
+        for any HTTP response (check ``status`` yourself), or ``None``
+        when the breaker is open or every attempt raised a network error.
+        """
+        verb = method.upper()
+        body: bytes | None = data
+        req_headers = dict(headers or {})
+        if json_body is not None:
+            if data is not None:
+                raise ValueError("pass either json_body or data, not both")
+            body = json.dumps(json_body).encode("utf-8")
+            req_headers.setdefault("Content-Type", "application/json")
+
+        breaker = self._breakers.get(url)
+        if breaker is None:
+            breaker = _CircuitBreaker()
+            self._breakers[url] = breaker
+        if not breaker.allow():
+            log.warning(
+                "[%s] HTTP %s %s skipped: circuit breaker open",
+                self.PLUGIN_NAME,
+                verb,
+                url,
+            )
+            return None
+
+        attempts = max(0, int(retries)) + 1
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            req = urllib.request.Request(
+                url, data=body, headers=req_headers, method=verb
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    raw = resp.read()
+                    text = raw.decode("utf-8", errors="replace")
+                    parsed: Any = None
+                    content_type = resp.headers.get("Content-Type", "")
+                    if "json" in content_type or (
+                        not content_type and text[:1] in ("{", "[")
+                    ):
+                        try:
+                            parsed = json.loads(text)
+                        except json.JSONDecodeError:
+                            parsed = None
+                    breaker.mark_success()
+                    return {"status": resp.status, "json": parsed, "text": text}
+            except urllib.error.HTTPError as exc:
+                # 4xx = caller error, no point retrying; 5xx = server error, retry
+                raw = exc.read() if hasattr(exc, "read") else b""
+                text = raw.decode("utf-8", errors="replace") if raw else ""
+                if exc.code < 500:
+                    breaker.mark_success()  # endpoint alive, request wrong
+                    return {
+                        "status": exc.code,
+                        "json": None,
+                        "text": text,
+                    }
+                last_error = exc
+                if attempt == attempts - 1:
+                    breaker.mark_failure()
+                    log.warning(
+                        "[%s] HTTP %s %s failed: HTTP %s",
+                        self.PLUGIN_NAME,
+                        verb,
+                        url,
+                        exc.code,
+                    )
+                    return {"status": exc.code, "json": None, "text": text}
+            except (OSError, ValueError) as exc:
+                last_error = exc
+                if attempt == attempts - 1:
+                    break
+            time.sleep(retry_backoff * (2**attempt))
+        breaker.mark_failure()
+        log.warning(
+            "[%s] HTTP %s %s failed after %d attempt(s): %s",
+            self.PLUGIN_NAME,
+            verb,
+            url,
+            attempts,
+            last_error,
+        )
+        return None
+
+    # -- WebSocket client (background thread, auto-reconnect) -----------------
+
+    def ws_connect(
+        self,
+        url: str,
+        on_message: Any,
+        *,
+        name: str | None = None,
+        headers: dict[str, str] | None = None,
+        reconnect_delay: float = 5.0,
+    ) -> bool:
+        """Connect to a WebSocket endpoint in a managed background thread.
+
+        Messages arrive as ``on_message(data)`` (str or bytes) in the
+        client thread. The connection auto-reconnects every
+        ``reconnect_delay`` seconds until :meth:`ws_close` is called or
+        the plugin shuts down. Requires the optional ``websocket-client``
+        package.
+
+        Returns ``True`` when the client thread was started.
+        """
+        try:
+            import websocket  # websocket-client
+        except ImportError:
+            log.error(
+                "[%s] ws_connect(%s): package 'websocket-client' not "
+                "installed — pip install websocket-client",
+                self.PLUGIN_NAME,
+                url,
+            )
+            return False
+        if not callable(on_message):
+            log.warning(
+                "[%s] ws_connect: on_message must be callable", self.PLUGIN_NAME
+            )
+            return False
+        client_name = name or url
+
+        with self._ws_lock:
+            existing = self._ws_clients.get(client_name)
+            if existing and existing["thread"].is_alive():
+                log.warning(
+                    "[%s] WebSocket client '%s' already running",
+                    self.PLUGIN_NAME,
+                    client_name,
+                )
+                return False
+
+            stop_event = threading.Event()
+
+            def _runner():
+                while not stop_event.is_set() and self._running:
+                    try:
+                        ws = websocket.create_connection(
+                            url, header=headers, timeout=10
+                        )
+                    except Exception as e:  # connect failed — retry later
+                        log.warning(
+                            "[%s] WebSocket '%s' connect failed: %s",
+                            self.PLUGIN_NAME,
+                            client_name,
+                            e,
+                        )
+                        stop_event.wait(reconnect_delay)
+                        continue
+                    log.info(
+                        "[%s] WebSocket '%s' connected", self.PLUGIN_NAME, client_name
+                    )
+                    with self._ws_lock:
+                        if client_name in self._ws_clients:
+                            self._ws_clients[client_name]["ws"] = ws
+                    try:
+                        while not stop_event.is_set():
+                            try:
+                                frame = ws.recv()
+                            except Exception:
+                                break  # socket closed / timed out -> reconnect
+                            if frame is None:
+                                break
+                            try:
+                                on_message(frame)
+                            except Exception as e:  # handler is user code
+                                log.exception(
+                                    "[%s] WebSocket '%s' handler failed",
+                                    self.PLUGIN_NAME,
+                                    client_name,
+                                )
+                                if self._health:
+                                    self._health.record_error(
+                                        f"plugin.{self.PLUGIN_NAME}",
+                                        f"ws '{client_name}' handler failed: {e}",
+                                    )
+                    finally:
+                        try:
+                            ws.close()
+                        except Exception as e:  # best-effort close
+                            log.debug(
+                                "[%s] WebSocket '%s' close failed: %s",
+                                self.PLUGIN_NAME,
+                                client_name,
+                                e,
+                            )
+                    if not stop_event.is_set() and self._running:
+                        log.info(
+                            "[%s] WebSocket '%s' disconnected — reconnecting in %ss",
+                            self.PLUGIN_NAME,
+                            client_name,
+                            reconnect_delay,
+                        )
+                        stop_event.wait(reconnect_delay)
+                log.debug(
+                    "[%s] WebSocket '%s' client stopped", self.PLUGIN_NAME, client_name
+                )
+
+            thread = threading.Thread(
+                target=_runner,
+                name=f"{self.PLUGIN_NAME}-ws-{client_name}",
+                daemon=True,
+            )
+            self._ws_clients[client_name] = {
+                "thread": thread,
+                "stop": stop_event,
+                "ws": None,
+            }
+        thread.start()
+        return True
+
+    def ws_close(self, name: str | None = None) -> None:
+        """Stop a managed WebSocket client (all clients when name omitted).
+
+        Signals the client thread and force-closes the live socket so a
+        blocking ``recv()`` returns immediately.
+        """
+        with self._ws_lock:
+            if name is None:
+                clients = list(self._ws_clients.values())
+                self._ws_clients.clear()
+            else:
+                entry = self._ws_clients.pop(name, None)
+                clients = [entry] if entry else []
+        for entry in clients:
+            entry["stop"].set()
+            sock = entry.get("ws")
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception as e:  # already closed / never connected
+                    log.debug(
+                        "[%s] WebSocket force-close failed: %s", self.PLUGIN_NAME, e
+                    )
+
+    def _close_ws_clients(self) -> None:
+        """Stop all WebSocket clients during shutdown."""
+        self.ws_close(None)
 
     # -- queries (request/response with correlation ids) -------------------
 

@@ -192,6 +192,69 @@ Hinweise:
   (`"<plugin-name>.<ding>"`; reservierte Kernfamilien `tiktok.*`/
   `minecraft.*` werden serverseitig mit `403 API-0009` abgelehnt).
 
+## Externe Netzwerk-Infrastruktur (Retry + Circuit-Breaker)
+
+Für die Anbindung Dritter (Discord-Bots, Gameserver, externe APIs) bekommen
+Plugins fertige Infrastruktur statt Eigenbau:
+
+### `http_request(url, method="GET", *, headers=None, json_body=None, data=None, timeout=10.0, retries=2, retry_backoff=0.5)`
+
+```python
+resp = self.http_request(
+    "https://api.example.test/v1/things",
+    method="POST",
+    json_body={"name": "x"},
+)
+if resp is None:
+    ...  # Netzwerk erschöpft oder Breaker offen — Offline-Fall behandeln
+elif resp["status"] >= 400:
+    ...
+else:
+    payload = resp["json"]  # wird bei JSON-Antwort automatisch geparst
+```
+
+- Retries bei Verbindungsfehlern und `5xx` mit exponentiellem Backoff; `4xx`
+  kehrt sofort zurück (Fehler des Aufrufers).
+- Circuit-Breaker pro URL: Nach 5 aufeinanderfolgenden Fehlern wird die URL
+  für 30 s lokal übersprungen (`None` statt tote Endpoint zu bombardieren);
+  jeder Erfolg setzt ihn zurück.
+- Liefert `{"status", "json", "text"}` für HTTP-Antworten, `None`, wenn die
+  Anfrage nicht abgeschlossen werden konnte.
+
+### `ws_connect(url, on_message, *, name=None, headers=None, reconnect_delay=5.0)` / `ws_close()`
+
+Verwaltete WebSocket-Client-Threads mit Auto-Reconnect (nutzt das
+mitgelieferte Paket `websocket-client`):
+
+```python
+def start(self):  # z. B. aus __init__ oder einem Command-Handler
+    self.ws_connect(
+        "wss://game.example.test/feed",
+        self.on_game_message,
+        name="game",
+    )
+
+def on_game_message(self, data):
+    # data ist str (oder bytes); läuft im Client-Thread
+    event = json.loads(data)
+    ...
+
+def on_stop(self):
+    self.ws_close()  # alle Clients; ws_close("game") für einen
+```
+
+- Verbindet alle `reconnect_delay` Sekunden neu, bis geschlossen oder das
+  Plugin herunterfährt (alle Clients werden beim Shutdown automatisch
+  gestoppt).
+- Handler-Exceptions sind isoliert und landen im Health-Monitor.
+- Doppelter `name` während der Laufzeit → Rückgabe `False`.
+
+> [!NOTE]
+> Diese Helfer sind **nicht** permission-gesperrt: Ein Plugin-Prozess kann
+> jederzeit selbst Sockets öffnen — ein Gate würde nur Reibung ohne echte
+> Sicherheit erzeugen. Der Wert liegt in der gemeinsamen Retry-/Breaker-/
+> Reconnect-Infrastruktur.
+
 ## Lebenszyklus
 
 ### `run()`

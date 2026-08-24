@@ -12,10 +12,12 @@ python-multipart==0.0.32
 psutil==7.2.2
 
 # === STREAMING & INTEGRATION ===
-# NOTE: 7.0.0 exists but is a fresh major (Aug 2026) — do not bump without
+# NOTE: 7.0.0 exists but is a fresh major (Aug 2026) - do not bump without
 # testing against a real livestream; the bridge depends on 6.x event APIs.
 TikTokLive==6.6.6
 mcrcon==0.7.0
+# Optional BasePlugin.ws_connect() dependency (WebSocket client for plugins)
+websocket-client==1.9.0
 
 # === BUILD & UTILS ===
 pyinstaller==6.22.2
