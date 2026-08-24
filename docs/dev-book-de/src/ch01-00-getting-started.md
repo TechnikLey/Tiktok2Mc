@@ -65,7 +65,7 @@ python tools/update_test/run_update_test.py --list   # Szenarien anzeigen
 python tools/update_test/run_update_test.py all --clean   # alle Szenarien ausführen
 ```
 
-Der Harness simuliert nur die HTTP-Quelle (via `TIKTOK2MC_UPDATE_SOURCE`); alles andere läuft mit dem echten Binary. `src/`, `config/` und `data/` werden nie angefasst. Port `29185` muss frei sein. Details — inklusive des bekannten Windows-Defender-False-Positive bei frisch gebautem, unsigniertem `update.exe` — stehen in `tools/update_test/README.md`.
+Der Harness simuliert nur die HTTP-Quelle (via `TIKTOK2MC_UPDATE_SOURCE`); alles andere läuft mit dem echten Binary. Er arbeitet ausschließlich in seinem eigenen Scratch-Verzeichnis — dein Repository (`src/`, `config/`, `data/`) wird von einem Testlauf nie angefasst. Port `29185` muss frei sein. Details — inklusive des bekannten Windows-Defender-False-Positive bei frisch gebautem, unsigniertem `update.exe` — stehen in `tools/update_test/README.md`.
 
 ### Python-Pakete (requirements.txt)
 

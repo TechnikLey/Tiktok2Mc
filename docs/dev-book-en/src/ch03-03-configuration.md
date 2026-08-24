@@ -2,6 +2,15 @@
 
 Each plugin has its own configuration in `config.yaml`. The system ensures the configuration is always valid — even if the file is missing or corrupted.
 
+> [!NOTE]
+> **Updates:** When a plugin is updated via its `update_url`, your
+> `config.yaml` is preserved — an update archive never overwrites it.
+> Fields added in the newer version are filled in from the manifest's
+> `config_schema` defaults on the next load ("Healing"). All other files
+> inside the plugin directory come from the new package, so anything a
+> plugin needs to persist across updates belongs under `data/`
+> (`plugin_data`), not in its own directory.
+
 ## The config.yaml
 
 ```yaml

@@ -65,7 +65,7 @@ python tools/update_test/run_update_test.py --list   # show scenarios
 python tools/update_test/run_update_test.py all --clean   # run all scenarios
 ```
 
-The harness only simulates the HTTP source (via `TIKTOK2MC_UPDATE_SOURCE`); everything else runs the real binary. It never touches `src/`, `config/` or `data/`. Port `29185` must be free. Details — including the known Windows Defender false positive on freshly built unsigned `update.exe` — are in `tools/update_test/README.md`.
+The harness only simulates the HTTP source (via `TIKTOK2MC_UPDATE_SOURCE`); everything else runs the real binary. It operates exclusively inside its own scratch directory — your repository (`src/`, `config/`, `data/`) is never touched by a test run. Port `29185` must be free. Details — including the known Windows Defender false positive on freshly built unsigned `update.exe` — are in `tools/update_test/README.md`.
 
 ### Python Packages (requirements.txt)
 

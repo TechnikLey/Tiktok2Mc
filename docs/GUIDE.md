@@ -594,7 +594,13 @@ A drop-down selector lets you switch between instances to view each server's con
 
 The tool checks for updates automatically on startup (enabled by default). If a new version is available, it downloads and installs it.
 
-The dashboard's **Check for updates** action also covers plugins and hooks: anything that declares an `update_url` in its manifest is checked and can be updated in one go. Your per-plugin/per-hook `config.yaml` settings are preserved during these updates.
+### What updates preserve — and what they replace
+
+**Tool updates** (the app itself) are *merge* installs: new files are copied in, nothing is deleted. Your `config.yaml` files are never overwritten, and everything under `data/` (actions, backups, plugin data), your Minecraft worlds, and any **external plugins/hooks you installed yourself** are left untouched.
+
+**Plugin/hook updates** via the dashboard replace the plugin's or hook's directory with the new version. Your `config.yaml` inside that directory is preserved automatically; all other files in the directory come from the new package. Persistent data is safe either way — plugins store it under `data/` (`plugin_data`), outside the updated directory.
+
+The dashboard's **Check for updates** action covers the tool as well as plugins and hooks: anything that declares an `update_url` in its manifest is checked and can be updated in one go.
 
 **Before updating, back up these files:**
 - `config/config.yaml` — your settings

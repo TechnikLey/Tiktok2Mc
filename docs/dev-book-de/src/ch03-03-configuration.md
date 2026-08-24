@@ -2,6 +2,15 @@
 
 Jedes Plugin hat eine eigene Konfiguration in der `config.yaml`. Das System stellt sicher, dass die Konfiguration immer gültig ist — selbst wenn die Datei fehlt oder beschädigt ist.
 
+> [!NOTE]
+> **Updates:** Bei einem Plugin-Update über die `update_url` bleibt die
+> `config.yaml` erhalten — ein Update-Archiv überschreibt sie nie.
+> Felder, die in der neueren Version dazukommen, werden beim nächsten
+> Laden aus den `config_schema`-Defaults des Manifests ergänzt
+> („Healing"). Alle übrigen Dateien im Plugin-Verzeichnis stammen danach
+> aus dem neuen Paket — was ein Plugin dauerhaft behalten muss, gehört
+> daher unter `data/` (`plugin_data`), nicht in sein eigenes Verzeichnis.
+
 ## Die config.yaml
 
 ```yaml
