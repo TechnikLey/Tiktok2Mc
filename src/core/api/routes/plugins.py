@@ -36,6 +36,12 @@ from core.api.services.plugin_discovery import (
 )
 from core.api.updater import PluginUpdateChecker
 from core.base_plugin import SHUTDOWN_COMMAND
+from core.runtime_signals import (
+    clean_plugin_signals as _clean_plugin_signals,
+)
+from core.runtime_signals import (
+    write_plugin_signal as _write_plugin_signal,
+)
 
 log = logging.getLogger(__name__)
 
@@ -56,38 +62,6 @@ async def _request_graceful_shutdown(plugin_name: str) -> None:
         log.warning("Failed to enqueue shutdown command for '%s': %s", plugin_name, exc)
         return
     await asyncio.sleep(SHUTDOWN_GRACE_SECONDS)
-
-
-def _runtime_dir() -> Path:
-    d = core.paths.get_root_dir() / "core" / "runtime"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def _write_plugin_signal(plugin_name: str, action: str) -> bool:
-    """Write a signal file that start.py watches for plugin lifecycle events.
-
-    Returns ``True`` if the signal was written successfully.
-    """
-    signal_file = _runtime_dir() / f"plugin_{action}_{plugin_name}"
-    try:
-        signal_file.write_text(plugin_name, encoding="utf-8")
-        return True
-    except OSError as exc:
-        log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
-        return False
-
-
-def _clean_plugin_signals(plugin_name: str) -> None:
-    """Remove all runtime signal files for a plugin."""
-    rd = _runtime_dir()
-    for pattern in (f"plugin_start_{plugin_name}", f"plugin_stop_{plugin_name}"):
-        p = rd / pattern
-        try:
-            if p.exists():
-                p.unlink()
-        except OSError as exc:
-            log.warning("Failed to clean signal %s: %s", p, exc)
 
 
 def _queries_from_manifest(raw: dict) -> list[str]:

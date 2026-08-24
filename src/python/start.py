@@ -880,13 +880,9 @@ async def check_and_run() -> None:
 
 def _cli_write_plugin_signal(plugin_name: str, action: str) -> bool:
     """Write a plugin lifecycle signal file for ``check_and_run()``."""
-    signal_file = RUNTIME_DIR / f"plugin_{action}_{plugin_name}"
-    try:
-        signal_file.write_text(plugin_name, encoding="utf-8")
-        return True
-    except OSError as exc:
-        log.warning("Failed to write plugin signal %s: %s", signal_file, exc)
-        return False
+    from core.runtime_signals import write_plugin_signal
+
+    return write_plugin_signal(plugin_name, action)
 
 
 def _cli_list_plugins() -> None:
