@@ -189,6 +189,8 @@ class HookRegistry:
                     source=info.get("source", existing.source),
                     display_name=info.get("display_name", existing.display_name),
                     description=info.get("description", existing.description),
+                    # Only set when the manifest provides one — never clear.
+                    update_url=info.get("update_url") or None,
                     error=error,
                 )
         return count

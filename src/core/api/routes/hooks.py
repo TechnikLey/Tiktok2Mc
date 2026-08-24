@@ -6,6 +6,7 @@ the hook system. Mirrors the plugin management pattern.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 from pathlib import Path
@@ -14,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 from ruamel.yaml.error import YAMLError
 
 from core.api.routes.reload import _write_signal
+from core.api.updater import PackageUpdateChecker
 from core.hook_manifest import (
     HookManifest,
     discover_hooks_dirs,
@@ -264,6 +266,98 @@ async def discover_hooks():
         "removed": cleaned,
         "hooks": hooks,
     }
+
+
+# ── Updates ───────────────────────────────────────────────────────────
+
+_hook_updater = PackageUpdateChecker()
+
+
+def _standalone_hooks_dir() -> Path:
+    """Return the main hooks directory (standalone hooks only)."""
+    dirs = discover_hooks_dirs()
+    if not dirs:
+        raise HTTPException(status_code=500, detail="Hooks directory not found")
+    return dirs[0]
+
+
+@router.get("/hooks/updates")
+async def check_hook_updates():
+    """Check all registered hooks for available updates.
+
+    Same mechanism as ``GET /plugins/updates``: every hook with a
+    non-empty ``update_url`` in its manifest is queried and its remote
+    version compared against the registry version.  Hooks without an
+    ``update_url`` are omitted.  Read-only.
+    """
+    registry = get_hook_registry()
+    pkgs = [h.to_dict() for h in registry.list()]
+    # Network-bound (one request per hook) → worker thread so the event
+    # loop stays responsive while the check runs.
+    results = await asyncio.to_thread(_hook_updater.check_updates, pkgs)
+    updates_available = sum(1 for r in results if r.get("update_available"))
+    return {
+        "hooks": results,
+        "total": len(results),
+        "updates_available": updates_available,
+    }
+
+
+@router.post("/hooks/updates/install")
+async def install_hook_updates():
+    """Install all pending standalone hook updates.
+
+    Only hooks that live directly in the main hooks directory can be
+    updated here — plugin-bundled hooks follow their plugin's update
+    cycle instead.  The user's ``config.yaml`` is preserved across an
+    update; afterwards the running bridge should reload hooks (the
+    dashboard restart flow does this implicitly).
+    """
+    registry = get_hook_registry()
+    pkgs = {h.name: h.to_dict() for h in registry.list()}
+    # Re-check to get latest versions (network-bound → worker thread)
+    results = await asyncio.to_thread(_hook_updater.check_updates, list(pkgs.values()))
+
+    hooks_dir = _standalone_hooks_dir()
+
+    install_results: list[dict] = []
+    for r in results:
+        if not r.get("update_available"):
+            continue
+        name = r.get("name", "")
+        display_name = r.get("display_name", name)
+        latest_version = r.get("latest_version", "")
+        if not name or not (hooks_dir / name).is_dir():
+            install_results.append(
+                {
+                    "name": name,
+                    "display_name": display_name,
+                    "version": latest_version,
+                    "success": False,
+                    "error": "Not a standalone hook directory",
+                }
+            )
+            continue
+        pkg = dict(pkgs.get(name, {}))
+        pkg["latest_version"] = latest_version
+        # Download + extract are network/disk bound — keep them off the
+        # event loop so SSE streams stay responsive.
+        success = await asyncio.to_thread(_hook_updater.install_update, pkg, hooks_dir)
+        if success:
+            registry.update(name, version=latest_version)
+        install_results.append(
+            {
+                "name": name,
+                "display_name": display_name,
+                "version": latest_version,
+                "success": success,
+                "error": None if success else "Installation failed",
+            }
+        )
+
+    installed = sum(1 for r in install_results if r["success"])
+    failed = sum(1 for r in install_results if not r["success"])
+    return {"results": install_results, "installed": installed, "failed": failed}
 
 
 # ── Single hook ────────────────────────────────────────────────────────

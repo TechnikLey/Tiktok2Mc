@@ -418,3 +418,114 @@ class TestInstallUpdateIntegrity:
 
         assert checker.install_update(plugin, tmp_path) is False
         assert verified["called"] is False
+
+
+def _build_update_zip(target: Path, manifest_name: str, *, ship_config: bool) -> bytes:
+    """Create an update archive at *target* and return its bytes."""
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            f"pkg/{manifest_name}",
+            json.dumps({"name": "demo", "version": "0.0.0", "entry_point": "main.py"}),
+        )
+        zf.writestr("pkg/main.py", "print('new version')\n")
+        if ship_config:
+            zf.writestr("pkg/config.yaml", "enabled: true\nfrom_archive: true\n")
+    data = buf.getvalue()
+    target.write_bytes(data)
+    return data
+
+
+class TestInstallUpdateReplacesPackage:
+    def _make_checker(self):
+        from core.api.updater import PackageUpdateChecker
+
+        return PackageUpdateChecker()
+
+    def _setup(self, tmp_path: Path, monkeypatch, manifest_name: str):
+        from core.api import updater
+        import hashlib
+
+        pkg_dir = tmp_path / "demo"
+        pkg_dir.mkdir()
+        (pkg_dir / manifest_name).write_text(
+            json.dumps({"name": "demo", "version": "1.0.0"}), encoding="utf-8"
+        )
+        (pkg_dir / "config.yaml").write_text(
+            "enabled: true\nuser_setting: keep_me\n", encoding="utf-8"
+        )
+
+        zip_bytes = {}
+
+        def fake_download(_url, target):
+            zip_bytes["data"] = _build_update_zip(
+                target, manifest_name, ship_config=True
+            )
+            return True
+
+        monkeypatch.setattr(updater, "_download_update", fake_download)
+        monkeypatch.setattr(
+            updater,
+            "fetch_checksum",
+            lambda url: hashlib.sha256(zip_bytes["data"]).hexdigest(),
+        )
+        return pkg_dir
+
+    def test_preserves_user_config_over_archive_config(
+        self, tmp_path: Path, monkeypatch
+    ):
+        pkg_dir = self._setup(tmp_path, monkeypatch, "plugin.json")
+        checker = self._make_checker()
+
+        ok = checker.install_update(
+            {
+                "name": "demo",
+                "update_url": "https://example.com/demo.zip",
+                "latest_version": "2.0.0",
+            },
+            tmp_path,
+        )
+
+        assert ok is True
+        config = (pkg_dir / "config.yaml").read_text(encoding="utf-8")
+        # The user's file survives — the archive's config.yaml is discarded.
+        assert "user_setting: keep_me" in config
+        assert "from_archive" not in config
+
+    def test_bumps_plugin_json_version(self, tmp_path: Path, monkeypatch):
+        pkg_dir = self._setup(tmp_path, monkeypatch, "plugin.json")
+        self._make_checker().install_update(
+            {
+                "name": "demo",
+                "update_url": "https://example.com/x.zip",
+                "latest_version": "2.0.0",
+            },
+            tmp_path,
+        )
+        manifest = json.loads((pkg_dir / "plugin.json").read_text(encoding="utf-8"))
+        assert manifest["version"] == "2.0.0"
+        assert (pkg_dir / "main.py").read_text(encoding="utf-8").startswith("print")
+
+    def test_bumps_hook_json_version(self, tmp_path: Path, monkeypatch):
+        pkg_dir = self._setup(tmp_path, monkeypatch, "hook.json")
+        self._make_checker().install_update(
+            {
+                "name": "demo",
+                "update_url": "https://example.com/x.zip",
+                "latest_version": "2.0.0",
+            },
+            tmp_path,
+        )
+        manifest = json.loads((pkg_dir / "hook.json").read_text(encoding="utf-8"))
+        assert manifest["version"] == "2.0.0"
+
+    def test_leaves_no_backup_dir_behind(self, tmp_path: Path, monkeypatch):
+        self._setup(tmp_path, monkeypatch, "plugin.json")
+        self._make_checker().install_update(
+            {"name": "demo", "update_url": "https://example.com/x.zip"},
+            tmp_path,
+        )
+        assert not (tmp_path / ".bak_demo").exists()

@@ -217,11 +217,13 @@ def get_last_update_result() -> dict[str, Any] | None:
     return _last_update_result
 
 
-class PluginUpdateChecker:
-    """Check and report plugin update status.
+class PackageUpdateChecker:
+    """Check and report package update status for plugins and hooks.
 
-    The checker reads registered plugins from the API registry,
-    queries each plugin's ``update_url``, and compares versions.
+    The checker reads registered packages from a registry, queries each
+    package's ``update_url``, and compares versions.  The same class
+    serves plugins and hooks — both are plain directories with a
+    manifest and an ``update_url``.
     """
 
     def __init__(self) -> None:
@@ -277,34 +279,35 @@ class PluginUpdateChecker:
         return results
 
     def get_cached_status(self, name: str) -> dict[str, Any] | None:
-        """Return the last check result for a plugin, or ``None``."""
+        """Return the last check result for a package, or ``None``."""
         return self._last_check.get(name)
 
     def install_update(
         self,
-        plugin: dict[str, Any],
-        plugins_dir: Path,
+        pkg: dict[str, Any],
+        base_dir: Path,
     ) -> bool:
-        """Download and install a plugin update.
+        """Download and install a package (plugin or hook) update.
 
-        Fetches ``update_url``, resolves the download asset,
-        and extracts/replaces the plugin directory.
+        Fetches ``update_url``, resolves the download asset, and
+        extracts/replaces the package directory under *base_dir*.
+
+        The user's ``config.yaml`` inside the package directory is
+        preserved across the update — an archive never overwrites it.
+        New/changed schema keys are merged at load time via the
+        manifest's ``config_schema`` defaults.
 
         Returns ``True`` on success.
         """
-        name = plugin.get("name", "")
-        update_url = plugin.get("update_url", "")
-        entry_point = plugin.get("entry_point", "")
+        name = pkg.get("name", "")
+        update_url = pkg.get("update_url", "")
 
         if not update_url:
             log.warning("No update_url for '%s'", name)
             return False
 
-        # Determine plugin directory from entry_point
-        if entry_point:
-            plugin_dir = plugins_dir / name
-        else:
-            plugin_dir = plugins_dir / name
+        # The package lives directly under *base_dir*.
+        pkg_dir = base_dir / name
 
         # Fetch latest release info
         headers = {"User-Agent": _USER_AGENT}
@@ -350,7 +353,7 @@ class PluginUpdateChecker:
             download_url = update_url
 
         # Download to temp directory
-        tmp_dir = plugin_dir.parent / f".update_{name}"
+        tmp_dir = pkg_dir.parent / f".update_{name}"
         if tmp_dir.exists():
             shutil.rmtree(tmp_dir, ignore_errors=True)
         tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -404,47 +407,77 @@ class PluginUpdateChecker:
             return False
         # ─────────────────────────────────────────────────────────────
 
-        # Extract
+        # Extract into a dedicated subdirectory so the archive itself
+        # never mixes with the extracted content.
         import zipfile
 
+        extract_dir = tmp_dir / "extracted"
         try:
-            _safe_extract_zip(archive_path, tmp_dir)
+            _safe_extract_zip(archive_path, extract_dir)
         except (OSError, ValueError, zipfile.BadZipFile) as exc:
             log.error("Extraction failed for '%s': %s", name, exc)
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return False
 
-        # Replace plugin directory
-        backup_dir = plugin_dir.parent / f".bak_{name}"
+        # Replace package directory
+        backup_dir = pkg_dir.parent / f".bak_{name}"
         if backup_dir.exists():
             shutil.rmtree(backup_dir, ignore_errors=True)
 
+        # Preserve the user's config.yaml — an update archive must never
+        # overwrite it (mirrors the tool updater, which skips user config).
+        preserved_config: bytes | None = None
+        config_file = pkg_dir / "config.yaml"
+        if config_file.is_file():
+            try:
+                preserved_config = config_file.read_bytes()
+            except OSError as exc:
+                log.warning("Could not read current config.yaml of '%s': %s", name, exc)
+
         try:
-            if plugin_dir.exists():
-                plugin_dir.rename(backup_dir)
-            # Move extracted content to plugin_dir
-            extracted_items = list(tmp_dir.iterdir())
+            if pkg_dir.exists():
+                pkg_dir.rename(backup_dir)
+            # Recreate the destination directory — the rename above
+            # removed it, and ``shutil.move`` needs its target parent.
+            pkg_dir.mkdir(parents=True, exist_ok=True)
+            # Move extracted content to the package directory
+            extracted_items = list(extract_dir.iterdir())
             if len(extracted_items) == 1 and extracted_items[0].is_dir():
                 # Single root folder — move contents
                 src = extracted_items[0]
                 for item in src.iterdir():
-                    shutil.move(str(item), str(plugin_dir / item.name))
+                    shutil.move(str(item), str(pkg_dir / item.name))
             else:
                 for item in extracted_items:
-                    shutil.move(str(item), str(plugin_dir / item.name))
+                    shutil.move(str(item), str(pkg_dir / item.name))
+
+            # Restore the preserved user config over whatever the
+            # archive shipped.
+            if preserved_config is not None:
+                try:
+                    (pkg_dir / "config.yaml").write_bytes(preserved_config)
+                except OSError as exc:
+                    log.warning("Could not restore config.yaml for '%s': %s", name, exc)
 
             # Cleanup
             shutil.rmtree(tmp_dir, ignore_errors=True)
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-            log.info("Updated plugin '%s' successfully", name)
+            log.info("Updated '%s' successfully", name)
             # Update manifest version
-            manifest_file = plugin_dir / "plugin.json"
-            if manifest_file.exists():
+            manifest_file = next(
+                (
+                    pkg_dir / fname
+                    for fname in ("plugin.json", "hook.json")
+                    if (pkg_dir / fname).is_file()
+                ),
+                None,
+            )
+            if manifest_file is not None:
                 try:
                     with manifest_file.open("r", encoding="utf-8") as fh:
                         manifest = json.load(fh)
-                    latest_version = plugin.get("latest_version", "")
+                    latest_version = pkg.get("latest_version", "")
                     if latest_version:
                         manifest["version"] = latest_version
                         with manifest_file.open("w", encoding="utf-8") as fh:
@@ -461,10 +494,14 @@ class PluginUpdateChecker:
             log.error("Failed to install update for '%s': %s", name, exc)
             # Restore backup
             if backup_dir.exists():
-                if plugin_dir.exists():
-                    shutil.rmtree(plugin_dir, ignore_errors=True)
-                backup_dir.rename(plugin_dir)
+                if pkg_dir.exists():
+                    shutil.rmtree(pkg_dir, ignore_errors=True)
+                backup_dir.rename(pkg_dir)
             # Cleanup temp
             if tmp_dir.exists():
                 shutil.rmtree(tmp_dir, ignore_errors=True)
             return False
+
+
+# Backward-compatible alias — the checker serves plugins and hooks alike.
+PluginUpdateChecker = PackageUpdateChecker
