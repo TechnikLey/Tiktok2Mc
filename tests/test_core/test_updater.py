@@ -1,6 +1,7 @@
 """Tests for the plugin update checker."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -350,3 +351,70 @@ class _FakeResponse:
 
     def __exit__(self, *args):
         pass
+
+
+class TestSafeExtractZip:
+    def test_extracts_normal_archive(self, tmp_path: Path):
+        import zipfile
+
+        from core.api.updater import _safe_extract_zip
+
+        archive = tmp_path / "p.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("main.py", "# plugin")
+            zf.writestr("sub/config.yaml", "key: value")
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        _safe_extract_zip(archive, dest)
+
+        assert (dest / "main.py").read_text() == "# plugin"
+        assert (dest / "sub" / "config.yaml").is_file()
+
+    def test_rejects_zip_slip_member(self, tmp_path: Path):
+        import zipfile
+
+        from core.api.updater import _safe_extract_zip
+
+        archive = tmp_path / "evil.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("../escaped.py", "# evil")
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+
+        with pytest.raises(ValueError, match="Zip slip"):
+            _safe_extract_zip(archive, dest)
+
+        assert not (tmp_path / "escaped.py").exists()
+
+
+class TestInstallUpdateIntegrity:
+    def _make_checker(self):
+        from core.api.updater import PluginUpdateChecker
+
+        return PluginUpdateChecker()
+
+    def test_aborts_when_no_checksum_available(self, tmp_path: Path, monkeypatch):
+        from core.api import updater
+
+        checker = self._make_checker()
+        plugin = {
+            "name": "demo",
+            "update_url": "https://example.com/demo.zip",
+            "entry_point": "main.py",
+        }
+
+        monkeypatch.setattr(updater, "_download_update", lambda *a, **k: True)
+        monkeypatch.setattr(updater, "fetch_checksum", lambda url: None)
+
+        verified = {"called": False}
+
+        def _fail_verify(*_a, **_k):
+            verified["called"] = True
+            return True
+
+        monkeypatch.setattr(updater, "verify_checksum", _fail_verify)
+
+        assert checker.install_update(plugin, tmp_path) is False
+        assert verified["called"] is False

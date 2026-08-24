@@ -33,6 +33,23 @@ _TIMEOUT = 10
 _USER_AGENT = "Tiktok2Mc-Updater/1.0"
 
 
+def _safe_extract_zip(zip_path: Path, dest: Path) -> None:
+    """Extract *zip_path* into *dest*, rejecting path traversal members.
+
+    Zip slip protection, mirrors src/python/update.py — a crafted archive
+    must never be able to write outside the extraction directory.
+    """
+    import zipfile
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        dest_resolved = str(dest.resolve())
+        for member in zf.infolist():
+            target = (dest / member.filename).resolve()
+            if not str(target).startswith(dest_resolved):
+                raise ValueError(f"Zip slip attempt: {member.filename}")
+        zf.extractall(dest)
+
+
 def _extract_version(text: str) -> str:
     """Extract the first semver-like version from a string."""
     if not text:
@@ -373,7 +390,15 @@ class PluginUpdateChecker:
         else:
             expected_hash = fetch_checksum(download_url)
 
-        if expected_hash and not verify_checksum(archive_path, expected_hash):
+        if not expected_hash:
+            log.error(
+                "Aborting update for '%s' — the update source provides no "
+                "checksum; refusing to install an unverified archive",
+                name,
+            )
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return False
+        if not verify_checksum(archive_path, expected_hash):
             log.error("Aborting update for '%s' — checksum verification failed", name)
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return False
@@ -383,9 +408,8 @@ class PluginUpdateChecker:
         import zipfile
 
         try:
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                zf.extractall(tmp_dir)
-        except (OSError, zipfile.BadZipFile) as exc:
+            _safe_extract_zip(archive_path, tmp_dir)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
             log.error("Extraction failed for '%s': %s", name, exc)
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return False
