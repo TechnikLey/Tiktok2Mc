@@ -278,7 +278,15 @@ def main():
 
     if not access_token or not refresh_token:
         log.error("Token response missing required fields:")
-        log.error(json.dumps(token_data, indent=2))
+        # Never log real tokens/secrets — mask them but keep the shape of
+        # the response visible for support diagnostics.
+        masked = {
+            key: "<redacted>"
+            if any(s in str(key).lower() for s in ("token", "secret"))
+            else value
+            for key, value in token_data.items()
+        }
+        log.error(json.dumps(masked, indent=2, default=str))
         return
 
     # Save to config

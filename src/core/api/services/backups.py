@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 #   config.v20260529_143021_123456.yaml.bak
 _TIMESTAMP_RE = re.compile(r"\.v(\d{8})_(\d{6})_(\d{6})")
 
+# One path segment of a backup category (``config``, ``plugins/timer``).
+_CATEGORY_PART_RE = re.compile(r"[A-Za-z0-9_-]+")
+
 
 def _fixed_target(category: str) -> Path | None:
     """Return the fixed restore target for *category*, if any."""
@@ -261,7 +264,7 @@ class BackupService:
             )
         root = core.paths.get_root_dir().resolve()
         resolved = (root / custom_target).resolve()
-        if not str(resolved).startswith(str(root)):
+        if resolved == root or not resolved.is_relative_to(root):
             raise ValueError("Target path must not escape the project root")
         return resolved
 
@@ -269,8 +272,24 @@ class BackupService:
         """Resolve a backup file inside *category*, rejecting traversal."""
         if not filename or Path(filename).name != filename:
             raise ValueError("Invalid backup file name")
+        if not self._is_safe_category(category):
+            raise ValueError(f"Invalid backup category: {category}")
         cat_dir = (self._manager.backup_root / category).resolve()
         candidate = (cat_dir / filename).resolve()
         if candidate.parent != cat_dir or not candidate.is_file():
             raise ValueError(f"Backup file not found: {filename}")
         return candidate
+
+    @staticmethod
+    def _is_safe_category(category: object) -> bool:
+        """Whether *category* is a plain name or ``plugins/<name>`` form.
+
+        Rejects anything that could escape ``data/backups/`` (``..``,
+        absolute paths, separators other than the single allowed one).
+        """
+        if not isinstance(category, str) or not category:
+            return False
+        parts = category.split("/")
+        if len(parts) > 2:
+            return False
+        return all(_CATEGORY_PART_RE.fullmatch(part) for part in parts)

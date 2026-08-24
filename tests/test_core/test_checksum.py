@@ -24,11 +24,15 @@ class TestComputeSha256:
 
 
 class TestVerifyChecksum:
-    def test_no_expected_returns_true(self, tmp_path: Path):
+    def test_no_expected_fails_closed(self, tmp_path: Path, caplog):
+        import logging
+
         f = tmp_path / "a.txt"
         f.write_text("x")
-        assert verify_checksum(f, None) is True
-        assert verify_checksum(f, "") is True
+        with caplog.at_level(logging.ERROR):
+            assert verify_checksum(f, None) is False
+            assert verify_checksum(f, "") is False
+        assert "no expected digest" in caplog.text
 
     def test_matching_checksum(self, tmp_path: Path):
         f = tmp_path / "a.txt"

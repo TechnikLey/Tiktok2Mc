@@ -31,11 +31,17 @@ def compute_sha256(path: Path) -> str:
 def verify_checksum(path: Path, expected: str | None) -> bool:
     """Verify *path* against an expected SHA-256 hex digest.
 
-    Returns ``True`` when the checksum matches or when *expected* is
-    ``None``/empty.  Logs a warning and returns ``False`` on mismatch.
+    Returns ``True`` only when a non-empty *expected* digest matches.
+    A missing expectation fails closed — callers must treat "no known
+    checksum" as unverified rather than trusted.  Logs an error and
+    returns ``False`` on mismatch or missing expectation.
     """
     if not expected:
-        return True
+        log.error(
+            "Checksum verification refused for %s — no expected digest provided",
+            path.name,
+        )
+        return False
     actual = compute_sha256(path)
     if actual == expected.lower().strip():
         log.info("Checksum verified for %s", path.name)

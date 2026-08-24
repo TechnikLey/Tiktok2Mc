@@ -21,6 +21,7 @@
 
 import asyncio
 import atexit
+import ipaddress
 import json
 
 # multiprocessing is not used by this module, but pre-importing it with
@@ -667,6 +668,37 @@ _launcher = PluginLauncher()
 # -----------------------------
 # API server lifecycle
 # -----------------------------
+def _bind_is_exposed(host: str) -> bool:
+    """Whether *host* binds the API beyond the loopback interface."""
+    if not host or not host.strip():  # uvicorn default: all interfaces
+        return True
+    try:
+        return not ipaddress.ip_address(host.strip()).is_loopback
+    except ValueError:
+        return host.strip().lower() not in ("localhost", "::1")
+
+
+def _warn_exposed_api(api_key: str) -> None:
+    """Warn loudly when the API is reachable from the network without a key."""
+    if not _bind_is_exposed(_SERVER_HOST) or str(api_key).strip():
+        return
+    bar = "=" * 62
+    log.warning(bar)
+    log.warning(
+        "SECURITY WARNING: The dashboard API is bound to '%s' without an api_key.",
+        _SERVER_HOST,
+    )
+    log.warning(
+        "Anyone in your network can control TikTok2MC — including running "
+        "shell commands defined in data/actions.mca."
+    )
+    log.warning(
+        "Set 'server_host: 127.0.0.1' in config/config.yaml, or configure "
+        "'api_key', unless you explicitly need LAN access."
+    )
+    log.warning(bar)
+
+
 async def start_api_server() -> None:
     """Start the FastAPI/uvicorn server as an asyncio task."""
     import uvicorn
@@ -674,6 +706,7 @@ async def start_api_server() -> None:
     from core.api import create_app
 
     api_key = cfg.get("api_key", "")
+    _warn_exposed_api(api_key)
     app = create_app(api_key=api_key)
     config = uvicorn.Config(
         app,

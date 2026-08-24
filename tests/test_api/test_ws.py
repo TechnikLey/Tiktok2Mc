@@ -52,3 +52,32 @@ class TestWebSocket:
             json={"type": "after.disconnect", "data": {}},
         )
         assert resp.status_code == 200
+
+    def test_websocket_rejects_cross_origin_handshake(self, client):
+        """Cross-site WebSocket hijacking is blocked by the origin guard.
+
+        A browser page opening ``ws://127.0.0.1:<port>/api/v1/ws`` always
+        sends a foreign ``Origin`` header — the handshake must be closed
+        before it completes instead of streaming events to the attacker.
+        """
+        import pytest
+        from starlette.websockets import WebSocketDisconnect
+
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(
+                "/api/v1/ws", headers={"origin": "https://evil.example"}
+            ):
+                pass  # pragma: no cover - never reached on rejection
+
+    def test_websocket_allows_same_origin_handshake(self, client):
+        """A same-origin handshake (dashboard tab reconnecting) passes."""
+        with client.websocket_connect(
+            "/api/v1/ws", headers={"origin": "http://testserver"}
+        ) as ws:
+            resp = client.post(
+                "/api/v1/events",
+                json={"type": "same.origin", "data": {"ok": True}},
+            )
+            assert resp.status_code == 200
+            data = ws.receive_json()
+            assert data["type"] == "same.origin"

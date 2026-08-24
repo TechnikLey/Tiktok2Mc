@@ -106,6 +106,12 @@ class LocalOriginGuardMiddleware:
 
     Non-browser clients (the bridge, plugins, curl, scripts) send neither
     ``Origin`` nor ``Sec-Fetch-Site`` and are unaffected.
+
+    WebSocket connections are covered by the same checks.  This blocks
+    cross-site WebSocket hijacking: browsers always attach an ``Origin``
+    header to WS handshakes, so a web page cannot open ``ws://`` against
+    this API and read the event stream.  A rejected handshake is closed
+    before it completes (uvicorn answers with HTTP 403).
     """
 
     def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
@@ -113,7 +119,7 @@ class LocalOriginGuardMiddleware:
         self.extra_origins = frozenset(extra_origins)
 
     async def __call__(self, scope, receive, send) -> None:
-        if scope["type"] != "http":
+        if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
 
@@ -124,11 +130,11 @@ class LocalOriginGuardMiddleware:
             origin in self.extra_origins
             or _same_host_origin(origin, headers.get("host", ""))
         ):
-            await _send_json_error(send, 403, "Cross-origin request rejected")
+            await self._reject(scope, send, "Cross-origin request rejected")
             return
 
         if headers.get("sec-fetch-site") == "cross-site":
-            await _send_json_error(send, 403, "Cross-site request rejected")
+            await self._reject(scope, send, "Cross-site request rejected")
             return
 
         client = scope.get("client")
@@ -137,10 +143,18 @@ class LocalOriginGuardMiddleware:
             host_header = headers.get("host", "")
             hostname = urlsplit(f"//{host_header}").hostname if host_header else None
             if not _is_local_machine_host(hostname):
-                await _send_json_error(send, 403, "Invalid Host header")
+                await self._reject(scope, send, "Invalid Host header")
                 return
 
         await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _reject(scope, send, detail: str) -> None:
+        if scope["type"] != "websocket":
+            await _send_json_error(send, 403, detail)
+            return
+        # Reject the WebSocket handshake before accepting it.
+        await send({"type": "websocket.close", "code": 1008})
 
 
 class SameHostCORSMiddleware:

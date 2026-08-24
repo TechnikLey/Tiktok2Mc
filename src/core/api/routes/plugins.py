@@ -320,7 +320,7 @@ async def discover_plugins():
     or loaded as a side effect.
     """
     try:
-        plugins_dir = str(core.paths.get_root_dir() / "src" / "plugins")
+        plugins_dir = str(core.paths.get_plugins_dir())
         discovered = discover_plugins_from_manifests(plugins_dir)
     except Exception as e:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to discover plugins")
