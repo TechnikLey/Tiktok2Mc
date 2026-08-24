@@ -63,11 +63,13 @@ class TestWebSocket:
         import pytest
         from starlette.websockets import WebSocketDisconnect
 
-        with pytest.raises(WebSocketDisconnect):
-            with client.websocket_connect(
+        with (
+            pytest.raises(WebSocketDisconnect),
+            client.websocket_connect(
                 "/api/v1/ws", headers={"origin": "https://evil.example"}
-            ):
-                pass  # pragma: no cover - never reached on rejection
+            ),
+        ):
+            pass  # pragma: no cover - never reached on rejection
 
     def test_websocket_allows_same_origin_handshake(self, client):
         """A same-origin handshake (dashboard tab reconnecting) passes."""

@@ -27,7 +27,7 @@ EXPECTED_PLUGINS: dict[str, dict[str, object]] = {
     },
     "test": {
         "dir": "test",
-        "display_name": "Test Plugin",
+        "display_name": "Test Sandbox",
     },
     "timer": {
         "dir": "timer",
