@@ -642,6 +642,23 @@ describe('ChatbotEditor', () => {
       await chatbotEditor.open();
       expect(document.getElementById('chatbot-beta-modal').classList.contains('hidden')).toBe(true);
     });
+
+    it('open resolves false while gated and true once acked', async () => {
+      localStorage.removeItem('tiktok2mc_chatbot_beta_ack');
+      expect(await chatbotEditor.open()).toBe(false);
+      localStorage.setItem('tiktok2mc_chatbot_beta_ack', '1');
+      expect(await chatbotEditor.open()).toBe(true);
+    });
+
+    it('acceptBeta re-highlights the chatbot nav item before opening', async () => {
+      localStorage.removeItem('tiktok2mc_chatbot_beta_ack');
+      await chatbotEditor.open();
+      const nav = document.querySelector('.nav-item[data-view="chatbot"]');
+      nav.classList.remove('active');
+      chatbotEditor.acceptBeta();
+      expect(nav.classList.contains('active')).toBe(true);
+      await chatbotEditor.open();
+    });
   });
 
   /* ─── enable/disable feedback ─── */

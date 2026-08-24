@@ -37,7 +37,8 @@ class ChatbotEditor {
       localStorage.setItem('tiktok2mc_chatbot_beta_ack', '1');
     } catch (_) { /* ignore */ }
     document.getElementById('chatbot-beta-modal')?.classList.add('hidden');
-    this.open();
+    document.querySelector('.nav-item[data-view="chatbot"]')?.classList.add('active');
+    return this.open();
   }
 
   declineBeta() {
@@ -71,7 +72,7 @@ class ChatbotEditor {
   async open() {
     if (!this._betaAcked()) {
       this._showBetaModal();
-      return;
+      return false;
     }
     this.el.classList.remove('hidden');
     this._updateWebviewButton();
@@ -82,6 +83,7 @@ class ChatbotEditor {
       const res = await fetchJSON('/chatbot/status');
       this._renderStatus(res.status || null);
     } catch (_) { /* bridge may not be running */ }
+    return true;
   }
 
   close() {

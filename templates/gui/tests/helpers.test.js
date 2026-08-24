@@ -217,6 +217,56 @@ describe('unsaved changes guard on navigation', () => {
   });
 });
 
+/* ─── switchToEditorNow: restore state when an editor aborts opening ─── */
+describe('switchToEditorNow aborted open restore', () => {
+  function resetNav() {
+    _pendingNavigation = null;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelector('.nav-item[data-view="status"]').classList.add('active');
+  }
+
+  it('restores the previous nav item when the editor aborts (resolves false)', async () => {
+    resetNav();
+    switchToEditorNow('chatbot', () => Promise.resolve(false));
+    await new Promise(r => setTimeout(r, 0));
+    expect(document.querySelector('.nav-item[data-view="chatbot"]').classList.contains('active')).toBe(false);
+    expect(document.querySelector('.nav-item[data-view="status"]').classList.contains('active')).toBe(true);
+  });
+
+  it('re-opens a previously open editor overlay when the new editor aborts', async () => {
+    _pendingNavigation = null;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const cfgOverlay = document.getElementById('config-editor');
+    const settingsNav = document.querySelector('.nav-item[data-view="settings"]');
+    cfgOverlay.classList.add('hidden');
+    cfgOverlay.classList.remove('hidden');
+    settingsNav.classList.add('active');
+    try {
+      switchToEditorNow('chatbot', () => Promise.resolve(false));
+      await new Promise(r => setTimeout(r, 0));
+      expect(cfgOverlay.classList.contains('hidden')).toBe(false);
+      expect(settingsNav.classList.contains('active')).toBe(true);
+      expect(document.querySelector('.nav-item[data-view="chatbot"]').classList.contains('active')).toBe(false);
+    } finally {
+      cfgOverlay.classList.add('hidden');
+      settingsNav.classList.remove('active');
+    }
+  });
+
+  it('keeps the target nav item active when the editor opens normally', async () => {
+    resetNav();
+    const actionsEditorEl = document.getElementById('actions-editor');
+    try {
+      switchToEditorNow('actions', () => {});
+      await new Promise(r => setTimeout(r, 0));
+      expect(document.querySelector('.nav-item[data-view="actions"]').classList.contains('active')).toBe(true);
+      expect(document.querySelector('.nav-item[data-view="status"]').classList.contains('active')).toBe(false);
+    } finally {
+      actionsEditorEl.classList.add('hidden');
+    }
+  });
+});
+
 /* ─── getMeta ─── */
 describe('getMeta', () => {
   it('returns field metadata for known paths', () => {
