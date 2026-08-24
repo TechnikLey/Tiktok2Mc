@@ -31,6 +31,12 @@ jobs:
       - name: Run Tests
         run: pytest tests/ -v --tb=short
 
+      - name: Check mca-spec.json is up to date
+        run: |
+          python build.py spec
+          git diff --exit-code mca-language-server/mca-spec.json ||
+            (echo "::error::mca-spec.json is stale — run 'python build.py spec' and commit the result." && exit 1)
+
       - name: Run Tests (with warnings)
         run: pytest tests/ -W error::UserWarning --tb=short
         continue-on-error: true
