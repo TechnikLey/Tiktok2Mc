@@ -71,6 +71,7 @@ from core.logger import (
     install_global_exception_hook,
     start_heartbeat,
 )
+from core.mca_parser import parse_mca
 from core.overlay_utils import send_overlay_text
 from core.paths import get_base_dir, get_runtime_dir
 from core.tiktok_chatbot import get_chatbot
@@ -759,118 +760,54 @@ def generate_datapack():
         return
 
     try:
-        # === Parse actions.mca ===
+        # === Parse actions.mca (shared parser: core.mca_parser) ===
         if ACTIONS_FILE.exists():
-            with ACTIONS_FILE.open("r", encoding="utf-8") as f:
-                for line_num, original_line in enumerate(f, 1):
-                    # Strip comments
-                    line = original_line.split("#", 1)[0].strip()
-                    if not line or ":" not in line:
-                        continue
+            parsed = parse_mca(ACTIONS_FILE.read_text(encoding="utf-8"))
+            for diag in parsed.diagnostics:
+                log.warning(f"[BUILD] actions.mca line {diag.line + 1}: {diag.message}")
+            for trig in parsed.triggers:
+                if not trig.enabled:
+                    continue
+                name = sanitize_filename(trig.raw_name)
+                if not name:
+                    continue
 
-                    trigger, full_cmd_line = map(str.strip, line.split(":", 1))
-                    name = sanitize_filename(trigger)
-                    if not name:
-                        continue
-
-                    # Split commands at semicolons
-                    individual_commands = full_cmd_line.split(";")
-                    for cmd in individual_commands:
-                        cmd = cmd.strip()
-                        if not cmd:
-                            continue
-
-                        # Detect command prefix
-                        _overlay_match = re.match(r"@(\w+)>>", cmd)
-                        if _overlay_match:
-                            kind = "overlay"
-                            overlay_name = _overlay_match.group(1)
-                            body = cmd[_overlay_match.end() :].strip()
-                        elif cmd.startswith(">>"):
-                            kind = "overlay"
-                            overlay_name = "default"
-                            body = cmd[2:].strip()
-                        elif cmd.startswith("!"):
-                            kind = "rcon"
-                            body = cmd[1:].strip()
-                        elif cmd.startswith("$"):
-                            kind = "script"
-                            body = cmd[1:].strip()
-                        elif cmd.startswith("/"):
-                            kind = "vanilla"
-                            body = cmd[1:].strip()
-                            # Check for !rc suffix (dynamic vanilla via RCON)
-                            rc_match = re.search(r"\s+!rc\s*$", body)
-                            if rc_match:
-                                kind = "vanilla_rc"
-                                body = body[: rc_match.start()].strip()
-                        elif cmd.startswith("&"):
-                            kind = "shell"
-                            body = cmd[1:].strip()
-                        else:
-                            log.error(
-                                f"Invalid command without prefix on line {line_num}: {cmd}"
-                            )
-                            continue
-
-                        # Parse multiplier (e.g. "command x3")
-                        multi_match = re.search(r"\s+x(\d+)\s*$", body)
-                        if multi_match:
-                            base_cmd = body[: multi_match.start()].replace(
-                                "{user}", "@a"
-                            )
-                            times = int(multi_match.group(1))
-                        else:
-                            base_cmd = body.replace("{user}", "@a")
-                            times = 1
-                        times = max(times, 1)
-
-                        overlay_body = (
-                            body[: multi_match.start()] if multi_match else body
+                for cmd in trig.commands:
+                    if cmd.type in ("overlay", "named_overlay"):
+                        overlay_actions.setdefault(name, []).append(
+                            (cmd.overlay_name, cmd.body)
                         )
-                        if kind == "overlay":
-                            overlay_actions.setdefault(name, []).append(
-                                (overlay_name, overlay_body)
-                            )
-                            valid_functions.add(name)
-                        else:
-                            for _ in range(times):
-                                if kind == "script":
-                                    script_actions.setdefault(name, []).append(base_cmd)
-                                    valid_functions.add(name)
-                                elif kind == "rcon":
-                                    rcon_only_actions.setdefault(name, []).append(
-                                        base_cmd
-                                    )
-                                    valid_functions.add(name)
-                                elif kind == "vanilla_rc":
-                                    # dynamic vanilla via RCON: keep {user} literal, route to RCON
-                                    rc_cmd = (
-                                        body[: multi_match.start()]
-                                        if multi_match
-                                        else body
-                                    )
-                                    rcon_only_actions.setdefault(name, []).append(
-                                        rc_cmd
-                                    )
-                                    valid_functions.add(name)
-                                elif kind == "vanilla":
-                                    collected_vanilla.setdefault(name, []).append(
-                                        base_cmd
-                                    )
-                                    valid_functions.add(name)
-                                    vanilla_functions.add(name)
-                                elif kind == "shell":
-                                    # shell commands keep the raw body (do not replace {user})
-                                    shell_cmd = (
-                                        body[: multi_match.start()]
-                                        if multi_match
-                                        else body
-                                    )
-                                    shell_actions_cache.setdefault(name, []).append(
-                                        shell_cmd
-                                    )
-                                    valid_functions.add(name)
+                        valid_functions.add(name)
+                        continue
+
+                    if cmd.dynamic_vanilla:
+                        # dynamic vanilla via RCON: keep {user} literal, route to RCON
+                        base_cmd = cmd.body
+                        target = rcon_only_actions
+                    elif cmd.type == "shell":
+                        # shell commands keep the raw body (do not replace {user})
+                        base_cmd = cmd.body
+                        target = shell_actions_cache
+                    elif cmd.type == "script":
+                        base_cmd = cmd.body.replace("{user}", "@a")
+                        target = script_actions
+                    elif cmd.type == "rcon":
+                        base_cmd = cmd.body.replace("{user}", "@a")
+                        target = rcon_only_actions
+                    elif cmd.type == "vanilla":
+                        base_cmd = cmd.body.replace("{user}", "@a")
+                        target = collected_vanilla
+                        vanilla_functions.add(name)
+                    else:
+                        log.error(
+                            f"[BUILD] Unhandled command type '{cmd.type}' on "
+                            f"trigger '{trig.raw_name}'"
+                        )
+                        continue
+
+                    for _ in range(max(cmd.multiplier, 1)):
+                        target.setdefault(name, []).append(base_cmd)
+                    valid_functions.add(name)
 
         # === Write datapack files (vanilla commands only) ===
         for name, commands in collected_vanilla.items():

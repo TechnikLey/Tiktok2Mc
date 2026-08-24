@@ -142,11 +142,15 @@ def _detect_prefix(cmd_str: str) -> tuple[str, dict[str, Any]]:
     prefix = cmd_str[0] if cmd_str else ""
     if prefix in TRIGGER_TYPE_MAP:
         return TRIGGER_TYPE_MAP[prefix], {}
-    return "vanilla", {}
+    # No recognized prefix — the command must not be treated as vanilla
+    # (that would silently drop its first character).
+    return "invalid", {}
 
 
 def _strip_prefix(cmd_str: str, cmd_type: str, extra: dict[str, Any]) -> str:
     """Remove the type prefix from a command string, returning the body."""
+    if cmd_type == "invalid":
+        return cmd_str
     if cmd_type == "named_overlay":
         name = extra.get("overlay_name", "default")
         prefix = f"@{name}>>"
@@ -295,6 +299,18 @@ def parse_mca(text: str, *, gifts: list[dict] | None = None) -> ParseResult:
                 continue
 
             cmd_type, extra = _detect_prefix(cmd_str)
+            if cmd_type == "invalid":
+                result.diagnostics.append(
+                    _make_diag(
+                        line_number,
+                        0,
+                        len(raw_cmd),
+                        "Each command must start with '/', '$', '!', '&' or '>>'.",
+                        Severity.ERROR,
+                        "invalid_prefix",
+                    )
+                )
+                continue
             body = _strip_prefix(cmd_str, cmd_type, extra)
 
             # Extract multiplier (e.g., "command x3")
