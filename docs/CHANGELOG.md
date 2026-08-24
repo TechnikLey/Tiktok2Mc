@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Java detection** — the tool handles Java installation with checksum verification, fallback download mirrors, and a proper progress bar with cancel option in the GUI.
 - **Save/discard prompt** — switching between editor tabs warns you if you have unsaved changes, so nothing gets lost.
 - **TikTok Chatbot** — an optional bot that automatically posts in your TikTok live chat: it thanks viewers for gifts and follows and can reply to keywords. You enable it in the new Chatbot tab.
+- **Extension permission system** — plugins and hooks must declare the API surface they use (`permissions` in `plugin.json` / `hook.json`); undeclared calls are denied by default. This protects your system from misbehaving or malicious extensions.
+- **Plugin sandbox** — optional process sandboxing restricts the resources (memory, CPU time, child processes) of each plugin subprocess. Built-in profiles `light`, `moderate` and `strict` are configurable via `plugin_sandbox` in `config.yaml`.
+- **Outbound webhooks** — forward live events to external HTTP endpoints (e.g. Discord webhooks) with per-channel event filters, message templates and circuit breakers (`outbound` section in `config.yaml`, editable in the Dashboard).
+- **Minecraft plugin management** — upload, enable/disable, and delete server plugins (`.jar` files) directly from the Server Manager in the Dashboard.
+- **Extended plugin/hook API** — extensions gain runtime reload, structured event context with subscriptions/publishing, hook-to-hook queries, persistent key-value storage, dashboard UI widgets, custom HTTP routes, veto support for hook actions, and versioned event payload contracts enforced by the API server.
+- **Notification system** — a central dispatcher for user-facing notifications (overlay, sound, TTS, Discord) with exchangeable channels.
+- **Application icons** — all binaries and the Windows installer now ship with proper icons.
 
 ### Changed
 
@@ -59,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Plugin updates are now verified** — downloads are checked for integrity before installation, preventing corrupted updates.
 - **Port count reduced from 12 to 5** — each plugin (Timer, Death Counter, Win Counter, Spotify Control) previously ran its own web server on a dedicated port. All plugins are now served through the central API server (29185). Only three ports are bound today (API: 29185, webhook: 29188, MC Server API: 29187); RCON (25575) and the Minecraft server (25565) are only connected to.
 - **Smaller Linux installer** — PyQt6 / QtWebEngine is bundled only into binaries that actually use the GUI (gui, overlay, plugins), and those share a single runtime under `core/runtime/` instead of each embedding a full WebEngine copy. `server`, `start`, `app`, `update` and `test_trigger` no longer carry any WebEngine code, cutting the installer size significantly.
+- **Direct RCON endpoint off by default** — `POST /api/v1/rcon/command` (used by the Dashboard Console) is rejected unless `rcon.http_command_api: true` is set; the regular queue path is unaffected.
+- **Breaking: hooks receive a typed `HookContext`** — hook actions now get a structured context object and an always-string user parameter. Custom hooks may need small adjustments (see developer documentation).
 
 ### Removed
 
@@ -79,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RCON command queue no longer gets stuck** — fixed a deadlock that could cause commands to stop being sent to the Minecraft server.
 - **Updater handles temporary errors** — the update checker now retries on temporary GitHub API errors instead of failing immediately.
 - **`{user}` placeholder in vanilla commands** — the `{user}` placeholder now works in vanilla Minecraft commands when using the `!rc` suffix. A warning is shown if you forget to add the suffix.
+- **Security hardening** — cross-origin and DNS-rebinding requests are rejected, secrets are redacted in API responses, `{user}` is sanitized against RCON slash-command injection, and overlay/theme inputs are XSS-hardened.
 
 ---
 
