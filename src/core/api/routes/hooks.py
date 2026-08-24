@@ -7,6 +7,7 @@ the hook system. Mirrors the plugin management pattern.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -91,6 +92,89 @@ def _request_hook_reload(reason: str, hook_name: str) -> bool:
             "[HOOK] Could not write reload signal — change applies after restart"
         )
     return ok
+
+
+# ── Hook dashboard widgets ────────────────────────────────────────────
+# Hooks with the "ui" permission can contribute HTML cards to the web
+# dashboard. Storage is in-memory: widgets are re-registered by the hook's
+# register() after every (re)load, so a restart simply starts empty.
+
+_hook_widgets: dict[str, dict[str, str]] = {}
+_hook_widgets_lock = threading.Lock()
+_WIDGET_HTML_MAX = 256 * 1024  # generous cap; widgets are small snippets
+
+
+@router.get("/hooks/widgets")
+async def list_hook_widgets():
+    """List all registered dashboard widgets (title only, no HTML)."""
+    with _hook_widgets_lock:
+        widgets = [
+            {"name": name, "title": entry["title"]}
+            for name, entry in sorted(_hook_widgets.items())
+        ]
+    return {"widgets": widgets}
+
+
+@router.post("/hooks/{name}/widget")
+async def register_hook_widget(name: str, body: dict):
+    """Register/replace a hook's dashboard widget.
+
+    Called by the bridge on behalf of a hook whose manifest grants the
+    ``ui`` permission. Unknown hooks are rejected so arbitrary processes
+    cannot inject UI content.
+    """
+    title = str(body.get("title") or name)[:200]
+    html = body.get("html")
+    if not isinstance(html, str) or not html.strip():
+        raise HTTPException(status_code=422, detail="'html' must be a non-empty string")
+    if len(html) > _WIDGET_HTML_MAX:
+        raise HTTPException(status_code=422, detail="widget html too large")
+    if name not in _get_hook_cache():
+        raise HTTPException(status_code=404, detail=f"Hook '{name}' not found")
+    with _hook_widgets_lock:
+        _hook_widgets[name] = {"title": title, "html": html}
+    log.info("[HOOK] Dashboard widget registered for '%s'", name)
+    return {"status": "ok"}
+
+
+@router.delete("/hooks/{name}/widget")
+async def delete_hook_widget(name: str):
+    """Remove a hook's widget (called when the hook is disabled/deleted)."""
+    with _hook_widgets_lock:
+        removed = _hook_widgets.pop(name, None)
+    return {"status": "ok", "removed": removed is not None}
+
+
+@router.get("/hooks/{name}/widget")
+async def get_hook_widget(name: str):
+    """Return a hook's widget as ``{"name", "title", "html"}``."""
+    with _hook_widgets_lock:
+        entry = _hook_widgets.get(name)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"No widget for hook '{name}'")
+    return {"name": name, "title": entry["title"], "html": entry["html"]}
+
+
+@router.get("/hooks/{name}/widget.html")
+async def get_hook_widget_page(name: str):
+    """Serve a hook's widget as a standalone HTML document (iframe target).
+
+    The snippet is embedded in a minimal transparent page so it blends
+    into the dashboard's dark theme.
+    """
+    from starlette.responses import HTMLResponse
+
+    with _hook_widgets_lock:
+        entry = _hook_widgets.get(name)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"No widget for hook '{name}'")
+    page = (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        "<style>body{background:transparent;color:#e8eaed;"
+        "font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:12px}"
+        "</style></head><body>" + entry["html"] + "</body></html>"
+    )
+    return HTMLResponse(page)
 
 
 # ── List / Discover ────────────────────────────────────────────────────
@@ -224,6 +308,8 @@ async def disable_hook(name: str):
         return {"status": "already_disabled", "name": name}
     registry.set_enabled(name, False)
     _invalidate_hook_cache()
+    with _hook_widgets_lock:
+        _hook_widgets.pop(name, None)
     _request_hook_reload("disable", name)
     return {"status": "disabled", "name": name, "runtime_reload": "requested"}
 

@@ -66,6 +66,7 @@ HOOK_PERMISSIONS: frozenset[str] = frozenset(
         "store",  # store_get / store_set / store_delete / store_all
         "network",  # request (control-plane HTTP helper)
         "events",  # publish_event (custom events on the API EventBus)
+        "ui",  # register_dashboard_widget (dashboard UI integration)
     }
 )
 
@@ -480,6 +481,45 @@ class HookAPI:
 
     def get_valid_functions(self) -> set[str]:
         return self._valid_functions
+
+    # --------------------------------------------------
+    # Dashboard UI integration
+    # --------------------------------------------------
+
+    def register_dashboard_widget(self, title: str, html: str) -> bool:
+        """Register an HTML widget shown in the web dashboard.
+
+        The dashboard renders a card per hook under its "Hook Widgets"
+        section (title + sandboxed iframe with the hook's HTML). Requires
+        the ``ui`` permission. Call it inside ``register()`` so the widget
+        is re-registered after a runtime reload. Returns ``True`` when the
+        API accepted the widget.
+        """
+        if not self._allow("ui", "register_dashboard_widget"):
+            return False
+        if not self._name or not _NAMESPACE_OK.match(self._name):
+            log.warning(
+                "[HOOK] register_dashboard_widget: API not bound to a hook name"
+            )
+            return False
+        if not isinstance(html, str) or not html.strip():
+            log.warning("[HOOK] register_dashboard_widget: empty html ignored")
+            return False
+        payload = json.dumps({"title": str(title or self._name), "html": html}).encode(
+            "utf-8"
+        )
+        try:
+            req = urllib.request.Request(
+                f"{_API_BASE}/hooks/{self._name}/widget",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=_STORE_TIMEOUT) as resp:
+                return resp.status == 200
+        except (OSError, urllib.error.URLError) as e:
+            log.error(f"[HOOK] register_dashboard_widget failed: {e}")
+            return False
 
     # --------------------------------------------------
     # Persistent store (namespaced, own namespace per hook)

@@ -892,9 +892,73 @@ async function loadPlugins() {
     renderPluginManager();
     renderOverlayUrls();
     renderPluginPagesNav();
+    refreshHookWidgets();
   } catch (e) {
     log('Plugins load failed: ' + e.message, 'err');
   }
+}
+
+/* ─── Hook Dashboard Widgets (hook "ui" permission) ─── */
+
+const HOOK_WIDGET_VIEW = 'hookwidgets';
+const _HOOK_WIDGET_ICON = '<svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M21 3H3a1 1 0 00-1 1v16a1 1 0 001 1h18a1 1 0 001-1V4a1 1 0 00-1-1zm-1 16H4V9h16v10zM4 7V5h16v2H4z" fill="currentColor"/></svg>';
+
+async function refreshHookWidgets() {
+  const nav = document.querySelector('.sidebar-nav');
+  const main = document.getElementById('dashboard');
+  if (!nav || !main) return;
+
+  // Remove previous render
+  document.querySelectorAll('[data-hook-widgets]').forEach(el => el.remove());
+
+  let widgets;
+  try {
+    const data = await fetchJSON('/hooks/widgets');
+    widgets = data.widgets || [];
+  } catch (e) {
+    return; // endpoint unavailable (older backend) — skip silently
+  }
+  if (!widgets.length) return;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'nav-item';
+  btn.setAttribute('data-view', HOOK_WIDGET_VIEW);
+  btn.setAttribute('data-hook-widgets', '1');
+  btn.title = I18N.t('hooks.widgetsTitle') || 'Hook Widgets';
+  btn.innerHTML = _HOOK_WIDGET_ICON +
+    '<span class="nav-label">' + escapeHtml(I18N.t('hooks.widgetsTitle') || 'Hook Widgets') + '</span>';
+  btn.onclick = () => openHookWidgets();
+  nav.appendChild(btn);
+
+  let cards = '';
+  for (const w of widgets) {
+    const url = API + '/hooks/' + encodeURIComponent(w.name) + '/widget.html';
+    cards +=
+      '<div class="card hook-widget-card" data-hook-widgets="1">' +
+      '<div class="card-header"><strong>' + escapeHtml(w.title) + '</strong>' +
+      '<span class="muted"> (' + escapeHtml(w.name) + ')</span></div>' +
+      '<iframe class="plugin-page-frame" title="' + escapeHtml(w.title) + '" loading="lazy" data-src="' + url + '" style="width:100%;height:220px;border:none"></iframe>' +
+      '</div>';
+  }
+  const view = document.createElement('div');
+  view.className = 'view';
+  view.id = 'view-' + HOOK_WIDGET_VIEW;
+  view.setAttribute('data-hook-widgets', '1');
+  view.innerHTML =
+    '<div class="view-header"><h2>' + escapeHtml(I18N.t('hooks.widgetsTitle') || 'Hook Widgets') + '</h2></div>' +
+    cards;
+  main.appendChild(view);
+}
+
+function openHookWidgets() {
+  const view = document.getElementById('view-' + HOOK_WIDGET_VIEW);
+  if (!view) return;
+  // Load iframes on first open
+  view.querySelectorAll('iframe[data-src]').forEach(f => {
+    if (!f.src && f.dataset.src) f.src = f.dataset.src;
+  });
+  switchView(HOOK_WIDGET_VIEW);
 }
 
 /* ─── Server Manager ─── */

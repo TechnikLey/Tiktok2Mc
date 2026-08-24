@@ -12,6 +12,7 @@ Alle Methoden, die dein Hook über das `api`-Objekt in der `register()`-Funktion
 | `register_timer(interval, fn)` | `fn()` periodisch ausführen (ohne `threading`) |
 | `register_query(name, fn)` | Query exponieren, die andere Hooks synchron aufrufen können |
 | `query_hook(target_hook, query, args=None)` | Query eines anderen Hooks aufrufen (Ergebnis oder `None`) |
+| `register_dashboard_widget(title, html)` | HTML-Karte im Web-Dashboard anzeigen (braucht `ui`-Permission) |
 | `get_hook_config(name)` | Per-Hook-Konfiguration lesen |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Overlay-Text anzeigen |
 | `store_get(key, default=None)` | Aus dem persistenten Store dieses Hooks lesen |
@@ -152,6 +153,7 @@ den Discovery-Tags):
 | `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
 | `network` | `request` (HTTP-Helper für die Control Plane) |
 | `events` | `publish_event` (eigene Events auf dem API-EventBus) |
+| `ui` | `register_dashboard_widget` (Dashboard-UI-Integration) |
 
 Ungesperrte Methoden, die immer funktionieren: `register_action`,
 `register_lifecycle`/`on_live_start`/`on_live_end`/`on_unload`,
@@ -466,6 +468,29 @@ def register(api: HookAPI):
   Hooks laufen weiter.
 - Bevorzuge EventBus-Events (`register_event`/`publish_event`), wenn
   Fire-and-Forget reicht — Queries erzeugen direkte Kopplung.
+
+## Dashboard-Widgets (`ui`-Permission)
+
+Hooks können live HTML-Karten in die Sektion **Hook-Widgets** des
+Web-Dashboards beitragen:
+
+```python
+def register(api: HookAPI):
+    api.register_dashboard_widget(
+        "Gift Combo",
+        "<div id='combo'>Combo: <b>0</b></div>"
+        "<script>/* eigenständige Update-Logik */</script>",
+    )
+```
+
+- Benötigt `"ui"` in den `permissions` der `hook.json`.
+- Aufruf in `register()` — Widgets werden nach jedem Reload neu
+  registriert; beim Deaktivieren des Hooks verschwindet die Karte
+  automatisch.
+- Das Snippet läuft in einem Iframe auf transparenter dunkler Seite; halte
+  es in sich geschlossen (inline Styles/Scripts, max. 256 KB).
+- Das Dashboard zeigt einen Navigationseintrag mit einer Karte pro
+  registriertem Hook.
 
 ## Event-Abos & Publishing
 

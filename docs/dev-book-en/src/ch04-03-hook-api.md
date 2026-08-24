@@ -12,6 +12,7 @@ All methods your hook can use via the `api` object in the `register()` function.
 | `register_timer(interval, fn)` | Run `fn()` periodically (no `threading` needed) |
 | `register_query(name, fn)` | Expose a query other hooks can call synchronously |
 | `query_hook(target_hook, query, args=None)` | Call another hook's query (returns result or `None`) |
+| `register_dashboard_widget(title, html)` | Show an HTML card in the web dashboard (requires `ui` permission) |
 | `get_hook_config(name)` | Read per-hook configuration |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Display overlay text |
 | `store_get(key, default=None)` | Read from this hook's persistent store |
@@ -55,6 +56,27 @@ def register(api: HookAPI):
   are reported as `HOOK-0011`); both hooks keep running.
 - Prefer EventBus events (`register_event`/`publish_event`) when
   fire-and-forget semantics suffice — queries create direct coupling.
+
+## Dashboard Widgets (`ui` permission)
+
+Hooks can contribute live HTML cards to the web dashboard's
+**Hook Widgets** section:
+
+```python
+def register(api: HookAPI):
+    api.register_dashboard_widget(
+        "Gift Combo",
+        "<div id='combo'>Combo: <b>0</b></div>"
+        "<script>/* self-contained update logic */</script>",
+    )
+```
+
+- Requires `"ui"` in the hook manifest's `permissions`.
+- Call inside `register()` — widgets are re-registered after every reload;
+  disabling the hook removes its card automatically.
+- The snippet runs in a sandboxed iframe on a transparent dark page; keep it
+  self-contained (inline styles/scripts, max 256 KB).
+- The dashboard shows one navigation entry with a card per registered hook.
 
 ## register_action(name, fn)
 
@@ -186,6 +208,7 @@ Side-effecting API calls are guarded by **permissions** declared in your
 | `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
 | `network` | `request` (control-plane HTTP helper) |
 | `events` | `publish_event` (custom events on the API EventBus) |
+| `ui` | `register_dashboard_widget` (dashboard UI integration) |
 
 Ungated methods that always work: `register_action`,
 `register_lifecycle`/`on_live_start`/`on_live_end`/`on_unload`,
