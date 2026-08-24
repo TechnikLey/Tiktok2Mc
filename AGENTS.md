@@ -10,7 +10,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 - **Bridge** `src/python/main.py`: TikTokLive events → `BotContext` queues → RCON `/`, datapack, overlay `>>`, shell `&`, hooks `$`. Publishes to in-process `event_bus` (`api/eventbus.py`). **Most sensitive file** (events/queues/retries) — minimize changes.
 - **Control plane** `src/core/api/`: thin routes (`routes/`) + logic (`services/`), Pydantic v2 models (`models.py`), plugin registry/launcher/watcher, health monitor, TikTok live tracker, updater.
 - **Plugins** `src/plugins/*`: subprocess, `BasePlugin` long-polls `?wait=1`; manifest `plugin.json`. **Hooks** `src/hooks/*`: in-process, `register(api: HookAPI)`; manifest `hook.json`.
-- **Data flow:** TikTok → bridge → queues → actions/plugins/hooks/RCON. Bridge→API `POST /api/v1/events`; GUI→API REST + SSE (`routes/ws.py`); API→GUI via EventBus.
+- **Data flow:** TikTok → bridge → queues → actions/plugins/hooks/RCON. Bridge→API `POST /api/v1/events`; GUI→API REST + SSE (`routes/events.py`, `routes/logs.py`) / WebSocket (`routes/ws.py`); API→GUI via EventBus.
 - **Root `core/` = runtime artifacts only; source is `src/core/`.**
 
 ## 3. Repository Structure

@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from ruamel.yaml.error import YAMLError
 
 from core.api.eventbus import event_bus
+from core.api.outbound_dispatcher import get_outbound_dispatcher
 from core.api.services import ApiService
 from core.api.services.rcon import get_rcon_service
 from core.overlay import get_overlay_manager
@@ -99,6 +100,13 @@ async def reload_runtime(body: ReloadRequest):
                 log.info("[RELOAD] Overlay settings reloaded")
             except (OSError, ValueError, YAMLError) as exc:
                 log.warning("[RELOAD] Failed to reload overlay settings: %s", exc)
+        # Outbound channels are API-owned config as well — pick up
+        # channel changes without a restart.
+        try:
+            get_outbound_dispatcher().refresh_channels()
+            log.info("[RELOAD] Outbound channels reloaded")
+        except (OSError, ValueError, YAMLError) as exc:
+            log.warning("[RELOAD] Failed to reload outbound channels: %s", exc)
 
     if body.actions:
         payload = {"send_minecraft_reload": body.send_minecraft_reload}

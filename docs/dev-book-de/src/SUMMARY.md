@@ -4,6 +4,10 @@
 
 - [Quickstart](./ch01-00-getting-started.md)
 
+# Grundkonzepte
+
+- [Grundkonzepte](./ch02-00-core-concepts.md)
+
 # Plugin-Entwicklung
 
 - [Plugin-Entwicklung](./ch03-00-plugins.md)

@@ -65,3 +65,24 @@ class TestReloadEndpoint:
     def test_reload_no_targets_bad_request(self, client):
         resp = client.post("/api/v1/reload", json={"config": False, "actions": False})
         assert resp.status_code == 400
+
+    def test_reload_config_refreshes_outbound_channels(self, client, monkeypatch):
+        """A config reload also re-reads outbound channel configuration."""
+        calls = []
+
+        class _FakeDispatcher:
+            def refresh_channels(self):
+                calls.append(True)
+
+        monkeypatch.setattr(
+            reload_mod,
+            "get_outbound_dispatcher",
+            lambda: _FakeDispatcher(),
+        )
+
+        resp = client.post("/api/v1/reload", json={"config": True, "actions": False})
+        assert resp.status_code == 200
+        assert calls == [True]
+
+        runtime = reload_mod._RUNTIME_DIR
+        (runtime / "reload_config").unlink(missing_ok=True)

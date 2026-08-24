@@ -417,6 +417,34 @@ TikTok limits chat messages strictly. The built-in protection keeps a minimum pa
 
 ---
 
+## Outbound Channels
+
+Outbound channels forward live events (gifts, follows, comments, …) to external HTTP endpoints — for example a **Discord webhook**, so your mods can see stream activity in a Discord channel. Channels are configured in `config/config.yaml` under `outbound:`.
+
+```yaml
+outbound:
+  enabled: true
+  max_fails: 3      # pause a channel after this many failed deliveries ...
+  cooldown: 10      # ... for this many seconds (circuit breaker)
+  retries: 1        # extra delivery attempts per message
+  timeout: 5        # HTTP timeout in seconds
+  channels:
+    - name: "discord-events"
+      url: "https://discord.com/api/webhooks/..."   # your webhook URL
+      events: ["tiktok.*"]   # event patterns to subscribe to
+      format: "discord"
+      template: "**{user}** triggered *{type}*"
+      enabled: false
+```
+
+- **`events`** — patterns like `tiktok.gift`, `tiktok.comment` or `tiktok.*` (all TikTok events). Matching works the same way as plugin event subscriptions.
+- **`format: discord`** — builds a Discord webhook payload from *template*. Placeholders: `{user}`, `{type}` and any event data key (`{comment}`, `{gift_name}`, …). Missing placeholders become empty.
+- **`format: raw`** — sends the plain JSON envelope `{"type", "data", "timestamp"}`, useful for bots and automations.
+
+Each channel has its own circuit breaker: after repeated failed deliveries it pauses for the cooldown period instead of spamming errors. Channel changes take effect on config reload or restart.
+
+---
+
 ## Plugins
 
 Plugins are optional features you can turn on or off.
