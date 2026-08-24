@@ -1,8 +1,9 @@
 # TikTok-Chatbot — Design & Umsetzungsplan
 
-> Status: **Phase 1–4 umgesetzt** (Kernmodul, Bridge-Wiring, API-Routen,
-> GUI-Tab inkl. Session-Login Variante A + B). Offen: nur noch Teile von
-> Phase 5 (Doku in dev-book EN+DE).
+> Status: **Umgesetzt** (Kernmodul, Bridge-Wiring, API-Routen, GUI-Tab inkl.
+> Session-Login Variante A + B, Tests). Die Nutzer-/Entwickler-Doku liegt im
+> dev-book (`ch06-00-tiktok-chatbot.md`, EN+DE); dieses Dokument ist die
+> historische Design-Referenz.
 > Dieses Dokument bündelt alle Erkenntnisse und Entscheidungen zum geplanten
 > TikTok-Chatbot für TikTok2Mc. Es dient als Referenz für die Umsetzung.
 

@@ -3,7 +3,7 @@
 ## 1. Overview & Stack
 TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC commands (RCON/datapack), overlays, plugins, or shell commands. Multi-process Python desktop app: FastAPI control plane (port `29185`), web dashboard, plugin/hook system, Minecraft server manager.
 
-**Stack:** Python 3.12 · FastAPI/uvicorn · Flask (legacy webhook) · TikTokLive 6.6.5 · mcrcon · pywebview+PyQt6 · PyYAML+ruamel.yaml (comment-preserving) · PyInstaller · pytest · Vitest+jsdom · Node/VSCode LSP (`.mca`) · mdBook
+**Stack:** Python 3.12 · FastAPI/uvicorn · Flask (legacy webhook) · TikTokLive 6.6.6 · mcrcon · pywebview+PyQt6 · PyYAML+ruamel.yaml (comment-preserving) · PyInstaller · pytest · Vitest+jsdom · Node/VSCode LSP (`.mca`) · mdBook
 
 ## 2. Architecture
 - **Supervisor** `src/python/start.py` runs the FastAPI control plane in-process (`create_app`, `core/api/server.py`) and spawns: `main.py` (bridge), `gui.py`, plugins, overlay, update. `run.py` = standalone dev API server.

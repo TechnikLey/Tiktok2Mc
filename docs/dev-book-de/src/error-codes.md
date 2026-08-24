@@ -16,6 +16,8 @@ Jeder Fehler im System hat einen stabilen, dokumentierten Code im Format `SUBSYS
 | `LIFECYCLE` | Prozess-Lebenszyklus / Supervisor |
 | `MC` | Minecraft-Server / RCON |
 | `TIKTOK` | TikTok-Live-Verbindung / Events |
+| `CHATBOT` | TikTok-Chatbot (KI-Antworten) |
+| `NOTIF` | Benachrichtigungs-Dispatcher |
 | `HOOK` | Hook-System |
 | `WATCHER` | Datei-/Verzeichnis-Watcher |
 | `WORKER` | Hintergrund-Worker-Threads / -Tasks |

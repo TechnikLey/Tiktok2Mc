@@ -16,6 +16,8 @@ Every error in the system has a stable, documented code in the format `SUBSYSTEM
 | `LIFECYCLE` | Process lifecycle / supervisor |
 | `MC` | Minecraft server / RCON |
 | `TIKTOK` | TikTok Live connection / events |
+| `CHATBOT` | TikTok chatbot (AI replies) |
+| `NOTIF` | Notification dispatcher |
 | `HOOK` | Hook system |
 | `WATCHER` | File / directory watchers |
 | `WORKER` | Background worker threads / tasks |

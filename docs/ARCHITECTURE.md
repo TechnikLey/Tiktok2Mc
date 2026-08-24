@@ -129,6 +129,10 @@ FastAPI app factory in `server.py`. Routes under `/api/v1` (see `routes/__init__
 | `/revenue` | `revenue.py` | Gift revenue tracking |
 | `/sessions` | `sessions.py` | Stream session summaries |
 | `/system` | `system.py` | App restart/shutdown |
+| `/chatbot` | `chatbot.py` | TikTok chatbot status, login, replies |
+| `/notifications` | `notifications.py` | Notification dispatch to channels |
+| `/outbound` | `outbound.py` | Outbound channels status/test |
+| `/plugins/{name}/data` | `plugin_data.py` | Plugin data store API |
 
 ### Services (`src/core/api/services/`)
 
@@ -297,10 +301,10 @@ Targets: `timer`, `spotify-control`, `death-counter`, `win-counter`.
 | Task | Source | Dest | Notes |
 |------|--------|------|-------|
 | `start` | `src/python/start.py` | root | Supervisor |
-| `main` | `src/python/main.py` | root | Bridge |
-| `gui` | `src/python/gui.py` | root | Desktop app (Qt) |
+| `app` | `src/python/main.py` | core | Bridge |
+| `gui` | `src/python/gui.py` | core | Desktop app (Qt) |
 | `overlay` | `src/python/overlay.py` | core | Standalone overlay |
-| `server` | `src/python/server.py` | root | API-only server |
+| `server` | `src/python/server.py` | core | API-only server |
 | `update` | `src/python/update.py` | root | Self-updater |
 | `test_trigger` | `src/python/send_trigger.py` | test | CLI trigger tester |
 
@@ -371,7 +375,7 @@ Plugin Commands (HTTP POST /api/v1/plugins/{name}/command)
 ## 16. Error Codes (`src/core/error_codes.py`)
 
 Structured codes: `SUBSYSTEM-NNNN` (e.g., `TIKTOK-0001`, `HOOK-0005`, `API-0001`).
-22 subsystems, 7 severity levels (DEBUG..FATAL).
+24 subsystems, 7 severity levels (DEBUG..FATAL).
 Available via `GET /api/v1/diagnostics/error-codes`.
 
 ---
