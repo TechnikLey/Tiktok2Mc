@@ -23,3 +23,23 @@ In diesem Kapitel lernst du, wie du Hooks erstellst, konfigurierst und in das Sy
 | Komplexität | Einfach, eine Funktion | Vollständige Klasse mit Threads |
 | Anwendungsfall | Einfache `$`-Befehle | Komplexe Logik, GUI, Zustand |
 | Lebenszyklus | Wird beim Start geladen | Wird als Subprozess gestartet/gestoppt |
+
+## Hooks aktualisieren
+
+Eigenständige Hooks unterstützen denselben Update-Mechanismus wie Plugins:
+
+- `update_url` in der `hook.json` deklarieren (GitHub-Releases-API-URL
+  oder direkter Link). Die Aktion *Nach Updates suchen* im Dashboard
+  fragt sie ab und bietet die Installation zusammen mit Tool- und
+  Plugin-Updates an.
+- **Nur eigenständige Hooks** — Hooks im Haupt-Hooks-Verzeichnis.
+  Plugin-gebündelte Hooks (`plugins/<name>/hooks/`) werden gemeinsam
+  mit ihrem Plugin aktualisiert.
+- Die Update-Quelle muss eine SHA-256-Prüfsumme bereitstellen
+  (`.sha256` oder `.checksum` neben dem Archiv); ungeprüfte Archive
+  werden abgelehnt.
+- Die `config.yaml` des Nutzers bleibt über ein Update hinweg erhalten.
+  Neue Schlüssel einer neueren Version werden beim nächsten Laden aus
+  den `config_schema`-Defaults des Manifests ergänzt.
+- Installierter Code wird aktiv, sobald die Bridge die Hooks neu lädt
+  (Neustart oder Reload-Signal mit `hooks: true`).

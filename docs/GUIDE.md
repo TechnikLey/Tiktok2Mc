@@ -594,6 +594,8 @@ A drop-down selector lets you switch between instances to view each server's con
 
 The tool checks for updates automatically on startup (enabled by default). If a new version is available, it downloads and installs it.
 
+The dashboard's **Check for updates** action also covers plugins and hooks: anything that declares an `update_url` in its manifest is checked and can be updated in one go. Your per-plugin/per-hook `config.yaml` settings are preserved during these updates.
+
 **Before updating, back up these files:**
 - `config/config.yaml` — your settings
 - `data/actions.mca` — your action rules

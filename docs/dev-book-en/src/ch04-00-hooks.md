@@ -23,3 +23,21 @@ In this chapter you will learn how to create, configure, and integrate hooks int
 | Complexity | Simple, one function | Full class with threads |
 | Use case | Simple `$` commands | Complex logic, GUI, state |
 | Lifecycle | Loaded on startup | Started/stopped as subprocess |
+
+## Updating Hooks
+
+Standalone hooks support the same update mechanism as plugins:
+
+- Declare `update_url` in `hook.json` (GitHub Releases API URL or a
+  direct link). The dashboard's *Check for updates* action queries it
+  and offers installation together with tool and plugin updates.
+- **Standalone hooks only** — hooks living in the main hooks directory.
+  Plugin-bundled hooks (`plugins/<name>/hooks/`) are updated together
+  with their plugin.
+- The update source must provide a SHA-256 checksum (`.sha256` or
+  `.checksum` next to the archive); unverified archives are refused.
+- The user's `config.yaml` is preserved across an update. New keys
+  introduced by a newer version are merged from the manifest's
+  `config_schema` defaults on the next load.
+- Installed code becomes active after the bridge reloads hooks
+  (restart or the reload signal with `hooks: true`).

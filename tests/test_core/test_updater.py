@@ -446,8 +446,9 @@ class TestInstallUpdateReplacesPackage:
         return PackageUpdateChecker()
 
     def _setup(self, tmp_path: Path, monkeypatch, manifest_name: str):
-        from core.api import updater
         import hashlib
+
+        from core.api import updater
 
         pkg_dir = tmp_path / "demo"
         pkg_dir.mkdir()
