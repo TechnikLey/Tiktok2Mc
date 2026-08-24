@@ -59,6 +59,7 @@ Die vollständige, maschinenlesbare Liste liefert `GET /api/v1/diagnostics/error
 | `HOOK-0008` | Hook lifecycle callback failed | Ein `on_live_start`/`on_live_end`/`on_unload`-Callback warf eine Exception |
 | `HOOK-0009` | Hook permission denied | Ein geschützter HookAPI-Aufruf fehlte den nötigen `permissions`-Eintrag in der `hook.json` |
 | `HOOK-0010` | Hook timer callback failed | Ein `register_timer()`-Callback warf eine Exception; der Timer läuft weiter |
+| `HOOK-0011` | Hook query handler failed | Ein `register_query()`-Handler warf während `query_hook()` eine Exception; der Aufrufer erhält `None` |
 
 ### PLUGIN (Plugin-System)
 

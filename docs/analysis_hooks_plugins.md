@@ -316,5 +316,5 @@ Alle drei Punkte sind inzwischen behoben.
 Die Ideen TTS (Kommentar-Vorlesen), Rate-Limit-Gate, Schimpfwort-Moderator, Gift-Combo-Detektor, Discord-Notifier und Scheduler sind damit **praktisch umsetzbar**; ein Viewer-Leaderboard kann Zustand per `api.request()` abfragen, System-Events per `bus_event` empfangen, per Query-Kanal Top-10 serverseitig bereitstellen und live als Dashboard-Tab zeigen. Eigene Spiele binden sich über `/events/ingest` an (Bus + Trigger ohne Minecraft-branded Webhook), und zeitbasierte Logik ist in Hooks wie Plugins erstklassig möglich.
 
 **Verbleibende Roadmap (aus der Capability-Matrix):**
-1. WebSocket-Server pro Erweiterung (der WebSocket-*Client* ist über `ws_connect()` abgedeckt)
-2. UI-Extension-Points für Hooks; Hook↔Hook-Query (MEDIUM/LOW)
+1. WebSocket-*Server* pro Erweiterung (Client-Seite über `ws_connect()` abgedeckt; für Server-seitige WS ist der generische RPC-Kanal + SSE der praktikable Ersatz)
+2. UI-Extension-Points für Hooks (Dashboard-Anbindung brückenübergreifend — eigener Design-Aufwand)

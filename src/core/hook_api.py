@@ -8,6 +8,10 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from typing import Any
+
+from core.crash_manager import get_crash_manager
+from core.error_codes import HOOK_0011
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +44,12 @@ HOOK_EVENT_SUBSCRIPTIONS: dict[str, dict[str, Callable]] = {}
 # scheduler (see core.hook_loader). Hooks cannot import ``threading``
 # (import whitelist), so periodic work goes through this API instead.
 HOOK_TIMERS: dict[str, list[dict]] = {}
+
+# Registered queries per hook: hook_name -> {query_name: callable(args)}.
+# Enables synchronous hook-to-hook request/response without going through
+# the EventBus. Handlers run inline in the caller's thread and must be fast;
+# exceptions are isolated and reported as HOOK-0011.
+HOOK_QUERIES: dict[str, dict[str, Callable]] = {}
 
 MIN_TIMER_INTERVAL: float = 0.1
 
@@ -319,6 +329,56 @@ class HookAPI:
             event_pattern.strip(),
             self._name or "<unbound>",
         )
+
+    # -- hook-to-hook queries ------------------------------------------------
+
+    def register_query(self, name: str, fn: Callable) -> bool:
+        """Expose a query other hooks can call synchronously.
+
+        The handler is called as ``fn(args: dict)`` and its return value
+        becomes the caller's result. Handlers run inline in the calling
+        thread — keep them fast and non-blocking. Exceptions are isolated
+        (reported as HOOK-0011); the caller receives ``None``.
+        Last registration wins per hook and name. Re-register after a
+        runtime reload.
+        """
+        if not isinstance(name, str) or not name.strip():
+            log.warning("[HOOK] register_query: invalid name %r", name)
+            return False
+        if not callable(fn):
+            log.warning("[HOOK] register_query(%r): not callable", name)
+            return False
+        HOOK_QUERIES.setdefault(self._name or "<unbound>", {})[name.strip()] = fn
+        return True
+
+    def query_hook(self, target_hook: str, query: str, args: dict | None = None) -> Any:
+        """Call a query exposed by another hook (synchronous, in-process).
+
+        Returns the handler's return value, or ``None`` when the target
+        hook/query does not exist or the handler raised (logged as
+        HOOK-0011). This is direct coupling between hooks — prefer EventBus
+        events when fire-and-forget semantics are enough.
+        """
+        handler = HOOK_QUERIES.get(target_hook, {}).get(query)
+        if handler is None:
+            log.warning(
+                "[HOOK] query_hook: no handler for '%s' on hook '%s'",
+                query,
+                target_hook,
+            )
+            return None
+        try:
+            return handler(dict(args or {}))
+        except Exception as e:
+            log.warning(
+                "[HOOK] query '%s' on hook '%s' failed: %s", query, target_hook, e
+            )
+            get_crash_manager().report_exception(
+                HOOK_0011,
+                exc=e,
+                context_info={"hook": target_hook, "query": query},
+            )
+            return None
 
     @staticmethod
     def _put_nowait_guarded(queue: asyncio.Queue, item: object, label: str) -> None:
@@ -631,4 +691,5 @@ def clear_hook_registrations() -> int:
         callbacks.clear()
     HOOK_EVENT_SUBSCRIPTIONS.clear()
     HOOK_TIMERS.clear()
+    HOOK_QUERIES.clear()
     return removed

@@ -10,6 +10,8 @@ All methods your hook can use via the `api` object in the `register()` function.
 | `rcon_enqueue(commands)` | Execute Minecraft commands |
 | `enqueue_trigger(action_name, user="hook", context=None)` | Trigger another action (chained) |
 | `register_timer(interval, fn)` | Run `fn()` periodically (no `threading` needed) |
+| `register_query(name, fn)` | Expose a query other hooks can call synchronously |
+| `query_hook(target_hook, query, args=None)` | Call another hook's query (returns result or `None`) |
 | `get_hook_config(name)` | Read per-hook configuration |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Display overlay text |
 | `store_get(key, default=None)` | Read from this hook's persistent store |
@@ -18,6 +20,41 @@ All methods your hook can use via the `api` object in the `register()` function.
 | `store_all()` | Read the whole persistent store |
 | `log(msg)` | Log hook-specific message |
 | `config` (Property) | Read global config (copy) |
+
+## Hook-to-Hook Queries
+
+Hooks can expose synchronous request/response endpoints to each other —
+useful for direct data exchange without an EventBus round-trip:
+
+```python
+# Provider hook
+def register(api: HookAPI):
+    stats = {"calls": 0}
+
+    def top(args):
+        stats["calls"] += 1
+        return {"calls": stats["calls"], "limit": args.get("limit", 5)}
+
+    api.register_query("top", top)
+```
+
+```python
+# Consumer hook
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        result = api.query_hook("provider-hook", "top", {"limit": 3})
+        if result is not None:
+            api.log(f"provider answered: {result}")
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+- Handlers run **inline in the calling thread** — keep them fast and
+  non-blocking; there is no timeout mechanism.
+- Unknown target/query or a raising handler returns `None` (handler errors
+  are reported as `HOOK-0011`); both hooks keep running.
+- Prefer EventBus events (`register_event`/`publish_event`) when
+  fire-and-forget semantics suffice — queries create direct coupling.
 
 ## register_action(name, fn)
 
@@ -152,8 +189,8 @@ Side-effecting API calls are guarded by **permissions** declared in your
 
 Ungated methods that always work: `register_action`,
 `register_lifecycle`/`on_live_start`/`on_live_end`/`on_unload`,
-`register_timer`, `register_event`, `log`, `get_hook_config`, `config`,
-`get_valid_functions`.
+`register_timer`, `register_query`, `query_hook`, `register_event`, `log`,
+`get_hook_config`, `config`, `get_valid_functions`.
 
 - A call without the matching permission is **denied** (logged as
   `HOOK-0009`) and returns its safe fallback (`None`, `False`, `{}` or
@@ -503,6 +540,7 @@ again, so it reads the fresh config and re-registers its actions.
 | `HOOK-0008` | Hook lifecycle callback failed |
 | `HOOK-0009` | Hook permission denied (missing entry in `permissions`) |
 | `HOOK-0010` | Hook timer callback failed (timer keeps running) |
+| `HOOK-0011` | Hook query handler failed (caller receives `None`) |
 
 ## Next Chapter
 

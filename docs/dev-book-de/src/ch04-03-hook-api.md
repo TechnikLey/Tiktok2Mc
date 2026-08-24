@@ -10,6 +10,8 @@ Alle Methoden, die dein Hook über das `api`-Objekt in der `register()`-Funktion
 | `rcon_enqueue(commands)` | Minecraft-Befehle ausführen |
 | `enqueue_trigger(action_name, user="hook", context=None)` | anderen Trigger auslösen (verkettet) |
 | `register_timer(interval, fn)` | `fn()` periodisch ausführen (ohne `threading`) |
+| `register_query(name, fn)` | Query exponieren, die andere Hooks synchron aufrufen können |
+| `query_hook(target_hook, query, args=None)` | Query eines anderen Hooks aufrufen (Ergebnis oder `None`) |
 | `get_hook_config(name)` | Per-Hook-Konfiguration lesen |
 | `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Overlay-Text anzeigen |
 | `store_get(key, default=None)` | Aus dem persistenten Store dieses Hooks lesen |
@@ -153,8 +155,8 @@ den Discovery-Tags):
 
 Ungesperrte Methoden, die immer funktionieren: `register_action`,
 `register_lifecycle`/`on_live_start`/`on_live_end`/`on_unload`,
-`register_timer`, `register_event`, `log`, `get_hook_config`, `config`,
-`get_valid_functions`.
+`register_timer`, `register_query`, `query_hook`, `register_event`, `log`,
+`get_hook_config`, `config`, `get_valid_functions`.
 
 - Ein Aufruf ohne passende Berechtigung wird **abgelehnt** (geloggt als
   `HOOK-0009`) und liefert seinen sicheren Rückgabewert (`None`, `False`,
@@ -429,6 +431,42 @@ def register(api: HookAPI):
 - Timer werden beim Entladen/Reload des Hooks automatisch entfernt —
   registriere sie in `register()` (das ohnehin bei jedem Reload neu läuft).
 
+## Hook-zu-Hook-Queries
+
+Hooks können einander synchrone Request/Response-Endpunkte exponieren —
+nützlich für direkten Datenaustausch ohne EventBus-Umweg:
+
+```python
+# Provider-Hook
+def register(api: HookAPI):
+    stats = {"calls": 0}
+
+    def top(args):
+        stats["calls"] += 1
+        return {"calls": stats["calls"], "limit": args.get("limit", 5)}
+
+    api.register_query("top", top)
+```
+
+```python
+# Consumer-Hook
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        result = api.query_hook("provider-hook", "top", {"limit": 3})
+        if result is not None:
+            api.log(f"Provider geantwortet: {result}")
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+- Handler laufen **inline im Thread des Aufrufers** — halte sie kurz und
+  nicht-blockierend; es gibt keinen Timeout-Mechanismus.
+- Unbekanntes Ziel/eine unbekannte Query oder eine Exception im Handler
+  liefert `None` (Handler-Fehler werden als `HOOK-0011` gemeldet); beide
+  Hooks laufen weiter.
+- Bevorzuge EventBus-Events (`register_event`/`publish_event`), wenn
+  Fire-and-Forget reicht — Queries erzeugen direkte Kopplung.
+
 ## Event-Abos & Publishing
 
 Hooks können **Bus-Events abonnieren** — Reaktion ganz ohne
@@ -510,6 +548,7 @@ die frische Config und registriert Actions neu.
 | `HOOK-0008` | Lifecycle-Callback fehlgeschlagen |
 | `HOOK-0009` | Hook-Berechtigung verweigert (Eintrag in `permissions` fehlt) |
 | `HOOK-0010` | Hook-Timer-Callback fehlgeschlagen (Timer läuft weiter) |
+| `HOOK-0011` | Hook-Query-Handler fehlgeschlagen (Aufrufer erhält `None`) |
 
 ## Nächstes Kapitel
 

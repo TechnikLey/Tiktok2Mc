@@ -1253,6 +1253,18 @@ HOOK_0010 = ErrorCode(
     recovery_hint="Check the hook's timer callback implementation.",
     impact="The current tick was skipped; the timer continues with its next run.",
 )
+HOOK_0011 = ErrorCode(
+    code="HOOK-0011",
+    subsystem=Subsystem.HOOK,
+    severity=Severity.WARNING,
+    message="Hook query handler failed.",
+    description=(
+        "A query handler registered via HookAPI.register_query() raised an "
+        "exception while another hook called it through query_hook()."
+    ),
+    recovery_hint="Check the target hook's query handler implementation.",
+    impact="The caller received None instead of a result; both hooks keep running.",
+)
 
 # --------------------------------------------------------------- NOTIF -----
 NOTIF_0001 = ErrorCode(
