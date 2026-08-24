@@ -250,7 +250,7 @@ def persist_to_config(
     concurrent writer and the config version counter is bumped (the
     bridge reloads on version changes).
     """
-    from core.config_lock import config_transaction
+    from core.config_lock import ConfigLockError, config_transaction
     from core.yaml_utils import load_yaml
 
     def apply_ports(cfg: dict[str, Any]) -> bool:
@@ -286,5 +286,10 @@ def persist_to_config(
         with config_transaction(config_path, backup=True) as cfg:
             apply_ports(cfg)
         log.info("Persisted resolved ports to %s", config_path)
-    except (OSError, ValueError, YAMLError) as exc:
+    except (
+        ConfigLockError,
+        OSError,
+        ValueError,
+        YAMLError,
+    ) as exc:
         log.warning("Failed to persist resolved ports: %s", exc)

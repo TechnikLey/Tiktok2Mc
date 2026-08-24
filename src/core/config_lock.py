@@ -25,6 +25,14 @@ _LOCK_TIMEOUT = 10.0
 _STALE_THRESHOLD = 30.0
 
 
+class ConfigLockError(RuntimeError):
+    """Raised when the cross-process config lock cannot be acquired.
+
+    Fail-closed by design: proceeding without the lock could let a
+    concurrent read-modify-write transaction overwrite changes.
+    """
+
+
 def _version_file(config_path: Path) -> Path:
     return config_path.with_suffix(config_path.suffix + ".version")
 
@@ -47,8 +55,13 @@ def _bump_config_version(config_path: Path) -> int:
     return new_version
 
 
-def _acquire_lock(lock_path: Path) -> FileLock | None:
-    """Acquire a cross-process file lock, cleaning stale locks."""
+def _acquire_lock(lock_path: Path) -> FileLock:
+    """Acquire a cross-process file lock, cleaning stale locks.
+
+    Raises :class:`ConfigLockError` instead of proceeding unlocked —
+    an unprotected write could race a parallel transaction and lose
+    its changes.
+    """
     lock = FileLock(lock_path, timeout=_LOCK_TIMEOUT)
 
     # Clean stale lock files left by crashed processes.
@@ -67,13 +80,15 @@ def _acquire_lock(lock_path: Path) -> FileLock | None:
 
     try:
         lock.acquire()
-        return lock
-    except Timeout:
+    except Timeout as exc:
         log.warning("Config lock timeout after %.0fs: %s", _LOCK_TIMEOUT, lock_path)
-        return None
+        raise ConfigLockError(
+            f"Could not acquire config lock within {_LOCK_TIMEOUT:.0f}s: {lock_path}"
+        ) from exc
     except OSError as exc:
         log.warning("Could not acquire config lock %s: %s", lock_path, exc)
-        return None
+        raise ConfigLockError(f"Could not acquire config lock: {lock_path}") from exc
+    return lock
 
 
 @contextmanager
