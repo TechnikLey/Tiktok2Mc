@@ -502,13 +502,14 @@ class ActionsEditor {
     }
 
     this.addGiftList.innerHTML = filtered.map(g => {
-      const imgPath = g.image_url || '';
+      const imgPath = escapeHtml(g.image_url || '');
+      const giftId = escapeHtml(String(g.id));
       const selected = this.selectedGiftId === g.id ? ' gift-item-selected' : '';
-      return `<div class="gift-item${selected}" data-gift-id="${g.id}">
+      return `<div class="gift-item${selected}" data-gift-id="${giftId}">
         <img src="${imgPath}" alt="${escapeHtml(g.name)}" class="gift-item-img" loading="lazy" onerror="this.style.display='none'">
         <div class="gift-item-info">
           <div class="gift-item-name">${escapeHtml(g.name)}</div>
-          <div class="gift-item-meta">ID: ${g.id} &middot; ${g.coins} coins</div>
+          <div class="gift-item-meta">ID: ${giftId} &middot; ${escapeHtml(String(g.coins))} coins</div>
         </div>
       </div>`;
     }).join('');

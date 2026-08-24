@@ -2703,7 +2703,7 @@ async function openReadmeModal(pluginName, displayName) {
   modal.classList.remove('hidden');
 
   try {
-    const res = await fetch(`${API}/plugins/${pluginName}/readme`);
+    const res = await fetch(`${API}/plugins/${encodeURIComponent(pluginName)}/readme`, { headers: _withApiKey({}) });
     if (!res.ok) {
       body.innerHTML = '<p class="muted">No README available for this plugin.</p>';
       return;
@@ -3780,7 +3780,7 @@ async function triggerRestart() {
   _restartPending = true;
   updateRestartBanner();
   try {
-    const res = await fetch('/api/v1/restart', { method: 'POST' });
+    const res = await fetch(API + '/restart', { method: 'POST', headers: _withApiKey({}) });
     if (res.ok) {
       _showRestartOverlay();
       // The supervisor keeps the API server alive and publishes
