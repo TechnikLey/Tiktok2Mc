@@ -1,5 +1,12 @@
 # ==========================================
-# Plugin configuration
+# Test Sandbox Plugin - Configuration
 # ==========================================
-# This is the local configuration file for this plugin.
+# Interactive developer sandbox for the BasePlugin framework.
+# These values override the defaults from plugin.json -> config_schema.
 
+milestone: 10
+
+theme:
+  background: "#000000"
+  text: "#00ff88"
+  accent: "#00cc66"

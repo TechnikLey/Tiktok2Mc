@@ -1,20 +1,158 @@
 {
   "name": "test",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "entry_point": "src/plugins/test/main.py",
-  "display_name": "Test Plugin",
-  "description": "Internal development and testing plugin.",
+  "display_name": "Test Sandbox",
+  "description": "Interactive developer sandbox demonstrating the BasePlugin framework: commands, queries, RPC, EventBus events with data_schema, persistent store and dashboard UI.",
   "author": "TechnikLey",
   "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
   "min_api_version": "1.0.0",
   "platform": "all",
-  "capabilities": [],
-  "permissions": [],
+  "capabilities": [
+    "test:counter",
+    "test:echo",
+    "test:events"
+  ],
+  "permissions": [
+    "events",
+    "store"
+  ],
   "depends_on": [],
+  "icon": "?",
+  "dashboard_ui": true,
+  "queries": [
+    "last_message",
+    "stats"
+  ],
+  "emitted_events": [
+    {
+      "key": "test.pong",
+      "name": "Pong",
+      "desc": "Fired for every 'ping' command",
+      "version": 1,
+      "data_schema": []
+    },
+    {
+      "key": "test.echo",
+      "name": "Echo",
+      "desc": "Fired for every 'echo' command with the message",
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "message",
+          "type": "string",
+          "required": true,
+          "desc": "The echoed message"
+        },
+        {
+          "key": "at",
+          "type": "string",
+          "desc": "Timestamp (HH:MM:SS) when the message was received"
+        }
+      ]
+    },
+    {
+      "key": "test.bump_milestone",
+      "name": "Bump Milestone",
+      "desc": "When the counter reaches the next configured milestone",
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "total",
+          "type": "number",
+          "required": true,
+          "desc": "Counter value that reached the milestone"
+        },
+        {
+          "key": "step",
+          "type": "number",
+          "desc": "Configured milestone step size"
+        }
+      ]
+    }
+  ],
+  "accepted_commands": {
+    "ping": {
+      "name": "Ping",
+      "desc": "Publishes a test.pong event on the EventBus",
+      "args": {}
+    },
+    "echo": {
+      "name": "Echo Message",
+      "desc": "Stores a message, publishes test.echo and shows it in state",
+      "args": {
+        "message": {
+          "type": "string",
+          "label": "Message",
+          "default": "",
+          "label_i18n": {
+            "en": "Message",
+            "de": "Nachricht"
+          }
+        }
+      }
+    },
+    "bump": {
+      "name": "Bump Counter",
+      "desc": "Increases the counter",
+      "args": {
+        "amount": {
+          "type": "number",
+          "label": "Amount",
+          "default": 1,
+          "min": 1,
+          "label_i18n": {
+            "en": "Amount",
+            "de": "Anzahl"
+          }
+        }
+      }
+    },
+    "reset": {
+      "name": "Reset Counter",
+      "desc": "Resets the counter to zero",
+      "args": {}
+    },
+    "save_dims": {
+      "name": "Save Window Size",
+      "desc": "Persist overlay window dimensions (sent by the overlay JS)",
+      "args": {}
+    }
+  },
   "update_url": "",
   "config_schema": {
     "version": 1,
     "fields": [
+      {
+        "key": "milestone",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Milestone Step",
+        "help": "Every time the counter crosses a multiple of this step, a test.bump_milestone event is published",
+        "category": "General"
+      },
+      {
+        "key": "theme.background",
+        "type": "color",
+        "default": "#000000",
+        "label": "Background Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.text",
+        "type": "color",
+        "default": "#00ff88",
+        "label": "Text Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent",
+        "type": "color",
+        "default": "#00cc66",
+        "label": "Accent Color",
+        "category": "Theme"
+      }
     ]
   }
 }
