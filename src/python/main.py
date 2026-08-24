@@ -1667,6 +1667,13 @@ def _process_comment_command(
                 continue
 
             base_cmd = cmd_text.split()[0].lower()
+            # A "minecraft:" namespace ("minecraft:op" runs the same command
+            # as "op") would bypass the first-word deny/allow match below —
+            # strip it so both spellings hit the same list entry.
+            if base_cmd.startswith("minecraft:"):
+                base_cmd = base_cmd.split(":", 1)[1]
+                if not base_cmd:
+                    continue
             if group["mode"] == "deny-all":
                 if base_cmd not in group["commands"]:
                     log.info(

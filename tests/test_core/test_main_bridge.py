@@ -1485,3 +1485,96 @@ class TestWebhookAuth:
         monkeypatch.setattr(main_mod, "request", self._make_request("127.0.0.1"))
 
         assert main_mod._bridge_auth_check() is None
+
+
+# =========================================================================
+# Comment command namespace normalization
+# =========================================================================
+
+
+class TestCommentCommandNamespace:
+    """minecraft:<cmd> must hit the same allow/deny entry as <cmd>."""
+
+    def _setup_ctx(self, monkeypatch, group):
+        import src.python.main as main_mod
+        from src.python.main import BotContext
+
+        bc = BotContext()
+        rcon_queue = asyncio.Queue()
+        bc.rcon_queue = rcon_queue
+
+        def fake_enqueue(item, *, queue=None, label="event"):
+            (queue or bc.trigger_queue).put_nowait(item)
+            return True
+
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue)
+        for name, obj in vars(main_mod.ctx).items():
+            if name.startswith("comment_cmd"):
+                setattr(bc, name, obj)
+        bc.comment_cmd_enable = True
+        bc.comment_cmd_groups = [group]
+        monkeypatch.setattr(main_mod, "ctx", bc)
+        return bc
+
+    def _group(self, mode, commands):
+        return {
+            "prefix": "!",
+            "roles": ["all"],
+            "mode": mode,
+            "commands": list(commands),
+            "cooldown": 0,
+            "user_cooldown": 0,
+            "handler": "rcon",
+            "trigger_comment_event": False,
+        }
+
+    def test_allow_all_blocklist_catches_namespace(self, monkeypatch):
+        from src.python.main import _process_comment_command
+
+        group = self._group("allow-all", ["op"])
+        bc = self._setup_ctx(monkeypatch, group)
+
+        suppressed = _process_comment_command(
+            "viewer", "!minecraft:op herobrine", False, False, False
+        )
+
+        assert bc.rcon_queue.empty()
+        assert suppressed is True
+
+    def test_deny_all_allowlist_accepts_namespace(self, monkeypatch):
+        from src.python.main import _process_comment_command
+
+        group = self._group("deny-all", ["tp"])
+        bc = self._setup_ctx(monkeypatch, group)
+
+        suppressed = _process_comment_command(
+            "viewer", "!minecraft:tp 0 64 0", False, False, False
+        )
+
+        assert not bc.rcon_queue.empty()
+        assert suppressed is True
+
+    def test_deny_all_still_blocks_unlisted_namespace(self, monkeypatch):
+        from src.python.main import _process_comment_command
+
+        group = self._group("deny-all", ["tp"])
+        bc = self._setup_ctx(monkeypatch, group)
+
+        _process_comment_command(
+            "viewer", "!minecraft:op herobrine", False, False, False
+        )
+
+        assert bc.rcon_queue.empty()
+
+    def test_plain_command_still_works(self, monkeypatch):
+        from src.python.main import _process_comment_command
+
+        group = self._group("deny-all", ["tp"])
+        bc = self._setup_ctx(monkeypatch, group)
+
+        _process_comment_command("viewer", "!tp 100 64 100", False, False, False)
+
+        assert not bc.rcon_queue.empty()
+        cmds, user = bc.rcon_queue.get_nowait()
+        assert cmds == ["tp 100 64 100"]
+        assert user == "viewer"
