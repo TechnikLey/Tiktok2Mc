@@ -28,7 +28,11 @@ log = logging.getLogger(__name__)
 
 def register(api: HookAPI):
     def my_handler(user, trigger, context):
-        """Handle a $-command triggered from actions.mca."""
+        """Handle a $-command triggered from actions.mca.
+
+        Veto contract: return False to abort the rest of this trigger's
+        chain (later hooks, overlays, RCON and shell actions are skipped).
+        """
         api.log(f"{name} triggered by {{user}}")
         api.rcon_enqueue([
             f"say {{user}} triggered {name}!",
@@ -36,6 +40,45 @@ def register(api: HookAPI):
 
     api.register_action("{action_name}", my_handler)
     log.info("[{display_name}] Registered action: {action_name}")
+
+    # ------------------------------------------------------------------
+    # Optional APIs (uncomment what you need; each guarded call requires
+    # the matching permission in hook.json -> "permissions"):
+    #
+    # Lifecycle:
+    #   api.on_live_start(lambda: api.log("live started"))
+    #   api.on_live_end(lambda: api.log("live ended"))
+    #   api.on_unload(lambda: api.log("unload - release resources here"))
+    #
+    # Periodic task (min 0.1 s, shared scheduler thread)      [no permission]
+    #   api.register_timer(5.0, lambda: api.log("tick"))
+    #
+    # Bus events ("tiktok.gift", "tiktok.*", "*")             [no permission]
+    #   api.register_event("tiktok.gift", lambda etype, data: api.log(str(data)))
+    #
+    # Hook-to-hook queries                                    [no permission]
+    #   api.register_query("status", lambda args: {{"ok": True}})
+    #   result = api.query_hook("other-hook", "status")
+    #
+    # Persistent store (namespaced per hook)                  [store]
+    #   api.store_set("counter", 1)
+    #   count = api.store_get("counter", default=0)
+    #
+    # Custom EventBus events (must be namespaced "{name}.*")  [events]
+    #   api.publish_event("{name}.something", {{"foo": "bar"}})
+    #
+    # Control-plane HTTP helper                               [network]
+    #   state = api.request("plugins/{name}/state")
+    #
+    # Dashboard widget                                        [ui]
+    #   api.register_dashboard_widget("{display_name}", "<b>Hello</b>")
+    #
+    # Overlay text                                            [overlay]
+    #   api.send_overlay_text("Title", "Subtitle", duration=3)
+    #
+    # Trigger another actions.mca chain                       [triggers]
+    #   api.enqueue_trigger("other_action", user)
+    # ------------------------------------------------------------------
 '''
 
 HOOK_JSON_TEMPLATE = """\
@@ -47,7 +90,9 @@ HOOK_JSON_TEMPLATE = """\
   "author": "",
   "min_api_version": "1.0.0",
   "capabilities": [],
+  "permissions": ["rcon"],
   "plugin": "{plugin}",
+  "depends_on": [],
   "update_url": "{update_url}",
   "config_schema": {{
     "version": 1,
@@ -227,6 +272,9 @@ def main():
     log.info(f"  Action: ${action_name} (use in actions.mca)")
     log.info("  Register function: register(api) in main.py")
     log.info(f'  Config: api.get_hook_config("{hook_name}")')
+    log.info("  Permissions: guarded API calls are default-deny — declare what")
+    log.info('    you use in hook.json -> "permissions". Valid values: rcon,')
+    log.info("    triggers, overlay, store, network, events, ui")
 
     input("\nPress Enter to exit...")
 

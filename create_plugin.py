@@ -56,15 +56,33 @@ class {class_name}(BasePlugin):
     def on_tick(self):
         pass
 
+    # Optional lifecycle hook: runs once on graceful shutdown
+    # (disable/restart/unregister via the API or interpreter exit).
+    # def on_stop(self):
+    #     pass
+
+    # Optional request/response: called via query_plugin() from other
+    # plugins. Advertise supported names in plugin.json -> "queries".
+    # def on_query(self, query: str, args: dict):
+    #     return None
+
+    # Optional generic REST endpoint: POST /api/v1/plugins/{name}/rpc
+    # def on_rpc(self, method: str, path: str, body: dict):
+    #     return None
+
+    # Optional dashboard tab (also set "dashboard_ui": true in plugin.json)
+    # def get_dashboard_html(self) -> str:
+    #     return ""
+
     def get_overlay_html(self) -> str:
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <style>
-{self.theme_style}
-    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-    body {{
+{{self.theme_style}}
+    * {{{{ margin: 0; padding: 0; box-sizing: border-box; }}}}
+    body {{{{
         background: transparent;
         font-family: 'Inter', 'Segoe UI', sans-serif;
         overflow: hidden;
@@ -72,14 +90,14 @@ class {class_name}(BasePlugin):
         display: flex; justify-content: center; align-items: center;
         color: var(--text);
         font-size: 5vh;
-    }}
+    }}}}
 </style>
 </head>
 <body>
     <div>Hello from {display_name}!</div>
     <script>
         const es = new EventSource('/api/v1/plugins/{name}/stream');
-        es.onmessage = e => {{ /* handle live updates */ }};
+        es.onmessage = e => {{{{ /* handle live updates */ }}}};
     </script>
 </body>
 </html>"""
@@ -175,7 +193,30 @@ def main():
     log.info("File 'version.txt' created.")
 
     # Create README.md
-    readme = f"# {plugin_name}\n\nVersion: {VERSION}\n\nDescription: \n"
+    readme = f"""# {plugin_name}
+
+Version: {VERSION}
+
+Description:
+
+## Permissions (plugin.json -> "permissions")
+Guarded helper calls are default-deny: declare every family you use.
+Valid values: store, network, plugins, events.
+
+- `store_get/store_set/store_delete/store_all` -> `store`
+- `api_get/api_post/api_put/api_delete/api_request` -> `network`
+- `publish_event` (types must be namespaced `{plugin_name}.*`) -> `events`
+- `send_command`/`query_plugin` (plugin-to-plugin) -> `plugins`
+
+`http_request`/`ws_connect` (external services) are NOT permission-gated.
+
+## Optional manifest fields
+- `"dashboard_ui": true` + override `get_dashboard_html()` for a dashboard tab
+- `"queries": [...]` advertised query names for `on_query()`
+- `"event_subscriptions": ["tiktok.gift", "tiktok.*"]` bus events delivered
+  as an `event` command (handle via `register_handler("event", ...)`)
+- `"emitted_events"` / `"accepted_commands"` for dashboard discovery
+"""
     (plugin_path / "README.md").write_text(readme, encoding="utf-8")
     log.info("File 'README.md' created.")
 
@@ -190,7 +231,7 @@ def main():
         update_url=update_url,
     )
     (plugin_path / "plugin.json").write_text(plugin_json, encoding="utf-8")
-    log.info("File 'plugin.json' created (with config_schema and ports).")
+    log.info("File 'plugin.json' created (with config_schema and permissions).")
 
     input("\nPress Enter to exit...")
 
