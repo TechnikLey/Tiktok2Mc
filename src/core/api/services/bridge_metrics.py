@@ -7,10 +7,7 @@ import time
 import urllib.request
 from typing import Any
 
-from ruamel.yaml.error import YAMLError
-
-import core.paths
-from core.yaml_utils import load_yaml
+from core.api.services.bridge_port import bridge_base_url
 
 log = logging.getLogger(__name__)
 
@@ -24,22 +21,8 @@ class BridgeMetricsService:
         self._cache_ttl: float = 5.0  # seconds
 
     def _get_bridge_url(self) -> str:
-        """Get the bridge metrics URL from config."""
-        try:
-            config_path = core.paths.get_config_file()
-            if config_path.exists():
-                cfg = load_yaml(config_path)
-                if cfg is not None:
-                    host = cfg.get("minecraft_server_api", {}).get(
-                        "web_server_host", "127.0.0.1"
-                    )
-                    port = cfg.get("minecraft_server_api", {}).get(
-                        "web_server_port", 29188
-                    )
-                    return f"http://{host}:{port}/metrics"
-        except (OSError, ValueError, YAMLError) as exc:
-            log.debug("Failed to read bridge metrics URL from config: %s", exc)
-        return "http://127.0.0.1:29188/metrics"
+        """Get the bridge metrics URL."""
+        return f"{bridge_base_url()}/metrics"
 
     def _fetch(self, url: str) -> dict[str, Any]:
         """Blocking HTTP GET of the bridge metrics endpoint (runs in a thread)."""
