@@ -8,6 +8,7 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 - **Follow, share & join actions** — react to viewers following, sharing, or joining your stream
 - **Like milestones** — trigger commands at like thresholds (every 100, 100k likes by default)
 - **Chat commands** — viewers type commands like `#give` or `$skip` in TikTok chat
+- **TikTok chatbot** — optional bot that thanks viewers and replies to keywords in your live chat (beta)
 - **Stream overlays** — OBS browser-source overlays for timers, counters, and text alerts
 - **Web Dashboard** — manage actions, configuration, plugins, and your server at `http://127.0.0.1:29185`
 - **Plugin & hook system** — extend TikTok2Mc with Python plugins and hooks

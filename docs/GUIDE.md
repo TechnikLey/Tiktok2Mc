@@ -328,6 +328,8 @@ The Event-Command Mapper can also be edited visually in the Dashboard.
 
 Let viewers send commands via TikTok chat. Each command group has its own prefix character.
 
+You can edit comment command groups in the **Commands** page of the Dashboard, or directly in `data/comment_commands.yaml`.
+
 **Example:** A moderator types `#say Hello` and the tool sends `say Hello` to the Minecraft server.
 
 ### How it works
@@ -341,7 +343,7 @@ Commands are organized into **groups**. Each group has:
 
 ### Default groups
 
-Chat commands are configured in `data/comment_commands.yaml`. The default file includes one group:
+Chat commands are configured in `data/comment_commands.yaml` (or via the **Commands** page in the Dashboard). The default file includes one group:
 
 1. **`#` group** — Minecraft commands via RCON. Only moderators and superfans can use it. **Disabled by default** (`comment_commands.enabled: false`).
 
@@ -515,11 +517,17 @@ It is also available as a desktop app.
 ### What you can do in the Dashboard
 
 - **Edit Actions** — visual table of event triggers with inline command editing. Add events by type (follow, join, comment, likes, share) or use the gift picker with search. Changes save with validation.
+- **Event Reactions** — a step-by-step wizard to set up what happens when viewers follow, like, gift, share, join, or comment — no file editing needed.
 - **Edit Configuration** — form-based editor with section navigation (Connection, Minecraft, Chat & Commands, System). Search filters across all settings. Validation prevents invalid values. Overlay theme colors can be previewed live before saving.
 - **Plugin Configuration** — each plugin has its own settings page with form fields, category sidebar, and search.
+- **Comment Commands** — edit chat command groups visually (see [Comment Commands](#comment-commands)).
 - **Event Commands** — visually edit the Event-Command Mapper.
+- **Event Tester** — simulate viewer events (follow, gift, etc.) to test your actions without going live.
 - **Server Manager** — create and manage Minecraft server instances (see below).
 - **Live Theme Editor** — adjust overlay colors and preview changes in real time without saving.
+- **Sessions & Revenue** — view automatic session summaries after each stream and browse your streaming income.
+- **Backups** — browse and restore the automatic backups of your configuration files.
+- **Console & Live Log** — send commands to the Minecraft server console (with autocomplete and history) and watch the live log with level filters.
 - **Check for Updates** — click "Check for Updates" in the Updates card.
 - **API Documentation** — visit `http://127.0.0.1:29185/docs` for interactive API reference.
 
@@ -604,12 +612,12 @@ A: No. The tool also works without TikTok — you can trigger actions manually o
 
 **Q: Can I test actions without going live?**
 
-A: Yes. Use the included test tool:
+A: Yes. Use the **Event Tester** page in the Dashboard, or the included test tool:
 
 - **Release / Installed**: `test/test_trigger.exe` (Windows) or `test/test_trigger.bin` (Linux)
 - **Development**: `python src/python/send_trigger.py` (e.g., `python src/python/send_trigger.py follow --user TestUser`)
 
-Enter a trigger name (like `follow` or a gift ID) to simulate it.
+Run it with a trigger name (like `follow` or a gift ID) to simulate that event.
 
 **Q: How do I know if the tool is working?**
 
