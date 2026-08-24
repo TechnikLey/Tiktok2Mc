@@ -563,17 +563,19 @@ def run_update():
         def safe_extract_zip(zip_path: Path, dest: Path) -> None:
             with zipfile.ZipFile(zip_path, "r") as z:
                 # Validate all member paths first (zip slip protection)
+                resolved_dest = dest.resolve()
                 for member in z.infolist():
                     target = (dest / member.filename).resolve()
-                    if not str(target).startswith(str(dest.resolve())):
+                    if not target.is_relative_to(resolved_dest):
                         raise ValueError(f"Zip slip attempt: {member.filename}")
                 z.extractall(dest)
 
         def safe_extract_tar(tar_path: Path, dest: Path) -> None:
             with tarfile.open(tar_path, "r:gz") as t:
+                resolved_dest = dest.resolve()
                 for member in t.getmembers():
                     target = (dest / member.name).resolve()
-                    if not str(target).startswith(str(dest.resolve())):
+                    if not target.is_relative_to(resolved_dest):
                         raise ValueError(f"Path traversal attempt: {member.name}")
                 t.extractall(dest)
 

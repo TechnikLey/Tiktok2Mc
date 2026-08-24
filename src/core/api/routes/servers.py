@@ -936,7 +936,9 @@ async def upload_custom_jar(
 
     # Sanitize version name for filesystem
     version_name = "".join(c for c in version_name if c.isalnum() or c in "._-").strip()
-    if not version_name:
+    # ".." survives the character filter and would escape versions_dir
+    # when used as a single path component.
+    if not version_name or ".." in version_name:
         raise HTTPException(status_code=400, detail="Invalid version name")
 
     versions_dir = _ensure_versions_dir()

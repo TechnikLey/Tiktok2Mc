@@ -243,7 +243,9 @@ async def check_plugin_updates():
     try:
         registry = get_registry()
         plugins = [p.model_dump(mode="json") for p in registry.list()]
-        results = _updater.check_updates(plugins)
+        # Network-bound (one request per plugin) → worker thread so the
+        # event loop stays responsive while the check runs.
+        results = await asyncio.to_thread(_updater.check_updates, plugins)
         updates_available = sum(1 for r in results if r.get("update_available"))
         return PluginUpdatesResponse(
             plugins=[PluginUpdateStatus(**r) for r in results],
@@ -261,12 +263,10 @@ async def install_plugin_updates():
     try:
         registry = get_registry()
         plugins = [p.model_dump(mode="json") for p in registry.list()]
-        # Re-check to get latest versions
-        results = _updater.check_updates(plugins)
+        # Re-check to get latest versions (network-bound → worker thread)
+        results = await asyncio.to_thread(_updater.check_updates, plugins)
 
-        plugins_dir = core.paths.get_root_dir() / "plugins"
-        if not plugins_dir.is_dir():
-            plugins_dir = core.paths.get_root_dir() / "src" / "plugins"
+        plugins_dir = core.paths.get_plugins_dir()
         if not plugins_dir.is_dir():
             raise HTTPException(
                 status_code=500, detail="Cannot locate plugins directory"
@@ -280,7 +280,11 @@ async def install_plugin_updates():
             display_name = r.get("display_name", name)
             latest_version = r.get("latest_version", "")
             plugin = next((p for p in plugins if p.get("name") == name), {})
-            success = _updater.install_update(plugin, plugins_dir)
+            # Download + extract are network/disk bound — keep them off
+            # the event loop so SSE streams stay responsive.
+            success = await asyncio.to_thread(
+                _updater.install_update, plugin, plugins_dir
+            )
             if success:
                 # Update registry with new version
                 registry.update(name, version=latest_version)

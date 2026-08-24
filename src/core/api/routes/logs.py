@@ -57,12 +57,11 @@ async def logs_stream():
 # ---------------------------------------------------------------------------
 
 
-@router.get("/logs/crash-reports")
-async def list_crash_reports():
-    """List all crash report files with metadata."""
+def _list_crash_reports_sync() -> list[dict]:
+    """Parse crash report metadata (blocking file I/O — run via to_thread)."""
     crash_dir = _get_log_dir() / "crash_reports"
     if not crash_dir.exists():
-        return {"reports": []}
+        return []
 
     reports = []
     for path in sorted(crash_dir.glob("crash_*.json"), reverse=True):
@@ -82,8 +81,13 @@ async def list_crash_reports():
             )
         except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             continue
+    return reports
 
-    return {"reports": reports}
+
+@router.get("/logs/crash-reports")
+async def list_crash_reports():
+    """List all crash report files with metadata."""
+    return {"reports": await asyncio.to_thread(_list_crash_reports_sync)}
 
 
 @router.get("/logs/crash-reports/{filename}")
