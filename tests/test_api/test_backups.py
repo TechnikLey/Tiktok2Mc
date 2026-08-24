@@ -108,6 +108,26 @@ class TestBackupsRestore:
         )
         assert resp.status_code == 400
 
+    def test_restore_category_traversal_400(self, client):
+        resp = client.post(
+            "/api/v1/backups/restore",
+            json={"category": "../../evil", "filename": "x.bak"},
+        )
+        assert resp.status_code == 400
+
+    def test_restore_custom_target_sibling_escape_400(self, client):
+        # "../Tiktok2Mc-sibling/..." starts with the project root as a
+        # string but resolves to a sibling directory — must be rejected.
+        resp = client.post(
+            "/api/v1/backups/restore",
+            json={
+                "category": "_other",
+                "filename": "x.bak",
+                "target": "../Tiktok2Mc-sibling/evil.yaml",
+            },
+        )
+        assert resp.status_code == 400
+
     def test_restore_missing_file_400(self, client):
         resp = client.post(
             "/api/v1/backups/restore",
