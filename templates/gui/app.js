@@ -2709,7 +2709,9 @@ async function openReadmeModal(pluginName, displayName) {
       return;
     }
     const md = await res.text();
-    body.innerHTML = typeof marked !== 'undefined' ? marked.parse(md) : escapeHtml(md);
+    body.innerHTML = typeof marked !== 'undefined'
+      ? sanitizeMarkdownHtml(marked.parse(md))
+      : escapeHtml(md);
   } catch {
     body.innerHTML = '<p class="muted">Failed to load README.</p>';
   }
@@ -5254,6 +5256,27 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+// Sanitizes rendered markdown (e.g. third-party plugin READMEs) before it is
+// assigned via innerHTML. The dashboard runs inside a pywebview window with a
+// privileged JS bridge, so active content must never survive this path.
+function sanitizeMarkdownHtml(html) {
+  const doc = new DOMParser().parseFromString(String(html), 'text/html');
+  doc.querySelectorAll('script,style,iframe,frame,object,embed,link,meta,form,base')
+    .forEach(el => el.remove());
+  doc.querySelectorAll('*').forEach(el => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value;
+      if (name.startsWith('on')) {
+        el.removeAttribute(attr.name);
+      } else if ((name === 'href' || name === 'src' || name === 'xlink:href' || name === 'action') &&
+                 /^\s*(javascript|vbscript|data:text\/html)/i.test(value)) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+  return doc.body.innerHTML;
 }
 function toTitle(str) {
   return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());

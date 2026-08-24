@@ -1287,7 +1287,9 @@
     <script src="./accessibility.js?v=1"></script>
     <script src="./actions-editor.js?v=3"></script>
     <script src="./chatbot-editor.js?v=2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- marked is bundled locally (pinned v15.0.12) — no CDN: the dashboard
+         runs in a privileged pywebview window and must work offline. -->
+    <script src="./vendor/marked.min.js?v=1"></script>
     <script src="./app.js?v=8"></script>
 </div>
 </body>
