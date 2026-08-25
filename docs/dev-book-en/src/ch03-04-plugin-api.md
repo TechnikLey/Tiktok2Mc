@@ -477,9 +477,6 @@ the `queries` field of `GET /plugins`. Calling an undeclared query fails
 fast with a 404 whose detail lists the plugin's declared queries — so a
 typo tells you immediately what *is* available.
 
-Reference implementation: the shipped **death-counter** plugin answers
-the `"deaths"` query.
-
 ```python
 class MyPlugin(BasePlugin):
     PLUGIN_NAME = "leaderboard"

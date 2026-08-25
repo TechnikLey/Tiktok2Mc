@@ -486,9 +486,6 @@ deklarierten Query schlägt sofort mit einem 404 fehl, dessen Detail die
 deklarierten Queries des Plugins auflistet — ein Tippfehler verrät also
 sofort, was tatsächlich verfügbar ist.
 
-Referenzimplementierung: das mitgelieferte **death-counter**-Plugin
-beantwortet die Query `"deaths"`.
-
 ```python
 class MyPlugin(BasePlugin):
     PLUGIN_NAME = "leaderboard"
