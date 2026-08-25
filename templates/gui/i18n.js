@@ -187,10 +187,6 @@
     'status.eventsPerMinute': 'Events/Min',
     'status.giftValueToday': 'Gift Value Today',
     'status.noLiveData': 'No live data available (bridge not connected)',
-    'status.systemHealth': 'System Health',
-    'status.memory': 'Memory (RSS)',
-    'status.memoryPercent': 'Memory %',
-    'status.subsystems': 'Subsystems',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',
@@ -1267,10 +1263,6 @@
     'status.eventsPerMinute': 'Events/Min',
     'status.giftValueToday': 'Geschenk-Wert heute',
     'status.noLiveData': 'Keine Live-Daten verfügbar (Bridge nicht verbunden)',
-    'status.systemHealth': 'Systemstatus',
-    'status.memory': 'Speicher (RSS)',
-    'status.memoryPercent': 'Speicher %',
-    'status.subsystems': 'Subsysteme',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',

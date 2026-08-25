@@ -77,7 +77,6 @@ let _shutdownCountdownInterval = null;
 let _shutdownCountdownValue = 30;
 let _healthIntervalId = null;
 let _statusIntervalId = null;
-let _systemHealthIntervalId = null;
 let _pluginsIntervalId = null;
 let _hooksIntervalId = null;
 let _closePollIntervalId = null;
@@ -93,7 +92,6 @@ let _serverActionInProgress = false;
 function _stopDashboardPolling() {
   if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
   if (_statusIntervalId) { clearInterval(_statusIntervalId); _statusIntervalId = null; }
-  if (_systemHealthIntervalId) { clearInterval(_systemHealthIntervalId); _systemHealthIntervalId = null; }
   if (_pluginsIntervalId) { clearInterval(_pluginsIntervalId); _pluginsIntervalId = null; }
   if (_hooksIntervalId) { clearInterval(_hooksIntervalId); _hooksIntervalId = null; }
   if (_uptimeIntervalId) { clearInterval(_uptimeIntervalId); _uptimeIntervalId = null; }
@@ -8285,61 +8283,6 @@ function connectLogStream() {
 
 /* ─── Live Dashboard Widgets ─── */
 
-function renderSystemHealth(data) {
-  const container = document.getElementById('sys-health-grid');
-  const empty = document.getElementById('sys-health-empty');
-  if (!container) return;
-
-  const states = data.states || {};
-  const names = Object.keys(states);
-  if (!names.length && data.running === undefined) {
-    container.innerHTML = '';
-    if (empty) empty.classList.remove('hidden');
-    return;
-  }
-  if (empty) empty.classList.add('hidden');
-
-  let html = '';
-
-  // Memory card (if available via diagnostics)
-  if (data.memory) {
-    const rss = data.memory.rss_mb;
-    const pct = data.memory.percent;
-    const memCls = pct > 80 ? 'danger' : pct > 60 ? 'warning' : 'success';
-    html += '<div class="status-card"><span class="status-card__label">' + I18N.t('status.memory') + '</span><span class="status-card__value ' + memCls + '">' + (rss != null ? rss.toFixed(1) + ' MB' : '—') + '</span></div>';
-    if (pct != null) {
-      html += '<div class="status-card"><span class="status-card__label">' + I18N.t('status.memoryPercent') + '</span><span class="status-card__value ' + memCls + '">' + pct.toFixed(1) + '%</span></div>';
-    }
-  }
-
-  // Subsystem cards
-  const stateLabels = { running: 'success', degraded: 'warning', failed: 'danger', starting: 'info', stopping: 'warning', stopped: '', unknown: '' };
-  for (const name of names) {
-    const state = states[name];
-    const cls = stateLabels[state] || '';
-    html += '<div class="status-card"><span class="status-card__label">' + escapeHtml(name) + '</span><span class="status-card__value' + (cls ? ' ' + cls : '') + '">' + escapeHtml(state) + '</span></div>';
-  }
-
-  // Summary line
-  if (data.running !== undefined) {
-    const summaryCls = data.failed > 0 ? 'danger' : data.degraded > 0 ? 'warning' : 'success';
-    html = '<div class="status-card"><span class="status-card__label">' + I18N.t('status.subsystems') + '</span><span class="status-card__value ' + summaryCls + '">' + data.running + '/' + data.total_components + '</span></div>' + html;
-  }
-
-  container.className = 'status-grid';
-  container.innerHTML = html;
-}
-
-async function loadSystemHealth() {
-  try {
-    const data = await fetchJSON('/diagnostics/health');
-    renderSystemHealth(data);
-  } catch (_) {
-    const empty = document.getElementById('sys-health-empty');
-    if (empty) empty.classList.add('hidden');
-  }
-}
-
 function updateEcmDiagnostics(payload) {
   // Update the reactions summary on the dashboard card if it shows 0
   const summary = document.getElementById('reactions-summary');
@@ -8891,7 +8834,6 @@ document.addEventListener('i18n:changed', () => {
     editor.render();
   }
   loadStatus();
-  loadSystemHealth();
   if (typeof reactionEditor !== 'undefined') {
     reactionEditor.renderSidebar();
     reactionEditor.renderList();
@@ -9215,7 +9157,6 @@ async function init() {
   _initMobileSidebar();
   await loadHealth();
   await loadStatus();
-  await loadSystemHealth();
   await loadConfig();
   await loadPlugins();
   // One-time hook discovery at startup, then periodic refresh is just the list
@@ -9231,7 +9172,6 @@ async function init() {
   if (!window.__TEST__) {
     _healthIntervalId = setInterval(loadHealth, 10000);
     _statusIntervalId = setInterval(loadStatus, 10000);
-    _systemHealthIntervalId = setInterval(loadSystemHealth, 10000);
     _pluginsIntervalId = setInterval(loadPlugins, 5000);
     _hooksIntervalId = setInterval(loadHooks, 10000);
     _uptimeIntervalId = setInterval(() => {
