@@ -32,8 +32,8 @@ InstallDirRegKey HKLM "${PRODUCT_UNINSTALL_KEY}" "InstallDir"
 
 ; ---------- Interface Settings ----------
 !define MUI_ABORTWARNING
-!define MUI_ICON "assets\icons\tiktok2mc.ico"
-!define MUI_UNICON "assets\icons\tiktok2mc-tool.ico"
+!define MUI_ICON "..\assets\icons\tiktok2mc.ico"
+!define MUI_UNICON "..\assets\icons\tiktok2mc-tool.ico"
 
 ; ---------- Pages ----------
 ; Installation type selection (always first)
