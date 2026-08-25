@@ -54,6 +54,43 @@ describe('renderPluginPagesNav', () => {
     expect(document.querySelectorAll('.view[data-plugin-page]').length).toBe(0);
     expect(document.getElementById('view-plugindash-death-counter')).toBeNull();
   });
+
+  it('keeps DOM untouched when the page set is unchanged', () => {
+    currentPlugins = [plugin()];
+    renderPluginPagesNav();
+    const view = document.getElementById('view-plugindash-death-counter');
+    const navItem = document.querySelector('.nav-item[data-view="plugindash-death-counter"]');
+    view.classList.add('active');
+    navItem.classList.add('active');
+
+    renderPluginPagesNav(); // periodic loadPlugins() poll with same data
+
+    expect(document.getElementById('view-plugindash-death-counter')).toBe(view);
+    expect(view.classList.contains('active')).toBe(true);
+    expect(navItem.classList.contains('active')).toBe(true);
+  });
+
+  it('restores the active tab after a real rebuild', () => {
+    currentPlugins = [plugin()];
+    renderPluginPagesNav();
+    openPluginDashboard('death-counter');
+
+    currentPlugins = [
+      plugin(),
+      { name: 'timer', display_name: 'Timer', enabled: true, dashboard_ui: true },
+    ];
+    renderPluginPagesNav();
+
+    expect(
+      document.querySelector('.nav-item[data-view="plugindash-death-counter"]').classList.contains('active')
+    ).toBe(true);
+    expect(document.getElementById('view-plugindash-death-counter').classList.contains('active')).toBe(true);
+    expect(frameSrcOf('view-plugindash-death-counter')).toContain('/api/v1/plugins/death-counter/dashboard');
+  });
+
+  function frameSrcOf(viewId) {
+    return document.querySelector(`#${viewId} iframe`).src;
+  }
 });
 
 describe('openPluginDashboard', () => {
@@ -61,6 +98,10 @@ describe('openPluginDashboard', () => {
     currentPlugins = [
       { name: 'death-counter', display_name: 'Death Counter', enabled: true, dashboard_ui: true },
     ];
+    document.querySelectorAll('.view.active').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item.active').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item[data-plugin-page]').forEach(el => el.remove());
+    document.querySelectorAll('.view[data-plugin-page]').forEach(el => el.remove());
     renderPluginPagesNav();
   });
 

@@ -83,6 +83,36 @@ Because the page shares the origin with the API, it can use relative
 - `POST /api/v1/plugins/{name}/command` to trigger your own command handlers
 - `GET/PUT /api/v1/plugins/{name}/data[/{key}]` for the persistent store
 
+#### Dashboard pages follow the GUI theme
+
+The web dashboard loads plugin pages with a `?theme=dark|light` query
+parameter and refreshes already-open tabs when the user toggles light/dark
+mode. Your page should read the parameter and set CSS variables accordingly,
+so the tab stays readable in both modes (the plugin's overlay colors from the
+`theme:` config section are meant for the **overlay window**, not the tab):
+
+```html
+<head>
+  <script>
+    (function () {
+      var t = new URLSearchParams(location.search).get('theme');
+      if (!t && window.matchMedia) {
+        t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t || 'dark');
+    })();
+  </script>
+  <style>
+    /* self.theme_style first, then GUI-theme overrides */
+    :root { --background: #f6f7f9; --text: #1b1e23; --accent: #4c8dff; }
+    [data-theme="dark"] { --background: #15171c; --text: #e8eaed; --accent: #5a8dff; }
+  </style>
+</head>
+```
+
+Without the parameter (e.g. when opened in a new tab), fall back to
+`prefers-color-scheme` as shown above.
+
 Reference implementation: the shipped **death-counter** plugin (counter view
 with +1/+10/Reset buttons).
 

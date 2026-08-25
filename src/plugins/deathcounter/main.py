@@ -66,6 +66,11 @@ class DeathCounterPlugin(BasePlugin):
                 data.update(extra)
             self.publish_event(f"death.{event_type}", data)
 
+    def _push_count(self):
+        """Push the real counter value (BasePlugin.state is empty otherwise)."""
+        self.state = self._manager.get_data()
+        self.push_state()
+
     # -- command handlers ---------------------------------------------------
 
     def _on_death(self, args):
@@ -74,7 +79,7 @@ class DeathCounterPlugin(BasePlugin):
             if self._manager._count >= ms and ms not in self._milestones_sent:
                 self._milestones_sent.add(ms)
                 self._maybe_signal("milestone", {"milestone": ms})
-        self.push_state()
+        self._push_count()
 
     def _on_add_death(self, args):
         self._on_death(args)
@@ -83,7 +88,7 @@ class DeathCounterPlugin(BasePlugin):
         self._manager._count = 0
         self._milestones_sent.clear()
         self._manager.save()
-        self.push_state()
+        self._push_count()
 
     def _on_save_dims(self, args):
         self.save_window_state(
@@ -153,8 +158,25 @@ class DeathCounterPlugin(BasePlugin):
 <html>
 <head>
     <meta charset="UTF-8">
+    <script>
+        (function () {{
+            var t = new URLSearchParams(location.search).get('theme');
+            if (!t && window.matchMedia) {{
+                t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }}
+            document.documentElement.setAttribute('data-theme', t || 'dark');
+        }})();
+    </script>
     <style>
 {self.theme_style}
+        /* Dashboard follows the GUI light/dark theme; the plugin's
+           overlay colors above only apply to the overlay window. */
+        :root {{
+            --background: #f6f7f9; --text: #1b1e23; --accent: #4c8dff;
+        }}
+        [data-theme="dark"] {{
+            --background: #15171c; --text: #e8eaed; --accent: #5a8dff;
+        }}
         body {{
             background: var(--background); color: var(--text);
             font-family: 'Inter', system-ui, sans-serif;

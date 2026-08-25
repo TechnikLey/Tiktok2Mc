@@ -83,6 +83,37 @@ Da die Seite dieselbe Origin wie die API hat, funktionieren relative
 - `POST /api/v1/plugins/{name}/command` zum Auslösen eigener Command-Handler
 - `GET/PUT /api/v1/plugins/{name}/data[/{key}]` für den persistenten Store
 
+#### Dashboard-Seiten folgen dem GUI-Theme
+
+Das Web-Dashboard lädt Plugin-Seiten mit einem `?theme=dark|light`
+Query-Parameter und aktualisiert bereits geöffnete Tabs, wenn der Nutzer
+Hell/Dunkel umschaltet. Die Seite sollte den Parameter auslesen und
+entsprechende CSS-Variablen setzen, damit der Tab in beiden Modi lesbar
+bleibt (die Overlay-Farben aus dem `theme:`-Config-Abschnitt sind für das
+**Overlay-Fenster** gedacht, nicht für den Tab):
+
+```html
+<head>
+  <script>
+    (function () {
+      var t = new URLSearchParams(location.search).get('theme');
+      if (!t && window.matchMedia) {
+        t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t || 'dark');
+    })();
+  </script>
+  <style>
+    /* erst self.theme_style, dann die GUI-Theme-Overrides */
+    :root { --background: #f6f7f9; --text: #1b1e23; --accent: #4c8dff; }
+    [data-theme="dark"] { --background: #15171c; --text: #e8eaed; --accent: #5a8dff; }
+  </style>
+</head>
+```
+
+Ohne Parameter (z. B. beim Öffnen in einem neuen Tab) gilt der Fallback auf
+`prefers-color-scheme` wie oben gezeigt.
+
 Referenzimplementierung: das mitgelieferte **death-counter**-Plugin
 (Zähler-Ansicht mit +1/+10/Reset-Buttons).
 

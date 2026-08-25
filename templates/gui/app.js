@@ -2569,17 +2569,53 @@ function pluginPageViewId(name) {
   return PLUGIN_PAGE_PREFIX + name;
 }
 
+function _currentGuiTheme() {
+  return document.documentElement.getAttribute('data-theme') || 'dark';
+}
+
+function _pluginPageUrl(name, theme) {
+  let url = API + '/plugins/' + encodeURIComponent(name) + '/dashboard';
+  if (theme) url += '?theme=' + encodeURIComponent(theme);
+  return url;
+}
+
+function _retargetPluginFrames(theme) {
+  document.querySelectorAll('.plugin-page-frame').forEach(f => {
+    if (!f.dataset.pluginName) return;
+    const url = _pluginPageUrl(f.dataset.pluginName, theme);
+    if (f.src) {
+      f.src = url;
+    } else {
+      f.dataset.src = url;
+    }
+  });
+}
+
 function renderPluginPagesNav() {
-  document.querySelectorAll('.nav-item[data-plugin-page]').forEach(el => el.remove());
-  document.querySelectorAll('.view[data-plugin-page]').forEach(el => el.remove());
   const nav = document.querySelector('.sidebar-nav');
   const main = document.getElementById('dashboard');
   if (!nav || !main) return;
   const pages = currentPlugins.filter(p => p.dashboard_ui && p.enabled && !p.error);
+  const desiredIds = pages.map(p => pluginPageViewId(p.name));
+  const existingIds = [...nav.querySelectorAll('.nav-item[data-plugin-page]')]
+    .map(b => b.getAttribute('data-view'));
+  // Unchanged page set -> leave DOM alone so the active tab and any
+  // already-loaded plugin iframes survive the periodic loadPlugins() poll.
+  if (existingIds.length === desiredIds.length &&
+      desiredIds.every((id, i) => id === existingIds[i])) return;
+  const activeId = main.querySelector('.view.active[data-plugin-page]')?.id || null;
+  const frameSrcs = {};
+  main.querySelectorAll('.view[data-plugin-page]').forEach(v => {
+    const f = v.querySelector('iframe');
+    if (f && f.src) frameSrcs[v.id] = f.src;
+  });
+  document.querySelectorAll('.nav-item[data-plugin-page]').forEach(el => el.remove());
+  document.querySelectorAll('.view[data-plugin-page]').forEach(el => el.remove());
+  const theme = _currentGuiTheme();
   for (const p of pages) {
     const label = p.display_name || p.name;
     const viewId = pluginPageViewId(p.name);
-    const url = API + '/plugins/' + encodeURIComponent(p.name) + '/dashboard';
+    const url = _pluginPageUrl(p.name, theme);
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -2602,8 +2638,20 @@ function renderPluginPagesNav() {
       I18N.t('plugins.pageOpenExternal') + '</a></div>' +
       '<iframe class="plugin-page-frame" title="' + escapeHtml(label) + '" loading="lazy"></iframe>';
     const frame = view.querySelector('iframe');
-    if (frame) frame.dataset.src = url; // lazy-load on first open
+    frame.dataset.pluginName = p.name;
+    const prevSrc = frameSrcs['view-' + viewId];
+    if (prevSrc) {
+      frame.src = prevSrc; // keep already-loaded page instead of reloading
+    } else {
+      frame.dataset.src = url; // lazy-load on first open
+    }
     main.appendChild(view);
+  }
+  if (activeId) {
+    // Restore the previously active plugin tab after a rebuild
+    const vid = activeId.replace(/^view-/, '');
+    nav.querySelector(`.nav-item[data-view="${vid}"]`)?.classList.add('active');
+    document.getElementById(activeId)?.classList.add('active');
   }
 }
 
@@ -8809,6 +8857,7 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
   _updateThemeLabel(next);
+  _retargetPluginFrames(next);
 }
 
 function _updateThemeLabel(theme) {
