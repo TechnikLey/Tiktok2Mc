@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smaller Linux installer** — PyQt6 / QtWebEngine is bundled only into binaries that actually use the GUI (gui, overlay, plugins), and those share a single runtime under `core/runtime/` instead of each embedding a full WebEngine copy. `server`, `start`, `app`, `update` and `test_trigger` no longer carry any WebEngine code, cutting the installer size significantly.
 - **Win Counter overlay label** — the overlay text was changed from `Wins:` to `Score:` to avoid TikTok's word blacklist filtering out the overlay messages.
 - **Breaking: hooks receive a typed `HookContext`** — hook actions now get a structured context object and an always-string user parameter. Custom hooks may need small adjustments (see developer documentation).
+- **Dump Java Version** – Update the default Java version to 25 for support of the latest Minecraft versions.
 
 ### Removed
 
