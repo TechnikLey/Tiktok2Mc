@@ -109,7 +109,7 @@ class PluginEventBridge:
         self._subscriptions: dict[str, list[str]] = {}
         self._comment_handlers: dict[str, dict[str, Any]] = {}
         self._health = get_health_monitor()
-        self._health.register("plugin_event_bridge", HealthState.UNKNOWN)
+        self._health.register("plugin_event_bridge", HealthState.STARTING)
 
     # ------------------------------------------------------------------
     #  Declarations

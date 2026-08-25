@@ -312,7 +312,7 @@ class ProcessSupervisor:
         # Register with health monitor
         _health = get_health_monitor()
         _health.register("supervisor", HealthState.UNKNOWN)
-        _health.register("api_server", HealthState.UNKNOWN)
+        _health.register("api_server", HealthState.STARTING)
 
     # ------------------------------------------------------------------
     # State helpers

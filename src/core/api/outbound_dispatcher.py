@@ -157,7 +157,10 @@ def _parse_channel(entry: Any, defaults: dict[str, Any]) -> OutboundChannel | No
         return None
     name = str(entry.get("name") or "")
     url = str(entry.get("url") or "")
-    if not name or not url.startswith(("http://", "https://")):
+    enabled = bool(entry.get("enabled", True))
+    if not name:
+        return None
+    if enabled and not url.startswith(("http://", "https://")):
         return None
     events_raw = entry.get("events", ["*"])
     if not isinstance(events_raw, list):
@@ -180,7 +183,7 @@ def _parse_channel(entry: Any, defaults: dict[str, Any]) -> OutboundChannel | No
         events=events,
         fmt=fmt,
         template=str(entry.get("template", "")),
-        enabled=bool(entry.get("enabled", True)),
+        enabled=enabled,
         retries=retries,
         timeout=timeout,
         breaker=OverlayClient(name=name, max_fails=max_fails, cooldown=cooldown),

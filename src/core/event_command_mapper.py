@@ -48,7 +48,7 @@ class EventCommandMapper:
         self._history: deque[dict[str, Any]] = deque(maxlen=MAX_HISTORY)
         self._dispatch_counts: dict[str, int] = {}
         self._health = get_health_monitor()
-        self._health.register("event_command_mapper", HealthState.UNKNOWN)
+        self._health.register("event_command_mapper", HealthState.STARTING)
 
     # ------------------------------------------------------------------
     #  Config helpers
