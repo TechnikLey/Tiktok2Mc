@@ -113,9 +113,6 @@ so the tab stays readable in both modes (the plugin's overlay colors from the
 Without the parameter (e.g. when opened in a new tab), fall back to
 `prefers-color-scheme` as shown above.
 
-Reference implementation: the shipped **death-counter** plugin (counter view
-with +1/+10/Reset buttons).
-
 ```python
 class MyPlugin(BasePlugin):
     PLUGIN_NAME = "my-plugin"

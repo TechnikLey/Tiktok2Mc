@@ -114,9 +114,6 @@ bleibt (die Overlay-Farben aus dem `theme:`-Config-Abschnitt sind für das
 Ohne Parameter (z. B. beim Öffnen in einem neuen Tab) gilt der Fallback auf
 `prefers-color-scheme` wie oben gezeigt.
 
-Referenzimplementierung: das mitgelieferte **death-counter**-Plugin
-(Zähler-Ansicht mit +1/+10/Reset-Buttons).
-
 ```python
 class MyPlugin(BasePlugin):
     PLUGIN_NAME = "my-plugin"
