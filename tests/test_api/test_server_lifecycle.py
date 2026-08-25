@@ -15,7 +15,7 @@ def _status(ok: bool) -> java_utils.JavaStatus:
     return java_utils.JavaStatus(
         ok=False,
         reason="No Java found for the test environment.",
-        hints=["sudo apt install -y openjdk-21-jre-headless"],
+        hints=["sudo apt install -y openjdk-25-jre-headless"],
         auto_installable=True,
     )
 

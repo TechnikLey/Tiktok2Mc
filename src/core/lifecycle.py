@@ -142,6 +142,8 @@ class ManagedProcess:
     session_name: str | None = field(default=None)
     start_time: float = field(default=0.0)
     restart_count: int = field(default=0)
+    # Captured subprocess output file (Windows hidden / Linux non-session)
+    log_file: Path | None = field(default=None, repr=False)
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +153,19 @@ class ManagedProcess:
 
 def _sanitize_session_name(name: str) -> str:
     return name.replace(" ", "-").replace("/", "-").lower()
+
+
+def _read_log_tail(log_file: Path | None, max_lines: int = 30) -> str:
+    """Return the last *max_lines* lines from *log_file*, or empty string."""
+    if log_file is None:
+        return ""
+    try:
+        with log_file.open("r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+        tail = lines[-max_lines:]
+        return "".join(tail)
+    except (OSError, ValueError):
+        return ""
 
 
 def _update_process_health(proc_name: str, state: ProcessState) -> None:
@@ -532,13 +547,23 @@ class ProcessSupervisor:
                     # If the child already exited (e.g. missing server.jar),
                     # do not keep polling until the full readiness timeout.
                     if not await self._process_is_alive(proc):
-                        log.error(
-                            "[SUPERVISOR] %s exited before becoming ready (exit code %s). "
-                            "Its service stays unavailable, but the rest of the "
-                            "application continues to run.",
-                            name,
-                            proc.proc.returncode if proc.proc is not None else "?",
+                        exit_code = (
+                            proc.proc.returncode if proc.proc is not None else "?"
                         )
+                        log.error(
+                            "[SUPERVISOR] %s exited before becoming ready "
+                            "(exit code %s). Its service stays unavailable, "
+                            "but the rest of the application continues to run.",
+                            name,
+                            exit_code,
+                        )
+                        tail = _read_log_tail(proc.log_file)
+                        if tail:
+                            log.error(
+                                "[SUPERVISOR] %s output (last 30 lines):\n%s",
+                                name,
+                                tail,
+                            )
                         exited_early = True
                         break
                     await asyncio.sleep(1.0)
@@ -603,18 +628,37 @@ class ProcessSupervisor:
             raise FileNotFoundError(f"Executable not found: {cmd[0]}")
 
         if IS_WINDOWS:
-            kwargs: dict[str, Any] = {
-                "cwd": cwd,
-                "env": env,
-                "close_fds": True,
-            }
             flags = (
                 subprocess.CREATE_NO_WINDOW
                 if proc.hidden
                 else subprocess.CREATE_NEW_CONSOLE
             )
-            kwargs["creationflags"] = flags
-            proc.proc = await asyncio.to_thread(subprocess.Popen, cmd, **kwargs)
+            if proc.hidden:
+                log_dir = get_root_dir() / "logs"
+                log_dir.mkdir(parents=True, exist_ok=True)
+                proc.log_file = log_dir / f"{_sanitize_session_name(proc.name)}.log"
+
+                kwargs: dict[str, Any] = {
+                    "cwd": cwd,
+                    "env": env,
+                    "close_fds": True,
+                    "stdin": subprocess.DEVNULL,
+                    "creationflags": flags,
+                }
+
+                def _spawn_win_log() -> subprocess.Popen | None:
+                    with open(proc.log_file, "w", encoding="utf-8") as lf:  # type: ignore[arg-type]
+                        return subprocess.Popen(cmd, stdout=lf, stderr=lf, **kwargs)
+
+                proc.proc = await asyncio.to_thread(_spawn_win_log)
+            else:
+                kwargs = {
+                    "cwd": cwd,
+                    "env": env,
+                    "close_fds": True,
+                    "creationflags": flags,
+                }
+                proc.proc = await asyncio.to_thread(subprocess.Popen, cmd, **kwargs)
         elif self._session_tool == "tmux":
             session_name = _sanitize_session_name(f"mc-{proc.name}")
             await asyncio.to_thread(
@@ -655,6 +699,7 @@ class ProcessSupervisor:
             log_dir = get_root_dir() / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_file = log_dir / f"{_sanitize_session_name(proc.name)}.log"
+            proc.log_file = log_file
             kwargs = {"cwd": cwd, "env": env, "stdin": subprocess.DEVNULL}
 
             def _spawn_with_log() -> subprocess.Popen | None:
@@ -677,10 +722,11 @@ class ProcessSupervisor:
                 await asyncio.sleep(0.05)
                 if proc.proc.poll() is not None:
                     code = proc.proc.returncode
-                    raise _ProcessStartupError(
-                        f"{proc.name} exited immediately with code {code}",
-                        intentional=(code == 0),
-                    )
+                    tail = _read_log_tail(proc.log_file)
+                    msg = f"{proc.name} exited immediately with code {code}"
+                    if tail:
+                        msg += f"\n--- subprocess output (last 30 lines) ---\n{tail}"
+                    raise _ProcessStartupError(msg, intentional=(code == 0))
 
     async def start_all(self) -> dict[str, bool]:
         """Start all registered non-shell backend processes in parallel.

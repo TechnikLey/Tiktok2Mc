@@ -54,14 +54,14 @@ class TestVersionParsing:
         assert java_utils.java_is_usable(fake_java) is False
 
     def test_is_usable_ok(self, monkeypatch, fake_java):
-        monkeypatch.setattr(java_utils, "java_major_version", lambda p: 21)
+        monkeypatch.setattr(java_utils, "java_major_version", lambda p: 25)
         assert java_utils.java_is_usable(fake_java) is True
 
 
 def _no_java(monkeypatch):
     monkeypatch.setattr(java_utils, "_system_java_path", lambda: None)
     monkeypatch.setattr(java_utils, "_java_home_path", lambda: None)
-    monkeypatch.setattr(java_utils, "java_major_version", lambda p: 21)
+    monkeypatch.setattr(java_utils, "java_major_version", lambda p: 25)
     monkeypatch.setattr(java_utils, "java_version_string", lambda p: "21.0.2")
 
 
@@ -107,7 +107,7 @@ class TestDetect:
         shim.write_text("fake", encoding="utf-8")
         monkeypatch.setattr(java_utils, "_system_java_path", lambda: shim)
         monkeypatch.setattr(
-            java_utils, "java_major_version", lambda p: None if p == shim else 21
+            java_utils, "java_major_version", lambda p: None if p == shim else 25
         )
         monkeypatch.setattr(java_utils, "_java_home_path", lambda: fake_java)
         status = java_utils.detect_java(tmp_path)
@@ -232,7 +232,7 @@ class TestInstallWindows:
         monkeypatch.setattr(java_utils.zipfile, "ZipFile", FakeZip)
         ok, message = java_utils.install_java_windows(tmp_path)
         assert ok is True
-        assert "Java 21 downloaded and extracted" in message
+        assert "Java 25 downloaded and extracted" in message
         assert java_bin.exists()
 
 

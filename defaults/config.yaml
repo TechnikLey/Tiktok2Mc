@@ -137,8 +137,8 @@ mc_version: "1.21.11"
 java:
   # Custom Java executable path (optional).
   # If set, this path is used instead of searching the system PATH.
-  # Example: "C:\Program Files\Java\jdk-21\bin\java.exe" (Windows)
-  # Example: "/usr/lib/jvm/java-21-openjdk/bin/java" (Linux)
+  # Example: "C:\Program Files\Java\jdk-25\bin\java.exe" (Windows)
+  # Example: "/usr/lib/jvm/java-25-openjdk/bin/java" (Linux)
   path: ""
 
   # RAM allocation. 'G' = Gigabytes.

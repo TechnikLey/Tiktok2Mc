@@ -84,7 +84,7 @@ The harness only simulates the HTTP source (via `TIKTOK2MC_UPDATE_SOURCE`); ever
 | Tool | Required for | Installation |
 |------|-------------|--------------|
 | **git** | Clone, updates | Usually pre-installed |
-| **java** | Minecraft server | `sudo apt install openjdk-21-jre-headless` |
+| **java** | Minecraft server | `sudo apt install openjdk-25-jre-headless` |
 | **Node.js + npm** | `build.py vsix`, `build.py ci` | https://nodejs.org/ (>= 20) |
 | **@vscode/vsce** | `build.py vsix` | `npm install -g @vscode/vsce` |
 | **binutils** | PyInstaller on Linux | See below |

@@ -32,9 +32,9 @@ from ruamel.yaml.error import YAMLError
 
 log = logging.getLogger(__name__)
 
-MIN_JAVA_VERSION = 21
+MIN_JAVA_VERSION = 25
 
-# Default download sources (Adoptium Temurin 21 JRE, Windows x64) with real
+# Default download sources (Adoptium Temurin 25 JRE, Windows x64) with real
 # SHA256 checksums from the Adoptium API (api.adoptium.net). The newest GA
 # release is tried first, older ones are kept as fallback mirrors. If a URL is
 # updated, the checksum MUST be refreshed too - a mismatch aborts that mirror.
@@ -42,33 +42,33 @@ MIN_JAVA_VERSION = 21
 _JDK_SOURCES = [
     {
         "url": (
-            "https://github.com/adoptium/temurin21-binaries/releases/download/"
-            "jdk-21.0.12%2B8/OpenJDK21U-jre_x64_windows_hotspot_21.0.12_8.zip"
+            "https://github.com/adoptium/temurin25-binaries/releases/download/"
+            "jdk-25.0.4%2B7/OpenJDK25U-jre_x64_windows_hotspot_25.0.4_7.zip"
         ),
-        "sha256": "b8aa18fef5edb69bee8618f99677d66d0873d22cb40d974c15ac9ffcdecf73ba",
+        "sha256": "5b0d58f043f762fa3ee6cc12b6774b59b245cafdcb357e45ce61f822aa9a56cb",
     },
     {
         "url": (
-            "https://github.com/adoptium/temurin21-binaries/releases/download/"
-            "jdk-21.0.4%2B7/OpenJDK21U-jre_x64_windows_hotspot_21.0.4_7.zip"
+            "https://github.com/adoptium/temurin25-binaries/releases/download/"
+            "jdk-25.0.3%2B9/OpenJDK25U-jre_x64_windows_hotspot_25.0.3_9.zip"
         ),
-        "sha256": "b58f6117d26a138da4cb962b974efc4be4b88b65093366146965d16ad3c45e75",
+        "sha256": "a183e7280220ad5f6fe94ecbf025a5f10fc5797a0b18c600ed8f813c8158c530",
     },
     {
         "url": (
-            "https://github.com/adoptium/temurin21-binaries/releases/download/"
-            "jdk-21.0.3%2B9/OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip"
+            "https://github.com/adoptium/temurin25-binaries/releases/download/"
+            "jdk-25.0.2%2B10/OpenJDK25U-jre_x64_windows_hotspot_25.0.2_10.zip"
         ),
-        "sha256": "f79eaa741cb9ec4d20c7fd57a0fc52c715da183bc68eb19f4778b816b89ef003",
+        "sha256": "1919e7e1603bc5937187139db2d65824f8d95ef42d0423ae9f9f1d9eb97842f6",
     },
 ]
 
 # Linux package names and the bare install command per package manager.
 _LINUX_PACKAGES = {
-    "apt": "openjdk-21-jre-headless",
-    "dnf": "java-21-openjdk-headless",
+    "apt": "openjdk-25-jre-headless",
+    "dnf": "java-25-openjdk-headless",
     "pacman": "jre-openjdk",
-    "zypper": "java-21-openjdk-headless",
+    "zypper": "java-25-openjdk-headless",
 }
 
 _PM_INSTALL = {
@@ -80,10 +80,10 @@ _PM_INSTALL = {
 
 # Human-readable install commands shown to the user in the GUI/logs.
 INSTALL_HINTS = {
-    "apt": "sudo apt install -y openjdk-21-jre-headless",
-    "dnf": "sudo dnf install -y java-21-openjdk-headless",
+    "apt": "sudo apt install -y openjdk-25-jre-headless",
+    "dnf": "sudo dnf install -y java-25-openjdk-headless",
     "pacman": "sudo pacman -S --noconfirm jre-openjdk",
-    "zypper": "sudo zypper install -y java-21-openjdk-headless",
+    "zypper": "sudo zypper install -y java-25-openjdk-headless",
 }
 
 
@@ -217,16 +217,16 @@ def install_hints() -> list[str]:
     if platform.system() == "Windows":
         return ["Java is bundled automatically - use the Install Java button."]
     if platform.system() == "Darwin":
-        return ["brew install openjdk@21"]
+        return ["brew install openjdk@25"]
     pm = _package_manager()
     if pm in INSTALL_HINTS:
         return [INSTALL_HINTS[pm]]
     return [
-        "Ubuntu/Debian : sudo apt install openjdk-21-jre-headless",
-        "Fedora/RHEL   : sudo dnf install java-21-openjdk-headless",
+        "Ubuntu/Debian : sudo apt install openjdk-25-jre-headless",
+        "Fedora/RHEL   : sudo dnf install java-25-openjdk-headless",
         "Arch Linux    : sudo pacman -S jre-openjdk",
-        "openSUSE      : sudo zypper install java-21-openjdk-headless",
-        "macOS         : brew install openjdk@21",
+        "openSUSE      : sudo zypper install java-25-openjdk-headless",
+        "macOS         : brew install openjdk@25",
     ]
 
 
@@ -382,7 +382,7 @@ def _verify_checksum(file_path: Path, expected_sha256: str) -> bool:
 
 
 def install_java_windows(root_dir: Path) -> tuple[bool, str]:
-    """Download and extract a bundled Java 21 JRE into ``server/java``.
+    """Download and extract a bundled Java 25 JRE into ``server/java``.
 
     Returns ``(ok, message)``.  Never raises; errors are returned so callers
     (CLI and API) can surface them cleanly.
@@ -405,7 +405,7 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
         expected_sha256 = source["sha256"]
         try:
             log.info(
-                "Downloading OpenJDK 21 JRE for Windows (mirror %d/%d)...",
+                "Downloading OpenJDK 25 JRE for Windows (mirror %d/%d)...",
                 idx + 1,
                 len(_JDK_SOURCES),
             )
@@ -452,7 +452,7 @@ def install_java_windows(root_dir: Path) -> tuple[bool, str]:
             continue
 
         if java_is_usable(java_bin):
-            return True, f"Java 21 downloaded and extracted to {java_dir}"
+            return True, f"Java 25 downloaded and extracted to {java_dir}"
         return False, "Java download/extract completed but the runtime is not usable."
 
     # All mirrors failed
