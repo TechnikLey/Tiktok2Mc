@@ -1330,6 +1330,13 @@ async def main() -> None:
 
     # Start backend services.
     await supervisor.start_all()
+    # Start additional MC server instances that have auto_start enabled.
+    try:
+        from core.api.routes.server_lifecycle import auto_start_mc_instances
+
+        await auto_start_mc_instances()
+    except Exception as exc:
+        log.warning("[AUTO-START] Failed to auto-start MC instances: %s", exc)
     # Start GUI shell (if registered).
     await supervisor.start_shell()
 

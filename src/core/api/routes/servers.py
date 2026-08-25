@@ -290,7 +290,7 @@ DEFAULT_INSTANCES: dict[str, dict[str, Any]] = {
         "version": "1.21.11",
         "port": 25565,
         "enabled": True,
-        "auto_start": False,
+        "auto_start": True,
         "java_args": "",
     }
 }

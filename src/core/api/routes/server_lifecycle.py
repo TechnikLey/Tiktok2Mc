@@ -25,6 +25,60 @@ SERVER_PROCESS_NAME = "Minecraft Server"
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
+
+async def auto_start_mc_instances() -> None:
+    """Start all MC server instances that have ``auto_start: True``.
+
+    The default instance is already registered and started by the supervisor's
+    ``start_all()``.  This function handles non-default instances that need
+    dynamic registration before they can be started.
+    """
+    from core.api.routes.servers import _get_instance_dir, _load_instances
+
+    supervisor = get_supervisor()
+    instances = _load_instances()
+
+    for inst_id, inst_data in instances.items():
+        if not inst_data.get("auto_start", False):
+            continue
+        if not inst_data.get("enabled", True):
+            continue
+
+        pname = _proc_name(inst_id)
+
+        # Default instance is already registered — skip it
+        if supervisor.get(pname) is not None:
+            continue
+
+        # Non-default instance: dynamically register then start
+        instance_dir = _get_instance_dir(inst_id)
+        jar_path = instance_dir / "server.jar"
+        if not jar_path.exists():
+            log.warning(
+                "[AUTO-START] Instance '%s' has auto_start=True but no server.jar — skipping",
+                inst_id,
+            )
+            continue
+
+        port = inst_data.get("port", 25565)
+        try:
+            cmd = _build_server_cmd(instance_dir, port)
+            supervisor.register(
+                pname,
+                cmd,
+                cwd=instance_dir,
+                hidden=True,
+                readiness_check=make_minecraft_readiness_check(instance_dir),
+                readiness_timeout=120.0,
+            )
+            log.info(
+                "[AUTO-START] Registered and starting server instance '%s'", inst_id
+            )
+            await supervisor.start(pname)
+        except Exception as exc:
+            log.warning("[AUTO-START] Failed to start instance '%s': %s", inst_id, exc)
+
+
 # Background Java installation state, polled by the GUI.
 # Uses a dict keyed by install_id to avoid race conditions between concurrent requests.
 _JAVA_INSTALL: dict[str, dict] = {}

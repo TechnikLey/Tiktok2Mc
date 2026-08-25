@@ -1236,6 +1236,10 @@ function renderServerCard(inst) {
       </div>
     </div>
     <div class="server-card-footer">
+      <label class="server-auto-start-toggle" title="${I18N.t('servers.autoStartTooltip')}">
+        <input type="checkbox" ${inst.auto_start ? 'checked' : ''} onchange="toggleAutoStart('${instId}', this.checked)">
+        <span>${I18N.t('servers.autoStart')}</span>
+      </label>
       <button class="btn btn--sm btn--secondary" onclick="openServerSwitchModal()">Switch Version</button>
       <button class="btn btn--sm btn--secondary" onclick="openServerFolder('${instId}')">Open Folder</button>
       ${instId !== 'default' ? '<button class="btn btn--sm btn--danger-ghost" onclick="deleteServerInstance(\'' + escapeHtml(instId) + '\')" title="Delete server">Delete</button>' : ''}
@@ -1402,6 +1406,16 @@ async function updateServerLifecycleUI() {
     refreshConsoleInstanceSelector();
   } catch (e) {
     log('Server status poll failed: ' + e.message, 'err');
+  }
+}
+
+async function toggleAutoStart(instanceId, enabled) {
+  try {
+    await putJSON('/servers/instances/' + encodeURIComponent(instanceId), { auto_start: enabled });
+    showToast(I18N.t(enabled ? 'servers.autoStartEnabled' : 'servers.autoStartDisabled', { name: instanceId }), 'success');
+  } catch (e) {
+    showToast(I18N.t('servers.actionFailed', { msg: e.message }), 'error');
+    await loadServerManager();
   }
 }
 
@@ -3773,7 +3787,9 @@ async function wizardSave() {
     if (!cfg.tiktok) cfg.tiktok = {};
     cfg.tiktok.user = wizardData.tiktok_user;
     if (!cfg.rcon) cfg.rcon = {};
-    cfg.rcon.password = wizardData.rcon_password;
+    if (wizardData.rcon_password && wizardData.rcon_password !== '__REDACTED__') {
+      cfg.rcon.password = wizardData.rcon_password;
+    }
     cfg.rcon.enabled = true;
     await putJSON('/config', { config: cfg, backup: true });
     await postJSON('/reload', {});
