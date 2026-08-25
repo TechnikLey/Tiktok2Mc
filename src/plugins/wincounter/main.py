@@ -157,7 +157,7 @@ class WinCounterPlugin(BasePlugin):
 </head>
 <body>
     <div class="container">
-        <span>Wins:</span><span id="wins">0</span><span class="separator">|</span><span id="needed">10</span>
+        <span>Score:</span><span id="wins">0</span><span class="separator">|</span><span id="needed">10</span>
     </div>
     <div class="record-section">Record Low: <span id="record_low">0</span></div>
     <script>
