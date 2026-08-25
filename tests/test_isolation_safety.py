@@ -116,6 +116,7 @@ class TestNoProjectFilesModified:
                     "__pycache__",
                     ".tmp_path_factory",
                     "build",
+                    "node_modules",
                 ):
                     skip = True
                     break

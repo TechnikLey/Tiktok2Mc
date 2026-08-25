@@ -40,6 +40,9 @@ const appGlobals = {
 
 export default defineConfig([
   {
+    ignores: ["vendor/**"],
+  },
+  {
     files: ["**/*.{js,mjs,cjs}"],
     plugins: { js },
     extends: ["js/recommended"],

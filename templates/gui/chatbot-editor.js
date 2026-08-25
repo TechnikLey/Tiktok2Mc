@@ -261,6 +261,7 @@ class ChatbotEditor {
   /* ─── Webview login (desktop app only, CHATBOT.md §5) ─── */
 
   _hasWebviewLogin() {
+    if (typeof window === 'undefined') return false;
     const api = window.pywebview && window.pywebview.api;
     return !!(api && typeof api.open_tiktok_login === 'function');
   }
