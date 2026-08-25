@@ -163,7 +163,6 @@
     /* ── Status view ── */
     'status.title': 'Status',
     'status.system': 'System Status',
-    'status.pluginsHealth': 'Plugin Health',
     'status.loading': 'Loading...',
     'status.waitingData': 'Waiting for data...',
     'status.server': 'Server',
@@ -188,9 +187,10 @@
     'status.eventsPerMinute': 'Events/Min',
     'status.giftValueToday': 'Gift Value Today',
     'status.noLiveData': 'No live data available (bridge not connected)',
-    'status.densityLabel': 'Dashboard density',
-    'status.densitySpacious': 'Spacious',
-    'status.densityCompact': 'Compact',
+    'status.systemHealth': 'System Health',
+    'status.memory': 'Memory (RSS)',
+    'status.memoryPercent': 'Memory %',
+    'status.subsystems': 'Subsystems',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',
@@ -1243,7 +1243,6 @@
     /* ── Status view ── */
     'status.title': 'Status',
     'status.system': 'Systemstatus',
-    'status.pluginsHealth': 'Plugin-Status',
     'status.loading': 'Lädt...',
     'status.waitingData': 'Warte auf Daten...',
     'status.server': 'Server',
@@ -1268,9 +1267,10 @@
     'status.eventsPerMinute': 'Events/Min',
     'status.giftValueToday': 'Geschenk-Wert heute',
     'status.noLiveData': 'Keine Live-Daten verfügbar (Bridge nicht verbunden)',
-    'status.densityLabel': 'Dashboard-Dichte',
-    'status.densitySpacious': 'Aufgeräumt',
-    'status.densityCompact': 'Profi',
+    'status.systemHealth': 'Systemstatus',
+    'status.memory': 'Speicher (RSS)',
+    'status.memoryPercent': 'Speicher %',
+    'status.subsystems': 'Subsysteme',
 
     /* ── Plugins ── */
     'plugins.title': 'Plugins',

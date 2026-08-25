@@ -138,10 +138,6 @@
             <div class="view active" id="view-status">
                 <div class="view-header">
                     <h2 data-i18n="status.title">Status</h2>
-                    <div class="density-toggle" role="group" aria-label="Dashboard density" data-i18n-aria-label="status.densityLabel">
-                        <button type="button" class="density-btn" data-density="spacious" onclick="setStatusDensity('spacious')" data-i18n="status.densitySpacious">Spacious</button>
-                        <button type="button" class="density-btn" data-density="compact" onclick="setStatusDensity('compact')" data-i18n="status.densityCompact">Compact</button>
-                    </div>
                     <button class="btn-help" onclick="Help.openHelp('status')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
                 </div>
 
@@ -156,9 +152,9 @@
                 </section>
 
                 <section class="view-section">
-                    <h3 data-i18n="status.pluginsHealth">Plugin Health</h3>
-                    <div id="live-plugin-grid" class="plugin-health-grid"></div>
-                    <div id="live-plugin-empty" class="text-muted" style="margin-top:8px;font-size:var(--text-sm);" data-i18n="status.waitingData">Waiting for data...</div>
+                    <h3 data-i18n="status.systemHealth">System Health</h3>
+                    <div id="sys-health-grid" class="status-grid"></div>
+                    <div id="sys-health-empty" class="text-muted" style="margin-top:8px;font-size:var(--text-sm);" data-i18n="status.waitingData">Waiting for data...</div>
                 </section>
             </div>
 

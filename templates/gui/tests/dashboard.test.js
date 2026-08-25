@@ -265,13 +265,12 @@ describe('renderPluginManager', () => {
 
   it('renders plugin table rows', () => {
     currentPlugins = [
-      { name: 'spotify', enabled: true, version: '1.0', port: 29186, display_name: 'Spotify' },
+      { name: 'spotify', enabled: true, version: '1.0', display_name: 'Spotify' },
     ];
     renderPluginManager();
     const tableDiv = document.getElementById('plugin-manager-table');
     expect(tableDiv.innerHTML).toContain('spotify');
     expect(tableDiv.innerHTML).toContain('1.0');
-    expect(tableDiv.innerHTML).toContain('29186');
   });
 });
 

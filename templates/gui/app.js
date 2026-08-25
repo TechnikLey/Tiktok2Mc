@@ -77,6 +77,7 @@ let _shutdownCountdownInterval = null;
 let _shutdownCountdownValue = 30;
 let _healthIntervalId = null;
 let _statusIntervalId = null;
+let _systemHealthIntervalId = null;
 let _pluginsIntervalId = null;
 let _hooksIntervalId = null;
 let _closePollIntervalId = null;
@@ -92,6 +93,7 @@ let _serverActionInProgress = false;
 function _stopDashboardPolling() {
   if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
   if (_statusIntervalId) { clearInterval(_statusIntervalId); _statusIntervalId = null; }
+  if (_systemHealthIntervalId) { clearInterval(_systemHealthIntervalId); _systemHealthIntervalId = null; }
   if (_pluginsIntervalId) { clearInterval(_pluginsIntervalId); _pluginsIntervalId = null; }
   if (_hooksIntervalId) { clearInterval(_hooksIntervalId); _hooksIntervalId = null; }
   if (_uptimeIntervalId) { clearInterval(_uptimeIntervalId); _uptimeIntervalId = null; }
@@ -720,23 +722,6 @@ function _updateServerUptimeDisplay() {
   }
 }
 
-const STATUS_DENSITY_KEY = 'tiktok2mc_status_density';
-
-function setStatusDensity(mode) {
-  const target = mode === 'compact' ? 'compact' : 'spacious';
-  const view = document.getElementById('view-status');
-  if (view) view.classList.toggle('density-compact', target === 'compact');
-  document.querySelectorAll('.density-btn').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-density') === target);
-  });
-  try { localStorage.setItem(STATUS_DENSITY_KEY, target); } catch (_) {}
-}
-
-function _initStatusDensity() {
-  let saved = 'spacious';
-  try { saved = localStorage.getItem(STATUS_DENSITY_KEY) || 'spacious'; } catch (_) {}
-  setStatusDensity(saved === 'compact' ? 'compact' : 'spacious');
-}
 
 async function loadStatus() {
   try {
@@ -1578,8 +1563,8 @@ async function toggleMcPlugin(instanceId, pluginName, enable) {
       I18N.t('servers.mcPluginCriticalDisableTitle'),
       I18N.t('servers.mcPluginCriticalDisableConfirm', { name: pluginName }),
       I18N.t('common.disable'),
-      'btn-warning',
-      'text-warning'
+      'btn-danger',
+      'text-danger'
     );
     if (!confirmed) return;
   }
@@ -2547,7 +2532,7 @@ function renderPluginManager() {
     tableDiv.innerHTML = '<p class="muted">' + I18N.t('plugins.noPlugins') + '</p>';
     return;
   }
-  let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>Port</th><th>' + I18N.t('plugins.platform') + '</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+  let html = '<table class="plugin-table"><thead><tr><th>Name</th><th>Version</th><th>' + I18N.t('plugins.platform') + '</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
   for (const p of currentPlugins) {
     const status = getPluginStatus(p);
     const hasError = !!p.error;
@@ -2564,13 +2549,12 @@ function renderPluginManager() {
     html += `<tr${errorTitle}>
       <td data-label="Name">${escapeHtml(p.display_name || p.name)}${hasError ? ' <span class="status-error-indicator" title="' + escapeHtml(p.error) + '">⚠️</span>' : ''}</td>
       <td data-label="Version">${p.version || '-'}</td>
-      <td data-label="Port">${p.port || '-'}</td>
       <td data-label="${I18N.t('plugins.platform')}">${platformBadge}</td>
       <td data-label="Status"><span class="plugin-status ${status.cls}">${status.label}</span></td>
       <td data-label="Actions">${action} <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${editDisabled} onclick="pluginEditor.openInline('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">Edit Config</button> <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="openReadmeModal('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">Readme</button></td>
     </tr>`;
     if (hasError) {
-      html += `<tr class="error-detail-row"><td colspan="6"><span class="error-detail">${escapeHtml(p.error)}</span></td></tr>`;
+      html += `<tr class="error-detail-row"><td colspan="5"><span class="error-detail">${escapeHtml(p.error)}</span></td></tr>`;
     }
   }
   html += '</tbody></table>';
@@ -8266,8 +8250,6 @@ function connectLogStream() {
           _lastTiktokEventTime = Date.now();
           _updateTiktokStatusDisplay();
         }
-      } else if (type === 'dashboard.plugin_states') {
-        renderLivePluginGrid(payload.plugins || {});
       } else if (type === 'dashboard.ecm_diagnostics') {
         updateEcmDiagnostics(payload);
       } else if (type === 'chatbot.status') {
@@ -8303,15 +8285,14 @@ function connectLogStream() {
 
 /* ─── Live Dashboard Widgets ─── */
 
-let _livePluginData = {};
-
-function renderLivePluginGrid(plugins) {
-  _livePluginData = plugins;
-  const container = document.getElementById('live-plugin-grid');
-  const empty = document.getElementById('live-plugin-empty');
+function renderSystemHealth(data) {
+  const container = document.getElementById('sys-health-grid');
+  const empty = document.getElementById('sys-health-empty');
   if (!container) return;
-  const names = Object.keys(plugins);
-  if (!names.length) {
+
+  const states = data.states || {};
+  const names = Object.keys(states);
+  if (!names.length && data.running === undefined) {
     container.innerHTML = '';
     if (empty) empty.classList.remove('hidden');
     return;
@@ -8319,35 +8300,44 @@ function renderLivePluginGrid(plugins) {
   if (empty) empty.classList.add('hidden');
 
   let html = '';
-  for (const name of names) {
-    const p = plugins[name];
-    const health = p.health_status || 'unknown';
-    const enabled = p.enabled;
-    const hb = p.last_heartbeat;
-    let hbText = '—';
-    if (hb) {
-      const secs = Math.floor((Date.now() / 1000) - hb);
-      if (secs < 10) hbText = 'now';
-      else if (secs < 60) hbText = secs + 's ago';
-      else if (secs < 3600) hbText = Math.floor(secs / 60) + 'm ago';
-      else hbText = Math.floor(secs / 3600) + 'h ago';
+
+  // Memory card (if available via diagnostics)
+  if (data.memory) {
+    const rss = data.memory.rss_mb;
+    const pct = data.memory.percent;
+    const memCls = pct > 80 ? 'danger' : pct > 60 ? 'warning' : 'success';
+    html += '<div class="status-card"><span class="status-card__label">' + I18N.t('status.memory') + '</span><span class="status-card__value ' + memCls + '">' + (rss != null ? rss.toFixed(1) + ' MB' : '—') + '</span></div>';
+    if (pct != null) {
+      html += '<div class="status-card"><span class="status-card__label">' + I18N.t('status.memoryPercent') + '</span><span class="status-card__value ' + memCls + '">' + pct.toFixed(1) + '%</span></div>';
     }
-
-    let statusDot = 'dot-unknown';
-    let healthClass = 'health-unknown';
-    if (!enabled) { statusDot = 'dot-disabled'; healthClass = 'health-disabled'; }
-    else if (health === 'healthy') { statusDot = 'dot-healthy'; healthClass = 'health-healthy'; }
-    else if (health === 'unhealthy') { statusDot = 'dot-unhealthy'; healthClass = 'health-unhealthy'; }
-    else if (health === 'dead') { statusDot = 'dot-dead'; healthClass = 'health-dead'; }
-
-    html += `<div class="live-plugin-pill ${healthClass}">
-      <span class="live-plugin-dot ${statusDot}"></span>
-      <span class="live-plugin-name">${escapeHtml(p.display_name || name)}</span>
-      <span class="live-plugin-hb">${escapeHtml(hbText)}</span>
-    </div>`;
   }
-  container.className = 'plugin-health-grid';
+
+  // Subsystem cards
+  const stateLabels = { running: 'success', degraded: 'warning', failed: 'danger', starting: 'info', stopping: 'warning', stopped: '', unknown: '' };
+  for (const name of names) {
+    const state = states[name];
+    const cls = stateLabels[state] || '';
+    html += '<div class="status-card"><span class="status-card__label">' + escapeHtml(name) + '</span><span class="status-card__value' + (cls ? ' ' + cls : '') + '">' + escapeHtml(state) + '</span></div>';
+  }
+
+  // Summary line
+  if (data.running !== undefined) {
+    const summaryCls = data.failed > 0 ? 'danger' : data.degraded > 0 ? 'warning' : 'success';
+    html = '<div class="status-card"><span class="status-card__label">' + I18N.t('status.subsystems') + '</span><span class="status-card__value ' + summaryCls + '">' + data.running + '/' + data.total_components + '</span></div>' + html;
+  }
+
+  container.className = 'status-grid';
   container.innerHTML = html;
+}
+
+async function loadSystemHealth() {
+  try {
+    const data = await fetchJSON('/diagnostics/health');
+    renderSystemHealth(data);
+  } catch (_) {
+    const empty = document.getElementById('sys-health-empty');
+    if (empty) empty.classList.add('hidden');
+  }
 }
 
 function updateEcmDiagnostics(payload) {
@@ -8901,7 +8891,7 @@ document.addEventListener('i18n:changed', () => {
     editor.render();
   }
   loadStatus();
-  renderLivePluginGrid(_livePluginData);
+  loadSystemHealth();
   if (typeof reactionEditor !== 'undefined') {
     reactionEditor.renderSidebar();
     reactionEditor.renderList();
@@ -9223,9 +9213,9 @@ async function init() {
   _initEditorVisibilityObserver();
   _initSidebarReveal();
   _initMobileSidebar();
-  _initStatusDensity();
   await loadHealth();
   await loadStatus();
+  await loadSystemHealth();
   await loadConfig();
   await loadPlugins();
   // One-time hook discovery at startup, then periodic refresh is just the list
@@ -9241,6 +9231,7 @@ async function init() {
   if (!window.__TEST__) {
     _healthIntervalId = setInterval(loadHealth, 10000);
     _statusIntervalId = setInterval(loadStatus, 10000);
+    _systemHealthIntervalId = setInterval(loadSystemHealth, 10000);
     _pluginsIntervalId = setInterval(loadPlugins, 5000);
     _hooksIntervalId = setInterval(loadHooks, 10000);
     _uptimeIntervalId = setInterval(() => {
