@@ -1553,7 +1553,22 @@ function renderMcPluginsList(listEl, countEl, instanceId) {
   listEl.innerHTML = html;
 }
 
+const _CRITICAL_MC_PLUGINS = ['MinecraftServerAPI-1.21.x', 'DelayedTNT'];
+function _isCriticalMcPlugin(name) {
+  return _CRITICAL_MC_PLUGINS.includes(name);
+}
+
 async function toggleMcPlugin(instanceId, pluginName, enable) {
+  if (!enable && _isCriticalMcPlugin(pluginName)) {
+    const confirmed = await showConfirmDialog(
+      I18N.t('servers.mcPluginCriticalDisableTitle'),
+      I18N.t('servers.mcPluginCriticalDisableConfirm', { name: pluginName }),
+      I18N.t('common.disable'),
+      'btn-warning',
+      'text-warning'
+    );
+    if (!confirmed) return;
+  }
   try {
     const action = enable ? 'enable' : 'disable';
     const res = await postJSON('/server/' + encodeURIComponent(instanceId) + '/mc-plugins/' + encodeURIComponent(pluginName) + '/' + action);
@@ -1565,6 +1580,16 @@ async function toggleMcPlugin(instanceId, pluginName, enable) {
 }
 
 async function deleteMcPlugin(instanceId, pluginName) {
+  if (_isCriticalMcPlugin(pluginName)) {
+    const confirmed = await showConfirmDialog(
+      I18N.t('servers.mcPluginCriticalDeleteTitle'),
+      I18N.t('servers.mcPluginCriticalDeleteConfirm', { name: pluginName }),
+      I18N.t('common.delete'),
+      'btn-danger',
+      'text-danger'
+    );
+    if (!confirmed) return;
+  }
   const confirmed = await showConfirmDialog(
     I18N.t('servers.mcPluginDeleteTitle'),
     I18N.t('servers.mcPluginDeleteConfirm', { name: pluginName }),

@@ -149,8 +149,8 @@ def _build_server_cmd(instance_dir: Path, port: int) -> list[str]:
 def _build_status(proc) -> dict:
     if proc is None:
         return {
-            "status": "unknown",
-            "state": "unknown",
+            "status": "stopped",
+            "state": "stopped",
             "alive": False,
             "pid": None,
             "uptime": None,

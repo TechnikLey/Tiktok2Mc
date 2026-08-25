@@ -553,6 +553,7 @@ def cmd_app(args):
             OUT_DIR / "test",
             OUT_DIR / "logs",
             OUT_DIR / "server" / "default" / "plugins" / "MinecraftServerAPI",
+            OUT_DIR / "server" / "plugins_source" / "MinecraftServerAPI",
             OUT_DIR
             / "server"
             / "datapack"
@@ -561,6 +562,7 @@ def cmd_app(args):
             / "streamingtool"
             / "function",
             OUT_DIR / "server" / "default" / "plugins" / "DelayedTNT",
+            OUT_DIR / "server" / "plugins_source" / "DelayedTNT",
             OUT_DIR / "hooks",
             OUT_DIR / "docs",
         ]
@@ -1321,14 +1323,27 @@ def cmd_app(args):
                 "server/default/plugins/MinecraftServerAPI/config.yml",
             ),
             (
+                "defaults/configServerAPI.yml",
+                "server/plugins_source/MinecraftServerAPI/config.yml",
+            ),
+            (
                 "defaults/DelayedTNTconfig.yml",
                 "server/default/plugins/DelayedTNT/config.yml",
+            ),
+            (
+                "defaults/DelayedTNTconfig.yml",
+                "server/plugins_source/DelayedTNT/config.yml",
             ),
             (
                 "tools/MinecraftServerAPI-1.21.x.jar",
                 "server/default/plugins/MinecraftServerAPI-1.21.x.jar",
             ),
+            (
+                "tools/MinecraftServerAPI-1.21.x.jar",
+                "server/plugins_source/MinecraftServerAPI-1.21.x.jar",
+            ),
             ("tools/DelayedTNT.jar", "server/default/plugins/DelayedTNT.jar"),
+            ("tools/DelayedTNT.jar", "server/plugins_source/DelayedTNT.jar"),
             ("tools/server.jar", "server/default/server.jar"),
             ("tools/server.jar", "versions/1.21.11/server.jar"),
             ("tools/mca.vsix", "core/assets/mca.vsix"),

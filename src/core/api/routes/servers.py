@@ -140,6 +140,52 @@ def _sync_datapack_to_instance(instance_id: str) -> Path | None:
         return None
 
 
+def _sync_plugins_to_instance(instance_id: str) -> None:
+    """Copy required MC server plugins (MinecraftServerAPI, DelayedTNT) to *instance_id*.
+
+    Both plugins are essential for the TikTok-to-Minecraft bridge.  The JARs and
+    default configs are copied from the central ``server/plugins_source/`` directory
+    (like the datapack sync uses ``server/datapack/``).
+    """
+    src_root = get_servers_dir() / "plugins_source"
+    if not src_root.exists():
+        log.warning(
+            "[PLUGINS] Plugin source not found at %s — nothing to sync", src_root
+        )
+        return
+
+    plugins_dst = get_servers_dir() / instance_id / "plugins"
+    plugins_dst.mkdir(parents=True, exist_ok=True)
+
+    # (source_jar_name, config_dir_name, config_file_name)
+    _REQUIRED_PLUGINS: list[tuple[str, str, str]] = [
+        ("MinecraftServerAPI-1.21.x.jar", "MinecraftServerAPI", "config.yml"),
+        ("DelayedTNT.jar", "DelayedTNT", "config.yml"),
+    ]
+
+    for jar_name, cfg_dir, cfg_name in _REQUIRED_PLUGINS:
+        src_jar = src_root / jar_name
+        dst_jar = plugins_dst / jar_name
+        src_cfg = src_root / cfg_dir / cfg_name
+        dst_cfg_dir = plugins_dst / cfg_dir
+        dst_cfg = dst_cfg_dir / cfg_name
+
+        try:
+            if src_jar.exists() and not dst_jar.exists():
+                shutil.copy2(src_jar, dst_jar)
+                log.info("[PLUGINS] Copied %s to instance '%s'", jar_name, instance_id)
+            if src_cfg.exists() and not dst_cfg.exists():
+                dst_cfg_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_cfg, dst_cfg)
+        except OSError as exc:
+            log.warning(
+                "[PLUGINS] Failed to sync %s to instance '%s': %s",
+                jar_name,
+                instance_id,
+                exc,
+            )
+
+
 def _resolve_version_jar(version: str) -> Path | None:
     """Return the path to server.jar for an installed *version*.
 
@@ -227,7 +273,7 @@ def _get_server_status(instance_id: str = "default") -> str:
         proc_name = _instance_process_name(instance_id)
         proc = supervisor.get(proc_name)
         if proc is None:
-            return "unknown"
+            return "stopped"
         return proc.state.value
     except Exception:  # status reporting is best-effort
         return "stopped"
@@ -501,6 +547,9 @@ async def create_instance(body: CreateInstanceRequest):
 
     # Sync datapack from default server to the new instance
     _sync_datapack_to_instance(inst_id)
+
+    # Copy required MC server plugins (MinecraftServerAPI, DelayedTNT)
+    _sync_plugins_to_instance(inst_id)
 
     instances[inst_id] = {
         "name": body.name,

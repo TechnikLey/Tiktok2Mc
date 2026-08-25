@@ -558,6 +558,10 @@
     'servers.mcPluginUploading': 'Uploading {name}...',
     'servers.mcPluginUploaded': 'Plugin {name} uploaded',
     'servers.mcPluginUploadFailed': 'Upload failed: {msg}',
+    'servers.mcPluginCriticalDisableTitle': 'Disable critical plugin?',
+    'servers.mcPluginCriticalDisableConfirm': 'Plugin {name} is a required system plugin. Disabling it will break the Minecraft-TikTok bridge and features like gift triggers, comments, and RCON commands will stop working. Are you sure?',
+    'servers.mcPluginCriticalDeleteTitle': 'Delete critical plugin?',
+    'servers.mcPluginCriticalDeleteConfirm': 'Plugin {name} is a required system plugin. Deleting it will break the Minecraft-TikTok bridge and features like gift triggers, comments, and RCON commands will stop working. Are you sure?',
 
     /* ── Revenue ── */
     'revenue.title': 'Revenue',
@@ -1630,6 +1634,10 @@
     'servers.mcPluginUploading': 'Lade {name} hoch...',
     'servers.mcPluginUploaded': 'Plugin {name} hochgeladen',
     'servers.mcPluginUploadFailed': 'Upload fehlgeschlagen: {msg}',
+    'servers.mcPluginCriticalDisableTitle': 'Kritisches Plugin deaktivieren?',
+    'servers.mcPluginCriticalDisableConfirm': 'Plugin {name} ist ein erforderliches Systemplugin. Das Deaktivieren wird die Minecraft-TikTok-Brücke unterbrechen und Funktionen wie Gift-Trigger, Kommentare und RCON-Befehle funktionieren nicht mehr. Sind Sie sicher?',
+    'servers.mcPluginCriticalDeleteTitle': 'Kritisches Plugin löschen?',
+    'servers.mcPluginCriticalDeleteConfirm': 'Plugin {name} ist ein erforderliches Systemplugin. Das Löschen wird die Minecraft-TikTok-Brücke unterbrechen und Funktionen wie Gift-Trigger, Kommentare und RCON-Befehle funktionieren nicht mehr. Sind Sie sicher?',
 
     /* ── Revenue ── */
     'revenue.title': 'Einnahmen',
