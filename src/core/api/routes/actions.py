@@ -196,7 +196,7 @@ async def get_registered_scripts():
                         def register_action(self, name: str, fn) -> None:
                             HOOK_ACTIONS[name] = fn
 
-                        def for_hook(self, name: str) -> "_StubAPI":
+                        def for_hook(self, name: str, **_kw) -> "_StubAPI":
                             return self
 
                         def __getattr__(self, _name: str):
