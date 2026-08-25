@@ -892,6 +892,7 @@ async def check_and_run() -> None:
                             plugin_name,
                         )
                 else:
+                    proc.enabled = True
                     await supervisor.start(plugin_name)
 
             elif name.startswith("plugin_stop_"):
