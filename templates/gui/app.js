@@ -3639,22 +3639,22 @@ function openConfigEditor() {
 }
 
 async function loadConfig() {
-  const el = document.getElementById('config-summary');
-  if (!el) return;
   try {
     const data = await fetchJSON('/config');
     currentConfig = data.config || {};
-    const tiktok = currentConfig.tiktok || {};
-    const rcon = currentConfig.rcon || {};
-    el.innerHTML = `
-      <div class="field-row"><span>${I18N.t('wizard.tiktokUserLabel')}</span><span>${escapeHtml(tiktok.user || '—')}</span></div>
-      <div class="field-row"><span>${I18N.t('config.serverHost')}</span><span>${escapeHtml(currentConfig.server_host || '—')}</span></div>
-      <div class="field-row"><span>${I18N.t('config.rconEnabled')}</span><span>${rcon.enabled ? I18N.t('common.yes') : I18N.t('common.no')}</span></div>
-      <div class="field-row"><span>${I18N.t('config.controlMethod')}</span><span>${escapeHtml(currentConfig.control_method || '—')}</span></div>`;
   } catch (e) {
-    el.textContent = I18N.t('editor.loadFailedGeneric');
     log('Config load failed: ' + e.message, 'err');
+    return;
   }
+  const el = document.getElementById('config-summary');
+  if (!el) return;
+  const tiktok = currentConfig.tiktok || {};
+  const rcon = currentConfig.rcon || {};
+  el.innerHTML = `
+    <div class="field-row"><span>${I18N.t('wizard.tiktokUserLabel')}</span><span>${escapeHtml(tiktok.user || '—')}</span></div>
+    <div class="field-row"><span>${I18N.t('config.serverHost')}</span><span>${escapeHtml(currentConfig.server_host || '—')}</span></div>
+    <div class="field-row"><span>${I18N.t('config.rconEnabled')}</span><span>${rcon.enabled ? I18N.t('common.yes') : I18N.t('common.no')}</span></div>
+    <div class="field-row"><span>${I18N.t('config.controlMethod')}</span><span>${escapeHtml(currentConfig.control_method || '—')}</span></div>`;
 }
 
 /* ─── Wizard (preserved) ─── */
@@ -3666,15 +3666,15 @@ function isFirstRun(cfg) {
 function showWizard() {
   document.getElementById('wizard').classList.remove('hidden');
   document.getElementById('dashboard').classList.add('hidden');
-  const tiktokUser = (currentConfig.tiktok || {}).user || '';
-  const rconPassword = (currentConfig.rcon || {}).password || '';
-  const tiktokOk = tiktokUser && tiktokUser !== 'your_tiktok_username';
-  const rconOk = !!rconPassword;
+  const rawTiktokUser = (currentConfig.tiktok || {}).user || '';
+  const rawRconPassword = (currentConfig.rcon || {}).password || '';
+  const tiktokOk = rawTiktokUser && rawTiktokUser !== 'your_tiktok_username';
+  const rconOk = !!rawRconPassword;
   // Skip already-configured steps
   wizardStep = tiktokOk ? 1 : 0;
   wizardData = {
-    tiktok_user: tiktokUser,
-    rcon_password: rconPassword,
+    tiktok_user: tiktokOk ? rawTiktokUser : '',
+    rcon_password: rconOk ? rawRconPassword : '',
   };
   renderWizardStep();
 }
