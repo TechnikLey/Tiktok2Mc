@@ -3538,7 +3538,7 @@ class HookConfigEditor {
         } else if (Array.isArray(v)) {
           if (JSON.stringify(v) !== JSON.stringify(o)) changes.push({ path: p, old: JSON.stringify(o), new: JSON.stringify(v) });
         } else {
-          if (v !== o) changes.push({ path: p, old: o === undefined ? '(none)' : o, new: v === undefined ? '(none)' : v });
+          if (v !== o && !(o === undefined && v === '')) changes.push({ path: p, old: o === undefined ? '(none)' : o, new: v === undefined ? '(none)' : v });
         }
       }
     };
@@ -5268,7 +5268,6 @@ class ConfigEditor {
       this.original = JSON.parse(JSON.stringify(this.data));
       currentConfig = JSON.parse(JSON.stringify(this.data));
       this._updateSaveButton();
-      this.close();
       await loadConfig();
       await postJSON('/reload', {});
       if (rconPasswordSet) {
@@ -5296,7 +5295,7 @@ class ConfigEditor {
         } else if (Array.isArray(v)) {
           if (JSON.stringify(v) !== JSON.stringify(o)) changes.push({ path: p, old: JSON.stringify(o), new: JSON.stringify(v) });
         } else {
-          if (v !== o) changes.push({ path: p, old: o === undefined ? '(none)' : o, new: v === undefined ? '(none)' : v });
+          if (v !== o && !(o === undefined && v === '')) changes.push({ path: p, old: o === undefined ? '(none)' : o, new: v === undefined ? '(none)' : v });
         }
       }
     };
@@ -6124,7 +6123,7 @@ class PluginConfigEditor {
         } else if (Array.isArray(v)) {
           if (JSON.stringify(v) !== JSON.stringify(o)) changes.push({ path: p, old: JSON.stringify(o), new: JSON.stringify(v) });
         } else {
-          if (v !== o) changes.push({ path: p, old: o === undefined ? '(none)' : o, new: v === undefined ? '(none)' : v });
+          if (v !== o && !(o === undefined && v === '')) changes.push({ path: p, old: o === undefined ? '(none)' : o, new: v === undefined ? '(none)' : v });
         }
       }
     };
