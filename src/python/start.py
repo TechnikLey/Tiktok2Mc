@@ -1540,6 +1540,16 @@ if __name__ == "__main__":
 
     # Forensic: check if previous shutdown was clean
     _prev = shutdown_ctrl.consume_previous_shutdown()
+
+    # Clear the GUI shutdown marker — the new supervisor is now starting,
+    # so any previous GUI cleanup is done.
+    _marker = ROOT_DIR / "tmp" / "shutdown_pending"
+    try:
+        if _marker.exists():
+            _marker.unlink()
+            log.debug("Cleared shutdown marker from previous GUI.")
+    except OSError:
+        pass
     if _prev is not None:
         phase = _prev.get("phase", "unknown")
         reason = _prev.get("reason", "unknown")

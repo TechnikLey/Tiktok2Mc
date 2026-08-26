@@ -28,6 +28,9 @@ sys.modules["core.logger"].handle_unhandled_exception = MagicMock()
 from python.gui import (  # noqa: E402
     LauncherAPI,
     _api_ready,
+    _clear_shutdown_marker,
+    _shutdown_pending,
+    _write_shutdown_marker,
 )
 
 
@@ -154,6 +157,7 @@ class TestLauncherAPIStop:
         mock_proc.poll.return_value = None
         monkeypatch.setattr("python.gui._full_system_proc", mock_proc)
         monkeypatch.setattr("python.gui.IS_WINDOWS", True)
+        monkeypatch.setattr("python.gui._write_shutdown_marker", lambda: None)
 
         mock_run = MagicMock()
         monkeypatch.setattr("subprocess.run", mock_run)
@@ -167,11 +171,27 @@ class TestLauncherAPIStop:
         mock_proc.poll.return_value = None
         monkeypatch.setattr("python.gui._full_system_proc", mock_proc)
         monkeypatch.setattr("python.gui.IS_WINDOWS", False)
+        monkeypatch.setattr("python.gui._write_shutdown_marker", lambda: None)
 
         api = LauncherAPI()
         result = api.stop_system()
         assert result == "stopped"
         mock_proc.terminate.assert_called_once()
+
+    def test_stop_system_writes_marker(self, monkeypatch):
+        marker_written = []
+        monkeypatch.setattr(
+            "python.gui._write_shutdown_marker", lambda: marker_written.append(True)
+        )
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        monkeypatch.setattr("python.gui._full_system_proc", mock_proc)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
+        monkeypatch.setattr("subprocess.run", MagicMock())
+
+        api = LauncherAPI()
+        api.stop_system()
+        assert len(marker_written) == 1
 
 
 class TestLauncherAPICloseFlow:
@@ -282,3 +302,78 @@ class TestGuiStartup:
 
         assert len(opened_urls) == 1
         assert "/gui/index.html" in opened_urls[0]
+
+
+class TestShutdownMarker:
+    """Tests for the shutdown-pending marker file mechanism."""
+
+    def test_write_creates_marker(self, monkeypatch, tmp_path):
+        marker = tmp_path / "shutdown_pending"
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        _write_shutdown_marker()
+        assert marker.exists()
+        marker.unlink()
+
+    def test_write_contains_pid(self, monkeypatch, tmp_path):
+        import os
+
+        marker = tmp_path / "shutdown_pending"
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        _write_shutdown_marker()
+        assert marker.read_text() == str(os.getpid())
+        marker.unlink()
+
+    def test_clear_removes_marker(self, monkeypatch, tmp_path):
+        marker = tmp_path / "shutdown_pending"
+        marker.write_text("12345")
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        _clear_shutdown_marker()
+        assert not marker.exists()
+
+    def test_clear_noop_when_no_marker(self, monkeypatch, tmp_path):
+        marker = tmp_path / "nonexistent"
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        _clear_shutdown_marker()
+
+    def test_pending_returns_false_when_no_marker(self, monkeypatch, tmp_path):
+        marker = tmp_path / "nonexistent"
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        assert _shutdown_pending() is False
+
+    def test_pending_returns_true_when_pid_alive(self, monkeypatch, tmp_path):
+        import os
+
+        marker = tmp_path / "shutdown_pending"
+        marker.write_text(str(os.getpid()))
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        assert _shutdown_pending() is True
+        marker.unlink()
+
+    def test_pending_returns_false_when_pid_dead(self, monkeypatch, tmp_path):
+        marker = tmp_path / "shutdown_pending"
+        marker.write_text("9999999")
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        assert _shutdown_pending() is False
+
+    def test_main_opens_launcher_when_marker_exists(self, monkeypatch, tmp_path):
+        opened_urls = []
+
+        def mock_open(url, **kwargs):
+            opened_urls.append(url)
+
+        marker = tmp_path / "shutdown_pending"
+        import os
+
+        marker.write_text(str(os.getpid()))
+        monkeypatch.setattr("python.gui.SHUTDOWN_PENDING", marker)
+        monkeypatch.setattr("python.gui._open_window", mock_open)
+        monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
+        monkeypatch.setattr("python.gui._gui_already_running", lambda: False)
+        monkeypatch.setattr("sys.argv", ["gui.py"])
+
+        from python.gui import main
+
+        main()
+
+        assert len(opened_urls) == 1
+        assert "launcher.html" in opened_urls[0]

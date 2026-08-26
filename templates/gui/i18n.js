@@ -153,6 +153,7 @@
     'launcher.remoteFailed': 'Could not connect to remote instance: {msg}',
     'launcher.remoteInvalidHost': 'Please enter a valid IP address or hostname.',
     'launcher.remoteSaved': 'Remote address saved.',
+    'launcher.shutdownInProgress': 'Previous system is shutting down, please wait...',
 
     /* ── Restart banner ── */
     'restart.pending': 'Restart pending, some changes require a restart to take effect.',
@@ -1229,6 +1230,7 @@
     'launcher.remoteFailed': 'Verbindung zur Remote-Instanz fehlgeschlagen: {msg}',
     'launcher.remoteInvalidHost': 'Bitte gib eine gültige IP-Adresse oder Hostname ein.',
     'launcher.remoteSaved': 'Remote-Adresse gespeichert.',
+    'launcher.shutdownInProgress': 'Vorheriges System wird heruntergefahren, bitte warten...',
 
     /* ── Restart banner ── */
     'restart.pending': 'Neustart ausstehend, einige Änderungen erfordern einen Neustart.',

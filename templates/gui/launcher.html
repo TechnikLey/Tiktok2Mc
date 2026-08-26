@@ -351,6 +351,7 @@
         const API_URL = 'http://127.0.0.1:29185/api/v1/health';
         const GUI_URL = 'http://127.0.0.1:29185/gui/index.html';
         let isStarting = false;
+        let shutdownPoll = null;
 
         function setStatus(state, text) {
             const pill = document.getElementById('status-pill');
@@ -373,11 +374,49 @@
 
         async function checkApi() {
             try {
-                await fetch(API_URL, { method: 'GET', mode: 'cors', cache: 'no-store' });
+                await fetch(API_URL, { method: 'GET', mode: 'cors', cache: 'no-store', signal: AbortSignal.timeout(1000) });
                 return true;
             } catch (e) {
                 return false;
             }
+        }
+
+        async function isShuttingDown() {
+            try {
+                if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.get_shutdown_status) {
+                    const s = await pywebview.api.get_shutdown_status();
+                    return !!(s && s.shutting_down);
+                }
+            } catch (_) {}
+            return false;
+        }
+
+        function setShutdownMode(active) {
+            const btn = document.getElementById('btn-start');
+            const hint = document.getElementById('api-hint');
+            if (active) {
+                btn.disabled = true;
+                btn.textContent = I18N.t('launcher.startSystem');
+                setStatus('starting', I18N.t('common.starting') + '...');
+                hint.textContent = I18N.t('launcher.shutdownInProgress') || 'Previous system is shutting down, please wait...';
+                hint.style.display = 'block';
+            } else {
+                hint.style.display = 'none';
+            }
+        }
+
+        function startShutdownPoll() {
+            if (shutdownPoll) return;
+            shutdownPoll = setInterval(async () => {
+                if (!(await isShuttingDown())) {
+                    clearInterval(shutdownPoll);
+                    shutdownPoll = null;
+                    setShutdownMode(false);
+                    setButton(false);
+                    setStatus('offline', I18N.t('common.offline'));
+                    document.getElementById('api-hint').style.display = 'block';
+                }
+            }, 2000);
         }
 
         async function waitForApi(maxAttempts, onReady) {
@@ -460,15 +499,23 @@
             }
         }
 
-        // Initial check
-        checkApi().then(ready => {
+        // Initial check — shutdown-aware
+        (async function() {
+            // During a previous shutdown the API may still respond briefly.
+            // Check shutdown state first to avoid connecting to a dying instance.
+            if (await isShuttingDown()) {
+                setShutdownMode(true);
+                startShutdownPoll();
+                return;
+            }
+            const ready = await checkApi();
             if (ready) {
                 setStatus('online', I18N.t('common.running'));
                 window.location.href = GUI_URL;
             } else {
                 document.getElementById('api-hint').style.display = 'block';
             }
-        });
+        })();
 
         document.addEventListener('i18n:changed', () => {
             I18N.apply();

@@ -59,6 +59,7 @@ _full_system_proc = None
 _window = None
 
 GUI_LOCKFILE = (ROOT_DIR / "tmp" / "gui.lock").resolve()
+SHUTDOWN_PENDING = (ROOT_DIR / "tmp" / "shutdown_pending").resolve()
 
 # ── TikTok webview login (docs/CHATBOT.md §5, Variante B) ──
 TIKTOK_LOGIN_URL = "https://www.tiktok.com/login"
@@ -193,6 +194,22 @@ def _api_ready(timeout: float = 1.0) -> bool:
         return False
 
 
+def _api_reachable(timeout: float = 1.0) -> bool:
+    """Raw HTTP check — returns True if the API health endpoint responds.
+
+    Unlike :func:`_api_ready`, this ignores any in-progress shutdown state
+    and is used by the atexit cleanup handler which *must* reach the API
+    to request a graceful shutdown.
+    """
+    try:
+        with urllib.request.urlopen(
+            f"{API_URL}/api/v1/health", timeout=timeout
+        ) as resp:
+            return resp.status == 200
+    except OSError:
+        return False
+
+
 class LauncherAPI:
     """JS-accessible API for the launcher page.
 
@@ -297,6 +314,9 @@ class LauncherAPI:
         if _full_system_proc is None or _full_system_proc.poll() is not None:
             return "not_running"
 
+        # Write marker FIRST so a new GUI can detect the shutdown
+        _write_shutdown_marker()
+
         # Prefer graceful shutdown through the API.
         try:
             req = urllib.request.Request(
@@ -340,6 +360,14 @@ class LauncherAPI:
         if _full_system_proc is not None and _full_system_proc.poll() is None:
             return "starting"
         return "offline"
+
+    def get_shutdown_status(self) -> dict[str, Any]:
+        """Return whether a previous supervisor shutdown is still in progress.
+
+        The launcher calls this to decide whether to enable the Start button.
+        Returns ``{"shutting_down": True/False}``.
+        """
+        return {"shutting_down": _shutdown_pending()}
 
     # ---- TikTok webview login ----
     def open_tiktok_login(self) -> str:
@@ -421,6 +449,10 @@ def _cleanup_processes():
         log.debug("Cleanup: no managed process to stop, skipping.")
         return
 
+    # Write marker FIRST — before any async shutdown request.
+    # A new GUI checks this file to know a shutdown is in progress.
+    _write_shutdown_marker()
+
     log.info(
         "Cleanup: managed process (PID %s) still running, attempting graceful shutdown.",
         _full_system_proc.pid,
@@ -428,7 +460,7 @@ def _cleanup_processes():
 
     # Only send shutdown request if the API is actually reachable.
     # If the API is already down, skip the request and force-kill directly.
-    api_was_running = _api_ready(timeout=1.0)
+    api_was_running = _api_reachable(timeout=1.0)
     if api_was_running:
         try:
             req = urllib.request.Request(
@@ -519,6 +551,58 @@ def _gui_already_running() -> bool:
         return False
 
 
+def _write_shutdown_marker() -> None:
+    """Write a marker file BEFORE initiating shutdown.
+
+    This is called from stop_system() and _cleanup_processes() to signal
+    to a future GUI instance that a shutdown is about to happen.  The
+    marker is written synchronously BEFORE any asynchronous shutdown
+    request, so there is no race condition.
+    """
+    try:
+        SHUTDOWN_PENDING.parent.mkdir(parents=True, exist_ok=True)
+        SHUTDOWN_PENDING.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError as exc:
+        log.warning("Failed to write shutdown marker: %s", exc)
+
+
+def _clear_shutdown_marker() -> None:
+    """Remove the shutdown marker file."""
+    try:
+        if SHUTDOWN_PENDING.exists():
+            SHUTDOWN_PENDING.unlink()
+    except OSError:
+        pass
+
+
+def _shutdown_pending() -> bool:
+    """Return True if a shutdown marker exists and the PID that wrote it
+    is still alive (meaning the old GUI's cleanup is still running).
+
+    If the PID is dead, the marker is stale and gets cleaned up.
+    """
+    if not SHUTDOWN_PENDING.exists():
+        return False
+    try:
+        pid = int(SHUTDOWN_PENDING.read_text().strip())
+        if IS_WINDOWS:
+            import ctypes
+
+            handle = ctypes.windll.kernel32.OpenProcess(0x0400, False, pid)
+            if handle:
+                ctypes.windll.kernel32.CloseHandle(handle)
+                return True
+            # PID dead → stale marker, clean it up
+            _clear_shutdown_marker()
+            return False
+        else:
+            os.kill(pid, 0)
+            return True
+    except (OSError, ValueError):
+        _clear_shutdown_marker()
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="TikTok2Mc GUI")
     parser.add_argument("--gui-hidden", action="store_true", help="Run without window")
@@ -536,8 +620,12 @@ def main() -> None:
 
     log.info("Starting GUI launcher...")
 
-    # If API is already running, go straight to the full dashboard
-    if _api_ready(timeout=2.0):
+    # If a previous supervisor is still shutting down, skip the API check
+    # entirely and go straight to the launcher — the JS side will detect
+    # the shutdown state, disable the Start button, and wait.
+    if _shutdown_pending():
+        log.info("Shutdown marker found — showing launcher")
+    elif _api_ready(timeout=1.0):
         log.info("API server already running — opening dashboard at %s", GUI_URL)
         _open_window(GUI_URL, is_launcher=False)
         return
