@@ -1488,6 +1488,7 @@ def validate_like_triggers(raw_triggers: object) -> list[dict]:
             log.warning("[CONFIG] 'tiktok.like_triggers' must be a list — ignored")
         return valid_triggers
 
+    log.info(f"[LIKE DEBUG] validate_like_triggers called: raw_triggers={raw_triggers}")
     for i, rule in enumerate(raw_triggers):
         if not isinstance(rule, dict):
             log.info(
@@ -1541,6 +1542,9 @@ def validate_like_triggers(raw_triggers: object) -> list[dict]:
             }
         )
 
+    log.info(
+        f"[LIKE DEBUG] Validated {len(valid_triggers)} like triggers: {[r['id'] for r in valid_triggers]}"
+    )
     return valid_triggers
 
 
@@ -1551,11 +1555,19 @@ def prepare_like_triggers(raw_triggers: list[dict]) -> list[dict]:
     fires each function exactly once per crossed milestone.
     """
     prepared: list[dict] = []
+    log.info(
+        f"[LIKE DEBUG] prepare_like_triggers called: raw_triggers={len(raw_triggers)}, valid_functions={len(ctx.valid_functions)}"
+    )
     for rule in raw_triggers:
         if not rule.get("enabled", True):
+            log.info(
+                f"[LIKE DEBUG] Skipping rule {rule.get('id', 'unknown')}: disabled"
+            )
             continue
         if rule["function"] not in ctx.valid_functions:
-            log.info(f"[CONFIG ERROR] Unknown function: {rule['function']}")
+            log.info(
+                f"[CONFIG ERROR] Unknown function: {rule['function']} (available: {sorted(ctx.valid_functions)})"
+            )
             continue
         prepared.append(
             {
@@ -1566,6 +1578,9 @@ def prepare_like_triggers(raw_triggers: list[dict]) -> list[dict]:
                 "last_blocks": 0,
             }
         )
+    log.info(
+        f"[LIKE DEBUG] Prepared {len(prepared)} like triggers: {[r['id'] for r in prepared]}"
+    )
     return prepared
 
 
@@ -1596,14 +1611,22 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
     action in actions.mca never enqueue.
     """
     rules = ctx.like_triggers
+    log.info(
+        f"[LIKE DEBUG] _enqueue_like_triggers called: total_since_start={total_since_start}, username={username}, rules={len(rules)}"
+    )
     if not rules:
+        log.info("[LIKE DEBUG] No like_triggers configured, returning")
         return
     with ctx.like_lock:
         for rule in rules:
             every = rule["every"]
             if every <= 0:
+                log.info(f"[LIKE DEBUG] Skipping rule {rule['id']}: every={every} <= 0")
                 continue
             blocks = total_since_start // every
+            log.info(
+                f"[LIKE DEBUG] Rule '{rule['id']}': every={every}, total_since_start={total_since_start}, blocks={blocks}, last_blocks={rule['last_blocks']}"
+            )
             if blocks > rule["last_blocks"]:
                 diff = blocks - rule["last_blocks"]
                 rule["last_blocks"] = blocks
@@ -1626,6 +1649,10 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
                         ),
                         label=f"like:{rule['id']}",
                     )
+            else:
+                log.info(
+                    f"[LIKE DEBUG] Rule '{rule['id']}' not triggered: blocks ({blocks}) <= last_blocks ({rule['last_blocks']})"
+                )
 
 
 def _process_comment_command(
@@ -2320,6 +2347,9 @@ def create_client(user):
                 ctx._last_like_total = event.total
                 ctx.session_likes = 0
                 log.info(f"[LIKE] Initial count set: {ctx.start_likes}")
+                log.info(
+                    f"[LIKE DEBUG] event.total={event.total}, start_likes={ctx.start_likes}, session_likes={ctx.session_likes}"
+                )
                 return
             # TikTok's cumulative count can rewind / reset mid-stream, so only
             # accumulate positive deltas (real new likes) instead of comparing
@@ -2329,6 +2359,9 @@ def create_client(user):
                 ctx._last_like_total, event.total, ctx.session_likes
             )
             total_since_start = ctx.session_likes
+            log.info(
+                f"[LIKE DEBUG] event.total={event.total}, _last_like_total={ctx._last_like_total}, session_likes={ctx.session_likes}, total_since_start={total_since_start}, like_triggers={len(ctx.like_triggers)}"
+            )
             try:
                 now = time.time()
                 # Throttle like events to ~1 per 3 seconds
@@ -2338,8 +2371,15 @@ def create_client(user):
                     _publish_tiktok_event(
                         "like", username or "unknown", delta=delta, total=event.total
                     )
+                    log.info(
+                        f"[LIKE DEBUG] Calling _enqueue_like_triggers with total_since_start={total_since_start}, username={username}"
+                    )
                     _enqueue_like_triggers(total_since_start, username)
                     ctx._last_like_event = now
+                else:
+                    log.info(
+                        f"[LIKE DEBUG] Throttled: now={now}, _last_like_event={ctx._last_like_event}, diff={now - ctx._last_like_event:.2f}s"
+                    )
             except Exception as e:  # TikTok event handler must not crash the client
                 log.error(f"[EVENT ERROR] Error in like handling: {e}")
                 get_crash_manager().report_exception(
