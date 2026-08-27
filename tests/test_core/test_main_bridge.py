@@ -99,6 +99,66 @@ class TestGetSafeUsername:
 
 
 # =========================================================================
+# Safe event.user access (TikTokLive incompatibilities must not kill the loop)
+# =========================================================================
+
+
+class _BreakingUserEvent:
+    """Mirrors TikTokLive proto_events where accessing ``event.user`` throws
+    (e.g. ``ExtendedUser.from_user`` hitting a ``nickName`` field the installed
+    proto model does not know)."""
+
+    @property
+    def user(self):
+        raise TypeError("User.__init__() got an unexpected keyword argument 'nickName'")
+
+
+class _GoodUserEvent:
+    def __init__(self, unique_id="gooduser", nickname="Good User"):
+        self.user = SimpleNamespace(unique_id=unique_id, nickname=nickname)
+
+
+class TestUserAttrSafe:
+    def test_returns_default_when_event_user_raises(self):
+        from src.python.main import user_attr_safe
+
+        event = _BreakingUserEvent()
+        assert user_attr_safe(event, "unique_id", "fallback") == "fallback"
+
+    def test_returns_attribute_when_user_ok(self):
+        from src.python.main import user_attr_safe
+
+        event = _GoodUserEvent(unique_id="gooduser")
+        assert user_attr_safe(event, "unique_id", "fallback") == "gooduser"
+
+    def test_returns_default_when_attr_missing(self):
+        from src.python.main import user_attr_safe
+
+        event = _GoodUserEvent()
+        assert user_attr_safe(event, "is_moderator", False) is False
+
+
+class TestUsernameFromEventSafe:
+    def test_unknown_when_event_user_raises(self):
+        from src.python.main import username_from_event_safe
+
+        event = _BreakingUserEvent()
+        assert username_from_event_safe(event) == "Unknown"
+
+    def test_custom_default_when_event_user_raises(self):
+        from src.python.main import username_from_event_safe
+
+        event = _BreakingUserEvent()
+        assert username_from_event_safe(event, default=None) is None
+
+    def test_uses_unique_id_when_user_ok(self):
+        from src.python.main import username_from_event_safe
+
+        event = _GoodUserEvent(unique_id="gooduser")
+        assert username_from_event_safe(event) == "gooduser"
+
+
+# =========================================================================
 # Webhook handling
 # =========================================================================
 
@@ -1083,6 +1143,42 @@ class TestEnqueueLikeTriggers:
         }
         monkeypatch.setattr(ctx, "valid_functions", {"likes"})
         assert prepare_like_triggers([rule]) == []
+
+
+class TestUpdateLikeTotals:
+    """_update_like_totals — robust accumulation of TikTok's oscillating count."""
+
+    def _call(self, previous, new, session):
+        from src.python.main import _update_like_totals
+
+        return _update_like_totals(previous, new, session)
+
+    def test_first_reading_sets_floor(self):
+        # previous=None: just record the new total, session unchanged.
+        assert self._call(None, 58157, 0) == (0, 58157)
+
+    def test_positive_delta_accumulates(self):
+        assert self._call(58157, 58200, 0) == (43, 58200)  # +43 new likes
+
+    def test_rewind_adds_nothing_and_moves_floor(self):
+        # total drops (mid-stream baseline reload): no new likes, floor moves.
+        assert self._call(58157, 58117, 0) == (0, 58117)
+
+    def test_rewind_then_growth_counts_only_new(self):
+        session, floor = self._call(58157, 58117, 0)
+        assert (session, floor) == (0, 58117)
+        session, floor = self._call(floor, 58217, session)  # +100 real
+        assert (session, floor) == (100, 58217)
+
+    def test_never_negative(self):
+        session, floor = 0, 58157
+        for total in (58117, 58000, 57999):
+            session, floor = self._call(floor, total, session)
+        assert session >= 0
+        assert floor == 57999
+
+    def test_equal_total_is_noop(self):
+        assert self._call(500, 500, 10) == (10, 500)
 
 
 class TestValidateLikeTriggers:

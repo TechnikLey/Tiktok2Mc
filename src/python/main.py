@@ -80,6 +80,7 @@ from core.yaml_utils import load_yaml
 
 log = initialize_logging(__name__)
 
+
 # ==========================================
 # CONFIGURATION & PATHS
 # ==========================================
@@ -147,6 +148,7 @@ class BotContext:
         self.namespace = "streamingtool"
         self.actions_valid = True
         self.start_likes = None
+        self._last_like_total = None
         self._last_like_event = 0.0
         self.like_triggers: list[dict] = []
         self.valid_functions = set()
@@ -980,7 +982,24 @@ async def execute_global_command(
     name = sanitize_filename(trigger_name)
 
     if name not in ctx.valid_functions:
+        _dbg(
+            "TRIGGER '%s' NOT in valid_functions (user=%s) — dropped. valid_contains[%s]",
+            trigger_name,
+            source_user,
+            trigger_name in ctx.valid_functions,
+        )
         return
+    _dbg(
+        "TRIGGER dispatch: name=%s user=%s depth=%d overlay=%s script=%s vanilla=%s rcon=%s shell=%s",
+        name,
+        source_user,
+        chain_depth,
+        name in ctx.overlay_actions,
+        name in ctx.script_actions,
+        name in ctx.vanilla_functions,
+        name in ctx.rcon_only_actions,
+        name in ctx.shell_actions_cache,
+    )
 
     user_display = source_user
 
@@ -1315,6 +1334,7 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
     """
     _record_metrics_event()
     data = {"user": user, **extra}
+    _dbg("PUBLISH tiktok.%s data=%s", event_type, data)
     _run_in_background(_notify_hooks_of_event, f"tiktok.{event_type}", data)
     body = json.dumps({"type": f"tiktok.{event_type}", "data": data}).encode("utf-8")
     _run_in_background(_post_tiktok_event_api, body)
@@ -1570,6 +1590,24 @@ def prepare_like_triggers(raw_triggers: list[dict]) -> list[dict]:
     return prepared
 
 
+def _update_like_totals(
+    previous_total: int | None, new_total: int, session_likes: int
+) -> tuple[int, int]:
+    """Accumulate real new likes from TikTok's cumulative count.
+
+    TikTok can rewind / reset the total mid-stream (a baseline reload), so
+    only positive deltas count as new likes. ``previous_total`` is the last
+    reported total (``None`` on first reading); returns ``(session_likes,
+    last_total)`` such that the accumulated value never goes negative.
+    """
+    if previous_total is None:
+        return session_likes, new_total
+    diff = new_total - previous_total
+    if diff > 0:
+        session_likes += diff
+    return session_likes, new_total
+
+
 def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None:
     """Enqueue configured like triggers at their 'every' milestones.
 
@@ -1579,6 +1617,12 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
     action in actions.mca never enqueue.
     """
     rules = ctx.like_triggers
+    _dbg(
+        "ENQUEUE-LIKE total_since_start=%d n_rules=%d valid_functions_count=%d",
+        total_since_start,
+        len(rules),
+        len(ctx.valid_functions),
+    )
     if not rules:
         return
     with ctx.like_lock:
@@ -1587,6 +1631,15 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
             if every <= 0:
                 continue
             blocks = total_since_start // every
+            _dbg(
+                "  like rule id=%s every=%s blocks=%s last_blocks=%s fn=%s in_valid=%s",
+                rule["id"],
+                every,
+                blocks,
+                rule["last_blocks"],
+                rule["function"],
+                rule["function"] in ctx.valid_functions,
+            )
             if blocks > rule["last_blocks"]:
                 diff = blocks - rule["last_blocks"]
                 rule["last_blocks"] = blocks
@@ -2180,6 +2233,28 @@ def get_safe_username(user):
     return name
 
 
+def user_attr_safe(event, name, default=None):
+    """Access an event's user attribute without letting TikTokLive's
+    ``ExtendedUser.from_user`` raise. TikTok's user payload may include fields
+    (e.g. ``nickName``) that the installed proto model does not know, which
+    makes ``event.user`` itself throw a TypeError. Any single bad event must
+    never kill the WebSocket loop, so resolve the user defensively.
+    """
+    try:
+        user = event.user
+    except Exception:
+        return default
+    return getattr(user, name, default)
+
+
+def username_from_event_safe(event, default: str | None = "Unknown"):
+    return (
+        user_attr_safe(event, "unique_id", None)
+        or user_attr_safe(event, "nickname", None)
+        or default
+    )
+
+
 # ==========================================
 # TIKTOK CLIENT
 # ==========================================
@@ -2187,6 +2262,18 @@ def get_safe_username(user):
 
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
+
+    # A single event-handler exception must never tear down the WebSocket
+    # reader loop. pyee re-emits handler errors as an "error" event; without a
+    # listener that propagation kills the whole stream (silence after the
+    # initial burst). Registering a handler keeps the loop alive.
+    def _on_client_event_error(exc):
+        log.error("TikTok event handler error (recovered, loop kept alive): %s", exc)
+        get_crash_manager().report_exception(
+            TIKTOK_0003, exc=exc, context_info={"source": "client_event_handler"}
+        )
+
+    client.add_listener("error", _on_client_event_error)
 
     _connect_time = [None]
     COMMENT_WARMUP_SECONDS = 1
@@ -2196,6 +2283,10 @@ def create_client(user):
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
+        _dbg(
+            "HANDLER on_gift fired (combo=%s)",
+            bool(getattr(event.gift, "combo", False)),
+        )
         try:
             if event.gift.combo:
                 if getattr(event, "streaking", False):
@@ -2213,7 +2304,7 @@ def create_client(user):
                 ctx.session_gift_value_usd += event.value
                 ctx.session_gifts += count
 
-            username = get_safe_username(event.user)
+            username = username_from_event_safe(event)
             _publish_tiktok_event(
                 "gift", username, gift_name=gift_name, gift_id=gift_id, count=count
             )
@@ -2250,7 +2341,8 @@ def create_client(user):
     # =========================
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
-        username = get_safe_username(event.user)
+        _dbg("HANDLER on_follow fired")
+        username = username_from_event_safe(event)
         ctx.session_follows += 1
         _publish_tiktok_event("follow", username)
         _process_follow(username)
@@ -2260,15 +2352,33 @@ def create_client(user):
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
-        username = get_safe_username(event.user) if hasattr(event, "user") else None
+        _dbg(
+            "HANDLER on_like fired total=%s start_likes=%s last_like_total=%s "
+            "session_likes=%d last_like_event=%.1f",
+            getattr(event, "total", "?"),
+            ctx.start_likes,
+            ctx._last_like_total,
+            ctx.session_likes,
+            ctx._last_like_event,
+        )
+        username = username_from_event_safe(event, default=None)
         if username:
             _publish_tiktok_event("like", username)
         with ctx.like_lock:
             if ctx.start_likes is None:
                 ctx.start_likes = event.total
+                ctx._last_like_total = event.total
+                ctx.session_likes = 0
                 log.info(f"[LIKE] Initial count set: {ctx.start_likes}")
                 return
-            total_since_start = event.total - ctx.start_likes
+            # TikTok's cumulative count can rewind / reset mid-stream, so only
+            # accumulate positive deltas (real new likes) instead of comparing
+            # to a one-time baseline — otherwise total_since_start goes
+            # negative and milestones never fire.
+            ctx.session_likes, ctx._last_like_total = _update_like_totals(
+                ctx._last_like_total, event.total, ctx.session_likes
+            )
+            total_since_start = ctx.session_likes
             try:
                 now = time.time()
                 # Throttle like events to ~1 per 3 seconds
@@ -2291,7 +2401,8 @@ def create_client(user):
     # ========================
     @client.on(JoinEvent)
     def on_join(event):
-        username = get_safe_username(event.user)
+        _dbg("HANDLER on_join fired")
+        username = username_from_event_safe(event)
         ctx.session_joins += 1
         _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
@@ -2308,9 +2419,11 @@ def create_client(user):
             _connect_time[0] is None
             or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS
         ):
+            _dbg("HANDLER on_comment during warmup — skipped")
             return
 
-        username = get_safe_username(event.user)
+        _dbg("HANDLER on_comment fired")
+        username = username_from_event_safe(event)
         ctx.session_comments += 1
         comment_text = getattr(event, "comment", "")
         _publish_tiktok_event("comment", username, comment=comment_text)
@@ -2318,9 +2431,9 @@ def create_client(user):
         is_super_fan = bool(getattr(event, "user_is_super_fan", None))
 
         in_fanclub = False
-        fan_ticket_count = getattr(event.user, "fan_ticket_count", None)
-        fans_club = getattr(event.user, "fans_club", None)
-        fans_club_info = getattr(event.user, "fans_club_info", None)
+        fan_ticket_count = user_attr_safe(event, "fan_ticket_count", None)
+        fans_club = user_attr_safe(event, "fans_club", None)
+        fans_club_info = user_attr_safe(event, "fans_club_info", None)
         if (
             fan_ticket_count
             and fan_ticket_count > 0
@@ -2329,7 +2442,7 @@ def create_client(user):
         ):
             in_fanclub = True
 
-        is_moderator = bool(getattr(event.user, "is_moderator", None))
+        is_moderator = bool(user_attr_safe(event, "is_moderator", None))
 
         # Heavy comment handling (logging, prefix matching, cooldowns, HTTP
         # conditional handlers) runs on a dedicated worker thread.
@@ -2343,7 +2456,8 @@ def create_client(user):
     # =========================
     @client.on(ShareEvent)
     def on_share(event):
-        username = get_safe_username(event.user)
+        _dbg("HANDLER on_share fired")
+        username = username_from_event_safe(event)
         ctx.session_shares += 1
         _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
@@ -2387,6 +2501,11 @@ def create_client(user):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
+        _dbg(
+            "CONNECT set tiktok_live=True; valid_functions count=%d, first10=%s",
+            len(ctx.valid_functions),
+            sorted(ctx.valid_functions)[:10],
+        )
         _reset_session()
         _publish_tiktok_status(True)
         _run_in_background(fire_hook_lifecycle, "live_start")
@@ -2785,20 +2904,43 @@ async def run_bot():
             continue
 
         ctx.start_likes = None
+        ctx._last_like_total = None
         ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
         client = create_client(ctx.tiktok_user)
         ctx.tiktok_client = client
 
         # Run the client on its own dedicated event loop so the webhook server
         # thread can disconnect it later via run_coroutine_threadsafe.
-        client_loop = asyncio.new_event_loop()
-        ctx.tiktok_client_loop = client_loop
-        _chatbot.bind_client(client, client_loop)
+        #
+        # IMPORTANT: create and serve the loop from the SAME worker thread
+        # (mirroring the working reference's `client.run()`). Creating it in the
+        # main thread and serving it from another strands the TikTok websocket
+        # reader after the initial room burst — it connects, delivers the
+        # opening snapshot, then never delivers another event (stream keeps
+        # running, only heartbeats follow). `set_event_loop` keeps every
+        # get_event_loop()/get_running_loop() call inside the thread consistent,
+        # including the websockets layer.
         _chatbot.apply_session_to_client(client)
+
+        def _run_client_blocking() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ctx.tiktok_client_loop = loop
+            _chatbot.bind_client(client, loop)
+            _dbg("CLIENT-LOOP created in worker thread: id=%s", id(loop))
+            try:
+                loop.run_until_complete(client.connect())
+            finally:
+                _chatbot.unbind_client()
+                ctx.tiktok_client_loop = None
+                try:
+                    loop.close()
+                except Exception:  # best-effort loop close
+                    pass
 
         try:
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
-            await asyncio.to_thread(client_loop.run_until_complete, client.connect())
+            await asyncio.to_thread(_run_client_blocking)
 
         except Exception as e:  # TikTok client connection errors are reported; reconnect loop continues
             log.exception("CRITICAL ERROR IN TIKTOK CLIENT")
@@ -2825,14 +2967,8 @@ async def run_bot():
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
-            _chatbot.unbind_client()
-            ctx.tiktok_client_loop = None
             ctx.tiktok_live = False
             _publish_tiktok_status(False)
-            try:
-                client_loop.close()
-            except Exception as e:  # best-effort loop close
-                log.warning(f"[TIKTOK] Error closing client loop: {e}")
             await asyncio.sleep(2)
 
 
