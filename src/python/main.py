@@ -981,26 +981,6 @@ async def execute_global_command(
     """
     name = sanitize_filename(trigger_name)
 
-    if name not in ctx.valid_functions:
-        _dbg(
-            "TRIGGER '%s' NOT in valid_functions (user=%s) — dropped. valid_contains[%s]",
-            trigger_name,
-            source_user,
-            trigger_name in ctx.valid_functions,
-        )
-        return
-    _dbg(
-        "TRIGGER dispatch: name=%s user=%s depth=%d overlay=%s script=%s vanilla=%s rcon=%s shell=%s",
-        name,
-        source_user,
-        chain_depth,
-        name in ctx.overlay_actions,
-        name in ctx.script_actions,
-        name in ctx.vanilla_functions,
-        name in ctx.rcon_only_actions,
-        name in ctx.shell_actions_cache,
-    )
-
     user_display = source_user
 
     # Structured context for hook actions. Always a fresh HookContext — the
@@ -1334,7 +1314,6 @@ def _publish_tiktok_event(event_type: str, user: str, **extra):
     """
     _record_metrics_event()
     data = {"user": user, **extra}
-    _dbg("PUBLISH tiktok.%s data=%s", event_type, data)
     _run_in_background(_notify_hooks_of_event, f"tiktok.{event_type}", data)
     body = json.dumps({"type": f"tiktok.{event_type}", "data": data}).encode("utf-8")
     _run_in_background(_post_tiktok_event_api, body)
@@ -1617,12 +1596,6 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
     action in actions.mca never enqueue.
     """
     rules = ctx.like_triggers
-    _dbg(
-        "ENQUEUE-LIKE total_since_start=%d n_rules=%d valid_functions_count=%d",
-        total_since_start,
-        len(rules),
-        len(ctx.valid_functions),
-    )
     if not rules:
         return
     with ctx.like_lock:
@@ -1631,15 +1604,6 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
             if every <= 0:
                 continue
             blocks = total_since_start // every
-            _dbg(
-                "  like rule id=%s every=%s blocks=%s last_blocks=%s fn=%s in_valid=%s",
-                rule["id"],
-                every,
-                blocks,
-                rule["last_blocks"],
-                rule["function"],
-                rule["function"] in ctx.valid_functions,
-            )
             if blocks > rule["last_blocks"]:
                 diff = blocks - rule["last_blocks"]
                 rule["last_blocks"] = blocks
@@ -2283,10 +2247,6 @@ def create_client(user):
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
-        _dbg(
-            "HANDLER on_gift fired (combo=%s)",
-            bool(getattr(event.gift, "combo", False)),
-        )
         try:
             if event.gift.combo:
                 if getattr(event, "streaking", False):
@@ -2341,7 +2301,6 @@ def create_client(user):
     # =========================
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
-        _dbg("HANDLER on_follow fired")
         username = username_from_event_safe(event)
         ctx.session_follows += 1
         _publish_tiktok_event("follow", username)
@@ -2352,15 +2311,6 @@ def create_client(user):
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
-        _dbg(
-            "HANDLER on_like fired total=%s start_likes=%s last_like_total=%s "
-            "session_likes=%d last_like_event=%.1f",
-            getattr(event, "total", "?"),
-            ctx.start_likes,
-            ctx._last_like_total,
-            ctx.session_likes,
-            ctx._last_like_event,
-        )
         username = username_from_event_safe(event, default=None)
         if username:
             _publish_tiktok_event("like", username)
@@ -2401,7 +2351,6 @@ def create_client(user):
     # ========================
     @client.on(JoinEvent)
     def on_join(event):
-        _dbg("HANDLER on_join fired")
         username = username_from_event_safe(event)
         ctx.session_joins += 1
         _publish_tiktok_event("join", username)
@@ -2419,10 +2368,8 @@ def create_client(user):
             _connect_time[0] is None
             or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS
         ):
-            _dbg("HANDLER on_comment during warmup — skipped")
             return
 
-        _dbg("HANDLER on_comment fired")
         username = username_from_event_safe(event)
         ctx.session_comments += 1
         comment_text = getattr(event, "comment", "")
@@ -2456,7 +2403,6 @@ def create_client(user):
     # =========================
     @client.on(ShareEvent)
     def on_share(event):
-        _dbg("HANDLER on_share fired")
         username = username_from_event_safe(event)
         ctx.session_shares += 1
         _publish_tiktok_event("share", username)
@@ -2501,11 +2447,6 @@ def create_client(user):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
-        _dbg(
-            "CONNECT set tiktok_live=True; valid_functions count=%d, first10=%s",
-            len(ctx.valid_functions),
-            sorted(ctx.valid_functions)[:10],
-        )
         _reset_session()
         _publish_tiktok_status(True)
         _run_in_background(fire_hook_lifecycle, "live_start")
@@ -2927,7 +2868,6 @@ async def run_bot():
             asyncio.set_event_loop(loop)
             ctx.tiktok_client_loop = loop
             _chatbot.bind_client(client, loop)
-            _dbg("CLIENT-LOOP created in worker thread: id=%s", id(loop))
             try:
                 loop.run_until_complete(client.connect())
             finally:
