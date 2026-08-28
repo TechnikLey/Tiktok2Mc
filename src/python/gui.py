@@ -27,6 +27,7 @@ if _src not in sys.path:
     sys.path.insert(0, _src)
 
 from core.api.server import DEFAULT_PORT  # noqa: E402
+from core.api.shutdown_signature import make_headers  # noqa: E402
 from core.crash_manager import get_crash_manager  # noqa: E402
 from core.error_codes import CHATBOT_0004  # noqa: E402
 from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
@@ -210,6 +211,24 @@ def _api_reachable(timeout: float = 1.0) -> bool:
         return False
 
 
+def _signed_shutdown_headers(identity: str) -> dict[str, str] | None:
+    """Build the signed headers for a shutdown request (or None on failure).
+
+    A valid HMAC signature is appended for every shutdown call so the API
+    can verify — and later audit — exactly who requested the shutdown.
+    """
+    headers = make_headers(identity)
+    if not headers:
+        log.warning(
+            "[SHUTDOWN-AUTH] Cannot sign shutdown request — no shared secret "
+            "available yet (identity=%s). The API will reject the request.",
+            identity,
+        )
+        return None
+    log.debug("[SHUTDOWN-AUTH] Signed shutdown request (identity=%s)", identity)
+    return headers
+
+
 class LauncherAPI:
     """JS-accessible API for the launcher page.
 
@@ -318,23 +337,26 @@ class LauncherAPI:
         _write_shutdown_marker()
 
         # Prefer graceful shutdown through the API.
-        try:
-            req = urllib.request.Request(
-                f"{API_URL}/api/v1/shutdown/now",
-                method="POST",
-                headers={"Content-Type": "application/json"},
-                data=b"{}",
-            )
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                if resp.status == 200:
-                    # Give the supervisor a few seconds to shut down cleanly.
-                    for _ in range(40):
-                        if _full_system_proc.poll() is not None:
-                            _full_system_proc = None
-                            return "stopped"
-                        time.sleep(0.25)
-        except OSError:
-            pass
+        headers = _signed_shutdown_headers("gui.py:stop_system")
+        if headers is not None:
+            headers["Content-Type"] = "application/json"
+            try:
+                req = urllib.request.Request(
+                    f"{API_URL}/api/v1/shutdown/now",
+                    method="POST",
+                    headers=headers,
+                    data=b"{}",
+                )
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    if resp.status == 200:
+                        # Give the supervisor a few seconds to shut down cleanly.
+                        for _ in range(40):
+                            if _full_system_proc.poll() is not None:
+                                _full_system_proc = None
+                                return "stopped"
+                            time.sleep(0.25)
+            except OSError:
+                pass
 
         # Force kill if still running.
         try:
@@ -462,25 +484,32 @@ def _cleanup_processes():
     # If the API is already down, skip the request and force-kill directly.
     api_was_running = _api_reachable(timeout=1.0)
     if api_was_running:
-        try:
-            req = urllib.request.Request(
-                f"{API_URL}/api/v1/shutdown/now",
-                method="POST",
-                headers={"Content-Type": "application/json"},
-                data=b"{}",
-            )
-            urllib.request.urlopen(req, timeout=3.0)
-            log.info("Cleanup: shutdown request sent, waiting for process to exit.")
-            for _ in range(20):
-                if _full_system_proc.poll() is not None:
-                    log.info("Cleanup: process exited cleanly.")
-                    return
-                time.sleep(0.25)
-            log.warning(
-                "Cleanup: process did not exit within 5s after API shutdown request."
-            )
-        except OSError as exc:
-            log.warning("Cleanup: API shutdown request failed: %s", exc)
+        headers = _signed_shutdown_headers("gui.py:_cleanup_processes")
+        if headers is not None:
+            headers["Content-Type"] = "application/json"
+            try:
+                req = urllib.request.Request(
+                    f"{API_URL}/api/v1/shutdown/now",
+                    method="POST",
+                    headers=headers,
+                    data=b"{}",
+                )
+                urllib.request.urlopen(req, timeout=3.0)
+                log.info("Cleanup: shutdown request sent, waiting for process to exit.")
+                for _ in range(20):
+                    if _full_system_proc.poll() is not None:
+                        log.info("Cleanup: process exited cleanly.")
+                        return
+                    time.sleep(0.25)
+                log.warning(
+                    "Cleanup: process did not exit within 5s after API shutdown request."
+                )
+            except urllib.error.HTTPError as exc:
+                log.warning("Cleanup: API shutdown request rejected: %s", exc)
+            except OSError as exc:
+                log.warning("Cleanup: API shutdown request failed: %s", exc)
+        else:
+            log.warning("Cleanup: cannot sign shutdown request, force-killing.")
     else:
         log.info("Cleanup: API not reachable, skipping shutdown request.")
 

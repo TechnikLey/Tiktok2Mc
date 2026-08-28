@@ -275,6 +275,15 @@ async def lifespan(app: FastAPI):
         "CORS reflects same-host origins (local GUI + LAN dashboard); "
         'use create_app(cors_origins=["*"]) to open for development'
     )
+    # Persist the shutdown signature secret now so the GUI can sign its
+    # (future) shutdown requests. The GUI re-reads the file per request.
+    try:
+        from core.api.shutdown_signature import ensure_secret
+
+        ensure_secret()
+        log.info("Shutdown signature secret ready")
+    except Exception as exc:  # secret creation must never block startup
+        log.warning("Could not prepare shutdown signature secret: %s", exc)
     set_event_loop(asyncio.get_running_loop())
     command_queue.set_loop(asyncio.get_running_loop())
     get_plugin_watcher().start()

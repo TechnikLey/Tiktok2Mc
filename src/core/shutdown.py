@@ -94,6 +94,7 @@ class ShutdownRequest:
         "id",
         "process_id",
         "reason",
+        "requester",
         "source",
         "stack",
         "thread_id",
@@ -108,6 +109,7 @@ class ShutdownRequest:
         reason: ShutdownReason = ShutdownReason.UNKNOWN,
         source: str = "",
         stack: str = "",
+        requester: dict[str, Any] | None = None,
     ) -> None:
         self.id = _make_shutdown_id()
         self.reason = reason
@@ -120,9 +122,10 @@ class ShutdownRequest:
         self.timestamp_iso = time.strftime(
             "%Y-%m-%dT%H:%M:%S", time.localtime(self.timestamp)
         )
+        self.requester = requester
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "id": self.id,
             "reason": self.reason.value,
             "source": self.source,
@@ -133,6 +136,9 @@ class ShutdownRequest:
             "timestamp": self.timestamp,
             "timestamp_iso": self.timestamp_iso,
         }
+        if self.requester:
+            data["requester"] = self.requester
+        return data
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +227,7 @@ class ShutdownController:
         *,
         reason: ShutdownReason = ShutdownReason.UNKNOWN,
         source: str = "",
+        requester: dict[str, Any] | None = None,
     ) -> ShutdownRequest | None:
         """Request a shutdown. Returns the accepted request, or None if
         a shutdown is already pending/running.
@@ -230,7 +237,9 @@ class ShutdownController:
         # Capture stack trace of the caller
         stack = "".join(traceback.format_stack())
 
-        request = ShutdownRequest(reason=reason, source=source, stack=stack)
+        request = ShutdownRequest(
+            reason=reason, source=source, stack=stack, requester=requester
+        )
 
         with self._lock:
             self._requests.append(request)
@@ -256,6 +265,7 @@ class ShutdownController:
             "  Thread: %s (id=%s)\n"
             "  Process: %s\n"
             "  Time: %s\n"
+            "  Requester: %s\n"
             "  Stack:\n%s",
             request.id,
             request.reason.value,
@@ -264,6 +274,7 @@ class ShutdownController:
             request.thread_id,
             request.process_id,
             request.timestamp_iso,
+            json.dumps(request.requester) if request.requester else "n/a",
             stack.rstrip(),
         )
 
