@@ -109,6 +109,19 @@ Der parallele A/B **lief jetzt durch** (fixierter `ab_orch.py`). Zwei Harness-Fi
 
 ---
 
+## 6c. NU: Externes `SIGN_NOT_200` (HTTP 500) beim Start — NICHT unsere App [BEWIESEN]
+
+2026-08-28: Das **gebaute Release** (`app.exe`) verbindet nicht mehr, Log zeigt sofort beim Start:
+`tiktok.com OK` → `check_alive OK` → `tiktok.eulerstream.com/webcast/fetch/` **HTTP 500** → `SIGN_NOT_200` → Crash → Reconnect 30s → wieder 500.
+
+- **Ursache ist extern:** Der Sign-Server `https://tiktok.eulerstream.com` ist der von `TikTokLive.web_settings.WebDefaults` hartkodierte Community-Sign-Dienst (`web_settings.py:127`); unsere App überschreibt nichts (kein eigenes `sign_url`/`sign_api_key` im Repo). Er soll die **signierte WebSocket-URL** liefern — schlägt er fehl, kommt die Verbindung gar nicht erst zustande.
+- **Dokumentiertes, wiederkehrendes Infra-Problem des Anbieters** (GitHub `isaackogan/TikTokLive#311`, `#278` — 500/503 "API is not ready" / "A 500 error occurred whilst fetching the webcast URL"). Tritt auf, wenn der Sign-Host TikTok's Webcast nicht erreicht (WAF/Scraping-Drosselung). Meist temporär.
+- **Kein Zusammenhang** mit unseren Fixes (Event-Stall/Loop); tritt vor jedem Websocket-Aufbau auf.
+- **Empfehlung:** Pause (5–20 min) + Neustart. Option bei Beständigkeit: eulerstream **API-Key** (`WebDefaults.tiktok_sign_api_key`) oder eigener Sign-Server (`/webcast/fetch` implementieren).
+- Zusätzlich im Log aufgefallen: `[LIKE DEBUG]`-Marker `validate_like_triggers` / `prepare_like_triggers` erscheinen weiterhin auf **INFO** — das sind andere Debug-Stellen **außerhalb** der im Fix 1 demoted Zeilen → §8D-Nachprüfung betrifft nur die On-Loop-Handler-Zeilen, nicht diese Config-Load-Debugs.
+
+---
+
 ## 7. WICHTIGSTE DATEIEN / HARNESSES (für die Fortsetzung)
 
 Alle unter `C:\Users\Finni\AppData\Local\Temp\opencode\`:
@@ -159,4 +172,4 @@ Die Harness (`ab_orch.py` + `ab_b.py`-Deadline + `_abcount`-Fix) funktioniert je
 - **Fix-Umsetzung wurde vom Benutzer ausdrücklich freigegeben** (Fix 1 + Fix 2 + Loop-A/B gewählt). Für weitere Eingriffe in Live-Verhalten wieder fragen.
 - `tools/bridge_debug.py` = Debug-Launcher für echte main.py in einer Sandbox (Marker `[TIKTOK][RAW]`, `[TIKTOK][WATCHDOG]`; Webhook-Proben gegen einen nicht laufenden API-Server können `urllib.error`-Meldungen zeigen — unkritisch).
 - Versionen nur in `src/core/version.py`; der Stopp/die Fixes berühren **kein** Repo-Artefakt außer `main.py`.
-- **Nicht committet:** Der Git-Stand ist sauber (`git diff` = nur `src/python/main.py`, +43/−14, Fix 1+2). Nur committen, wenn der Benutzer es verlangt.
+- **Status:** Fixes committet + gepusht auf `v1.0.0-dev` (`96131fa` fix-bridge, `a7fe15e` docs AI_HANDOVER). `src/data/` (Runtime-Backups) bleibt untracked. Weitere Commits/Push nur auf ausdrücklichen Wunsch.
