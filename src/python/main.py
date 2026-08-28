@@ -80,6 +80,31 @@ from core.yaml_utils import load_yaml
 
 log = initialize_logging(__name__)
 
+if os.environ.get("TIKTOK2MC_DEBUG"):  # troubleshooting: unveil TikTokLive internals
+    for _dbg_name in (
+        "TikTokLive",
+        "TikTokLive.web",
+        "TikTokLive.ws",
+        "python.main",
+        "core.tiktok_chatbot",
+    ):
+        logging.getLogger(_dbg_name).setLevel(logging.DEBUG)
+    try:
+        # TikTokLive 6.6.x resets its logger to ERROR inside TikTokLiveClient.__init__
+        # via TikTokLiveLogHandler.get_logger(level=...). Force DEBUG at the source.
+        from TikTokLive.client.logger import LogLevel, TikTokLiveLogHandler
+
+        _orig_get_logger = TikTokLiveLogHandler.get_logger
+
+        @classmethod
+        def _force_debug_get_logger(cls, level=None, stream=None):
+            return _orig_get_logger.__func__(cls, LogLevel.DEBUG, stream)
+
+        TikTokLiveLogHandler.get_logger = _force_debug_get_logger
+    except Exception:
+        pass
+    log.info("[DEBUG] TIKTOK2MC_DEBUG=1 — TikTokLive debug logging enabled")
+
 
 # ==========================================
 # CONFIGURATION & PATHS
@@ -87,11 +112,26 @@ log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
 
-CONFIG_FILE = (BASE_DIR.parent / "config" / "config.yaml").resolve()
-ACTIONS_FILE = (BASE_DIR.parent / "data" / "actions.mca").resolve()
-COMMENT_COMMANDS_FILE = (BASE_DIR.parent / "data" / "comment_commands.yaml").resolve()
-FOLLOWED_USERS_FILE = (BASE_DIR.parent / "data" / "followed_users.txt").resolve()
-RUNTIME_DIR = get_runtime_dir()
+
+# Debug/sandbox override for tests and troubleshooting (see tools/bridge_debug.py):
+#   TIKTOK2MC_BASE_PARENT  — replaces BASE_DIR.parent, i.e. where "config/" and
+#                           "data/" live. Lets the bridge run fully inside a
+#                           disposable sandbox dir without touching the real
+#                           repo config/data.
+#   TIKTOK2MC_RUNTIME_DIR  — overrides the runtime signal files dir.
+# Both are opt-in; with them unset the behaviour is byte-identical to before.
+def _env_path(name: str) -> Path | None:
+    value = os.environ.get(name)
+    return Path(value).resolve() if value else None
+
+
+_BASE_PARENT = _env_path("TIKTOK2MC_BASE_PARENT") or BASE_DIR.parent
+CONFIG_FILE = (_BASE_PARENT / "config" / "config.yaml").resolve()
+ACTIONS_FILE = (_BASE_PARENT / "data" / "actions.mca").resolve()
+COMMENT_COMMANDS_FILE = (_BASE_PARENT / "data" / "comment_commands.yaml").resolve()
+FOLLOWED_USERS_FILE = (_BASE_PARENT / "data" / "followed_users.txt").resolve()
+_RUNTIME_DIR_ENV = _env_path("TIKTOK2MC_RUNTIME_DIR")
+RUNTIME_DIR = _RUNTIME_DIR_ENV or get_runtime_dir()
 RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
 RELOAD_ACTIONS_SIGNAL = (RUNTIME_DIR / "reload_actions").resolve()
 RELOAD_COMMENT_COMMANDS_SIGNAL = (RUNTIME_DIR / "reload_comment_commands").resolve()
@@ -151,6 +191,10 @@ class BotContext:
         self._last_like_total = None
         self._last_like_event = 0.0
         self.like_triggers: list[dict] = []
+
+        # TikTok event diagnostics (raw-received counter + stall watchdog)
+        self._last_tiktok_event_ts = 0.0
+        self._tiktok_event_counters: dict[str, int] = {}
         self.valid_functions = set()
         self.vanilla_functions = set()
         self.shell_actions_cache = {}
@@ -200,7 +244,11 @@ class BotContext:
         self.queue_active = True
         self.queue_pause_on_death = True
         self.config = {}
-        self.runtime_path_shutdown = (BASE_DIR / "runtime" / "shutdown").resolve()
+        self.runtime_path_shutdown = (
+            (_RUNTIME_DIR_ENV / "shutdown").resolve()
+            if _RUNTIME_DIR_ENV
+            else (BASE_DIR / "runtime" / "shutdown").resolve()
+        )
 
         # RCON retry tracking (keyed by repr(commands) to limit re-queue loops)
         self.max_rcon_retries = 3
@@ -538,7 +586,7 @@ def _apply_config(config: dict) -> None:
     ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
     ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
     raw_path = str(ft_cfg.get("file", "data/followed_users.txt"))
-    ctx.follow_tracking_file = (BASE_DIR.parent / raw_path).resolve()
+    ctx.follow_tracking_file = (_BASE_PARENT / raw_path).resolve()
     ctx._followed_cache = set()
     if ctx.follow_tracking_file.exists():
         with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
@@ -557,7 +605,7 @@ def _apply_config(config: dict) -> None:
 
     _apply_comment_commands_from_yaml()
 
-    ctx.datapack_root = (BASE_DIR / ".." / "server" / "datapack").resolve()
+    ctx.datapack_root = (_BASE_PARENT / "server" / "datapack").resolve()
     ctx.datapack_root.mkdir(parents=True, exist_ok=True)
 
 
@@ -2251,6 +2299,27 @@ def username_from_event_safe(event, default: str | None = "Unknown"):
 # ==========================================
 
 
+async def _ws_stall_watchdog():
+    """Warn when the TikTok websocket is live but stops delivering events.
+
+    Runs on the client's own event loop (see ``_run_client_blocking``). If no
+    raw event reached the bridge for a long time while ``ctx.tiktok_live``,
+    the websocket reader is probably stalled — the old silent-death symptom —
+    so surface it in the logs instead of staying quietly dead.
+    """
+    while True:
+        await asyncio.sleep(20)
+        if not ctx.tiktok_live:
+            continue
+        idle = time.time() - ctx._last_tiktok_event_ts
+        if ctx._last_tiktok_event_ts > 0 and idle > 60:
+            log.warning(
+                f"[TIKTOK][WATCHDOG] No events for {idle:.0f}s while live — "
+                f"websocket receiver may be stalled / loop crashed. "
+                f"Events so far: {ctx._tiktok_event_counters}"
+            )
+
+
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
 
@@ -2266,6 +2335,18 @@ def create_client(user):
 
     client.add_listener("error", _on_client_event_error)
 
+    # Raw-event diagnostics: proves whether the websocket actually delivers
+    # events to the bridge before handler dispatch. Prints each event type on
+    # first occurrence and then every 200th, so a silent loop (the old
+    # "loop crash"/stranded-reader symptom) is visible in the logs.
+    def _log_raw_event(etype: str) -> None:
+        now = time.time()
+        ctx._last_tiktok_event_ts = now
+        cnt = ctx._tiktok_event_counters.get(etype, 0) + 1
+        ctx._tiktok_event_counters[etype] = cnt
+        if cnt <= 3 or cnt % 200 == 0:
+            log.info(f"[TIKTOK][RAW] {etype} event #{cnt} received")
+
     _connect_time = [None]
     COMMENT_WARMUP_SECONDS = 1
 
@@ -2274,6 +2355,7 @@ def create_client(user):
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
+        _log_raw_event("gift")
         try:
             if event.gift.combo:
                 if getattr(event, "streaking", False):
@@ -2328,6 +2410,7 @@ def create_client(user):
     # =========================
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
+        _log_raw_event("follow")
         username = username_from_event_safe(event)
         ctx.session_follows += 1
         _publish_tiktok_event("follow", username)
@@ -2338,6 +2421,7 @@ def create_client(user):
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
+        _log_raw_event("like")
         username = username_from_event_safe(event, default=None)
         if username:
             _publish_tiktok_event("like", username)
@@ -2391,6 +2475,7 @@ def create_client(user):
     # ========================
     @client.on(JoinEvent)
     def on_join(event):
+        _log_raw_event("join")
         username = username_from_event_safe(event)
         ctx.session_joins += 1
         _publish_tiktok_event("join", username)
@@ -2404,6 +2489,7 @@ def create_client(user):
     # =========================
     @client.on(CommentEvent)
     def on_comment(event):
+        _log_raw_event("comment")
         if (
             _connect_time[0] is None
             or (time.time() - _connect_time[0]) < COMMENT_WARMUP_SECONDS
@@ -2443,6 +2529,7 @@ def create_client(user):
     # =========================
     @client.on(ShareEvent)
     def on_share(event):
+        _log_raw_event("share")
         username = username_from_event_safe(event)
         ctx.session_shares += 1
         _publish_tiktok_event("share", username)
@@ -2487,6 +2574,9 @@ def create_client(user):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
+        # Baseline for the stall watchdog: from now on a long event silence
+        # while live is treated as a stalled receiver.
+        ctx._last_tiktok_event_ts = time.time()
         _reset_session()
         _publish_tiktok_status(True)
         _run_in_background(fire_hook_lifecycle, "live_start")
@@ -2909,7 +2999,17 @@ async def run_bot():
             ctx.tiktok_client_loop = loop
             _chatbot.bind_client(client, loop)
             try:
-                loop.run_until_complete(client.connect())
+                # Stall watchdog runs on the same loop as the websocket reader,
+                # so a dead/stuck receiver surfaces instead of staying silent.
+                watch_dog = loop.create_task(_ws_stall_watchdog())
+                try:
+                    loop.run_until_complete(client.connect())
+                finally:
+                    watch_dog.cancel()
+                    try:  # let the loop process the cancellation
+                        loop.run_until_complete(asyncio.sleep(0))
+                    except Exception:  # best-effort drain
+                        pass
             finally:
                 _chatbot.unbind_client()
                 ctx.tiktok_client_loop = None
