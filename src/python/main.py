@@ -1659,20 +1659,22 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
     action in actions.mca never enqueue.
     """
     rules = ctx.like_triggers
-    log.info(
+    log.debug(
         f"[LIKE DEBUG] _enqueue_like_triggers called: total_since_start={total_since_start}, username={username}, rules={len(rules)}"
     )
     if not rules:
-        log.info("[LIKE DEBUG] No like_triggers configured, returning")
+        log.debug("[LIKE DEBUG] No like_triggers configured, returning")
         return
     with ctx.like_lock:
         for rule in rules:
             every = rule["every"]
             if every <= 0:
-                log.info(f"[LIKE DEBUG] Skipping rule {rule['id']}: every={every} <= 0")
+                log.debug(
+                    f"[LIKE DEBUG] Skipping rule {rule['id']}: every={every} <= 0"
+                )
                 continue
             blocks = total_since_start // every
-            log.info(
+            log.debug(
                 f"[LIKE DEBUG] Rule '{rule['id']}': every={every}, total_since_start={total_since_start}, blocks={blocks}, last_blocks={rule['last_blocks']}"
             )
             if blocks > rule["last_blocks"]:
@@ -1698,7 +1700,7 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
                         label=f"like:{rule['id']}",
                     )
             else:
-                log.info(
+                log.debug(
                     f"[LIKE DEBUG] Rule '{rule['id']}' not triggered: blocks ({blocks}) <= last_blocks ({rule['last_blocks']})"
                 )
 
@@ -2316,8 +2318,22 @@ async def _ws_stall_watchdog():
             log.warning(
                 f"[TIKTOK][WATCHDOG] No events for {idle:.0f}s while live — "
                 f"websocket receiver may be stalled / loop crashed. "
-                f"Events so far: {ctx._tiktok_event_counters}"
+                f"Events so far: {ctx._tiktok_event_counters}. "
+                "Reconnecting to restore the stream."
             )
+            # Self-heal: the reader / ack lane is starved (TikTokLive 6.6.5
+            # hb race). Close the websocket from this loop so client.connect()
+            # returns and run_bot() reconnects with a fresh signed URL
+            # (signed URLs expire in ~30 s, so a plain client.run(false)
+            # reconnect loop would hit stale URLs; a fresh connect() is safest).
+            client = ctx.tiktok_client
+            if client is not None:
+                try:
+                    await client.disconnect(close_client=False)
+                except Exception as exc:
+                    log.warning(
+                        f"[TIKTOK][WATCHDOG] Reconnect disconnect failed: {exc!r}"
+                    )
 
 
 def create_client(user):
@@ -2431,7 +2447,7 @@ def create_client(user):
                 ctx._last_like_total = event.total
                 ctx.session_likes = 0
                 log.info(f"[LIKE] Initial count set: {ctx.start_likes}")
-                log.info(
+                log.debug(
                     f"[LIKE DEBUG] event.total={event.total}, start_likes={ctx.start_likes}, session_likes={ctx.session_likes}"
                 )
                 return
@@ -2443,7 +2459,7 @@ def create_client(user):
                 ctx._last_like_total, event.total, ctx.session_likes
             )
             total_since_start = ctx.session_likes
-            log.info(
+            log.debug(
                 f"[LIKE DEBUG] event.total={event.total}, _last_like_total={ctx._last_like_total}, session_likes={ctx.session_likes}, total_since_start={total_since_start}, like_triggers={len(ctx.like_triggers)}"
             )
             try:
@@ -2455,13 +2471,13 @@ def create_client(user):
                     _publish_tiktok_event(
                         "like", username or "unknown", delta=delta, total=event.total
                     )
-                    log.info(
+                    log.debug(
                         f"[LIKE DEBUG] Calling _enqueue_like_triggers with total_since_start={total_since_start}, username={username}"
                     )
                     _enqueue_like_triggers(total_since_start, username)
                     ctx._last_like_event = now
                 else:
-                    log.info(
+                    log.debug(
                         f"[LIKE DEBUG] Throttled: now={now}, _last_like_event={ctx._last_like_event}, diff={now - ctx._last_like_event:.2f}s"
                     )
             except Exception as e:  # TikTok event handler must not crash the client
@@ -2503,10 +2519,23 @@ def create_client(user):
 
         is_super_fan = bool(getattr(event, "user_is_super_fan", None))
 
+        # Resolve the user object ONCE per event: ``event.user`` is a property
+        # that re-runs ExtendedUser.from_user (and may throw on unknown proto
+        # fields) on every access, so fan/moderator checks share a single
+        # lookup instead of re-triggering it (on-loop cost under high comment
+        # flow delays the websocket ack/heartbeat -> reader stall).
+        try:
+            user = event.user
+        except Exception:
+            user = None
+
+        def _ua(name, default=None):
+            return getattr(user, name, default) if user is not None else default
+
         in_fanclub = False
-        fan_ticket_count = user_attr_safe(event, "fan_ticket_count", None)
-        fans_club = user_attr_safe(event, "fans_club", None)
-        fans_club_info = user_attr_safe(event, "fans_club_info", None)
+        fan_ticket_count = _ua("fan_ticket_count", None)
+        fans_club = _ua("fans_club", None)
+        fans_club_info = _ua("fans_club_info", None)
         if (
             fan_ticket_count
             and fan_ticket_count > 0
@@ -2515,7 +2544,7 @@ def create_client(user):
         ):
             in_fanclub = True
 
-        is_moderator = bool(user_attr_safe(event, "is_moderator", None))
+        is_moderator = bool(_ua("is_moderator", None))
 
         # Heavy comment handling (logging, prefix matching, cooldowns, HTTP
         # conditional handlers) runs on a dedicated worker thread.
