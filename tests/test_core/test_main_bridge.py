@@ -1573,6 +1573,72 @@ class TestSessionSummary:
         _save_session_summary({})
         assert not (tmp_path / "data" / "sessions.jsonl").exists()
 
+    def test_should_start_new_session_without_session(self, monkeypatch):
+        from src.python.main import _should_start_new_session, ctx
+
+        monkeypatch.setattr(ctx, "session_start_ts", None)
+        monkeypatch.setattr(ctx, "session_end_ts", None)
+        assert _should_start_new_session() is True
+
+    def test_should_start_new_session_after_completed_live(self, monkeypatch):
+        from src.python.main import _should_start_new_session, ctx
+
+        monkeypatch.setattr(ctx, "session_start_ts", 100.0)
+        monkeypatch.setattr(ctx, "session_end_ts", 600.0)
+        assert _should_start_new_session() is True
+
+    def test_reconnect_mid_live_keeps_session(self, monkeypatch):
+        from src.python.main import _should_start_new_session, ctx
+
+        monkeypatch.setattr(ctx, "session_start_ts", 100.0)
+        monkeypatch.setattr(ctx, "session_end_ts", None)
+        assert _should_start_new_session() is False
+
+    def test_flush_active_session_saves_open_session(self, tmp_path, monkeypatch):
+        from src.python.main import _flush_active_session, ctx
+
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+        monkeypatch.setattr(ctx, "session_start_ts", 100.0)
+        monkeypatch.setattr(ctx, "session_end_ts", None)
+        monkeypatch.setattr(ctx, "session_gifts", 3)
+        monkeypatch.setattr(ctx, "session_likes", 42)
+
+        _flush_active_session()
+
+        lines = (
+            (tmp_path / "data" / "sessions.jsonl")
+            .read_text(encoding="utf-8")
+            .strip()
+            .split("\n")
+        )
+        assert len(lines) == 1
+        data = json.loads(lines[0])
+        assert data["gifts"] == 3
+        assert data["likes"] == 42
+        assert data["duration_seconds"] > 0
+
+    def test_flush_active_session_skips_completed(self, tmp_path, monkeypatch):
+        from src.python.main import _flush_active_session, ctx
+
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+        monkeypatch.setattr(ctx, "session_start_ts", 100.0)
+        monkeypatch.setattr(ctx, "session_end_ts", 600.0)
+
+        _flush_active_session()
+
+        assert not (tmp_path / "data" / "sessions.jsonl").exists()
+
+    def test_flush_active_session_skips_without_start(self, tmp_path, monkeypatch):
+        from src.python.main import _flush_active_session, ctx
+
+        monkeypatch.setattr("src.python.main.BASE_DIR", tmp_path / "src")
+        monkeypatch.setattr(ctx, "session_start_ts", None)
+        monkeypatch.setattr(ctx, "session_end_ts", None)
+
+        _flush_active_session()
+
+        assert not (tmp_path / "data" / "sessions.jsonl").exists()
+
 
 # =========================================================================
 # Webhook endpoint auth (X-API-Key on non-localhost requests)

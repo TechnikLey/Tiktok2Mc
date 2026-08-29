@@ -2571,7 +2571,8 @@ def create_client(user):
         ctx.tiktok_live = True
         # Raw-event diagnostics baseline.
         ctx._last_tiktok_event_ts = time.time()
-        _reset_session()
+        if _should_start_new_session():
+            _reset_session()
         _publish_tiktok_status(True)
         _run_in_background(fire_hook_lifecycle, "live_start")
         # Capture the client's event loop — this handler runs on it, exactly
@@ -2649,6 +2650,19 @@ async def gift_revenue_counter():
 # ========================
 # Session summary (per stream)
 # ========================
+def _should_start_new_session() -> bool:
+    """Whether a fresh ``ConnectEvent`` begins a new session.
+
+    TikTokLive's websocket disallows in-socket reconnects (signed URLs expire
+    fast), so a dropped connection re-enters the bridge via a fresh
+    ``ConnectEvent`` — even while the stream is still running. Resetting the
+    session counters on such reconnects would split one stream into multiple
+    records (only the last segment would ever be saved). Preserve the running
+    session unless there was none yet or the previous one already ended.
+    """
+    return ctx.session_start_ts is None or ctx.session_end_ts is not None
+
+
 def _reset_session():
     """Reset the per-session counters before a new live connection."""
     ctx.session_start_ts = time.time()
@@ -2703,6 +2717,21 @@ def _save_session_summary(entry: dict) -> None:
         log.info("[SESSION] Summary saved: %s", file_path)
     except OSError as exc:
         log.warning("Failed to save session summary %s: %s", file_path, exc)
+
+
+def _flush_active_session() -> None:
+    """Persist an unfinished live session (e.g. bridge shutdown mid-stream).
+
+    ``LiveEndEvent`` is the normal persistence point. This covers shutdowns
+    and abrupt disconnects where the stream-end event never arrives. Sessions
+    that already ended normally (``session_end_ts`` set) were persisted by the
+    live-end handler and are skipped to avoid duplicate records.
+    """
+    if ctx.session_start_ts is None or ctx.session_end_ts is not None:
+        return
+    entry = _session_summary_entry()
+    if entry:
+        _save_session_summary(entry)
 
 
 # ==========================================
@@ -3055,6 +3084,10 @@ async def run_bot():
             _chatbot.unbind_client()
             ctx.tiktok_client_loop = None
             ctx.tiktok_live = False
+            # Persist a stream that was still running when the bridge stopped
+            # (no LiveEndEvent will arrive). Sync on purpose — the task must
+            # finish before the process exits.
+            _flush_active_session()
             _publish_tiktok_status(False)
             await asyncio.sleep(2)
 
