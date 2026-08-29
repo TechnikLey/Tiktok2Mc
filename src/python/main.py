@@ -1495,14 +1495,26 @@ def _touch_runtime_shutdown():
         log.warning(f"[LIVE] Could not write shutdown signal: {e}")
 
 
-def _process_follow(username: str, persist: bool = True, context: dict | None = None):
-    """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user."""
+def _process_follow(
+    username: str,
+    persist: bool = True,
+    context: dict | None = None,
+    force: bool = False,
+):
+    """Shared follow dedup: cache check, persist (optional), enqueue trigger once per user.
+
+    ``force=True`` bypasses the visited-cache entirely (neither checked nor
+    recorded) so a *test* follow always fires and never poisons real dedup.
+    """
     user_lower = username.lower()
-    with ctx.follow_lock:
-        if user_lower in ctx._followed_cache:
-            log.info(f"[FOLLOW] {username} already tracked — follow trigger skipped")
-            return
-        ctx._followed_cache.add(user_lower)
+    if not force:
+        with ctx.follow_lock:
+            if user_lower in ctx._followed_cache:
+                log.info(
+                    f"[FOLLOW] {username} already tracked — follow trigger skipped"
+                )
+                return
+            ctx._followed_cache.add(user_lower)
     if persist:
         # File append runs on the background executor; dedup already happened
         # above, so an async write can never produce a duplicate trigger.
@@ -2154,14 +2166,26 @@ def handle_custom_trigger():
                 "connected": not new_state,
             }, 200
 
-        # Route 'follow' through the shared dedup logic so custom_trigger respects _followed_cache
-        # persist=False damit Test-User nicht in followed_users.txt landen
         if sanitized == "follow":
+            if "follow" not in ctx.valid_functions:
+                return {
+                    "status": "error",
+                    "message": (
+                        "Trigger 'follow' is not configured — add a 'follow:' action "
+                        "to actions.mca."
+                    ),
+                }, 400
+            # Test follows must always fire: bypass the real-follower dedup cache
+            # (neither check nor record) so repeating the same test user still
+            # triggers, and a later real follow of that user is not swallowed.
+            # persist=False keeps the test user out of followed_users.txt.
             _process_follow(
                 user,
                 persist=False,
+                force=True,
                 context=_make_hook_context("follow", source="webhook"),
             )
+            log.info(f"[CUSTOM TRIGGER] Injected: 'follow' (user: {user})")
             return {"status": "ok", "trigger": sanitized, "user": user}, 200
 
         if ctx.main_loop is None:

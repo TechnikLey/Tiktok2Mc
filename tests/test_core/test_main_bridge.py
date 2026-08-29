@@ -543,6 +543,50 @@ class TestProcessFollowOffload:
         submitted["fn"](*submitted["args"])
         assert "testuser" in tracking_file.read_text(encoding="utf-8")
 
+    def test_force_bypasses_dedup_and_does_not_record(self, monkeypatch):
+        """Event Tester follow must fire even for an already-known user, and
+        must not record the test user so a later real follow still triggers."""
+        import src.python.main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "follow_lock", threading.Lock())
+        monkeypatch.setattr(main_mod.ctx, "_followed_cache", {"testuser"})
+        monkeypatch.setattr(main_mod.ctx, "valid_functions", {"follow"})
+
+        enqueued = {}
+
+        def fake_enqueue(item, *, queue=None, label="event"):
+            enqueued["item"] = item
+            enqueued["label"] = label
+            return True
+
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue)
+
+        main_mod._process_follow("TestUser", persist=False, force=True)
+
+        assert enqueued.get("label") == "follow"
+        assert enqueued["item"][1] == "TestUser"
+        assert main_mod.ctx._followed_cache == {"testuser"}
+
+    def test_without_force_still_dedups_cached_user(self, monkeypatch):
+        """The real follow path keeps skipping already-tracked users."""
+        import src.python.main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "follow_lock", threading.Lock())
+        monkeypatch.setattr(main_mod.ctx, "_followed_cache", {"testuser"})
+        monkeypatch.setattr(main_mod.ctx, "valid_functions", {"follow"})
+
+        enqueued = {"items": []}
+
+        def fake_enqueue(item, *, queue=None, label="event"):
+            enqueued["items"].append(item)
+            return True
+
+        monkeypatch.setattr(main_mod, "enqueue_threadsafe", fake_enqueue)
+
+        main_mod._process_follow("TestUser", persist=False)
+
+        assert enqueued["items"] == []
+
 
 class TestHookActionOffload:
     def test_hook_action_runs_in_thread(self, monkeypatch):
