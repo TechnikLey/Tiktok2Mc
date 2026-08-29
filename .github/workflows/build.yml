@@ -42,27 +42,14 @@ jobs:
         run: choco install nsis
 
       - name: Run Build
-        run: python build.py --installer
+        run: python build.py app --installer
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: build/release/
-
-      - name: Upload Installer Artifact (Windows only)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: TikTok2MC-Windows-Installer
-          path: build/TikTok2MC-*-Setup.exe
-
-      - name: Upload Linux Installer Artifact
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: TikTok2Mc-Linux-Installer
-          path: build/TikTok2Mc-*-Linux-Setup.sh
+          if-no-files-found: error
 
   release:
     needs: build
@@ -84,28 +71,37 @@ jobs:
           name: TikTok2Mc-Linux
           path: build-linux/
 
-      - name: Download Windows Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: TikTok2MC-Windows-Installer
-          path: installer-win/
-
-      - name: Download Linux Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: TikTok2Mc-Linux-Installer
-          path: installer-linux/
-
       - name: Create Archives
         run: |
+          set -e
+
+          # Move installers out of the release bundles so they are not packed inside.
+          mkdir -p installer-win installer-linux
+          if [ -f build-windows/TikTok2MC-Setup.exe ]; then
+            mv build-windows/TikTok2MC-Setup.exe installer-win/
+          fi
+          if [ -f build-linux/TikTok2Mc-Linux-Setup.sh ]; then
+            mv build-linux/TikTok2Mc-Linux-Setup.sh installer-linux/
+          fi
+
+          # Archive the actual application bundles.
           cd build-windows && zip -9 -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
           GZIP=-9 tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
+
           sha256sum TikTok2Mc-${{ github.ref_name }}-Windows.zip > TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
           sha256sum TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz > TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
-          mv installer-win/TikTok2MC-*-Setup.exe ./TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe || true
-          sha256sum TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe > TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256 || true
-          mv installer-linux/TikTok2Mc-*-Linux-Setup.sh ./TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh || true
-          sha256sum TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh > TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256 || true
+
+          # Rename installers to the release asset naming convention.
+          if [ -f installer-win/TikTok2MC-Setup.exe ]; then
+            mv installer-win/TikTok2MC-Setup.exe ./TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe
+            sha256sum TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe > TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256
+          fi
+          if [ -f installer-linux/TikTok2Mc-Linux-Setup.sh ]; then
+            mv installer-linux/TikTok2Mc-Linux-Setup.sh ./TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh
+            sha256sum TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh > TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256
+          fi
+
+          ls -la
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
