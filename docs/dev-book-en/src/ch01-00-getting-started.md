@@ -67,6 +67,29 @@ python tools/update_test/run_update_test.py all --clean   # run all scenarios
 
 The harness only simulates the HTTP source (via `TIKTOK2MC_UPDATE_SOURCE`); everything else runs the real binary. It operates exclusively inside its own scratch directory — your repository (`src/`, `config/`, `data/`) is never touched by a test run. Port `29185` must be free. Details — including the known Windows Defender false positive on freshly built unsigned `update.exe` — are in `tools/update_test/README.md`.
 
+### Build & Release (CI)
+
+Building is orchestrated by GitHub Actions, not a manual step:
+
+- **`.github/workflows/test.yml`** — runs the full Python test suite (`pytest tests/`) on every push to `main`, on `ubuntu-latest`.
+- **`.github/workflows/build.yml`** — triggered on `v*` tags (and `workflow_dispatch`). Builds a matrix of Windows and Linux bundles, then publishes a GitHub Release.
+
+The release publishes exactly these assets (each with an accompanying `.sha256`):
+
+- `TikTok2MC-<version>-Windows-Setup.exe` — Windows installer (NSIS)
+- `TikTok2MC-<version>-Windows.zip` — Windows portable archive
+- `TikTok2Mc-<version>-Linux-Setup.sh` — Linux self-extracting installer
+
+> [!WARNING]
+> A portable `Linux.tar.gz` is **not** published. GitHub caps release assets at 2 GiB (2147483648 bytes), and the uncompressed Linux bundle exceeds that limit — most of it consists of already-compressed PNG gift assets that cannot be shrunk further. Linux is therefore delivered via its self-extracting installer (`-Linux-Setup.sh`) only. This is enforced in `.github/workflows/build.yml`, which deliberately skips archiving the Linux bundle in `Create Archives`. Re-add a Linux archive only if it stays well under the 2 GiB limit.
+
+Releases are triggered by moving a version tag to the desired commit and pushing:
+
+```bash
+git tag v1.0.1 <commit>
+git push origin v1.0.1
+```
+
 ### Python Packages (requirements.txt)
 
 | Package | Required for |

@@ -67,6 +67,29 @@ python tools/update_test/run_update_test.py all --clean   # alle Szenarien ausf�
 
 Der Harness simuliert nur die HTTP-Quelle (via `TIKTOK2MC_UPDATE_SOURCE`); alles andere läuft mit dem echten Binary. Er arbeitet ausschließlich in seinem eigenen Scratch-Verzeichnis — dein Repository (`src/`, `config/`, `data/`) wird von einem Testlauf nie angefasst. Port `29185` muss frei sein. Details — inklusive des bekannten Windows-Defender-False-Positive bei frisch gebautem, unsigniertem `update.exe` — stehen in `tools/update_test/README.md`.
 
+### Build & Release (CI)
+
+Der Build wird von GitHub Actions orchestriert, nicht manuell:
+
+- **`.github/workflows/test.yml`** — führt bei jedem Push auf `main` die komplette Python-Testsuite (`pytest tests/`) auf `ubuntu-latest` aus.
+- **`.github/workflows/build.yml`** — wird bei `v*`-Tags ausgelöst (und via `workflow_dispatch`). Baut eine Matrix aus Windows- und Linux-Bundles und veröffentlicht anschließend ein GitHub-Release.
+
+Das Release veröffentlicht genau diese Assets (jeweils mit einer passenden `.sha256`):
+
+- `TikTok2MC-<version>-Windows-Setup.exe` — Windows-Installer (NSIS)
+- `TikTok2MC-<version>-Windows.zip` — portables Windows-Archiv
+- `TikTok2Mc-<version>-Linux-Setup.sh` — Linux-Selbstextrahierer-Installer
+
+> [!WARNING]
+> Ein portables `Linux.tar.gz` wird **nicht** veröffentlicht. GitHub begrenzt Release-Assets auf 2 GiB (2147483648 Bytes), und das unkomprimierte Linux-Bundle überschreitet dieses Limit — der Großteil besteht aus bereits komprimierten PNG-Gift-Assets, die sich nicht weiter verkleinern lassen. Linux wird daher nur über seinen Selbstextrahierer-Installer (`-Linux-Setup.sh`) ausgeliefert. Das wird in `.github/workflows/build.yml` erzwungen, das das Archivieren des Linux-Bundles in `Create Archives` bewusst überspringt. Ein Linux-Archiv darf nur wieder ergänzt werden, wenn es deutlich unter dem 2-GiB-Limit bleibt.
+
+Releases werden ausgelöst, indem ein Versionstag auf den gewünschten Commit bewegt und gepusht wird:
+
+```bash
+git tag v1.0.1 <commit>
+git push origin v1.0.1
+```
+
 ### Python-Pakete (requirements.txt)
 
 | Paket | Benötigt für |
