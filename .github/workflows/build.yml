@@ -84,12 +84,13 @@ jobs:
             mv build-linux/TikTok2Mc-Linux-Setup.sh installer-linux/
           fi
 
-          # Archive the actual application bundles.
+          # Archive the Windows application bundle.
+          # NOTE: the Linux bundle (Linux.tar.gz) is intentionally NOT archived:
+          # it exceeds GitHub's 2 GiB release-asset limit. Linux is delivered via
+          # its self-extracting Installer (-Linux-Setup.sh) instead.
           cd build-windows && zip -9 -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
-          GZIP=-9 tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
 
           sha256sum TikTok2Mc-${{ github.ref_name }}-Windows.zip > TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
-          sha256sum TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz > TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
 
           # Rename installers to the release asset naming convention.
           if [ -f installer-win/TikTok2MC-Setup.exe ]; then
@@ -108,9 +109,7 @@ jobs:
         with:
           files: |
             TikTok2Mc-${{ github.ref_name }}-Windows.zip
-            TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz
             TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
-            TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
             TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe
             TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256
             TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh
