@@ -1,53 +1,50 @@
 [Introduction](./Introduction.md)
-[Basic concepts & terms](./ch00-00-Fundamentals-and-Concepts.md)
-[Establish local development](./ch00-01-Setting-Up-Local-Development.md)
 
-- [How the system works together](./ch01-00-How-the-System-Works-Together.md)
-  - [Receive data from TikTok](./ch01-01-Receiving-Data-from-TikTok.md)
-  - [Process events](./ch01-02-Processing-Events.md)
-  - [Send data to Minecraft](./ch01-03-Sending-Data-to-Minecraft.md)
+# Quickstart
 
-- [Create your own plugin](./ch02-00-Create-your-own-plugin.md)
-  - [Plugin structure & setup](./ch02-01-plugin-structure-and-setup.md)
-  - [Events & webhooks](./ch02-02-webhook-events-and-minecraft-integration.md)
-  - [Configuration & data](./ch02-03-configuration-and-data-storage.md)
-  - [GUI with pywebview](./ch02-04-gui-with-pywebview.md)
-  - [Inter-plugin communication](./ch02-05-inter-plugin-communication.md)
-  - [Error Handling & Best Practices](./ch02-06-error-handling-and-best-practices.md)
+- [Quickstart](./ch01-00-getting-started.md)
 
-- [From Event to Minecraft Command](./ch03-00-Mapping-Events-to-Minecraft.md)
-  - [The actions.mca file](./ch03-01-The-actions.mca-File.md)
-  - [Syntax & Commands](./ch03-02-Structure.md)
-  - [Design decisions](./ch03-03-Design-Decisions.md)
-  - [Parser logic](./ch03-04-Parser-Logic.md)
-  - [$random & meta commands](./ch03-05-Function-of-the-$random-Command.md)
-  - [Custom $ commands](./ch03-06-Creating-Your-Own-$-Command.md)
-  - [RCON & Bottleneck](./ch03-07-Rcon-and-Its-Limitations.md)
-  - [mcfunction batch optimization](./ch03-08-The-Use-of-mcfunction-Files.md)
+# Core Concepts
 
-- [Modular architecture](./ch04-00-System-Modules-and-Integration.md)
-  - [Control Methods: DCS vs ICS](./ch04-01-Control-Method.md)
-  - [The PLUGIN_REGISTRY](./ch04-02-The-PLUGIN_REGISTRY.md)
-  - [GUI architecture with Flask](./ch04-03-GUI-Architecture.md)
-  - [Inter-Module Communication (DCS)](./ch04-04-Communication-and-DCS.md)
-  - [Modules in streaming software](./ch04-05-Integrating-Plugins-into-Streaming-Software.md)
+- [Core Concepts](./ch02-00-core-concepts.md)
 
-- [Python in this project](./ch05-00-Python-in-This-Project.md)
-  - [The main.py file](./ch05-01-The-main.py-File.md)
-  - [Imports](./ch05-02-Imports.md)
-  - [TikTok-Client & Event-Handler](./ch05-03-TikTok-Client-and-Event-Handler.md)
-  - [Understanding the Event System](./ch05-04-Understanding-the-Event-System.md)
-  - [Gift-Events](./ch05-05-Gift-Events.md)
-  - [Follow-Events](./ch05-06-Follow-Events.md)
-  - [Like-Events](./ch05-07-Like-Events.md)
-  - [Threading & Queues](./ch05-08-Threading-and-Queues.md)
+# Plugin Development
 
-- [Debugging & troubleshooting](./ch06-00-Debugging-and-Troubleshooting.md)
+- [Plugin Development](./ch03-00-plugins.md)
+  - [Your First Plugin](./ch03-01-your-first-plugin.md)
+  - [Plugin Structure & Manifest](./ch03-02-plugin-structure.md)
+  - [Configuration](./ch03-03-configuration.md)
+  - [Plugin API Reference](./ch03-04-plugin-api.md)
+  - [Receiving Events](./ch03-05-events-and-subscriptions.md)
+  - [Cross-Plugin Communication](./ch03-06-cross-plugin-communication.md)
+  - [Overlays & State](./ch03-07-overlays-and-state.md)
 
-- [Appendix](./attachment.md)
-  - [Glossary](./glossary.md)
-  - [Core modules of the infrastructure](./core-modules.md)
-  - [Project structure](./project-structure.md)
-  - [Configuration (config.yaml)](./config.md)
-  - [Update process](./update.md)
-  - [Create a plugin without Python](./create-a-plugin-without-Python.md)
+# Hook Development
+
+- [Hook Development](./ch04-00-hooks.md)
+  - [Your First Hook](./ch04-01-your-first-hook.md)
+  - [Hook Structure & Manifest](./ch04-02-hook-structure-and-manifest.md)
+  - [Hook API Reference](./ch04-03-hook-api.md)
+  - [Hook Configuration](./ch04-04-hook-configuration.md)
+  - [Import Restrictions](./ch04-05-import-restrictions.md)
+  - [Plugin-Bundled Hooks](./ch04-06-plugin-bundled-hooks.md)
+
+# Actions & Minecraft
+
+- [Actions & Minecraft](./ch05-00-actions-and-minecraft.md)
+  - [Actions.mca Reference](./ch05-01-actions-mca-overview.md)
+  - [Event-Command-Mapper](./ch05-02-event-command-mapper.md)
+  - [RCON & Minecraft](./ch05-03-rcon-and-minecraft.md)
+  - [Overlay System](./ch05-04-overlay-system.md)
+
+# TikTok Chatbot
+
+- [TikTok Chatbot](./ch06-00-tiktok-chatbot.md)
+
+# Appendix
+
+- [Glossary](./glossary.md)
+- [Configuration Reference](./config-reference.md)
+- [Error Codes](./error-codes.md)
+- [Troubleshooting](./troubleshooting.md)
+- [FAQ](./faq.md)

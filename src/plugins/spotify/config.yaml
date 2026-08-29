@@ -1,0 +1,28 @@
+# ==========================================
+# Spotify Control Plugin — Configuration
+# ==========================================
+# This file controls the Spotify plugin settings.
+# All settings are local to this plugin.
+
+client_id: ""
+client_secret: ""
+redirect_uri: "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control"
+device_id: ""
+volume_step: 10
+playtrack_mode: "replace"
+
+signal_on:
+  - "track_changed"
+  - "play"
+  - "pause"
+
+theme:
+  background: "#000000"
+  text: "#ffffff"
+  accent: "#1db954"
+  accent2: "#1ed760"
+
+# OAuth tokens — populated automatically by the OAuth flow
+access_token: ""
+refresh_token: ""
+token_expires_at: 0

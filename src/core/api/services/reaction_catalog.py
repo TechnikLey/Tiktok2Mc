@@ -1,0 +1,353 @@
+"""Reaction catalog assembly for the GUI reactions wizard.
+
+Merges built-in core events (TikTok, Minecraft, Server) with the
+``emitted_events`` and ``accepted_commands`` declared by each plugin
+manifest. Plugins self-describe their reaction capabilities in
+``plugin.json`` — no GUI code changes are needed for a new plugin to
+appear in the wizard.
+"""
+
+import logging
+import time
+from pathlib import Path
+from typing import Any
+
+import core.paths
+from core.api.launcher import PluginLauncher
+
+log = logging.getLogger(__name__)
+
+# Version of the unified event catalog schema. Bump when the shape of
+# ``build_reaction_catalog()`` changes in a breaking way so consumers
+# (GUI wizards, external tools) can detect and adapt.
+CATALOG_VERSION = 1
+
+# Built-in events that are not owned by a plugin (TikTok, Minecraft, Server).
+CORE_EVENTS: dict[str, dict[str, Any]] = {
+    # TikTok
+    "tiktok.follow": {
+        "name": "New Follower",
+        "name_i18n": {"en": "New Follower", "de": "Neuer Follower"},
+        "desc": "When someone follows your TikTok account",
+        "desc_i18n": {
+            "en": "When someone follows your TikTok account",
+            "de": "Jemand folgt deinem TikTok-Account",
+        },
+        "category": "tiktok",
+        "icon": "👤",
+    },
+    "tiktok.join": {
+        "name": "Viewer Joins",
+        "name_i18n": {"en": "Viewer Joins", "de": "Zuschauer betritt"},
+        "desc": "When someone joins your live stream",
+        "desc_i18n": {
+            "en": "When someone joins your live stream",
+            "de": "Jemand betritt deinen Live-Stream",
+        },
+        "category": "tiktok",
+        "icon": "🚪",
+    },
+    "tiktok.comment": {
+        "name": "New Comment",
+        "name_i18n": {"en": "New Comment", "de": "Neuer Kommentar"},
+        "desc": "When someone sends a chat message",
+        "desc_i18n": {
+            "en": "When someone sends a chat message",
+            "de": "Jemand sendet eine Nachricht",
+        },
+        "category": "tiktok",
+        "icon": "💬",
+    },
+    "tiktok.like": {
+        "name": "New Like",
+        "name_i18n": {"en": "New Like", "de": "Neues Like"},
+        "desc": "When someone likes your stream",
+        "desc_i18n": {
+            "en": "When someone likes your stream",
+            "de": "Jemand liked deinen Stream",
+        },
+        "category": "tiktok",
+        "icon": "❤️",
+    },
+    "tiktok.share": {
+        "name": "New Share",
+        "name_i18n": {"en": "New Share", "de": "Neuer Share"},
+        "desc": "When someone shares your stream",
+        "desc_i18n": {
+            "en": "When someone shares your stream",
+            "de": "Jemand teilt deinen Stream",
+        },
+        "category": "tiktok",
+        "icon": "🔗",
+    },
+    "tiktok.gift": {
+        "name": "Gift Received",
+        "name_i18n": {"en": "Gift Received", "de": "Geschenk erhalten"},
+        "desc": "When someone sends a gift",
+        "desc_i18n": {
+            "en": "When someone sends a gift",
+            "de": "Jemand sendet ein Geschenk",
+        },
+        "category": "tiktok",
+        "icon": "🎁",
+    },
+    # Minecraft
+    "minecraft.player_death": {
+        "name": "Player Dies",
+        "name_i18n": {"en": "Player Dies", "de": "Spieler stirbt"},
+        "desc": "When you or another player dies",
+        "desc_i18n": {
+            "en": "When you or another player dies",
+            "de": "Du oder ein anderer Spieler stirbt",
+        },
+        "category": "minecraft",
+        "icon": "💀",
+    },
+    "minecraft.player_respawn": {
+        "name": "Player Respawns",
+        "name_i18n": {"en": "Player Respawns", "de": "Spieler spawnt neu"},
+        "desc": "When a player respawns after dying",
+        "desc_i18n": {
+            "en": "When a player respawns after dying",
+            "de": "Ein Spieler spawnt nach dem Tod neu",
+        },
+        "category": "minecraft",
+        "icon": "✨",
+    },
+    # Server
+    "server.started": {
+        "name": "Server Starts",
+        "name_i18n": {"en": "Server Starts", "de": "Server startet"},
+        "desc": "When the Minecraft server finishes starting",
+        "desc_i18n": {
+            "en": "When the Minecraft server finishes starting",
+            "de": "Der Minecraft-Server hat erfolgreich gestartet",
+        },
+        "category": "server",
+        "icon": "🟢",
+    },
+    "server.stopping": {
+        "name": "Server Stopping",
+        "name_i18n": {"en": "Server Stopping", "de": "Server stoppt"},
+        "desc": "When the Minecraft server begins to shut down",
+        "desc_i18n": {
+            "en": "When the Minecraft server begins to shut down",
+            "de": "Der Minecraft-Server fährt herunter",
+        },
+        "category": "server",
+        "icon": "🛑",
+    },
+}
+
+# Quick-start presets shown on the empty reactions screen. These reference
+# the plugins bundled with the app by name; presets whose plugin is not
+# installed are filtered out at build time, so removing a plugin never
+# leaves dead suggestions and no code change is required.
+CORE_TEMPLATES: list[dict[str, Any]] = [
+    {
+        "event": "minecraft.player_death",
+        "plugin": "spotify-control",
+        "command": "pause",
+        "args": {},
+        "title": "Pause Music on Death",
+        "desc": "Automatically pause Spotify when you die in Minecraft.",
+    },
+    {
+        "event": "timer.zero",
+        "plugin": "win-counter",
+        "command": "add_win",
+        "args": {"amount": 1},
+        "title": "Add Win on Timer",
+        "desc": "Award a win when the countdown timer hits zero.",
+    },
+    {
+        "event": "tiktok.gift",
+        "plugin": "timer",
+        "command": "add_time",
+        "args": {"seconds": 30},
+        "title": "Add Time on Gift",
+        "desc": "Add 30 seconds to the timer every time someone sends a gift.",
+    },
+]
+
+
+def _plugins_dir() -> Path | None:
+    """Return the plugins directory (dev or release layout), or None."""
+    root = core.paths.get_root_dir()
+    for candidate in (root / "src" / "plugins", root / "plugins"):
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def collect_known_event_keys(plugins_dir: Path | None = None) -> set[str]:
+    """Return every event key known to the system (delivery registry).
+
+    Merges the built-in core events with every plugin's declared
+    ``emitted_events``. The PluginEventBridge uses this to warn about
+    subscriptions pointing at unknown event names (typo protection).
+    """
+    known = set(CORE_EVENTS)
+    plugins_dir = plugins_dir or _plugins_dir()
+    if plugins_dir is None or not plugins_dir.is_dir():
+        return known
+
+    launcher = PluginLauncher(plugins_dir=plugins_dir)
+    try:
+        manifests = launcher._discover_from_manifests()
+    except Exception as exc:  # catalog must never break on a broken manifest
+        log.warning("Failed to scan plugin manifests for emitted events: %s", exc)
+        return known
+    for manifest in manifests:
+        for ev in manifest.emitted_events:
+            known.add(ev.key)
+    return known
+
+
+# ---------------------------------------------------------------------------
+# Event payload schemas (versioned contract)
+# ---------------------------------------------------------------------------
+
+_SCHEMA_TTL = 30.0
+_schema_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def get_event_schemas(plugins_dir: Path | None = None) -> dict[str, Any]:
+    """Return ``{event_key: {"plugin", "version", "data_schema"}}`` for
+    every declared event that carries a payload contract.
+
+    TTL-cached like the accepted_commands registry; an empty dict means
+    no schemas are declared and validation is a no-op.
+    """
+    now = time.monotonic()
+    cache_key = str(plugins_dir) if plugins_dir else "<default>"
+    cached = _schema_cache.get(cache_key)
+    if cached and now - cached[0] < _SCHEMA_TTL:
+        return cached[1]
+
+    result: dict[str, Any] = {}
+    plugins_dir = plugins_dir or _plugins_dir()
+    if plugins_dir is not None and plugins_dir.is_dir():
+        launcher = PluginLauncher(plugins_dir=plugins_dir)
+        try:
+            manifests = launcher._discover_from_manifests()
+        except Exception as exc:  # never break publishing on a broken manifest
+            log.warning("Failed to scan plugin manifests for event schemas: %s", exc)
+            manifests = []
+        for manifest in manifests:
+            for ev in manifest.emitted_events:
+                if ev.data_schema:
+                    result[ev.key] = {
+                        "plugin": manifest.name,
+                        "version": ev.version,
+                        "data_schema": [f.model_dump() for f in ev.data_schema],
+                    }
+    _schema_cache[cache_key] = (now, result)
+    return result
+
+
+def invalidate_event_schema_cache() -> None:
+    """Drop the schema cache (call after plugin installs/updates)."""
+    _schema_cache.clear()
+
+
+def validate_event_payload(
+    event_type: str, data: dict[str, Any], plugins_dir: Path | None = None
+) -> list[str]:
+    """Check *data* against the declaring plugin's ``data_schema``.
+
+    Returns a list of violation messages (empty = valid or no schema
+    declared). Only declared events are validated; unknown/undeclared
+    event types pass through untouched. Extra keys beyond the schema are
+    allowed so consumers can extend payloads without breaking publishers.
+    """
+    schemas = get_event_schemas(plugins_dir)
+    contract = schemas.get(event_type)
+    if not contract:
+        return []
+    violations: list[str] = []
+    for field in contract["data_schema"]:
+        key = field["key"]
+        if key not in data:
+            if field.get("required"):
+                violations.append(f"missing required key '{key}'")
+            continue
+        expected = field["type"]
+        value = data[key]
+        ok = True
+        if expected == "boolean":
+            ok = isinstance(value, bool)
+        elif expected == "number":
+            # bool is a subclass of int — reject it explicitly
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif expected == "string":
+            ok = isinstance(value, str)
+        elif expected == "object":
+            ok = isinstance(value, dict)
+        elif expected == "array":
+            ok = isinstance(value, list)
+        # "any" accepts everything
+        if not ok:
+            violations.append(
+                f"'{key}' must be {expected} (got {type(value).__name__})"
+            )
+    return violations
+
+
+def _available_templates(
+    templates: list[dict[str, Any]], installed: set[str]
+) -> list[dict[str, Any]]:
+    """Keep only presets whose target plugin is actually installed."""
+    return [t for t in templates if t.get("plugin") in installed]
+
+
+def build_reaction_catalog() -> dict[str, Any]:
+    """Assemble the full reaction catalog from core + plugin manifests.
+
+    Returns ``{"events": ..., "plugins": ..., "commands": ...,
+    "templates": [...]}``.  Plugin-declared entries always override any
+    core entry with the same key so plugins can extend or replace the
+    built-in catalog.  Quick-start presets referencing an uninstalled
+    plugin are dropped.
+    """
+    events: dict[str, dict[str, Any]] = dict(CORE_EVENTS)
+    plugins: dict[str, dict[str, Any]] = {}
+    commands: dict[str, dict[str, Any]] = {}
+
+    plugins_dir = _plugins_dir()
+    if plugins_dir is None:
+        log.warning(
+            "Plugins directory not found — reaction catalog has core events only"
+        )
+        return {
+            "version": CATALOG_VERSION,
+            "events": events,
+            "plugins": plugins,
+            "commands": commands,
+            "templates": [],
+        }
+
+    launcher = PluginLauncher(plugins_dir=plugins_dir)
+    for manifest in launcher._discover_from_manifests():
+        plugins[manifest.name] = {
+            "name": manifest.display_name or manifest.name,
+            "desc": manifest.description,
+            "icon": manifest.icon,
+        }
+        for ev in manifest.emitted_events:
+            data = ev.model_dump()
+            # Plugin events are grouped under the plugin's own name.
+            data["category"] = manifest.name
+            events[ev.key] = data
+        if manifest.accepted_commands:
+            commands[manifest.name] = {
+                key: cmd.model_dump() for key, cmd in manifest.accepted_commands.items()
+            }
+
+    return {
+        "version": CATALOG_VERSION,
+        "events": events,
+        "plugins": plugins,
+        "commands": commands,
+        "templates": _available_templates(CORE_TEMPLATES, set(plugins)),
+    }

@@ -1,0 +1,198 @@
+import asyncio
+import logging
+import threading
+import time
+import uuid
+from typing import Any
+
+log = logging.getLogger(__name__)
+
+
+class PluginStateStore:
+    """Stores the latest state per plugin, thread-safe.
+
+    Plugins push their current state via the EventBus
+    (``plugin.{name}.state_update``) and the store caches the
+    most recent value so SSE clients always receive the latest
+    state on connection.
+    """
+
+    def __init__(self) -> None:
+        self._states: dict[str, dict[str, Any]] = {}
+        self._lock = threading.Lock()
+
+    def set_state(self, name: str, state: dict[str, Any]) -> None:
+        with self._lock:
+            self._states[name] = state
+
+    def get_state(self, name: str) -> dict[str, Any] | None:
+        with self._lock:
+            return self._states.get(name)
+
+    def clear(self, name: str) -> None:
+        with self._lock:
+            self._states.pop(name, None)
+
+
+state_store = PluginStateStore()
+
+
+class CommandQueue:
+    """Per-plugin command queues with push notification support.
+
+    Other components enqueue commands here via the API.
+    Plugin processes can either poll ``GET /api/v1/plugins/{name}/commands``
+    or use the long-polling variant ``?wait=1`` which blocks until
+    a command arrives (zero-latency, no wasted CPU).
+    """
+
+    MAX_QUEUE_SIZE: int = 1000
+
+    def __init__(self) -> None:
+        self._queues: dict[str, list[dict[str, Any]]] = {}
+        self._events: dict[str, asyncio.Event] = {}
+        self._lock = threading.Lock()
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+
+    def enqueue(self, plugin_name: str, command: str, **kwargs: Any) -> str:
+        cmd_id = str(uuid.uuid4())
+        entry: dict[str, Any] = {
+            "id": cmd_id,
+            "command": command,
+            "args": kwargs,
+            "timestamp": time.time(),
+        }
+        event: asyncio.Event | None = None
+        with self._lock:
+            queue = self._queues.setdefault(plugin_name, [])
+            if len(queue) >= self.MAX_QUEUE_SIZE:
+                queue.pop(0)
+                log.warning(
+                    "[CMD-QUEUE] %s queue full — dropped oldest command", plugin_name
+                )
+            queue.append(entry)
+            event = self._events.get(plugin_name)
+        if event is not None and self._loop is not None and self._loop.is_running():
+            self._loop.call_soon_threadsafe(event.set)
+        return cmd_id
+
+    def dequeue_all(self, plugin_name: str) -> list[dict[str, Any]]:
+        with self._lock:
+            cmds = self._queues.pop(plugin_name, [])
+            event = self._events.get(plugin_name)
+        if event is not None:
+            event.clear()
+        return cmds
+
+    async def wait_for_commands(self, plugin_name: str, timeout: float = 30.0) -> None:
+        """Block the current async task until a command is enqueued for *plugin_name*.
+
+        Returns immediately if commands are already pending.
+        Raises ``asyncio.TimeoutError`` if *timeout* elapses.
+        """
+        with self._lock:
+            if self._queues.get(plugin_name):
+                return
+            if plugin_name not in self._events:
+                self._events[plugin_name] = asyncio.Event()
+            event = self._events[plugin_name]
+        await asyncio.wait_for(event.wait(), timeout=timeout)
+
+    def clear(self, plugin_name: str) -> None:
+        with self._lock:
+            self._queues.pop(plugin_name, None)
+            self._events.pop(plugin_name, None)
+
+
+command_queue = CommandQueue()
+
+
+class QueryStore:
+    """Tracks in-flight plugin queries awaiting the plugin's response.
+
+    A query is delivered to the plugin through the regular command queue
+    (reserved command ``__query__``) and carries a correlation id. The
+    HTTP caller awaits a ``asyncio.Future`` here; the plugin's answer
+    arrives via ``POST /plugins/{name}/query-response`` which resolves
+    the future again. Thread-safe; futures are resolved via
+    ``call_soon_threadsafe`` so responses may arrive from any thread.
+    """
+
+    def __init__(self) -> None:
+        self._pending: dict[str, tuple[str, asyncio.Future]] = {}
+        self._lock = threading.Lock()
+
+    def register(self, query_id: str, plugin_name: str, future: asyncio.Future) -> None:
+        with self._lock:
+            self._pending[query_id] = (plugin_name, future)
+
+    def resolve(self, query_id: str, result: Any) -> bool:
+        """Resolve a pending query successfully. Returns False if unknown/done."""
+        return self._settle(query_id, {"ok": True, "result": result})
+
+    def fail(self, query_id: str, error: str) -> bool:
+        """Resolve a pending query with an error. Returns False if unknown/done."""
+        return self._settle(query_id, {"ok": False, "error": error})
+
+    def abandon(self, query_id: str) -> None:
+        """Drop tracking for a query (e.g. after the caller timed out)."""
+        with self._lock:
+            self._pending.pop(query_id, None)
+
+    def _settle(self, query_id: str, outcome: dict[str, Any]) -> bool:
+        with self._lock:
+            entry = self._pending.pop(query_id, None)
+        if entry is None:
+            return False
+        _, future = entry
+        if future.done():
+            return False
+
+        def _deliver() -> None:
+            if not future.done():
+                future.set_result(outcome)
+
+        loop = future.get_loop()
+        if loop.is_running():
+            loop.call_soon_threadsafe(_deliver)
+        else:
+            _deliver()
+        return True
+
+
+query_store = QueryStore()
+
+
+class OverlayHtmlStore:
+    """Caches rendered overlay HTML for each plugin.
+
+    Plugins POST their final rendered HTML on startup so the
+    Main API can serve it at ``/api/v1/plugins/{name}/overlay``.
+    """
+
+    def __init__(self) -> None:
+        self._html: dict[str, str] = {}
+        self._lock = threading.Lock()
+
+    def set_html(self, name: str, html: str) -> None:
+        with self._lock:
+            self._html[name] = html
+
+    def get_html(self, name: str) -> str | None:
+        with self._lock:
+            return self._html.get(name)
+
+    def clear(self, name: str) -> None:
+        with self._lock:
+            self._html.pop(name, None)
+
+
+overlay_html_store = OverlayHtmlStore()
+
+# Same store mechanism for plugin dashboard pages: plugins POST
+# their dashboard HTML on startup, the API serves it at
+# ``/api/v1/plugins/{name}/dashboard`` and the GUI embeds it as a tab.
+dashboard_html_store = OverlayHtmlStore()

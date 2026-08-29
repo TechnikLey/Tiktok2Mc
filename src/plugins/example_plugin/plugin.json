@@ -1,0 +1,83 @@
+{
+  "name": "example-plugin",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/example_plugin/main.py",
+  "display_name": "Example Plugin",
+  "description": "Reference plugin – demonstrates all BasePlugin features. Serves as a learning template and is excluded from release builds.",
+  "author": "Tiktok2Mc",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "min_api_version": "1.0.0",
+  "bundled": true,
+  "platform": "all",
+  "capabilities": [],
+  "permissions": ["events", "plugins"],
+  "depends_on": [],
+  "update_url": "",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "initial_count",
+        "type": "number",
+        "default": 0,
+        "label": "Initial Count",
+        "help": "The starting value of the counter.",
+        "category": "General"
+      },
+      {
+        "key": "step_size",
+        "type": "number",
+        "default": 1,
+        "label": "Step Size",
+        "help": "How much the counter changes per increment/decrement.",
+        "category": "General"
+      },
+      {
+        "key": "auto_tick",
+        "type": "boolean",
+        "default": false,
+        "label": "Auto Tick",
+        "help": "If enabled, the counter increments automatically every second.",
+        "category": "Behavior"
+      },
+      {
+        "key": "max_count",
+        "type": "number",
+        "default": 9999,
+        "label": "Maximum",
+        "help": "Upper limit of the counter (0 = unlimited).",
+        "category": "Limits"
+      },
+      {
+        "key": "theme",
+        "type": "group",
+        "label": "Colors (Theme)",
+        "help": "Overrides the plugin's default design colors.",
+        "category": "Appearance",
+        "fields": [
+          {
+            "key": "background",
+            "type": "color",
+            "default": "#000000",
+            "label": "Background",
+            "help": "Background color of the overlay."
+          },
+          {
+            "key": "text",
+            "type": "color",
+            "default": "#00ff88",
+            "label": "Text Color",
+            "help": "Main color for the counter text."
+          },
+          {
+            "key": "accent",
+            "type": "color",
+            "default": "#00cc66",
+            "label": "Accent",
+            "help": "Color for accents (e.g. labels)."
+          }
+        ]
+      }
+    ]
+  }
+}

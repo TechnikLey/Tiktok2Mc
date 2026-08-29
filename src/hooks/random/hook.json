@@ -1,0 +1,36 @@
+{
+  "name": "random",
+  "version": "1.0.0",
+  "display_name": "Random Trigger",
+  "description": "Picks a random eligible trigger and executes it when a $random action is triggered.",
+  "author": "TikTok2Mc",
+  "min_api_version": "1.0.0",
+  "capabilities": ["hook:random"],
+  "permissions": ["triggers"],
+  "update_url": "",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "mode",
+        "type": "select",
+        "default": "deny-all",
+        "label": "Filter Mode",
+        "help": "deny-all: triggers in the list are excluded from random pool. allow-only: only triggers in the list are eligible.",
+        "category": "General",
+        "options": ["deny-all", "allow-only"]
+      },
+      {
+        "key": "triggers",
+        "type": "array",
+        "default": [],
+        "label": "Triggers",
+        "help": "List of trigger names to deny or allow (depending on mode).",
+        "category": "General",
+        "item_schema": {
+          "type": "string"
+        }
+      }
+    ]
+  }
+}

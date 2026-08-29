@@ -1,0 +1,17 @@
+# Random Trigger Hook Configuration
+# Controls which triggers can be selected by the $random action
+# in data/actions.mca.
+#
+# mode:
+#   "deny-all"  — All triggers are eligible EXCEPT those in the list
+#                 (the list acts as a blocklist)
+#   "allow-all" — Only triggers in the list are eligible
+#                 (the list acts as an allowlist; any value other than
+#                 "deny-all" behaves this way)
+#
+# NOTE: Triggers that contain "$random" are automatically excluded
+# to prevent infinite recursion.
+mode: deny-all
+triggers:
+  - likes
+  - like_2

@@ -1,0 +1,45 @@
+# ==========================================
+# Timer Plugin — Configuration
+# ==========================================
+# Fully decoupled count-up / count-down timer.
+# Publishes events to the EventBus; consumers react via API.
+
+# Direction: "down" (countdown from start_time) or "up" (count from 0)
+direction: "down"
+
+# Initial time in seconds
+start_time: 600
+
+# Seconds added/removed per tick
+time_step: 1
+
+# Start automatically when plugin loads
+auto_start: false
+
+# When counting down and reaching zero, loop back to start_time instead of pausing
+loop: false
+
+# Events that trigger an automatic reset
+reset_on:
+  - "zero"
+
+# Timer events published to the EventBus. Consumers can subscribe without coupling.
+signal_on:
+  - "zero"
+  - "started"
+  - "paused"
+  - "reset"
+
+# Milestone times (seconds) that emit a timer.milestone event
+milestones: []
+
+# Overlay display format: mm:ss | hh:mm:ss | seconds
+format: "mm:ss"
+
+# Theme colours for the overlay window
+theme:
+  background: "#000000"
+  text: "#89CFF0"
+  warning: "#FFD700"
+  blink: "#FF8C00"
+  danger: "#FF0000"

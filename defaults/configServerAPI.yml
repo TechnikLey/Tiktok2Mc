@@ -24,9 +24,6 @@ webhooks:
   # You can set multiple URLs here.
   urls:
     - "http://localhost:29188/webhook"
-    - "http://localhost:29189/webhook"
-    - "http://localhost:29190/webhook"
-    - "http://localhost:29191/webhook"
   
   # If set to true, only the message content will be sent to the webhook endpoints
   # instead of the full JSON object with event, load_type, and message fields.

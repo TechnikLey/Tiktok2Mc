@@ -1,108 +1,95 @@
-# TikTok to Minecraft Integration
+# TikTok2Mc
 
-> [!IMPORTANT]
->
-> # v1.0.0 — Coming Soon
->
-> A major rewrite is in active development. v1.0.0 will ship:
->
-> * **Graphical User Interface** — manage everything through a GUI.
->   No more editing YAML, actions files, or configs by hand.
-> * **Plugin overhaul** — each plugin becomes a true standalone module.
->   Enable only what you need (opt-in). Timer, Death Counter, and Win
->   Counter are no longer hardwired together.
-> * **Unified API server** — one central backend instead of a dozen
->   separate executables. Drastically fewer ports and better stability.
-> * **Quality of Life** — first-run setup wizard, live log viewer,
->   overlay previews, theme editor with color pickers, Spotify setup
->   assistant, and integrated trigger testing.
->
-> **⚠️ Breaking Change:** v1.0.0 will **not** be compatible with v0.x
-> configurations, plugins, or workflows. This is intentional — the v0.x
-> line was an experimental phase, and v1.0.0 is the first stable release
-> built on a clean foundation.
->
-> If you are a new user, start with the latest **v0.5.0**.
-> Existing users can continue using v0.5.0 — it remains
-> stable and supported for day-to-day streaming.
->
-> **Update:** Development, testing, and polishing are in their final stage. The first stable v1.0.0 release is planned for August 2026, pending successful completion of the remaining final verification.
->
-> See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for current progress.
-
-
-Connect your TikTok Live stream to a Minecraft server. Gifts, follows, and likes from your viewers trigger real-time commands in the game.
-
-The tool includes a ready-to-use Minecraft server (1.21.11). On Windows, Java is automatically downloaded and set up if not already present, no manual installation required. On Linux, the tool will locate or install Java automatically.
+Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, follow you, or hit like milestones, things happen in your Minecraft world automatically. Configure everything through the Web Dashboard or via simple text files — **for basic use no programming is required**.
 
 ## Features
 
-- Real-time connection to TikTok Live via [TikTokLive](https://github.com/isaackogan/TikTokLive)
-- Trigger Minecraft commands through gifts, follows, and like milestones
-- Customizable action mappings with support for chaining, repeating, and randomizing commands
-- Built-in overlay plugins for OBS (Death Counter, Win Counter, Like Goal, Timer, Text Overlay)
-- Configurable like triggers with custom thresholds
-- Support for vanilla commands, server plugin commands, and special actions
-- Auto-updater for easy version management
+- **Gift reactions** — every gift triggers Minecraft commands: spawn mobs, give items, run effects, show overlays
+- **Follow, share & join actions** — react to viewers following, sharing, or joining your stream
+- **Like milestones** — trigger commands at like thresholds (every 100, 100k likes by default)
+- **Chat commands** — viewers type commands like `#give` or `$skip` in TikTok chat
+- **TikTok chatbot** — optional bot that thanks viewers and replies to keywords in your live chat (beta)
+- **Stream overlays** — OBS browser-source overlays for timers, counters, and text alerts
+- **Web Dashboard** — manage actions, configuration, plugins, and your server at `http://127.0.0.1:29185`
+- **Plugin & hook system** — extend TikTok2Mc with Python plugins and hooks
+- **Auto-updates** — checks for new versions and installs them automatically
 
 ## Requirements
 
-- **OS:** Windows or Linux
-- **RAM:** 12 GB minimum recommended (the Minecraft server uses up to 4 GB by default, adjustable)
+| Component | Requirement |
+|-----------|-------------|
+| **OS** | Windows 10+ or Linux |
+| **RAM** | 4 GB minimum, 8 GB recommended (Minecraft server: up to 4 GB, adjustable) |
+| **Free space** | ~1 GB for the tool, ~500 MB per additional Minecraft version |
+| **TikTok** | An active TikTok account — the live connection requires you to be streaming |
+| **Minecraft** | Java Edition (the tool bundles a PaperMC server, or use your own) |
+
+## Installation
+
+**Windows** — Download `TikTok2MC-<version>-Windows-Setup.exe` from [Releases](https://github.com/TechnikLey/Tiktok2Mc/releases) and run the installer. A portable ZIP is also available — extract anywhere and run.
+The installer is recommended, as it lets you configure the tool and create a desktop shortcut.
+
+**Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it. The installer itself needs no `sudo` — it installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `.tar.gz` archive is also available.
+
+> [!NOTE]
+> Running the tool on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail (depends on your desktop environment: some assign a TTY, some don't). Set `show_sudo_warning: false` in `config.yaml` to skip the check. If `~/.local/bin` is not on your `PATH`, the installer will show you how to add it.
+
+### Installation for advanced users
+You can also clone the repository and build the tool yourself. Keep in mind that a few dependencies must be installed on your system before it can be built — see the [developer documentation](./docs/dev-book-en/src/ch01-00-getting-started.md).
+Please note that building is very slow and resource-heavy: on low-end systems it can take a long time. Make sure you have enough free space, RAM, and CPU power available.
 
 ## Quick Start
 
-1. Open the file `config/config.yaml` in a text editor (for example Notepad).
-2. Find the line `User: your_tiktok_username` and replace `your_tiktok_username` with your actual TikTok username.
-3. Find `Password: ABC1234` and change it to any password you like. This is the password for the connection between the tool and the Minecraft server.
-4. Save the file.
-5. Open `data/actions.mca` and set up your actions. This file defines what happens in Minecraft when viewers send gifts, follow, or hit like milestones. There are already some example actions included, but you should adjust them to your liking. See the [User Guide](./docs/GUIDE.md#setting-up-actions) for a full explanation.
-6. Run `start.exe` (Windows) or `sudo ./start.bin` (Linux) to launch everything.
+1. **Launch** — Run `start.exe` (Windows) or `sudo ./start.bin` (Linux). The Dashboard opens at `http://127.0.0.1:29185`.
+2. **Set up** — On first launch a setup wizard guides you through the required settings: enter your TikTok username (without `@`) and set a secure RCON password. Everything else is managed from the Dashboard.
+3. **Enable features** — Turn on what you need from the Dashboard (Plugins, Comment Commands, etc.).
+4. **Define actions** — Use the Actions page in the Dashboard, or edit `data/actions.mca` directly. Each line is `trigger:command`. Example: `follow:/give @a minecraft:diamond`.
+5. **Connect** — Open Minecraft Java Edition → Multiplayer → Add Server → `localhost:25565`.
 
-That's it. The tool will start the Minecraft server, connect to your TikTok Live, and begin listening for events.
+> You must be live on TikTok to receive live events; the tool can also be used with manual triggers. The Dashboard is at `http://127.0.0.1:29185` — most settings can also be edited by hand in `config/config.yaml` and `data/actions.mca`.
 
-> [!IMPORTANT]
-> You must be live on TikTok for the connection to work. The tool will keep trying to reconnect until your stream is live.
+## Overlay URLs (OBS Browser Source)
 
-For a detailed walkthrough of all settings, action syntax, overlays, and troubleshooting, see the **[User Guide](./docs/GUIDE.md)**.
+All overlays are served through the central API at `http://127.0.0.1:29185`:
 
-For a list of all changes between versions, see the **[Changelog](./docs/CHANGELOG.md)**.
+| Overlay | URL |
+|---------|-----|
+| Text overlay (default) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default` |
+| Text overlay (chroma key) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default&chroma=true` |
+| Timer | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
+| Death Counter | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
+| Win Counter | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
+| Spotify Control | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
+
+**Real-time updates (SSE streams)** — for browser sources that need live updates without refresh:
+- Core overlay: `http://127.0.0.1:29185/api/v1/overlay/stream`
+- Plugin overlays: `http://127.0.0.1:29185/api/v1/plugins/{name}/stream`
+
+## Getting help
+
+- **User Guide** — [`docs/GUIDE.md`](./docs/GUIDE.md) covers installation, configuration, actions, comment commands, plugins, overlays, server management, and FAQ in detail.
+- **Issues** — Open a [GitHub Issue](https://github.com/TechnikLey/Tiktok2Mc/issues) for bugs or feature requests.
 
 ## Developer Documentation
 
 The developer documentation is best viewed online:
 
-- **[English-Dev-Documentation](https://technikley.github.io/Tiktok2Mc/en)**
-- **[Deutsche-Dev-Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
+- **[English Dev Documentation](https://technikley.github.io/Tiktok2Mc/en)**
+- **[Deutsche Entwickler-Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
 
 > [!TIP]
 > The online docs are better organized and easier to navigate. You can also browse the Markdown files directly in the repository if you prefer:
-> - [English-Dev-Documentation](./docs/dev-book-en/src/Introduction.md)
-> - [Deutsche-Dev-Dokumentation](./docs/dev-book-de/src/Introduction.md)
+> - [English Dev Documentation](./docs/dev-book-en/src/Introduction.md)
+> - [Deutsche Entwickler-Dokumentation](./docs/dev-book-de/src/Introduction.md)
 
 > [!WARNING]
 > The developer documentation may not always be fully up to date.
 
 ## License
 
-This project is licensed under the **PolyForm Noncommercial License 1.0.0** with a special exception for TikTok content creators.
+PolyForm Noncommercial License 1.0.0 with a special exception for TikTok content creators.
 
-**Allowed:**
-- Use during TikTok Lives, including earning money through Gifts, Diamonds, and the Creator Program.
-- Personal and educational use.
-- Modifying the code, provided changes are shared under the same license.
+**Allowed:** Use during TikTok Lives (including monetized streams), personal and educational use, modifying the code.
+**Not allowed:** Commercial use on other platforms (Twitch, YouTube, Kick) without permission, selling the software.
 
-**Not allowed:**
-- Commercial use on other platforms (Twitch, YouTube, Kick) without permission.
-- Selling the software or any modified version of it.
-
-**Attribution:** When sharing or redistributing, include this notice:
-
-`Required Notice: Copyright (c) 2026 TechnikLey - https://github.com/TechnikLey/Tiktok2Mc.git`
-
-For the full legal text, see the [LICENSE](LICENSE) file.
-
-## Contact
-
-- **GitHub:** [Open an Issue](https://github.com/TechnikLey/Tiktok2Mc/issues) or start a discussion.
-- **Profile:** [TechnikLey on GitHub](https://github.com/TechnikLey)
+See [LICENSE](LICENSE) for the full legal text.

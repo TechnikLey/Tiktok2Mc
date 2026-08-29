@@ -1,0 +1,19 @@
+# ==========================================
+# Win Counter Plugin — Configuration
+# ==========================================
+# Fully decoupled win counter with milestones.
+# Publishes events to the EventBus; consumers react via API.
+
+initial_needed: 10
+milestone_increment: 10
+
+signal_on:
+  - "milestone"
+  - "record_low"
+
+theme:
+  background: "#000000"
+  text: "#ffffff"
+  danger: "#ff4444"
+  muted: "#aaaaaa"
+  separator: "#444444"

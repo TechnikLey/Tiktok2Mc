@@ -1,0 +1,580 @@
+# Hook-API-Referenz
+
+Alle Methoden, die dein Hook über das `api`-Objekt in der `register()`-Funktion nutzen kann.
+
+## Übersicht
+
+| Methode | Beschreibung |
+|---------|--------------|
+| `register_action(name, fn)` | Handler für `$`-Befehle registrieren |
+| `rcon_enqueue(commands)` | Minecraft-Befehle ausführen |
+| `enqueue_trigger(action_name, user="hook", context=None)` | anderen Trigger auslösen (verkettet) |
+| `register_timer(interval, fn)` | `fn()` periodisch ausführen (ohne `threading`) |
+| `register_query(name, fn)` | Query exponieren, die andere Hooks synchron aufrufen können |
+| `query_hook(target_hook, query, args=None)` | Query eines anderen Hooks aufrufen (Ergebnis oder `None`) |
+| `register_dashboard_widget(title, html)` | HTML-Karte im Web-Dashboard anzeigen (braucht `ui`-Permission) |
+| `get_hook_config(name)` | Per-Hook-Konfiguration lesen |
+| `send_overlay_text(title, subtitle="", duration=3, overlay_name="default")` | Overlay-Text anzeigen |
+| `store_get(key, default=None)` | Aus dem persistenten Store dieses Hooks lesen |
+| `store_set(key, value)` | In den persistenten Store schreiben |
+| `store_delete(key)` | Schlüssel aus dem Store löschen |
+| `store_all()` | Kompletten Store lesen |
+| `log(msg)` | Hook-spezifische Meldung loggen |
+| `config` (Property) | Globale Config lesen (Kopie) |
+
+## register_action(name, fn)
+
+Registriert eine Handler-Funktion im globalen `HOOK_ACTIONS`-Dictionary.
+
+```python
+api.register_action("superjump", mein_handler)
+```
+
+- **name**: Muss mit dem Namen nach `$` in der `actions.mca` übereinstimmen
+- **fn**: `(user: str, trigger: str, context: HookContext) -> bool | None`
+  — `user` ist immer der reine Benutzername-String; Ereignisdaten liegen
+  in `context` (siehe unten)
+- Doppelte Registrierung wird ignoriert (erster Aufruf gewinnt)
+
+```python
+def register(api: HookAPI):
+    def handler(user, trigger, context):
+        api.rcon_enqueue([f"say {user} löste {trigger} aus!"])
+
+    api.register_action("mein-befehl", handler)
+```
+
+### Rückgabewert — Veto-Vertrag
+
+Eine Hook-Action kann den auslösenden Trigger durch die Rückgabe von `False` blockieren (Veto):
+
+| Rückgabewert | Wirkung |
+|--------------|--------|
+| `None` (Standard) / `True` | Kette läuft wie gewohnt weiter |
+| `False` | Der Rest der Trigger-Kette wird abgebrochen |
+
+Gibt ein Hook `False` zurück, werden alle folgenden `$`-Aktionen derselben
+Trigger-Zeile übersprungen; Overlay-, Vanilla-, RCON- und Shell-Aktionen des
+Triggers werden nicht ausgeführt. Bereits von früheren Hooks enqueued Trigger
+(via `enqueue_trigger`) bleiben unberührt.
+
+Damit lassen sich Gate-Hooks wie Rate-Limiter oder Schimpfwortfilter umsetzen:
+
+```python
+def register(api: HookAPI):
+    recent: list[float] = []
+
+    def anti_spam(user, trigger, context):
+        now = time.time()
+        recent[:] = [t for t in recent if now - t < 5]
+        if len(recent) >= 10:
+            return False  # zu viele Events — ganzen Trigger blockieren
+        recent.append(now)
+
+    api.register_action("gate", anti_spam)
+```
+
+In der `data/actions.mca` steht das Gate an erster Stelle, damit es vor allem anderen läuft:
+
+```mca
+gift:$gate;$say_thanks
+```
+
+## Handler-Kontext — strukturierte Ereignisdaten
+
+Das dritte Handler-Argument ist ein **`HookContext`** — eine `dict`-Unterklasse,
+die das Ereignis beschreibt, mit dem die Kette gestartet wurde. Sie wird von der
+Ereignisquelle gebaut und enthält mindestens:
+
+| Schlüssel | Typ | Bedeutung |
+|-----|------|---------|
+| `event` | `str` | Trigger-Familie: `"gift"`, `"follow"`, `"like"`, `"comment"`, `"join"`, `"share"` bzw. der Trigger-Name bei Webhook-/Hook-Quellen |
+| `source` | `str` | Herkunft des Triggers: `"tiktok"`, `"webhook"` (custom_trigger/Test/API-Dispatch) oder `"hook"` |
+
+Ereignisspezifische Schlüssel kommen hinzu:
+
+| Ereignis | Zusätzliche Schlüssel |
+|-------|------------|
+| `gift` | `gift_name`, `gift_id`, `streak` (Combo-Länge; `1` bei Nicht-Combo-Gifts), `combo` |
+| `comment` | `comment`, `is_moderator`, `is_super_fan`, `in_fanclub` |
+| `like` | `total_since_start`, `milestone_every`, `milestone_rule` |
+| Hook-verkettet (`enqueue_trigger`) | `hook` (Name deines Hooks) plus alles, was du per `context=` übergibst |
+
+Schlüssel sind nur vorhanden, wenn sie bedeutungsvoll sind (z. B. fehlt
+`combo` bei Nicht-Gift-Events). Pflicht-Schlüssel liest du als Attribute,
+optionale via `.get()`:
+
+- `context.event`, `context.streak` — Attribut-Zugriff, fail-fast mit
+  `AttributeError` bei unbekannten Schlüsseln (Tippfehler-Schutz)
+- `context.get("combo", False)` — optionale Schlüssel mit Defaults
+- Volle Dict-Kompatibilität bleibt erhalten: `in`, Iteration,
+  `json.dumps(context)` funktionieren wie gewohnt
+
+Interne Mechanik wie die Verkettungstiefe ist bewusst **nicht** Teil des
+Kontexts — er beschreibt das Ereignis, nicht den Dispatcher.
+
+### Beispiel: Gift-Combo-Bonus
+
+Da der Kontext die fertige Streak-Länge enthält, ist ein Combo-Bonus nur
+noch ein einfacher Schwellwert-Check — Combo-Gifts feuern einmal beim
+Ende der Streak, mit `streak` als Gesamtzahl der Gifts:
+
+```python
+def register(api: HookAPI):
+    def combo_bonus(user, trigger, context):
+        if context.event != "gift":
+            return
+        if context.gift_name == "Rose" and context.streak >= 10:
+            api.rcon_enqueue([f"say {user} hat eine {context.streak}x Rosen-Combo geschickt!"])
+            api.enqueue_trigger(
+                "mega_celebration", user,
+                context={"event": "gift", "gift_name": "Rose",
+                         "streak": context.streak},
+            )
+
+    api.register_action("combo_check", combo_bonus)
+```
+
+```mca
+gift:$combo_check;$say_thanks
+```
+
+## Permissions (Berechtigungen)
+
+Seiteneffektbehaftete API-Aufrufe sind durch **Permissions** geschützt,
+die in deiner `hook.json` deklariert werden (getrennt von `capabilities`,
+den Discovery-Tags):
+
+| Permission | Gewährt |
+|------------|--------|
+| `rcon` | `rcon_enqueue` |
+| `triggers` | `enqueue_trigger` |
+| `overlay` | `send_overlay_text` |
+| `store` | `store_get`, `store_set`, `store_delete`, `store_all` |
+| `network` | `request` (HTTP-Helper für die Control Plane) |
+| `events` | `publish_event` (eigene Events auf dem API-EventBus) |
+| `ui` | `register_dashboard_widget` (Dashboard-UI-Integration) |
+
+Ungesperrte Methoden, die immer funktionieren: `register_action`,
+`register_lifecycle`/`on_live_start`/`on_live_end`/`on_unload`,
+`register_timer`, `register_query`, `query_hook`, `register_event`, `log`,
+`get_hook_config`, `config`, `get_valid_functions`.
+
+- Ein Aufruf ohne passende Berechtigung wird **abgelehnt** (geloggt als
+  `HOOK-0009`) und liefert seinen sicheren Rückgabewert (`None`, `False`,
+  `{}` oder den übergebenen Default) — der Hook läuft weiter, nichts crasht.
+- Unbekannte Permission-Namen in der `hook.json` erzeugen beim Laden eine Warnung.
+- Deklariere nur, was du nutzt. Hinweis: Permissions schützen nur die
+  **HookAPI-Oberfläche** — ein Hook darf weiterhin direkt `urllib`/`requests`
+  importieren; Prozess-Sandboxing ist ein eigenes Thema.
+
+```json
+{
+  "name": "sprung",
+  "permissions": ["rcon", "overlay"]
+}
+```
+
+## request(path, payload=None, method=None, timeout=5)
+
+Synchrone Request/Response-Aufrufe gegen die Control Plane.
+Liefert den **geparsten JSON-Body** (`dict`/`list`/str/...) zurück, oder
+`None`, wenn der Body leer ist oder der Aufruf fehlschlägt — Fehler werden
+geloggt, nie geworfen.
+
+- `path` ist relativ zur API-Basis `/api/v1`, z. B.
+  `"plugins/spotify/state"`.
+- `payload=None` sendet ein GET; mit Payload wird sie als JSON per POST
+  gesendet (überschreibbar mit `method="PUT"` etc.).
+- Benötigt die `network`-Permission.
+
+```python
+def register(api: HookAPI):
+    def handler(user, trigger, context):
+        state = api.request("plugins/spotify/state")
+        track = (state or {}).get("state", {})
+        if track.get("name"):
+            api.send_overlay_text(title=track["name"], subtitle=track["artists"])
+        else:
+            api.send_overlay_text(title="Spotify", subtitle="Kein aktiver Track")
+
+    api.register_action("spotify_current", handler)
+```
+
+Beispiel — Benachrichtigung mit autarken Channel-Einstellungen senden.
+Eingebaute Channels sind `log`, `overlay`, `sound`, `tts` und `discord`;
+jeder Eintrag trägt seine eigenen Parameter inline:
+
+```python
+result = api.request("notifications", payload={
+    "title": f"Danke für den Follow, {user}!",
+    "channels": {"discord": {"webhook_url": webhook_aus_hook_config}},
+})
+# result -> {"sent": [...], "failed": [...], "skipped": [...]} oder None
+```
+
+- `overlay`: `{"overlay_name": "default", "duration": 4}` — OBS-Overlay-Text
+- `sound`: `{"file": "data/sounds/alert.wav"}` — spielt eine .wav-Datei (Windows)
+- `tts`: `{"rate": 0, "timeout": 15}` — spricht den Text via Windows SAPI
+- `discord`: `{"webhook_url": "https://discord.com/api/webhooks/..."}`
+
+Jeder Request trägt seine eigenen Parameter — verschiedene Aktionen können
+unterschiedliche Webhooks oder Sounds unabhängig ansprechen; unbekannte
+Channel-Namen erscheinen als `skipped` (mit `NOTIF-0002`-Warnung im
+API-Log), gescheiterte Zustellungen als `failed` (`NOTIF-0001`) — beides
+wirft nie Exceptions.
+
+## rcon_enqueue(commands)
+
+Fügt eine Liste von Minecraft-Befehlen in die RCON-Warteschlange ein.
+
+```python
+api.rcon_enqueue([
+    "effect give @a minecraft:speed 30 2 true",
+    f"say {user} hat Geschwindigkeit ausgelöst!",
+])
+```
+
+- **commands**: `list[str]` — werden nacheinander an den Minecraft-Server gesendet
+- Die Queue ist asynchron: Die Funktion blockiert nicht
+- Bei voller Queue werden Befehle stillschweigend verworfen
+
+## enqueue_trigger(action_name, user="hook", context=None)
+
+Löst einen anderen Action-Namen aus (verkettete Trigger).
+
+```python
+api.enqueue_trigger("explosion", user)
+```
+
+- Ruft `execute_global_command(action_name, user)` auf
+- **Maximale Verkettungstiefe**: 3 (danach wird der Trigger gesperrt)
+- Bei Überschreitung wird der Action-Name **dauerhaft für die Session** blockiert
+- **context**: optionales Dict, das an die Hook-Actions der neuen Kette
+  weitergereicht wird (siehe [Handler-Kontext](#handler-kontext--strukturierte-ereignisdaten)).
+  Ohne Angabe startet die neue Kette mit `{"source": "hook", "hook": <name>}`.
+
+### Beispiel: Verkettung
+
+```
+actions.mca:
+  follow: $begruessung
+  $begruessung → enqueue_trigger("feuerwerk")
+  feuerwerk → in actions.mca: feuerwerk: $effekt
+```
+
+Der Hook reagiert auf `$begruessung` und löst dann `feuerwerk` aus:
+
+```python
+def on_begruessung(user, trigger, context):
+    api.rcon_enqueue([f"say Hallo {user}!"])
+    api.enqueue_trigger("feuerwerk", user)
+```
+
+## get_hook_config(name)
+
+Gibt die Konfiguration eines bestimmten Hooks als Dict zurück. Der Parameter `name` ist der Hook-Name (identisch mit dem Verzeichnisnamen und dem `name`-Feld in der `hook.json`).
+
+```python
+config = api.get_hook_config("sprung")
+dauer = config.get("dauer", 10)
+```
+
+- Liefert ein leeres Dict `{}`, wenn der Hook keine Konfiguration hat
+- Die Konfiguration stammt aus der `config.yaml` des Hooks kombiniert mit dem `config_schema`
+
+## send_overlay_text(title, subtitle="", duration=3, overlay_name="default")
+
+Zeigt eine Overlay-Textnachricht an.
+
+```python
+api.send_overlay_text("Neuer Follower!", user, 5)
+api.send_overlay_text("Gift", "Diamant", 3, "gift-overlay")
+```
+
+- **title**: Haupttext
+- **subtitle**: Untertitel (optional)
+- **duration**: Anzeigedauer in Sekunden (Default: 3)
+- **overlay_name**: Overlay-Kanal (Default: `"default"`)
+- Gibt `True` bei Erfolg, `False` bei Fehler zurück (z. B. wenn der API-Server nicht erreicht werden kann oder das Overlay deaktiviert ist)
+
+## log(msg)
+
+Schreibt eine Hook-spezifische Log-Nachricht.
+
+```python
+api.log(f"Benutzer {user} hat Aktion ausgelöst")
+```
+
+- Erscheint im Log mit `[HOOK]` Präfix
+
+## config (Property)
+
+Schreibgeschützter Zugriff auf die globale `config.yaml` (Kopie).
+
+```python
+glob_cfg = api.config
+rcon_host = glob_cfg.get("server_host", "127.0.0.1")
+```
+
+## Persistenter Speicher
+
+Jeder Hook bekommt automatisch seinen eigenen Namespace im namespaced
+persistenten Store der API (`data/plugin_data/<hook-name>.json`). Das `api`-Objekt,
+das an `register()` übergeben wird, ist bereits an den Namen deines Hooks gebunden
+— kein HTTP-Boilerplate nötig:
+
+```python
+def register(api: HookAPI):
+    def track(user, trigger, context):
+        count = api.store_get("count", 0)
+        api.store_set("count", count + 1)
+
+    api.register_action("track", track)
+```
+
+| Methode | Verhalten |
+|--------|----------|
+| `store_get(key, default=None)` | Liefert den Wert, oder `default`, wenn der Schlüssel fehlt / der Store nicht erreichbar ist |
+| `store_set(key, value)` | Speichert beliebige JSON-serialisierbare Daten; gibt `True`/`False` zurück |
+| `store_delete(key)` | Löscht einen Schlüssel; `True` wenn er existierte |
+| `store_all()` | Liefert alle Schlüssel/Werte als Dict |
+
+Schlüssel müssen dem Muster `[A-Za-z0-9_.-]{1,128}` entsprechen. Werte überleben
+Neustarts und werden atomar geschrieben. Das Dashboard kann dieselben Daten über
+`GET /api/v1/plugins/<hook-name>/data` lesen.
+
+## Lifecycle-Callbacks
+
+Hooks können Callbacks registrieren, die feuern, wenn die TikTok-Live-Verbindung
+hergestellt wird, wenn der Live-Stream endet und wenn der Hook entladen wird.
+Nützlich für Start-/Shutdown-Ankündigungen, Reset internen States oder
+Synchronisation mit externen Diensten.
+
+```python
+def register(api: HookAPI):
+    def on_start():
+        api.send_overlay_text("Stream Online!", "Hooks sind aktiv", 5)
+        api.log("TikTok-Verbindung hergestellt — Hook bereit")
+
+    def on_end():
+        api.send_overlay_text("Stream Offline", "Bis zum nächsten Mal!", 5)
+        api.log("TikTok-Stream beendet — Hook fährt herunter")
+
+    api.on_live_start(on_start)
+    api.on_live_end(on_end)
+```
+
+- **`on_live_start(fn)`** — Wird einmal aufgerufen, wenn die Bridge erfolgreich
+  mit dem TikTok-Live-Stream verbunden ist (`ConnectEvent`). Läuft in einem
+  Hintergrund-Executor; Exceptions in einem Hook blockieren andere Hooks nie.
+- **`on_live_end(fn)`** — Wird einmal aufgerufen, wenn der Live-Stream endet
+  (`LiveEndEvent`). Ebenfalls im Hintergrund-Executor.
+- Die generische Form ist `api.register_lifecycle(event, fn)` mit `event`
+  als `"live_start"`, `"live_end"` oder `"unload"`. Die Convenience-Methoden
+  sind empfohlen.
+
+### Unload-Callbacks (`api.on_unload(fn)`)
+
+Der `unload`-Callback läuft **bevor** die Registrierungen deines Hooks
+gelöscht werden — beim Runtime-Reload (Enable/Disable/Config-Änderung) und
+beim Herunterfahren der Bridge. Hier gibst du Ressourcen frei:
+
+```python
+def register(api: HookAPI):
+    state_file = open("state.json", "a")
+
+    def aufraeumen():
+        state_file.close()
+        api.log("Hook entladen — Ressourcen freigegeben")
+
+    api.on_unload(aufraeumen)
+```
+
+- Wird ohne Argumente aufgerufen; läuft vor dem erneuten `register()` beim
+  nächsten Laden.
+- Exceptions sind pro Hook isoliert (gemeldet als `HOOK-0008`) und blockieren
+  weder den Reload noch andere Hooks.
+
+> [!NOTE]
+> Callbacks sind synchron (kein `async def`). Sie laufen in einem Thread-Pool,
+> um den TikTok-Client-Thread nicht zu blockieren. Halte sie kurz; schwere
+> Arbeit sollte via `api.rcon_enqueue`, `api.enqueue_trigger` oder HTTP-Calls
+> ausgelagert werden.
+
+## Timer (`api.register_timer(interval, fn)`)
+
+Hooks dürfen `threading` nicht importieren (siehe
+[Import-Restriktionen](./ch04-05-import-restrictions.md)). Für periodische
+Arbeit — Aggregationsfenster, Debouncer, geplante Prüfungen, Cache-Ablauf —
+gibt es stattdessen `register_timer`:
+
+```python
+def register(api: HookAPI):
+    pending: list[str] = []
+
+    def flush_pending():
+        if not pending:
+            return
+        api.rcon_enqueue([f"say {len(pending)} Events gepuffert"])
+        pending.clear()
+
+    api.register_timer(30.0, flush_pending)   # alle 30 Sekunden
+```
+
+- **`interval`**: Sekunden zwischen den Läufen; Werte unter `0.1` werden auf
+  `0.1` geklemmt.
+- **`fn`**: wird ohne Argumente im gemeinsamen Timer-Scheduler-Thread der
+  Bridge aufgerufen — nie auf den Trigger-/TikTok-Threads.
+- Exceptions sind pro Timer isoliert (gemeldet als `HOOK-0010`); der Timer
+  läuft mit seinem nächsten Tick weiter. Fällt ein Lauf deutlich hinten
+  nach, werden verpasste Ticks übersprungen statt nachgeholt.
+- Gibt bei Erfolg `True` zurück, bei ungültigen Eingaben `False`.
+- Timer werden beim Entladen/Reload des Hooks automatisch entfernt —
+  registriere sie in `register()` (das ohnehin bei jedem Reload neu läuft).
+
+## Hook-zu-Hook-Queries
+
+Hooks können einander synchrone Request/Response-Endpunkte exponieren —
+nützlich für direkten Datenaustausch ohne EventBus-Umweg:
+
+```python
+# Provider-Hook
+def register(api: HookAPI):
+    stats = {"calls": 0}
+
+    def top(args):
+        stats["calls"] += 1
+        return {"calls": stats["calls"], "limit": args.get("limit", 5)}
+
+    api.register_query("top", top)
+```
+
+```python
+# Consumer-Hook
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        result = api.query_hook("provider-hook", "top", {"limit": 3})
+        if result is not None:
+            api.log(f"Provider geantwortet: {result}")
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+- Handler laufen **inline im Thread des Aufrufers** — halte sie kurz und
+  nicht-blockierend; es gibt keinen Timeout-Mechanismus.
+- Unbekanntes Ziel/eine unbekannte Query oder eine Exception im Handler
+  liefert `None` (Handler-Fehler werden als `HOOK-0011` gemeldet); beide
+  Hooks laufen weiter.
+- Bevorzuge EventBus-Events (`register_event`/`publish_event`), wenn
+  Fire-and-Forget reicht — Queries erzeugen direkte Kopplung.
+
+## Dashboard-Widgets (`ui`-Permission)
+
+Hooks können live HTML-Karten in die Sektion **Hook-Widgets** des
+Web-Dashboards beitragen:
+
+```python
+def register(api: HookAPI):
+    api.register_dashboard_widget(
+        "Gift Combo",
+        "<div id='combo'>Combo: <b>0</b></div>"
+        "<script>/* eigenständige Update-Logik */</script>",
+    )
+```
+
+- Benötigt `"ui"` in den `permissions` der `hook.json`.
+- Aufruf in `register()` — Widgets werden nach jedem Reload neu
+  registriert; beim Deaktivieren des Hooks verschwindet die Karte
+  automatisch.
+- Das Snippet läuft in einem Iframe auf transparenter dunkler Seite; halte
+  es in sich geschlossen (inline Styles/Scripts, max. 256 KB).
+- Das Dashboard zeigt einen Navigationseintrag mit einer Karte pro
+  registriertem Hook.
+
+## Event-Abos & Publishing
+
+Hooks können **Bus-Events abonnieren** — Reaktion ganz ohne
+`$`-Zeile in `actions.mca`:
+
+```python
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        # data trägt die Event-Payload, z. B. {"user": ..., "gift_name": ...}
+        api.log(f"{data.get('user')} hat {data.get('gift_name')} gesendet")
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+- Patterns folgen der Plugin-Semantik von `event_subscriptions`: exakter
+  Typ (`"tiktok.gift"`), Präfix-Wildcard am Ende (`"tiktok.*"`,
+  `"minecraft.*"`) oder Catch-all `"*"`.
+- Handler laufen als `fn(event_type, data)` im Hintergrund-Executor der
+  Bridge; Exceptions sind pro Hook isoliert.
+- Nach einem Runtime-Reload neu registrieren (dein `register()` läuft
+  ohnehin erneut).
+
+Hooks können auch **eigene Events** auf den EventBus legen
+(`api.publish_event`) — dafür ist die `events`-Permission nötig:
+
+```python
+def register(api: HookAPI):
+    def on_gift(event_type, data):
+        api.publish_event("combo-hook.gift_combo", {"count": 2})
+
+    api.register_event("tiktok.gift", on_gift)
+```
+
+> [!NOTE]
+> Event-Typen müssen unter dem eigenen Hook-Namen namespaced sein
+> (`"<hook-name>.<ding>"`), damit Hooks keine Kern-Events wie
+> `tiktok.gift` fälschen können — andere Typen werden mit Warnung
+> abgelehnt. Plugins konsumieren diese Events über
+> `event_subscriptions` in ihrem Manifest genau wie eingebaute.
+
+## Hook-Runtime-Reload
+
+**Hooks aktivieren/deaktivieren oder deren Config ändern — ohne Bridge-Restart.**
+
+Wenn du:
+- einen Hook im Dashboard aktivierst/deaktivierst (`POST /hooks/{name}/enable|disable`)
+- die Hook-Config speicherst (`PUT /hooks/{name}/config`)
+- `POST /reload` mit `"hooks": true` aufrufst
+
+nimmt die Bridge das `reload_hooks`-Signal innerhalb von ~1 Sekunde auf und
+registriert alle aktiven Hooks neu. Dein `register()` läuft erneut, liest also
+die frische Config und registriert Actions neu.
+
+> [!IMPORTANT]
+> - `register()` wird **bei jedem Reload** aufgerufen, nicht nur einmal. Schreibe
+>   es idempotent (z. B. `register_action` ignoriert Duplikate, daher ist
+>   erneutes Registrieren desselben Action-Namens sicher).
+> - Per-Hook-Config wird beim Reload neu via `get_hook_config()` eingelesen.
+> - Registriere einen `api.on_unload(fn)`-Callback, um Ressourcen (Dateien,
+>   Verbindungen) zwischen Reloads freizugeben — siehe
+>   [Unload-Callbacks](#unload-callbacks-apion_unloadfn).
+>   ```python
+>   def register(api: HookAPI):
+>       # Ressourcen des vorherigen Laufs freigeben, dann neu aufsetzen
+>       api.register_action("meine_action", handler)
+>   ```
+
+## Fehlercodes für Hooks
+
+| Code | Bedeutung |
+|------|-----------|
+| `HOOK-0001` | Hook-Manifest fehlt oder ungültig |
+| `HOOK-0002` | `main.py` des Hooks nicht gefunden |
+| `HOOK-0003` | Nicht erlaubtes Modul importiert |
+| `HOOK-0004` | Hook konnte nicht geladen werden (`main.py` warf Exception) |
+| `HOOK-0005` | Registrierung fehlgeschlagen (`register()` warf Exception) |
+| `HOOK-0006` | Hook-Action fehlgeschlagen (Exception bei Ausführung) |
+| `HOOK-0007` | `register()`-Funktion fehlt |
+| `HOOK-0008` | Lifecycle-Callback fehlgeschlagen |
+| `HOOK-0009` | Hook-Berechtigung verweigert (Eintrag in `permissions` fehlt) |
+| `HOOK-0010` | Hook-Timer-Callback fehlgeschlagen (Timer läuft weiter) |
+| `HOOK-0011` | Hook-Query-Handler fehlgeschlagen (Aufrufer erhält `None`) |
+
+## Nächstes Kapitel
+
+Lerne, wie du [Hook-Konfigurationen](./ch04-04-hook-configuration.md) definierst und ausliest.

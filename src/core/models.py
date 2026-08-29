@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-REQUIRED_KEYS = {"name", "path", "enable", "level", "ics"}
 
 @dataclass(slots=True)
 class AppConfig:
@@ -12,7 +11,7 @@ class AppConfig:
     enable: bool
     level: int
     ics: bool
-    port: int = 0
+    depends_on: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip():
@@ -27,8 +26,6 @@ class AppConfig:
             raise ValueError("level must be a non-negative int.")
         if not isinstance(self.ics, bool):
             raise TypeError("ics must be a bool.")
-        if not isinstance(self.port, int) or self.port < 0:
-            raise ValueError("port must be a non-negative int.")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -37,7 +34,7 @@ class AppConfig:
             "enable": self.enable,
             "level": self.level,
             "ics": self.ics,
-            "port": self.port,
+            "depends_on": self.depends_on,
         }
 
     @classmethod
@@ -48,11 +45,5 @@ class AppConfig:
             enable=data["enable"],
             level=data["level"],
             ics=data["ics"],
-            port=data.get("port", 0),
+            depends_on=data.get("depends_on", []),
         )
-
-
-def validate_config_dict(config: dict[str, Any]) -> None:
-    missing = REQUIRED_KEYS - set(config.keys())
-    if missing:
-        raise ValueError(f"Missing required key(s): {', '.join(sorted(missing))}")

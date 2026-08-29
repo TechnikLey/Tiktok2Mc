@@ -1,124 +1,42 @@
-# TikTok to Minecraft Integration
+# TikTok2Mc — User Guide
 
-Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, follow you, or hit like milestones, Minecraft commands are triggered in real-time on your server.
+This guide explains how to use TikTok2Mc. No programming knowledge is required.
 
-> **Author:** TechnikLey — [GitHub](https://github.com/TechnikLey/Tiktok2Mc)  
-> **License:** PolyForm Noncommercial 1.0.0 (with creator exception)
+If you want to learn more about the tool or develop your own plugins, see the developer documentation:
+- [English Developer Docs](./dev-book-en/src/ch01-00-getting-started.md)
+- [German Developer Docs](./dev-book-de/src/ch01-00-getting-started.md)
+
+The recommended way to configure and control TikTok2Mc is the **Dashboard** (GUI) at `http://127.0.0.1:29185/` (or the desktop application). Everything can be done there — no file editing needed:
+
+> [!NOTE]
+> The Dashboard also provides additional help and validation, which reduces the chance of misconfiguration.
+> The configuration files are still available for advanced users who prefer to edit them directly.
+> Keep in mind that a mistake in these files can break the tool.
+
+- **Dashboard (GUI)** — The web interface is the primary way to configure and control the tool. It is the only place to enable plugins and to run the setup wizard.
+- **Configuration Files** — `config.yaml` and other files can also be edited directly with any text editor. This is optional and only needed for advanced tweaks.
+- **Mixed** — Use both. Changes from the GUI and files are synchronized automatically.
+
+You cannot open the setup wizard from the Dashboard later; it only appears on first launch (or while the TikTok username **or** RCON password are still set to defaults). If you miss it, the same settings are available in **Settings → Connection**.
 
 ---
 
 ## Table of Contents
 
-- [TikTok to Minecraft Integration](#tiktok-to-minecraft-integration)
-  - [Table of Contents](#table-of-contents)
-  - [Project Introduction](#project-introduction)
-  - [Features](#features)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-    - [Windows](#windows)
-    - [Linux](#linux)
-  - [Quick Start](#quick-start)
-  - [Configuration](#configuration)
-  - [Usage](#usage)
-    - [Understanding actions.mca](#understanding-actionsmca)
-    - [Trigger Types](#trigger-types)
-    - [Command Types](#command-types)
-      - [`/` — Vanilla Minecraft Commands](#--vanilla-minecraft-commands)
-      - [`!` — Server Plugin Commands (RCON)](#--server-plugin-commands-rcon)
-      - [`$` — Special Actions](#--special-actions)
-      - [`>>` — Overlay Text](#--overlay-text)
-    - [Chaining and Repeating Commands](#chaining-and-repeating-commands)
-    - [Using Trigger Names vs IDs](#using-trigger-names-vs-ids)
-    - [The $random Action](#the-random-action)
-    - [Like Triggers](#like-triggers)
-    - [Comment Commands](#comment-commands)
-    - [Shell Actions (shell\_actions.txt)](#shell-actions-shell_actionstxt)
-    - [Testing Triggers Without TikTok](#testing-triggers-without-tiktok)
-  - [Minecraft Server](#minecraft-server)
-    - [Starting the Server](#starting-the-server)
-    - [Joining Locally](#joining-locally)
-    - [Letting Friends Join (Port Forwarding)](#letting-friends-join-port-forwarding)
-    - [Server Details](#server-details)
-    - [Datapack Mechanics](#datapack-mechanics)
-    - [Replacing the Server Version](#replacing-the-server-version)
-  - [Plugins and Overlays](#plugins-and-overlays)
-    - [Death Counter](#death-counter)
-    - [Win Counter](#win-counter)
-    - [Like Goal](#like-goal)
-    - [Stream Timer](#stream-timer)
-    - [Overlay Text](#overlay-text)
-    - [Spotify Control](#spotify-control)
-      - [Setup](#setup)
-      - [Chat Commands via comment\_commands](#chat-commands-via-comment_commands)
-      - [Direct Trigger Actions (for actions.mca)](#direct-trigger-actions-for-actionsmca)
-    - [Channel Points](#channel-points)
-      - [Setup](#setup-1)
-      - [How Viewers Earn Points](#how-viewers-earn-points)
-      - [Overlay](#overlay)
-      - [Per-Command Points Cost, Cooldown \& Roles](#per-command-points-cost-cooldown--roles)
-      - [Global Cooldown (Cross-Group)](#global-cooldown-cross-group)
-    - [Follow Tracking](#follow-tracking)
-    - [Multiple Overlays](#multiple-overlays)
-    - [VS Code Extension for .mca Files](#vs-code-extension-for-mca-files)
-  - [Maintenance](#maintenance)
-    - [Updating the Tool](#updating-the-tool)
-    - [Backing Up Your Data](#backing-up-your-data)
-    - [Ports Used by the Tool](#ports-used-by-the-tool)
-    - [Log Files](#log-files)
-    - [Replacing the Minecraft Server Version](#replacing-the-minecraft-server-version)
-  - [FAQ](#faq)
-  - [AI Prompt File](#ai-prompt-file)
-    - [What it does](#what-it-does)
-    - [How to use it](#how-to-use-it)
-    - [Who this is for](#who-this-is-for)
-  - [Additional Resources](#additional-resources)
-
----
-
-## Project Introduction
-
-TikTok2Mc bridges TikTok Live events — gifts, follows, likes, comments, joins, and shares — to a Minecraft server in real-time. Each event can be mapped to one or more Minecraft commands, allowing your stream audience to interact directly with the game.
-
-The tool bundles:
-
-- A **Minecraft 1.21.11 server** (Vanilla)
-- A **Java runtime** (auto-downloaded on Windows; auto-detected or installed on Linux)
-- Two **server-side plugins**: MinecraftServerAPI (player event webhooks) and DelayedTNT (custom TNT spawning)
-- **Overlay plugins** for stream notifications: Death Counter, Win Counter, Like Goal, Timer, Overlay Text
-- An **auto-updater** for seamless version management
-
----
-
-## Features
-
-- **Real-time TikTok Live connection** via the [TikTokLive](https://github.com/isaackogan/TikTokLive) library
-- **Customizable action mappings** — connect any gift, follow, like milestone, comment, or join to Minecraft commands
-- **Multiple command types:**
-  - Vanilla Minecraft commands (written to a datapack)
-  - Server plugin commands (sent via RCON)
-  - Built-in special actions (`$random`)
-  - Stream overlay notifications
-- **Command chaining** — run multiple commands from a single trigger
-- **Command repeating** — repeat a command multiple times
-- **Like milestones** — configure custom like thresholds with individual commands
-- **Comment Commands** — let viewers send Minecraft commands via chat with role-based access control
-- **HTTP Actions** — run shell commands on your PC when a gift is received
-- **Built-in overlays** for OBS / streaming software
-- **Event Hooks** — extend functionality with custom Python hook scripts
-- **Auto-updater** — keeps the tool up to date
-- **Cross-platform** — Windows and Linux
-
----
-
-## Requirements
-
-| Requirement | Details |
-|-------------|---------|
-| **Operating System** | Windows 10+ or Linux |
-| **RAM** | 12 GB minimum recommended (Minecraft server uses up to 4 GB by default — adjustable) |
-| **TikTok Account** | Required for live streaming |
-| **Minecraft** | Java Edition (any version that supports datapacks and RCON, 1.13+) |
-| **Streaming Software** | OBS Studio, vMix, Streamlabs Desktop, or TikTok Live Studio / Twitch Studio |
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Setup Wizard](#setup-wizard)
+- [Actions and Triggers](#actions-and-triggers)
+- [Event-Command Mapper](#event-command-mapper)
+- [Comment Commands](#comment-commands)
+- [TikTok Chatbot](#tiktok-chatbot)
+- [Plugins](#plugins)
+- [Overlays](#overlays)
+- [The Dashboard](#the-dashboard)
+- [Server Manager](#server-manager)
+- [Updating the Tool](#updating-the-tool)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
 
 ---
 
@@ -126,731 +44,599 @@ The tool bundles:
 
 ### Windows
 
-1. Download the latest release from the [GitHub Releases page](https://github.com/TechnikLey/Tiktok2Mc/releases).
-2. Extract the ZIP archive to any folder.
-3. Run `start.exe` to launch the tool.
+Download `TikTok2MC-<version>-Windows-Setup.exe` from the [Releases page](https://github.com/TechnikLey/Tiktok2Mc/releases) and run it. The installer guides you through setup:
 
-No manual Java installation is required — the bundled Java runtime is used automatically.
+- **Basic** — quick install with default settings
+- **Advanced** — choose which components to install (Plugins, Minecraft Server, Documentation), set GUI mode, Java path, and port
+
+The installer creates desktop and Start Menu shortcuts. Use Windows Add/Remove Programs to uninstall.
+
+> [!NOTE]
+> **Development builds** (from `python build.py app`) produce `TikTok2MC-Setup.exe` (unversioned). **Release assets** from GitHub Releases are versioned: `TikTok2MC-v1.0.0-Windows-Setup.exe`. Use the versioned name when downloading from Releases.
 
 ### Linux
 
-1. Download the latest release.
-2. Extract the archive.
-3. Run `sudo ./start.bin` from the terminal.
+Download `TikTok2Mc-<version>-Linux-Setup.sh` from the Releases page. Open a terminal, navigate to the download folder, and run:
 
-The tool will detect your system Java or prompt you to install it if missing. Running with `sudo` is required for updates and permission-sensitive paths.
+```bash
+chmod +x TikTok2Mc-<version>-Linux-Setup.sh
+./TikTok2Mc-<version>-Linux-Setup.sh
+```
 
-> [!TIP]
-> The tool shows a sudo warning on Linux. You can disable it by setting `show_sudo_warning: false` in `config.yaml`.
+The installer places the tool in `~/.local/share/TikTok2Mc` (no root required for the installation itself) and creates a `tiktok2mc` command and a desktop entry. Note that **running** the tool on Linux requires root privileges (`sudo`) — this is a separate step from the installation. If `~/.local/bin` is not on your `PATH`, the installer shows you how to add it.
 
----
+> [!NOTE]
+> **Development builds** (from `python build.py app`) produce `TikTok2Mc-Linux-Setup.sh` (unversioned). **Release assets** from GitHub Releases are versioned: `TikTok2Mc-v1.0.0-Linux-Setup.sh`. Use the versioned name when downloading from Releases.
 
-## Quick Start
+### Portable version
 
-1. **Edit the configuration**
-
-   Open `config/config.yaml` in any text editor and change these two values:
-
-   ```yaml
-   TikTok:
-     User: your_tiktok_username   # Replace with your TikTok username (no @)
-   RCON:
-     Password: ABC1234            # Replace with any password you like
-   ```
-
-> [!IMPORTANT]
-> Do not use Tab for indentation — always use spaces. Keep a space after colons (e.g., `User: myname`, not `User:myname`).
-
-2. **Set up actions (optional)**
-
-   The file `data/actions.mca` defines what happens in Minecraft when events occur. It comes with example actions — adjust them to your liking. See [Understanding actions.mca](#understanding-actionsmca) for the full syntax.
-
-3. **Launch the tool**
-
-   - **Windows:** Double-click `start.exe`
-   - **Linux:** Run `sudo ./start.bin` in a terminal
-
-   The tool will:
-   - Start the Minecraft server
-   - Connect to your TikTok Live
-   - Begin listening for events
-
-4. **Join the Minecraft server**
-
-   - Open Minecraft Java Edition
-   - Go to **Multiplayer > Add Server**
-   - Enter `localhost:25565` as the address
-   - Click **Done** and join
-
-> [!IMPORTANT]
-> You must be live on TikTok for the connection to work. The tool will keep trying to reconnect automatically.
+A portable ZIP (Windows) or tar.gz (Linux) is also available. Extract it anywhere and run the tool directly.
 
 ---
 
 ## Configuration
 
-All settings are stored in `config/config.yaml`. Open this file with any text editor — every option is documented with inline comments that explain its purpose, allowed values, and defaults.
+All main settings are in `config/config.yaml`. Open this file with any text editor.
+
+**Every setting has a comment above it explaining what it does.** Read the comments — they tell you exactly what each option controls.
+
+### Minimum required changes
+
+1. **Your TikTok username** — under `tiktok.user`. Enter your username without the `@` symbol.
+> [!IMPORTANT]
+> Do not enter your display name here — TikTok can only identify you by your username.
+2. **Your RCON password** — under `rcon.password`. Change this from the default to something secure. This password connects the tool to your Minecraft server. The tool will ask you to set one on first start if left empty.
+3. **Which features are enabled** — each section has `enabled: true` or `enabled: false`. **Core services** (RCON, GUI, Overlay, Update, Minecraft Server API, Shutdown) are enabled by default in `config.yaml`. **Plugins and comment commands** start disabled. Turn on only what you need.
+
+### Plugin-specific config files
+
+Each plugin (e.g. Timer, Spotify Control) has its own `config.yaml` inside its plugin directory (e.g., `plugins/timer/config.yaml`). You can edit these files to change plugin-specific behavior like colors, timers, and milestones.
+
+> [!TIP]
+> The Dashboard (web interface) provides a visual editor for all settings. You don't need to edit files by hand unless you prefer to.
+
+![Screenshot of the Dashboard configuration editor showing the section navigation and search bar](../images/Plugin_Config.png)
 
 ---
 
-## Usage
+## Setup Wizard
 
-### Understanding actions.mca
+The first time you start the tool (or if your TikTok username and RCON password are still set to defaults), a **Setup Wizard** opens automatically in the Dashboard. It walks you through three steps:
 
-The file `data/actions.mca` is the core of the tool. Each line maps a TikTok event to a Minecraft command.
+1. **TikTok Username** — enter your username (without the `@` symbol)
+2. **RCON Password** — create a secure password (the wizard shows a strength meter)
+3. **Review & Save** — check your settings and save
 
-**Format:**
+Saving immediately applies the settings (a reload and server restart happen behind the scenes). The wizard closes after saving and only appears again while the TikTok username or RCON password are still set to defaults — it cannot be reopened manually. If you skipped it, set the same values later in **Settings → Connection**. There is no "restart now or later" prompt and no separate way to relaunch the wizard.
+
+---
+
+## Actions and Triggers
+You can edit actions through the GUI or directly in the `actions.mca` file.
+
+![Actions Editor](../images/Actions_Editor.png)
+
+The file `data/actions.mca` controls what happens in Minecraft when TikTok events occur.
+
+> [!NOTE]
+> The `actions.mca` file is read at startup and can be reloaded at runtime without a restart. Use the **Actions** page in the Dashboard to edit and save — changes are applied immediately via a hot reload. You can also trigger a reload manually via `POST /api/v1/reload` with `{"actions": true}`. It is also recommended to install the language server, as it provides IntelliSense and marks errors.
+
+### How it works
+
+Each line has two parts, separated by a colon:
 
 ```
-Trigger:TypeCommand
+Trigger:Command
 ```
 
-- **Trigger** — What causes the action (gift ID, gift name, `follow`, `join`, `comment`, `share`, `likes`, `like_2`, or a custom like trigger name)
-- **:** — A colon separates the trigger from the command (no spaces around it)
-- **Type** — The first character(s) that tell the tool what kind of command it is:
-  - `/` — Vanilla Minecraft command
-  - `!` — Server plugin command
-  - `$` — Special built-in or script action
-  - `>>` — Overlay text notification
-- **Command** — The actual command to run
+**Trigger** — what causes the action. This can be:
+- A gift ID (like `5655`)
+- A gift name in quotes (like `'Tom the Tomato'`)
+- `follow` — someone follows your account
+- `join` — someone joins your stream
+- `comment` — someone writes a comment
+- `share` — someone shares your stream
+- `likes` — like milestone reached (default: every 100 likes)
+- `like_2` — second like milestone reached (default: 100,000 likes)
 
-> [!WARNING]
-> The type character (`/`, `!`, `$`, `>>`) is required. Omitting it will cause the command to fail.
+**Command** — what happens in Minecraft. The first character tells the tool what kind of command it is:
 
-**Examples:**
+| Symbol | What it means | Example |
+|--------|--------------|---------|
+| `/` | Normal Minecraft command | `/give @a minecraft:diamond` |
+| `!` | Server plugin command | `!tnt 5 0.5 2` |
+| `$` | Hook / Script | `$random` |
+| `>>` | Show text on your stream overlay | `>>New Follower!\|{user}\|5` |
+| `&` | Shell / system command | `&notepad.exe` (Windows) / `&notify-send "Done!"` (Linux) |
+
+### Simple examples
 
 ```
+# When someone follows, give everyone a golden apple
 follow:/give @a minecraft:golden_apple 7
-5655:!tnt 2 0.1 2 Notch
+
+# When gift 5655 is received, spawn an Evoker
+5655:/execute at @a run summon minecraft:evoker ~ ~ ~
+
+# When someone follows, show a message on stream
+follow:>>New Follower!|{user} is now following you!|5
+
+# When gift 16071 is received, pick a random action
 16071:$random
-comment:>>{user} wrote:|{comment}|3
 ```
 
-Lines starting with `#` are treated as comments and ignored.
+### Chaining commands
+
+Use `;` to run multiple commands from one trigger:
 
 ```
-# This line is disabled
-#8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
+follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user}!|5
 ```
 
----
+### Repeating commands
 
-### Trigger Types
-
-| Trigger | Description | Example |
-|---------|-------------|---------|
-| **Gift ID** (number) | Fires when a specific TikTok gift is received | `5655:/give @a minecraft:diamond` |
-| **Gift Name** (text) | Fires when a gift with that name is received | `Rosa:/give @a minecraft:rose` |
-| **Gift Name with spaces** | Must be wrapped in single quotes | `'Tom the Tomato':/give @a minecraft:carrot 10` |
-| `follow` | Fires when someone follows your account | `follow:/say Thanks for the follow!` |
-| `join` | Fires when a viewer joins the stream | `join:>>Welcome!|{user} just joined!|3` |
-| `comment` | Fires for every chat comment | `comment:>>{user} wrote:|{comment}|3` |
-| `share` | Fires when a viewer shares the stream | `share:/give @a minecraft:emerald 1` |
-| `likes` | Fires at a configured like interval (default: every 100) | `likes:/execute at @a run summon minecraft:creeper ~ ~ ~` |
-| `like_2` | Fires at a second like interval (default: every 100,000) | `like_2:/clear @a *; /kill @a` |
-
-> [!WARNING]
-> The `comment` and `join` triggers fire for **every** event. On active streams this can be very frequent. Avoid complex or expensive commands here to prevent overwhelming your server.
->
-> **Note:** If `comment_commands` is enabled and a comment matches a command prefix (e.g., `#say hello`), **both** the comment_commands handler AND the `comment` trigger in `actions.mca` fire by default. You can disable this per group with `trigger_comment_event: false` in `config.yaml`.
-
----
-
-### Command Types
-
-#### `/` — Vanilla Minecraft Commands
-
-Standard Minecraft commands, compiled to a datapack and executed in-game.
+Add `xN` to run a command multiple times:
 
 ```
-follow:/give @a minecraft:golden_apple 7
 8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
 ```
 
-#### `!` — Server Plugin Commands (RCON)
+This spawns 3 Evokers instead of 1.
 
-Commands sent directly to the Minecraft server via RCON. Used for server plugin commands that are not part of vanilla Minecraft.
+### Overlay text
 
-```
-5655:!tnt 2 0.1 2 Notch
-```
-
-> [!NOTE]
-> **The `!tnt` Command (DelayedTNT Plugin):**
->
-> | Syntax | Description |
-> |--------|-------------|
-> | `!tnt <Amount>` | Spawns TNT with the delay set in `config.yml` |
-> | `!tnt <Amount> <Player>` | Spawns TNT for a specific player |
-> | `!tnt <Amount> <Delay> <Fuse>` | Spawns TNT with custom delay and fuse |
-> | `!tnt <Amount> <Delay> <Fuse> <Player>` | Spawns TNT with custom delay, fuse, and target player |
->
-> - **Amount** — How many TNT to spawn
-> - **Delay** — Seconds between each TNT spawn (e.g., `0.1`)
-> - **Fuse** — Seconds before each TNT explodes
-> - **Player** — Player name to spawn TNT at
-
-> [!WARNING]
-> Do not write vanilla Minecraft commands with `!`. Doing so may cause the server to crash or freeze, and the tool will require significantly more resources.
-
-#### `$` — Special Actions
-
-Special built-in or script actions.
-
-- **`$random`** — Picks and executes a random action from the available trigger pool. See [The $random Action](#the-random-action).
-- **Custom `$` commands** — Defined via Event Hooks. See [Event Hooks](#event-hooks--commands).
-
-#### `>>` — Overlay Text
-
-Sends a text notification to the stream overlay. Used as an OBS Browser Source.
+The `>>` command shows text on your stream. Format:
 
 ```
 >>Title|Subtitle|Duration
 ```
 
-| Part | Description |
-|------|-------------|
-| **Title** | Main text to display (large) |
-| **Subtitle** | Smaller text below the title |
-| **Duration** | How many seconds the text stays visible (optional, default: 3) |
+- **Title** — main text (large)
+- **Subtitle** — smaller text below
+- **Duration** — how many seconds it stays visible
+
+**Named overlays:** Use `@name>>` to send text to a specific overlay slot:
+
+```
+follow:@alerts>>New Follower!|{user}!|5
+```
+
+Define overlay names in `config.yaml` under `overlay.overlays` (at least `default` is required).
 
 **Placeholders:**
+- `{user}` — replaced with the viewer's TikTok username
+- `{comment}` — replaced with the comment text (only for `comment` trigger)
 
-- `{user}` — Replaced with the TikTok username of the viewer who triggered the action
-- `{comment}` — Replaced with the comment text (only for the `comment` trigger)
-
-**Examples:**
+Example:
 
 ```
-follow:>>New Follower!|{user} is now following you!|5
 comment:>>{user} wrote:|{comment}|3
-16111:>>Diamond!|Thank you {user}!
+follow:>>New Follower!|{user} is now following you!|5
 ```
 
-> [!NOTE]
-> The overlay name can be specified with `@Name>>` syntax for multiple overlays. See [Multiple Overlays](#multiple-overlays).
+### The `$random` action
 
----
-
-### Chaining and Repeating Commands
-
-**Chaining with `;`:**
-
-Run multiple commands from a single trigger, separated by `;`. They execute left to right.
-
-```
-like_2:/clear @a *; /kill @a
-follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now following you!|5
-```
-
-**Repeating with `xN`:**
-
-Append `x` followed by a number to repeat a command that many times.
-
-```
-8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
-```
-
-This summons 3 Evokers. Without `x3`, the command runs once.
-
----
-
-### Using Trigger Names vs IDs
-
-Triggers can be specified by either **gift ID** (number) or **gift name** (text). Both are valid:
-
-```
-16212:/give @a minecraft:diamond 5
-Cool:/give @a minecraft:diamond 5
-```
-
-Both lines do the same thing — when the gift "Cool" (ID 16212) is received, all players get 5 diamonds.
-
-**Priority rule:** The system checks names first, then IDs. If a name match is found, the ID-based line is ignored. If both a name and its ID are defined for the same gift, only the name-based trigger runs.
-
-**Names with spaces** must be wrapped in single quotes:
-
-```
-'Tom the Tomato':/give @a minecraft:carrot 10
-```
-
-All available gift IDs and names are defined in `core/gifts.json`. Gift images are available in `core/assets/`.
-
----
-
-### The $random Action
-
-The `$random` command picks a random eligible trigger from your defined actions and executes it.
+`$random` picks a random action from your list and runs it. Good for variety.
 
 ```
 16071:$random
 ```
 
-When gift ID 16071 is received, the tool selects one random trigger from the pool and runs its command.
+You can control which triggers are eligible in the Random hook's config file (`hooks/random/config.yaml`). Set `mode: deny-all` to exclude the listed triggers from the random pool, or `mode: allow-all` to only allow the listed triggers.
 
-You can control which triggers are eligible using the `random_triggers` section in `config/config.yaml`. Use `mode: deny-all` to allow only the listed triggers, or `mode: allow-all` to allow all triggers except those listed.
+To prevent infinite loops, chained triggers are limited to a depth of 3 — if a chain gets deeper (e.g. `$random` keeps picking a trigger that maps back to `$random`), the offending trigger is permanently banned for the session.
+
+### Commenting out lines
+
+Lines starting with `#` are treated as comments and are ignored.
+
+```text
+# This is a comment
+```
+
+Lines starting with `##` are also ignored, but are specifically used to **deactivate an action**:
+
+```text
+##follow:/say Thanks for the follow!
+```
+
+From the parser's perspective, there is technically no difference between `#` and `##` — both are ignored. The distinction exists for the GUI.
+
+The GUI cannot reliably determine whether a commented-out line was originally a trigger or simply a regular comment. Therefore, `##` provides an explicit way to mark a disabled action.
+
+* `#` → regular comment
+* `##` → disabled action/trigger, identifiable by the GUI
+
+This allows the GUI to distinguish between ordinary comments and intentionally deactivated triggers or actions without changing how the parser handles comments.
+
+If you are not using the GUI, you can use `#` or `##` for either purpose, since both are treated the same by the parser. However, keeping regular comments and disabled actions separate is cleaner and allows the GUI to identify them correctly.
+Additionally, some plugins or hooks may rely on this distinction, treating `#` as a regular comment and `##` as a disabled trigger. Using them incorrectly could therefore cause unexpected behavior or compatibility issues.
+
+### Gift IDs
+
+A full list of gift IDs and names is available in:
+
+- **Development**: `defaults/gifts.json` (source file in the repository)
+- **Release / Installed**: `core/gifts.json` (copied by the build system)
+
+The Dashboard also includes a gift picker with search.
+
+![Gift Selector](../images/Gift_Picker.png)
 
 ---
 
-### Like Triggers
+## Event-Command Mapper
 
-Like triggers fire when the total number of likes reaches a configured threshold. They are defined in two places that work together:
+The file `data/event_commands.yaml` connects events from your Minecraft world (like a player dying) to plugin actions (like pausing the timer).
 
-- **`config.yaml`** — under `like_goal.triggers`, you define the interval (every N likes), the trigger name, and whether it is enabled.
-- **`actions.mca`** — you add a line using the trigger name from the config to specify which command to run.
+This is useful for automating reactions — for example:
+- When a player dies, pause the timer
+- When the timer hits zero, add a win
+- When a player respawns, resume the timer
 
-See `config/config.yaml` for the full configuration options and examples.
+### How it works
+
+Each entry has an **event type** and a list of **actions** to run:
+
+```yaml
+event_commands:
+  minecraft.player_death:
+    - target: timer
+      command: pause
+    - target: spotify-control
+      command: pause
+  minecraft.player_respawn:
+    - target: timer
+      command: resume
+  timer.zero:
+    - target: win-counter
+      command: add_win
+      args:
+        amount: 1
+```
+
+**Available event types:**
+- `minecraft.player_death` — a player dies
+- `minecraft.player_respawn` — a player respawns
+- `timer.started`, `timer.paused`, `timer.resumed`, `timer.reset` — timer state changes
+- `timer.tick`, `timer.zero`, `timer.milestone` — timer progress events
+- `server.started`, `server.stopping` — server lifecycle events
+
+**Available targets:**
+- `timer` — send commands to the Timer plugin
+- `spotify-control` — send commands to the Spotify plugin
+- `death-counter` — send commands to the Death Counter plugin
+- `win-counter` — send commands to the Win Counter plugin
+
+**Available commands per target:**
+
+| Target | Commands |
+|--------|----------|
+| timer | `start`, `pause`, `resume`, `reset`, `add_time`, `set_time`, `save_dims` |
+| spotify-control | `play`, `pause`, `next`, `previous`, `volume`, `volume_up`, `volume_down`, `shuffle`, `repeat`, `save`, `playtrack` |
+| win-counter | `add_win`, `remove_win`, `save_dims` |
+| death-counter | `player_death`, `add_death`, `reset`, `save_dims` |
+
+> [!NOTE]
+> `save_dims` is an internal command used by plugins to persist overlay window dimensions. It is registered by all built-in plugins but not typically invoked manually.
+
+The Event-Command Mapper can also be edited visually in the Dashboard.
 
 ---
 
-### Comment Commands
+## Comment Commands
 
-The `comment_commands` feature lets viewers send commands via TikTok chat. Viewers type a prefix (e.g., `#` or `$`) followed by a command, and the tool forwards it to Minecraft (via RCON) or to an HTTP endpoint (for plugins like Spotify).
+Let viewers send commands via TikTok chat. Each command group has its own prefix character.
 
-Commands are organized into **groups** — each with its own prefix, role requirements, allowed commands list, and optional cooldowns.
+You can edit comment command groups in the **Commands** page of the Dashboard, or directly in `data/comment_commands.yaml`.
 
-**Example:** A moderator writes `#say Hello` → the command `say Hello` is sent to the Minecraft server via RCON.
+**Example:** A moderator types `#say Hello` and the tool sends `say Hello` to the Minecraft server.
+
+### How it works
+
+Commands are organized into **groups**. Each group has:
+- A **prefix** (like `#` or `$`) that triggers it
+- **Allowed roles** (who can use it)
+- A **mode** (`deny-all` or `allow-all`)
+- A **commands list**
+- Individual **cooldowns** and other settings
+
+### Default groups
+
+Chat commands are configured in `data/comment_commands.yaml` (or via the **Commands** page in the Dashboard). The default file includes one group:
+
+1. **`#` group** — Minecraft commands via RCON. Only moderators and superfans can use it. **Disabled by default** (`comment_commands.enabled: false`).
+
+A second group for **Spotify control** (`$` prefix) ships as a commented example in the same file — uncomment it to let viewers control Spotify via chat.
+
+### Security
+
+RCON commands send raw commands to your Minecraft server. If you allow `all` roles, use `deny-all` mode and only list safe commands.
+
+### Cooldowns
+
+Each group can have cooldowns to prevent spam:
+- `cooldown` — seconds between any command in this group
+- `user_cooldown` — seconds the same viewer must wait before their next command
+
+Global cooldowns also exist at the top of the `comment_commands` section in `data/comment_commands.yaml` and apply across all groups.
+
+### Per-command overrides
+
+You can override settings for individual commands using `commands_config`:
+
+```yaml
+commands_config:
+  skip:
+    cooldown: 30
+  volume:
+    roles:
+      - moderator
+  playtrack:
+    conditional: true
+```
+
+### Trigger comment event
+
+Each group has a `trigger_comment_event` setting (default: `true`). When set to `false`, commands in that group won't fire the `comment` trigger in `actions.mca`.
+
+> For full details, read the inline comments in `data/comment_commands.yaml`.
+
+---
+
+## TikTok Chatbot
+
+The Chatbot is an **optional** bot that posts automatic messages in your TikTok live chat: it thanks viewers for gifts and follows and can reply to keywords in comments. You set it up entirely in the **Chatbot tab** of the dashboard.
 
 > [!WARNING]
-> Some prefix characters like `!` may not work reliably in all streaming software. The `#` character is recommended for reliable operation.
+> **The chatbot is a beta feature.** Automated messages are a grey area in TikTok's terms of service — your account can be banned. Use a dedicated bot account, never your main account.
 
-All settings are configured in `config/config.yaml` under `comment_commands` — the file has detailed inline comments explaining every option.
+### Setup
+
+1. Open the **Chatbot** tab and confirm the beta warning (shown once).
+2. Flip the **Enable Bot** switch at the top.
+3. Sign in with the account that should post:
+   - Click **Sign in with TikTok** and log in inside the opening window (easiest), or
+   - Paste the `sessionid` cookie manually — click *How do I get the session ID?* for step-by-step instructions.
+4. Configure your automatic replies (see below) and click **Save Changes**.
+
+Changes apply immediately — no restart needed.
+
+### Automatic replies
+
+You configure what the bot posts as a list of rules. Each rule has a situation, an optional match and a message:
+
+- **On gift** / **On follow** / **On stream join** — reacts to that event
+- **On keyword** — reacts when a comment matches or starts with the given word
+
+The **first matching rule wins**: an event only triggers one reply. Use the `{user}`, `{gift}` and `{comment}` placeholders in your messages (e.g. `Thanks {user} for {gift}!`).
+
+### Spam protection
+
+TikTok limits chat messages strictly. The built-in protection keeps a minimum pause between messages, a per-minute rate limit and drops duplicate messages automatically. Keep these limits conservative to protect your account.
+
+---
+
+## Outbound Channels
+
+Outbound channels forward live events (gifts, follows, comments, …) to external HTTP endpoints — for example a **Discord webhook**, so your mods can see stream activity in a Discord channel. Channels are configured in `config/config.yaml` under `outbound:`.
+
+```yaml
+outbound:
+  enabled: true
+  max_fails: 3      # pause a channel after this many failed deliveries ...
+  cooldown: 10      # ... for this many seconds (circuit breaker)
+  retries: 1        # extra delivery attempts per message
+  timeout: 5        # HTTP timeout in seconds
+  channels:
+    - name: "discord-events"
+      url: "https://discord.com/api/webhooks/..."   # your webhook URL
+      events: ["tiktok.*"]   # event patterns to subscribe to
+      format: "discord"
+      template: "**{user}** triggered *{type}*"
+      enabled: false
+```
+
+- **`events`** — patterns like `tiktok.gift`, `tiktok.comment` or `tiktok.*` (all TikTok events). Matching works the same way as plugin event subscriptions.
+- **`format: discord`** — builds a Discord webhook payload from *template*. Placeholders: `{user}`, `{type}` and any event data key (`{comment}`, `{gift_name}`, …). Missing placeholders become empty.
+- **`format: raw`** — sends the plain JSON envelope `{"type", "data", "timestamp"}`, useful for bots and automations.
+
+Each channel has its own circuit breaker: after repeated failed deliveries it pauses for the cooldown period instead of spamming errors. Channel changes take effect on config reload or restart.
+
+---
+
+## Plugins
+
+Plugins are optional features you can turn on or off.
+
+### How to enable a plugin
+
+1. Open the **Plugins** page in the Dashboard.
+2. Find the plugin you want and toggle it on.
+3. Some plugins have additional setup (see below).
 
 > [!NOTE]
-> Comment Commands are separate from the `comment` trigger in `actions.mca`. The `comment` trigger fires for every comment regardless of prefix. Comment Commands only activate when the prefix matches and the viewer has the required role.
->
-> When a comment matches a command prefix, **both** systems fire — the Comment Command AND the `comment` trigger in `actions.mca`. If you have actions mapped to `comment`, they will execute in addition to the chat command.
->
-> You can control this per group with `trigger_comment_event: true/false` in `config.yaml`. Set it to `false` to prevent the `comment` trigger from firing when a command matches that group.
+> Everything starts disabled **except** core services (RCON, GUI, Overlay, Update, Minecraft Server API, Shutdown — these are enabled by default in `config.yaml`). Only plugins and comment commands start disabled. Turn on only what you need.
 
----
+### Available plugins
 
-### Shell Actions (shell_actions.txt)
+| Plugin | What it does | Overlay URL |
+|--------|-------------|-------------|
+| **Timer** | Countdown or count-up timer for your stream | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
+| **Death Counter** | Counts player deaths automatically | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
+| **Win Counter** | Tracks wins and losses | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
+| **Spotify Control** | Viewers control your Spotify via chat | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
 
-The file `data/shell_actions.txt` runs shell commands on your computer when a gift is received.
+### Timer
 
-**Format:**
+A configurable timer for your stream. Can count down from a set time or count up from zero. Supports milestones, auto-start, looping, and an OBS overlay.
 
-```
-GiftID:ShellCommand
-```
-
-- **GiftID** — Numeric gift ID (same as in `actions.mca` and `core/gifts.json`)
-- **ShellCommand** — Any shell command that can run on your computer
-
-**Example:**
-
-```
-18508:curl -X POST http://localhost:29191/add?amount=10
-16071:curl -X POST http://localhost:29191/remove?amount=10
-```
-
-**Important notes:**
-
-- HTTP actions are **gift-only** — not supported for `follow`, `join`, `comment`, or like triggers.
-- Both `actions.mca` and `shell_actions.txt` are checked for every gift. If the same gift ID appears in both, **both run independently** — they do not conflict.
-- Lines starting with `#` are comments.
-- Lines starting with `//define name = value` define variables that are replaced in all following commands with `{name}`.
-- The command runs directly on your computer. Only use commands you trust.
-
----
-
-### Testing Triggers Without TikTok
-
-A test tool is included to simulate triggers and comments without going live.
-
-- **Windows:** `test/test_trigger.exe`
-- **Linux:** `test/test_trigger.bin`
-
-**Simulating triggers (gifts, follows, likes, etc.):**
-
-1. Make sure the tool is running (TikTok connection is not required).
-2. Start the test executable.
-3. Enter any trigger name (e.g., `follow`, `like_2`, or a gift ID like `5655`) and optionally a username.
-4. The tool simulates the trigger — all actions, overlays, and Minecraft commands will run as configured.
-
-**Simulating chat comments:**
-
-1. Enter `comment` as the trigger.
-2. Enter a username, the comment text (including the prefix, e.g., `#say Hello` or `$play`), and optionally set moderator/superfan/fanclub roles.
-3. The tool processes the comment exactly as if a viewer typed it in TikTok chat — prefix matching, role checks, command filters, cooldowns, and dispatch all apply.
-
-**Toggle TikTok connection:** Enter `tiktok` as the trigger to toggle the TikTok connection on or off. This setting resets when the tool restarts.
-
-> [!IMPORTANT]
-> The test tool only confirms that the trigger or comment was sent to the tool. It does not guarantee that the action was executed in Minecraft or by a plugin. Always check in-game or in the logs.
-
----
-
-## Minecraft Server
-
-### Starting the Server
-
-The Minecraft server starts automatically when you launch the tool. The server is managed by the orchestrator — no manual intervention needed.
-
-### Joining Locally
-
-1. Start the tool with `start.exe` (Windows) or `sudo ./start.bin` (Linux).
-2. Open Minecraft Java Edition.
-3. Go to **Multiplayer > Add Server**.
-4. Enter `localhost:25565`.
-5. Click **Done** and join.
-
-### Letting Friends Join (Port Forwarding)
-
-To let others join over the internet, set up port forwarding on your router:
-
-1. Open your router's settings (usually `192.168.1.1` or `192.168.0.1`).
-2. Find the **Port Forwarding** section.
-3. Forward port **25565** (TCP/UDP) to the local IP of the computer running the server.
-4. Share your public IP address with friends.
-
-> [!NOTE]
-> Port forwarding varies by router model. Search "[your router model] port forwarding" for specific instructions.
-
-### Server Details
-
-| Setting | Default |
-|---------|---------|
-| Minecraft version | 1.21.11 (Vanilla) |
-| Java | OpenJDK 21 (bundled on Windows) |
-| RAM | 4 GB (configurable via `Java.Xms` / `Java.Xmx` in `config.yaml`) |
-| Minecraft port | 25565 |
-| RCON port | 25575 |
-| Server directory | `server/mc/` |
-| Server plugins | MinecraftServerAPI, DelayedTNT |
-
-### Datapack Mechanics
-
-Vanilla commands (prefixed with `/` in `actions.mca`) are compiled to `.mcfunction` files in the `StreamingTool` datapack at `world/datapacks/StreamingTool/`. This datapack is generated dynamically each time the tool starts.
-
-Plugin commands (prefixed with `!`) bypass the datapack and are sent directly to the server via RCON. The RCON queue uses dynamic throttling (0.01s–0.5s delay based on queue depth).
-
-### Replacing the Server Version
-
-1. Go to the `server/mc/` folder.
-2. Note the **filename** of the current `.jar` file.
-3. Replace it with your new server `.jar` file (Forge, Fabric, Paper, etc.).
-4. **Rename** the new file to match the original filename exactly.
-
-> [!NOTE]
-> Your replacement server must support RCON and datapacks (available in almost all Minecraft versions from 1.1 onward and 1.13 onward respectively).
-
----
-
-## Plugins and Overlays
-
-The tool includes several built-in overlay plugins. These are small web pages that you can add as **Browser Sources** in your streaming software. Each plugin can be enabled or disabled individually in `config/config.yaml`.
+[Timer Plugin — full documentation](../src/plugins/timer/README.md)
 
 ### Death Counter
 
-Displays the number of times the player has died. Updates automatically on in-game death.
+Automatically detects player deaths and counts them. No setup needed beyond enabling. Supports milestones and an OBS overlay.
 
-- **OBS URL:** `http://localhost:29190`
+[Death Counter Plugin — full documentation](../src/plugins/deathcounter/README.md)
 
 ### Win Counter
 
-Tracks wins and losses. Decrements on player death, increments when the Stream Timer reaches zero.
+Tracks wins and losses with configurable milestones. Use the Event-Command Mapper to add wins automatically (e.g., when the timer hits zero).
 
-- **OBS URL:** `http://localhost:29191`
-
-### Like Goal
-
-Shows a progress bar tracking likes toward a goal. Configure the display text, initial goal, and multiplier mode in `config/config.yaml`.
-
-- **OBS URL:** `http://localhost:29193`
-
-### Stream Timer
-
-A countdown timer that pauses on player death and resumes on respawn. When it reaches zero, a win is counted. The starting time is set in `config/config.yaml`.
-
-- **OBS URL:** `http://localhost:29189`
-
-### Overlay Text
-
-Displays custom text notifications on stream.
-
-- **OBS URL:** `http://localhost:29186/?overlay=default`
-
-> [!NOTE]
-> Overlay Text works best with **DCS** mode. In **ICS** mode, a green screen filter is needed, which may reduce text quality.
-
----
+[Win Counter Plugin — full documentation](../src/plugins/wincounter/README.md)
 
 ### Spotify Control
 
-Lets viewers control Spotify playback through TikTok chat comments and events. Displays the current track as an OBS overlay.
+Lets viewers control your Spotify playback through TikTok chat. Requires a Spotify Developer App (Client ID + Secret) and the `$` comment command group to be enabled.
 
-#### Setup
-
-1. **Create a Spotify Developer App:**
-   - Go to [https://developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
-   - Click **Create App** and choose a name (e.g. "TikTok2Mc Spotify")
-   - Under **Redirect URIs**, add: `http://127.0.0.1:29194/callback`
-   - Copy the **Client ID** and **Client Secret**
-
-2. **Add to config.yaml:**
-   ```yaml
-   spotify:
-     enabled: true
-     client_id: "YOUR_CLIENT_ID"
-     client_secret: "YOUR_CLIENT_SECRET"
-     playtrack_mode: "replace"     # "replace" — play immediately, "queue" — add to queue
-   ```
-
-3. **Start the plugin & log in:**
-   - When the tool starts, your browser opens automatically for Spotify login
-   - Alternatively: open `http://localhost:29194/login` in your browser
-
-#### Chat Commands via comment_commands
-
-The default `config.yaml` includes a `$` group for Spotify chat control (see `comment_commands` section). Viewers type `$play`, `$pause`, `$skip`, `$prev`, `$volume 50`, `$save`, `$shuffle`, `$repeat`, `$current`, `$playtrack Artist - Song`, etc. in TikTok chat. See [Comment Commands](#comment-commands) for details.
-
-- **`$playtrack`** — Searches Spotify for the given artist and song, then either plays it immediately or adds it to the queue (configured via `spotify.playtrack_mode` in `config.yaml`). Unlike other commands, if the song is not found, no channel points are deducted and no cooldowns are triggered. Requires `comment_commands.commands_config.playtrack.conditional: true` to enable this safe-fail behavior.
-
-> [!IMPORTANT]
-> **Viewer feedback limitations** — TikTok chat is a one-way input: the tool can receive commands but cannot reply directly to a viewer. This means there is currently no built-in way to tell a viewer whether their `$playtrack` succeeded, why their points weren't deducted, or how many points they have left. While you could build custom overlay feedback using `>>` in `actions.mca`, this approach does not scale well — on busy streams with frequent commands, overlays can pile up or get overwritten, causing viewer confusion rather than clarity. A per-user notification system (whisper-style) is not feasible within TikTok's event model. For now there is no optimal solution that works across all stream sizes.
-
-#### Direct Trigger Actions (for actions.mca)
-
-Events (gifts, follows, likes) can also trigger Spotify actions:
-
-```
-follow:$spotify_current              # Shows current song on follow
-5655:$spotify_play                   # Plays on gift
-5655:$spotify_pause                  # Pauses on gift
-8913:$spotify_next                   # Next track on gift
-16071:$spotify_previous              # Previous track
-6267:$spotify_volume_up              # Volume up
-7168:$spotify_volume_down            # Volume down
-18508:$spotify_save                  # Save song
-'Tom the Tomato':$spotify_shuffle    # Toggle shuffle
-```
-
-- **OBS URL:** `http://localhost:29194`
-
-All options are configured in `config/config.yaml` under `spotify:` — the file has detailed inline comments for each setting.
-
-### Channel Points
-
-Awards loyalty points to active viewers automatically. Points are deducted automatically when a viewer uses a command that has `points_cost` set — no separate commands needed.
-
-#### Setup
-
-No additional setup is needed beyond enabling it in `config.yaml`:
-
-```yaml
-channel_points:
-  enabled: true
-  port: 29195
-  award_amount: 10
-  award_interval_seconds: 60
-  ping_timeout_minutes: 10
-  leaderboard_count: 10
-```
-
-- **`award_amount`** — points earned per interval by each active viewer
-- **`award_interval_seconds`** — how often points are awarded (e.g. 60 = every minute)
-- **`ping_timeout_minutes`** — viewer's `last_seen` must be within this window to receive points. Resets on every interaction.
-- **`leaderboard_count`** — number of top viewers shown on the overlay
-
-#### How Viewers Earn Points
-
-Viewers are tracked via TikTok Live events — each interaction updates their `last_seen` timestamp, keeping them in the active window:
-
-| Event | Triggers ping | Notes |
-|-------|--------------|-------|
-| Joining the stream | ✅ | Fires once when viewer enters |
-| Writing a comment | ✅ | Every comment (e.g. `$skip`) |
-| Liking | ✅ | Each like event from that user |
-| Sending a gift | ✅ | Each gift sent |
-| Following | ✅ | Once per unique follow (tracked) |
-| Sharing | ✅ | Each share event |
-
-Every `award_interval_seconds`, all viewers whose `last_seen` is within `ping_timeout_minutes` get `award_amount` points. A viewer who types `$skip`, sends a gift, likes, or follows is immediately marked active — no manual claiming needed.
-
-> [!NOTE]
-> **Pure lurkers** (watching without any interaction) are **not** tracked — TikTok does not expose passive viewership data. Viewers must join, comment, or otherwise interact to accumulate points.
-
-#### Overlay
-
-- **OBS URL:** `http://localhost:29195`
-- Shows a live leaderboard that updates every 10 seconds via SSE.
-
-#### Per-Command Points Cost, Cooldown & Roles
-
-Per-command settings go in a separate `commands_config` block — the `commands` list stays clean with just names:
-
-```yaml
-commands:
-  - play
-  - pause
-  - skip
-  - prev
-  - volume
-  - save
-  - repeat
-  - shuffle
-  - current
-  - playtrack
-
-commands_config:
-  skip:
-    points_cost: 50        # viewer needs 50 points
-    cooldown: 30           # 30s between any $skip
-  prev:
-    points_cost: 20
-  playtrack:
-    points_cost: 50
-    cooldown: 30
-    conditional: true      # points & cooldowns only apply if song is found
-    url: "http://127.0.0.1:{spotify_port}/playtrack?user={user}&text={text}"
-    handler: http
-  volume:
-    roles: [moderator]     # only moderators
-```
-
-When a viewer uses `$skip`, the system checks their balance, deducts the cost, applies the cooldown, and dispatches the command.
-
-**Conditional commands** (like `$playtrack`) behave differently: the system first sends the request to the plugin, waits for the response, and only deducts points and applies cooldowns if the song was found. If the song could not be found, nothing is deducted and no cooldown fires — the viewer can try again immediately.
-
-#### Global Cooldown (Cross-Group)
-
-Global cooldowns live at the top of the `comment_commands` section, **outside** any group, and apply across **all** groups.
-
-- **`cooldown`** — When set to `10`, a viewer who triggers `$skip` must wait 10 seconds before ANY command works (even `#op` or `!points`) from ANY viewer.
-- **`user_cooldown`** — When set to `30`, a viewer who triggers `$skip` must wait 30 seconds before THEIR next command works in any group. Other viewers are not affected.
-
-```yaml
-comment_commands:
-  enabled: true
-  cooldown: 10              # 10s global cooldown across ALL groups (any user)
-  user_cooldown: 30         # 30s per-user global cooldown across all groups
-  groups:
-    - prefix: "$"
-      cooldown: 0            # per-group cooldown still works on top
-      ...
-    - prefix: "#"
-      cooldown: 0
-      ...
-```
-
-Each group keeps its own `cooldown` and `user_cooldown` — those still apply in addition to the global ones. Set a global value to `0` to disable.
+[Spotify Control Plugin — full documentation](../src/plugins/spotify/README.md)
 
 ---
 
-### Follow Tracking
+## Overlays
 
-Prevents viewers from repeatedly unfollowing and refollowing to farm the follow trigger. Each unique follower is written to a file — subsequent follows from the same user are ignored.
+Overlays are web pages you can add as a **Browser Source** in OBS Studio (or any streaming software).
 
-Configured in `config/config.yaml` under `tiktok.follow_tracking`:
+### Overlay types
 
-```yaml
-tiktok:
-  follow_tracking:
-    mode: "all_time"    # or "per_stream"
-    file: "data/followed_users.txt"
-```
+There are two types of overlays:
 
-- **`all_time`** (default) — Follows are tracked across all streams. Once a user is recorded, their future follows are ignored, even after restarting the tool.
-- **`per_stream`** — The tracked list resets every time the tool starts. Each stream starts fresh.
+1. **Plugin overlays** — provided by plugins (Timer, Death Counter, Win Counter, Spotify Control). Each has its own URL.
+2. **Core overlay** — displays text messages triggered by `>>` commands in `actions.mca`. Served at `http://127.0.0.1:29185/api/v1/overlay?overlay=default`.
 
-> [!IMPORTANT]
-> Only new follows that happen **while the tool is running** are tracked. Users who already followed before the tool was started **cannot** be detected — they will trigger the follow action the first time they follow during a tracked stream. This is a limitation of TikTok's event system: we only see follow events that occur while connected.
+### How to add an overlay to OBS
 
----
+1. In OBS, click the **+** under Sources and select **Browser Source**.
+2. Enter a name (like "Death Counter").
+3. Paste the plugin's overlay URL from the table above.
+4. Set the width and height to match your stream resolution (1920x1080 for 1080p, 1280x720 for 720p).
+5. Click **OK**.
 
-### Multiple Overlays
+The overlay will update automatically when events occur.
 
-You can run several overlay windows simultaneously — each as a separate OBS Browser Source pointing to a different named overlay. Configure the list of overlay names in `config/config.yaml` under `overlay_text.overlays`.
+### Core overlay (text messages)
 
-Each name creates a unique URL: `http://localhost:29186/?overlay=NAME`
+The core overlay at `/api/v1/overlay` shows text messages triggered by `>>` commands. You can create multiple named overlays:
 
-**Targeting overlays from `actions.mca`:**
+- `http://127.0.0.1:29185/api/v1/overlay?overlay=default`
+- `http://127.0.0.1:29185/api/v1/overlay?overlay=alerts`
 
-```
-follow:@alerts>>New Follower!|{user} is now following you!|5
-join:@stats>>Welcome!|{user} just joined!|3
-```
+Define overlay names in `config.yaml` under `overlay.overlays`, then target them with `@name>>` in `actions.mca`.
 
-Writing `>>` without a name targets the `default` overlay automatically.
+### Display modes
 
-> [!IMPORTANT]
-> The name must exactly match one of the names defined under `Overlays` in `config.yaml`. If no match is found, the message is silently dropped.
+The core overlay supports two display modes (set in `config.yaml` under `overlay.display_mode`):
 
----
+- **overwrite** — new messages replace the current one immediately
+- **queue** — messages line up and display one after another
 
-### VS Code Extension for .mca Files
+### Chroma key
 
-A custom VS Code extension (`mca.vsix`) is included in `core/assets/mca.vsix`.
-
-**Features:**
-- Syntax highlighting for `.mca` files
-- Error highlighting for common mistakes (missing colons, wrong prefixes)
-- Colorful formatting for triggers, commands, and comments
-
-**Installation:**
-1. Open VS Code.
-2. Go to Extensions (Ctrl+Shift+X).
-3. Click the three-dot menu > **Install from VSIX...**.
-4. Select `core/assets/mca.vsix`.
-5. Open any `.mca` file to see syntax highlighting.
+For chroma key (green screen) support, add `&chroma=true` to the overlay URL:
+`http://127.0.0.1:29185/api/v1/overlay?overlay=default&chroma=true`
 
 ---
 
-## Maintenance
+## The Dashboard
 
-### Updating the Tool
+The Dashboard is a web interface available at `http://127.0.0.1:29185/` that lets you manage everything visually. No file editing required.
+It is also available as a desktop app.
 
-The tool can update itself automatically (enabled by default). On startup it checks for new versions and installs updates. You can disable this in `config/config.yaml`.
+### What you can do in the Dashboard
 
-> [!IMPORTANT]
-> Always back up your data before updating. See [Backing Up Your Data](#backing-up-your-data).
+- **Edit Actions** — visual table of event triggers with inline command editing. Add events by type (follow, join, comment, likes, share) or use the gift picker with search. Changes save with validation.
+- **Event Reactions** — a step-by-step wizard to set up what happens when viewers follow, like, gift, share, join, or comment — no file editing needed.
+- **Edit Configuration** — form-based editor with section navigation (Connection, Minecraft, Chat & Commands, System). Search filters across all settings. Validation prevents invalid values. Overlay theme colors can be previewed live before saving.
+- **Plugin Configuration** — each plugin has its own settings page with form fields, category sidebar, and search.
+- **Comment Commands** — edit chat command groups visually (see [Comment Commands](#comment-commands)).
+- **Event Commands** — visually edit the Event-Command Mapper.
+- **Event Tester** — simulate viewer events (follow, gift, etc.) to test your actions without going live.
+- **Server Manager** — create and manage Minecraft server instances (see below).
+- **Live Theme Editor** — adjust overlay colors and preview changes in real time without saving.
+- **Sessions & Revenue** — view automatic session summaries after each stream and browse your streaming income.
+- **Backups** — browse and restore the automatic backups of your configuration files.
+- **Console & Live Log** — send commands to the Minecraft server console (with autocomplete and history) and watch the live log with level filters.
+- **Check for Updates** — click "Check for Updates" in the Updates card.
+- **API Documentation** — visit `http://127.0.0.1:29185/docs` for interactive API reference.
 
-### Backing Up Your Data
+---
 
-Before updating or making major changes, save copies of these items:
+## Server Manager
 
-- `server/mc/` — Your Minecraft world and server data
-- `data/actions.mca` — Your custom action mappings
-- `data/shell_actions.txt` — Your shell action mappings
-- `config/config.yaml` — Your configuration
+The Server Manager (in the Dashboard) lets you create and manage multiple Minecraft server instances from one place.
+
+### Server instances
+
+Each server instance has its own:
+- **Name** — a label to identify it
+- **Version** — which PaperMC version it runs
+- **Status** — shown with a color-coded indicator (running, stopped, etc.)
+- **Port** — the server port
+- **Save folder** — worlds, configs, and mods
+
+A **default** instance is always present. You can create additional instances for different game modes, maps, or testing.
+
+### What you can do
+
+- **Start, stop, or restart** any instance with one click
+- **Switch versions** — change the PaperMC version per instance
+- **Create new instances** — set a name, port, and version
+- **Delete instances** — non-default instances can be removed
+- **Open folder** — access the server files directly
+
+### Console access
+
+A drop-down selector lets you switch between instances to view each server's console output in real time.
+
+---
+
+## Updating the Tool
+
+The tool checks for updates automatically on startup (enabled by default). If a new version is available, it downloads and installs it.
+
+### What updates preserve — and what they replace
+
+**Tool updates** (the app itself) are *merge* installs: new files are copied in, nothing is deleted. Your `config.yaml` files are never overwritten, and everything under `data/` (actions, backups, plugin data), your Minecraft worlds, and any **external plugins/hooks you installed yourself** are left untouched.
+
+**Plugin/hook updates** via the dashboard replace the plugin's or hook's directory with the new version. Your `config.yaml` inside that directory is preserved automatically; all other files in the directory come from the new package. Persistent data is safe either way — plugins store it under `data/` (`plugin_data`), outside the updated directory.
+
+The dashboard's **Check for updates** action covers the tool as well as plugins and hooks: anything that declares an `update_url` in its manifest is checked and can be updated in one go.
+
+**Before updating, back up these files:**
+- `config/config.yaml` — your settings
+- `data/actions.mca` — your action rules
+- `data/event_commands.yaml` — your event mappings
+- `server/default/` — your Minecraft world
 
 Copy them to a safe location outside the tool folder.
 
-### Ports Used by the Tool
+### Configuration migration
 
-| Port | Used For |
-|------|----------|
-| 25565 | Minecraft Server |
-| 25575 | RCON (Server Communication) |
-| 29185 | Web Dashboard (GUI) |
-| 29187 | Minecraft Server API |
-| 29188 | Internal Web Server |
-| 29189 | Stream Timer Overlay |
-| 29190 | Death Counter Overlay |
-| 29191 | Win Counter Overlay |
-| 29186 | Overlay Text |
-| 29193 | Like Goal Overlay |
-| 29194 | Spotify Control |
+When you update, new configuration options are automatically merged into your existing `config.yaml` if `auto_update_config` is enabled (default: true). Your user-defined values are preserved.
 
-Under normal circumstances, you do not need to change any ports. Only change a port if you get an "Address already in use" error.
+**To disable auto-updates:**
+Set `update.enabled: false` in `config.yaml`.
 
-### Log Files
+> [!WARNING]
+> Disabling this can cause the tool to malfunction or crash.
+> Only set this to `false` if you want to rename or add your own settings, or if you expect the tool to crash.
 
-The tool creates several log files during operation. Here's what each contains:
+**To check for updates manually:**
+Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in the Updates card, or visit `http://127.0.0.1:29185/api/v1/updates/check` directly.
 
-| File | Purpose |
-|------|---------|
-| `logs/update_logs/updater_*.log` | Update check logs — one file per update attempt |
-| `data/revenue_log.jsonl` | Gift revenue tracking — **gross estimate** (diamonds × 0.005 USD). TikTok pays out only a portion of this amount to the streamer (typically around 50%, varies by region and agreement). The actual net revenue is **not** tracked by this tool. |
-| `data/window_state_*.json` | Window size/position for plugin overlays (not logs, but stored here) |
+---
 
-**Cleaning up:** Old update logs are automatically removed based on `max_update_logs` in `config.yaml` (default keeps recent ones, deletes older). Revenue logs and window state files are safe to delete manually if you want a fresh start.
+### Error codes in logs
 
-### Replacing the Minecraft Server Version
+If you see a code like `[HOOK-0005]` or `[API-0001]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the error-code reference in the developer docs (`docs/dev-book-en/src/error-codes.md` or `docs/dev-book-de/src/error-codes.md`).
 
-See [Replacing the Server Version](#replacing-the-server-version) in the Minecraft Server section.
+### Health and diagnostics
+
+The Dashboard has a **Live Plugin Health** card that shows the status of all components with color-coded indicators. For a full system report, visit:
+
+- `http://127.0.0.1:29185/api/v1/health` — basic health check
+- `http://127.0.0.1:29185/api/v1/health/extended` — detailed health info
+- `http://127.0.0.1:29185/api/v1/diagnostics` — full diagnostics report (threads, crash history, component states)
 
 ---
 
@@ -858,96 +644,72 @@ See [Replacing the Server Version](#replacing-the-server-version) in the Minecra
 
 **Q: Do I need to be live on TikTok for the tool to work?**
 
-A: Yes. The tool connects to your active TikTok Live stream. It will keep retrying until you go live.
+A: No. The tool also works without TikTok — you can trigger actions manually or with automation scripts. It is up to you.
 
 **Q: Can I test actions without going live?**
 
-A: Yes. Use the included test tool (`test/test_trigger.exe` on Windows or `test/test_trigger.bin` on Linux). See [Testing Triggers Without TikTok](#testing-triggers-without-tiktok).
+A: Yes. Use the **Event Tester** page in the Dashboard, or the included test tool:
 
-**Q: How do I know if the tool is working correctly?**
+- **Release / Installed**: `test/test_trigger.exe` (Windows) or `test/test_trigger.bin` (Linux)
+- **Development**: `python src/python/send_trigger.py` (e.g., `python src/python/send_trigger.py follow --user TestUser`)
 
-A: The main console window shows live log output. If you see "Connected to TikTok" and the Minecraft server starts without errors, everything is running. You can also use the test trigger tool to verify actions fire correctly.
+Run it with a trigger name (like `follow` or a gift ID) to simulate that event.
+
+**Q: How do I know if the tool is working?**
+
+A: The console window shows live output. If you see "Connected to TikTok" and the Minecraft server starts without errors, everything is running.
+You can also use test triggers (see above) or check the Live Logs tab in the GUI — if you see no errors, the tool should run properly.
 
 **Q: How often is the tool updated?**
 
-A: There is no fixed schedule. Updates are published when new features, bug fixes, or compatibility improvements are ready.
-
-**Q: How do I update the tool?**
-
-A: Updates are automatic by default. The tool checks for new versions on startup and installs them. You can disable auto-updates in `config.yaml`.
+A: There is no fixed schedule. Updates come out when new features or fixes are ready.
 
 **Q: Can I use a different Minecraft version?**
 
-A: Yes. Replace the server `.jar` file in `server/mc/`. The replacement must support RCON and datapacks.
+A: Yes. Use the Server Manager in the Dashboard to switch the version, or replace the `.jar` file in `server/default/`. The new server must support RCON and datapacks (most do). The default version is 1.21.11 (PaperMC).
 
 **Q: Can I use modded servers (Forge, Fabric, Paper)?**
 
-A: Yes. Replace the server `.jar` as described above. Ensure the modded server supports RCON and datapacks.
+A: Yes. Replace the server `.jar` as described above. Make sure the modded server supports RCON and datapacks.
 
 **Q: Does the tool work with Minecraft Bedrock Edition?**
 
-A: No. The tool is designed for Minecraft Java Edition. Bedrock Edition does not support datapacks or RCON in the same way.
+A: No. Only Java Edition supports the features this tool needs.
 
-**Q: Can the Minecraft server run on a different computer?**
+**Q: Can I run the Minecraft server on a different computer?**
 
-A: Yes. You can run the Minecraft server on a separate machine and point the tool to it. Set the RCON IP and port in `config.yaml` to match your remote server. The tool itself must still run on your streaming PC.
+A: Yes. Set `server_host` (the address the tool connects to for RCON) and `rcon.port` in `config.yaml` to match your remote server, and make sure RCON is enabled there. The tool itself must still run on your streaming PC.
 
 **Q: Can I use the overlays without OBS?**
 
-A: Yes. The overlays are standard web pages served on localhost ports. You can open them in any browser or add them as Browser Sources in any streaming software that supports that feature (vMix, Streamlabs Desktop, etc.).
+A: Yes. The overlays are web pages. You can open them in any browser or add them to any streaming software that supports Browser Sources.
 
 **Q: How do I find gift IDs?**
 
-A: Open `core/gifts.json` in a text editor. Each gift entry has an `id` field. You can also enable the GUI search tool in `config.yaml`.
-
-**Q: I get an "Address already in use" error. What can I do?**
-
-A: Another application is using one of the ports the tool needs. Check the [Ports Used by the Tool](#ports-used-by-the-tool) table and either close the conflicting application or change the port in `config.yaml`.
+A: The Dashboard includes a **gift picker** that searches gifts by name or ID with image URLs and coin cost. You can also open `core/gifts.json` directly.
 
 **Q: Can I use the tool with Twitch or YouTube?**
 
 A: The tool is designed for TikTok Live. The license restricts commercial use on other platforms.
 
-**Q: My Minecraft server is lagging. What can I do?**
+**Q: My server is lagging. What can I do?**
 
-A: Increase the RAM allocation (`Java.Xms` / `Java.Xmx` in `config.yaml`) if your system has enough memory. Reduce the frequency of expensive commands in `actions.mca`. Avoid using `comment` or `join` triggers with complex commands on busy streams.
+A: Increase the RAM allocation in `config.yaml` under `java.xms` and `java.xmx`. Also avoid using `comment` or `join` triggers with complex commands on busy streams.
 
----
+**Q: Can viewers spam commands?**
 
-## AI Prompt File
+A: Use cooldowns in `data/comment_commands.yaml` to limit how often commands can be used. You can set per-group and per-user cooldowns.
 
-The file [`AIPrompt.md`](../AIPrompt.md) at the project root is a **system prompt template for AI-powered coding assistants** such as opencode, Cursor, GitHub Copilot, or Claude Projects.
+**Q: How do I use chroma key / green screen for overlays?**
 
-### What it does
-
-When loaded into a compatible AI assistant, this prompt instructs the AI to:
-
-- Start in **English** by default, then **ask the user for their preferred language** during the first conversation.
-- **Save the user's choice** by editing the `USER_LANGUAGE` field in `AIPrompt.md` itself.
-- Follow strict **safety rules**: always read `GUIDE.md` first when unsure, never guess, and never proceed if required information is missing.
-- Always **propose changes before editing files** and wait for explicit user confirmation.
-- Only use information that is directly supported by the project files or documented comments — no invented facts.
-- Treat event hooks as advanced and potentially error-prone.
-
-### How to use it
-
-1. Open your AI assistant's configuration or custom instructions settings.
-2. Copy the entire contents of `AIPrompt.md`.
-3. Paste it as the system prompt / custom instructions.
-4. The assistant will now follow the rules defined in the prompt when working on this project.
-
-### Who this is for
-
-This file is intended for **developers and project maintainers** who use AI tools to help with this project. It ensures consistent, safe, and beginner-friendly behavior regardless of which AI assistant is being used.
+A: Add `&chroma=true` to any core overlay URL. For plugin overlays, check the plugin's overlay page for chroma key support.
 
 ---
 
 ## Additional Resources
 
-- **Developer Documentation (English):** [docs/dev-book-en/src/Introduction.md](./dev-book-en/src/Introduction.md) or [online](https://technikley.github.io/Tiktok2Mc/en)
-- **Developer Documentation (Deutsch):** [docs/dev-book-de/src/Introduction.md](./dev-book-de/src/Introduction.md) or [online](https://technikley.github.io/Tiktok2Mc/de)
-- **Changelog:** [docs/CHANGELOG.md](./CHANGELOG.md)
-- **GitHub Repository:** [https://github.com/TechnikLey/Tiktok2Mc](https://github.com/TechnikLey/Tiktok2Mc)
+- **README:** [README.md](../README.md) — quick start and overview
+- **Changelog:** [CHANGELOG.md](./CHANGELOG.md) — release history
+- **GitHub:** [https://github.com/TechnikLey/Tiktok2Mc](https://github.com/TechnikLey/Tiktok2Mc)
 - **Report Issues:** [GitHub Issues](https://github.com/TechnikLey/Tiktok2Mc/issues)
-- **TikTokLive Library:** [https://github.com/isaackogan/TikTokLive](https://github.com/isaackogan/TikTokLive)
-- **AI Prompt File:** [AIPrompt.md](#ai-prompt-file) (see section above)
+- **API Docs:** `http://127.0.0.1:29185/docs` — interactive API reference (when the tool is running)

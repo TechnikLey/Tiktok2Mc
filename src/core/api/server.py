@@ -1,0 +1,464 @@
+import asyncio
+import ipaddress
+import json
+import logging
+import secrets
+import socket
+from collections.abc import Iterable
+from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
+from starlette.status import HTTP_401_UNAUTHORIZED
+
+from core.overlay import set_event_loop
+from core.paths import get_root_dir
+
+from .api_key import set_api_key
+from .chatbot_status import get_chatbot_status_tracker
+from .dashboard_publisher import get_dashboard_publisher
+from .eventbus import event_bus
+from .models import API_VERSION
+from .outbound_dispatcher import get_outbound_dispatcher
+from .plugin_event_bridge import get_plugin_event_bridge
+from .plugin_health import get_plugin_health_monitor
+from .plugin_overlay import command_queue
+from .plugin_watcher import get_plugin_watcher
+from .routes import api_router
+from .services import ApiService
+from .services.rcon import get_rcon_service
+from .tiktok_live import get_tiktok_live_tracker
+
+log = logging.getLogger(__name__)
+
+DEFAULT_PORT = 29185
+
+_LOCALHOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _same_host_origin(origin: str, host: str) -> bool:
+    """Return ``True`` when an Origin's netloc matches the request Host."""
+    if not origin or not host:
+        return False
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    return parsed.netloc == host
+
+
+def _is_local_machine_host(hostname: str | None) -> bool:
+    """Whether *hostname* (Host header without port) refers to this machine.
+
+    Loopback names and any IP literal are accepted.  A DNS name is only
+    accepted when it is this machine's own hostname — DNS rebinding works
+    by pointing a *foreign* domain at 127.0.0.1, which this check detects.
+    """
+    if not hostname:
+        return False
+    if hostname in _LOCALHOSTS:
+        return True
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        return True
+    return hostname.lower() == socket.gethostname().lower()
+
+
+async def _send_json_error(send, status: int, detail: str) -> None:
+    body = json.dumps({"detail": detail}).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
+class LocalOriginGuardMiddleware:
+    """Reject browser requests that did not originate from the dashboard.
+
+    Blocks the two browser-based attack classes against a localhost API:
+
+    * **Cross-site request forgery ("drive-by"):** a malicious web page
+      makes ``fetch()`` calls to ``http://127.0.0.1:<port>``.  Browsers
+      attach a foreign ``Origin`` header (and/or ``Sec-Fetch-Site:
+      cross-site``) to such requests — they are rejected with ``403``
+      instead of being silently executed.
+    * **DNS rebinding:** an attacker domain resolves to ``127.0.0.1``, so
+      the request arrives from localhost but carries the attacker's
+      hostname in the ``Host`` header.  Requests from localhost clients
+      whose ``Host`` is neither a loopback name, an IP literal nor this
+      machine's own hostname are rejected as well.
+
+    Non-browser clients (the bridge, plugins, curl, scripts) send neither
+    ``Origin`` nor ``Sec-Fetch-Site`` and are unaffected.
+
+    WebSocket connections are covered by the same checks.  This blocks
+    cross-site WebSocket hijacking: browsers always attach an ``Origin``
+    header to WS handshakes, so a web page cannot open ``ws://`` against
+    this API and read the event stream.  A rejected handshake is closed
+    before it completes (uvicorn answers with HTTP 403).
+    """
+
+    def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
+        self.app = app
+        self.extra_origins = frozenset(extra_origins)
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+
+        origin = headers.get("origin")
+        if origin is not None and not (
+            origin in self.extra_origins
+            or _same_host_origin(origin, headers.get("host", ""))
+        ):
+            await self._reject(scope, send, "Cross-origin request rejected")
+            return
+
+        if headers.get("sec-fetch-site") == "cross-site":
+            await self._reject(scope, send, "Cross-site request rejected")
+            return
+
+        client = scope.get("client")
+        client_host = client[0] if client else ""
+        if client_host in _LOCALHOSTS:
+            host_header = headers.get("host", "")
+            hostname = urlsplit(f"//{host_header}").hostname if host_header else None
+            if not _is_local_machine_host(hostname):
+                await self._reject(scope, send, "Invalid Host header")
+                return
+
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _reject(scope, send, detail: str) -> None:
+        if scope["type"] != "websocket":
+            await _send_json_error(send, 403, detail)
+            return
+        # Reject the WebSocket handshake before accepting it.
+        await send({"type": "websocket.close", "code": 1008})
+
+
+class SameHostCORSMiddleware:
+    """Reflect an Origin only when it belongs to the server's own host.
+
+    The desktop GUI (pywebview) and any LAN browser that opens the
+    dashboard at ``http://<server-host>:<port>`` send an ``Origin`` whose
+    host matches the request's ``Host`` header — those are allowed and the
+    origin is echoed.  Foreign origins never match, so no CORS headers are
+    reflected to arbitrary pages.  Note that reflection alone does not
+    block cross-origin *execution*; request rejection is handled by
+    :class:`LocalOriginGuardMiddleware`.
+    """
+
+    def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
+        self.app = app
+        self.extra_origins = frozenset(extra_origins)
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+        origin = headers.get("origin")
+        if origin is None or not (
+            origin in self.extra_origins
+            or _same_host_origin(origin, headers.get("host", ""))
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        origin_bytes = origin.encode()
+        if scope["method"] == "OPTIONS":
+            allow_headers = headers.get("access-control-request-headers", "")
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [
+                        (b"access-control-allow-origin", origin_bytes),
+                        (b"access-control-allow-credentials", b"true"),
+                        (
+                            b"access-control-allow-methods",
+                            b"GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                        ),
+                        (b"access-control-allow-headers", allow_headers.encode()),
+                        (b"access-control-max-age", b"600"),
+                        (b"vary", b"origin"),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": b""})
+            return
+
+        async def send_with_cors(message):
+            if message["type"] == "http.response.start":
+                message = dict(message)
+                message["headers"] = [
+                    *message.get("headers", []),
+                    (b"access-control-allow-origin", origin_bytes),
+                    (b"access-control-allow-credentials", b"true"),
+                    (b"vary", b"origin"),
+                ]
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
+
+
+def _discover_hooks_at_startup() -> None:
+    """Auto-discover hooks from filesystem and populate the hook registry.
+
+    Mirrors what PluginWatcher does for plugins — ensures hooks appear
+    in the GUI immediately without waiting for the bridge process.
+    """
+    try:
+        from core.hook_loader import _discover_hook_dirs
+        from core.hook_registry import get_hook_registry
+
+        discovered = _discover_hook_dirs()
+        hook_infos = []
+        for info in discovered:
+            hook_infos.append(
+                {
+                    "name": info["name"],
+                    "version": info["version"],
+                    "display_name": info["display_name"],
+                    "description": info["description"],
+                    "author": info["author"],
+                    "capabilities": info["capabilities"],
+                    "plugin": info["plugin"],
+                    "update_url": info["update_url"],
+                    "source": info["source"],
+                }
+            )
+        registry = get_hook_registry()
+        new_count = registry.sync_from_discovery(hook_infos)
+        active_names = {info["name"] for info in discovered}
+        cleaned = registry.clean_stale(active_names)
+        if new_count or cleaned:
+            log.info(
+                "[HOOK] Auto-discovered: %d new, %d removed at startup",
+                new_count,
+                cleaned,
+            )
+        else:
+            log.info("[HOOK] Auto-discovered %d hook(s) at startup", len(discovered))
+    except Exception as exc:  # hook discovery must never block API startup
+        log.warning("[HOOK] Auto-discovery at startup failed: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from core.event_command_mapper import get_event_command_mapper
+
+    log.info("API server v%s starting up ...", API_VERSION)
+    log.info(
+        "CORS reflects same-host origins (local GUI + LAN dashboard); "
+        'use create_app(cors_origins=["*"]) to open for development'
+    )
+    # Persist the shutdown signature secret now so the GUI can sign its
+    # (future) shutdown requests. The GUI re-reads the file per request.
+    try:
+        from core.api.shutdown_signature import ensure_secret
+
+        ensure_secret()
+        log.info("Shutdown signature secret ready")
+    except Exception as exc:  # secret creation must never block startup
+        log.warning("Could not prepare shutdown signature secret: %s", exc)
+    set_event_loop(asyncio.get_running_loop())
+    command_queue.set_loop(asyncio.get_running_loop())
+    get_plugin_watcher().start()
+    _discover_hooks_at_startup()
+    await get_plugin_health_monitor().start()
+    get_event_command_mapper().start()
+    get_plugin_event_bridge().start()
+    get_outbound_dispatcher().start()
+    get_dashboard_publisher().start()
+    get_tiktok_live_tracker().start()
+    get_chatbot_status_tracker().start()
+    # Pre-configure RCON from config for the console feature
+    try:
+        cfg = ApiService().read_config()
+        rcon_cfg = cfg.get("rcon", {})
+        get_rcon_service().configure(
+            host=rcon_cfg.get("host", "localhost"),
+            port=rcon_cfg.get("port", 25575),
+            password=rcon_cfg.get("password", ""),
+        )
+    except Exception:  # RCON is optional; console auto-configures on first request
+        log.warning(
+            "Could not read RCON config — console will auto-configure on first request"
+        )
+
+    await event_bus.publish("server.started", {"version": API_VERSION})
+    try:
+        yield
+    except asyncio.CancelledError:
+        # Expected when the supervisor cancels the API server task during shutdown.
+        pass
+    finally:
+        await get_rcon_service().disconnect()
+        await get_plugin_event_bridge().stop()
+        await get_outbound_dispatcher().stop()
+        await get_dashboard_publisher().stop()
+        await get_tiktok_live_tracker().stop()
+        await get_chatbot_status_tracker().stop()
+        await get_event_command_mapper().stop()
+        await get_plugin_health_monitor().stop()
+        await event_bus.publish("server.stopping", {})
+        log.info("API server shutting down ...")
+
+
+def create_app(
+    title: str = "TikTok2MC API",
+    version: str = API_VERSION,
+    cors_origins: list[str] | None = None,
+    api_key: str = "",
+) -> FastAPI:
+    """Build and return a configured FastAPI application instance.
+
+    Parameters
+    ----------
+    title:
+        Application title shown in the OpenAPI docs.
+    version:
+        API version string.
+    cors_origins:
+        Optional explicit list of allowed origins for CORS.  When omitted,
+        the ``SameHostCORSMiddleware`` reflects any origin whose host
+        matches the request (local GUI and LAN dashboard) and the
+        ``LocalOriginGuardMiddleware`` rejects cross-origin, cross-site
+        and DNS-rebinding requests outright.  Pass ``["*"]`` only for
+        development — it disables both middlewares.
+    api_key:
+        Optional API key for authentication.  When set, all non-localhost
+        requests must include the ``X-API-Key`` header (or ``?key=`` query
+        parameter for SSE).  Empty means authentication is disabled.
+
+    Returns
+    -------
+    FastAPI
+        Ready-to-serve application.
+    """
+    set_api_key(api_key)
+    app = FastAPI(
+        title=title,
+        version=version,
+        lifespan=lifespan,
+    )
+
+    if cors_origins is not None:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        app.add_middleware(SameHostCORSMiddleware)
+        # Rejects (not just de-CORS) cross-origin / rebinding requests.
+        # Only active in the default mode — an explicit cors_origins list
+        # is the documented development escape hatch and replaces the
+        # whole origin-protection stack.
+        app.add_middleware(LocalOriginGuardMiddleware)
+
+    class CancelledErrorMiddleware:
+        """Suppress CancelledError spam when clients disconnect or the server shuts down."""
+
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+            try:
+                await self.app(scope, receive, send)
+            except asyncio.CancelledError:
+                # Client disconnected or the supervisor is shutting down.
+                # Send a 499 (client closed request) if possible, then stop.
+                try:
+                    await send(
+                        {"type": "http.response.start", "status": 499, "headers": []}
+                    )
+                    await send({"type": "http.response.body", "body": b""})
+                except Exception:  # client already gone; nothing more to do
+                    pass
+
+    app.add_middleware(CancelledErrorMiddleware)
+
+    app.include_router(api_router)
+
+    if api_key:
+
+        @app.middleware("http")
+        async def check_api_key(request: Request, call_next):
+            # CORS preflights carry no API key by design; the actual request
+            # (which does send it) is still checked below.
+            if request.method == "OPTIONS":
+                return await call_next(request)
+
+            client_host = request.client.host if request.client else ""
+
+            if client_host not in _LOCALHOSTS:
+                # Header is preferred; the ?key= query parameter exists so
+                # EventSource (SSE) clients can authenticate — they cannot
+                # set custom headers.
+                req_key = request.headers.get("X-API-Key", "")
+                if not req_key:
+                    req_key = request.query_params.get("key", "")
+                if not secrets.compare_digest(req_key, api_key):
+                    return JSONResponse(
+                        {
+                            "detail": "Missing or invalid API key. Provide X-API-Key header."
+                        },
+                        status_code=HTTP_401_UNAUTHORIZED,
+                    )
+            return await call_next(request)
+
+    # Serve the central GUI dashboard at /gui
+    # Release layout: core/templates/gui/   Dev layout: templates/gui/
+    root = get_root_dir()
+    gui_dir = root / "core" / "templates" / "gui"
+    if not gui_dir.exists():
+        gui_dir = root / "templates" / "gui"
+    if gui_dir.exists():
+        app.mount(
+            "/gui",
+            StaticFiles(directory=str(gui_dir), html=True),
+            name="gui",
+        )
+
+    # Serve gift images at /gifts-pictures
+    # Release layout: core/assets/gifts_picture/   Dev layout: assets/gifts_picture/
+    gifts_pics = root / "core" / "assets" / "gifts_picture"
+    if not gifts_pics.exists():
+        gifts_pics = root / "assets" / "gifts_picture"
+    if gifts_pics.exists():
+        app.mount(
+            "/gifts-pictures",
+            StaticFiles(directory=str(gifts_pics)),
+            name="gifts_pictures",
+        )
+
+    return app

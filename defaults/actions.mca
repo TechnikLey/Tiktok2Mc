@@ -1,109 +1,62 @@
-# actions.mca — TikTok Events → Minecraft Commands
-# For more info see GUIDE.md
-# Gift IDs and Names: see core/gifts.json
+# ─── Syntax Quick Reference ───────────────────────────────────────────────────
+# <trigger>:<command1> ; <command2>        →  chain multiple with ;
+# >>Title|Subtitle|Seconds                 →  overlay text (on-screen)
+# /command                                 →  Minecraft vanilla (datapack, static)
+# /command !rc                             →  Vanilla via RCON (dynamic, {user} replaced)
+# !command                                 →  RCON (direct to server)
+# $name                                    →  hook script (Python)
+# &command                                 →  shell command (PC, e.g. webhook)
+# @slot>>Title                             →  overlay in named slot
+# x<number>                                →  multiplier (run command N times)
+# {user}                                   →  placeholder: viewer name (only replaced in RCON/!rc)
+# {comment}                                →  placeholder: comment text (comment trigger only)
+# ## <trigger>:...                         →  disabled (kept as template)
+# Gift ID format:  <gift_id>               →  just the numeric gift ID from gifts.json
+# All gift IDs and names: defaults/gifts.json
+# ─── Event Examples ────────────────────────────────────────────────────────────
 
-# =====================================================================
-#  FOLLOW — triggers when someone follows your TikTok account
-# =====================================================================
+# 1. Follow: golden apple + overlay (; chains both)
+follow:/give @a minecraft:golden_apple 7 ; >>New Follower!|{user} is now following!|5
 
-# Give every player 7 golden apples as a follow reward,
-# AND show an overlay notification on stream for 5 seconds.
-# The ; chains both commands: first the /give, then the >> overlay.
-# {user} is automatically replaced with the follower's TikTok name.
-follow:/give @a minecraft:golden_apple 7; >>New Follower!|{user} is now following you!|5
+# 1b. (dynamic): send personalized message via RCON (supports {user})
+7654:/say Welcome {user}! !rc
 
-# =====================================================================
-#  JOIN — triggers when a viewer joins the live stream
-# =====================================================================
+# 2. Likes (every 100): creeper spawn with x3 multiplier
+likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x3
 
-# This fires for EVERY join — can be very frequent on active streams.
-# Use with caution: avoid expensive or spammy commands here.
-# The example below is disabled (#). Remove the # to activate it.
-# Show a welcome overlay when someone joins the stream.
-# {user} is replaced with the viewer's TikTok username.
-#join:>>Welcome!|{user} just joined the stream!
+# 3. Like mega (default: 100k): clear inventory + kill all
+like_2:/clear @a * ; /kill @a
 
-# =====================================================================
-#  COMMENT — triggers on every comment in the live chat
-# =====================================================================
+# 4. Comment: display chat message in overlay ({comment} works here only)
+comment:>>{user} wrote:|{comment}
 
-# This fires for EVERY comment — can be very frequent on active streams.
-# Use with caution: avoid expensive or spammy commands here.
-# The example below is disabled (#). Remove the # to activate it.
-# You can use {comment} to show the comment text in the overlay:
-#comment:>>{user} wrote:|{comment}
+# 5. Share: fireworks for everyone (simple /give)
+share:/give @a minecraft:firework_rocket 3
 
-# =====================================================================
-#  LIKES — triggers based on accumulated like count
-# =====================================================================
+# ─── Gift Examples ─────────────────────────────────────────────────────────────
 
-# "likes" fires every N likes (default: every 100, configured in config.yaml).
-# This spawns 2 Creepers at every player's position.
-# x2 = repeat the summon command 2 times = 2 Creepers.
-likes:/execute at @a run summon minecraft:creeper ~ ~ ~ x2
-
-# "like_2" fires at a bigger milestone (default: every 100_000 likes).
-# First clears every player's inventory, then kills all players.
-# The ; chains both commands: /clear runs first, then /kill.
-like_2:/clear @a *; /kill @a
-
-# =====================================================================
-#  GIFTS — triggered by specific TikTok gift IDs
-#  (find all IDs in core/gifts.json)
-# =====================================================================
-
-# --- Rose (Gift ID: 5655) ---
-# Spawns 2 TNT at the player "Notch" using the DelayedTNT plugin.
-# !tnt is a server plugin command (not vanilla Minecraft).
-# Parameters: !tnt <Amount> <Delay> <Fuse> <Player>
-#   Amount = 2      → spawn 2 TNT blocks
-#   Delay  = 0.1    → 0.1 seconds between each TNT spawn
-#   Fuse   = 2      → each TNT explodes after 2 seconds
-#   Player = Notch  → TNT spawns at this player's position
-5655:!tnt 2 0.1 2 Notch
-
-# --- Mamma Mia (Gift ID: 16111) ---
-# Gives every player 1 diamond. Simple vanilla /give command.
-16111:/give @a minecraft:diamond
-
-# --- Rosa (Gift ID: 8913) ---
-# Summons 3 Evokers at every player's position.
-# /execute at @a run ... = run the command at each player's location.
-# x3 = repeat 3 times = 3 Evokers per player.
+# 6. Rosa (ID 913): summon 3 evokers (multiplier x3 on the command)
 8913:/execute at @a run summon minecraft:evoker ~ ~ ~ x3
 
-# --- Corgi (Gift ID: 6267) ---
-# Spawns 600 TNT using the DelayedTNT plugin.
-# Same syntax as above: !tnt <Amount> <Delay> <Fuse> <Player>
-6267:!tnt 600 0.1 2 Notch
+# 7. Mamma Mia (ID 16111): diamonds + overlay (chained)
+16111:/give @a minecraft:diamond ; >>Mamma Mia!|{user} sent Mamma Mia!|4
 
-# --- Money Gun (Gift ID: 7168) ---
-# Summons 50 Withers at every player's position.
-# x50 = repeat 50 times = 50 Withers.
-7168:/execute at @a run summon minecraft:wither ~ ~ ~ x50
-
-# =====================================================================
-#  SPECIAL FUNCTIONS ($)
-# =====================================================================
-
-# --- Flower Show (Gift ID: 16071) ---
-# $random picks one random action from all defined triggers
-# and executes it. Triggers containing $random are always excluded.
-# Additional exclusions are configurable in config.yaml under:
-#   random_triggers > triggers (default: likes, like_2, follow, join, comment)
-16071:$random
-
-# =====================================================================
-# Trigger Name instead of ID
-# =====================================================================
-
-# You can also use trigger names instead of numeric IDs.
-# It you trigger name has spaces, enclose it in single quotes ('').
-# The example below defines a trigger named "Tom the Tomato" for the same gift ID 16379.
-# When you define trigger name and trigger ID for the same action, the name takes priority.
-# This example below executes then the Gift was sent
-'Tom the Tomato':$random
-# As long as the example above is active, the trigger name "Tom the Tomato" will take priority 
-# over the numeric ID 16379.
-# So the example below will never be executed as long as the trigger name ('Tom the Tomato') is defined.
+# 8. Tom the Tomato (ID 16379): random trigger ($random)
 16379:$random
+
+# ─── Advanced Examples ─────────────────────────────────────────────────────────
+
+# 9. Quoted trigger name (needed when the name contains spaces)
+'Tom the Tomato':/give @a minecraft:potato 1
+
+# 10. Shell command: Discord webhook on follow (PC-side)
+# Note: & shell commands do NOT substitute {user} — the payload is static.
+#follow:&curl -X POST -H "Content-Type: application/json" -d "{\"content\":\"New follower!\"}" https://discord.com/api/webhooks/YOUR_WEBHOOK
+
+# 11. Disabled with ## – kept as template, won't fire
+# Note: like_2 is already active above, so the validator/language server shows
+# a warning here. Enabling this line (removing ##) would cause a duplicate trigger error.
+##like_2:/kill @a
+
+# 12. Disabled gift with TNT parameters (requires TNT plugin)
+##5655:!tnt 2 0.1 2 Notch

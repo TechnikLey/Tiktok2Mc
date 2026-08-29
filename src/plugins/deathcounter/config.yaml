@@ -1,0 +1,15 @@
+# ==========================================
+# Death Counter Plugin — Configuration
+# ==========================================
+# Fully decoupled death counter with milestones.
+# Publishes events to the EventBus; consumers react via API.
+
+milestones: []
+
+signal_on:
+  - "milestone"
+
+theme:
+  background: "#000000"
+  text: "#ff4444"
+  accent: "#ff8888"

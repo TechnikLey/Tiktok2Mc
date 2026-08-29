@@ -1,9 +1,9 @@
-config_version: 7
+config_version: 1.0
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
 # =============================================================================
-# This is the main configuration file for the TikTok-to-Minecraft tool.
+# This is the main configuration file for TikTok2Mc.
 # Every option is explained below. Read through it carefully before your
 # first stream.
 #
@@ -22,7 +22,16 @@ config_version: 7
 #         - item2
 #   - For empty lists, use:  list_name: []
 #   - Lines starting with # are comments and are ignored
+#
+# For detailed explanations of all sections, see docs/GUIDE.md.
 # =============================================================================
+
+# ---------------------------------------------------------------------------
+#  ADVANCED MODE (WEB GUI)
+# ---------------------------------------------------------------------------
+# This key is managed by the Web GUI and has no effect on
+# the backend. Do NOT change it manually unless you know what you are doing.
+config_advanced: false
 
 # ---------------------------------------------------------------------------
 #  AUTO-UPDATE CONFIG
@@ -42,13 +51,53 @@ auto_update_config: true
 show_sudo_warning: true
 
 # ---------------------------------------------------------------------------
+#  PORT POLICY
+# ---------------------------------------------------------------------------
+# Controls what happens when a required port is already in use.
+#
+#   auto_resolve: true   — Automatically find the next free port
+#   auto_resolve: false  — Log an error and exit (safe mode)
+#
+#   session_only: true   — Changed ports are used only this session
+#   session_only: false  — Save resolved ports to config permanently
+#
+#   max_offset: 10       — How many ports to try (-1 = unlimited)
+port_policy:
+  auto_resolve: true
+  session_only: true
+  max_offset: 10
+
+# ---------------------------------------------------------------------------
+#  API SERVER CONFIGURATION
+# ---------------------------------------------------------------------------
+# The central API server address and port.
+# Interactive API documentation: http://localhost:<port>/docs
+api:
+  # Port that the central API server listens on (default: 29185).
+  # Change this if you have another service on the same port.
+  port: 29185
+
+# ---------------------------------------------------------------------------
 #  SERVER BIND ADDRESS
 # ---------------------------------------------------------------------------
 # Controls which network interfaces the servers listen on.
 #   "127.0.0.1"  — Local access only (default, safe)
 #   "0.0.0.0"    — Allow access from other devices on your network
 #   "<IP>"       — Bind to a specific network interface
+#
+# Interactive API documentation: http://localhost:<api.port>/docs
 server_host: "127.0.0.1"
+
+# ---------------------------------------------------------------------------
+#  API KEY
+# ---------------------------------------------------------------------------
+# Optional API key for authentication when the server is exposed beyond
+# localhost.  When set, all non-localhost requests must include the header:
+#
+#   X-API-Key: <your_api_key>
+#
+# Leave empty to disable authentication (safe when server_host is 127.0.0.1).
+api_key: ""
 
 # ---------------------------------------------------------------------------
 #  CONTROL METHOD
@@ -68,14 +117,30 @@ control_method: DCS
 #  AUTO-SHUTDOWN
 # ---------------------------------------------------------------------------
 # When enabled, the tool shuts down automatically after your live stream ends.
+# A countdown gives you time to cancel (type 'stop' in the console).
 shutdown:
   enabled: true
   delay_seconds: 30
+
+# ---------------------------------------------------------------------------
+#  MINECRAFT VERSION
+# ---------------------------------------------------------------------------
+# The Minecraft server version to use (PaperMC build).
+# SAFE versions: 1.21.11 (tested & confirmed working).
+# Other versions are UNTESTED and may break functionality.
+# Managed by the Web GUI (Advanced Settings). Do not edit manually.
+mc_version: "1.21.11"
 
 # ===========================================================================
 #  MINECRAFT SERVER (JAVA)
 # ===========================================================================
 java:
+  # Custom Java executable path (optional).
+  # If set, this path is used instead of searching the system PATH.
+  # Example: "C:\Program Files\Java\jdk-25\bin\java.exe" (Windows)
+  # Example: "/usr/lib/jvm/java-25-openjdk/bin/java" (Linux)
+  path: ""
+
   # RAM allocation. 'G' = Gigabytes.
   # Using the same value for xms (initial) and xmx (maximum) is recommended.
   # Default: 4G — reduce to 2G or 1G if your system has less than 8 GB RAM.
@@ -94,12 +159,19 @@ java:
 rcon:
   enabled: true
 
-  # CHANGE THIS PASSWORD before using the server publicly.
-  # Anyone with this password can control your Minecraft server.
-  password: ABC1234
+  # Set a secure password. The tool will ask you to set one on first start
+  # if this is left empty.
+  password: ""
 
   # RCON port (default: 25575)
   port: 25575
+
+  # Direct RCON command endpoint (POST /api/v1/rcon/command) for the
+  # dashboard console and extensions. Disabled by default for security and
+  # stability — direct commands bypass the bridge's RCON queue and
+  # throttling. Set to true to enable it (the dashboard Console tab needs
+  # it); the queue path keeps working either way.
+  http_command_api: false
 
 # ===========================================================================
 #  TIKTOK LIVE
@@ -124,162 +196,40 @@ tiktok:
   #         "per_stream" — Resets the tracked list every time the tool starts.
   #                        Each stream starts fresh.
   #
-  #   file: Path to the tracked-followers file (default: data/followed_users.txt)
-  #
   # NOTE: Only new follows that happen while the tool is running AND
   # connected to a live stream are tracked. Users who already followed
   # before the tool was running cannot be detected — they will trigger
   # a follow action the first time they follow during a tracked stream.
   follow_tracking:
     mode: "all_time"
-    file: "data/followed_users.txt"
 
 # ===========================================================================
-#  COMMENT COMMANDS
+#  LIKE TRIGGERS
 # ===========================================================================
-# Let viewers send commands via TikTok chat. Each group defines its own
-# prefix character, access roles, allow/deny rules, and dispatch handler.
+# Like triggers fire when the total stream likes reach a threshold.
+# You can define multiple triggers with different intervals.
 #
-# !!! SECURITY WARNING !!!
-# RCON handlers send RAW commands to your Minecraft server. Anyone with the
-# required role can execute any command.
-# ALWAYS use deny-all mode when allowed_roles includes "all", "fanclub",
-# or "superfan".
-comment_commands:
-  # Master switch — set to true to let viewers send commands via chat.
-  # When enabled, each group below processes matching comments independently.
-  enabled: false
-
-  # Global cooldown — applies ACROSS all groups. If set to 10, someone who
-  # runs $skip must wait 10 seconds before ANY command works (#op, !points, etc).
-  # Each group still has its own cooldown/user_cooldown that applies on top.
-  # Set to 0 to disable.
-  cooldown: 0
-
-  # Global user cooldown — like global cooldown, but per user. If set to 30, a
-  # viewer who runs $skip must wait 30 seconds before THEIR NEXT command works
-  # in any group. Other viewers are not affected. Set to 0 to disable.
-  user_cooldown: 0
-
-  # Define one or more command groups. Each group has its own prefix,
-  # role requirements, allow/deny rules, dispatch target, and cooldowns.
-  # All comments starting with the group's prefix are checked against it.
-  groups:
-      # ──────────────────────────────────────────────
-      #  Minecraft Commands (RCON)
-      # ──────────────────────────────────────────────
-      # Viewers type #say Hello or #give PlayerName diamond
-      # to run commands on your Minecraft server.
-      #
-      #   enabled       — true/false to turn this group on/off
-      #   prefix        — The character that triggers this group ("#")
-      #   allowed_roles — Who can use it: all, moderator, superfan, fanclub
-      #   mode          — "deny-all" = only listed commands work
-      #                   "allow-all" = everything works except listed commands
-      #   commands         — List of base command names to allow or block
-      #   commands_config  — Per-command overrides (points_cost, cooldown, roles, url, handler)
-      #   handler          — "rcon" sends to Minecraft, "http" sends to a URL
-      #   cooldown              — Seconds to wait between ANY command in this group (0 = off)
-      #   user_cooldown         — Seconds the SAME viewer must wait before next command (0 = off)
-      #   trigger_comment_event — Also fire the 'comment' trigger in actions.mca? (default: true)
-    - enabled: true
-      prefix: "#"
-      allowed_roles:
-        - moderator
-        - superfan
-      mode: deny-all
-      commands:
-        - say
-        - give
-      commands_config: []
-      handler: rcon
-      cooldown: 0
-      user_cooldown: 0
-      trigger_comment_event: true
-
-      # ──────────────────────────────────────────────
-      #  Spotify Control (HTTP)
-      # ──────────────────────────────────────────────
-      # Viewers type $play, $pause, $skip, $volume 50, etc.
-      # to control Spotify playback. Requires the Spotify plugin
-      # to be configured (see spotify section below).
-      #
-      #   url — HTTP endpoint that receives the command.
-      #         {user} = viewer's TikTok name
-      #         {text} = command text (without the $ prefix)
-      #         {spotify_port} = resolved from spotify.port below
-    - enabled: true
-      prefix: "$"
-      allowed_roles:
-        - all
-      mode: deny-all
-      # Plain list of command names. Used by mode (allow-all / deny-all)
-      # to decide which commands are allowed or blocked.
-      commands:
-        - play
-        - pause
-        - skip
-        - prev
-        - volume
-        - save
-        - repeat
-        - shuffle
-        - current
-        - playtrack
-
-      # Per-command overrides. Only commands listed here need an entry.
-      # Each key matches a command name from the commands list above.
-      commands_config:
-        skip:
-          # Points cost — viewer needs this many channel points to use this command.
-          # Set to 0 (or omit) to make the command free.
-          points_cost: 50
-          # Per-command cooldown in seconds (overrides group cooldown below).
-          cooldown: 30
-        prev:
-          points_cost: 20
-        playtrack:
-          # Points cost — viewer needs this many channel points.
-          points_cost: 50
-          # Per-command cooldown in seconds.
-          cooldown: 30
-          # When true: points & cooldowns only apply if the song is found.
-          # If the song can't be found, nothing is deducted and no cooldown fires.
-          conditional: true
-          # Direct URL to the playtrack endpoint (bypasses /comment).
-          # The response includes {"found": true/false} for conditional handling.
-          url: "http://127.0.0.1:{spotify_port}/playtrack?user={user}&text={text}"
-          handler: http
-        volume:
-          # Per-command role override (overrides group allowed_roles).
-          roles:
-            - moderator
-      handler: http
-      url: "http://127.0.0.1:{spotify_port}/comment?user={user}&text={text}"
-      cooldown: 0
-      user_cooldown: 0
-      trigger_comment_event: true
-
-# ===========================================================================
-#  RANDOM TRIGGER FILTER ($random)
-# ===========================================================================
-# Controls which triggers can be selected by the $random action
-# in data/actions.mca.
+# Each entry requires:
+#   id       — A unique name for this trigger (used in logs)
+#   every    — Like interval between activations (e.g., 100 = every 100 likes)
+#   function — The trigger name used in data/actions.mca (connects config to command)
+#   payload  — (optional) A label passed with the trigger (default: "Community")
+#   enabled  — (optional) Set to false to disable without deleting (default: true)
 #
-# mode:
-#   "deny-all"  — Only triggers in the list are eligible
-#   "allow-all" — All triggers are eligible EXCEPT those in the list
-#
-# NOTE: Triggers that contain "$random" are automatically excluded
-# to prevent infinite recursion.
-random_triggers:
-  mode: deny-all
-  triggers:
-    - likes
-    - like_2
-    - follow
-    - join
-    - comment
+# Example: With "every: 100" and function "likes", the trigger fires every
+# 100 likes and executes whatever command you wrote for "likes" in actions.mca.
+like_triggers:
+  - id: likes_standard
+    every: 100
+    function: likes
+    payload: Community
+    enabled: true
+
+  - id: likes_100k
+    every: 100_000
+    function: like_2
+    payload: Community
+    enabled: true
 
 # ===========================================================================
 #  CONSOLE VISIBILITY
@@ -289,12 +239,12 @@ random_triggers:
 console:
   # Visibility level:
   #   0 — Off:       Hides everything
-  #   1 — Silent:    Hides console, keeps GUI and overlays
-  #   2 — Standard:  Shows main windows (recommended)
+  #   1 — Silent:    Hides console, keeps GUI and overlays (recommended)
+  #   2 — Standard:  Shows main windows
   #   3 — Advanced:  Also shows background services
   #   4 — Debug:     Shows all enabled processes
   #   5 — Override:  Shows every process (even disabled ones, debugging only)
-  log_level: 2
+  log_level: 1
 
   # Show the main console window.
   visible: true
@@ -311,247 +261,113 @@ console:
 # Handles communication between the bridge and the Minecraft server.
 # Required for player death/respawn detection, datapack loading, etc.
 minecraft_server_api:
-  enabled: true
   api_port: 29187
   web_server_port: 29188
+  # Pause the TikTok command queue while the tracked player is dead and
+  # resume it on respawn. Disable if a foreign game sends player_death /
+  # player_respawn webhooks that must not affect the Minecraft queue.
+  queue_pause_on_death: true
 
-# --- OVERLAY TEXT ---
-# Displays text notifications on stream (triggered via >> in actions.mca).
-# Works as an OBS Browser Source with transparent background.
-overlay_text:
+# --- GUI ---
+# The graphical user interface is served by the central API server
+# and displayed in a pywebview window.
+# Set enabled: true to launch the dashboard on startup.
+gui:
   enabled: true
-  port: 29186
 
-  # Display mode when a new message arrives while one is still shown:
-  #   "overwrite" — New message replaces current one (recommended)
-  #   "queue"     — Messages queue up and show one after another
-  #   WARNING: Queue mode can pile up on busy streams.
+# ===========================================================================
+#  OVERLAY (CORE)
+# ===========================================================================
+# The built-in overlay subsystem displays text messages on stream.
+# It runs as a core component, not a plugin.
+overlay:
+  enabled: true
+
+  # Display mode: overwrite = replace current message; queue = line up messages
   display_mode: overwrite
 
-  # Fade-in and fade-out duration in milliseconds.
-  # These are NOT included in the Duration from >>commands.
-  # Example: fade_in=500, fade_out=500, Duration=3 → total visible = 4s
-  # Set to 0 for instant appear/disappear.
+  # Fade durations (milliseconds)
   fade_in: 500
   fade_out: 500
 
-  # Circuit breaker: after max_fails consecutive failures, stop trying
-  # for cooldown seconds before retrying.
+  # Circuit breaker settings
   max_fails: 3
   cooldown: 10
 
-  # Named overlay instances. Each name creates a separate URL:
-  #   http://127.0.0.1:PORT/?overlay=NAME
-  # You can send text to a specific overlay from actions.mca using
-  # @NAME>> syntax (e.g., @alerts>>Title|Subtitle|3).
-  # If you use >> without a name, the "default" overlay is used.
+  # Named overlay slots (at least "default" is required)
   overlays:
     - name: "default"
 
-# --- LIKE GOAL ---
-# A progress bar tracking likes toward a goal.
-like_goal:
-  enabled: true
-
-  # Port for the Like Goal OBS overlay.
-  port: 29193
-
-  # -----------------------------------------------------------------------
-  #  LIKE TRIGGERS
-  # -----------------------------------------------------------------------
-  # Like triggers fire when the total stream likes reach a threshold.
-  # You can define multiple triggers with different intervals.
-  #
-  # Each entry requires:
-  #   id       — A unique name for this trigger (used in logs)
-  #   every    — Like interval between activations (e.g., 100 = every 100 likes)
-  #   function — The trigger name used in data/actions.mca (connects config to command)
-  #   payload  — (optional) A label passed with the trigger (default: "Community")
-  #   enabled  — (optional) Set to false to disable without deleting (default: true)
-  #
-  # Example: With "every: 100" and function "likes", the trigger fires every
-  # 100 likes and executes whatever command you wrote for "likes" in actions.mca.
-  triggers:
-    - id: likes_standard
-      every: 100
-      function: likes
-      payload: Community
-      enabled: true
-
-    - id: likes_100k
-      every: 100_000
-      function: like_2
-      payload: Community
-      enabled: true
-
-  # Text displayed above the progress bar.
-  display_text: "Like Goal"
-
-  # Number of likes needed to reach the first goal.
-  # Use underscores for readability (100_000 = 100000).
-  # Do NOT use dots or commas (100.000 and 100,000 will not work).
-  initial_goal: 100_000
-
-  # What happens after a goal is reached:
-  #   0  — Reset mode:     Likes reset to 0, goal starts over
-  #   1  — Step mode:      Goal increases by initial_goal each time
-  #                         (100k → 200k → 300k → ...)
-  #   2+ — Multiply mode:  Goal is multiplied by this value each time
-  #                         (100k → 200k → 400k → 800k → ...)
-  goal_multiplier: 1
-
-# --- STREAM TIMER ---
-# A countdown timer for your stream. Pauses on player death, resumes on
-# respawn. When it reaches zero, a win is counted.
-timer:
-  enabled: true
-  port: 29189
-  start_time: 10   # Minutes
-
-# --- DEATH COUNTER ---
-# Displays the number of player deaths on stream.
-death_counter:
-  enabled: true
-  port: 29190
-
-# --- WIN COUNTER OVERLAY ---
-# Tracks wins and losses. Decrements on death, increments on timer expiry.
-win_counter:
-  enabled: true
-  port: 29191
-
-# --- WEB DASHBOARD (GUI) ---
-# A web-based gift browser and server dashboard.
-# Enable this to search gift IDs visually in a browser window.
-gui:
-  enabled: false
-  port: 29185
-
-# --- SPOTIFY CONTROL ---
-# Lets viewers control your Spotify playback via chat ($play, $pause, etc.)
-# and stream events (gifts, follows, likes). Displays the current track
-# as an OBS overlay with album art.
-#
-# SETUP:
-#   1. Go to https://developer.spotify.com/dashboard and create an app
-#   2. Note your Client ID and Client Secret
-#   3. Add http://127.0.0.1:29194/callback as a Redirect URI in the app
-#   4. Enter the credentials below
-#   5. On first start, your browser opens for Spotify login
-#
-# CHAT COMMANDS:
-#   The $ group in comment_commands (see above) forwards chat messages
-#   like "$play" to this plugin. The {spotify_port} placeholder in that
-#   URL resolves to whatever port you set here.
-#
-# OBS OVERLAY:
-#   Add a Browser Source with URL http://localhost:29194
-#   The overlay automatically scales to your browser source size.
-spotify:
-  # Set to false to disable the Spotify plugin entirely (overlay + controls).
-  enabled: true
-
-  # Port for the web server. Also used for the OBS overlay URL
-  # and the chat command HTTP endpoint.
-  port: 29194
-
-  # Your Spotify Developer App credentials.
-  # Get them at https://developer.spotify.com/dashboard
-  client_id: ""
-  client_secret: ""
-
-  # Redirect URI — must exactly match what you entered in your
-  # Spotify Developer App settings. Only change this if you
-  # also changed the port above.
-  redirect_uri: "http://127.0.0.1:29194/callback"
-
-  # Target a specific Spotify device by ID.
-  # Leave empty to use whatever device is currently active.
-  # You can find device IDs by checking /api/player/devices
-  # while Spotify is playing on your target device.
-  device_id: ""
-
-  # How much the volume changes per $volume up / $volume down command (percent).
-  # E.g., 10 means each command changes volume by 10%.
-  volume_step: 10
-
-  # How $playtrack commands are handled:
-  #   "replace" — Plays the requested song immediately, replacing the current track.
-  #   "queue"   — Adds the requested song to the Spotify queue (plays after current track).
-  playtrack_mode: "replace"
-
-# --- CHANNEL POINTS ---
-# Awards loyalty points to active viewers. Viewers can check !points
-# and redeem rewards with !redeem <name>. Points are awarded every
-# award_interval_seconds to viewers who joined or commented recently.
-channel_points:
-  enabled: true
-
-  # Port for the web server, overlay, and chat command HTTP endpoint.
-  port: 29195
-
-  # How many points are awarded per interval to each active viewer.
-  award_amount: 10
-
-  # How often (in seconds) points are awarded.
-  award_interval_seconds: 60
-
-  # How many minutes after last activity a viewer is considered inactive.
-  ping_timeout_minutes: 10
-
-  # Number of top viewers shown on the leaderboard overlay.
-  leaderboard_count: 10
-
-# ===========================================================================
-#  THEME — Customize overlay colors
-# ===========================================================================
-# Customize colors for each plugin overlay. All values are CSS hex codes.
-# Omit any key to keep the default. Changes take effect after restart.
-theme:
-  like_goal:
-    background: "#050505"
-    text: "#ffffff"
-    accent: "#00f5ff"
-    accent2: "#8a2be2"
-    danger: "#ff4d4d"
-  death_counter:
-    background: "#000000"
-    text: "#8ef3ff"
-  win_counter:
-    background: "#000000"
-    text: "#ffffff"
-    danger: "#ff4d4d"
-    muted: "#666666"
-    separator: "#333333"
-  timer:
-    background: "#000000"
-    text: "#89CFF0"
-    warning: "#FFD700"
-    blink: "#FF8C00"
-    danger: "#FF0000"
-  overlay_text:
+  # Theme colours for the overlay windows
+  theme:
     background: "#00FF00"
     text: "#ffffff"
-  spotify:
-    background: "#000000"
-    text: "#ffffff"
-    accent: "#1db954"
-    accent2: "#1ed760"
-  channel_points:
-    background: "#000000"
-    text: "#ffffff"
-    accent: "#FFD700"
-    accent2: "#00BFFF"
-    accent3: "#40E0D0"
-    danger: "#FF4500"
+
+# --- OUTBOUND CHANNELS (WEBHOOKS / DISCORD) ---
+# Forwards live events to external HTTP endpoints (e.g. Discord webhooks).
+# Each channel subscribes to event patterns (tiktok.gift, tiktok.*, ...).
+# Formats:
+#   raw     - JSON envelope {"type", "data", "timestamp"}
+#   discord - Discord webhook payload built from a template with
+#             {user}, {type} and any event data placeholder ({comment}, ...)
+outbound:
+  # Master switch for all outbound deliveries.
+  enabled: true
+
+  # Circuit breaker: after max_fails consecutive failed deliveries a
+  # channel pauses for cooldown seconds.
+  max_fails: 3
+  cooldown: 10
+
+  # Additional delivery attempts per message and HTTP timeout in seconds.
+  retries: 1
+  timeout: 5
+
+  channels:
+    - name: "discord-events"
+      url: ""
+      events: ["tiktok.*"]
+      format: "discord"
+      template: "**{user}** triggered *{type}*"
+      enabled: false
 
 # --- AUTO-UPDATER ---
 # Checks for new versions on startup and installs them automatically.
 # It is strongly recommended to keep this enabled.
+# You can also check for updates manually via the API:
+#   GET http://localhost:29185/api/v1/updates/check
 update:
   enabled: true
+
+  # When true, updates are installed automatically on startup.
+  # When false, you will be notified in the GUI when an update is
+  # available and can install it manually from the Updates tab.
+  auto_install: true
 
   # Maximum number of update log files to keep in logs/update_logs/.
   #  0  = delete all logs after each update
   #  -1 = never delete logs
   max_update_logs: 20
+
+# --- PLUGIN SANDBOX ---
+# Restricts plugin subprocess resources to limit the impact of
+# misbehaving or compromised plugins.
+#
+#   enabled:        true/false to enable sandboxing
+#   profile:        Built-in profile name: "light", "moderate" or "strict".
+#                   When set, it overrides the raw values below. Individual
+#                   plugins can override it via "sandbox_profile" in their
+#                   plugin.json.
+#   max_memory_mb:  Maximum RAM per plugin (Linux direct / Windows job)
+#   max_cpu_time:   Maximum CPU seconds per plugin (Linux only)
+#   max_files:      Maximum open file descriptors (Linux only)
+#   max_processes:  Maximum child processes per plugin (Linux only)
+#   priority_class: Windows process priority (below_normal / idle)
+plugin_sandbox:
+  enabled: false
+  profile: ""
+  max_memory_mb: 512
+  max_cpu_time: 3600
+  max_files: 256
+  max_processes: 32
+  priority_class: "below_normal"

@@ -1,0 +1,13 @@
+{
+  "name": "spotify_control",
+  "version": "1.0.0",
+  "display_name": "Spotify Control Bridge",
+  "description": "Bridges TikTok $-commands (spotify_play, spotify_pause, etc.) to the Spotify plugin via the central API.",
+  "author": "TikTok2Mc",
+  "min_api_version": "1.0.0",
+  "plugin": "spotify-control",
+  "capabilities": ["spotify:control"],
+  "permissions": ["overlay", "network"],
+  "update_url": "",
+  "depends_on": ["spotify-control"]
+}

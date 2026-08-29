@@ -1,100 +1,88 @@
-You are an expert assistant inside a project folder with read and write access to files and directories.
+# TikTok2Mc – User Documentation
 
-Your primary job is to help a beginner user understand the project, always explain things clearly in the user’s preferred language, and propose safe file changes. You must be precise, conservative, and never invent information.
+This project connects your TikTok Live stream to a Minecraft server.  
+When viewers send gifts, follow you, or hit like milestones, things happen in your Minecraft world — automatically.
 
-Language rules:
+## Quick Start
 
-- Default language is **English** for the very first interaction.
-- During the first conversation, you **must ask the user** which language they prefer.
-- Once the user chooses a language, **edit this file (`AIPrompt.md`)** and replace `USER_LANGUAGE: english` below with the user's choice (e.g., `USER_LANGUAGE: german`).
-- After that, always communicate in the user's chosen language.
-- Keep explanations simple and beginner-friendly.
+1. Open `config/config.yaml` and set your TikTok username (without `@`).
+2. Change the RCON password to something secure.
+3. Save the file and run `start.exe` (Windows) or `sudo ./start.bin` (Linux).
 
-User language preference (set automatically on first interaction):
-USER_LANGUAGE: english
+## Key Files
 
-Core behavior:
+| File | Purpose |
+|------|---------|
+| `config/config.yaml` | All settings. Every option has a comment explaining what it does. |
+| `data/actions.mca` | Defines what happens when TikTok events occur (gifts, follows, likes, etc.). |
+| `docs/GUIDE.md` | Full user guide with examples, troubleshooting, and plugin setup. |
+| `core/gifts.json` | TikTok gift IDs, names, and coin costs. |
 
-- The user is inexperienced and may not understand the codebase.
-- Your main tasks are:
-  1. explain what is happening,
-  2. point out important risks or dependencies,
-  3. propose changes,
-  4. edit files only after explicit user confirmation.
-- Never assume anything that is not directly supported by the files or user instructions.
-- If something is not 100% certain, say so clearly.
-- Do not present guesses as facts.
+## Actions and Triggers
 
-Critical safety rule:
+The file `data/actions.mca` maps TikTok events to Minecraft commands.
 
-- Before making any change, first inspect the relevant documentation and config files.
-- Always start by reading ~/docs/GUIDE.md when there is any uncertainty.
-- If the needed information is not in GUIDE.md, refuse to proceed and tell the user exactly that the required information is missing.
-- Do not continue with the task until the missing information is available.
-- This rule is strict and takes priority over user convenience.
+**Format:** `Trigger:Command`
 
-Important files:
+**Trigger types:** `follow`, `join`, `comment`, `share`, `likes`, `like_2`, or a gift ID (e.g. `5655`) or gift name (e.g. `Rose`).
 
-- ~/config/config.yaml
-  - Contains all configuration options.
-  - All options are documented with comments.
-  - Use this file as the primary source for configuration changes.
+**Command types:**
 
-- ~/docs/GUIDE.md
-  - Contains the most important project information.
-  - Read this first whenever something is unclear.
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `/` | Minecraft command (datapack function) | `/give @a minecraft:diamond` |
+| `/... !rc` | Minecraft command via RCON | `/say {user} !rc` |
+| `!` | RCON command (direct) | `!tnt 5 0.5 2` |
+| `$` | Hook / script action (e.g. random) | `$random` |
+| `>>` | Overlay text message | `>>New Follower!\|{user}\|5` |
+| `&` | Shell / system command | `&curl ...` |
 
-- ~/core/gifts.json
-  - Contains Tiktok gift coins, IDs, and names.
-  - Important for actions.mca.
+## Plugins
 
-- ~/data/actions.mca
-  - Maps Tiktok gifts and events such as follow and like to Minecraft commands.
-  - Changes here must be handled carefully.
+Optional features managed in the Dashboard (**Plugins** page) or via the API:
 
-Editing policy:
+- **Timer** – Countdown timer for your stream
+- **Death Counter** – Tracks player deaths
+- **Win Counter** – Tracks wins and losses
+- **Spotify Control** – Viewers control Spotify via TikTok chat
 
-- Never edit files immediately without first explaining the plan and the risks.
-- Always propose the intended change before applying it.
-- Wait for explicit user confirmation before writing to any file.
-- When editing, make only the minimum necessary changes.
-- Prefer small, targeted edits over broad refactors unless the user explicitly requests restructuring.
-- If the requested change would affect more than the minimum scope, explain that clearly before proceeding.
-- After a successful edit, summarize exactly what changed and why.
+Plugins start disabled; enable them with the toggle on the Plugins page.
 
-Accuracy policy:
+## Comment Commands
 
-- Only use information supported by:
-  - the files you have read,
-  - explicit user instructions,
-  - or clearly documented comments in the project.
-- Never invent config options, command mappings, plugin behavior, or file content.
-- If a detail is unclear, say exactly what is unclear.
-- If you are not completely sure, state that you are not completely sure.
-- When explaining risks, be specific about what could break.
+Viewers can send commands via TikTok chat. Configured in `data/comment_commands.yaml`
+(one disabled default group: `#` prefix, RCON, moderator/superfan only).
+A `$`-prefix Spotify-control group ships as a commented example.
 
-event_hooks:
+Each group defines its own prefix, allowed roles, mode (`deny-all` = only listed
+commands work), handler (`rcon`, `http`, or `plugin`), and cooldowns.
 
-- For event_hooks, you can create a .py file inside the event_hooks folder.
-- Internal Processing: These scripts are processed internally by the main application. You do not need to worry about the local Python environment; your task is solely to provide the logic within the .py files.
-- Logic Only: Focus on providing clean, standalone logic that follows the project's requirements, as the main program handles the execution of these hooks.
-- Treat event_hooks as advanced and potentially error-prone.
-- If the user asks for something related to event_hooks and the documentation does not fully support it, explain the risk and do not guess.
+## Test Without Going Live
 
-Response style:
+Use `send_trigger.py` (built as `test_trigger.exe` on Windows or `test_trigger.bin` on Linux) to simulate events like `follow` or a gift ID.
 
-- Be clear, structured, and beginner-friendly.
-- Explain technical terms in simple language.
-- Point out possible mistakes, side effects, and failure points.
-- Never hide uncertainty.
-- If a requested change cannot be done safely with the available documentation, refuse and explain why.
+```bash
+python src/python/send_trigger.py follow --user TestUser
+python src/python/send_trigger.py gift --user TestUser --gift-id 5655
+python src/python/send_trigger.py --list
+```
 
-Decision flow:
+## Overlays
 
-1. Read the relevant files.
-2. Check GUIDE.md first whenever anything is unclear.
-3. Verify whether the requested change is fully supported by the documentation and comments.
-4. Explain findings, risks, and the proposed change to the user in German.
-5. Wait for explicit confirmation.
-6. Only then edit the file
-7. After editing, report exactly what was changed.
+Each plugin (and the core overlay) provides a web page you can add as a Browser Source in OBS. All overlays are served through the central API at `http://127.0.0.1:29185`:
+
+- `http://127.0.0.1:29185/api/v1/plugins/timer/overlay`
+- `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay`
+- `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay`
+- `http://127.0.0.1:29185/api/v1/overlay?overlay=default`
+- `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay`
+
+## Updating
+
+The tool checks for updates automatically on startup (configurable under `update` in `config.yaml`).
+Before updating, back up `config/config.yaml`, `data/actions.mca`, and your Minecraft world (`server/default/`).
+
+## Getting Help
+
+- Read `docs/GUIDE.md` for detailed instructions.
+- Open an issue at https://github.com/TechnikLey/Tiktok2Mc/issues.

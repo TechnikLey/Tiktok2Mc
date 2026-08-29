@@ -1,0 +1,203 @@
+{
+  "name": "win-counter",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/wincounter/main.py",
+  "display_name": "Win Counter",
+  "description": "Counts wins with configurable milestones. Publishes win.milestone and win.record_low events to the EventBus so consumers can react without coupling.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "min_api_version": "1.0.0",
+  "bundled": true,
+  "platform": "all",
+  "capabilities": [
+    "win-counter:count",
+    "win-counter:milestones",
+    "win-counter:events"
+  ],
+  "permissions": [
+    "events"
+  ],
+  "depends_on": [],
+  "icon": "🏆",
+  "emitted_events": [
+    {
+      "key": "win.milestone",
+      "name": "Win Milestone Reached",
+      "desc": "When the win count reaches a configured milestone",
+      "icon": "🏆",
+      "name_i18n": {
+        "en": "Win Milestone Reached",
+        "de": "Sieg-Meilenstein erreicht"
+      },
+      "desc_i18n": {
+        "en": "When the win count reaches a configured milestone",
+        "de": "Wenn die Sieganzahl einen konfigurierten Meilenstein erreicht"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "wins",
+          "type": "number",
+          "required": true,
+          "desc": "Win count that reached the milestone"
+        },
+        {
+          "key": "needed",
+          "type": "number",
+          "desc": "Wins needed for the next milestone"
+        }
+      ]
+    },
+    {
+      "key": "win.record_low",
+      "name": "New Record Low",
+      "desc": "When the win count drops to a new record low",
+      "icon": "📉",
+      "name_i18n": {
+        "en": "New Record Low",
+        "de": "Neuer Tiefststand"
+      },
+      "desc_i18n": {
+        "en": "When the win count drops to a new record low",
+        "de": "Wenn die Sieganzahl auf einen neuen Tiefststand sinkt"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "wins",
+          "type": "number",
+          "required": true,
+          "desc": "New record-low win count"
+        }
+      ]
+    }
+  ],
+  "accepted_commands": {
+    "add_win": {
+      "name": "Add Win",
+      "desc": "Increase the win count",
+      "args": {
+        "amount": {
+          "type": "number",
+          "label": "How many wins",
+          "default": 1,
+          "min": 1,
+          "label_i18n": {
+            "en": "How many wins",
+            "de": "Wie viele Siege"
+          }
+        }
+      },
+      "name_i18n": {
+        "en": "Add Win",
+        "de": "Sieg hinzufügen"
+      },
+      "desc_i18n": {
+        "en": "Increase the win count",
+        "de": "Sieganzahl erhöhen"
+      }
+    },
+    "remove_win": {
+      "name": "Remove Win",
+      "desc": "Decrease the win count",
+      "args": {
+        "amount": {
+          "type": "number",
+          "label": "How many to remove",
+          "default": 1,
+          "min": 1,
+          "label_i18n": {
+            "en": "How many to remove",
+            "de": "Wie viele entfernen"
+          }
+        }
+      },
+      "name_i18n": {
+        "en": "Remove Win",
+        "de": "Sieg entfernen"
+      },
+      "desc_i18n": {
+        "en": "Decrease the win count",
+        "de": "Sieganzahl verringern"
+      }
+    }
+  },
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "initial_needed",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Initial Needed",
+        "help": "Wins required for the first milestone",
+        "category": "Goals"
+      },
+      {
+        "key": "milestone_increment",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "label": "Milestone Increment",
+        "help": "Additional wins needed for each next milestone",
+        "category": "Goals"
+      },
+      {
+        "key": "signal_on",
+        "type": "array",
+        "default": [
+          "milestone",
+          "record_low"
+        ],
+        "item_schema": {
+          "type": "select",
+          "options": [
+            "milestone",
+            "record_low"
+          ]
+        },
+        "label": "Signal On",
+        "help": "Events published to the EventBus via POST /api/v1/events",
+        "advanced": true,
+        "category": "Events"
+      },
+      {
+        "key": "theme.background",
+        "type": "color",
+        "default": "#000000",
+        "label": "Background Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.text",
+        "type": "color",
+        "default": "#ffffff",
+        "label": "Text Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.muted",
+        "type": "color",
+        "default": "#aaaaaa",
+        "label": "Muted Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.danger",
+        "type": "color",
+        "default": "#ff4444",
+        "label": "Danger Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.separator",
+        "type": "color",
+        "default": "#444444",
+        "label": "Separator Color",
+        "category": "Theme"
+      }
+    ]
+  }
+}

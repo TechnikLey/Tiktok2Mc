@@ -31,14 +31,38 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Build
-        run: python build.py
+      - name: Install Qt6 system dependencies (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libqt6webenginecore6 qt6-wayland
 
-      - name: Upload Artifact
+      - name: Install NSIS (Windows only)
+        if: matrix.os == 'windows-latest'
+        run: choco install nsis
+
+      - name: Run Build
+        run: python build.py --installer
+
+      - name: Upload Release Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: build/release/
+
+      - name: Upload Installer Artifact (Windows only)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TikTok2MC-Windows-Installer
+          path: build/TikTok2MC-*-Setup.exe
+
+      - name: Upload Linux Installer Artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TikTok2Mc-Linux-Installer
+          path: build/TikTok2Mc-*-Linux-Setup.sh
 
   release:
     needs: build
@@ -60,10 +84,28 @@ jobs:
           name: TikTok2Mc-Linux
           path: build-linux/
 
+      - name: Download Windows Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTok2MC-Windows-Installer
+          path: installer-win/
+
+      - name: Download Linux Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTok2Mc-Linux-Installer
+          path: installer-linux/
+
       - name: Create Archives
         run: |
           cd build-windows && zip -9 -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
           GZIP=-9 tar -czf TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz -C build-linux .
+          sha256sum TikTok2Mc-${{ github.ref_name }}-Windows.zip > TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
+          sha256sum TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz > TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
+          mv installer-win/TikTok2MC-*-Setup.exe ./TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe || true
+          sha256sum TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe > TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256 || true
+          mv installer-linux/TikTok2Mc-*-Linux-Setup.sh ./TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh || true
+          sha256sum TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh > TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256 || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -71,3 +113,9 @@ jobs:
           files: |
             TikTok2Mc-${{ github.ref_name }}-Windows.zip
             TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz
+            TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
+            TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
+            TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe
+            TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256
+            TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh
+            TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256

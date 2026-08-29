@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok2Mc Dashboard</title>
+    <link rel="stylesheet" href="./design-system.css?v=3">
+    <link rel="stylesheet" href="./style.css?v=8">
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h1 class="sidebar-title">TikTok2Mc</h1>
+                <button class="sidebar-toggle" onclick="cycleSidebar()" data-i18n-title="nav.toggleSidebar" data-i18n-aria-label="nav.toggleSidebar" title="Toggle sidebar" aria-label="Toggle sidebar">
+                    <svg class="toggle-full" viewBox="0 0 24 24" width="20" height="20"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor"/></svg>
+                    <svg class="toggle-icons" viewBox="0 0 24 24" width="20" height="20"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" fill="currentColor"/></svg>
+                </button>
+                <button class="sidebar-hide-btn" onclick="hideSidebar()" data-i18n-title="nav.hideSidebar" data-i18n-aria-label="nav.hideSidebar" title="Hide sidebar" aria-label="Hide sidebar">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/></svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button type="button" class="nav-item active" data-view="status" onclick="switchView('status')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.status">Status</span>
+                </button>
+                <button type="button" class="nav-item" data-view="revenue" onclick="switchView('revenue')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.revenue">Revenue</span>
+                </button>
+                <button type="button" class="nav-item" data-view="sessions" onclick="switchView('sessions')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.sessions">Sessions</span>
+                </button>
+                <button type="button" class="nav-item" data-view="log" onclick="switchView('log')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.log">Live Log</span>
+                </button>
+                <button type="button" class="nav-item" data-view="settings" onclick="switchToEditor('settings', openConfigEditor)">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.settings">Settings</span>
+                </button>
+                <button type="button" class="nav-item" data-view="servers" onclick="switchView('servers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.servers">Server Manager</span>
+                </button>
+                <button type="button" class="nav-item" data-view="console" onclick="switchView('console')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm7.5-5.18l-1.41 1.41L12 15.59l3.5-3.5-1.41-1.41L12 12.82l-2.09-2.09-1.41 1.41L11.5 12.82zM7.5 14h4v1.5h-4V14z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.console">Console</span>
+                </button>
+                <button type="button" class="nav-item" data-view="triggers" onclick="switchView('triggers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.triggers">Event Tester</span>
+                </button>
+                <button type="button" class="nav-item" data-view="actions" onclick="switchToEditor('actions', () => actionsEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 000-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.actions">Actions</span>
+                </button>
+                <button type="button" class="nav-item" data-view="reactions" onclick="switchToEditor('reactions', () => reactionEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.reactions">Reactions</span>
+                </button>
+                <button type="button" class="nav-item" data-view="commands" onclick="switchToEditor('commands', () => commentCommandsEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.commands">Commands</span>
+                </button>
+                <button type="button" class="nav-item" data-view="chatbot" onclick="switchToEditor('chatbot', () => chatbotEditor.open())">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2a2 2 0 0 1 2 2c0 .36-.1.7-.27 1H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4.27A2 2 0 0 1 10 4a2 2 0 0 1 2-2zM8.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 15h8v1.5H8V15z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.chatbot">Chatbot</span>
+                </button>
+
+                <button type="button" class="nav-item" data-view="plugins" onclick="switchView('plugins')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.plugins">Plugins</span>
+                </button>
+                <button type="button" class="nav-item" data-view="hooks" onclick="switchView('hooks')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 17H7V6h10v12zM9 8h6v2H9V8zm0 4h6v2H9v-2z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.hooks">Hooks</span>
+                </button>
+                <button type="button" class="nav-item" data-view="overlays" onclick="switchView('overlays')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.overlays">Overlays</span>
+                </button>
+                <button type="button" class="nav-item" data-view="backups" onclick="switchView('backups')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.backups">Backups</span>
+                </button>
+                <button type="button" class="nav-item" data-view="updates" onclick="switchView('updates')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.updates">Updates</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-status-row">
+                    <div id="status-pill" class="offline" data-i18n="nav.connecting">Connecting...</div>
+                    <div id="tiktok-status-pill" class="tiktok-status offline" data-i18n-title="nav.tiktokStatus" title="TikTok Live connection status" data-i18n="common.offline">Offline</div>
+                </div>
+                <div class="sidebar-lang-row">
+                    <span class="sidebar-lang-label" data-i18n="nav.language">Language</span>
+                    <div class="lang-switch">
+                        <button class="lang-btn" data-lang="en" onclick="I18N.setLang('en')">EN</button>
+                        <button class="lang-btn" data-lang="de" onclick="I18N.setLang('de')">DE</button>
+                    </div>
+                </div>
+                <button class="btn btn--danger btn--sm" onclick="promptShutdown()" data-i18n="nav.shutdown">Shutdown</button>
+                <button class="theme-toggle" onclick="toggleTheme()" data-i18n-title="nav.toggleTheme" data-i18n-aria-label="nav.toggleTheme" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+                    <svg class="theme-icon-light" viewBox="0 0 24 24" width="14" height="14"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 000-1.41.996.996 0 00-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 000 1.41.996.996 0 001.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06z" fill="currentColor"/></svg>
+                    <svg class="theme-icon-dark" viewBox="0 0 24 24" width="14" height="14"><path d="M9 2c-1.05 0-2.05.16-3 .46 1.69 1.23 2.8 3.24 2.8 5.54 0 3.87-3.13 7-7 7-.57 0-1.13-.07-1.67-.2C2.72 18.84 6.5 22 11 22c5.52 0 10-4.48 10-10S16.52 2 11 2z" fill="currentColor"/></svg>
+                    <span id="theme-label" data-i18n="nav.themeDark">Dark</span>
+                </button>
+                <button class="btn-help" onclick="Help.openHelp('shortcuts')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+            </div>
+        </aside>
+        <button type="button" class="sidebar-reveal" data-i18n-title="nav.showSidebar" data-i18n-aria-label="nav.showSidebar" title="Show sidebar" aria-label="Show sidebar"></button>
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+        <main id="dashboard" class="dashboard-content hidden">
+            <header class="mobile-header">
+                <button type="button" class="mobile-menu-btn" onclick="toggleMobileSidebar()" data-i18n-aria-label="nav.openSidebar" data-i18n-title="nav.openSidebar" title="Open menu" aria-label="Open menu" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/></svg>
+                </button>
+                <span class="mobile-header-title">TikTok2Mc</span>
+            </header>
+            <div id="restart-pending-banner" class="restart-banner hidden">
+                <div class="restart-banner__inner">
+                    <span class="restart-banner__text" data-i18n="restart.pending">Restart pending, some changes require a restart to take effect.</span>
+                    <div class="restart-banner__actions">
+                        <button class="btn btn--primary btn--sm" onclick="triggerRestart()" data-i18n="restart.now">Restart Now</button>
+                        <button class="btn btn--secondary btn--sm" onclick="dismissRestartBanner()" data-i18n="restart.dismiss">Dismiss</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Status ─── -->
+            <div class="view active" id="view-status">
+                <div class="view-header">
+                    <h2 data-i18n="status.title">Status</h2>
+                    <button class="btn-help" onclick="Help.openHelp('status')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                </div>
+
+                <section class="view-section">
+                    <h3 data-i18n="status.system">System Status</h3>
+                    <div id="system-info" class="text-muted" data-i18n="status.loading">Loading...</div>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="status.liveStats">Live Statistics</h3>
+                    <div id="live-stats-grid" class="status-grid"></div>
+                </section>
+
+            </div>
+
+            <!-- ─── Plugins ─── -->
+            <div class="view" id="view-plugins">
+                <div id="plugin-list-section">
+                    <div class="view-header">
+                        <h2 data-i18n="plugins.title">Plugins</h2>
+                        <button class="btn-help" onclick="Help.openHelp('plugins')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                    <section class="view-section">
+                        <h3 data-i18n="plugins.management">Plugin Management</h3>
+                        <div id="plugin-manager-table"></div>
+                    </section>
+                </div>
+
+                <div id="plugins-config-section" class="hidden">
+                    <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
+                        <h2 id="plugins-config-title" data-i18n="plugins.configuration">Configuration</h2>
+                        <button class="btn btn--secondary" onclick="closeInlinePluginConfig()" data-i18n="plugins.backTo">← Back to Plugins</button>
+                    </div>
+                    <div class="plugins-config-layout">
+                        <nav class="editor-sidebar" id="plugins-config-sidebar"></nav>
+                        <div class="editor-main">
+                            <div class="editor-topbar">
+                                <div class="editor-search">
+                                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                    <input type="text" id="plugins-config-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="pluginEditor.onInlineSearch(this.value)">
+                                </div>
+                                <div class="header-actions">
+                                    <button class="btn btn-advanced" id="plugins-config-advanced-btn" onclick="pluginEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
+                                    <button class="btn btn--primary btn-save-disabled" id="plugins-config-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+                                </div>
+                            </div>
+                            <div class="editor-content" id="plugins-config-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Hooks ─── -->
+            <div class="view" id="view-hooks">
+                <div id="hook-list-section">
+                    <div class="view-header">
+                        <h2 data-i18n="hooks.title">Hooks</h2>
+                        <button class="btn btn--secondary" onclick="refreshHooks()" style="padding:0.3rem 0.8rem;font-size:0.85rem;">⟳ Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                    <section class="view-section">
+                        <h3 data-i18n="hooks.management">Hook Management</h3>
+                        <div id="hook-manager-table"></div>
+                    </section>
+                </div>
+
+                <div id="hooks-config-section" class="hidden">
+                    <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
+                        <h2 id="hooks-config-title" data-i18n="hooks.configuration">Configuration</h2>
+                        <button class="btn btn--secondary" onclick="closeInlineHookConfig()" data-i18n="hooks.backTo">← Back to Hooks</button>
+                    </div>
+                    <div class="plugins-config-layout">
+                        <nav class="editor-sidebar" id="hooks-config-sidebar"></nav>
+                        <div class="editor-main">
+                            <div class="editor-topbar">
+                                <div class="editor-search">
+                                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                    <input type="text" id="hooks-config-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="hookEditor.onInlineSearch(this.value)">
+                                </div>
+                                <div class="header-actions">
+                                    <button class="btn btn-advanced" id="hooks-config-advanced-btn" onclick="hookEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
+                                    <button class="btn btn--primary btn-save-disabled" id="hooks-config-save" onclick="hookEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+                                    <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                                </div>
+                            </div>
+                            <div class="editor-content" id="hooks-config-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Log ─── -->
+            <div class="view" id="view-log">
+                <div class="view-header">
+                    <h2 data-i18n="log.title">Live Log</h2>
+                    <button class="btn-help" onclick="Help.openHelp('log')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                </div>
+
+                <div class="log-toolbar">
+                    <div class="log-stats" id="log-stats">
+                        <span class="log-stat" data-level="all" data-i18n-title="log.allEntries" title="Total entries"><span class="log-stat-count" id="stat-all">0</span> All</span>
+                        <span class="log-stat log-stat--info" data-level="info" data-i18n-title="log.infoEntries" title="Info entries"><span class="log-stat-count" id="stat-info">0</span> Info</span>
+                        <span class="log-stat log-stat--warn" data-level="warning" data-i18n-title="log.warningEntries" title="Warning entries"><span class="log-stat-count" id="stat-warning">0</span> Warn</span>
+                        <span class="log-stat log-stat--err" data-level="error" data-i18n-title="log.errorEntries" title="Error entries"><span class="log-stat-count" id="stat-error">0</span> Error</span>
+                        <span class="log-stat log-stat--crit" data-level="critical" data-i18n-title="log.criticalEntries" title="Critical entries"><span class="log-stat-count" id="stat-critical">0</span> Critical</span>
+                        <span class="log-stat log-stat--debug" data-level="debug" data-i18n-title="log.debugEntries" title="Debug entries"><span class="log-stat-count" id="stat-debug">0</span> Debug</span>
+                    </div>
+                    <div class="log-search">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="log-search" data-i18n-placeholder="log.searchPlaceholder" placeholder="Search logs..." oninput="liveLog.onSearch(this.value)">
+                    </div>
+                </div>
+                <div class="log-filter-bar">
+                    <div class="log-filter-group">
+                        <label class="log-filter-label" data-i18n="log.level">Level:</label>
+                        <div class="log-filter-buttons" id="log-filter-buttons">
+                            <button class="log-filter-btn active" data-level="all" data-i18n="common.all">All</button>
+                            <button class="log-filter-btn" data-level="info" data-i18n="common.info">Info</button>
+                            <button class="log-filter-btn" data-level="warning" data-i18n="common.warning">Warning</button>
+                            <button class="log-filter-btn" data-level="error" data-i18n="common.error">Error</button>
+                            <button class="log-filter-btn" data-level="critical" data-i18n="common.critical">Critical</button>
+                            <button class="log-filter-btn" data-level="debug" data-i18n="common.debug">Debug</button>
+                        </div>
+                    </div>
+                    <div class="log-actions">
+                        <button class="btn btn--sm btn--secondary" id="log-pause-btn" onclick="liveLog.togglePause()" data-i18n="common.pause">Pause</button>
+                        <button class="btn btn--sm btn--secondary" onclick="liveLog.clear()" data-i18n="common.clear">Clear</button>
+                        <button class="btn btn--sm btn--secondary" onclick="liveLog.export()" data-i18n="common.export">Export</button>
+<label class="log-autoscroll" title="Auto-scroll to newest entries">
+                        <input type="checkbox" id="log-autoscroll" checked> <span data-i18n="log.autoscroll">Auto-scroll</span>
+                    </label>
+                    </div>
+                </div>
+                <div id="log-view" class="log-view"></div>
+                <div class="log-footer">
+                    <span class="text-muted" id="log-status" data-i18n="log.connecting">Connecting to log stream...</span>
+                    <span class="text-muted" id="log-visible-count"></span>
+                </div>
+
+                <section class="view-section crash-reports-section">
+                    <div class="crash-reports-header">
+                        <h3 data-i18n="log.crashReports">Crash Reports</h3>
+                        <button class="btn btn--sm btn--secondary" onclick="crashReports.load()" data-i18n="common.refresh">Refresh</button>
+                    </div>
+                    <p class="muted" id="crash-reports-empty" data-i18n="log.noCrashReports">No crash reports available.</p>
+                    <div id="crash-reports-list" class="crash-reports-list"></div>
+                    <div id="crash-report-detail" class="crash-report-detail hidden">
+                        <div id="crash-report-detail-content"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ─── Console ─── -->
+            <div class="view" id="view-console">
+                <div class="view-header">
+                    <h2 data-i18n="console.title">Minecraft Console</h2>
+                    <div class="console-toolbar">
+                        <span id="console-status" class="console-status offline" data-i18n="console.disconnected">Disconnected</span>
+                        <select id="console-instance-selector" class="form-select" style="width:auto;min-width:140px;font-size:var(--text-sm);padding:0.25rem 0.5rem;" onchange="consoleTerminal.switchInstance(this.value)">
+                          <option value="" data-i18n="console.selectServer">Select server...</option>
+                        </select>
+                        <button class="btn btn--sm btn--secondary" id="btn-console-connect" onclick="consoleTerminal.toggleConnection()" data-i18n="console.connect">Connect</button>
+                        <button class="btn btn--sm btn--secondary" id="btn-console-clear" onclick="consoleTerminal.clear()" data-i18n="console.clear">Clear</button>
+                    </div>
+                    <button class="btn-help" onclick="Help.openHelp('console')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                </div>
+                <div id="console-output" class="console-output">
+                    <div class="console-line muted" data-i18n="console.prompt">Click "Connect" to open an RCON session.</div>
+                </div>
+                <div class="console-input-row">
+                    <span class="console-prompt">&gt;</span>
+                    <input type="text" id="console-input" class="console-input" data-i18n-placeholder="console.placeholder" placeholder="Enter Minecraft command..." disabled autocomplete="off" spellcheck="false">
+                </div>
+                <div class="console-hint" data-i18n="console.hint">Tab: command autocomplete · ↑/↓: command history</div>
+            </div>
+
+            <!-- ─── Overlays ─── -->
+            <div class="view" id="view-overlays">
+                <div class="view-header">
+                    <h2 data-i18n="overlays.title">Overlays</h2>
+                    <button class="btn-help" onclick="Help.openHelp('overlays')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                </div>
+                <section class="view-section">
+                    <h3 data-i18n="overlays.urls">Overlay URLs</h3>
+                    <div id="overlay-urls" class="overlay-urls"></div>
+                </section>
+            </div>
+
+            <!-- ─── Updates ─── -->
+            <div class="view" id="view-updates">
+                <div class="view-header">
+                    <h2 data-i18n="updates.title">Updates</h2>
+                    <button class="btn-help" onclick="Help.openHelp('updates')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                </div>
+
+                <section class="view-section">
+                    <div id="updates-summary">
+                        <span class="text-muted" data-i18n="updates.noInfo">No update information available.</span>
+                    </div>
+                    <div id="updates-detail" class="hidden"></div>
+                </section>
+            </div>
+
+            <!-- ─── Backups ─── -->
+            <div class="view" id="view-backups">
+                <div class="view-header">
+                    <h2 data-i18n="backups.title">Backups</h2>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary btn--sm" onclick="loadBackups()" data-i18n="common.refresh" title="Refresh backups">Refresh</button>
+                        <button class="btn btn--primary btn--sm" onclick="createBackupsNow()" data-i18n="backups.createNow">Backup Now</button>
+                        <button class="btn-help" onclick="Help.openHelp('backups')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+
+                <section class="view-section">
+                    <p class="text-muted" data-i18n="backups.intro">Every time you save a configuration, a backup is created automatically. Restore a backup here to roll back changes.</p>
+                    <div id="backups-root"></div>
+                </section>
+
+                <section class="view-section">
+                    <div class="view-section-header">
+                        <h3 data-i18n="backups.bundleTitle">Config Bundle</h3>
+                    </div>
+                    <p class="text-muted" data-i18n="backups.bundleIntro">Export your complete configuration (config, actions, event commands, plugin and hook configs) as a ZIP bundle, or import one to restore it on another device.</p>
+                    <div class="bundle-actions">
+                        <button class="btn btn--secondary" onclick="exportConfigBundle()" data-i18n="backups.bundleExport">Export Bundle</button>
+                        <button class="btn btn--primary" onclick="importConfigBundle()" data-i18n="backups.bundleImport">Import Bundle</button>
+                        <input type="file" id="bundle-file-input" accept=".zip" class="hidden">
+                    </div>
+                </section>
+            </div>
+
+            <!-- ─── Server Manager ─── -->
+            <div class="view" id="view-servers">
+                <div class="view-header">
+                    <h2 data-i18n="servers.title">Server Manager</h2>
+                    <div class="header-actions">
+                        <button class="btn btn--primary btn--sm" onclick="openServerCreateModal()" title="Create a new server instance" data-i18n="servers.create">+ Create Server</button>
+                        <button class="btn btn--secondary btn--sm" onclick="openServerDownloadModal()" title="Download PaperMC version" data-i18n="servers.downloadVersion">Download Version</button>
+                        <button class="btn btn--secondary btn--sm" onclick="openServerCustomModal()" title="Import custom server.jar" data-i18n="servers.addCustom">Add Custom Version</button>
+                        <button class="btn btn--secondary btn--sm" onclick="loadServerManager()" data-i18n="common.refresh" data-i18n-title="common.refresh" title="Refresh">Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('servers')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+
+                <!-- Java runtime status (shown when Java is missing/too old) -->
+                <div id="java-status-banner" class="hidden"></div>
+
+                <!-- Server Instance Cards -->
+                <div class="server-grid" id="server-instances">
+                    <div class="text-muted server-loading" data-i18n="servers.loadingInstances">Loading server instances...</div>
+                </div>
+
+                <!-- Version Library -->
+                <section class="view-section" style="margin-top: var(--space-6);">
+                    <div class="view-section-header">
+                        <h3 data-i18n="servers.versionLibrary">Version Library</h3>
+                        <span class="text-muted version-count" id="version-count"></span>
+                    </div>
+                    <div id="server-versions-list">
+                        <p class="text-muted" data-i18n="servers.loadingVersions">Loading versions...</p>
+                    </div>
+                </section>
+
+                <!-- Minecraft Server Plugins -->
+                <section class="view-section" style="margin-top: var(--space-6);">
+                    <div class="view-section-header">
+                        <h3 data-i18n="servers.mcPlugins">Minecraft Plugins</h3>
+                        <span class="text-muted" id="mc-plugins-count"></span>
+                    </div>
+                    <div class="mc-plugins-instance-select" style="margin-bottom: var(--space-4);">
+                        <label data-i18n="servers.mcPluginsInstance">Instance:</label>
+                        <select id="mc-plugins-instance-select" class="form-input" onchange="loadMcPlugins()" style="max-width:300px;display:inline-block;margin-left:0.5rem;"></select>
+                        <button class="btn btn--sm btn--primary" onclick="uploadMcPlugin()" style="margin-left:0.5rem;" data-i18n="servers.mcPluginsAdd">Add Plugin</button>
+                        <input type="file" id="mc-plugins-file-input" accept=".jar" style="display:none;" onchange="confirmUploadMcPlugin()">
+                    </div>
+                    <div id="mc-plugins-list">
+                        <p class="text-muted" data-i18n="servers.loadingMcPlugins">Loading plugins...</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ─── Revenue ─── -->
+            <div class="view" id="view-revenue">
+                <div class="view-header">
+                    <h2 data-i18n="revenue.title">Revenue</h2>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary btn--sm" onclick="loadRevenueView()" title="Refresh revenue data" data-i18n="common.refresh">Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('revenue')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+
+                <div class="status-grid revenue-summary" id="revenue-summary"></div>
+
+                <section class="view-section">
+                    <div class="revenue-panel">
+                        <div class="revenue-filters">
+                            <div class="revenue-filter-group">
+                                <span class="revenue-period" data-days="0" role="button" tabindex="0" onclick="revenueSetPeriod(0)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(0)" data-i18n="revenue.periodAll">All</span>
+                                <span class="revenue-period" data-days="7" role="button" tabindex="0" onclick="revenueSetPeriod(7)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(7)" data-i18n="revenue.period7">7 days</span>
+                                <span class="revenue-period" data-days="30" role="button" tabindex="0" onclick="revenueSetPeriod(30)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(30)" data-i18n="revenue.period30">30 days</span>
+                                <span class="revenue-period" data-days="90" role="button" tabindex="0" onclick="revenueSetPeriod(90)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(90)" data-i18n="revenue.period90">90 days</span>
+                            </div>
+                            <label class="revenue-filter-label">
+                                <span data-i18n="revenue.from">From</span>
+                                <input type="date" id="revenue-from" onchange="revenueApplyFilters()">
+                            </label>
+                            <label class="revenue-filter-label">
+                                <span data-i18n="revenue.to">To</span>
+                                <input type="date" id="revenue-to" onchange="revenueApplyFilters()">
+                            </label>
+                            <button class="btn btn--secondary btn--sm revenue-clear" onclick="revenueClearFilters()" data-i18n="revenue.clear">Clear</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="view-section">
+                    <div class="revenue-section-head">
+                        <h3 data-i18n="revenue.daily">Daily Revenue</h3>
+                        <div class="revenue-legend">
+                            <span class="revenue-legend__item"><i class="revenue-legend__swatch revenue-legend__swatch--gross"></i><span data-i18n="revenue.legendGross">Gross (viewer spend)</span></span>
+                            <span class="revenue-legend__item"><i class="revenue-legend__swatch revenue-legend__swatch--net"></i><span data-i18n="revenue.legendNet">Net (payout)</span></span>
+                            <span class="revenue-legend__item"><i class="revenue-legend__swatch revenue-legend__swatch--fee"></i><span data-i18n="revenue.legendFee">TikTok fee</span></span>
+                        </div>
+                    </div>
+                    <div id="revenue-chart" class="revenue-chart"></div>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="revenue.history">History</h3>
+                    <div id="revenue-table-wrap"></div>
+                    <p class="text-muted revenue-note" data-i18n="revenue.estimateNote">Estimates based on TikTok rates: 1 diamond = $0.005 payout, 2 coins = 1 diamond, coins ≈ $0.013 each. Actual payouts vary by region, package and app store.</p>
+                </section>
+            </div>
+
+            <!-- ─── Sessions ─── -->
+            <div class="view" id="view-sessions">
+                <div class="view-header">
+                    <h2 data-i18n="sessions.title">Sessions</h2>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary btn--sm" onclick="loadSessions()" data-i18n="common.refresh" title="Refresh sessions">Refresh</button>
+                        <button class="btn btn--primary btn--sm" onclick="downloadSessionsReport()" data-i18n="sessions.downloadReport">Download Report</button>
+                        <button class="btn-help" onclick="Help.openHelp('sessions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+
+                <div class="status-grid" id="sessions-summary"></div>
+
+                <section class="view-section">
+                    <h3 data-i18n="sessions.history">Stream History</h3>
+                    <div id="sessions-table-wrap"></div>
+                </section>
+            </div>
+
+            <!-- ─── Event Tester ─── -->
+            <div class="view" id="view-triggers">
+                <div class="view-header">
+                    <h2 data-i18n="triggers.title">Event Tester</h2>
+                    <div class="console-toolbar">
+                        <span id="trigger-tester-status" class="console-status offline" data-i18n="triggers.ready">Ready</span>
+                    </div>
+                    <button class="btn-help" onclick="Help.openHelp('triggers')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                </div>
+
+                <section class="view-section">
+                    <div class="warning-box">
+                        <strong data-i18n="triggers.testMode">TEST MODE</strong>: Events fired here are simulated and behave exactly like real TikTok events. Use with care on a live server.
+                    </div>
+                </section>
+
+                <!-- TikTok Connection Control -->
+                <section class="view-section">
+                    <h3 data-i18n="triggers.systemControls">System Controls</h3>
+                    <div class="trigger-form">
+                        <div class="form-row" style="align-items:center;">
+                            <div class="form-group" style="flex:1;margin-bottom:0;">
+                                <label data-i18n="triggers.tiktokConnection">TikTok Connection</label>
+                                <div class="tiktok-toggle-row">
+                                    <span id="tiktok-connection-state" class="tiktok-state-label tiktok-state-on" data-i18n="triggers.on">ON</span>
+                                    <button class="btn btn--secondary" id="btn-tiktok-toggle" onclick="eventTester.toggleTiktok()" data-i18n="triggers.toggleConnection">Toggle Connection</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="triggers.triggerSimulator">Trigger Simulator</h3>
+                    <div class="trigger-form">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label data-i18n="triggers.eventType">Event Type</label>
+                                <select id="trigger-type" class="form-select" onchange="eventTester.onTypeChange()">
+                                    <option value="follow" data-i18n="triggers.follow">Follow</option>
+                                    <option value="like" data-i18n="triggers.like">Like</option>
+                                    <option value="join" data-i18n="triggers.join">Join</option>
+                                    <option value="share" data-i18n="triggers.share">Share</option>
+                                    <option value="comment" data-i18n="triggers.comment">Comment</option>
+                                    <option value="gift" data-i18n="triggers.gift">Gift</option>
+                                    <option value="custom" data-i18n="triggers.custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="custom-trigger-group" style="flex:1;display:none;">
+                                <label data-i18n="triggers.customName">Custom Trigger Name</label>
+                                <input type="text" id="trigger-custom-name" class="form-input" data-i18n-placeholder="triggers.customPlaceholder" placeholder="e.g. my_action">
+                            </div>
+                            <div class="form-group" id="gift-trigger-group" style="flex:2;display:none;">
+                                <label data-i18n="triggers.selectGift">Select Gift</label>
+                                <div class="gift-picker">
+                                    <input type="text" id="gift-search" class="form-input" data-i18n-placeholder="triggers.searchGifts" placeholder="Search gifts by name or ID..." oninput="eventTester.onGiftSearch(this.value)">
+                                    <div id="gift-select" class="gift-list" style="max-height:200px;"></div>
+                                    <input type="hidden" id="gift-selected-id" value="">
+                                </div>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label data-i18n="triggers.user">User</label>
+                                <input type="text" id="trigger-user" class="form-input" value="TestUser">
+                            </div>
+                        </div>
+                        <div class="form-row" id="comment-fields" style="display:none;">
+                            <div class="form-group" style="flex:2">
+                                <label data-i18n="triggers.commentText">Comment Text</label>
+                                <input type="text" id="comment-text" class="form-input" data-i18n-placeholder="triggers.commentPlaceholder" placeholder="Enter comment text...">
+                            </div>
+                            <div class="form-group checkbox-group" style="flex:1;align-items:flex-end;padding-bottom:0.5rem;">
+                                <label><input type="checkbox" id="comment-mod"> <span data-i18n="triggers.moderator">Moderator</span></label>
+                                <label><input type="checkbox" id="comment-sf"> <span data-i18n="triggers.superfan">Superfan</span></label>
+                                <label><input type="checkbox" id="comment-fc"> <span data-i18n="triggers.fanclub">Fanclub</span></label>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn--primary" id="btn-trigger-send" onclick="eventTester.sendTrigger()" data-i18n="triggers.sendTrigger">Send Trigger</button>
+                            <button class="btn btn--secondary" onclick="eventTester.clearHistory()" data-i18n="triggers.clearHistory">Clear History</button>
+                        </div>
+                        <div id="trigger-error" class="modal-error hidden"></div>
+                    </div>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="triggers.sessionHistory">Session History</h3>
+                    <div id="trigger-history" class="trigger-history">
+                        <p class="text-muted" data-i18n="triggers.noEvents">No events triggered yet this session.</p>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <div id="app-loading" class="app-loading">
+            <div class="app-loading__spinner"></div>
+            <div class="app-loading__text">Loading TikTok2Mc...</div>
+        </div>
+
+    <!-- First-Run Wizard -->
+    <div id="wizard" class="wizard-overlay hidden">
+        <div class="wizard-card">
+            <h2 id="wizard-title" data-i18n="wizard.title">Welcome to TikTok2Mc</h2>
+            <div class="wizard-steps" id="wizard-steps"></div>
+            <div id="wizard-content"></div>
+            <div class="wizard-actions">
+                <button class="btn btn--secondary" id="wizard-back" data-i18n="wizard.back">Back</button>
+                <button class="btn btn--primary" id="wizard-next" data-i18n="wizard.next">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restart Dialog -->
+    <div id="restart-dialog" class="wizard-overlay hidden">
+        <div class="wizard-card text-center">
+            <h2 class="dialog-title" data-i18n="wizard.setupCompleteTitle">Setup Complete</h2>
+            <p class="muted dialog-desc">Your settings have been saved.<br>The tool must be restarted for changes to take effect.</p>
+            <div class="dialog-actions-center">
+                <button class="btn btn--primary" id="btn-restart-now" data-i18n="restart.now">Restart Now</button>
+                <button class="btn btn--secondary" id="btn-restart-later" data-i18n="restart.later">Later</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions: Server Restart Dialog -->
+    <div id="actions-restart-dialog" class="wizard-overlay hidden">
+        <div class="wizard-card text-center">
+            <h2 class="dialog-title" data-i18n="actions.restartRequired">Server Restart Required</h2>
+            <p class="muted dialog-desc" data-i18n="actions.restartMessage">The actions have been saved. Minecraft loads datapack functions only when the server starts, so the server must be restarted for the changes to take effect. Restart now or later?</p>
+            <div class="dialog-actions-center">
+                <button class="btn btn--primary" id="btn-actions-restart-now" data-i18n="restart.now">Restart Now</button>
+                <button class="btn btn--secondary" id="btn-actions-restart-later" data-i18n="restart.later">Later</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Notification Dialog -->
+    <div id="update-notification-dialog" class="wizard-overlay hidden">
+        <div class="wizard-card text-center">
+            <div class="update-notification-icon" style="font-size:2.5rem;margin-bottom:0.5rem;">&#x2191;</div>
+            <h2 class="dialog-title" data-i18n="updates.popupTitle">Update Available</h2>
+            <p class="muted dialog-desc" id="update-notification-desc"></p>
+            <div class="dialog-actions-center" style="gap:0.75rem;">
+                <button class="btn btn--primary" id="btn-update-now" data-i18n="updates.updateNow">Update Now</button>
+                <button class="btn btn--secondary" id="btn-update-dismiss" data-i18n="updates.dismiss">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Editor -->
+    <div id="config-editor" class="editor-overlay hidden">
+        <div class="editor-layout">
+            <nav class="editor-sidebar" id="editor-sidebar"></nav>
+            <div class="editor-main">
+                <div class="editor-topbar" id="editor-topbar">
+                    <h2 data-i18n="editor.title">Settings</h2>
+                    <div class="editor-search">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="editor-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="editor.onSearch(this.value)">
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-advanced" id="config-advanced-btn" onclick="editor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
+                        <button class="btn btn--primary btn-save-disabled" id="config-editor-save" onclick="editor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+                        <button class="btn-help" onclick="Help.openHelp('settings')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+                <div class="editor-content" id="editor-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Editor -->
+    <div id="actions-editor" class="editor-overlay hidden">
+      <div class="actions-layout">
+        <div class="actions-topbar">
+          <h2 data-i18n="actions.title">Actions Editor</h2>
+          <div class="header-actions">
+            <button class="btn btn--primary btn-save-disabled" id="actions-editor-save" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+            <button class="btn-help" onclick="Help.openHelp('actions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+          </div>
+        </div>
+
+        <!-- Visual Panel -->
+        <div id="actions-visual-panel" class="actions-body">
+          <div class="actions-table-panel">
+            <div class="actions-table-header">
+              <h3 data-i18n="actions.eventTriggers">Event Triggers</h3>
+              <button class="btn btn--secondary btn--sm" id="actions-add-trigger" data-i18n="actions.addEvent">+ Add Event</button>
+            </div>
+            <table class="actions-table">
+              <thead><tr>
+                <th class="actions-col-type" data-i18n="actions.type">Type</th>
+                <th class="actions-col-name" data-i18n="actions.name">Name</th>
+                <th class="actions-col-status" data-i18n="actions.status">Status</th>
+                <th data-i18n="actions.commands">Commands</th>
+              </tr></thead>
+              <tbody id="actions-table-body"></tbody>
+            </table>
+          </div>
+          <div id="actions-detail" class="actions-detail hidden">
+            <div id="actions-detail-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Event Modal -->
+    <div id="actions-add-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card">
+        <h3 data-i18n="actions.addTriggerTitle">Add Event Trigger</h3>
+        <div class="form-group">
+          <label data-i18n="actions.triggerType">Trigger Type</label>
+          <select id="actions-add-type" class="form-select">
+            <option value="event" data-i18n="actions.event">Event</option>
+            <option value="gift" data-i18n="actions.gift">Gift</option>
+          </select>
+        </div>
+
+        <!-- Event panel -->
+        <div id="actions-add-event-panel" class="form-group">
+          <label data-i18n="actions.eventName">Event Name</label>
+          <select id="actions-add-event-name" class="form-select">
+            <option value="follow" data-i18n="triggers.follow">Follow</option>
+            <option value="join" data-i18n="triggers.join">Join</option>
+            <option value="comment" data-i18n="triggers.comment">Comment</option>
+            <option value="likes" data-i18n="triggers.likes">Likes</option>
+            <option value="like_2" data-i18n="triggers.like2">Like_2</option>
+            <option value="share" data-i18n="triggers.share">Share</option>
+          </select>
+          <input type="text" id="actions-add-event-custom" class="form-input hidden" data-i18n-placeholder="actions.eventNamePlaceholder" placeholder="Enter custom event name..." style="margin-top:0.5rem;">
+        </div>
+
+        <!-- Gift panel -->
+        <div id="actions-add-gift-panel" class="form-group hidden">
+          <label data-i18n="actions.searchGiftsLabel">Search Gifts</label>
+          <input type="text" id="actions-add-gift-search" class="form-input" placeholder="Search by name or ID..." data-i18n-placeholder="actions.searchGifts">
+          <div id="actions-add-gift-list" class="gift-list"></div>
+        </div>
+
+        <div id="actions-add-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="actions-add-event-cancel" data-i18n="actions.cancel">Cancel</button>
+          <button class="btn btn--primary" id="actions-add-event-confirm" data-i18n="actions.addEventConfirm">Add Event</button>
+          <button class="btn btn--primary hidden" id="actions-add-gift-confirm" disabled data-i18n="actions.addGiftTrigger">Add Gift Trigger</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reaction Editor -->
+    <div id="reaction-editor" class="editor-overlay hidden">
+      <div class="reactions-layout">
+        <!-- Sidebar -->
+        <nav class="reactions-sidebar" id="reaction-sidebar">
+          <div class="sidebar-header" data-i18n="editor.filterByCategory">Filter by Category</div>
+          <div class="sidebar-group" id="reaction-sidebar-categories"></div>
+        </nav>
+        <!-- Main -->
+        <div class="reactions-main">
+          <!-- Topbar -->
+          <div class="reactions-topbar">
+            <div class="reactions-topbar-left">
+              <h2 data-i18n="reactions.title">Event Reactions</h2>
+              <div class="reactions-subtitle" data-i18n="reactions.subtitle">When something happens, automatically control your plugins</div>
+            </div>
+            <div class="reactions-search-wrap">
+              <svg class="search-icon-inline" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <input type="text" id="reaction-search" data-i18n-placeholder="reactions.searchPlaceholder" placeholder="Search reactions..." oninput="reactionEditor.onSearch(this.value)">
+            </div>
+            <div class="header-actions">
+              <button class="btn btn--primary" id="reaction-add" onclick="reactionEditor.startCreate()" data-i18n="reactions.create">+ Create Reaction</button>
+              <button class="btn btn--primary btn-save-disabled" id="reaction-save" onclick="reactionEditor.save()" disabled data-i18n="reactions.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+              <button class="btn-help" onclick="Help.openHelp('reactions')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+            </div>
+          </div>
+          <!-- Content -->
+          <div class="reactions-content" id="reaction-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reaction Wizard (Create / Edit) -->
+    <div id="reaction-wizard" class="wizard-overlay hidden modal-z-250">
+      <div class="wizard-card reaction-wizard-card">
+        <div class="wizard-header">
+          <h2 id="reaction-wizard-title" data-i18n="reactions.wizardCreate">Create Reaction</h2>
+          <div class="wizard-steps-bar" id="reaction-wizard-steps"></div>
+        </div>
+        <div class="wizard-body reaction-wizard-body" id="reaction-wizard-body"></div>
+        <div class="wizard-footer" id="reaction-wizard-footer">
+          <button class="btn btn--secondary" id="reaction-wizard-back" data-i18n="common.back">Back</button>
+          <div style="display:flex;gap:var(--space-3);">
+            <button class="btn btn--secondary" id="reaction-wizard-cancel" data-i18n="common.cancel">Cancel</button>
+            <button class="btn btn--primary" id="reaction-wizard-next" data-i18n="common.next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reaction Delete Confirm -->
+    <div id="reaction-delete-modal" class="wizard-overlay hidden modal-z-300">
+      <div class="wizard-card text-center modal-sm">
+        <h2 class="dialog-title text-danger" data-i18n="reactions.deleteTitle">Delete Reaction?</h2>
+        <p id="reaction-delete-message" class="muted dialog-desc"></p>
+        <div class="dialog-actions-center">
+          <button class="btn btn--secondary" id="reaction-delete-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--danger" id="reaction-delete-confirm" data-i18n="common.delete">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Commands Editor -->
+    <div id="comment-commands-editor" class="editor-overlay hidden">
+      <div class="reactions-layout">
+        <nav class="reactions-sidebar" id="cc-sidebar">
+          <div class="sidebar-header" data-i18n="editor.filterByCategory">Filter by Category</div>
+          <div class="sidebar-group" id="cc-sidebar-categories"></div>
+        </nav>
+        <div class="reactions-main">
+          <div class="reactions-topbar">
+            <div class="reactions-topbar-left">
+              <h2 data-i18n="cc.title">Chat Commands</h2>
+              <div class="reactions-subtitle" data-i18n="cc.subtitle">Let viewers send commands via TikTok chat</div>
+            </div>
+            <div class="reactions-search-wrap">
+              <svg class="search-icon-inline" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <input type="text" id="cc-search" data-i18n-placeholder="cc.searchPlaceholder" placeholder="Search commands..." oninput="commentCommandsEditor.onSearch(this.value)">
+            </div>
+            <div class="header-actions">
+              <button class="btn btn--primary" id="cc-add" onclick="commentCommandsEditor.startCreate()" data-i18n="cc.add">+ Add Command Group</button>
+              <button class="btn btn--primary btn-save-disabled" id="cc-save" onclick="commentCommandsEditor.save()" disabled data-i18n="cc.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+              <button class="btn-help" onclick="Help.openHelp('commentCommands')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+            </div>
+          </div>
+          <div class="reactions-content" id="cc-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Commands Group Editor (wizard) -->
+    <div id="cc-group-editor" class="wizard-overlay hidden modal-z-250">
+      <div class="wizard-card cc-wizard-card">
+        <div class="wizard-header">
+          <h2 id="cc-group-title" data-i18n="cc.createGroup">Create Command Group</h2>
+          <div class="wizard-steps-bar" id="cc-wizard-steps"></div>
+        </div>
+        <div class="wizard-body cc-wizard-body" id="cc-group-body"></div>
+        <div class="wizard-footer">
+          <button class="btn btn--secondary" id="cc-group-back" data-i18n="common.back" style="visibility:hidden;">Back</button>
+          <div style="display:flex;gap:var(--space-3);">
+            <button class="btn btn--secondary" id="cc-group-cancel" data-i18n="common.cancel">Cancel</button>
+            <button class="btn btn--primary" id="cc-group-next" data-i18n="common.next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment Commands Delete Confirm -->
+    <div id="cc-delete-modal" class="wizard-overlay hidden modal-z-300">
+      <div class="wizard-card text-center modal-sm">
+        <h2 class="dialog-title text-danger" data-i18n="cc.deleteTitle">Delete Group?</h2>
+        <p id="cc-delete-message" class="muted dialog-desc"></p>
+        <div class="dialog-actions-center">
+          <button class="btn btn--secondary" id="cc-delete-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--danger" id="cc-delete-confirm" data-i18n="common.delete">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chatbot Editor -->
+    <div id="chatbot-editor" class="editor-overlay hidden">
+      <div class="editor-layout">
+        <div class="editor-main">
+          <div class="editor-topbar" id="chatbot-topbar">
+            <h2 data-i18n="chatbot.title">Chatbot</h2>
+            <span id="chatbot-status-pill" class="chatbot-pill offline" data-i18n="chatbot.stateOff">Off</span>
+            <div class="header-actions">
+              <button class="btn btn--primary btn-save-disabled" id="chatbot-save" onclick="chatbotEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+              <button class="btn-help" onclick="Help.openHelp('chatbot')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+            </div>
+          </div>
+          <div class="editor-content chatbot-content" id="chatbot-content">
+
+            <!-- Master toggle -->
+            <section class="chatbot-card chatbot-toggle-card">
+              <div class="chatbot-toggle-row">
+                <div class="chatbot-toggle-info">
+                  <h3 id="cb-master-title" data-i18n="chatbot.enableBot">Enable Bot</h3>
+                  <p class="hint" data-i18n="chatbot.enabledHint">The bot connects with your TikTok login and posts automatic replies in the chat.</p>
+                </div>
+                <label class="switch" data-i18n-title="chatbot.enableBot">
+                  <input type="checkbox" id="cb-enabled">
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </section>
+
+            <!-- Live status hero -->
+            <section class="chatbot-card chatbot-hero">
+              <div class="chatbot-hero-head">
+                <span class="chatbot-pulse-dot" id="cb-hero-dot" aria-hidden="true"></span>
+                <div class="chatbot-hero-text">
+                  <h3 id="cb-hero-title" data-i18n="chatbot.stateUnknown">Unknown</h3>
+                  <p class="chatbot-hero-sub hint" id="cb-hero-sub"></p>
+                </div>
+              </div>
+              <div class="chatbot-stats" id="chatbot-stats"></div>
+              <div class="chatbot-error hidden" id="chatbot-error"></div>
+            </section>
+
+            <!-- Automatic replies -->
+            <section class="chatbot-card chatbot-replies-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M6 2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6.6l-4.7 3.7c-.6.5-1.7.1-1.7-.8V18H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm1 6a1 1 0 1 0 0 2h10a1 1 0 1 0 0-2H7zm0 4a1 1 0 1 0 0 2h7a1 1 0 1 0 0-2H7z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.repliesTitle">Automatic replies</h3>
+                  <p class="hint" data-i18n="chatbot.repliesHint">Configure what the bot posts in each situation: gifts, follows, joins or keywords. The first matching rule wins.</p>
+                </div>
+                <button type="button" class="btn btn--secondary btn-sm chatbot-add-btn" id="cb-reply-add" data-i18n="chatbot.addReply">+ Add reply</button>
+              </div>
+              <div class="chatbot-chips">
+                <button type="button" class="chatbot-chip" onclick="chatbotEditor.insertPlaceholder('{user}')">{user}</button>
+                <button type="button" class="chatbot-chip" onclick="chatbotEditor.insertPlaceholder('{gift}')">{gift}</button>
+                <button type="button" class="chatbot-chip" onclick="chatbotEditor.insertPlaceholder('{comment}')">{comment}</button>
+              </div>
+              <div class="chatbot-replies-list" id="cb-replies-list"></div>
+            </section>
+
+            <!-- TikTok session / login -->
+            <section class="chatbot-card" id="cb-session-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3H9zm3 4a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-1.27A2 2 0 0 1 12 14z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.sessionTitle">TikTok login</h3>
+                  <p class="hint" data-i18n="chatbot.sessionDesc">The bot posts as this account. Paste the sessionid cookie of your bot account. It is stored encrypted and never leaves this device.</p>
+                </div>
+                <span class="chatbot-session-badge" id="cb-session-badge">
+                  <span class="chatbot-session-dot"></span>
+                  <span id="cb-session-badge-text" data-i18n="chatbot.sessionMissing">Not signed in</span>
+                </span>
+              </div>
+
+              <div class="chatbot-warning hidden" id="cb-session-warning"></div>
+
+              <div class="chatbot-session-grid">
+                <div class="form-group">
+                  <label for="cb-session-id" data-i18n="chatbot.sessionIdLabel">Session ID (sessionid cookie)</label>
+                  <div class="chatbot-secret-field">
+                    <input type="password" id="cb-session-id" autocomplete="off" spellcheck="false" data-i18n-placeholder="chatbot.sessionIdPlaceholder" placeholder="Paste sessionid here…">
+                    <button type="button" class="chatbot-eye-btn" id="cb-session-eye" aria-label="Show/Hide" onclick="chatbotEditor.toggleSessionVisibility()">
+                      <svg viewBox="0 0 24 24" class="cb-eye-show"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+                      <svg viewBox="0 0 24 24" class="cb-eye-hide"><path d="M2.1 3.5 3.5 2.1l18.4 18.4-1.4 1.4-3.2-3.2A11.6 11.6 0 0 1 12 19c-5 0-9-4.5-10-7 .5-1.3 1.7-3 3.4-4.4L2.1 3.5zM12 5c1.4 0 2.7.3 3.9.9L14 7.8A4.5 4.5 0 0 0 7.8 14l-2.5-2.5C4 12.4 3.3 13.3 3 13.9 4 15.7 7.6 17 12 17c.9 0 1.7-.1 2.5-.2l-1.8-1.8a4.5 4.5 0 0 1-5.7-5.7L4.6 6.9C3.2 8 2.3 9.2 2 10c1 2.5 5 7 10 7 .5 0 .9 0 1.3-.1z"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group form-group--compact">
+                  <label for="cb-session-idc" data-i18n="chatbot.sessionIdcLabel">Data center (tt-target-idc, optional)</label>
+                  <input type="text" id="cb-session-idc" autocomplete="off" spellcheck="false" placeholder="va">
+                </div>
+              </div>
+
+              <div class="chatbot-session-actions">
+                <button type="button" class="btn btn--primary hidden" id="cb-session-webview" onclick="chatbotEditor.webviewLogin()" data-i18n="chatbot.webviewLoginBtn">Sign in with TikTok</button>
+                <button type="button" class="btn btn--secondary" id="cb-session-save" onclick="chatbotEditor.saveSession()" data-i18n="chatbot.sessionSave">Sign in</button>
+                <button type="button" class="btn btn--danger-ghost" id="cb-session-remove" onclick="chatbotEditor.clearSession()" data-i18n="chatbot.sessionRemove">Sign out</button>
+                <button type="button" class="btn btn--secondary" id="cb-session-help-btn" onclick="chatbotEditor.toggleSessionHelp()" data-i18n="chatbot.sessionHelpBtn">How do I get the session ID?</button>
+              </div>
+
+              <ol class="chatbot-session-steps hidden" id="cb-session-steps">
+                <li data-i18n="chatbot.step1">Open tiktok.com in your browser and log in with the account the bot should post as.</li>
+                <li data-i18n="chatbot.step2">Press F12 → tab “Application” (Chrome/Edge) or “Storage” (Firefox).</li>
+                <li data-i18n="chatbot.step3">Left side: Cookies → https://www.tiktok.com</li>
+                <li data-i18n="chatbot.step4">Copy the value of the row named sessionid.</li>
+                <li data-i18n="chatbot.step5">Optional: note the value of tt-target-idc and enter it above.</li>
+                <li data-i18n="chatbot.step6">Paste the value here and click “Sign in”. Applies on the next connect.</li>
+              </ol>
+              <p class="chatbot-session-note" data-i18n="chatbot.sessionSecurityNote">🔒 Treat the session ID like a password and only use it on your own devices.</p>
+            </section>
+
+            <!-- Spam protection -->
+            <section class="chatbot-card chatbot-spam-card">
+              <div class="chatbot-card-head">
+                <span class="chatbot-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm0 4.2 5 1.9V11c0 3.8-2.1 7.3-5 8.5V6.2z"/></svg>
+                </span>
+                <div class="chatbot-card-titles">
+                  <h3 data-i18n="chatbot.spamTitle">Spam protection</h3>
+                  <p class="hint" data-i18n="chatbot.spamHint">Keeps the bot within TikTok's rate limits and avoids bans.</p>
+                </div>
+              </div>
+              <div class="chatbot-grid">
+                <div class="form-group">
+                  <label for="cb-min-interval" data-i18n="chatbot.minInterval">Minimum pause between messages</label>
+                  <div class="chatbot-number-field">
+                    <input type="number" id="cb-min-interval" min="0" step="0.5">
+                    <span class="chatbot-unit" data-i18n="chatbot.unitSeconds">sec</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="cb-max-per-minute" data-i18n="chatbot.maxPerMinute">Rate limit</label>
+                  <div class="chatbot-number-field">
+                    <input type="number" id="cb-max-per-minute" min="1" step="1">
+                    <span class="chatbot-unit" data-i18n="chatbot.unitPerMinute">msgs/min</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="cb-max-queue" data-i18n="chatbot.maxQueue">Queue size</label>
+                  <div class="chatbot-number-field">
+                    <input type="number" id="cb-max-queue" min="1" step="1">
+                    <span class="chatbot-unit" data-i18n="chatbot.unitMessages">msgs</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="cb-max-len" data-i18n="chatbot.maxLen">Max message length</label>
+                  <div class="chatbot-number-field">
+                    <input type="number" id="cb-max-len" min="1" step="1">
+                    <span class="chatbot-unit" data-i18n="chatbot.unitChars">chars</span>
+                  </div>
+                </div>
+              </div>
+              <div class="chatbot-toggle-row chatbot-dedupe-row">
+                <div class="chatbot-toggle-info">
+                  <span data-i18n="chatbot.dedupe">Skip identical consecutive messages</span>
+                  <p class="hint" data-i18n="chatbot.dedupeHint">TikTok rejects duplicates, so the bot skips them instead of failing.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="cb-dedupe">
+                  <span class="switch-slider" aria-hidden="true"></span>
+                </label>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chatbot Beta Warning -->
+    <div id="chatbot-beta-modal" class="wizard-overlay hidden modal-z-300">
+      <div class="wizard-card">
+        <h2 class="dialog-title text-warning" data-i18n="chatbot.betaTitle">Beta feature: TikTok chatbot</h2>
+        <div class="dialog-desc chatbot-beta-body">
+          <p data-i18n="chatbot.betaIntro">The chatbot posts automatic messages in your TikTok live chat. This feature is still in beta.</p>
+          <ul class="chatbot-beta-list">
+            <li data-i18n="chatbot.betaRisk1">Automated messages are a grey area in TikTok's terms of service.</li>
+            <li data-i18n="chatbot.betaRisk2">Your account (or the bot account) can be shadowbanned or permanently banned.</li>
+            <li data-i18n="chatbot.betaRisk3">Use a dedicated bot account, never your main account, and keep the rate limits conservative.</li>
+          </ul>
+          <p data-i18n="chatbot.betaOwnRisk">Use at your own risk. TikTok2Mc is not responsible for any account penalties.</p>
+        </div>
+        <div class="dialog-actions-center">
+          <button class="btn btn--secondary" id="cb-beta-cancel" onclick="chatbotEditor.declineBeta()" data-i18n="chatbot.betaCancel">Cancel</button>
+          <button class="btn btn--primary" id="cb-beta-agree" onclick="chatbotEditor.acceptBeta()" data-i18n="chatbot.betaAgree">I understand and agree</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plugin Config Editor -->
+    <div id="plugin-config-editor" class="editor-overlay hidden">
+        <div class="editor-layout">
+            <nav class="editor-sidebar" id="plugin-editor-sidebar"></nav>
+            <div class="editor-main">
+                <div class="editor-topbar" id="plugin-editor-topbar">
+                    <h2 id="plugin-editor-title">Plugin Configuration</h2>
+                    <div class="editor-search">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="plugin-editor-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="pluginEditor.onSearch(this.value)">
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-advanced" id="plugin-editor-advanced-btn" onclick="pluginEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
+                        <button class="btn btn--primary btn-save-disabled" id="plugin-editor-save" onclick="pluginEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+                        <button class="btn-help" onclick="Help.openHelp('plugins')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+                <div class="editor-content" id="plugin-editor-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plugin Review Modal -->
+    <div id="plugin-review-modal" class="wizard-overlay hidden modal-z-250">
+        <div class="modal-card">
+            <h3 data-i18n="editor.reviewTitle">Review Changes</h3>
+            <div id="plugin-review-body" class="modal-scroll"></div>
+            <div class="modal-actions">
+                <button class="btn btn--secondary" onclick="pluginEditor.hideReview()" data-i18n="common.back">Back</button>
+                <button class="btn btn--primary" onclick="pluginEditor.confirmSave()" data-i18n="editor.confirmSave">Confirm Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hook Review Modal -->
+    <div id="hook-review-modal" class="wizard-overlay hidden modal-z-250">
+        <div class="modal-card">
+            <h3 data-i18n="editor.reviewTitle">Review Changes</h3>
+            <div id="hook-review-body" class="modal-scroll"></div>
+            <div class="modal-actions">
+                <button class="btn btn--secondary" onclick="hookEditor.hideReview()" data-i18n="common.back">Back</button>
+                <button class="btn btn--primary" onclick="hookEditor.confirmSave()" data-i18n="editor.confirmSave">Confirm Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="review-modal" class="wizard-overlay hidden modal-z-250">
+        <div class="modal-card">
+            <h3 data-i18n="editor.reviewTitle">Review Changes</h3>
+            <div id="review-body" class="modal-scroll"></div>
+            <div class="modal-actions">
+                <button class="btn btn--secondary" onclick="editor.hideReview()" data-i18n="common.back">Back</button>
+                <button class="btn btn--primary" onclick="editor.confirmSave()" data-i18n="editor.confirmSave">Confirm Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shutdown Countdown Overlay -->
+    <div id="shutdown-overlay" class="wizard-overlay hidden modal-z-350">
+        <div class="wizard-card text-center modal-sm">
+            <h2 class="dialog-title text-danger" data-i18n="dialog.appShutdown">Application Shutdown</h2>
+            <p class="muted" data-i18n="dialog.shutdownIn">Shutdown in:</p>
+            <div id="shutdown-countdown-display" class="shutdown-countdown">--</div>
+            <div class="dialog-actions-center">
+                <button class="btn btn--danger" id="btn-shutdown-now" data-i18n="dialog.shutdownNow">Shutdown Now</button>
+                <button class="btn btn--secondary" id="btn-shutdown-cancel" data-i18n="dialog.cancelShutdown">Cancel Shutdown</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div id="confirm-dialog" class="wizard-overlay hidden modal-z-300">
+        <div class="wizard-card text-center modal-sm">
+            <h2 id="confirm-title" class="dialog-title" data-i18n="dialog.confirm">Confirm</h2>
+            <p id="confirm-message" class="muted dialog-desc"></p>
+            <div class="dialog-actions-center">
+                <button class="btn btn--secondary" id="btn-confirm-cancel" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn--primary" id="btn-confirm-ok" data-i18n="common.confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt Dialog (text input) -->
+    <div id="prompt-dialog" class="wizard-overlay hidden modal-z-300">
+        <div class="wizard-card modal-sm">
+            <h2 id="prompt-title" class="dialog-title">Prompt</h2>
+            <p id="prompt-message" class="muted dialog-desc"></p>
+            <input type="text" id="prompt-input" class="prompt-dialog-input" />
+            <div class="dialog-actions-center">
+                <button class="btn btn--secondary" id="btn-prompt-cancel" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn--primary" id="btn-prompt-ok" data-i18n="common.confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unsaved Changes Modal -->
+    <div id="unsaved-changes-modal" class="wizard-overlay hidden modal-z-400">
+      <div class="wizard-card text-center modal-md">
+        <h2 class="dialog-title text-warning" data-i18n="dialog.unsavedTitle">Unsaved Changes</h2>
+        <p class="muted dialog-desc">
+          You have unsaved changes in one or more editors.<br>
+          What would you like to do?
+        </p>
+        <div class="dialog-actions-stack">
+          <button class="btn btn--primary btn--full" id="btn-unsaved-save-exit" data-i18n="common.saveAndExit">Save and Exit</button>
+          <button class="btn btn--danger btn--full" id="btn-unsaved-exit-no-save" data-i18n="common.exitWithoutSaving">Exit Without Saving</button>
+          <button class="btn btn--secondary btn--full" id="btn-unsaved-cancel" data-i18n="common.cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Settings Confirmation Dialog -->
+    <div id="advanced-confirm-dialog" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:500px;">
+        <h3 style="color:var(--danger);margin-top:0;" data-i18n="dialog.advancedTitle">⚠️ Advanced Settings</h3>
+        <p style="color:var(--text-muted);" data-i18n="dialog.advancedWarning">
+          These settings can break functionality if misconfigured. Only continue if you understand the risks.
+        </p>
+        <p style="color:var(--danger);font-weight:600;font-size:0.95rem;">
+          Type <code style="background:var(--input-bg);padding:0.15rem 0.4rem;border-radius:3px;" data-i18n="dialog.advancedPhrase">I understand the risks</code> to confirm:
+        </p>
+        <input type="text" id="advanced-confirm-input" style="width:100%;padding:0.5rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.9rem;margin-bottom:1rem;" data-i18n-placeholder="dialog.advancedPlaceholder" placeholder="Type confirmation phrase...">
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="advanced-confirm-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--danger" id="advanced-confirm-ok" disabled data-i18n="dialog.unlockAdvanced">Unlock Advanced</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Create Server Modal -->
+    <div id="server-create-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;" data-i18n="servers.createTitle">Create New Server</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;" data-i18n="servers.createDesc">Create a new Minecraft server instance with a separate directory and port.</p>
+        <div class="form-group">
+          <label data-i18n="servers.name">Server Name</label>
+          <input type="text" id="server-create-name" class="form-input" data-i18n-placeholder="servers.namePlaceholder" placeholder="e.g. Survival World" autocomplete="off">
+          <p class="field-desc" data-i18n="servers.nameDesc">A friendly name for this server instance.</p>
+        </div>
+        <div class="form-group">
+          <label data-i18n="servers.version">Version</label>
+          <select id="server-create-version" class="form-select" style="width:100%;">
+            <option value="" data-i18n="servers.versionPlaceholder">Loading installed versions...</option>
+          </select>
+          <p class="field-desc" data-i18n="servers.versionDesc">Select an installed Minecraft version.</p>
+        </div>
+        <div class="form-group">
+          <label data-i18n="servers.port">Port</label>
+          <input type="number" id="server-create-port" class="form-input" value="25565" min="1024" max="65535">
+          <p class="field-desc" data-i18n="servers.portDesc">The port players connect to (1024-65535).</p>
+        </div>
+        <div id="server-create-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="server-create-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--primary" id="server-create-confirm" disabled data-i18n="servers.createConfirm">Create Server</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Download Version Modal -->
+    <div id="server-download-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;" data-i18n="servers.downloadTitle">Download PaperMC Version</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;">Select a version to download from PaperMC. The jar will be saved to <code>servers/&lt;version&gt;/server.jar</code>.</p>
+        <div class="form-group">
+          <label data-i18n="servers.version">Version</label>
+          <select id="server-download-version" class="form-select" style="width:100%;">
+            <option value="" data-i18n="servers.loadingVersions">Loading versions...</option>
+          </select>
+          <p class="field-desc" style="margin-top:0.25rem;" data-i18n="servers.safeNote">SAFE versions are tested. Others are untested.</p>
+        </div>
+        <div id="server-download-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="server-download-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--primary" id="server-download-confirm" disabled data-i18n="servers.downloadConfirm">Download</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Switch Version Modal -->
+    <div id="server-switch-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:520px;">
+        <h3 style="margin-top:0;" data-i18n="servers.switchTitleModal">Switch Server Version</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;" data-i18n="servers.switchDescModal">Select an installed version to switch to.</p>
+        <div id="server-switch-list" style="max-height:300px;overflow-y:auto;margin-bottom:1rem;">
+          <p class="text-muted" data-i18n="servers.switchLoading">Loading installed versions...</p>
+        </div>
+        <div class="modal-actions" style="justify-content:space-between;">
+          <button class="btn btn--ghost btn--sm" id="server-switch-download" title="Download a new version from PaperMC" data-i18n="servers.downloadNewVersion">+ Download New Version</button>
+          <div>
+            <button class="btn btn--secondary" id="server-switch-cancel" data-i18n="common.cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Manager: Upload Custom Jar Modal -->
+    <div id="server-custom-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin-top:0;" data-i18n="servers.customTitle">Add Custom server.jar</h3>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:0.9rem;">Import a custom Minecraft server jar. It will be tagged as CUSTOM and saved to <code>servers/&lt;name&gt;/server.jar</code>.</p>
+        <div class="form-group">
+          <label data-i18n="servers.customName">Version Name</label>
+          <input type="text" id="server-custom-name" class="form-input" data-i18n-placeholder="servers.customNamePlaceholder" placeholder="e.g. my-custom-server">
+          <p class="field-desc" data-i18n="servers.customNameDesc">A unique identifier for this server version.</p>
+        </div>
+        <div class="form-group">
+          <label data-i18n="servers.jarFile">server.jar File</label>
+          <input type="file" id="server-custom-file" class="form-input" accept=".jar">
+          <p class="field-desc" data-i18n="servers.jarOnly">Only .jar files are accepted.</p>
+        </div>
+        <div id="server-custom-error" class="modal-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn--secondary" id="server-custom-cancel" data-i18n="common.cancel">Cancel</button>
+          <button class="btn btn--primary" id="server-custom-confirm" disabled data-i18n="servers.importConfirm">Import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="wizard-card help-modal-card">
+        <div class="help-modal-header">
+          <h2 id="help-modal-title" data-i18n="help.title">Help</h2>
+          <button class="btn btn--secondary btn--sm" id="help-modal-close" onclick="Help.closeHelp()" data-i18n="common.close">Close</button>
+        </div>
+        <div id="help-modal-body" class="help-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Plugin README Modal -->
+    <div id="readme-modal" class="wizard-overlay hidden modal-z-250">
+      <div class="modal-card readme-modal-card">
+        <div class="readme-modal-header">
+          <h2 id="readme-modal-title">Plugin Documentation</h2>
+          <button class="btn btn--secondary btn--sm" onclick="closeReadmeModal()" data-i18n="common.close">Close</button>
+        </div>
+        <div id="readme-modal-body" class="readme-modal-body markdown-body"></div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script src="./help.js?v=2"></script>
+    <script src="./i18n.js?v=1"></script>
+    <script src="./shortcuts.js?v=1"></script>
+    <script src="./accessibility.js?v=1"></script>
+    <script src="./actions-editor.js?v=3"></script>
+    <script src="./chatbot-editor.js?v=2"></script>
+    <!-- marked is bundled locally (pinned v15.0.12) — no CDN: the dashboard
+         runs in a privileged pywebview window and must work offline. -->
+    <script src="./vendor/marked.min.js?v=1"></script>
+    <script src="./app.js?v=8"></script>
+</div>
+</body>
+</html>

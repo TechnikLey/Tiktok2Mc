@@ -1,0 +1,358 @@
+{
+  "name": "spotify-control",
+  "version": "1.0.0",
+  "entry_point": "src/plugins/spotify/main.py",
+  "display_name": "Spotify Control",
+  "description": "Allows viewers to control Spotify playback via TikTok comments. Supports play, skip, volume, and queue management through the Spotify Web API.",
+  "author": "TechnikLey",
+  "homepage": "https://github.com/TechnikLey/Tiktok2Mc",
+  "min_api_version": "1.0.0",
+  "bundled": true,
+  "platform": "all",
+  "capabilities": [
+    "spotify:playback",
+    "spotify:control",
+    "spotify:queue"
+  ],
+  "permissions": [
+    "events"
+  ],
+  "depends_on": [],
+  "icon": "🎵",
+  "emitted_events": [
+    {
+      "key": "spotify.track_changed",
+      "name": "Track Changed",
+      "desc": "When the currently playing Spotify track changes",
+      "icon": "🎵",
+      "name_i18n": {
+        "en": "Track Changed",
+        "de": "Track gewechselt"
+      },
+      "desc_i18n": {
+        "en": "When the currently playing Spotify track changes",
+        "de": "Wenn sich der aktuelle Spotify-Track ändert"
+      },
+      "version": 1,
+      "data_schema": [
+        {
+          "key": "track",
+          "type": "string",
+          "desc": "Track name"
+        },
+        {
+          "key": "artist",
+          "type": "string",
+          "desc": "Artist name"
+        }
+      ]
+    },
+    {
+      "key": "spotify.play",
+      "name": "Playback Started",
+      "desc": "When Spotify playback starts",
+      "icon": "▶️",
+      "name_i18n": {
+        "en": "Playback Started",
+        "de": "Wiedergabe gestartet"
+      },
+      "desc_i18n": {
+        "en": "When Spotify playback starts",
+        "de": "Wenn die Spotify-Wiedergabe startet"
+      }
+    },
+    {
+      "key": "spotify.pause",
+      "name": "Playback Paused",
+      "desc": "When Spotify playback is paused",
+      "icon": "⏸️",
+      "name_i18n": {
+        "en": "Playback Paused",
+        "de": "Wiedergabe pausiert"
+      },
+      "desc_i18n": {
+        "en": "When Spotify playback is paused",
+        "de": "Wenn die Spotify-Wiedergabe pausiert wird"
+      }
+    }
+  ],
+  "accepted_commands": {
+    "play": {
+      "name": "Play Music",
+      "desc": "Start or resume playback",
+      "args": {},
+      "name_i18n": {
+        "en": "Play Music",
+        "de": "Musik abspielen"
+      },
+      "desc_i18n": {
+        "en": "Start or resume playback",
+        "de": "Wiedergabe starten oder fortsetzen"
+      }
+    },
+    "pause": {
+      "name": "Pause Music",
+      "desc": "Pause the current track",
+      "args": {},
+      "name_i18n": {
+        "en": "Pause Music",
+        "de": "Musik pausieren"
+      },
+      "desc_i18n": {
+        "en": "Pause the current track",
+        "de": "Aktuellen Track pausieren"
+      }
+    },
+    "next": {
+      "name": "Next Track",
+      "desc": "Skip to the next song",
+      "args": {},
+      "name_i18n": {
+        "en": "Next Track",
+        "de": "Nächster Track"
+      },
+      "desc_i18n": {
+        "en": "Skip to the next song",
+        "de": "Zum nächsten Song springen"
+      }
+    },
+    "previous": {
+      "name": "Previous Track",
+      "desc": "Go back to the previous song",
+      "args": {},
+      "name_i18n": {
+        "en": "Previous Track",
+        "de": "Vorheriger Track"
+      },
+      "desc_i18n": {
+        "en": "Go back to the previous song",
+        "de": "Zum vorherigen Song zurückgehen"
+      }
+    },
+    "volume": {
+      "name": "Set Volume",
+      "desc": "Change playback volume",
+      "args": {
+        "level": {
+          "type": "number",
+          "label": "Volume level (0–100)",
+          "default": 50,
+          "min": 0,
+          "max": 100,
+          "label_i18n": {
+            "en": "Volume level (0–100)",
+            "de": "Lautstärke (0–100)"
+          }
+        }
+      },
+      "name_i18n": {
+        "en": "Set Volume",
+        "de": "Lautstärke einstellen"
+      },
+      "desc_i18n": {
+        "en": "Change playback volume",
+        "de": "Wiedergabelautstärke ändern"
+      }
+    },
+    "volume_up": {
+      "name": "Volume Up",
+      "desc": "Increase the volume",
+      "args": {},
+      "name_i18n": {
+        "en": "Volume Up",
+        "de": "Lauter"
+      },
+      "desc_i18n": {
+        "en": "Increase the volume",
+        "de": "Lautstärke erhöhen"
+      }
+    },
+    "volume_down": {
+      "name": "Volume Down",
+      "desc": "Decrease the volume",
+      "args": {},
+      "name_i18n": {
+        "en": "Volume Down",
+        "de": "Leiser"
+      },
+      "desc_i18n": {
+        "en": "Decrease the volume",
+        "de": "Lautstärke verringern"
+      }
+    },
+    "shuffle": {
+      "name": "Toggle Shuffle",
+      "desc": "Turn shuffle on or off",
+      "args": {},
+      "name_i18n": {
+        "en": "Toggle Shuffle",
+        "de": "Zufallswiedergabe umschalten"
+      },
+      "desc_i18n": {
+        "en": "Turn shuffle on or off",
+        "de": "Zufallswiedergabe ein- oder ausschalten"
+      }
+    },
+    "repeat": {
+      "name": "Toggle Repeat",
+      "desc": "Turn repeat on or off",
+      "args": {},
+      "name_i18n": {
+        "en": "Toggle Repeat",
+        "de": "Wiederholung umschalten"
+      },
+      "desc_i18n": {
+        "en": "Turn repeat on or off",
+        "de": "Wiederholung ein- oder ausschalten"
+      }
+    },
+    "save": {
+      "name": "Save Track",
+      "desc": "Save the currently playing song to your library",
+      "args": {},
+      "name_i18n": {
+        "en": "Save Track",
+        "de": "Track speichern"
+      },
+      "desc_i18n": {
+        "en": "Save the currently playing song to your library",
+        "de": "Aktuellen Song in der Bibliothek speichern"
+      }
+    },
+    "playtrack": {
+      "name": "Play Specific Track",
+      "desc": "Search for and play a song",
+      "args": {
+        "query": {
+          "type": "string",
+          "label": "Song name or URL",
+          "default": "",
+          "placeholder": "Never Gonna Give You Up",
+          "label_i18n": {
+            "en": "Song name or URL",
+            "de": "Songname oder URL"
+          }
+        }
+      },
+      "name_i18n": {
+        "en": "Play Specific Track",
+        "de": "Bestimmten Track abspielen"
+      },
+      "desc_i18n": {
+        "en": "Search for and play a song",
+        "de": "Nach einem Song suchen und abspielen"
+      }
+    }
+  },
+  "update_url": "https://api.github.com/repos/TechnikLey/Tiktok2Mc/releases/latest",
+  "config_schema": {
+    "version": 1,
+    "fields": [
+      {
+        "key": "client_id",
+        "type": "string",
+        "default": "",
+        "label": "Client ID",
+        "help": "Spotify Developer App Client ID",
+        "category": "Authentication"
+      },
+      {
+        "key": "client_secret",
+        "type": "string",
+        "default": "",
+        "secret": true,
+        "label": "Client Secret",
+        "help": "Spotify Developer App Client Secret",
+        "category": "Authentication"
+      },
+      {
+        "key": "redirect_uri",
+        "type": "string",
+        "default": "http://127.0.0.1:29185/api/v1/plugins/oauth/callback?name=spotify-control",
+        "label": "Redirect URI",
+        "advanced": true,
+        "category": "Authentication"
+      },
+      {
+        "key": "device_id",
+        "type": "string",
+        "default": "",
+        "label": "Device ID",
+        "help": "Leave empty to use the currently active Spotify device",
+        "advanced": true,
+        "category": "Playback"
+      },
+      {
+        "key": "volume_step",
+        "type": "integer",
+        "default": 10,
+        "min": 1,
+        "max": 100,
+        "label": "Volume Step",
+        "help": "Percent change per volume up / down command",
+        "category": "Playback"
+      },
+      {
+        "key": "playtrack_mode",
+        "type": "select",
+        "options": [
+          "replace",
+          "queue"
+        ],
+        "default": "replace",
+        "label": "Playtrack Mode",
+        "help": "replace = play immediately; queue = add to queue",
+        "category": "Playback"
+      },
+      {
+        "key": "signal_on",
+        "type": "array",
+        "default": [
+          "track_changed",
+          "play",
+          "pause"
+        ],
+        "item_schema": {
+          "type": "select",
+          "options": [
+            "track_changed",
+            "play",
+            "pause"
+          ]
+        },
+        "label": "Signal On",
+        "help": "Events published to the EventBus via POST /api/v1/events",
+        "advanced": true,
+        "category": "Events"
+      },
+      {
+        "key": "theme.background",
+        "type": "color",
+        "default": "#000000",
+        "label": "Background Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.text",
+        "type": "color",
+        "default": "#ffffff",
+        "label": "Text Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent",
+        "type": "color",
+        "default": "#1db954",
+        "label": "Accent Color",
+        "category": "Theme"
+      },
+      {
+        "key": "theme.accent2",
+        "type": "color",
+        "default": "#1ed760",
+        "label": "Accent 2 Color",
+        "category": "Theme"
+      }
+    ]
+  }
+}

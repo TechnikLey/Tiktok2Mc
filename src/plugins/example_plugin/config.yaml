@@ -1,0 +1,20 @@
+# ==========================================
+# example_plugin – Local Configuration
+# ==========================================
+# This YAML is loaded automatically by BasePlugin.
+# Values here override defaults from plugin.json → config_schema.
+
+# Initial counter value
+initial_count: 0
+# Step size for increment/decrement commands
+step_size: 1
+# Auto-increment every second
+auto_tick: false
+# Maximum value (0 = unlimited)
+max_count: 9999
+
+# Theme colors (optional – overrides built-in defaults)
+theme:
+  background: "#000000"
+  text: "#00ff88"
+  accent: "#00cc66"
