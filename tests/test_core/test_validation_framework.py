@@ -305,6 +305,7 @@ class TestStartupValidation:
 
         exe = tmp_path / "test_script"
         exe.write_text("#!/bin/sh")
+        exe.chmod(0o755)
         result = validate_executable(exe, "test")
         assert result.passed is True
 

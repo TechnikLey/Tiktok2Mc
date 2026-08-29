@@ -4,8 +4,11 @@ These tests verify the NSIS script structure and the build.py
 installer integration without requiring the actual makensis compiler.
 """
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 
 # Directory where the installer script lives
 INSTALLER_DIR = Path(__file__).resolve().parent.parent.parent / "installer"
@@ -192,6 +195,10 @@ class TestInstallerPrerequisites:
         content = NSIS_SCRIPT.read_text(encoding="utf-8")
         assert 'File /r "..\\build\\release\\*"' in content
 
+    @pytest.mark.skipif(
+        sys.platform != "win32",
+        reason="Requires a built build/release dir (not present in CI test job)",
+    )
     def test_build_release_directory_exists_or_can_be_created(self):
         build_dir = NSIS_SCRIPT.parent.parent / "build" / "release"
         assert build_dir.parent.exists()

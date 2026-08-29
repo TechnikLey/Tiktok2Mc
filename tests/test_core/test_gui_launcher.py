@@ -114,6 +114,7 @@ class TestLauncherAPIStartSystem:
         result = api.start_system()
         assert result.startswith("missing:")
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only CREATE_NO_WINDOW")
     def test_starts_system_process(self, monkeypatch, tmp_path):
         fake_exe = tmp_path / "start.exe"
         fake_exe.write_text("")

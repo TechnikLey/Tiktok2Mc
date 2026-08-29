@@ -4,6 +4,8 @@ import subprocess
 import sys
 from typing import ClassVar
 
+import pytest
+
 from core.sandbox import PluginSandbox
 
 
@@ -30,12 +32,14 @@ class TestPluginSandbox:
         assert sb.max_processes == 8
         assert sb.priority_class == "idle"
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only priority classes")
     def test_popen_kwargs_windows(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "win32")
         sb = PluginSandbox(priority_class="below_normal")
         kwargs = sb.get_popen_kwargs()
         assert kwargs["creationflags"] == subprocess.BELOW_NORMAL_PRIORITY_CLASS
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only priority classes")
     def test_popen_kwargs_windows_idle(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "win32")
         sb = PluginSandbox(priority_class="idle")
@@ -77,6 +81,7 @@ class TestPluginSandbox:
         assert FakeResource.RLIMIT_NOFILE in resources
         assert FakeResource.RLIMIT_NPROC in resources
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only job API")
     def test_is_windows_job_no_crash(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "win32")
         sb = PluginSandbox()

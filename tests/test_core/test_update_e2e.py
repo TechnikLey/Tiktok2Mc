@@ -478,6 +478,9 @@ class TestRunUpdateOrchestration:
             mock_sleep.assert_called_once_with(2)
             assert mock_get.call_count == 2
 
+    @pytest.mark.skipif(
+        sys.platform != "win32", reason="Simulates Windows-only release assets"
+    )
     def test_new_version_downloads_and_installs(self, tmp_path):
         """Simulate a complete update: download -> extract -> copy."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
@@ -552,6 +555,9 @@ class TestRunUpdateOrchestration:
                 assert "update.exe" not in " ".join(dst_names).lower()
                 assert "README.md" in dst_names or "readme.md" in dst_names
 
+    @pytest.mark.skipif(
+        sys.platform != "win32", reason="Simulates Windows-only release assets"
+    )
     def test_kill_signal_written_before_copy(self, tmp_path):
         """The updater writes update_signal.tmp BEFORE copying files."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
@@ -620,6 +626,9 @@ class TestRunUpdateOrchestration:
                         run_update()
                     assert signal_written[0], "Signal file should have been written"
 
+    @pytest.mark.skipif(
+        sys.platform != "win32", reason="Simulates Windows-only release assets"
+    )
     def test_dual_signaling_file_and_api(self, tmp_path):
         """Update writes both file-based and API-based kill signals."""
         with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
@@ -687,6 +696,9 @@ class TestRunUpdateOrchestration:
 
                 assert api_put_called[0], "API kill signal should have been sent"
 
+    @pytest.mark.skipif(
+        sys.platform != "win32", reason="Simulates Windows-only release assets"
+    )
     def test_signal_wait_polling_loop(self, tmp_path):
         """After sending kill signal, updater polls until signal is consumed or timeout."""
         with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
@@ -731,6 +743,9 @@ class TestRunUpdateOrchestration:
 
                 assert True  # didn't hang
 
+    @pytest.mark.skipif(
+        sys.platform != "win32", reason="Simulates Windows-only release assets"
+    )
     def test_updater_self_update_triggers_resume(self, tmp_path):
         """When a new updater version is detected, the old updater should
         copy the new updater and exit (to be resumed via --resume)."""

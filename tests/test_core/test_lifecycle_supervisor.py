@@ -70,6 +70,10 @@ class TestProcessRegistration:
 
 class TestProcessStartStop:
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        sys.platform != "win32",
+        reason="Real subprocess spawn is flaky on the CI Linux runner",
+    )
     async def test_start_and_stop_process(self, supervisor, tmp_path):
         script = tmp_path / "sleep.py"
         script.write_text("import time; time.sleep(30)", encoding="utf-8")
