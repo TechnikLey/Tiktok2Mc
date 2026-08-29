@@ -1968,8 +1968,44 @@ async function testOverlay(encodedName, btn) {
 
 let _revenueData = { entries: [], file: {} };
 
+/* Real TikTok payout model (community-estimated 2026 rates).
+   Net = diamond value × $0.005 (creator cash-out). Gross = what the
+   viewer actually spent: 2 coins become 1 diamond, coins cost ≈ $0.013
+   on average, so gross = net × (2 × 0.013) / 0.005 ≈ net × 5.2 and the
+   creator keeps ≈ 19 % of the viewer's spend. */
+const REVENUE_NET_PER_DIAMOND_USD = 0.005;
+const REVENUE_COINS_PER_DIAMOND = 2;
+const REVENUE_USD_PER_COIN = 0.013;
+
 function _revenueRound2(value) {
   return Math.round(value * 100) / 100;
+}
+
+function _revenueNetSharePct() {
+  return (
+    (REVENUE_NET_PER_DIAMOND_USD /
+      (REVENUE_COINS_PER_DIAMOND * REVENUE_USD_PER_COIN)) *
+    100
+  );
+}
+
+function revenueGrossFromNet(netUsd) {
+  const v = Number(netUsd) || 0;
+  return _revenueRound2(
+    (v * (REVENUE_COINS_PER_DIAMOND * REVENUE_USD_PER_COIN)) /
+      REVENUE_NET_PER_DIAMOND_USD
+  );
+}
+
+function revenueEnrichEntry(e) {
+  const net = Number(e && e.estimated_revenue_usd) || 0;
+  const gross = revenueGrossFromNet(net);
+  return {
+    date: e && e.date,
+    netUsd: _revenueRound2(net),
+    grossUsd: gross,
+    tiktokUsd: _revenueRound2(gross - net),
+  };
 }
 
 async function loadRevenueView() {
@@ -2038,7 +2074,11 @@ function computeRevenueStats(entries) {
     return {
       count: 0,
       totalUsd: 0,
+      totalGrossUsd: 0,
+      tiktokUsd: 0,
       averageUsd: 0,
+      averageGrossUsd: 0,
+      netSharePct: _revenueNetSharePct(),
       best: null,
       worst: null,
       lastChangeUsd: null,
@@ -2054,6 +2094,7 @@ function computeRevenueStats(entries) {
     if (!worst || e.estimated_revenue_usd < worst.value) worst = { date: e.date, value: e.estimated_revenue_usd };
   }
   const total = values.reduce((s, v) => s + v, 0);
+  const totalGross = values.reduce((s, v) => s + revenueGrossFromNet(v), 0);
   const last = values[count - 1];
   const prev = values[count - 2];
   const last7 = values.slice(-7).reduce((s, v) => s + v, 0);
@@ -2061,7 +2102,11 @@ function computeRevenueStats(entries) {
   return {
     count,
     totalUsd: _revenueRound2(total),
+    totalGrossUsd: _revenueRound2(totalGross),
+    tiktokUsd: _revenueRound2(totalGross - total),
     averageUsd: _revenueRound2(total / count),
+    averageGrossUsd: _revenueRound2(totalGross / count),
+    netSharePct: _revenueNetSharePct(),
     best,
     worst,
     lastChangeUsd: count >= 2 ? _revenueRound2(last - prev) : null,
@@ -2071,7 +2116,7 @@ function computeRevenueStats(entries) {
   };
 }
 
-function formatCurrency(value) {
+function formatUSD(value) {
   const v = Number(value) || 0;
   const neg = v < 0;
   const abs = Math.abs(v);
@@ -2080,61 +2125,102 @@ function formatCurrency(value) {
   return (neg ? '-' : '') + '$' + parts.join('.');
 }
 
+function formatEUR(value) {
+  const v = Number(value) || 0;
+  const neg = v < 0;
+  const [int, dec] = Math.abs(v).toFixed(2).split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return (neg ? '-' : '') + grouped + ',' + dec + ' €';
+}
+
+const USD_TO_EUR_RATE = 0.86; // 1 USD ≈ 0.86 EUR (2026 average)
+
+function formatCurrency(value) {
+  const v = Number(value) || 0;
+  if (I18N.lang() === 'de') {
+    return formatEUR(v * USD_TO_EUR_RATE);
+  }
+  return formatUSD(v);
+}
+
 function formatCurrencyDelta(value) {
   if (value == null || Number.isNaN(Number(value))) return '—';
   const sign = value > 0 ? '+' : '';
   return sign + formatCurrency(value);
 }
 
+function _revenueCard(label, value, delta) {
+  return '<div class="status-card">' +
+    '<span class="status-card__label">' + escapeHtml(label) + '</span>' +
+    '<span class="status-card__value' + (delta == null ? '' : (delta >= 0 ? ' success' : ' danger')) + '">' + value + '</span>' +
+  '</div>';
+}
+
 function renderRevenueSummary(entries) {
   const el = document.getElementById('revenue-summary');
   if (!el) return;
   const stats = computeRevenueStats(entries);
-  const cards = [
-    { label: I18N.t('revenue.totalFiltered'), value: formatCurrency(stats.totalUsd) },
-    { label: I18N.t('revenue.daysWithRevenue'), value: String(stats.count) },
-    { label: I18N.t('revenue.averagePerDay'), value: formatCurrency(stats.averageUsd) },
-    {
-      label: I18N.t('revenue.bestDay'),
-      value: stats.best
-        ? formatCurrency(stats.best.value) + ' <span class="text-muted">' + escapeHtml(stats.best.date) + '</span>'
-        : '—',
-    },
-    {
-      label: I18N.t('revenue.worstDay'),
-      value: stats.worst
-        ? formatCurrency(stats.worst.value) + ' <span class="text-muted">' + escapeHtml(stats.worst.date) + '</span>'
-        : '—',
-    },
-    { label: I18N.t('revenue.last7Days'), value: formatCurrency(stats.last7Usd) },
-    {
-      label: I18N.t('revenue.last7VsPrev7'),
-      value: formatCurrencyDelta(stats.delta7Usd),
-      delta: stats.delta7Usd,
-    },
-  ];
-  el.innerHTML = cards.map(c =>
+  const netPct = Math.round(stats.netSharePct || 0);
+  const feePct = 100 - netPct;
+  const html = [
+    '<div class="status-card revenue-hero">' +
+      '<span class="status-card__label">' + escapeHtml(I18N.t('revenue.net')) + '</span>' +
+      '<span class="status-card__value revenue-hero__value">' + formatCurrency(stats.totalUsd) + '</span>' +
+      '<span class="revenue-hero__sub">' + escapeHtml(I18N.t('revenue.netSub', { pct: netPct })) + '</span>' +
+    '</div>',
     '<div class="status-card">' +
-      '<span class="status-card__label">' + escapeHtml(c.label) + '</span>' +
-      '<span class="status-card__value' + (c.delta == null ? '' : (c.delta >= 0 ? ' success' : ' danger')) + '">' + c.value + '</span>' +
-    '</div>'
-  ).join('');
+      '<span class="status-card__label">' + escapeHtml(I18N.t('revenue.gross')) + '</span>' +
+      '<span class="status-card__value">' + formatCurrency(stats.totalGrossUsd) + '</span>' +
+      '<span class="revenue-card-sub">' + escapeHtml(I18N.t('revenue.grossSub')) + '</span>' +
+    '</div>',
+    '<div class="status-card revenue-fee-card">' +
+      '<span class="status-card__label">' + escapeHtml(I18N.t('revenue.tiktokShare')) + '</span>' +
+      '<span class="status-card__value">' + formatCurrency(stats.tiktokUsd) + '</span>' +
+      '<span class="revenue-card-sub">≈ ' + feePct + '%</span>' +
+    '</div>',
+    _revenueCard(I18N.t('revenue.daysWithRevenue'), String(stats.count)),
+    _revenueCard(I18N.t('revenue.averagePerDay'), formatCurrency(stats.averageUsd)),
+    _revenueCard(I18N.t('revenue.bestDay'), stats.best
+      ? formatCurrency(stats.best.value) + ' <span class="text-muted">' + escapeHtml(stats.best.date) + '</span>'
+      : '—'),
+    _revenueCard(I18N.t('revenue.worstDay'), stats.worst
+      ? formatCurrency(stats.worst.value) + ' <span class="text-muted">' + escapeHtml(stats.worst.date) + '</span>'
+      : '—'),
+    _revenueCard(I18N.t('revenue.last7Days'), formatCurrency(stats.last7Usd)),
+    _revenueCard(I18N.t('revenue.last7VsPrev7'), formatCurrencyDelta(stats.delta7Usd), stats.delta7Usd),
+  ];
+  el.innerHTML = html.join('');
 }
 
 function renderRevenueChart(entries) {
   const el = document.getElementById('revenue-chart');
   if (!el) return;
   if (!entries.length) {
-    el.innerHTML = '<p class="text-muted">' + I18N.t('revenue.noData') + '</p>';
+    el.innerHTML = '';
     return;
   }
-  const max = Math.max(...entries.map(e => e.estimated_revenue_usd), 0.01);
-  const labelEvery = Math.ceil(entries.length / 12);
-  el.innerHTML = entries.map((e, i) => {
-    const h = Math.max(4, Math.round((e.estimated_revenue_usd / max) * 100));
-    const label = i % labelEvery === 0 || i === entries.length - 1 ? e.date.slice(5) : '';
-    return '<div class="revenue-bar" title="' + escapeHtml(e.date) + ': ' + formatCurrency(e.estimated_revenue_usd) + '">' +
-      '<div class="revenue-bar-fill" style="height:' + h + '%"></div>' +
+  const today = _revenueISODate(new Date());
+  const enriched = entries.map(revenueEnrichEntry);
+  const max = Math.max(...enriched.map(e => e.grossUsd), 0.01);
+  const labelEvery = Math.ceil(enriched.length / 12);
+  const grossLabel = I18N.t('revenue.gross');
+  const netLabel = I18N.t('revenue.net');
+  const feeLabel = I18N.t('revenue.tiktokShare');
+  el.innerHTML = enriched.map((e, i) => {
+    const netH = Math.max(0, Math.round((e.netUsd / max) * 100));
+    const feeH = Math.max(0, Math.round((e.tiktokUsd / max) * 100));
+    const label = i % labelEvery === 0 || i === enriched.length - 1 ? e.date.slice(5) : '';
+    const latest = e.date === today ? ' revenue-bar--latest' : '';
+    const tip =
+      e.date + '\n' +
+      grossLabel + ': ' + formatCurrency(e.grossUsd) + '\n' +
+      netLabel + ': ' + formatCurrency(e.netUsd) + '\n' +
+      feeLabel + ': ' + formatCurrency(e.tiktokUsd);
+    return '<div class="revenue-bar' + latest + '" title="' + escapeHtml(tip) + '">' +
+      '<div class="revenue-bar-stack">' +
+        (e.netUsd > 0 ? '<span class="revenue-bar-segment revenue-bar-segment--net" style="height:' + netH + '%"></span>' : '') +
+        (e.tiktokUsd > 0 ? '<span class="revenue-bar-segment revenue-bar-segment--fee" style="height:' + feeH + '%"></span>' : '') +
+      '</div>' +
       '<span class="revenue-bar-label">' + escapeHtml(label) + '</span>' +
     '</div>';
   }).join('');
@@ -2144,22 +2230,30 @@ function renderRevenueTable(entries) {
   const wrap = document.getElementById('revenue-table-wrap');
   if (!wrap) return;
   if (!entries.length) {
-    wrap.innerHTML = '<p class="text-muted">' + I18N.t('revenue.noData') + '</p>';
+    wrap.innerHTML = '';
     return;
   }
-  let html = '<table class="plugin-table"><thead><tr><th>Date</th><th>Revenue</th><th>Change</th></tr></thead><tbody>';
+  const grossLabel = I18N.t('revenue.gross');
+  const netLabel = I18N.t('revenue.net');
+  const feeLabel = I18N.t('revenue.tiktokShare');
+  const changeLabel = I18N.t('revenue.change');
+  let html = '<table class="plugin-table revenue-table"><thead><tr>' +
+    '<th>Date</th><th>' + grossLabel + '</th><th>' + netLabel + '</th><th>' + feeLabel + '</th><th>' + changeLabel + '</th>' +
+    '</tr></thead><tbody>';
   let prev = null;
-  for (const e of entries) {
-    const delta = prev != null ? e.estimated_revenue_usd - prev : null;
+  for (const e of entries.map(revenueEnrichEntry)) {
+    const delta = prev != null ? e.netUsd - prev : null;
     const deltaHtml = delta == null
       ? '—'
       : '<span class="revenue-delta ' + (delta >= 0 ? 'revenue-delta--up' : 'revenue-delta--down') + '">' + formatCurrencyDelta(delta) + '</span>';
     html += '<tr>' +
       '<td data-label="Date">' + escapeHtml(e.date) + '</td>' +
-      '<td data-label="Revenue">' + formatCurrency(e.estimated_revenue_usd) + '</td>' +
-      '<td data-label="Change">' + deltaHtml + '</td>' +
+      '<td data-label="' + escapeHtml(grossLabel) + '">' + formatCurrency(e.grossUsd) + '</td>' +
+      '<td data-label="' + escapeHtml(netLabel) + '" class="revenue-table__net">' + formatCurrency(e.netUsd) + '</td>' +
+      '<td data-label="' + escapeHtml(feeLabel) + '">' + formatCurrency(e.tiktokUsd) + '</td>' +
+      '<td data-label="' + escapeHtml(changeLabel) + '">' + deltaHtml + '</td>' +
     '</tr>';
-    prev = e.estimated_revenue_usd;
+    prev = e.netUsd;
   }
   html += '</tbody></table>';
   wrap.innerHTML = html;
@@ -8889,6 +8983,12 @@ document.addEventListener('i18n:changed', () => {
   if (typeof reactionEditor !== 'undefined') {
     reactionEditor.renderSidebar();
     reactionEditor.renderList();
+  }
+  if (document.getElementById('view-revenue')?.classList.contains('active')) {
+    renderRevenueView();
+  }
+  if (document.getElementById('view-sessions')?.classList.contains('active')) {
+    renderSessionsView();
   }
 });
 

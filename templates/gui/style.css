@@ -573,22 +573,57 @@ tr:last-child td { border-bottom: none; }
 .status-card__value.danger { color: var(--color-danger); }
 
 /* ─── Revenue View ─── */
+.revenue-summary {
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.revenue-hero {
+  border: 1px solid var(--color-accent);
+  background: linear-gradient(180deg, var(--color-accent-subtle), var(--color-elevated));
+  box-shadow: var(--shadow-sm);
+}
+.revenue-hero__value {
+  font-size: var(--text-2xl);
+  color: var(--color-accent);
+  letter-spacing: -0.02em;
+}
+.revenue-hero__sub {
+  font-size: var(--text-xs);
+  color: var(--color-accent-hover);
+  line-height: 1.4;
+}
+.revenue-fee-card .status-card__value { color: var(--color-text-muted); }
+.revenue-card-sub {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.revenue-panel {
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
 .revenue-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4) var(--space-5);
 }
 .revenue-filter-group {
   display: inline-flex;
-  gap: var(--space-1);
+  gap: var(--space-2);
   background: var(--color-input);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-1);
 }
 .revenue-period {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
   font-size: var(--text-xs);
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
@@ -598,10 +633,12 @@ tr:last-child td { border-bottom: none; }
 }
 .revenue-period:hover {
   color: var(--color-text);
+  background: var(--color-elevated);
 }
 .revenue-period.active {
   background: var(--color-accent);
   color: var(--color-bg);
+  box-shadow: var(--shadow-sm);
 }
 .revenue-filter-label {
   display: inline-flex;
@@ -615,42 +652,132 @@ tr:last-child td { border-bottom: none; }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 30px;
   font-size: var(--text-xs);
 }
+.revenue-filter-label input[type="date"]:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+.revenue-clear { margin-left: auto; }
+
+.revenue-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+  padding-right: var(--space-2);
+}
+.revenue-section-head h3 { margin: 0; min-width: 0; }
+.revenue-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.revenue-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.revenue-legend__swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.revenue-legend__swatch--gross {
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border-hover);
+}
+.revenue-legend__swatch--net {
+  background: linear-gradient(180deg, var(--color-accent-hover), var(--color-accent));
+}
+.revenue-legend__swatch--fee {
+  background: repeating-linear-gradient(45deg, transparent 0 3px, rgba(239, 68, 68, 0.5) 3px 6px);
+}
+
 .revenue-chart {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  min-height: 200px;
-  padding: var(--space-3);
+  gap: 3px;
+  min-height: 240px;
+  padding: var(--space-4);
   background: var(--color-elevated);
+  background-image: repeating-linear-gradient(
+    to top,
+    transparent 0 39px,
+    rgba(255, 255, 255, 0.04) 39px 40px
+  );
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow-x: auto;
 }
 .revenue-bar {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
   flex: 1 1 0;
-  min-width: 14px;
+  min-width: 16px;
+  min-height: 0;
   height: 100%;
 }
-.revenue-bar-fill {
+.revenue-bar-stack {
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
-  max-width: 28px;
+  max-width: 30px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.revenue-bar-segment {
+  width: 100%;
   min-height: 4px;
-  background: var(--color-accent);
+}
+.revenue-bar-segment--net {
+  background: linear-gradient(180deg, var(--color-accent-hover), var(--color-accent));
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  transition: height var(--transition-fast);
+  transition: filter var(--transition-fast);
+}
+.revenue-bar-segment--fee {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.03) 0 4px,
+    rgba(255, 255, 255, 0.1) 4px 8px
+  );
+  border-top: 1px dashed rgba(239, 68, 68, 0.45);
+}
+.revenue-bar:hover .revenue-bar-segment--net { filter: brightness(1.15); }
+.revenue-bar--latest .revenue-bar-segment--net {
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    0 0 12px var(--color-accent-subtle);
+  border-radius: var(--radius-sm);
 }
 .revenue-bar-label {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   font-size: 0.65rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+  line-height: 1;
+}
+
+.revenue-table td { padding: var(--space-3); }
+.revenue-table__net { color: var(--color-accent); font-weight: var(--weight-semibold); }
+.revenue-note {
+  margin: var(--space-3) 0 0 0;
+  font-size: var(--text-xs);
+  max-width: 720px;
 }
 .revenue-delta--up { color: var(--color-success); }
 .revenue-delta--down { color: var(--color-danger); }

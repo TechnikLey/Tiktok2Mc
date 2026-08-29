@@ -584,6 +584,16 @@
     'revenue.worstDay': 'Worst day',
     'revenue.last7Days': 'Last 7 days',
     'revenue.last7VsPrev7': 'Last 7 vs prev 7',
+    'revenue.net': 'Net',
+    'revenue.gross': 'Gross',
+    'revenue.tiktokShare': 'TikTok share',
+    'revenue.netSub': 'Payout, ≈ {pct}% of viewer spend',
+    'revenue.grossSub': 'What your viewers paid',
+    'revenue.change': 'Change',
+    'revenue.legendGross': 'Gross (viewer spend)',
+    'revenue.legendNet': 'Net (payout)',
+    'revenue.legendFee': 'TikTok fee',
+    'revenue.estimateNote': 'Estimates based on TikTok rates: 1 diamond = $0.005 payout, 2 coins = 1 diamond, coins ≈ $0.013 each. Actual payouts vary by region, package and app store.',
 
     /* ── Event Tester ── */
     'triggers.title': 'Event Tester',
@@ -1662,6 +1672,16 @@
     'revenue.worstDay': 'Schlechtester Tag',
     'revenue.last7Days': 'Letzte 7 Tage',
     'revenue.last7VsPrev7': 'Letzte 7 vs. vorherige 7',
+    'revenue.net': 'Netto',
+    'revenue.gross': 'Brutto',
+    'revenue.tiktokShare': 'TikTok-Anteil',
+    'revenue.netSub': 'Auszahlung, ≈ {pct}% der Zuschauer-Ausgaben',
+    'revenue.grossSub': 'Was deine Zuschauer zahlten',
+    'revenue.change': 'Änderung',
+    'revenue.legendGross': 'Brutto (Zuschauer gaben aus)',
+    'revenue.legendNet': 'Netto (Auszahlung)',
+    'revenue.legendFee': 'TikTok-Gebühr',
+    'revenue.estimateNote': 'Schätzungen basieren auf TikTok-Sätzen: 1 Diamant = 0,005 $ (≈ 0,004 €) Auszahlung, 2 Coins = 1 Diamant, Coins ≈ 0,013 $ (≈ 0,011 €)/Stück. Umrechnung: 1 $ ≈ 0,86 €. Tatsächliche Auszahlungen variieren je nach Region, Paket und App-Store.',
 
     /* ── Event Tester ── */
     'triggers.title': 'Event-Tester',

@@ -26,17 +26,29 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.status">Status</span>
                 </button>
-                <button type="button" class="nav-item" data-view="plugins" onclick="switchView('plugins')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.plugins">Plugins</span>
+                <button type="button" class="nav-item" data-view="revenue" onclick="switchView('revenue')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.revenue">Revenue</span>
                 </button>
-                <button type="button" class="nav-item" data-view="hooks" onclick="switchView('hooks')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 17H7V6h10v12zM9 8h6v2H9V8zm0 4h6v2H9v-2z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.hooks">Hooks</span>
+                <button type="button" class="nav-item" data-view="sessions" onclick="switchView('sessions')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.sessions">Sessions</span>
                 </button>
-                <button type="button" class="nav-item" data-view="overlays" onclick="switchView('overlays')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.overlays">Overlays</span>
+                <button type="button" class="nav-item" data-view="log" onclick="switchView('log')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.log">Live Log</span>
+                </button>
+                <button type="button" class="nav-item" data-view="servers" onclick="switchView('servers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.servers">Server Manager</span>
+                </button>
+                <button type="button" class="nav-item" data-view="settings" onclick="switchToEditor('settings', openConfigEditor)">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.settings">Settings</span>
+                </button>
+                <button type="button" class="nav-item" data-view="triggers" onclick="switchView('triggers')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.triggers">Event Tester</span>
                 </button>
                 <button type="button" class="nav-item" data-view="actions" onclick="switchToEditor('actions', () => actionsEditor.open())">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 000-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z" fill="currentColor"/></svg>
@@ -50,38 +62,26 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.commands">Commands</span>
                 </button>
-
                 <button type="button" class="nav-item" data-view="chatbot" onclick="switchToEditor('chatbot', () => chatbotEditor.open())">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M12 2a2 2 0 0 1 2 2c0 .36-.1.7-.27 1H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4.27A2 2 0 0 1 10 4a2 2 0 0 1 2-2zM8.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 15h8v1.5H8V15z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.chatbot">Chatbot</span>
                 </button>
-                <button type="button" class="nav-item" data-view="settings" onclick="switchToEditor('settings', openConfigEditor)">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0014 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.settings">Settings</span>
+
+                <button type="button" class="nav-item" data-view="plugins" onclick="switchView('plugins')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.plugins">Plugins</span>
                 </button>
-                <button type="button" class="nav-item" data-view="log" onclick="switchView('log')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.log">Live Log</span>
+                <button type="button" class="nav-item" data-view="hooks" onclick="switchView('hooks')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 17H7V6h10v12zM9 8h6v2H9V8zm0 4h6v2H9v-2z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.hooks">Hooks</span>
+                </button>
+                <button type="button" class="nav-item" data-view="overlays" onclick="switchView('overlays')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="currentColor"/></svg>
+                    <span class="nav-label" data-i18n="nav.overlays">Overlays</span>
                 </button>
                 <button type="button" class="nav-item" data-view="console" onclick="switchView('console')">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm7.5-5.18l-1.41 1.41L12 15.59l3.5-3.5-1.41-1.41L12 12.82l-2.09-2.09-1.41 1.41L11.5 12.82zM7.5 14h4v1.5h-4V14z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.console">Console</span>
-                </button>
-                <button type="button" class="nav-item" data-view="servers" onclick="switchView('servers')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 13H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zM7 19H5v-2h2v2zM20 3H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zM7 9H5V7h2v2z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.servers">Server Manager</span>
-                </button>
-                <button type="button" class="nav-item" data-view="revenue" onclick="switchView('revenue')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.revenue">Revenue</span>
-                </button>
-                <button type="button" class="nav-item" data-view="sessions" onclick="switchView('sessions')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.sessions">Sessions</span>
-                </button>
-                <button type="button" class="nav-item" data-view="triggers" onclick="switchView('triggers')">
-                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
-                    <span class="nav-label" data-i18n="nav.triggers">Event Tester</span>
                 </button>
                 <button type="button" class="nav-item" data-view="backups" onclick="switchView('backups')">
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" fill="currentColor"/></svg>
@@ -430,34 +430,46 @@
                     </div>
                 </div>
 
-                <div class="status-grid" id="revenue-summary"></div>
+                <div class="status-grid revenue-summary" id="revenue-summary"></div>
 
                 <section class="view-section">
-                    <div class="revenue-filters">
-                        <div class="revenue-filter-group">
-                            <span class="revenue-period" data-days="0" onclick="revenueSetPeriod(0)" data-i18n="revenue.periodAll">All</span>
-                            <span class="revenue-period" data-days="7" onclick="revenueSetPeriod(7)" data-i18n="revenue.period7">7 days</span>
-                            <span class="revenue-period" data-days="30" onclick="revenueSetPeriod(30)" data-i18n="revenue.period30">30 days</span>
-                            <span class="revenue-period" data-days="90" onclick="revenueSetPeriod(90)" data-i18n="revenue.period90">90 days</span>
+                    <div class="revenue-panel">
+                        <div class="revenue-filters">
+                            <div class="revenue-filter-group">
+                                <span class="revenue-period" data-days="0" role="button" tabindex="0" onclick="revenueSetPeriod(0)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(0)" data-i18n="revenue.periodAll">All</span>
+                                <span class="revenue-period" data-days="7" role="button" tabindex="0" onclick="revenueSetPeriod(7)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(7)" data-i18n="revenue.period7">7 days</span>
+                                <span class="revenue-period" data-days="30" role="button" tabindex="0" onclick="revenueSetPeriod(30)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(30)" data-i18n="revenue.period30">30 days</span>
+                                <span class="revenue-period" data-days="90" role="button" tabindex="0" onclick="revenueSetPeriod(90)" onkeydown="if(event.key==='Enter'||event.key===' ')revenueSetPeriod(90)" data-i18n="revenue.period90">90 days</span>
+                            </div>
+                            <label class="revenue-filter-label">
+                                <span data-i18n="revenue.from">From</span>
+                                <input type="date" id="revenue-from" onchange="revenueApplyFilters()">
+                            </label>
+                            <label class="revenue-filter-label">
+                                <span data-i18n="revenue.to">To</span>
+                                <input type="date" id="revenue-to" onchange="revenueApplyFilters()">
+                            </label>
+                            <button class="btn btn--secondary btn--sm revenue-clear" onclick="revenueClearFilters()" data-i18n="revenue.clear">Clear</button>
                         </div>
-                        <label class="revenue-filter-label">From
-                            <input type="date" id="revenue-from" onchange="revenueApplyFilters()">
-                        </label>
-                        <label class="revenue-filter-label">To
-                            <input type="date" id="revenue-to" onchange="revenueApplyFilters()">
-                        </label>
-                        <button class="btn btn--secondary btn--sm" onclick="revenueClearFilters()" data-i18n="revenue.clear">Clear</button>
                     </div>
                 </section>
 
                 <section class="view-section">
-                    <h3 data-i18n="revenue.daily">Daily Revenue</h3>
+                    <div class="revenue-section-head">
+                        <h3 data-i18n="revenue.daily">Daily Revenue</h3>
+                        <div class="revenue-legend">
+                            <span class="revenue-legend__item"><i class="revenue-legend__swatch revenue-legend__swatch--gross"></i><span data-i18n="revenue.legendGross">Gross (viewer spend)</span></span>
+                            <span class="revenue-legend__item"><i class="revenue-legend__swatch revenue-legend__swatch--net"></i><span data-i18n="revenue.legendNet">Net (payout)</span></span>
+                            <span class="revenue-legend__item"><i class="revenue-legend__swatch revenue-legend__swatch--fee"></i><span data-i18n="revenue.legendFee">TikTok fee</span></span>
+                        </div>
+                    </div>
                     <div id="revenue-chart" class="revenue-chart"></div>
                 </section>
 
                 <section class="view-section">
                     <h3 data-i18n="revenue.history">History</h3>
                     <div id="revenue-table-wrap"></div>
+                    <p class="text-muted revenue-note" data-i18n="revenue.estimateNote">Estimates based on TikTok rates: 1 diamond = $0.005 payout, 2 coins = 1 diamond, coins ≈ $0.013 each. Actual payouts vary by region, package and app store.</p>
                 </section>
             </div>
 

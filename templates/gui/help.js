@@ -512,11 +512,14 @@
           body: {
             en: [
               'Shows the gift value you received per day. Use the period buttons (All, 7, 30, 90 days) or a custom date range, and clear the filter to go back.',
-              'The summary cards show total (filtered), days with revenue, average per day, best and worst day.',
+              'Gross is what your viewers spent on coins (2 coins = 1 diamond, coins ≈ $0.013 each). Net is your payout after TikTok takes its share. The chart stacks the TikTok fee (hatched) below your net payout.',
+              'The summary cards highlight your net payout, the gross viewer spend and TikTok\u2019s share, plus days with revenue, average per day, best and worst day.',
             ],
             de: [
               'Zeigt den pro Tag erhaltenen Geschenk-Wert. Nutze die Zeitraum-Buttons (Alle, 7, 30, 90 Tage) oder einen eigenen Datumsbereich und setze den Filter zurück, um zum Anfang zu gelangen.',
-              'Die Übersichtskarten zeigen Gesamt (gefiltert), Tage mit Einnahmen, Durchschnitt pro Tag sowie besten und schlechtesten Tag.',
+              'Brutto ist, was deine Zuschauer für Coins ausgegeben haben (2 Coins = 1 Diamant, Coins ≈ 0,013 $ ≈ 0,011 €). Netto ist deine Auszahlung nach TikToks Anteil. Das Diagramm stapelt die TikTok-Gebühr (schraffiert) unter deiner Netto-Auszahlung.',
+              'Die Übersichtskarten heben deine Netto-Auszahlung, den Brutto-Zuschauer-Umsatz und TikToks Anteil hervor, dazu Tage mit Einnahmen, Durchschnitt pro Tag sowie besten und schlechtesten Tag.',
+              'In der deutschen Oberfläche werden alle Beträge in Euro angezeigt (umgerechnet mit 1 $ ≈ 0,86 €).',
             ],
           },
         },
