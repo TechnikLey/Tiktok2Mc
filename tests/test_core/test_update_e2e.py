@@ -265,9 +265,10 @@ class TestUpdateWhitelist:
         return file.lower() != "config.yaml"
 
     def test_whitelisted_root_files_copied(self):
+        suffix = ".exe" if sys.platform == "win32" else ".bin"
         assert self._should_copy(".", "version.txt") is True
         assert self._should_copy(".", "README.md") is True
-        assert self._should_copy(".", "start.exe") is True
+        assert self._should_copy(".", f"start{suffix}") is True
 
     def test_non_whitelisted_root_files_skipped(self):
         assert self._should_copy(".", "secret.key") is False
