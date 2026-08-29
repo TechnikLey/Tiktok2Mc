@@ -626,14 +626,50 @@ class ActionsEditor {
   async _askAndReloadActions() {
     let sendReload = false;
     if (currentConfig && currentConfig.rcon && currentConfig.rcon.enabled) {
-      sendReload = confirm(I18N.t('actions.reloadConfirm'));
+      sendReload = await this._askServerRestart();
     }
     await postJSON('/reload', { config: false, actions: true, send_minecraft_reload: sendReload });
     if (sendReload) {
       showToast(I18N.t('actions.savedReload'), 'success');
     } else {
       showToast(I18N.t('actions.savedRunReload'), 'info');
+      setRestartPending(true);
     }
+  }
+
+  _askServerRestart() {
+    const dlg = document.getElementById('actions-restart-dialog');
+    const nowBtn = document.getElementById('btn-actions-restart-now');
+    const laterBtn = document.getElementById('btn-actions-restart-later');
+    if (!dlg || !nowBtn || !laterBtn) {
+      return Promise.resolve(confirm(I18N.t('actions.restartMessage')));
+    }
+    return new Promise((resolve) => {
+      const cleanup = () => {
+        dlg.classList.add('hidden');
+        document.removeEventListener('keydown', onKey);
+        nowBtn.replaceWith(nowBtn.cloneNode(true));
+        laterBtn.replaceWith(laterBtn.cloneNode(true));
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          cleanup();
+          resolve(false);
+        }
+      };
+
+      const newNow = nowBtn.cloneNode(true);
+      const newLater = laterBtn.cloneNode(true);
+      nowBtn.parentNode.replaceChild(newNow, nowBtn);
+      laterBtn.parentNode.replaceChild(newLater, laterBtn);
+
+      newNow.addEventListener('click', () => { cleanup(); resolve(true); });
+      newLater.addEventListener('click', () => { cleanup(); resolve(false); });
+
+      dlg.classList.remove('hidden');
+      document.addEventListener('keydown', onKey);
+    });
   }
 
   /* ── Raw Editor ── (removed) */

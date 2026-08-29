@@ -379,6 +379,7 @@ class TestReloadOffloadsToThread:
 
         def fake_validate_file(*_args, **_kwargs):
             seen["validate"] = threading.get_ident()
+            return []
 
         def fake_generate_datapack():
             seen["build"] = threading.get_ident()
@@ -395,6 +396,36 @@ class TestReloadOffloadsToThread:
 
         assert seen.get("validate") != main_thread
         assert seen.get("build") != main_thread
+
+    @pytest.mark.asyncio
+    async def test_reload_actions_requests_server_restart_when_opted_in(
+        self, monkeypatch, tmp_path
+    ):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod, "validate_file", lambda *a, **k: [])
+        monkeypatch.setattr(main_mod, "generate_datapack", lambda: None)
+        monkeypatch.setattr(main_mod, "get_health_monitor", lambda: MagicMock())
+        monkeypatch.setattr(main_mod, "get_runtime_dir", lambda: tmp_path)
+
+        await main_mod.reload_actions(send_minecraft_reload=True)
+
+        assert (tmp_path / "restart_server").exists()
+
+    @pytest.mark.asyncio
+    async def test_reload_actions_does_not_restart_without_opt_in(
+        self, monkeypatch, tmp_path
+    ):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod, "validate_file", lambda *a, **k: [])
+        monkeypatch.setattr(main_mod, "generate_datapack", lambda: None)
+        monkeypatch.setattr(main_mod, "get_health_monitor", lambda: MagicMock())
+        monkeypatch.setattr(main_mod, "get_runtime_dir", lambda: tmp_path)
+
+        await main_mod.reload_actions(send_minecraft_reload=False)
+
+        assert not (tmp_path / "restart_server").exists()
 
 
 # =========================================================================

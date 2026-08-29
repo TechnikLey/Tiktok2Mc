@@ -37,7 +37,8 @@ class ReloadRequest(BaseModel):
     hooks: bool = Field(False, description="Reload all event hooks in the bridge")
     send_minecraft_reload: bool = Field(
         False,
-        description="Ask the App bridge to send /reload to the Minecraft server after reloading actions",
+        description="Ask the App bridge to restart the Minecraft server after reloading actions "
+        "(Minecraft loads datapack functions only at server start — /reload is not enough)",
     )
 
 

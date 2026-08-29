@@ -45,6 +45,7 @@ from TikTokLive.events import (
     ShareEvent,
 )
 
+from core.api.services.datapack import sync_datapack
 from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
 from core.error_codes import (
@@ -2740,14 +2741,36 @@ async def reload_config():
         log.error("[RELOAD] Config reload failed: %s", e)
 
 
+def _request_minecraft_restart() -> None:
+    """Ask the supervisor to restart the Minecraft server.
+
+    ``start.py`` polls the ``restart_server`` runtime signal and restarts the
+    Minecraft Server program. Writing the signal from the bridge guarantees
+    the datapack regeneration + world sync finished before the next boot.
+    """
+    signal = get_runtime_dir() / "restart_server"
+    try:
+        signal.write_text("actions reload", encoding="utf-8")
+        log.info("[RELOAD] Datapack synced — Minecraft server restart requested")
+    except OSError as exc:
+        log.warning(
+            "[RELOAD] Failed to request Minecraft server restart (%s) — "
+            "restart the server manually so datapack changes take effect",
+            exc,
+        )
+
+
 async def reload_actions(send_minecraft_reload: bool = False):
     """Reload actions.mca at runtime without restarting the bridge.
 
-    ``send_minecraft_reload`` asks the bridge to push ``/reload`` to the
-    Minecraft server via RCON after the datapack has been regenerated.
+    ``send_minecraft_reload`` asks the bridge to restart the Minecraft server
+    after the datapack has been regenerated: Minecraft only loads datapack
+    functions when the server starts, so a plain ``/reload`` is not enough for
+    function changes to take effect.
     """
     log.info(
-        "[RELOAD] Actions reload requested (send /reload: %s)", send_minecraft_reload
+        "[RELOAD] Actions reload requested (restart Minecraft: %s)",
+        send_minecraft_reload,
     )
     try:
         # File validation and the datapack rebuild run in a thread; the
@@ -2762,6 +2785,14 @@ async def reload_actions(send_minecraft_reload: bool = False):
             return
 
         await asyncio.to_thread(generate_datapack)
+        # Push the fresh datapack into the server world so the restart below
+        # boots with the regenerated functions.
+        try:
+            sync_datapack(
+                (_BASE_PARENT / "server" / "default").resolve(), ctx.datapack_root
+            )
+        except OSError as exc:
+            log.warning("[RELOAD] Failed to sync datapack into the world: %s", exc)
         ctx.actions_valid = True
         get_health_monitor().set_state("tiktok_bridge", HealthState.RUNNING)
         ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
@@ -2769,17 +2800,15 @@ async def reload_actions(send_minecraft_reload: bool = False):
             ctx.hook_api.update_runtime_state(valid_functions=ctx.valid_functions)
 
         if send_minecraft_reload:
-            if ctx.rcon_enabled:
-                try:
-                    ctx.rcon_queue.put_nowait((["/reload"], "system"))
-                    log.info("[RELOAD] Sent /reload to Minecraft server")
-                except asyncio.QueueFull:
-                    log.warning("[RELOAD] RCON queue full; could not send /reload")
-            else:
-                log.info(
-                    "[RELOAD] /reload requested but RCON disabled; "
-                    "vanilla action changes require a Minecraft server restart or manual /reload"
-                )
+            # Minecraft loads datapack functions only at server start — a
+            # /reload does not pick up regenerated functions, so restart the
+            # server (the world copy was already synced above).
+            _request_minecraft_restart()
+        else:
+            log.info(
+                "[RELOAD] No Minecraft server restart requested — "
+                "datapack function changes require a restart to take effect"
+            )
 
         log.info("[RELOAD] Actions reloaded successfully")
     except Exception as e:  # runtime reload is best-effort; previous state stays active

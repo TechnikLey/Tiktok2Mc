@@ -443,4 +443,108 @@ describe('ActionsEditor', () => {
       expect(input.value).toBe('curl http://localhost');
     });
   });
+
+  /* ─── _askServerRestart dialog ─── */
+  describe('_askServerRestart', () => {
+    it('resolves true when "Restart Now" is clicked', async () => {
+      const dlg = document.getElementById('actions-restart-dialog');
+      dlg.classList.add('hidden');
+      const promise = actionsEditor._askServerRestart();
+      expect(dlg.classList.contains('hidden')).toBe(false);
+      document.getElementById('btn-actions-restart-now').click();
+      await expect(promise).resolves.toBe(true);
+      expect(dlg.classList.contains('hidden')).toBe(true);
+    });
+
+    it('resolves false when "Later" is clicked', async () => {
+      const dlg = document.getElementById('actions-restart-dialog');
+      dlg.classList.add('hidden');
+      const promise = actionsEditor._askServerRestart();
+      document.getElementById('btn-actions-restart-later').click();
+      await expect(promise).resolves.toBe(false);
+      expect(dlg.classList.contains('hidden')).toBe(true);
+    });
+
+    it('resolves false on Escape', async () => {
+      const dlg = document.getElementById('actions-restart-dialog');
+      dlg.classList.add('hidden');
+      const promise = actionsEditor._askServerRestart();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await expect(promise).resolves.toBe(false);
+      expect(dlg.classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  /* ─── _askAndReloadActions ─── */
+  describe('_askAndReloadActions', () => {
+    let origPostJSON, origToast, origSetPending, origConfig;
+
+    beforeEach(() => {
+      origPostJSON = postJSON;
+      origToast = showToast;
+      origSetPending = setRestartPending;
+      origConfig = currentConfig;
+    });
+
+    afterEach(() => {
+      postJSON = origPostJSON;
+      showToast = origToast;
+      setRestartPending = origSetPending;
+      currentConfig = origConfig;
+    });
+
+    it('sends send_minecraft_reload=true when restart now is chosen', async () => {
+      currentConfig = { rcon: { enabled: true } };
+      let captured;
+      postJSON = async (url, body) => { captured = { url, body }; };
+      showToast = () => {};
+      let pending = null;
+      setRestartPending = (p) => { pending = p; };
+      const dlg = document.getElementById('actions-restart-dialog');
+      dlg.classList.add('hidden');
+
+      const promise = actionsEditor._askAndReloadActions();
+      document.getElementById('btn-actions-restart-now').click();
+      await promise;
+
+      expect(captured.url).toBe('/reload');
+      expect(captured.body.send_minecraft_reload).toBe(true);
+      expect(pending).toBe(null);
+    });
+
+    it('does not restart and marks restart pending when later is chosen', async () => {
+      currentConfig = { rcon: { enabled: true } };
+      let captured;
+      postJSON = async (url, body) => { captured = { url, body }; };
+      showToast = () => {};
+      let pending = null;
+      setRestartPending = (p) => { pending = p; };
+      const dlg = document.getElementById('actions-restart-dialog');
+      dlg.classList.add('hidden');
+
+      const promise = actionsEditor._askAndReloadActions();
+      document.getElementById('btn-actions-restart-later').click();
+      await promise;
+
+      expect(captured.body.send_minecraft_reload).toBe(false);
+      expect(pending).toBe(true);
+    });
+
+    it('skips the dialog when rcon is disabled', async () => {
+      currentConfig = { rcon: { enabled: false } };
+      let captured;
+      postJSON = async (url, body) => { captured = body; };
+      showToast = () => {};
+      let pending = 'untouched';
+      setRestartPending = (p) => { pending = p; };
+      const dlg = document.getElementById('actions-restart-dialog');
+      dlg.classList.add('hidden');
+
+      await actionsEditor._askAndReloadActions();
+
+      expect(captured.send_minecraft_reload).toBe(false);
+      expect(pending).toBe(true);
+      expect(dlg.classList.contains('hidden')).toBe(true);
+    });
+  });
 });

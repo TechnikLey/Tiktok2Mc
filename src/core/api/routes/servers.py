@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from ruamel.yaml.error import YAMLError
 
 from core.api.services import ApiService
+from core.api.services.datapack import sync_datapack
 from core.paths import get_root_dir, get_servers_dir, get_versions_dir
 
 log = logging.getLogger(__name__)
@@ -100,44 +101,9 @@ def _sync_datapack_to_instance(instance_id: str) -> Path | None:
     the full datapack folder and zip from ``server/datapack/``.
     Returns the instance's datapack root path, or ``None`` on failure.
     """
-    dp_dir = get_servers_dir() / "datapack"
-    if not dp_dir.exists():
-        log.warning(
-            "[DATAPACK] Datapack source not found at %s — nothing to sync", dp_dir
-        )
-        return None
-
-    instance_dp = get_servers_dir() / instance_id / "world" / "datapacks"
-    instance_dp.mkdir(parents=True, exist_ok=True)
-
-    dp_name = "StreamingTool"
-    src_dir = dp_dir / dp_name
-    dst_dir = instance_dp / dp_name
-    src_zip = dp_dir / f"{dp_name}.zip"
-    dst_zip = instance_dp / f"{dp_name}.zip"
-
-    try:
-        # Remove old datapack in instance
-        if dst_dir.exists():
-            shutil.rmtree(dst_dir)
-        if dst_zip.exists():
-            dst_zip.unlink()
-
-        # Copy fresh datapack
-        if src_dir.exists():
-            shutil.copytree(src_dir, dst_dir)
-        if src_zip.exists():
-            shutil.copy2(src_zip, dst_zip)
-
-        log.info(
-            "[DATAPACK] Synced '%s' datapack to instance '%s'", dp_name, instance_id
-        )
-        return instance_dp
-    except OSError as exc:
-        log.warning(
-            "[DATAPACK] Failed to sync datapack to instance '%s': %s", instance_id, exc
-        )
-        return None
+    return sync_datapack(
+        get_servers_dir() / instance_id, get_servers_dir() / "datapack"
+    )
 
 
 def _sync_plugins_to_instance(instance_id: str) -> None:

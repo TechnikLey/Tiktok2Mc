@@ -603,6 +603,18 @@
         </div>
     </div>
 
+    <!-- Actions: Server Restart Dialog -->
+    <div id="actions-restart-dialog" class="wizard-overlay hidden">
+        <div class="wizard-card text-center">
+            <h2 class="dialog-title" data-i18n="actions.restartRequired">Server Restart Required</h2>
+            <p class="muted dialog-desc" data-i18n="actions.restartMessage">The actions have been saved. Minecraft loads datapack functions only when the server starts, so the server must be restarted for the changes to take effect. Restart now or later?</p>
+            <div class="dialog-actions-center">
+                <button class="btn btn--primary" id="btn-actions-restart-now" data-i18n="restart.now">Restart Now</button>
+                <button class="btn btn--secondary" id="btn-actions-restart-later" data-i18n="restart.later">Later</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Update Notification Dialog -->
     <div id="update-notification-dialog" class="wizard-overlay hidden">
         <div class="wizard-card text-center">

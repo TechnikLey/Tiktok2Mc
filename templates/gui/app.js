@@ -3896,6 +3896,10 @@ function dismissRestartBanner() {
   _restartPending = false;
   updateRestartBanner();
 }
+function setRestartPending(pending) {
+  _restartPending = pending;
+  updateRestartBanner();
+}
 document.getElementById('wizard-back').addEventListener('click', () => { if (wizardStep > 0) { wizardStep--; renderWizardStep(); } });
 document.getElementById('wizard-next').addEventListener('click', wizardNext);
 

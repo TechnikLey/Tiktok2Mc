@@ -9,6 +9,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import YAMLError
 
+from core.api.services.datapack import sync_datapack, wait_for_datapack
 from core.crash_manager import get_crash_manager
 from core.error_codes import MC_0002, MC_0003
 from core.health_monitor import HealthState, get_health_monitor
@@ -293,6 +294,19 @@ if RCON_ENABLED and not RCON_PASSWORD:
         "Starting Minecraft server with RCON disabled until a password is configured."
     )
     set_server_property(SERVER_PROPERTIES, "enable-rcon", "false")
+
+# === Sync StreamingTool datapack into the instance world ===
+# Vanilla ``/`` actions in actions.mca run as ``function streamingtool:...``,
+# so the generated datapack must be present in the world before the server
+# boots. The bridge generates it into the staging area concurrently — wait
+# briefly for a complete snapshot (see wait_for_datapack).
+DP_SOURCE = (ROOT_DIR / "server" / "datapack").resolve()
+if not wait_for_datapack(DP_SOURCE):
+    log.warning(
+        "[DATAPACK] Datapack was not ready within the wait window — "
+        "vanilla actions may be unavailable"
+    )
+sync_datapack(INSTANCE_DIR, DP_SOURCE)
 
 # === Start Minecraft server ===
 log.info("\n--- Minecraft Server ---")
