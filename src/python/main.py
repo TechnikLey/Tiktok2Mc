@@ -1657,6 +1657,9 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
     ``payload`` as the subject (shown in logs and the ``{user}`` placeholder).
     Rules are filtered by ``ctx.valid_functions``, so triggers without an
     action in actions.mca never enqueue.
+
+    Callers must hold ``ctx.like_lock`` (the sole critical section), matching
+    the single-lock design so nested acquisition never deadlocks.
     """
     rules = ctx.like_triggers
     log.debug(
@@ -1665,44 +1668,41 @@ def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None
     if not rules:
         log.debug("[LIKE DEBUG] No like_triggers configured, returning")
         return
-    with ctx.like_lock:
-        for rule in rules:
-            every = rule["every"]
-            if every <= 0:
-                log.debug(
-                    f"[LIKE DEBUG] Skipping rule {rule['id']}: every={every} <= 0"
-                )
-                continue
-            blocks = total_since_start // every
-            log.debug(
-                f"[LIKE DEBUG] Rule '{rule['id']}': every={every}, total_since_start={total_since_start}, blocks={blocks}, last_blocks={rule['last_blocks']}"
+    for rule in rules:
+        every = rule["every"]
+        if every <= 0:
+            log.debug(f"[LIKE DEBUG] Skipping rule {rule['id']}: every={every} <= 0")
+            continue
+        blocks = total_since_start // every
+        log.debug(
+            f"[LIKE DEBUG] Rule '{rule['id']}': every={every}, total_since_start={total_since_start}, blocks={blocks}, last_blocks={rule['last_blocks']}"
+        )
+        if blocks > rule["last_blocks"]:
+            diff = blocks - rule["last_blocks"]
+            rule["last_blocks"] = blocks
+            log.info(
+                f"[LIKE] Trigger '{rule['id']}' -> +{diff} "
+                f"(total_since_start={total_since_start})"
             )
-            if blocks > rule["last_blocks"]:
-                diff = blocks - rule["last_blocks"]
-                rule["last_blocks"] = blocks
-                log.info(
-                    f"[LIKE] Trigger '{rule['id']}' -> +{diff} "
-                    f"(total_since_start={total_since_start})"
-                )
-                for _ in range(diff):
-                    enqueue_threadsafe(
-                        (
-                            rule["function"],
-                            rule["payload"],
-                            0,
-                            _make_hook_context(
-                                "like",
-                                total_since_start=total_since_start,
-                                milestone_every=every,
-                                milestone_rule=rule["id"],
-                            ),
+            for _ in range(diff):
+                enqueue_threadsafe(
+                    (
+                        rule["function"],
+                        rule["payload"],
+                        0,
+                        _make_hook_context(
+                            "like",
+                            total_since_start=total_since_start,
+                            milestone_every=every,
+                            milestone_rule=rule["id"],
                         ),
-                        label=f"like:{rule['id']}",
-                    )
-            else:
-                log.debug(
-                    f"[LIKE DEBUG] Rule '{rule['id']}' not triggered: blocks ({blocks}) <= last_blocks ({rule['last_blocks']})"
+                    ),
+                    label=f"like:{rule['id']}",
                 )
+        else:
+            log.debug(
+                f"[LIKE DEBUG] Rule '{rule['id']}' not triggered: blocks ({blocks}) <= last_blocks ({rule['last_blocks']})"
+            )
 
 
 def _process_comment_command(
@@ -2301,41 +2301,6 @@ def username_from_event_safe(event, default: str | None = "Unknown"):
 # ==========================================
 
 
-async def _ws_stall_watchdog():
-    """Warn when the TikTok websocket is live but stops delivering events.
-
-    Runs on the client's own event loop (see ``_run_client_blocking``). If no
-    raw event reached the bridge for a long time while ``ctx.tiktok_live``,
-    the websocket reader is probably stalled — the old silent-death symptom —
-    so surface it in the logs instead of staying quietly dead.
-    """
-    while True:
-        await asyncio.sleep(20)
-        if not ctx.tiktok_live:
-            continue
-        idle = time.time() - ctx._last_tiktok_event_ts
-        if ctx._last_tiktok_event_ts > 0 and idle > 60:
-            log.warning(
-                f"[TIKTOK][WATCHDOG] No events for {idle:.0f}s while live — "
-                f"websocket receiver may be stalled / loop crashed. "
-                f"Events so far: {ctx._tiktok_event_counters}. "
-                "Reconnecting to restore the stream."
-            )
-            # Self-heal: the reader / ack lane is starved (TikTokLive 6.6.5
-            # hb race). Close the websocket from this loop so client.connect()
-            # returns and run_bot() reconnects with a fresh signed URL
-            # (signed URLs expire in ~30 s, so a plain client.run(false)
-            # reconnect loop would hit stale URLs; a fresh connect() is safest).
-            client = ctx.tiktok_client
-            if client is not None:
-                try:
-                    await client.disconnect(close_client=False)
-                except Exception as exc:
-                    log.warning(
-                        f"[TIKTOK][WATCHDOG] Reconnect disconnect failed: {exc!r}"
-                    )
-
-
 def create_client(user):
     client = TikTokLiveClient(unique_id=user)
 
@@ -2603,12 +2568,23 @@ def create_client(user):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
-        # Baseline for the stall watchdog: from now on a long event silence
-        # while live is treated as a stalled receiver.
+        # Raw-event diagnostics baseline.
         ctx._last_tiktok_event_ts = time.time()
         _reset_session()
         _publish_tiktok_status(True)
         _run_in_background(fire_hook_lifecycle, "live_start")
+        # Capture the client's event loop — this handler runs on it, exactly
+        # like the reference's client.run() serves one loop in the worker
+        # thread — so run_coroutine_threadsafe can still disconnect the client
+        # externally (webhook toggle / config reload) and the chatbot can
+        # schedule room chat on it.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        ctx.tiktok_client_loop = loop
+        if loop is not None:
+            get_chatbot().bind_client(client, loop)
 
     return client
 
@@ -3009,47 +2985,18 @@ async def run_bot():
         client = create_client(ctx.tiktok_user)
         ctx.tiktok_client = client
 
-        # Run the client on its own dedicated event loop so the webhook server
-        # thread can disconnect it later via run_coroutine_threadsafe.
-        #
-        # IMPORTANT: create and serve the loop from the SAME worker thread
-        # (mirroring the working reference's `client.run()`). Creating it in the
-        # main thread and serving it from another strands the TikTok websocket
-        # reader after the initial room burst — it connects, delivers the
-        # opening snapshot, then never delivers another event (stream keeps
-        # running, only heartbeats follow). `set_event_loop` keeps every
-        # get_event_loop()/get_running_loop() call inside the thread consistent,
-        # including the websockets layer.
+        # Connect exactly the way the proven-working reference does
+        # (AI_HANDOVER §2 / §8A option 3): TikTokLive's thread-blocking
+        # `client.run()` builds its own event loop inside this worker thread
+        # and serves it (`run_until_complete(client.connect())`) until the
+        # WebSocket closes — no set_event_loop, no loop.close(), no watchdog,
+        # no wrapper around the run call. The loop is captured in on_connect
+        # (which runs on that loop) for external disconnect / chatbot sends.
         _chatbot.apply_session_to_client(client)
-
-        def _run_client_blocking() -> None:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            ctx.tiktok_client_loop = loop
-            _chatbot.bind_client(client, loop)
-            try:
-                # Stall watchdog runs on the same loop as the websocket reader,
-                # so a dead/stuck receiver surfaces instead of staying silent.
-                watch_dog = loop.create_task(_ws_stall_watchdog())
-                try:
-                    loop.run_until_complete(client.connect())
-                finally:
-                    watch_dog.cancel()
-                    try:  # let the loop process the cancellation
-                        loop.run_until_complete(asyncio.sleep(0))
-                    except Exception:  # best-effort drain
-                        pass
-            finally:
-                _chatbot.unbind_client()
-                ctx.tiktok_client_loop = None
-                try:
-                    loop.close()
-                except Exception:  # best-effort loop close
-                    pass
 
         try:
             log.info(f"[*] Connecting to @{ctx.tiktok_user}...")
-            await asyncio.to_thread(_run_client_blocking)
+            await asyncio.to_thread(client.run)
 
         except Exception as e:  # TikTok client connection errors are reported; reconnect loop continues
             log.exception("CRITICAL ERROR IN TIKTOK CLIENT")
@@ -3076,6 +3023,8 @@ async def run_bot():
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:
+            _chatbot.unbind_client()
+            ctx.tiktok_client_loop = None
             ctx.tiktok_live = False
             _publish_tiktok_status(False)
             await asyncio.sleep(2)

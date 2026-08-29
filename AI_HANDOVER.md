@@ -1,7 +1,7 @@
 # AI Handover — TikTok2Mc: "Bridge stoppt nach Initial-Burst" (Live-Event-Problem)
 
 > Erstellt: 2026-08-28 — Zweck: Eine andere KI soll die Arbeit nahtlos fortsetzen können.
-> Aktualisiert: 2026-08-28 (Live-A/B §6b): Harness gefixt, A lief kontinuierlich durch, Stopp nicht reproduziert.
+> Aktualisiert: 2026-08-29 (**ROOT CAUSE GEFUNDEN + FIXED, §6e**): Deterministic nested non-reentrant `ctx.like_lock` deadlock in `_enqueue_like_triggers`; Fix = Option 2 (Einzel-Lock), live verifiziert (andykister: 36 Like- statt 2 Like-Events, 18 Trigger-Fires, kein Stopp).
 > Alle Aussagen sind strikt nach dem Prinzip **"Nicht raten"** klassifiziert: `[BEWIESEN]` = per Code + Test belegt, `[HYPOTHESE]` = plausibel, aber nicht hart reproduziert, `[OFFEN]` = noch zu klären.
 
 ---
@@ -14,7 +14,7 @@ Der **aktuelle** Bridge (`D:\Tiktok2Mc\src\python\main.py`, TikTokLive 6.6.5) li
 
 ## 2. Repository-/Kontext-Lage
 
-- **Aktueller Bridge (A):** `D:\Tiktok2Mc\src\python\main.py` — 81168 Bytes, ~3055 Zeilen. Modell: `ctx = BotContext()` (Modul-global), `create_client(user)` Zeile 2323, `_ws_stall_watchdog` Zeile 2302 (nested), `run_bot` Zeile 2901, **`_run_client_blocking` ist NESTED in `run_bot` (Zeile 3025), NICHT Modul-Ebene** — wichtig für jede weitere Test-Harness.
+- **Aktueller Bridge (A):** `D:\Tiktok2Mc\src\python\main.py` — ~3080 Zeilen. Modell: `ctx = BotContext()` (Modul-global), `create_client(user)` Zeile ~2304 (→ heute `@client.on(ConnectEvent)`-Hook bindet Chatbot + erfasst `ctx.tiktok_client_loop`), `run_bot` Zeile ~2985. **`_run_client_blocking`/`_ws_stall_watchdog` wurden ENTFERNT** (§6e): Connect = pur `await asyncio.to_thread(client.run)` wie in der Referenz.
 - **Alter Bridge (B/Referenz):** `D:\Streaming_Tool_pub\src\python\main.py` — ganz andere Architektur: Flask-Webhook (Port aus Config), `MAIN_LOOP`-Global, `print`-Logging (keine `[RAW]`-Marker), `await asyncio.to_thread(client.run)` (Zeile 886). Flask-Server startet **nur unter `__main__`** → beim Modul-Import für Tests läuft er nicht.
 - **TikTokLive installiert:** **6.6.5** unter `D:\Programieren\Python\Python3.12\Lib\site-packages\TikTokLive\`
 - Alle temporären Test-Skripte: `C:\Users\Finni\AppData\Local\Temp\opencode\` (ausführbare Harness-Dateien, siehe §7).
@@ -36,6 +36,7 @@ Der **aktuelle** Bridge (`D:\Tiktok2Mc\src\python\main.py`, TikTokLive 6.6.5) li
 - Meine frühe "Reproduktion" (`test_stagesA.log` — LOG/BOTH-Stufen stoppte nach ~9–12 Events) hielt **nicht** stand:
   - `test_stagesB.log`, `test_stagesC.log` (2×2-Matrix: print/dict × TikTokLive-debug on/off): **kein Stopp in 4/4 Phasen** (30–41 Events, gap 0.47–4.95s).
 - → Der Stopp ist **intermittierend und live-flow-/Scheduling-abhängig** — ein **Race**, kein fester Handler-Fehler.
+> **2026-08-29 (§6e):** Diese Schlußfolgerung ist ÜBERHOLT. Der Stopp ist deterministisch (2. Like-Event) und trat in den frühen Tests nur deshalb nicht auf, weil dort `like_triggers` nicht geladen/kein 2. Like kam. Der damalige „Race"-Eindruck entstand aus Config/Flow-Stichproben ohne vollständige Config.
 
 ### 3.4 Fix 1+2 und 1690 pytest-Tests [BEWIESEN]
 - Fix 1 (On-Loop-Arbeit minimieren) + Fix 2 (Watchdog-Auto-Heal) sind implementiert und statisch verifiziert (siehe §5).
@@ -47,6 +48,8 @@ Der **aktuelle** Bridge (`D:\Tiktok2Mc\src\python\main.py`, TikTokLive 6.6.5) li
 
 ## 4. HYPOTHESE — Die plausibelste (und einzige) Erklärung, die zum Code passt
 
+> **2026-08-29: ÜBERHOLT durch §6e.** Die „On-Loop-Handler-Last / leise Drossel"-Hypothese war naheliegend, aber falsch: Die Ursache ist ein deterministischer **nested-Lock-Deadlock** (`_enqueue_like_triggers` re-acq `ctx.like_lock` unter `on_like`-Lock). Die Latenz (Reader > Ack > Drossel) stimmt nur zufällig mit dem Beobachtungsbild überein. Historisch dokumentiert:
+
 **Timing-Race auf der Event-Loop der TikTokLive-Library (NICHT Loop-Isolation):**
 - Reader, per-Frame-**Ack** (`ws_client.py:263-264`) und **`hb`-Heartbeat** (`_ping_loop_fn`, gleicher Loop) teilen **eine** asyncio-Loop.
 - **Wichtig (Architektur-Klärung):** Diese Loop-Architektur ist bei **alt (B) und neu (A) identisch** — `TikTokLiveClient.run()` ≡ `_asyncio_loop.run_until_complete(connect())` (`client.py:226`; `_asyncio_loop` = `get_running_loop()`/sonst `new_event_loop()` `client.py:519-522`). B (`to_thread(client.run)`) und A (`to_thread(_run_client_blocking)` mit eigenem `new_event_loop`) lassen den TikTok-Client jeweils in **genau einer** Loop laufen. Es gibt also **keinen** alten Modus, der Reader/Ack/hb auf getrennte Loops verteilt hätte. Der Unterschied ist nicht "Loop-Isolation", sondern die **Menge synchroner Arbeit, die die Event-Handler im Aufruf-Kontext dieser einen Loop verrichten** (der neue, reichere Bridge hat mehr Checks/Queues/HTTP-Sinks pro Event als der spartanische alte).
@@ -57,30 +60,26 @@ Der **aktuelle** Bridge (`D:\Tiktok2Mc\src\python\main.py`, TikTokLive 6.6.5) li
 
 ---
 
-## 5. UMSETZUNG — Fix 1 + Fix 2 in `src/python/main.py`
+## 5. UMSETZUNG — Fix 1 + Loop-Port + Deadlock-Fix (§6e) in `src/python/main.py`
 
-### Fix 1 — On-Loop-Handler-Arbeit minimieren
+> **Stand 2026-08-29:** Fix 2 (`_ws_stall_watchdog`) wurde ENTFERNT — er heilte den eigentlich blockierten Loop nicht (§6d) und ist durch den Deterministic-Fix (§6e) gegenstandslos. Der Loop-Port (Option 3, `await asyncio.to_thread(client.run)`) und der Deadlock-Fix sind UMgesetzt. Fix 1 bleibt.
+
+### Fix 1 — On-Loop-Handler-Arbeit minimieren (GILT WEITERHIN)
 - Per-Like-`[LIKE DEBUG]`-Diagnostik von `log.info` auf `log.debug` demoted:
-  - `_enqueue_like_triggers` (Zeilen ~1659–1703): alle `[LIKE DEBUG]`-Zeilen (4×).
-  - `on_like` (Zeilen ~2422–2472): `[LIKE DEBUG]`-Zeilen (4×) auf `log.debug`.
+  - `_enqueue_like_triggers` (Zeilen ~1653–1704): alle `[LIKE DEBUG]`-Zeilen (4×).
+  - `on_like` (Zeilen ~2404–2452): `[LIKE DEBUG]`-Zeilen (4×) auf `log.debug`.
 - `on_comment`: `event.user` wird **einmal pro Event** gelöst (`user = event.user` in try/except → `None` bei Fehler) und für die Fan-/Moderator-Checks wiederverwendet (`_ua(name, default)`-Helper) statt 4–5× `user_attr_safe(event, ...)` — jeder `event.user`-Zugriff ist eine Property, die `ExtendedUser.from_user` re-runt und bei unbekannten Proto-Feldern (z.B. `nickName`) werfen kann.
 
-### Fix 2 — Auto-Heal im Watchdog
-`_ws_stall_watchdog` ruft bei Erkennung (idle > 60s while live) jetzt zusätzlich zu `log.warning`:
-```python
-client = ctx.tiktok_client
-if client is not None:
-    try:
-        await client.disconnect(close_client=False)
-    except Exception:
-        log.warning(...)
-```
-Wirkung: schließt die WS → `client.connect()` kehrt zurück → `_run_client_blocking` endet → (im echten Lauf `run_bot`) verbindet mit **frischer signierter URL** neu. Signierte URLs laufen ~30s ab, daher ist ein komplettes neues `connect()` sicherer als ein blinder Reconnect-Loop.
+### Loop-Port (Option 3, §8A-alt) — Connect wie die Referenz
+`_run_client_blocking` + eigener Loop + `set_event_loop` + Watchdog ENTFERNT; `run_bot` verbindet jetzt pur mit `await asyncio.to_thread(client.run)` (Referenz-Verhalten). `on_connect` erfasst `ctx.tiktok_client_loop` (der laufenden Loop) und bindet den Chatbot dort; `run_bot`-`finally` entbindet Chatbot + cleared `ctx.tiktok_client_loop`.
 
-### Verifiziert
-- `disconnect()` (`client.py:228`) schließt WS und awaited `_event_loop_task` → `connect()` kehrt zurück — Code gelesen.
-- `ast.parse`-Syntax-Check OK; `ruff format` angewendet; `ruff check` 0 Findings.
-- 1690 pytest-Tests pass.
+### Deadlock-Fix (§6e) — `_enqueue_like_triggers`: inneren Lock entfernt
+Einziger Kritischer Abschnitt ist `on_like`'s `with ctx.like_lock:`; der Helfer acq nicht mehr erneut. Docstring dokumentiert den Lock-Vertrag. Regressionstest deckt den Nested-Lock ab.
+
+### Verifiziert (2026-08-29)
+- `pytest tests/test_core/test_main_bridge.py`: **103 passed**. Volle Suite: **2070 passed, 3 skipped** (151 s).
+- `ruff format --check .` sauber; `ruff check` 0 Findings.
+- Live 70 s (andykister): 36 Like- / 12 Comment- / 14 Join-Events, 18 Trigger-Fires, kein Stopp (§6e).
 
 ---
 
@@ -122,6 +121,67 @@ Der parallele A/B **lief jetzt durch** (fixierter `ab_orch.py`). Zwei Harness-Fi
 
 ---
 
+## 6d. NU: Stopp REAL reproduziert (darkygame) + Fix 2 WIRKUNGSLOS [BEWIESEN]
+
+2026-08-28, gleicher Account `@darkygame`, gleicher Moment, gebaute Releases gegen-über:
+
+**Neue App (mit Fix 1+2):** verbindet (Live established), **Initial-Burst** (`comment #1-3`, `like #1-2`, `join #1` um 21:46:50), dann **nichts mehr** — nur noch die 60s-App-Heartbeats (`heartbeat | status=alive`, Memory = Main-Loop), **kein** `[TIKTOK][WATCHDOG]`-Feuer, kein Reconnect.
+**Alte App (Referenz):** verbindet (nach einem unkritischen, externen `ReadTimeout` beim ersten Sign-Versuch), liefert dann **kontinuierlich Ereignisse** (viele Likes/Actions/Follows) ohne Stopp.
+
+Das ist **der bislang eindeutigste Beleg**: gleicher Account + Flow → alt läuft durch, neu stoppt nach Initial-Burst. Das Symptom ist real in der neuen Datei, unabhängig vom externen Sign-Server (der hier ja funktionierte).
+
+### Warum Fix 2 wirkungslos ist (kritisch)
+`_ws_stall_watchdog` wird von `_run_client_blocking` auf **derselben** TikTok-Loop gestartet (`main.py:3033 loop.create_task(_ws_stall_watchdog())`), die auch `loop.run_until_complete(client.connect())` (Zeile 3035) treibt. **Ist diese Loop blockiert/starved (§4-Hypothese), wird auch der Watchdog nie ausgeführt** — er kann sich nicht selbst heilen, weil er im selben blockierten Loop steckt. Die 60s-App-Heartbeats laufen weiter, weil sie auf dem **Main-Loop** sind (getrennt). → Fix 2 greift konstruktionsbedingt nicht gegen die Loop-Starvation.
+
+### Handler-Last-Status (für Folge-Arbeit)
+Die Handler sind bereits sauber isoliert: HTTP-Publish (`_publish_tiktok_event` → `_run_in_background`, Executor), Queue-Push (`enqueue_threadsafe` → `call_soon_threadsafe` auf `ctx.main_loop`), `_record_metrics_event` nur In-Memory-List. Fix 1 (Like-Debug demote + `event.user` einmal) hat den Stopp NICHT behoben. Vermuteter Engpass: schiere Menge synchroner Handler-Dispaches pro Sekunde auf der einen TikTok-Loop (Reader+Ack+hb).
+
+### Empfohlene Lösungswege (geordnet nach Eingriffsgröße)
+1. **Fix 2 neu auf Main-Loop:** Watchdog-Task von `run_bot`/Main-Loop aus, der per `asyncio.run_coroutine_threadsafe(client.disconnect(...), tiktok_loop)` bei Stille von **außerhalb** reconnectet (umgeht Loop-Blockade). Sicherheitsnetz, Symptom.
+2. **Ursache senken:** verbliebene On-Loop-Handler-Last weiter auf Executor verlagern, bis sie bei `darkygame`-Flow durchläuft (jetzt reproduzierbar/verifizierbar).
+3. **Alte Verbindungslogik übernehmen:** TikTok-Verbindungsstrategie der alten, funktionierenden Datei in die neue übernehmen (größter Eingriff, orientiert am Nachweis).
+- **Benutzerentscheidung 2026-08-28: STOPEN, nur dokumentieren** — keine weiteren main.py-Eingriffe jetzt.
+
+---
+
+## 6e. ROOT CAUSE GEFUNDEN + FIXED — nested non-reentrant `ctx.like_lock` Deadlock [BEWIESEN]
+
+2026-08-29, der Beleg in drei Stufen:
+
+### Stufe 1: A/B-Minimal-Harnesses grenzen Ursache auf „geladene Config" ein [BEWIESEN]
+Fünf neue Harness-Proben (Temp\opencode): `ab_sideB2.py` (alte Datei, minimal), `ab_sideA2.py` (neue Datei, **ohne** `load_config`), `ab_sideA4.py`/`ab_sideA6.py` (neue Datei, **volle Init ohne die 6 Async-Tasks**), alle mit identischem Connect-Code (`await asyncio.to_thread(client.run)`) und By-Type-Zähler über den TikTokLiveLogHandler:
+- B2 (alt): **925** Events kontinuierlich (like=185, join=132, comment=16), never stops.
+- A2 (neu, keine Config): **856** Events kontinuierlich — Handler/`create_client`/Connect-Code sind unschuldig.
+- A4/A6 (neu, volle Init): **stockt nach ~35–73 Events**, Gaps ~90–126 s — egal ob die 6 Async-Tasks laufen(d) oder nicht.
+- A2 ∥ A4 im selben Fenster (120 s): A2=625 flows, A4=65 dann 124 s tot → **deterministisch app-seitig, config-abhängig**.
+
+### Stufe 2: faulthandler-Stack-Dump liefert den hängenden Thread [BEWIESEN]
+`ab_sideA6.py` = A4 + `faulthandler.dump_traceback_later(4, repeat=True)`. Der Dump direkt nach dem Einfrieren (`ab7_a6_fh.log.err`) zeigt Thread 0x00000b8c:
+```
+main.py:1668 in _enqueue_like_triggers      ← `with ctx.like_lock:` (acquire blockiert)
+main.py:2442 in on_like                     ← INNERHALB `with ctx.like_lock:` (Z. 2409)
+pyee … _ws_client_loop → client.run → to_thread worker
+```
+→ Der TikTok-Reader-Thread hängt **permanent** im zweiten `acquire`. WebSocket bleibt offen, keine weiteren Frames gelesen, keine Acks → TikTok drosselt still → „Burst dann Stille". Kein Close, kein Reconnect — exakt das Symptom.
+
+### Stufe 3: Zeitlinie erklärt ALLE Messungen [BEWIESEN]
+- `ctx.like_lock = threading.Lock()` (main.py:207) — **nicht reentrant**.
+- `on_like` (Z. 2404) hält den Lock ab Z. 2409 und ruft **innerhalb** `_enqueue_like_triggers` (Z. 2442), das denselben Lock erneut akquiriert (Z. 1668) → **Deadlock beim 2. Like-Event**.
+- 1. Like: `start_likes is None` → Initial-Count → `return` VOR dem Trigger-Enqueue → kein Deadlock. → **jede** A-Full/A4/A6-Messung zeigt exakt `like=2`, dann 0 Events.
+- Variierende Stalls (5/35/59/73) = Zufall, wie viele Events bis zum 2. Like im Initial-Burst ankommen.
+- A2 fließt, weil `like_triggers` leer ist (kein `load_config`) → `if not rules: return` VOR dem Lock. Alte Datei (`Streaming_Tool_pub` Z. 795) hält den Lock genau **einmal** (Inline-Trigger-Loop).
+
+### Fix (Option 2, freigegeben)
+`_enqueue_like_triggers` einzig aus `on_like` unter Lock gerufen → das innere `with ctx.like_lock:` entfernt, Loop-Body dedented, Docstring dokumentiert den Lock-Vertrag („Callers must hold ctx.like_lock"). → Einzel-Lock wie in der Referenz-Datei.
+
+### Verifikation [BEWIESEN]
+- Regressionstest `TestEnqueueLikeTriggers::test_locks_not_nested_when_called_under_like_lock` (Daemon-Thread + `join(5)`; ohne Fix DEADLOCK/FAIL) — `pytest tests/test_core/test_main_bridge.py`: **103 passed**.
+- Volle Suite: **2070 passed, 3 skipped** (151 s). `ruff format --check .` sauber, `ruff check` sauber.
+- **Live andykister 70 s** (`bridge_debug --user andykister --duration 70 --like-every 3 --no-probe`): **36 LikeEvents** (vorher exakt 2), Comment=12, Join=14, **18 `[LIKE] Trigger`-Fires** (`likes_standard` +63, `likes_100k` +63), Events fließen bis zum Ende — **kein Stopp**.
+- **Sauberer paralleler A/B (2026-08-29, andykister, 110 s, gleicher Live-Moment, `ab11_*.log`):** A4 (fix, volle Init) **548** Events (Like=103, Join=84, Comment=12, gap max 0,2 s) ∥ B2 (alt) **554** Events (Like=105, Join=83, Comment=12, gap max 1,4 s) — praktisch identische Verteilung, **kein Stopp auf beiden Seiten**. Solo-A4-Lauf (`ab10_*.log`): 693 Events / 121 s (Gaps ≤0,8 s). Hinweis: Ein erster Parallel-Anlauf (`ab9_A4_err.log`) fiel beim externen Sign-Server ab (`SIGN_NOT_200`, HTTP 500, §6c) — NICHT App-seitig; A4-Minimal-Harness hat keinen Reconnect.
+
+> Hinweis: CSS-TikTokLive-Version lautet tatsächlich 6.6.5 (Kerncode identisch zu 6.6.6-Angaben in §2 der Doku). Die early „Loop-Model/Race"-Hypothesen (§4) sind übertroffen: Ursache war ein deterministischer Lock-Fehler, kein Scheduling-Race.
+
 ## 7. WICHTIGSTE DATEIEN / HARNESSES (für die Fortsetzung)
 
 Alle unter `C:\Users\Finni\AppData\Local\Temp\opencode\`:
@@ -138,7 +198,8 @@ Alle unter `C:\Users\Finni\AppData\Local\Temp\opencode\`:
 | `fix_verify_andykister.log`, `test_loop_ab.log`, `test_stagesA/B/C.log`, `test_b_full2.log` | Referenz-Logs mit den Messwerten (Einzelheiten: `ANDYKISTER FLOW SCHWANKT`). |
 
 ### Logs mit Messwerten (Kurzfassung)
-- `live_ab_run2.log`: **NEU** — paralleler A/B 150s andykister: A 617 / B 641 Received-Events, kein Stopp, kein Watchdog-Feuer (§6b).
+- **§6d (entscheidend):** `darkygame` — alte App läuft durch, neue stoppt nach Initial-Burst (5 Events → nichts). Fix 2 wirkungslos (Watchdog im blockierten Loop).
+- `live_ab_run2.log`: paralleler A/B 150s andykister: A 617 / B 641 Received-Events, kein Stopp, kein Watchdog-Feuer (§6b).
 - `test_loop_ab2.log`: CURRENT 82 / OLD 77 Events in je 40s, kein Stopp.
 - `test_stagesB/C.log`: 2×2-Matrix, kein Stopp in 4/4 Phasen (30–41 Events, gap 0.47–4.95s).
 - `test_stagesA.log`: frühere (reproduzierbare? → NICHT reproduzierbar) Stopp-Begehung: LOG/BOTH stoppte nach ~9–12 Events — als flow-abhängig eingeordnet, NICHT als deterministischer Handler-Fehler.
@@ -147,22 +208,20 @@ Alle unter `C:\Users\Finni\AppData\Local\Temp\opencode\`:
 
 ## 8. NÄCHSTE SCHRITTE — für die nachfolgende KI
 
-### A. [PRIO-1] Funktionsfähigen parallelen A/B — **ERLEDIGT (Lauf §6b)**
-Die Harness (`ab_orch.py` + `ab_b.py`-Deadline + `_abcount`-Fix) funktioniert jetzt und lief erfolgreich (617/641, kein Stopp). **Was offen bleibt:** der Stopp wurde in keinem Fenster reproduziert, also steht der definitive Beweis (Stopp beobachtet ≤> Fix heilt) weiter aus. Für einen solchen Lauf: frischen `__pycache__/` löschen, sehr aktiven Account, dann `python ab_orch.py --user <acct> --duration <s>`.
-1. **Stream-Ausgabe live** statt End-Puffer — erledigt.
-2. **Exit-Garantie** — erledigt (ab_a `os._exit`; ab_b daemon-Deadline; Orchestrator `communicate(timeout)`+`kill`).
-3. Metrik: `FINAL_EVENTS=…` + `events=… gap=…s` — erledigt (Zähler-Fix, §6b).
-4. **Beide gleichzeitig starten** — erledigt (Threads, gleicher Live-Moment).
+### A. [ERLEDIGT §6e] Stopp-Ursache behoben — nested `ctx.like_lock`-Deadlock
+Deterministische Root Cause gefunden und mit Option 2 gefixt (`_enqueue_like_triggers` innerer Lock entfernt). Verifiziert: 103 bridge-Tests, 2070 volle Suite, Live andykister 70 s (36 Like- statt 2; 18 Trigger-Fires; kein Stopp). **Ausstehend:** Long-Run-Verifikation gegen einen Konstant-Flow-Account (`darkygame`) über mehrere Minuten im vollen `run_bot` (inkl. der 6 Async-Tasks + Reconnect), da die Minimal-Harness A4 ohne Tasks lief.
 
 ### B. Warum die bisherige Verifikation den Stopp nicht zuverlässig traf
-- `andykister`'s Flow schwankt stark. Für einen gescheiten A/B braucht es einen Account, der **gerade live ist und konstant hohen Flow** (viele Likes/Comments/Sekunde) liefert. Vom Benutzer fragen, ob er einen solchen aktuell kennt (vorher wurde behauptet "der hat ständig flow", aber im Testfenster war kaum Flow).
+- Der Stopp tritt **immer beim 2. Like-Event** ein (nicht flow-abhängig, sondern strict deterministisch sobald `like_triggers` geladen sind). Frühere Tests ohne geladene Config oder ohne echten 2. Like konnten ihn nie treffen — das erklärt alle „kein Stopp"-Läufe (§6b/§6c/§3.3).
+- `andykister`'s Flow schwankt stark; für künftige Live-Tests `darkygame` (bzw. einen Account mit konstant hohem Flow) nutzen.
 - **429-Risiko**: TikTok ratelimed uns bei zu vielen blinden Verbindungen. Spärlich und zielgerichtet testen; nach einem 429 eine Pause (>1–2 min) einlegen.
 
-### C. Zusätzliche, sinnvolle Maßnahme (falls Live-Test zu sporadisch)
-- Fix 2 (Watchdog-Auto-Heal) machbar **auch ohne den Race zu reproduzieren**: den behobenen Bridge dauerhaft gegen den Ziel-Account laufen lassen; wenn er je stillsteht, verbindet der Watchdog automatisch neu statt stehenzubleiben. Das ist der operative Nutzen von Fix 2 parallel zur verbleibenden empirischen Bestätigung.
+### C. Watchdog-Auto-Heal — **mangels Ursache irrelevant geworden, aber als Sicherheitsnetz wertvoll**
+Fix 2 (Watchdog) ist **entfernt** — die Ursache ist behoben. Falls in Zukunft wieder Stille auftritt: Watchdog von außen (Main-Loop) per `asyncio.run_coroutine_threadsafe(client.disconnect(...), ctx.tiktok_client_loop)` reconnecten als Symptom-Netz.
 
-### D. Verifikation der Fix-1-Debug-Demotions
-- Unter normalen Bedingungen (ohne `TIKTOK2MC_DEBUG`) dürfen **keine `[LIKE DEBUG]`-Zeilen** mehr auf INFO-Ebene erscheinen; unter `TIKTOK2MC_DEBUG=1` sollen sie weiterhin (auf DEBUG) erscheinen. In einem Live-Lauf einmal gegenprüfen (Bridge-Log bzw. Handler-Verhalten).
+### D. Löschbar/Hinweise
+- `ab_sideA2/B2/A4/A5/A6.py`-Harnesses + `ab2_*`–`ab8_*`-Logs in Temp\opencode dokumentieren den Beweisweg (§6e); können nach Long-Run-Verifikation verworfen werden.
+- `bridge_debug.py`-Webhook-Proben (`urllib.error`, ECONNREFUSED) sind unkritisch, wenn kein API-Server läuft.
 
 ---
 
@@ -171,5 +230,5 @@ Die Harness (`ab_orch.py` + `ab_b.py`-Deadline + `_abcount`-Fix) funktioniert je
 - `src/python/main.py` ist die **sensitivste Datei** — Änderungen minimal und getestet.
 - **Fix-Umsetzung wurde vom Benutzer ausdrücklich freigegeben** (Fix 1 + Fix 2 + Loop-A/B gewählt). Für weitere Eingriffe in Live-Verhalten wieder fragen.
 - `tools/bridge_debug.py` = Debug-Launcher für echte main.py in einer Sandbox (Marker `[TIKTOK][RAW]`, `[TIKTOK][WATCHDOG]`; Webhook-Proben gegen einen nicht laufenden API-Server können `urllib.error`-Meldungen zeigen — unkritisch).
-- Versionen nur in `src/core/version.py`; der Stopp/die Fixes berühren **kein** Repo-Artefakt außer `main.py`.
-- **Status:** Fixes committet + gepusht auf `v1.0.0-dev` (`96131fa` fix-bridge, `a7fe15e` docs AI_HANDOVER). `src/data/` (Runtime-Backups) bleibt untracked. Weitere Commits/Push nur auf ausdrücklichen Wunsch.
+- Versionen nur in `src/core/version.py`; die Fixes berühren `main.py`, den Regressionstest (`tests/test_core/test_main_bridge.py`) und diese Doku — sonst kein Repo-Artefakt.
+- **Status:** Fix 1+2 + Loop-Port + **Deadlock-Fix (§6e)** liegen UNCOMMITTED auf `v1.0.0-dev` (Stand: 2070 passed, Live-Verifikation erfolgt). Frühere Commits: `96131fa` (fix-bridge), `a7fe15e` (docs). `src/data/` (Runtime-Backups) bleibt untracked. Commits/Push nur auf ausdrücklichen Wunsch.

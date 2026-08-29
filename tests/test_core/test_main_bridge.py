@@ -1144,6 +1144,47 @@ class TestEnqueueLikeTriggers:
         monkeypatch.setattr(ctx, "valid_functions", {"likes"})
         assert prepare_like_triggers([rule]) == []
 
+    def test_locks_not_nested_when_called_under_like_lock(self, monkeypatch):
+        """Regression: on_like calls _enqueue_like_triggers WHILE holding
+        ctx.like_lock. The helper re-acquiring the (non-reentrant) lock used to
+        deadlock the TikTok reader thread after the second like event (burst
+        then silence). The helper must not nest the lock."""
+        import threading
+
+        import src.python.main as main_mod
+        from src.python.main import _enqueue_like_triggers, ctx, prepare_like_triggers
+
+        rule = {
+            "id": "likes_standard",
+            "every": 100,
+            "function": "likes",
+            "payload": "Community",
+            "enabled": True,
+        }
+        monkeypatch.setattr(ctx, "valid_functions", {"likes"})
+        monkeypatch.setattr(ctx, "like_triggers", prepare_like_triggers([rule]))
+
+        calls = []
+        monkeypatch.setattr(
+            main_mod,
+            "enqueue_threadsafe",
+            lambda item, label=None: calls.append((item, label)),
+        )
+        result = {}
+
+        def worker():
+            # Mirrors on_like (main.py: on_like after fix): caller holds the lock.
+            with ctx.like_lock:
+                _enqueue_like_triggers(150, "viewer")
+            result["done"] = True
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        t.join(timeout=5)
+        assert not t.is_alive(), "deadlock: helper re-acquired lock held by caller"
+        assert result.get("done")
+        assert calls and calls[0][1] == "like:likes_standard"
+
 
 class TestUpdateLikeTotals:
     """_update_like_totals — robust accumulation of TikTok's oscillating count."""
