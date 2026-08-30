@@ -16,7 +16,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 ## 3. Repository Structure
 | Path | Purpose / new code goes here |
 |---|---|
-| `src/python/*.py` | Entry points, one binary each (see `build.py` tasks): `start`, `main` (bridge), `gui` (pywebview), `server`, `overlay`, `update`, `send_trigger` (CLI trigger tester) |
+| `src/python/*.py` | Entry points, one binary each (see `build.py` tasks): `start`, `main` (bridge), `gui` (pywebview), `server`, `overlay`, `update`, `update_progress` (Tk update-splash), `send_trigger` (CLI trigger tester) |
 | `src/core/` | Shared library `core.*` — API, trigger_engine, validator, paths, logger, plugins/hooks, utils |
 | `src/core/api/routes/` | New REST endpoints (must be registered in `routes/__init__.py`) |
 | `src/core/api/services/` | Business logic for routes; `actions.py` = `.mca` parse/serialize; `__init__.py` = `ApiService` (config read/write) |

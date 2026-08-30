@@ -355,6 +355,11 @@ def start_UPDATE_EXE_PATH():
     """Run updater synchronously — must wait for exit code."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
     log_dir = ROOT_DIR / "logs" / "update_logs"
+    # Capture updater output on every platform; hidden Windows runs (the
+    # normal case) would otherwise discard stdout/stderr entirely.
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M")
+    log_file = log_dir / f"updater_{timestamp}.log"
     if IS_WINDOWS:
         update_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
         flags = (
@@ -362,14 +367,15 @@ def start_UPDATE_EXE_PATH():
             if update_hidden
             else subprocess.CREATE_NEW_CONSOLE
         )
-        proc = subprocess.Popen(cmd, creationflags=flags)
+        if update_hidden:
+            with open(log_file, "a", encoding="utf-8") as lf:
+                proc = subprocess.Popen(cmd, creationflags=flags, stdout=lf, stderr=lf)
+        else:
+            proc = subprocess.Popen(cmd, creationflags=flags)
     else:
         log.info(
             "Starting updater. This may take a few minutes. Please do not close or interrupt the program..."
         )
-        log_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M")
-        log_file = log_dir / f"updater_{timestamp}.log"
         with open(log_file, "a", encoding="utf-8") as lf:
             proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, start_new_session=True)
 
@@ -450,23 +456,12 @@ if UPDATE_ENABLED and UPDATE_AUTO_INSTALL:
 
         elif result == 0:
             set_last_update_result(0, ok=True, message="Update installed successfully.")
-            log.info("\nUpdate has been installed. Restarting automatically...")
-            _executable = sys.executable
-            _args = [_executable] + sys.argv[1:]
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "utf-8"
-            # PyInstaller 6.9+ requires reset env for processes that outlive us.
-            env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-            if IS_WINDOWS:
-                restart_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
-                flags = (
-                    subprocess.CREATE_NO_WINDOW
-                    if restart_hidden
-                    else subprocess.CREATE_NEW_CONSOLE
-                )
-                subprocess.Popen(_args, creationflags=flags, close_fds=True, env=env)
-            else:
-                subprocess.Popen(_args, env=env, start_new_session=True, close_fds=True)
+            # The updater relaunches the application itself after installing the
+            # files (see update.py _relaunch_tool_after_update). We must not
+            # restart here: on Windows the updater overwrites our executable
+            # while it is running, so an early restart would be terminated by
+            # the kill signal again and never come back up.
+            log.info("\nUpdate installed. Waiting for the updater to restart...")
             sys.exit(0)
 
         else:

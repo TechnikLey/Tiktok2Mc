@@ -419,24 +419,95 @@
             }, 2000);
         }
 
-        async function waitForApi(maxAttempts, onReady) {
-            let attempts = 0;
+        const UPDATE_ACTIVE_PHASES = ['checking', 'downloading', 'installing'];
+        const WAIT_TIMEOUT_MS = 30000;
+        const UPDATE_TIMEOUT_MS = 600000;
+
+        let guiCloseRequested = false;
+
+        function resetStartButton() {
+            setButton(false);
+            document.getElementById('btn-start').textContent = I18N.t('launcher.startSystem');
+        }
+
+        function requestGuiCloseForUpdate() {
+            if (guiCloseRequested) return;
+            guiCloseRequested = true;
+            setStatus('installing', I18N.t('launcher.updateInstalling'));
+            // Give the message a beat on screen, then hand over to the
+            // always-on-top update splash window (it closes itself when the
+            // restarted app is back).
+            setTimeout(() => {
+                try {
+                    if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.close_for_update) {
+                        const lang = (typeof I18N !== 'undefined' && I18N.lang) ? I18N.lang() : 'en';
+                        pywebview.api.close_for_update(lang).catch(() => {});
+                    } else if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.close_app) {
+                        pywebview.api.close_app().catch(() => {});
+                    }
+                } catch (_) {}
+            }, 800);
+        }
+
+        async function getUpdateStatus() {
+            try {
+                if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.get_update_status) {
+                    return await pywebview.api.get_update_status();
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        function updateStatusText(s) {
+            if (!s) return null;
+            if (s.phase === 'checking') return I18N.t('launcher.updateChecking');
+            if (s.phase === 'downloading') {
+                if (typeof s.progress === 'number' && s.progress >= 0) return I18N.t('launcher.updateDownloading', { p: s.progress });
+                return I18N.t('launcher.updateDownloadingWait');
+            }
+            if (s.phase === 'installing') return I18N.t('launcher.updateInstalling');
+            if (s.phase === 'done') return I18N.t('launcher.updateRestarting');
+            return null;
+        }
+
+        async function waitForApi(onReady, onUpdateError) {
+            let deadline = Date.now() + WAIT_TIMEOUT_MS;
             const poll = setInterval(async () => {
                 if (isStarting === false) {
                     clearInterval(poll);
                     return;
                 }
                 const ready = await checkApi();
-                attempts++;
                 if (ready) {
                     clearInterval(poll);
                     onReady();
-                } else if (attempts > maxAttempts) {
+                    return;
+                }
+                const update = await getUpdateStatus();
+                if (update && update.phase === 'error') {
                     clearInterval(poll);
                     isStarting = false;
-                    setButton(false);
+                    resetStartButton();
+                    setStatus('offline', I18N.t('common.offline'));
+                    showMessage(I18N.t('launcher.updateFailed', { msg: update.message || '' }), 'error');
+                    onUpdateError && onUpdateError();
+                    return;
+                }
+                if (update && UPDATE_ACTIVE_PHASES.includes(update.phase)) {
+                    deadline = Date.now() + UPDATE_TIMEOUT_MS;
+                    const text = updateStatusText(update);
+                    if (text) setStatus('starting', text);
+                    if (update.phase === 'installing') requestGuiCloseForUpdate();
+                } else if (update && update.phase === 'done') {
+                    setStatus('starting', I18N.t('launcher.updateRestarting'));
+                }
+                if (Date.now() > deadline) {
+                    clearInterval(poll);
+                    isStarting = false;
+                    resetStartButton();
                     setStatus('offline', I18N.t('common.offline'));
                     showMessage(I18N.t('launcher.timeout'), 'error');
+                    onUpdateError && onUpdateError();
                 }
             }, 500);
         }
@@ -485,7 +556,7 @@
                     return;
                 }
 
-                waitForApi(60, () => {
+                waitForApi(() => {
                     isStarting = false;
                     showMessage(I18N.t('launcher.started'), 'success');
                     setTimeout(() => { window.location.href = GUI_URL; }, 600);

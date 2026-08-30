@@ -154,6 +154,12 @@
     'launcher.remoteInvalidHost': 'Please enter a valid IP address or hostname.',
     'launcher.remoteSaved': 'Remote address saved.',
     'launcher.shutdownInProgress': 'Previous system is shutting down, please wait...',
+    'launcher.updateChecking': 'Checking for updates...',
+    'launcher.updateDownloading': 'Update ({p}%)...',
+    'launcher.updateDownloadingWait': 'Update downloading...',
+    'launcher.updateInstalling': 'Updating...',
+    'launcher.updateRestarting': 'Update installed — restarting...',
+    'launcher.updateFailed': 'Update failed: {msg}. Please try starting again.',
 
     /* ── Restart banner ── */
     'restart.pending': 'Restart pending, some changes require a restart to take effect.',
@@ -1242,6 +1248,12 @@
     'launcher.remoteInvalidHost': 'Bitte gib eine gültige IP-Adresse oder Hostname ein.',
     'launcher.remoteSaved': 'Remote-Adresse gespeichert.',
     'launcher.shutdownInProgress': 'Vorheriges System wird heruntergefahren, bitte warten...',
+    'launcher.updateChecking': 'Suche nach Updates...',
+    'launcher.updateDownloading': 'Update ({p}%)...',
+    'launcher.updateDownloadingWait': 'Update wird heruntergeladen...',
+    'launcher.updateInstalling': 'Update wird installiert...',
+    'launcher.updateRestarting': 'Update installiert — Neustart läuft...',
+    'launcher.updateFailed': 'Update fehlgeschlagen: {msg}. Bitte versuche es erneut zu starten.',
 
     /* ── Restart banner ── */
     'restart.pending': 'Neustart ausstehend, einige Änderungen erfordern einen Neustart.',

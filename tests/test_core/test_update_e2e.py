@@ -8,6 +8,7 @@ Covers the full update flow that the compiled update.exe performs:
   - Full run_update() flow with mocks
 """
 
+import json
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -951,3 +952,215 @@ class TestUpdateSourceOverride:
             for n, v in snap.items():
                 setattr(python.update, n, v)
             monkeypatch.delenv("TIKTOK2MC_UPDATE_SOURCE", raising=False)
+
+
+# =========================================================================
+# Status reporting + relaunch helpers (GUI launcher feedback)
+# =========================================================================
+
+
+class TestUpdateStatusReporting:
+    """Tests the GUI-feedback helpers added to update.py.
+
+    ``_write_update_status`` / ``_clear_update_status`` publish progress for
+    ``gui.py::LauncherAPI.get_update_status``; ``_relaunch_tool_after_update``
+    restarts ``start.exe`` after a successful ``--auto`` install because
+    ``start.py`` already exited on the kill signal.
+    """
+
+    def test_write_status_writes_json(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+        ):
+            python.update._write_update_status("downloading", progress=42)
+        assert json.loads(status_file.read_text(encoding="utf-8")) == {
+            "phase": "downloading",
+            "progress": 42,
+            "message": "",
+        }
+
+    def test_write_status_with_message(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+        ):
+            python.update._write_update_status("error", message="Update failed.")
+        assert json.loads(status_file.read_text(encoding="utf-8"))["message"] == (
+            "Update failed."
+        )
+
+    def test_clear_status_removes_file(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        status_file.write_text("{}", encoding="utf-8")
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+        ):
+            python.update._clear_update_status()
+        assert not status_file.exists()
+
+    def test_status_helpers_are_noops_without_file(self):
+        """When _init() was never called, UPDATE_STATUS_FILE is None → no-ops."""
+        import python.update
+
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", None),
+            patch.object(python.update, "log"),
+        ):
+            python.update._write_update_status("checking")
+            python.update._clear_update_status()
+
+    def test_status_write_failure_is_swallowed(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+            patch.object(
+                status_file.__class__, "write_text", side_effect=OSError("locked")
+            ),
+        ):
+            python.update._write_update_status("checking")  # must not raise
+
+    def test_relaunch_skipped_outside_auto_mode(self):
+        import python.update
+
+        with (
+            patch.object(python.update, "AUTO_MODE", False),
+            patch.object(python.update, "subprocess") as mock_sp,
+            patch.object(python.update, "log"),
+        ):
+            assert python.update._relaunch_tool_after_update() is True
+        mock_sp.Popen.assert_not_called()
+
+    def test_relaunch_launches_start_exe(self):
+        import python.update
+
+        start_file = Path("install") / "start.exe"
+        with (
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "START_FILE", start_file),
+            patch.object(python.update, "subprocess") as mock_sp,
+            patch.object(python.update, "log"),
+        ):
+            assert python.update._relaunch_tool_after_update() is True
+        assert mock_sp.Popen.call_count == 1
+        cmd = mock_sp.Popen.call_args[0][0]
+        assert str(cmd[0]).endswith("start.exe")
+
+    def test_relaunch_returns_false_on_oserror(self):
+        import python.update
+
+        mock_sp = MagicMock()
+        mock_sp.Popen = MagicMock(side_effect=OSError("start.exe missing"))
+        with (
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "START_FILE", Path("start.exe")),
+            patch.object(python.update, "subprocess", mock_sp),
+            patch.object(python.update, "log"),
+        ):
+            assert python.update._relaunch_tool_after_update() is False
+
+
+class TestInstallFileWithRetry:
+    """Tests _install_file_with_retry (locked-file retry on Windows).
+
+    The retry is what closes the race between start.exe exiting on the kill
+    signal and the updater replacing it — on non-Windows platforms the first
+    failure must propagate immediately (original behavior).
+    """
+
+    @staticmethod
+    def _flaky_copy(fails: int, real_copy) -> tuple:
+        calls = {"n": 0}
+
+        def flaky(src, dst):
+            calls["n"] += 1
+            if calls["n"] <= fails:
+                raise OSError(32, "file in use")
+            return real_copy(src, dst)
+
+        return flaky, calls
+
+    def test_success_first_try(self, tmp_path):
+        import python.update
+
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="win32")),
+            patch.object(python.update, "log"),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert dst.read_text() == "data"
+
+    def test_retries_lock_then_succeeds(self, tmp_path):
+        import shutil
+
+        import python.update
+
+        real_copy = shutil.copy2
+        flaky, calls = self._flaky_copy(2, real_copy)
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="win32")),
+            patch.object(python.update.shutil, "copy2", flaky),
+            patch.object(python.update.time, "sleep"),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert calls["n"] == 3
+        assert dst.read_text() == "data"
+
+    def test_raises_after_retry_window(self, tmp_path):
+        import python.update
+
+        calls = {"n": 0}
+
+        def always_locked(_src, _dst):
+            calls["n"] += 1
+            raise OSError(32, "file in use")
+
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="win32")),
+            patch.object(python.update.shutil, "copy2", always_locked),
+            patch.object(python.update.time, "sleep"),
+            pytest.raises(OSError),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert calls["n"] == 101
+
+    def test_no_retry_outside_win32(self, tmp_path):
+        import python.update
+
+        calls = {"n": 0}
+
+        def always_fails(_src, _dst):
+            calls["n"] += 1
+            raise OSError("not locked")
+
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="linux")),
+            patch.object(python.update.shutil, "copy2", always_fails),
+            pytest.raises(OSError),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert calls["n"] == 1

@@ -304,7 +304,8 @@ class TestRestartFlow:
     """Tests the start.py restart flow after update completes."""
 
     def test_restart_on_code_zero(self):
-        """Return code 0 triggers restart flow."""
+        """Return code 0 means update installed; start.py exits and the
+        updater itself relaunches the application (_relaunch_tool_after_update)."""
         result = 0
         assert result is not None
         assert result != "kill"
@@ -328,7 +329,7 @@ class TestRestartFlow:
         assert result is None
 
     def test_update_loop_restart_decision(self):
-        """Simulate the update loop decision logic from start.py lines 537-562."""
+        """Simulate the update loop decision logic from start.py."""
 
         def update_decision(result):
             if result is None:
@@ -337,13 +338,15 @@ class TestRestartFlow:
                 return "exit"
             if result == 5:
                 return "continue"
-            return "restart"
+            # Code 0 (or any other failure code): start.py exits — the
+            # updater owns the relaunch after the install.
+            return "exit"
 
         assert update_decision(None) == "break"
         assert update_decision("kill") == "exit"
         assert update_decision(5) == "continue"
-        assert update_decision(0) == "restart"
-        assert update_decision(1) == "restart"
+        assert update_decision(0) == "exit"
+        assert update_decision(1) == "exit"
 
 
 # ---------------------------------------------------------------------------
