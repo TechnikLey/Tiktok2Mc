@@ -2339,7 +2339,19 @@ def create_client(user):
             TIKTOK_0003, exc=exc, context_info={"source": "client_event_handler"}
         )
 
-    client.add_listener("error", _on_client_event_error)
+    # Register the handler-error listener defensively: newer TikTokLive versions
+    # (>=6.6.5) support a string event name in `add_listener`, but older builds
+    # require a `Type[Event]` and call `.get_type()` on the argument, which
+    # crashes on the "error" string. The listener is a best-effort safety net —
+    # never let an unsupported registration tear down the whole bridge at client
+    # creation.
+    try:
+        client.add_listener("error", _on_client_event_error)
+    except (AttributeError, TypeError):
+        log.warning(
+            "[TIKTOK] Error-listener registration unsupported by this TikTokLive "
+            "version; loop-crash recovery not registered"
+        )
 
     # Raw-event diagnostics: proves whether the websocket actually delivers
     # events to the bridge before handler dispatch. Prints each event type on
