@@ -23,14 +23,19 @@ TikTok2Mc connects TikTok Live events with Minecraft. This documentation is aime
 
 ## Conventions
 
-> [!TIP] Practical recommendations.
+> [!TIP]
+> Practical recommendations.
 
-> [!NOTE] Background information.
+> [!NOTE]
+> Background information.
 
-> [!IMPORTANT] Important notes.
+> [!IMPORTANT]
+> Important notes.
 
-> [!WARNING] Potential sources of errors.
+> [!WARNING]
+> Potential sources of errors.
 
-> [!CAUTION] Critical warnings.
+> [!CAUTION]
+> Critical warnings.
 
 Code examples take precedence over descriptions. In case of discrepancies, the source code is authoritative.
