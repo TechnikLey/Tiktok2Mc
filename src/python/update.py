@@ -37,6 +37,17 @@ from core.logger import (
     install_global_exception_hook,
 )
 from core.paths import get_base_dir, get_runtime_dir
+from core.update_exit import (
+    EXIT_API_ERROR,
+    EXIT_CHECKSUM_MISMATCH,
+    EXIT_DOWNLOAD_FAILED,
+    EXIT_INSTALL_FAILED,
+    EXIT_MISSING_CHECKSUM,
+    EXIT_NO_ASSET,
+    EXIT_NO_UPDATE,
+    EXIT_OK,
+    EXIT_UNEXPECTED,
+)
 from core.utils import load_config, normalize_config_version
 
 log = initialize_logging(__name__)
@@ -50,16 +61,8 @@ SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 # Exit codes — one code per failure class so ``start.py`` and the dashboard
 # can report precisely *why* an update did not happen. ``5`` is deliberately
 # kept as the benign "nothing to do" code (start.py treats it as "continue").
+# Defined centrally in core.update_exit (shared with start.py).
 # ---------------------------------------------------------------------------
-EXIT_OK = 0
-EXIT_UNEXPECTED = 1
-EXIT_NO_UPDATE = 5
-EXIT_API_ERROR = 10
-EXIT_NO_ASSET = 11
-EXIT_MISSING_CHECKSUM = 12
-EXIT_CHECKSUM_MISMATCH = 13
-EXIT_DOWNLOAD_FAILED = 14
-EXIT_INSTALL_FAILED = 15
 
 # API request hardening: a transient DNS/network/HTTP blip must not abort
 # an update run. Retry the version check a few times with backoff before
