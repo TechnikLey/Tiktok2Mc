@@ -18,6 +18,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
+import python.update
+
 # =========================================================================
 # _inject_values_strictly — pure config injection logic
 # =========================================================================
@@ -812,6 +814,90 @@ class TestRunUpdateOrchestration:
                 mock_popen.assert_called_once()
                 args = mock_popen.call_args[0][0]
                 assert "--resume" in args, f"Expected --resume in {args}"
+                assert "--auto" in args, f"Expected --auto forwarded in {args}"
+
+
+class TestUpdaterSelfUpdateResumeRelaunch:
+    """Self-update handoff must forward --auto so the resume child can
+    relaunch start.exe (start.py no longer restarts itself on EXIT_OK)."""
+
+    def _exercise_self_update(self, tmp_path: Path, auto_mode: bool):
+        """Run the full self-update orchestration and return the resume args."""
+        with (
+            TestRunUpdateOrchestration()._get_run_update(tmp_path) as (
+                run_update,
+                _base_dir,
+                _temp_dir,
+            ),
+            patch.object(python.update, "AUTO_MODE", auto_mode),
+            patch("python.update.requests.get") as mock_get,
+            patch("python.update.subprocess.Popen") as mock_popen,
+            patch("python.update.os.execv"),
+            patch("python.update.verify_checksum", return_value=True),
+            patch("python.update.sys.exit", side_effect=SystemExit),
+            patch("python.update.shutil.copy2"),
+            patch("python.update.shutil.rmtree"),
+            patch("python.update.os.chmod"),
+            patch("python.update.download_with_progress"),
+            patch("python.update.zipfile.ZipFile") as mock_zip,
+        ):
+
+            def fake_populate(path):
+                (path / "version.txt").write_text(
+                    "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
+                )
+                (path / "core").mkdir(exist_ok=True)
+                (path / "core" / "update.exe").write_text("new updater binary")
+
+            mock_zip.return_value.__enter__.return_value.extractall = fake_populate
+
+            release_resp = MagicMock()
+            release_resp.status_code = 200
+            release_resp.json.return_value = {
+                "tag_name": "v1.0.0",
+                "assets": [
+                    {
+                        "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                        "url": "https://fake.url/asset",
+                    },
+                    {
+                        "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
+                        "url": "https://fake.url/asset.sha256",
+                    },
+                ],
+            }
+            checksum_resp = MagicMock()
+            checksum_resp.status_code = 200
+            checksum_resp.text = "a" * 64 + "\n"
+
+            def mock_get_side_effect(url, **kwargs):
+                if "releases/latest" in url or "/releases" in url:
+                    return release_resp
+                if "asset.sha256" in url:
+                    return checksum_resp
+                if "updater/signal" in url:
+                    signal_resp = MagicMock()
+                    signal_resp.status_code = 200
+                    signal_resp.json.return_value = {"signal": None}
+                    return signal_resp
+                raise requests.exceptions.RequestException("unexpected URL")
+
+            mock_get.side_effect = mock_get_side_effect
+
+            with pytest.raises(SystemExit):
+                run_update()
+
+            _ = mock_popen  # silence lint
+            return mock_popen.call_args[0][0]
+
+    def test_forward_auto_when_auto_mode(self, tmp_path):
+        args = self._exercise_self_update(tmp_path, auto_mode=True)
+        assert "--auto" in args and "--resume" in args, args
+
+    def test_no_auto_forward_outside_auto_mode(self, tmp_path):
+        args = self._exercise_self_update(tmp_path, auto_mode=False)
+        assert "--resume" in args, args
+        assert "--auto" not in args, args
 
 
 # =========================================================================
