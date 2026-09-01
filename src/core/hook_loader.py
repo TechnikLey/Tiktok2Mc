@@ -22,6 +22,7 @@ from core.error_codes import (
     HOOK_0008,
     HOOK_0010,
 )
+from core.event_patterns import match_event
 from core.hook_api import (
     HOOK_EVENT_SUBSCRIPTIONS,
     HOOK_LIFECYCLE,
@@ -650,22 +651,11 @@ def _stop_timer_thread() -> None:
     _timer_stop_event = None
 
 
-def _event_pattern_matches(pattern: str, event_type: str) -> bool:
-    """Match a subscription pattern against an event type.
-
-    Same semantics as plugin ``event_subscriptions``: exact match,
-    catch-all ``"*"``, or trailing prefix wildcard ``"prefix.*"``.
-    """
-    if pattern == "*" or pattern == event_type:
-        return True
-    return pattern.endswith(".*") and event_type.startswith(pattern[:-1])
-
-
 def matching_event_hooks(event_type: str) -> list[tuple[str, Callable]]:
     """Return ``(hook_name, callback)`` pairs subscribed to *event_type*."""
     matches: list[tuple[str, Callable]] = []
     for pattern, hooks in list(HOOK_EVENT_SUBSCRIPTIONS.items()):
-        if _event_pattern_matches(pattern, event_type):
+        if match_event(event_type, pattern):
             for hook_name, fn in list(hooks.items()):
                 matches.append((hook_name, fn))
     return matches

@@ -34,28 +34,13 @@ import logging
 import threading
 from typing import Any
 
+from core.event_patterns import match_event
 from core.health_monitor import HealthState, get_health_monitor
 from core.plugin_config import discover_plugins_dir, load_plugin_manifest
 
 log = logging.getLogger(__name__)
 
 DEFAULT_COMMENT_PREFIX = "$"
-
-
-def match_event(event_type: str, pattern: str) -> bool:
-    """Return whether *event_type* matches a subscription *pattern*.
-
-    Supports the catch-all (``*``), exact names (``tiktok.gift``) and
-    trailing wildcards (``tiktok.*`` matches every ``tiktok.<suffix>``).
-    """
-    if pattern == "*":
-        return True
-    if pattern == event_type:
-        return True
-    if pattern.endswith(".*"):
-        prefix = pattern[:-2]
-        return event_type.startswith(prefix + ".")
-    return False
 
 
 def load_manifest_declarations(
