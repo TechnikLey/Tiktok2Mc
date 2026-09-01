@@ -78,6 +78,7 @@ from core.shutdown import (  # noqa: E402
     ShutdownReason,
     get_shutdown_controller,
 )
+from core.update_exit import EXIT_MESSAGES, EXIT_NO_UPDATE, EXIT_OK  # noqa: E402
 from core.utils import load_config  # noqa: E402
 from core.validation_framework import (  # noqa: E402
     run_startup_validation,
@@ -328,16 +329,6 @@ _SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # -----------------------------
 # Updater
 # -----------------------------
-_UPDATE_EXIT_MESSAGES = {
-    1: "Unexpected error while updating.",
-    5: "No update needed.",
-    10: "Could not reach the update server.",
-    11: "No update file found for this platform.",
-    12: "Checksum file is missing.",
-    13: "Checksum verification failed — file may be corrupted.",
-    14: "Download failed.",
-    15: "Could not install the update (files locked or read-only?).",
-}
 
 
 def replace_updater_if_exists() -> None:
@@ -449,13 +440,15 @@ if UPDATE_ENABLED and UPDATE_AUTO_INSTALL:
             )
             sys.exit(0)
 
-        if result == 5:
-            set_last_update_result(5, ok=True, message="No update needed.")
+        if result == EXIT_NO_UPDATE:
+            set_last_update_result(
+                EXIT_NO_UPDATE, ok=True, message=EXIT_MESSAGES[EXIT_NO_UPDATE]
+            )
             log.info("Continuing...")
             break
 
-        elif result == 0:
-            set_last_update_result(0, ok=True, message="Update installed successfully.")
+        elif result == EXIT_OK:
+            set_last_update_result(EXIT_OK, ok=True, message=EXIT_MESSAGES[EXIT_OK])
             # The updater relaunches the application itself after installing the
             # files (see update.py _relaunch_tool_after_update). We must not
             # restart here: on Windows the updater overwrites our executable
@@ -468,7 +461,7 @@ if UPDATE_ENABLED and UPDATE_AUTO_INSTALL:
             set_last_update_result(
                 result,
                 ok=False,
-                message=_UPDATE_EXIT_MESSAGES.get(
+                message=EXIT_MESSAGES.get(
                     result, f"Updater failed with exit code {result}."
                 ),
             )

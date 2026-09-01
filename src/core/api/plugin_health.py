@@ -9,7 +9,6 @@ unhealthy.  Active process-level health checking is done by
 import asyncio
 import logging
 import time
-from threading import Lock
 
 from core.api.registry import get_registry
 
@@ -33,7 +32,6 @@ class PluginHealthMonitor:
 
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
-        self._lock = Lock()
 
     async def start(self) -> None:
         if self._task is not None:
@@ -78,8 +76,16 @@ class PluginHealthMonitor:
             elif age <= _HEARTBEAT_TIMEOUT and plugin.health_status in (
                 "starting",
                 "unknown",
+                "unhealthy",
+                "dead",
             ):
                 # Promote to healthy once a recent heartbeat is seen.
+                if plugin.health_status in ("unhealthy", "dead"):
+                    log.info(
+                        "Plugin '%s' recovered (was %s) — marking healthy",
+                        plugin.name,
+                        plugin.health_status,
+                    )
                 registry.update(plugin.name, health_status="healthy")
 
 
