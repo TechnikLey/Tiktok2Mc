@@ -626,6 +626,18 @@ class TriggerTypesResponse(BaseModel):
     types: list[str]
 
 
+class LikeMilestone(BaseModel):
+    id: str
+    every: int
+    function: str
+    payload: str = "Community"
+    enabled: bool = True
+
+
+class LikeMilestonesResponse(BaseModel):
+    milestones: list[LikeMilestone]
+
+
 class TriggerExecuteRequest(BaseModel):
     trigger: str
     user: str = "System"

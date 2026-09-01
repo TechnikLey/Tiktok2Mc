@@ -46,12 +46,7 @@ def _build_gift_image_map() -> dict[str, str]:
     for f in pics_dir.iterdir():
         if f.suffix.lower() != ".png":
             continue
-        stem = f.stem
-        us_pos = stem.find("_")
-        if us_pos == -1:
-            continue
-        name_part = stem[us_pos + 1 :]
-        normalized = _normalize_name(name_part)
+        normalized = _normalize_name(f.stem)
         mapping[normalized] = f"/gifts-pictures/{f.name}"
     return mapping
 

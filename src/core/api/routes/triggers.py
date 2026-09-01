@@ -16,6 +16,8 @@ from fastapi import APIRouter, HTTPException
 
 from core.api.eventbus import event_bus
 from core.api.models import (
+    LikeMilestone,
+    LikeMilestonesResponse,
     TiktokToggleResponse,
     TriggerCommentRequest,
     TriggerExecuteRequest,
@@ -38,6 +40,33 @@ async def list_trigger_types():
         return TriggerTypesResponse(types=types)
     except Exception as exc:  # any unexpected error becomes an HTTP 500
         log.exception("Failed to list trigger types")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/triggers/like-milestones", response_model=LikeMilestonesResponse)
+async def get_like_milestones():
+    try:
+        from core.api.services import ApiService
+
+        svc = ApiService()
+        cfg = svc.read_config()
+        raw = cfg.get("like_triggers", [])
+        milestones = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            milestones.append(
+                LikeMilestone(
+                    id=str(entry.get("id", "")),
+                    every=int(entry.get("every", 0)),
+                    function=str(entry.get("function", "")),
+                    payload=str(entry.get("payload", "Community")),
+                    enabled=bool(entry.get("enabled", True)),
+                )
+            )
+        return LikeMilestonesResponse(milestones=milestones)
+    except Exception as exc:
+        log.exception("Failed to get like milestones")
         raise HTTPException(status_code=500, detail=str(exc))
 
 

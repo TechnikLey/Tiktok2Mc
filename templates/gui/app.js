@@ -6695,7 +6695,7 @@ class ReactionEditor {
       // Publish to EventBus so the event-command mapper dispatches the reaction
       await postJSON('/events', { type: event, data: { test: true, source: 'reaction_test' } });
       // Also attempt to send via trigger service if it's a known TikTok event type
-      const knownTiktokEvents = ['follow', 'like', 'join', 'share', 'comment', 'gift'];
+      const knownTiktokEvents = ['follow', 'join', 'share', 'comment', 'gift'];
       const tiktokPrefix = event.startsWith('tiktok.') ? event.slice(7) : '';
       if (knownTiktokEvents.includes(tiktokPrefix)) {
         await postJSON('/triggers/execute', {
@@ -9003,6 +9003,9 @@ class EventTester {
     this._gifts = [];
     this._selectedGift = null;
     this._giftSelectLoaded = false;
+    this._milestones = [];
+    this._selectedMilestone = null;
+    this._milestonesLoaded = false;
   }
 
   onTypeChange() {
@@ -9010,12 +9013,17 @@ class EventTester {
     const customGroup = document.getElementById('custom-trigger-group');
     const giftGroup = document.getElementById('gift-trigger-group');
     const commentFields = document.getElementById('comment-fields');
+    const likeMilestoneGroup = document.getElementById('like-milestone-group');
     if (customGroup) customGroup.style.display = type === 'custom' ? 'block' : 'none';
     if (giftGroup) giftGroup.style.display = type === 'gift' ? 'block' : 'none';
     if (commentFields) commentFields.style.display = type === 'comment' ? 'flex' : 'none';
+    if (likeMilestoneGroup) likeMilestoneGroup.style.display = type === 'like' ? 'block' : 'none';
 
     if (type === 'gift' && !this._giftSelectLoaded) {
       this._loadGifts();
+    }
+    if (type === 'like' && !this._milestonesLoaded) {
+      this._loadMilestones();
     }
   }
 
@@ -9028,6 +9036,64 @@ class EventTester {
     } catch (e) {
       showToast(I18N.t('triggers.giftsLoadFailed', { msg: e.message }), 'error');
       this._gifts = [];
+    }
+  }
+
+  async _loadMilestones() {
+    try {
+      const data = await fetchJSON('/triggers/like-milestones');
+      this._milestones = (data.milestones || []).filter(m => m.enabled);
+      this._milestonesLoaded = true;
+      this._renderMilestoneSelect(this._milestones);
+    } catch (e) {
+      showToast(I18N.t('triggers.giftsLoadFailed', { msg: e.message }), 'error');
+      this._milestones = [];
+    }
+  }
+
+  _renderMilestoneSelect(milestones) {
+    const select = document.getElementById('like-milestone-select');
+    const info = document.getElementById('like-milestone-info');
+    if (!select) return;
+    select.innerHTML = '';
+    if (!milestones.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = I18N.t('triggers.noMilestones');
+      opt.disabled = true;
+      select.appendChild(opt);
+      if (info) info.textContent = '';
+      return;
+    }
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = I18N.t('triggers.chooseMilestone');
+    placeholder.disabled = true;
+    placeholder.selected = !this._selectedMilestone;
+    select.appendChild(placeholder);
+    for (const m of milestones) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.id} — ${I18N.t('triggers.milestoneInfo', { every: m.every, function: m.function })}`;
+      if (this._selectedMilestone && this._selectedMilestone.id === m.id) opt.selected = true;
+      select.appendChild(opt);
+    }
+    if (info && this._selectedMilestone) {
+      info.textContent = I18N.t('triggers.milestoneInfo', { every: this._selectedMilestone.every, function: this._selectedMilestone.function });
+    } else if (info) {
+      info.textContent = '';
+    }
+  }
+
+  onMilestoneChange() {
+    const select = document.getElementById('like-milestone-select');
+    const info = document.getElementById('like-milestone-info');
+    const id = select ? select.value : '';
+    this._selectedMilestone = this._milestones.find(m => m.id === id) || null;
+    if (info && this._selectedMilestone) {
+      info.textContent = I18N.t('triggers.milestoneInfo', { every: this._selectedMilestone.every, function: this._selectedMilestone.function });
+    } else if (info) {
+      info.textContent = '';
     }
   }
 
@@ -9187,6 +9253,12 @@ class EventTester {
       }
       giftId = String(this._selectedGift.id);
       triggerName = this._selectedGift.name || giftId;
+    } else if (type === 'like') {
+      if (!this._selectedMilestone || !this._selectedMilestone.function) {
+        this._showError(I18N.t('triggers.selectMilestoneRequired'));
+        return;
+      }
+      triggerName = this._selectedMilestone.function;
     }
 
     const userInput = document.getElementById('trigger-user');

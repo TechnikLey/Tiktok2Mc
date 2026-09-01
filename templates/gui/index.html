@@ -552,6 +552,13 @@
                                     <input type="hidden" id="gift-selected-id" value="">
                                 </div>
                             </div>
+                            <div class="form-group" id="like-milestone-group" style="flex:1;display:none;">
+                                <label data-i18n="triggers.selectLikeMilestone">Select Like Milestone</label>
+                                <select id="like-milestone-select" class="form-select" onchange="eventTester.onMilestoneChange()">
+                                    <option value="" disabled selected data-i18n="triggers.chooseMilestone">Choose milestone...</option>
+                                </select>
+                                <div id="like-milestone-info" class="text-muted" style="margin-top:0.35rem;font-size:0.85em;"></div>
+                            </div>
                             <div class="form-group" style="flex:1">
                                 <label data-i18n="triggers.user">User</label>
                                 <input type="text" id="trigger-user" class="form-input" value="TestUser">
