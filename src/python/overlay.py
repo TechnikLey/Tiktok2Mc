@@ -36,7 +36,10 @@ from core.yaml_utils import load_yaml  # noqa: E402
 log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
-API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
+# The supervisor exports RESOLVED_PORT_API_PORT when port_policy.auto_resolve
+# relocated the API port; fall back to the default when unset (standalone runs).
+API_PORT = os.environ.get("RESOLVED_PORT_API_PORT", str(DEFAULT_PORT))
+API_URL = f"http://127.0.0.1:{API_PORT}"
 
 
 def _linux_install_hint() -> str:

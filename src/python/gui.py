@@ -45,7 +45,10 @@ log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
-API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
+# The supervisor exports RESOLVED_PORT_API_PORT when port_policy.auto_resolve
+# relocated the API port; fall back to the default when unset (standalone runs).
+API_PORT = os.environ.get("RESOLVED_PORT_API_PORT", str(DEFAULT_PORT))
+API_URL = f"http://127.0.0.1:{API_PORT}"
 GUI_URL = f"{API_URL}/gui/index.html"
 # Release layout: core/templates/gui/  |  Dev layout: templates/gui/
 LAUNCHER_HTML = ROOT_DIR / "core" / "templates" / "gui" / "launcher.html"
@@ -353,7 +356,7 @@ class LauncherAPI:
             downloads.mkdir(parents=True, exist_ok=True)
         except OSError:
             downloads = Path.home()
-        path = downloads / filename
+        path = downloads / Path(filename).name
         try:
             path.write_text(content, encoding="utf-8")
             return str(path)
@@ -368,7 +371,7 @@ class LauncherAPI:
             downloads.mkdir(parents=True, exist_ok=True)
         except OSError:
             downloads = Path.home()
-        path = downloads / filename
+        path = downloads / Path(filename).name
         try:
             path.write_bytes(base64.b64decode(data))
             return str(path)
