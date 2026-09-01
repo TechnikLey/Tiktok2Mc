@@ -160,6 +160,51 @@ document.getElementById('btn-update-now').addEventListener('click', () => {
 
 document.getElementById('btn-update-dismiss').addEventListener('click', hideUpdateNotification);
 
+/* ─── TikTok Connection Failure Dialog ─── */
+let _tiktokFailedDialogActive = false;
+
+function showTiktokFailedDialog(maxFails) {
+  const dlg = document.getElementById('tiktok-failed-dialog');
+  if (!dlg || _tiktokFailedDialogActive) return;
+  const msg = document.getElementById('tiktok-failed-message');
+  if (msg) {
+    msg.textContent = I18N.t('dialog.tiktokFailed.message', { count: maxFails || 1 });
+  }
+  dlg.classList.remove('hidden');
+  _tiktokFailedDialogActive = true;
+  _tiktokConnectDisabled = true;
+  _updateTiktokStatusDisplay();
+}
+
+function hideTiktokFailedDialog() {
+  const dlg = document.getElementById('tiktok-failed-dialog');
+  if (!dlg) return;
+  dlg.classList.add('hidden');
+  _tiktokFailedDialogActive = false;
+}
+
+document.getElementById('btn-tiktok-failed-reconnect')?.addEventListener('click', async () => {
+  hideTiktokFailedDialog();
+  try {
+    const result = await postJSON('/triggers/tiktok-connection', {});
+    if (result.status === 'ok' || result.status === 'success') {
+      _tiktokConnectDisabled = !result.connected;
+      _updateTiktokStatusDisplay();
+      showToast(I18N.t('triggers.connectionNow', { state: result.connected ? I18N.t('triggers.on') : I18N.t('triggers.off') }), 'success');
+      log(`[TIKTOK] Reconnect requested from failure dialog: ${result.connected ? 'ON' : 'OFF'}`, 'info');
+    } else {
+      showToast((result.message || I18N.t('triggers.toggleFailedTitle')), 'error');
+    }
+  } catch (e) {
+    showToast(I18N.t('triggers.toggleFailed', { msg: e.message }), 'error');
+  }
+});
+
+document.getElementById('btn-tiktok-failed-keep-off')?.addEventListener('click', () => {
+  hideTiktokFailedDialog();
+  showToast(I18N.t('dialog.tiktokFailed.keepOffConfirmed'), 'info');
+});
+
 /* ─── Server Manager — lifecycle polling is started/stopped in view switch code ─── */
 
 /* ─── Server Manager Modal Wiring ─── */
@@ -4092,6 +4137,8 @@ const HELP_TEXT = {
   'rcon.http_command_api': 'Direct command endpoint (POST /api/v1/rcon/command) used by the dashboard Console tab. Disabled by default for security and stability — direct commands bypass the bridge\'s RCON queue and throttling. Enable only if you use the console or extensions need it; trigger actions keep working via the queue either way.',
   'tiktok.user': 'Your TikTok username — without the @ symbol. This is required for the tool to connect to your live stream.',
   'tiktok.reconnect_delay_seconds': 'Seconds to wait before attempting to reconnect after a connection loss.',
+  'tiktok.failed_connection_popup_enabled': 'When enabled, after the configured number of consecutive failed connection attempts the tool pauses reconnecting and shows a warning in the GUI where you can choose to reconnect or keep the connection disabled. Repeated failed attempts can make TikTok block your device.',
+  'tiktok.max_connect_fails': 'Number of consecutive failed connection attempts after which the tool pauses reconnecting and shows the warning popup. Set to 1 to pause after the first failure.',
   'tiktok.autosave_interval_seconds': 'How often (in seconds) the gift revenue log file is saved to disk. The log is stored at data/gift_revenue_log.jsonl.',
   'tiktok.follow_tracking.mode': 'all_time tracks follows across ALL streams. Once a user is recorded, their future follows are ignored even after restarting. per_stream resets the list every time the tool starts.',
   'tiktok.follow_tracking.file': 'Path to the file storing tracked follower names. Default: data/followed_users.txt.',
@@ -4156,6 +4203,8 @@ const HELP_TEXT_DE = {
   'rcon.http_command_api': 'Direkter Befehls-Endpunkt (POST /api/v1/rcon/command), den der Konsole-Tab im Dashboard nutzt. Aus Sicherheits- und Stabilitätsgründen standardmäßig deaktiviert — direkte Befehle umgehen die RCON-Queue und das Throttling der Bridge. Aktiviere ihn nur, wenn du die Konsole nutzt oder Erweiterungen ihn brauchen; Trigger-Aktionen funktionieren über die Queue weiterhin.',
   'tiktok.user': 'Dein TikTok-Benutzername — ohne das @-Zeichen. Dies ist erforderlich, damit sich das Tool mit deinem Live-Stream verbinden kann.',
   'tiktok.reconnect_delay_seconds': 'Sekunden, die vor dem erneuten Verbindungsversuch nach einem Verbindungsverlust gewartet werden.',
+  'tiktok.failed_connection_popup_enabled': 'Wenn aktiviert, pausiert das Tool nach der konfigurierten Anzahl aufeinanderfolgender fehlgeschlagener Verbindungsversuche das Wiederverbinden und zeigt eine Warnung in der GUI, in der du wählen kannst, ob du erneut verbinden oder die Verbindung deaktiviert lassen möchtest. Wiederholte Fehlversuche können dazu führen, dass TikTok dein Gerät blockiert.',
+  'tiktok.max_connect_fails': 'Anzahl aufeinanderfolgender fehlgeschlagener Verbindungsversuche, nach denen das Tool das Wiederverbinden pausiert und das Warn-Popup anzeigt. Setze 1, um nach dem ersten Fehlversuch zu pausieren.',
   'tiktok.autosave_interval_seconds': 'Wie oft (in Sekunden) die Geschenk-Umsatzlog-Datei auf der Festplatte gespeichert wird. Die Log-Datei liegt unter data/gift_revenue_log.jsonl.',
   'tiktok.follow_tracking.mode': 'all_time verfolgt Follower über ALLE Streams hinweg. Sobald ein Nutzer erfasst wurde, werden zukünftige Follows auch nach einem Neustart ignoriert. per_stream setzt die Liste bei jedem Start des Tools zurück.',
   'tiktok.follow_tracking.file': 'Pfad zur Datei, die die verfolgten Followernamen speichert. Standard: data/followed_users.txt.',
@@ -4220,6 +4269,8 @@ const FIELD_META = {
   'rcon.http_command_api': { basic: true, type: 'bool' },
   'tiktok.user': { basic: true, type: 'text', required: true },
   'tiktok.reconnect_delay_seconds': { basic: true, type: 'number', min: 0 },
+  'tiktok.failed_connection_popup_enabled': { basic: true, type: 'bool' },
+  'tiktok.max_connect_fails': { basic: true, type: 'number', min: 1 },
   'tiktok.autosave_interval_seconds': { basic: true, type: 'number', min: 1 },
   'tiktok.follow_tracking': { basic: true },
   'tiktok.follow_tracking.mode': { basic: true, type: 'select', options: ['all_time','per_stream'] },
@@ -8385,6 +8436,15 @@ function connectLogStream() {
           _tiktokConnectDisabled = payload.disabled;
         }
         _updateTiktokStatusDisplay();
+      } else if (type === 'tiktok.connect_failed') {
+        // Repeated connection failures: pause + let the user choose whether
+        // to re-enable or keep the TikTok connection disabled.
+        showTiktokFailedDialog(payload.max_fails || 1);
+        liveLog.add(
+          (payload.reason || '') + ' — ' + I18N.t('dialog.tiktokFailed.title'),
+          'error',
+          'tiktok'
+        );
       } else if (type.startsWith('tiktok.')) {
         // Test triggers (trigger tester / external simulations) must never
         // count as proof of an active live connection.

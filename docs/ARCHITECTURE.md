@@ -220,7 +220,7 @@ Provides: `register_handler()`, `push_state()`, `get_overlay_html()`, `run()`, `
 - `api.port` (29185), `server_host` (127.0.0.1), `api_key`
 - `rcon` (enabled, port 25575, password)
 - `minecraft_server_api` (api_port 29187, web_server_port 29188)
-- `tiktok` (user, reconnect_delay_seconds, follow_tracking)
+- `tiktok` (user, reconnect_delay_seconds, follow_tracking, failed_connection_popup_enabled, max_connect_fails)
 - `like_triggers` (top-level like milestone config)
 - `overlay` (overlays[], display_mode)
 - `gui`, `update`, `plugin_sandbox`, `shutdown`

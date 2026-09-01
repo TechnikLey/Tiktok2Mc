@@ -742,6 +742,12 @@
     'dialog.advancedPhrase': 'I understand the risks',
     'dialog.unlockAdvanced': 'Unlock Advanced',
     'dialog.missingKey': 'Authentication required. Reopen the dashboard with ?key=YOUR_KEY (matches config.yaml: api_key).',
+    'dialog.tiktokFailed.title': 'TikTok Connection Problems',
+    'dialog.tiktokFailed.message': 'The TikTok connection failed {count} times in a row. Reconnecting repeatedly can get TikTok to block your device.',
+    'dialog.tiktokFailed.hint': 'The connection is paused. Choose an option below to continue.',
+    'dialog.tiktokFailed.reconnect': 'Reconnect TikTok',
+    'dialog.tiktokFailed.keepOff': 'Keep Disabled',
+    'dialog.tiktokFailed.keepOffConfirmed': 'TikTok connection stays disabled.',
 
     /* ── Config / hook / plugin editors ── */
     'editor.configuration': 'Configuration',
@@ -1841,6 +1847,12 @@
     'dialog.advancedPhrase': 'Ich verstehe die Risiken',
     'dialog.unlockAdvanced': 'Erweitert freischalten',
     'dialog.missingKey': 'Authentifizierung erforderlich. Öffne das Dashboard erneut mit ?key=YOUR_KEY (entspricht config.yaml: api_key).',
+    'dialog.tiktokFailed.title': 'TikTok-Verbindungsprobleme',
+    'dialog.tiktokFailed.message': 'Die TikTok-Verbindung ist {count}-mal hintereinander fehlgeschlagen. Wiederholte Verbindungsversuche können dazu führen, dass TikTok dein Gerät blockiert.',
+    'dialog.tiktokFailed.hint': 'Die Verbindung wurde pausiert. Wähle unten eine Option, um fortzufahren.',
+    'dialog.tiktokFailed.reconnect': 'TikTok erneut verbinden',
+    'dialog.tiktokFailed.keepOff': 'Deaktiviert lassen',
+    'dialog.tiktokFailed.keepOffConfirmed': 'Die TikTok-Verbindung bleibt deaktiviert.',
 
     /* ── Config / hook / plugin editors ── */
     'editor.configuration': 'Konfiguration',

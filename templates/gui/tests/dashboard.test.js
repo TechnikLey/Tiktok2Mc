@@ -805,3 +805,51 @@ describe('EventTester TikTok connection state', () => {
     await promise;
   });
 });
+
+/* ─── TikTok connection failure dialog ─── */
+describe('TikTok connection failure dialog', () => {
+  beforeEach(() => {
+    _tiktokConnectDisabled = false;
+    _tiktokLiveState = null;
+    _tiktokFailedDialogActive = false;
+    globalThis.fetch = async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({}) });
+  });
+
+  it('shows the dialog and marks the connection as disabled', () => {
+    showTiktokFailedDialog(5);
+    expect(document.getElementById('tiktok-failed-dialog').classList.contains('hidden')).toBe(false);
+    expect(_tiktokConnectDisabled).toBe(true);
+    expect(document.getElementById('tiktok-failed-message').textContent).toContain('5');
+    hideTiktokFailedDialog();
+  });
+
+  it('does not show a second dialog while one is already active', () => {
+    showTiktokFailedDialog(5);
+    showTiktokFailedDialog(5);
+    expect(_tiktokFailedDialogActive).toBe(true);
+    hideTiktokFailedDialog();
+    expect(_tiktokFailedDialogActive).toBe(false);
+  });
+
+  it('reconnects on "Reconnect TikTok" by toggling the connection', async () => {
+    showTiktokFailedDialog(3);
+    let posted = false;
+    globalThis.fetch = async () => {
+      posted = true;
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ status: 'ok', connected: true }) };
+    };
+    document.getElementById('btn-tiktok-failed-reconnect').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(posted).toBe(true);
+    expect(_tiktokConnectDisabled).toBe(false);
+    expect(document.getElementById('tiktok-failed-dialog').classList.contains('hidden')).toBe(true);
+  });
+
+  it('keeps the connection disabled when choosing "Keep Disabled"', async () => {
+    showTiktokFailedDialog(3);
+    document.getElementById('btn-tiktok-failed-keep-off').click();
+    await Promise.resolve();
+    expect(_tiktokConnectDisabled).toBe(true);
+    expect(document.getElementById('tiktok-failed-dialog').classList.contains('hidden')).toBe(true);
+  });
+});

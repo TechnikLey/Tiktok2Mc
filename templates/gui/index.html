@@ -1154,6 +1154,19 @@
         </div>
     </div>
 
+    <!-- TikTok Connection Failure Dialog -->
+    <div id="tiktok-failed-dialog" class="wizard-overlay hidden modal-z-400">
+        <div class="wizard-card text-center modal-sm">
+            <h2 class="dialog-title text-warning" id="tiktok-failed-title" data-i18n="dialog.tiktokFailed.title">TikTok Connection Problems</h2>
+            <p class="muted dialog-desc" id="tiktok-failed-message"></p>
+            <p class="muted dialog-desc" style="margin-top:0.25rem;" id="tiktok-failed-hint"></p>
+            <div class="dialog-actions-stack">
+                <button class="btn btn--primary btn--full" id="btn-tiktok-failed-reconnect" data-i18n="dialog.tiktokFailed.reconnect">Reconnect TikTok</button>
+                <button class="btn btn--secondary btn--full" id="btn-tiktok-failed-keep-off" data-i18n="dialog.tiktokFailed.keepOff">Keep Disabled</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Unsaved Changes Modal -->
     <div id="unsaved-changes-modal" class="wizard-overlay hidden modal-z-400">
       <div class="wizard-card text-center modal-md">

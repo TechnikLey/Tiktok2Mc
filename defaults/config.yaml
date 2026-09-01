@@ -183,6 +183,16 @@ tiktok:
   # Seconds to wait before attempting to reconnect after a connection loss.
   reconnect_delay_seconds: 30
 
+  # Connection-failure protection. Repeated failed connection attempts can make
+  # TikTok block your device for a while. When enabled, after
+  # `max_connect_fails` consecutive failed attempts the tool pauses reconnecting
+  # and shows a warning in the GUI where you can choose to re-enable the
+  # connection or keep it disabled.
+  #   failed_connection_popup_enabled: true/false  (master switch for the popup)
+  #   max_connect_fails: number of failed attempts before pausing (e.g. 5)
+  failed_connection_popup_enabled: true
+  max_connect_fails: 5
+
   # How often (in seconds) the gift revenue log file is saved to disk.
   # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
