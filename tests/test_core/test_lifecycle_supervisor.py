@@ -236,3 +236,32 @@ class TestWaitForPort:
         # Port is free now because the socket is closed.
         result = await _wait_for_port_free("127.0.0.1", port, timeout=1.0)
         assert result is True
+
+
+class TestReadInstanceDirLogTail:
+    def test_reads_minecraft_latest_log(self, tmp_path):
+        from core.lifecycle import _read_instance_dir_log_tail
+
+        (tmp_path / "logs").mkdir()
+        (tmp_path / "logs" / "latest.log").write_text(
+            'Preparing level...\nDone (8.1s)! For help, type "help"\n',
+            encoding="utf-8",
+        )
+        tail = _read_instance_dir_log_tail(tmp_path)
+        assert "Done (8.1s)!" in tail
+
+    def test_falls_back_to_debug_log(self, tmp_path):
+        from core.lifecycle import _read_instance_dir_log_tail
+
+        (tmp_path / "logs").mkdir()
+        (tmp_path / "logs" / "debug.log").write_text(
+            "stacktrace line\n", encoding="utf-8"
+        )
+        tail = _read_instance_dir_log_tail(tmp_path)
+        assert "stacktrace line" in tail
+
+    def test_returns_empty_for_none_or_missing(self, tmp_path):
+        from core.lifecycle import _read_instance_dir_log_tail
+
+        assert _read_instance_dir_log_tail(None) == ""
+        assert _read_instance_dir_log_tail(tmp_path) == ""

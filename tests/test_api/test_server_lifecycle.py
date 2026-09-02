@@ -92,3 +92,35 @@ class TestStartPrefight:
         # Pre-flight passed; the default server is not registered in the test
         # app, so the supervisor reports 404 instead of starting a server.
         assert resp.status_code == 404
+
+
+class TestReadInstanceLogTail:
+    def test_reads_latest_log(self, tmp_path):
+        (tmp_path / "logs").mkdir()
+        (tmp_path / "logs" / "latest.log").write_text(
+            'Loading...\nDone (5.4s)! For help, type "help"\n',
+            encoding="utf-8",
+        )
+        tail = server_lifecycle._read_instance_log_tail(tmp_path)
+        assert "Done (5.4s)!" in tail
+
+    def test_falls_back_to_debug_log(self, tmp_path):
+        (tmp_path / "logs").mkdir()
+        (tmp_path / "logs" / "debug.log").write_text(
+            "some debug output\n", encoding="utf-8"
+        )
+        tail = server_lifecycle._read_instance_log_tail(tmp_path)
+        assert "some debug output" in tail
+
+    def test_returns_empty_when_no_log(self, tmp_path):
+        assert server_lifecycle._read_instance_log_tail(tmp_path) == ""
+
+    def test_limits_to_last_lines(self, tmp_path):
+        (tmp_path / "logs").mkdir()
+        (tmp_path / "logs" / "latest.log").write_text(
+            "\n".join(f"line {i}" for i in range(60)),
+            encoding="utf-8",
+        )
+        tail = server_lifecycle._read_instance_log_tail(tmp_path, max_lines=10)
+        assert tail.count("line ") == 10
+        assert "line 59" in tail

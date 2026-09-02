@@ -168,6 +168,28 @@ def _read_log_tail(log_file: Path | None, max_lines: int = 30) -> str:
         return ""
 
 
+def _read_instance_dir_log_tail(cwd: Path | None, max_lines: int = 40) -> str:
+    """Best-effort diagnostic tail of a child's output in its working dir.
+
+    Used as a fallback when the child runs inside a tmux/screen session (so
+    no ``proc.log_file`` exists) — e.g. the Minecraft server's
+    ``logs/latest.log``. Returns an empty string when nothing is readable.
+    """
+    if cwd is None:
+        return ""
+    for rel in ("logs/latest.log", "logs/debug.log", "latest.log"):
+        path = cwd / rel
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text("utf-8", errors="replace").splitlines()
+        except (OSError, ValueError):
+            continue
+        if lines:
+            return "\n".join(lines[-max_lines:])
+    return ""
+
+
 def _update_process_health(proc_name: str, state: ProcessState) -> None:
     """Update the health monitor for a managed process."""
     try:
@@ -574,6 +596,21 @@ class ProcessSupervisor:
                             name,
                             proc.readiness_timeout,
                         )
+                        tail = _read_log_tail(proc.log_file)
+                        if not tail and proc.cwd:
+                            # On Linux processes usually run inside a
+                            # tmux/screen session and never write a
+                            # ``proc.log_file`` — fall back to the child's
+                            # output files in its working directory (e.g. the
+                            # Minecraft server's logs/latest.log) so the
+                            # reason is not lost.
+                            tail = _read_instance_dir_log_tail(proc.cwd)
+                        if tail:
+                            log.error(
+                                "[SUPERVISOR] %s output (last lines):\n%s",
+                                name,
+                                tail,
+                            )
                     proc.state = ProcessState.FAILED
                     _update_process_health(name, ProcessState.FAILED)
                     return False
