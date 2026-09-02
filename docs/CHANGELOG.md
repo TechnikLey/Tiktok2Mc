@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.0.1] - 2026-09-01
+
+### Added
+
+- **Update splash window** — updates now show an always-on-top progress window displaying the current phase (checking, downloading, installing, done) with a progress bar. The window closes automatically once the update finishes and the tool is running again, so you always know what's happening.
+
+### Changed
+
+- **TikTok connection failure protection** — if the TikTok connection failed repeatedly in the past, the tool would keep retrying silently or the account could get blocked. After multiple failed connection attempts, a warning dialog now appears in the GUI where you can choose to re-enable the connection or keep it disabled. The fail counter resets once the connection is successful again.
+- **Documentation updates** — `README.md`, `GUIDE.md`, and both developer books (EN/DE) have been updated. The Linux section now includes run instructions for the portable archive, the Build & Release workflow is documented, and admonition syntax has been corrected across all docs.
+
+### Fixed
+
+- **Automatic updates failing / tool not starting** — when the tool was started (e.g. via the GUI) while an update was being installed, the automatic restart could be interrupted mid-update, leaving the tool in a broken or unstarted state with no way for the user to see what was wrong. The update process now handles the restart correctly itself and the new splash window shows the progress, so the tool reliably comes back up after every update.
+- **Portable Linux archive missing from releases** — the `Linux.tar.gz` download was unavailable because the build pipeline produced an archive exceeding GitHub's 2 GiB asset limit after symlinks were dereferenced. The archive is now built directly on the release runner so symlinks stay intact and the file fits within the limit.
+- **Event Tester gift images and like milestones not working** — the Event Tester did not display gift images for the selected gift, and testing like events failed because only like milestones (not raw likes) exist. Both now work correctly: gifts show their image, and a milestone selector appears when testing like events.
+- **GUI/overlay losing connection after port relocation** — when the API port was automatically relocated by `auto_resolve`, the GUI and overlay still tried to connect to the old default port. They now use the actual resolved port.
+- **Bridge crash on older TikTokLive versions** — fixed a startup crash that could occur with certain bundled TikTokLive library versions. The tool now handles incompatible listener APIs gracefully instead of shutting down.
+- **Download path traversal vulnerability** — file downloads from the web UI are now sanitized to prevent paths outside the intended download folder.
+- **Plugin recovery not logged** — when an unhealthy plugin comes back online, this is now recorded in the log so you can see that everything is working again.
+
+---
+
 ## [v1.0.0] - 2026-08-30
 
 > [!WARNING]
