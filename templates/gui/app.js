@@ -170,6 +170,10 @@ function showTiktokFailedDialog(maxFails) {
   if (msg) {
     msg.textContent = I18N.t('dialog.tiktokFailed.message', { count: maxFails || 1 });
   }
+  const hint = document.getElementById('tiktok-failed-hint');
+  if (hint) {
+    hint.textContent = I18N.t('dialog.tiktokFailed.hint');
+  }
   dlg.classList.remove('hidden');
   _tiktokFailedDialogActive = true;
   _tiktokConnectDisabled = true;
@@ -8442,7 +8446,7 @@ function connectLogStream() {
         showTiktokFailedDialog(payload.max_fails || 1);
         liveLog.add(
           (payload.reason || '') + ' — ' + I18N.t('dialog.tiktokFailed.title'),
-          'error',
+          'warning',
           'tiktok'
         );
       } else if (type.startsWith('tiktok.')) {

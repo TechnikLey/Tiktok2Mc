@@ -1438,7 +1438,7 @@ def _check_connect_failure_threshold(reason: str) -> bool:
     ctx.connect_fail_popup_triggered = True
     with ctx.tiktok_lock:
         ctx.disable_tiktok_connect = True
-    log.error(
+    log.warning(
         "[TIKTOK] Reached %d failed connection attempts — pausing reconnects "
         "and asking via GUI whether to re-enable.",
         ctx.max_connect_fails,
@@ -3193,7 +3193,7 @@ async def run_bot():
             # user (via the GUI popup) whether to re-enable or keep disabled.
             reached = _check_connect_failure_threshold(reason)
             if reached:
-                log.error(
+                log.warning(
                     "[TIKTOK] Reconnect paused after repeated connection failures."
                 )
                 await asyncio.sleep(2)
