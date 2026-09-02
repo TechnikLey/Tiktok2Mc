@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Plugin platform info not showing in GUI** — the plugin manager always displayed "—" for the platform column, even when plugins declared a specific platform (e.g. "windows") in their `plugin.json`. The platform value is now correctly read from the manifest and displayed in the dashboard.
+
+---
+
 ## [v1.0.1] - 2026-09-01
 
 ### Added
