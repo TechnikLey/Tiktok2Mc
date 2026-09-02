@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Linux installer accepted wrong Java version** — the Linux installer only checked whether Java was present but did not verify the version, allowing Java 21 to pass even though Java 25 is required. It now validates the major version and warns if it is too old, with correct package names for all distros.
 - **Linux binaries fail to start (missing libpython)** — PyInstaller 6.x on Linux resolves `libpython3.12.so.1.0` relative to the executable directory, so `--onefile` binaries (`start.bin`, `update.bin`) need an `_internal/` directory alongside them. The build now creates a root-level `_internal` symlink pointing to the shared runtime.
 - **Linux GUI crashes with missing xcb-cursor** — Qt6 >= 6.5 requires `libxcb-cursor.so.0` on Linux, but the install hints and dependency checks did not mention it. The GUI now detects the missing library before Qt init and prints the correct install command. The Linux installer also checks for it.
-- **`!rc` toggle in the Actions Editor** — vanilla commands can now be switched to "Send via RCON" directly in the editor (adds the `!rc` suffix), so `{user}` is replaced with the viewer's name without typing it manually. Before, the setting failed to persist after saving.
+- **`!rc` toggle missing in the Actions Editor** — the "Send via RCON" (`!rc`) option was missing entirely from the visual Actions Editor in the release, so vanilla commands could not be set to send via RCON from the GUI. The toggle is now available in the editor (it adds the `!rc` suffix) and is correctly saved and kept.
 
 ---
 
