@@ -925,6 +925,12 @@ def cmd_app(args):
                     f"{rel_up}/core/runtime/_internal", link_dir / "_internal"
                 )
 
+            # Root-level _internal symlink for --onefile binaries (start, update).
+            # PyInstaller 6.x on Linux resolves libpython relative to the
+            # executable directory, so onefile binaries in the release root need
+            # the same _internal/ directory that the Qt onedir binaries use.
+            _make_symlink("core/runtime/_internal", OUT_DIR / "_internal")
+
         def _build_linux_qt_bundle(qt_tasks: list[dict]) -> bool:
             """Build all Qt binaries as one onedir bundle sharing a single PyQt6 runtime."""
             if IS_WINDOWS or not qt_tasks:

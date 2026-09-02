@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Download path traversal vulnerability** — file downloads from the web UI are now sanitized to prevent paths outside the intended download folder.
 - **Plugin recovery not logged** — when an unhealthy plugin comes back online, this is now recorded in the log so you can see that everything is working again.
 - **Linux installer accepted wrong Java version** — the Linux installer only checked whether Java was present but did not verify the version, allowing Java 21 to pass even though Java 25 is required. It now validates the major version and warns if it is too old, with correct package names for all distros.
+- **Linux binaries fail to start (missing libpython)** — PyInstaller 6.x on Linux resolves `libpython3.12.so.1.0` relative to the executable directory, so `--onefile` binaries (`start.bin`, `update.bin`) need an `_internal/` directory alongside them. The build now creates a root-level `_internal` symlink pointing to the shared runtime.
 
 ---
 
