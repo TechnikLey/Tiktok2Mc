@@ -494,10 +494,10 @@
           h: { en: 'Java', de: 'Java' },
           body: {
             en: [
-              'If no compatible Java runtime is found, a banner appears and you can install Java with one click. Minecraft needs Java 17 or newer (depending on the version).',
+              'If no compatible Java runtime is found, a banner appears and you can install Java with one click. Minecraft needs Java 25 or newer.',
             ],
             de: [
-              'Wenn keine kompatible Java-Laufzeit gefunden wird, erscheint ein Banner und du kannst Java mit einem Klick installieren. Minecraft benötigt Java 17 oder neuer (je nach Version).',
+              'Wenn keine kompatible Java-Laufzeit gefunden wird, erscheint ein Banner und du kannst Java mit einem Klick installieren. Minecraft benötigt Java 25 oder neuer.',
             ],
           },
         },

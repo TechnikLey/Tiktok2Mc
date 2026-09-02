@@ -116,15 +116,25 @@ if [ "$INSTALL_TYPE" = "2" ]; then
 fi
 
 # --- Java check ---
+MIN_JAVA=25
 if command -v java &> /dev/null; then
     JAVA_VER=$(java -version 2>&1 | awk -F '"' 'NR==1 {print $2}')
-    log_ok "Java found: $JAVA_VER"
+    JAVA_MAJOR=$(echo "$JAVA_VER" | awk -F '.' '{print $1}')
+    if [ "$JAVA_MAJOR" -ge "$MIN_JAVA" ] 2>/dev/null; then
+        log_ok "Java $JAVA_VER found (>= $MIN_JAVA)"
+    else
+        log_warn "Java $JAVA_VER found, but version $MIN_JAVA+ is required."
+        log_warn "Install a newer Java version:"
+        log_warn "  Debian/Ubuntu: sudo apt install openjdk-${MIN_JAVA}-jre-headless"
+        log_warn "  Fedora:        sudo dnf install java-${MIN_JAVA}-openjdk-headless"
+        log_warn "  Arch:          sudo pacman -S jre-openjdk"
+    fi
 else
-    log_warn "Java not found. TikTok2Mc includes Java auto-detection,"
-    log_warn "but you may need to install OpenJDK 17+ manually:"
-    log_warn "  Debian/Ubuntu: sudo apt install openjdk-17-jre"
-    log_warn "  Fedora:        sudo dnf install java-17-openjdk"
-    log_warn "  Arch:          sudo pacman -S jre17-openjdk"
+    log_warn "Java not found. TikTok2Mc requires Java $MIN_JAVA+."
+    log_warn "Install it with one of:"
+    log_warn "  Debian/Ubuntu: sudo apt install openjdk-${MIN_JAVA}-jre-headless"
+    log_warn "  Fedora:        sudo dnf install java-${MIN_JAVA}-openjdk-headless"
+    log_warn "  Arch:          sudo pacman -S jre-openjdk"
 fi
 
 # --- Extract embedded archive ---

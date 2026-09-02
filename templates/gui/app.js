@@ -1049,7 +1049,7 @@ function renderJavaStatusBanner(data) {
     return;
   }
   const reason = (data && data.reason) || 'No Java runtime was found on this system.';
-  const minVer = (data && data.minJavaVersion) || 21;
+  const minVer = (data && data.minJavaVersion) || 25;
   const hints = (data && data.hints) || [];
   const installMsg = data && data.install && data.install.message ? '<br><em>' + escapeHtml(data.install.message) + '</em>' : '';
   const hintBlock = hints.length
@@ -2682,7 +2682,7 @@ function renderPluginManager() {
     const enableDisabled = hasError || !compatible ? ' disabled' : '';
     const platformBadge = !compatible
       ? '<span class="plugin-status status-disabled" title="' + I18N.t('plugins.platformIncompatible') + '">' + _platformLabel(p.platform) + ' ⚠️</span>'
-      : (p.platform && p.platform !== 'all' ? '<span class="plugin-status status-info">' + _platformLabel(p.platform) + '</span>' : '<span class="text-muted">—</span>');
+      : (p.platform && p.platform !== 'all' ? '<span class="plugin-status status-info">' + _platformLabel(p.platform) + '</span>' : '<span class="text-muted">' + _platformLabel(p.platform) + '</span>');
     const action = p.enabled
       ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.disable')}</button>`
       : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.enable')}</button>`;

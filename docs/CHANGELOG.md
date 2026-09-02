@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bridge crash on older TikTokLive versions** — fixed a startup crash that could occur with certain bundled TikTokLive library versions. The tool now handles incompatible listener APIs gracefully instead of shutting down.
 - **Download path traversal vulnerability** — file downloads from the web UI are now sanitized to prevent paths outside the intended download folder.
 - **Plugin recovery not logged** — when an unhealthy plugin comes back online, this is now recorded in the log so you can see that everything is working again.
+- **Linux installer accepted wrong Java version** — the Linux installer only checked whether Java was present but did not verify the version, allowing Java 21 to pass even though Java 25 is required. It now validates the major version and warns if it is too old, with correct package names for all distros.
 
 ---
 
