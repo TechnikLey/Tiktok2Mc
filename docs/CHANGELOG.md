@@ -7,15 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
-### Fixed
-
-- **Plugin platform info not showing in GUI** — the plugin manager always displayed "—" for the platform column, even when plugins declared a specific platform (e.g. "windows") in their `plugin.json`. The platform value is now correctly read from the manifest and displayed in the dashboard.
-
----
-
-## [v1.0.1] - 2026-09-01
+## [v1.0.1]
 
 ### Added
 
@@ -28,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Plugin platform info not showing in GUI** — the plugin manager always displayed "—" for the platform column, even when plugins declared a specific platform (e.g. "windows") in their `plugin.json`. The platform value is now correctly read from the manifest and displayed in the dashboard.
 - **Automatic updates failing / tool not starting** — when the tool was started (e.g. via the GUI) while an update was being installed, the automatic restart could be interrupted mid-update, leaving the tool in a broken or unstarted state with no way for the user to see what was wrong. The update process now handles the restart correctly itself and the new splash window shows the progress, so the tool reliably comes back up after every update.
 - **Portable Linux archive missing from releases** — the `Linux.tar.gz` download was unavailable because the build pipeline produced an archive exceeding GitHub's 2 GiB asset limit after symlinks were dereferenced. The archive is now built directly on the release runner so symlinks stay intact and the file fits within the limit.
 - **Event Tester gift images and like milestones not working** — the Event Tester did not display gift images for the selected gift, and testing like events failed because only like milestones (not raw likes) exist. Both now work correctly: gifts show their image, and a milestone selector appears when testing like events.
