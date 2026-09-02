@@ -204,6 +204,25 @@ def _check_xcb_cursor() -> bool:
     return False
 
 
+def _linux_start_command() -> list[str]:
+    """Return the command to launch start.bin as root on Linux.
+
+    start.py enforces root on Linux. When the GUI is already root (e.g.
+    launched via sudo/pkexec) start.bin runs directly; otherwise we elevate
+    through pkexec (PolicyKit). Falls back to gksudo/sudo where available.
+    """
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return [str(START_EXE)]
+    for cli in (shutil.which("pkexec"), shutil.which("gksudo")):
+        if cli:
+            return [cli, str(START_EXE)]
+    sudo = shutil.which("sudo")
+    if sudo:
+        return [sudo, str(START_EXE)]
+    # No elevation tool found — best effort, may fail at runtime.
+    return [str(START_EXE)]
+
+
 def _api_ready(timeout: float = 1.0) -> bool:
     """Quick check if the API health endpoint responds."""
     try:
@@ -414,8 +433,13 @@ class LauncherAPI:
                 log_file = BASE_DIR / "logs" / "full_system.log"
                 log_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_file, "w", encoding="utf-8") as lf:
+                    # start.bin must run as root on Linux (start.py enforces
+                    # this). When the GUI itself is not root, elevate via
+                    # pkexec so the supervisor has the privileges it needs
+                    # (Minecraft server binding, per-user install layout).
+                    cmd = _linux_start_command()
                     _full_system_proc = subprocess.Popen(
-                        [str(START_EXE)], stdout=lf, stderr=lf, stdin=subprocess.DEVNULL
+                        cmd, stdout=lf, stderr=lf, stdin=subprocess.DEVNULL
                     )
             log.info(
                 "Full system process started (PID %s)",
