@@ -129,6 +129,17 @@ async def validate_actions_content(body: RawActionsUpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/actions/validate-triggers")
+async def validate_triggers_structured(body: ActionsUpdateRequest):
+    try:
+        diagnostics = _get_service().validate_triggers(
+            [t.model_dump() for t in body.triggers]
+        )
+        return {"diagnostics": diagnostics}
+    except Exception as e:  # any unexpected error becomes an HTTP 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _load_gifts() -> list[dict]:
     root = core.paths.get_root_dir()
     gifts_file = root / "core" / "gifts.json"

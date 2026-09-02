@@ -6,6 +6,8 @@ class ActionsEditor {
     this.gifts = [];
     this.giftSearch = '';
     this.availableScripts = [];
+    this.diagnostics = [];
+    this._validateTimer = null;
 
     this.el = document.getElementById('actions-editor');
     this.tableBody = document.getElementById('actions-table-body');
@@ -66,12 +68,60 @@ class ActionsEditor {
   _updateSaveButton() {
     const btn = document.getElementById('actions-editor-save');
     if (!btn) return;
-    btn.disabled = !this.isDirty;
-    btn.style.opacity = this.isDirty ? '1' : '0.5';
-    btn.style.cursor = this.isDirty ? 'pointer' : 'not-allowed';
+    const hasErrors = (this.diagnostics || []).some(d => d.severity === 'ERROR');
+    const canSave = this.isDirty && !hasErrors;
+    btn.disabled = !canSave;
+    btn.style.opacity = canSave ? '1' : '0.5';
+    btn.style.cursor = canSave ? 'pointer' : 'not-allowed';
+    btn.title = hasErrors ? I18N.t('actions.saveBlockedErrors') : '';
   }
 
-  /* ── Data Loading ── */
+  /* ── Validation ── */
+
+  async _validate() {
+    try {
+      const data = await postJSON('/actions/validate-triggers', { triggers: this.triggers });
+      this.diagnostics = data.diagnostics || [];
+    } catch (e) {
+      this.diagnostics = [];
+      console.error(I18N.t('actions.validateFailed', { msg: e.message }));
+    }
+    this._renderDiagnostics();
+    this._updateSaveButton();
+  }
+
+  _scheduleValidate() {
+    if (this._validateTimer) clearTimeout(this._validateTimer);
+    this._validateTimer = setTimeout(() => this._validate(), 400);
+  }
+
+  _renderDiagnostics() {
+    const panel = document.getElementById('actions-diagnostics');
+    if (!panel) return;
+    const diags = this.diagnostics || [];
+    if (!diags.length) {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+      return;
+    }
+    panel.style.display = 'block';
+    const errors = diags.filter(d => d.severity === 'ERROR');
+    const warnings = diags.filter(d => d.severity === 'WARNING');
+    let html = '<div class="actions-diag-summary">';
+    if (errors.length) html += `<span class="diag-count diag-errors">${errors.length} ${I18N.t('actions.errors')}</span>`;
+    if (warnings.length) html += `<span class="diag-count diag-warnings">${warnings.length} ${I18N.t('actions.warnings')}</span>`;
+    html += '</div><ul class="actions-diag-list">';
+    diags.forEach(d => {
+      const name = this.triggers[d.line] ? (this.triggers[d.line].name || '') : '';
+      html += `<li class="diag-${d.severity === 'ERROR' ? 'error' : 'warning'}">
+        <span class="diag-badge">${d.severity === 'ERROR' ? I18N.t('actions.error') : I18N.t('actions.warning')}</span>
+        <span class="diag-msg">${escapeHtml(d.message)}</span>
+        ${name ? `<span class="diag-trigger">(${escapeHtml(name)})</span>` : ''}
+      </li>`;
+    });
+    html += '</ul>';
+    panel.innerHTML = html;
+  }
 
   async load() {
     try {
@@ -84,6 +134,7 @@ class ActionsEditor {
       showToast(I18N.t('actions.loadFailed', { msg: e.message }), 'error');
     }
     this._populateScriptDropdowns();
+    await this._validate();
   }
 
   async loadGifts() {
@@ -340,6 +391,7 @@ class ActionsEditor {
     this.triggers.splice(index, 1);
     this.isDirty = true;
     this._updateSaveButton();
+    this._scheduleValidate();
     if (this.triggers.length === 0) {
       this.selectedIndex = -1;
       this.renderTable();
@@ -388,6 +440,7 @@ class ActionsEditor {
     this.isDirty = true;
     this._updateSaveButton();
     this.renderTable();
+    this._scheduleValidate();
   }
 
   updateCmd(ti, ci, field, value) {
@@ -397,6 +450,7 @@ class ActionsEditor {
       this.isDirty = true;
     this._updateSaveButton();
       this.renderTable();
+      this._scheduleValidate();
     }
   }
 
@@ -409,6 +463,7 @@ class ActionsEditor {
     this._updateSaveButton();
     this.renderDetail(ti);
     this.renderTable();
+    this._scheduleValidate();
   }
 
   removeCmd(ti, ci) {
@@ -419,6 +474,7 @@ class ActionsEditor {
     this._updateSaveButton();
     this.renderDetail(ti);
     this.renderTable();
+    this._scheduleValidate();
   }
 
   /* ── Add Event Modal (replaces prompt) ── */
@@ -591,6 +647,7 @@ class ActionsEditor {
     this.renderTable();
     this.selectTrigger(this.triggers.length - 1);
     this._closeAddModal();
+    this._scheduleValidate();
   }
 
   _showAddError(msg) {
@@ -619,6 +676,12 @@ class ActionsEditor {
             return;
           }
         }
+      }
+
+      await this._validate();
+      if (this.diagnostics.some(d => d.severity === 'ERROR')) {
+        showToast(I18N.t('actions.saveBlockedErrors'), 'error');
+        return;
       }
 
       const body = { triggers: this.triggers };

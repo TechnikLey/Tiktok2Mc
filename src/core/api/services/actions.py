@@ -216,6 +216,35 @@ class ActionsService:
                             }
                         )
 
+                trigger_name = str(trigger.get("name", "")).strip().lower()
+
+                # {comment} is only substituted on the comment trigger
+                if (
+                    "{comment}" in cmd.get("command", "")
+                ) and trigger_name != "comment":
+                    diagnostics.append(
+                        {
+                            "line": ti,
+                            "message": "Command uses {comment} but this is not the 'comment' trigger — {comment} will NOT be substituted.",
+                            "severity": "ERROR",
+                            "code": "COMMENT_PLACEHOLDER_WRONG_TRIGGER",
+                        }
+                    )
+
+                # Shell commands do not substitute {user}/{comment}
+                if cmd_type == "shell" and (
+                    "{user}" in cmd.get("command", "")
+                    or "{comment}" in cmd.get("command", "")
+                ):
+                    diagnostics.append(
+                        {
+                            "line": ti,
+                            "message": "Shell command uses a placeholder ({user}/{comment}) — shell commands are sent with a static payload and placeholders are NOT substituted.",
+                            "severity": "WARNING",
+                            "code": "PLACEHOLDER_IN_SHELL",
+                        }
+                    )
+
         return diagnostics
 
     # ── Serialize (structured → raw) ──────────────────────────────────

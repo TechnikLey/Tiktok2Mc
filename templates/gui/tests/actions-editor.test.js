@@ -326,9 +326,49 @@ describe('ActionsEditor', () => {
     });
   });
 
+  /* ─── diagnostics panel & save blocking ─── */
+  describe('diagnostics & save blocking', () => {
+    it('_updateSaveButton blocks save when errors present', () => {
+      actionsEditor.isDirty = true;
+      actionsEditor.diagnostics = [{ severity: 'ERROR', message: 'bad', line: 0 }];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(true);
+    });
+
+    it('_updateSaveButton enables save when dirty and no errors', () => {
+      actionsEditor.isDirty = true;
+      actionsEditor.diagnostics = [{ severity: 'WARNING', message: 'meh', line: 0 }];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(false);
+    });
+
+    it('_renderDiagnostics hides panel when no diagnostics', () => {
+      actionsEditor.triggers = [{ name: 'follow' }];
+      actionsEditor.diagnostics = [];
+      actionsEditor._renderDiagnostics();
+      const panel = document.getElementById('actions-diagnostics');
+      expect(panel.style.display).toBe('none');
+    });
+
+    it('_renderDiagnostics renders error and warning items', () => {
+      actionsEditor.triggers = [{ name: 'follow' }];
+      actionsEditor.diagnostics = [
+        { severity: 'ERROR', message: '{comment} wrong', line: 0 },
+        { severity: 'WARNING', message: '{user} needs !rc', line: 0 },
+      ];
+      actionsEditor._renderDiagnostics();
+      const panel = document.getElementById('actions-diagnostics');
+      expect(panel.style.display).toBe('block');
+      expect(panel.innerHTML).toContain('{comment} wrong');
+      expect(panel.innerHTML).toContain('{user} needs !rc');
+      expect(panel.innerHTML).toContain('follow');
+    });
+  });
+
   /* ─── _renderRawDiagnostics ─── */
-  describe('_renderRawDiagnostics', () => {
-    it('shows no issues when empty', () => {
+  describe('_renderRawDiagnostics', () => {    it('shows no issues when empty', () => {
       actionsEditor._renderRawDiagnostics([]);
       const list = document.getElementById('actions-raw-diag-list');
       expect(list.innerHTML).toContain('No issues found');
