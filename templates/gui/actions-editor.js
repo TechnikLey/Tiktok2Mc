@@ -68,12 +68,12 @@ class ActionsEditor {
   _updateSaveButton() {
     const btn = document.getElementById('actions-editor-save');
     if (!btn) return;
-    const hasErrors = (this.diagnostics || []).some(d => d.severity === 'ERROR');
-    const canSave = this.isDirty && !hasErrors;
+    const hasIssues = (this.diagnostics || []).some(d => d.severity === 'ERROR' || d.severity === 'WARNING');
+    const canSave = this.isDirty && !hasIssues;
     btn.disabled = !canSave;
     btn.style.opacity = canSave ? '1' : '0.5';
     btn.style.cursor = canSave ? 'pointer' : 'not-allowed';
-    btn.title = hasErrors ? I18N.t('actions.saveBlockedErrors') : '';
+    btn.title = hasIssues ? I18N.t('actions.saveBlockedWarnings') : '';
   }
 
   /* ── Validation ── */
@@ -236,8 +236,8 @@ class ActionsEditor {
             data-trigger-idx="${index}"
             data-cmd-idx="${ci}"
             onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)"
-            onfocus="actionsEditor._showScriptDropdown(event, ${index}, ${ci})"
-            oninput="actionsEditor._filterScriptDropdown(event)">
+            oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'command', this.value); actionsEditor._filterScriptDropdown(event)"
+            onfocus="actionsEditor._showScriptDropdown(event, ${index}, ${ci})">
           <div class="cmd-script-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;">
             <div class="cmd-script-list"></div>
           </div>
@@ -246,30 +246,32 @@ class ActionsEditor {
         // For vanilla, rcon, shell: show command input
         const placeholders = { 'vanilla': I18N.t('actions.command'), 'rcon': I18N.t('actions.command'), 'shell': I18N.t('actions.shellCommand') };
         const placeholder = placeholders[cmd.type] || I18N.t('actions.command');
-        html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
-      }
-
-      if (cmd.type !== 'overlay' && cmd.type !== 'named_overlay') {
-        html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
-      }
-
-      if (cmd.type === 'vanilla') {
-        html += `<label class="cmd-rc" title="${I18N.t('actions.dynamicVanillaHint')}">
-          <input type="checkbox" ${cmd.dynamic_vanilla ? 'checked' : ''} onchange="actionsEditor.updateCmd(${index}, ${ci}, 'dynamic_vanilla', this.checked)">
-          <span>${I18N.t('actions.dynamicVanilla')}</span>
-        </label>`;
+        html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'command', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
       }
 
       html += `<button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="${I18N.t('actions.removeCommand')}">&times;</button>
         </div>`;
 
+      // Meta row: multiplier + dynamic vanilla (nicely formatted, below the input)
+      html += `<div class="cmd-meta">`;
+      if (cmd.type !== 'overlay' && cmd.type !== 'named_overlay') {
+        html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
+      }
+      if (cmd.type === 'vanilla') {
+        html += `<label class="cmd-rc" title="${I18N.t('actions.dynamicVanillaHint')}">
+          <input type="checkbox" ${cmd.dynamic_vanilla ? 'checked' : ''} onchange="actionsEditor.updateCmd(${index}, ${ci}, 'dynamic_vanilla', this.checked)">
+          <span>${I18N.t('actions.dynamicVanillaShort')}</span>
+        </label>`;
+      }
+      html += `</div>`;
+
       if (cmd.type === 'overlay' || cmd.type === 'named_overlay') {
         html += `<div class="cmd-overlay-fields">
-          <input type="text" value="${escapeHtml(cmd.title || '')}" placeholder="${I18N.t('actions.titleField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'title', this.value)">
-          <input type="text" value="${escapeHtml(cmd.subtitle || '')}" placeholder="${I18N.t('actions.subtitleField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'subtitle', this.value)">
+          <input type="text" value="${escapeHtml(cmd.title || '')}" placeholder="${I18N.t('actions.titleField')}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'title', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'title', this.value)">
+          <input type="text" value="${escapeHtml(cmd.subtitle || '')}" placeholder="${I18N.t('actions.subtitleField')}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'subtitle', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'subtitle', this.value)">
           <input type="number" min="1" max="30" value="${cmd.duration || 3}" placeholder="${I18N.t('actions.durationField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'duration', parseInt(this.value) || 3)" style="width:90px;">`;
         if (cmd.type === 'named_overlay') {
-          html += `<input type="text" value="${escapeHtml(cmd.overlay_name || 'default')}" placeholder="${I18N.t('actions.overlayNameField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'overlay_name', this.value)" style="width:120px;">`;
+          html += `<input type="text" value="${escapeHtml(cmd.overlay_name || 'default')}" placeholder="${I18N.t('actions.overlayNameField')}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'overlay_name', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'overlay_name', this.value)" style="width:120px;">`;
         }
         html += `</div>`;
       }
@@ -450,6 +452,16 @@ class ActionsEditor {
       this.isDirty = true;
     this._updateSaveButton();
       this.renderTable();
+      this._scheduleValidate();
+    }
+  }
+
+  _updateCmdLive(ti, ci, field, value) {
+    const cmd = this.triggers[ti]?.commands?.[ci];
+    if (cmd) {
+      cmd[field] = value;
+      this.isDirty = true;
+      this._updateSaveButton();
       this._scheduleValidate();
     }
   }
@@ -679,8 +691,8 @@ class ActionsEditor {
       }
 
       await this._validate();
-      if (this.diagnostics.some(d => d.severity === 'ERROR')) {
-        showToast(I18N.t('actions.saveBlockedErrors'), 'error');
+      if (this.diagnostics.some(d => d.severity === 'ERROR' || d.severity === 'WARNING')) {
+        showToast(I18N.t('actions.saveBlockedWarnings'), 'error');
         return;
       }
 

@@ -589,6 +589,7 @@ class ActionCommand(BaseModel):
     type: str = "vanilla"  # vanilla, rcon, script, overlay, named_overlay, shell
     command: str = ""
     multiplier: int = 1
+    dynamic_vanilla: bool = False
     title: str = ""
     subtitle: str = ""
     duration: int = 3

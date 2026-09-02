@@ -336,12 +336,28 @@ describe('ActionsEditor', () => {
       expect(btn.disabled).toBe(true);
     });
 
-    it('_updateSaveButton enables save when dirty and no errors', () => {
+    it('_updateSaveButton blocks save when warnings present', () => {
       actionsEditor.isDirty = true;
-      actionsEditor.diagnostics = [{ severity: 'WARNING', message: 'meh', line: 0 }];
+      actionsEditor.diagnostics = [{ severity: 'WARNING', message: 'warn', line: 0 }];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(true);
+    });
+
+    it('_updateSaveButton enables save when dirty and no issues', () => {
+      actionsEditor.isDirty = true;
+      actionsEditor.diagnostics = [];
       actionsEditor._updateSaveButton();
       const btn = document.getElementById('actions-editor-save');
       expect(btn.disabled).toBe(false);
+    });
+
+    it('_updateSaveButton stays disabled when not dirty even with no issues', () => {
+      actionsEditor.isDirty = false;
+      actionsEditor.diagnostics = [];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(true);
     });
 
     it('_renderDiagnostics hides panel when no diagnostics', () => {
@@ -518,6 +534,30 @@ describe('ActionsEditor', () => {
       const checkbox = document.querySelector('.cmd-rc input');
       expect(checkbox).not.toBeNull();
       expect(checkbox.checked).toBe(true);
+    });
+
+    it('places the rc checkbox inside the meta row below the input', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say hi', multiplier: 1, dynamic_vanilla: true, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const meta = document.querySelector('.cmd-meta');
+      expect(meta).not.toBeNull();
+      const rc = meta.querySelector('.cmd-rc');
+      expect(rc).not.toBeNull();
+    });
+
+    it('remove button stays in the cmd-row (top right) for vanilla commands', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say hi', multiplier: 1, dynamic_vanilla: true, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const row = document.querySelector('.cmd-row');
+      expect(row.querySelector('.btn-icon')).not.toBeNull();
     });
 
     it('does not render the checkbox for non-vanilla commands', () => {
