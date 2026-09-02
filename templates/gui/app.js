@@ -8691,7 +8691,7 @@ const consoleTerminal = {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(API + '/rcon/connect', { method: 'POST', signal: controller.signal, headers: _withApiKey({}) });
-      if (!res.ok) throw new Error((await res.json()).detail || I18N.t('console.commandFailed'));
+      if (!res.ok) throw new Error((await _parseErrorDetail(res)) || I18N.t('console.commandFailed'));
       this._connected = true;
       status.textContent = I18N.t('console.connected');
       status.className = 'console-status connected';
@@ -8740,7 +8740,7 @@ const consoleTerminal = {
         headers: _withApiKey({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ command: cmd })
       });
-      if (!res.ok) throw new Error((await res.json()).detail || I18N.t('console.commandFailed'));
+      if (!res.ok) throw new Error((await _parseErrorDetail(res)) || I18N.t('console.commandFailed'));
       const data = await res.json();
       if (data.response) {
         this._print(data.response, 'output');

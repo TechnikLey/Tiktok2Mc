@@ -32,3 +32,38 @@ class TestServersList:
         assert body["id"] == "default"
         assert "hasJar" in body
         assert body["hasJar"] is False
+
+
+class TestOpenInstanceFolder:
+    async def test_open_with_check_reports_failure(self, monkeypatch):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from core.api.routes.servers import _open_with_check
+
+        proc = MagicMock()
+        proc.returncode = 1
+        monkeypatch.setattr("asyncio.to_thread", AsyncMock(return_value=proc))
+        assert await _open_with_check(["xdg-open", "/tmp/foo"]) is False
+
+    async def test_open_with_check_reports_success(self, monkeypatch):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from core.api.routes.servers import _open_with_check
+
+        proc = MagicMock()
+        proc.returncode = 0
+        monkeypatch.setattr("asyncio.to_thread", AsyncMock(return_value=proc))
+        assert await _open_with_check(["xdg-open", "/tmp/foo"]) is True
+
+    async def test_open_with_check_missing_opener(self, monkeypatch):
+        from core.api.routes.servers import _open_with_check
+
+        async def raise_fnf(*_a, **_k):
+            raise FileNotFoundError
+
+        monkeypatch.setattr("asyncio.to_thread", raise_fnf)
+        assert await _open_with_check(["xdg-open", "/tmp/foo"]) is False
+
+    def test_open_instance_folder_missing_instance(self, client):
+        resp = client.post("/api/v1/servers/instances/nope/open")
+        assert resp.status_code == 404

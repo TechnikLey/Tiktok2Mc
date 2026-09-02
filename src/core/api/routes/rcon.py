@@ -49,6 +49,19 @@ def _configure_from_config():
     )
 
 
+def _config_error() -> HTTPException:
+    """Return a JSON 500 for RCON config loading failures.
+
+    Prevents unhandled exceptions from reaching FastAPI's default handler,
+    which returns a plain-text ``Internal Server Error`` body that the GUI
+    can't parse as JSON.
+    """
+    return HTTPException(
+        status_code=500,
+        detail="Failed to load RCON configuration. Check the config file.",
+    )
+
+
 class CommandRequest(BaseModel):
     command: str
 
@@ -66,7 +79,11 @@ class StatusResponse(BaseModel):
 @router.get("/status", response_model=StatusResponse)
 async def get_status():
     svc = get_rcon_service()
-    _configure_from_config()
+    try:
+        _configure_from_config()
+    except Exception as exc:
+        log.error("Failed to load RCON config: %s", exc)
+        raise _config_error() from exc
     return StatusResponse(
         connected=svc.connected,
         host=svc.host,
@@ -77,7 +94,11 @@ async def get_status():
 @router.post("/connect")
 async def connect():
     svc = get_rcon_service()
-    _configure_from_config()
+    try:
+        _configure_from_config()
+    except Exception as exc:
+        log.error("Failed to load RCON config: %s", exc)
+        raise _config_error() from exc
     ok = await svc.connect()
     if not ok:
         raise HTTPException(status_code=502, detail="RCON connection failed")
@@ -108,7 +129,11 @@ async def send_command(req: CommandRequest):
         )
     svc = get_rcon_service()
     if not svc.connected:
-        _configure_from_config()
+        try:
+            _configure_from_config()
+        except Exception as exc:
+            log.error("Failed to load RCON config: %s", exc)
+            raise _config_error() from exc
         ok = await svc.connect()
         if not ok:
             raise HTTPException(status_code=502, detail="RCON not connected")

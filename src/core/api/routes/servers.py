@@ -645,6 +645,26 @@ async def delete_instance(instance_id: str):
     return {"status": "ok", "message": f"Server instance '{instance_id}' deleted"}
 
 
+async def _open_with_check(cmd: list[str]) -> bool:
+    """Run an opener command and report whether it actually succeeded.
+
+    ``xdg-open``/``open`` often fail silently (headless, missing file
+    manager), so we wait for the exit code instead of assuming success.
+    """
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        log.warning("Opener not found: %s", cmd[0])
+        return False
+
+
 @router.post("/servers/instances/{instance_id}/open")
 async def open_instance_folder(instance_id: str):
     instances = _load_instances()
@@ -666,21 +686,9 @@ async def open_instance_folder(instance_id: str):
             os.startfile(str(target_path))
             opened = True
         elif system == "Darwin":
-            await asyncio.to_thread(
-                subprocess.Popen,
-                ["open", str(target_path)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            opened = True
+            opened = await _open_with_check(["open", str(target_path)])
         else:
-            await asyncio.to_thread(
-                subprocess.Popen,
-                ["xdg-open", str(target_path)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            opened = True
+            opened = await _open_with_check(["xdg-open", str(target_path)])
     except OSError as e:
         log.warning("Failed to open folder %s: %s", target_path, e)
 
