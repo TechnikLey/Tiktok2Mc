@@ -52,9 +52,9 @@ def _linux_install_hint() -> str:
     except FileNotFoundError:
         return "Install Qt6 system libraries for your distribution."
     if "Debian" in os_release or "Ubuntu" in os_release:
-        return "sudo apt install libqt6webenginecore6 qt6-wayland"
+        return "sudo apt install libqt6webenginecore6 qt6-wayland libxcb-cursor0"
     elif "Fedora" in os_release:
-        return "sudo dnf install qt6-qtwebengine qt6-qtwayland"
+        return "sudo dnf install qt6-qtwebengine qt6-qtwayland libxcb-cursor"
     elif "Arch" in os_release or "Manjaro" in os_release:
         return "sudo pacman -S qt6-webengine qt6-wayland"
     return "Install Qt6 system libraries for your distribution."

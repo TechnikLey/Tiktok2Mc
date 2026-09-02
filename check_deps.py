@@ -184,6 +184,21 @@ def _check_java():
     return shutil.which("java") is not None, None
 
 
+def _check_xcb_cursor():
+    """Check if libxcb-cursor.so.0 is available (Qt6 >= 6.5 on Linux)."""
+    if sys.platform != "linux":
+        return True, None
+    import ctypes
+
+    for name in ("libxcb-cursor.so.0", "libxcb-cursor.so"):
+        try:
+            ctypes.CDLL(name)
+            return True, None
+        except OSError:
+            continue
+    return False, None
+
+
 SYSTEM_TOOLS = [
     # (name, check_func, pkg_names, required_for, optional, platform)
     # pkg_names: dict {pm_name: pkg} for auto-install
@@ -276,6 +291,19 @@ SYSTEM_TOOLS = [
             "dnf": "qt6-qtwebengine qt6-qtwayland",
             "pacman": "qt6-webengine qt6-wayland",
             "zypper": "qt6-webengine",
+        },
+        "gui",
+        False,
+        "linux",
+    ),
+    (
+        "xcb-cursor",
+        _check_xcb_cursor,
+        {
+            "apt": "libxcb-cursor0",
+            "dnf": "libxcb-cursor",
+            "pacman": "libxcb",
+            "zypper": "libxcb-cursor0",
         },
         "gui",
         False,

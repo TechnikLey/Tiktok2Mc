@@ -137,6 +137,22 @@ else
     log_warn "  Arch:          sudo pacman -S jre-openjdk"
 fi
 
+# --- Qt xcb-cursor check (Qt6 >= 6.5 requires libxcb-cursor) ---
+if command -v ldconfig &> /dev/null; then
+    if ! ldconfig -p 2>/dev/null | grep -q libxcb-cursor; then
+        log_warn "libxcb-cursor.so.0 not found — the GUI will not start without it."
+        log_warn "Install it with:"
+        log_warn "  Debian/Ubuntu: sudo apt install libxcb-cursor0"
+        log_warn "  Fedora:        sudo dnf install libxcb-cursor"
+        log_warn "  Arch:          sudo pacman -S libxcb"
+    fi
+elif [ -z "$(find /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu -name 'libxcb-cursor.so*' 2>/dev/null | head -1)" ]; then
+    log_warn "libxcb-cursor.so.0 not found — the GUI will not start without it."
+    log_warn "  Debian/Ubuntu: sudo apt install libxcb-cursor0"
+    log_warn "  Fedora:        sudo dnf install libxcb-cursor"
+    log_warn "  Arch:          sudo pacman -S libxcb"
+fi
+
 # --- Extract embedded archive ---
 log_info "Extracting application files..."
 

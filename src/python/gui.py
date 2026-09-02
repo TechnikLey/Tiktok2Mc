@@ -181,12 +181,27 @@ def _linux_install_hint() -> str:
     except FileNotFoundError:
         return "Install Qt6 system libraries for your distribution."
     if "Debian" in os_release or "Ubuntu" in os_release:
-        return "sudo apt install libqt6webenginecore6 qt6-wayland"
+        return "sudo apt install libqt6webenginecore6 qt6-wayland libxcb-cursor0"
     elif "Fedora" in os_release:
-        return "sudo dnf install qt6-qtwebengine qt6-qtwayland"
+        return "sudo dnf install qt6-qtwebengine qt6-qtwayland libxcb-cursor"
     elif "Arch" in os_release or "Manjaro" in os_release:
         return "sudo pacman -S qt6-webengine qt6-wayland"
     return "Install Qt6 system libraries for your distribution."
+
+
+def _check_xcb_cursor() -> bool:
+    """Return True if libxcb-cursor.so.0 is available (required by Qt6 >= 6.5)."""
+    if sys.platform != "linux":
+        return True
+    import ctypes
+
+    for name in ("libxcb-cursor.so.0", "libxcb-cursor.so"):
+        try:
+            ctypes.CDLL(name)
+            return True
+        except OSError:
+            continue
+    return False
 
 
 def _api_ready(timeout: float = 1.0) -> bool:
@@ -756,6 +771,20 @@ def main() -> None:
     _prime_update_splash_cache()
 
     log.info("Starting GUI launcher...")
+
+    # Pre-flight: Qt6 >= 6.5 requires libxcb-cursor.so on Linux.
+    if sys.platform == "linux" and not _check_xcb_cursor():
+        hint = _linux_install_hint()
+        log.error(
+            "libxcb-cursor.so.0 not found — Qt6 cannot start the GUI. "
+            "Install it with: %s",
+            hint,
+        )
+        try:
+            input("Press Enter to exit...")
+        except EOFError:
+            pass
+        sys.exit(1)
 
     # If a previous supervisor is still shutting down, skip the API check
     # entirely and go straight to the launcher — the JS side will detect
