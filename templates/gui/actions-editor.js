@@ -114,7 +114,9 @@ class ActionsEditor {
       const cmdSummary = (t.commands || []).length
         ? t.commands.map(c => {
             const prefix = { vanilla: '/', rcon: '!', script: '$', overlay: '>>', named_overlay: `@${c.overlay_name}>>`, shell: '&' }[c.type] || '/';
-            return prefix + (c.command || '').substring(0, 30);
+            let summary = prefix + (c.command || '').substring(0, 30);
+            if (c.type === 'vanilla' && c.dynamic_vanilla) summary += ' !rc';
+            return summary;
           }).join('; ')
         : I18N.t('actions.noCommands');
       return `<tr class="actions-row ${i === this.selectedIndex ? 'selected' : ''} ${t.enabled ? '' : 'disabled'}" data-index="${i}" onclick="actionsEditor.selectTrigger(${i})">
@@ -198,6 +200,13 @@ class ActionsEditor {
 
       if (cmd.type !== 'overlay' && cmd.type !== 'named_overlay') {
         html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
+      }
+
+      if (cmd.type === 'vanilla') {
+        html += `<label class="cmd-rc" title="${I18N.t('actions.dynamicVanillaHint')}">
+          <input type="checkbox" ${cmd.dynamic_vanilla ? 'checked' : ''} onchange="actionsEditor.updateCmd(${index}, ${ci}, 'dynamic_vanilla', this.checked)">
+          <span>${I18N.t('actions.dynamicVanilla')}</span>
+        </label>`;
       }
 
       html += `<button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="${I18N.t('actions.removeCommand')}">&times;</button>

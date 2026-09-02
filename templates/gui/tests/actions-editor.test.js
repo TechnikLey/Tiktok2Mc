@@ -444,6 +444,63 @@ describe('ActionsEditor', () => {
     });
   });
 
+  /* ─── dynamic vanilla (!rc) ─── */
+  describe('dynamic vanilla (!rc)', () => {
+    it('shows the !rc suffix in the table summary for dynamic vanilla commands', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say Welcome {user}', multiplier: 1, dynamic_vanilla: true }],
+      }];
+      actionsEditor.renderTable();
+      const body = document.getElementById('actions-table-body');
+      expect(body.textContent).toContain('/say Welcome {user}');
+      expect(body.textContent).toContain('!rc');
+    });
+
+    it('does not show the !rc suffix when dynamic_vanilla is false', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'give @a apple', multiplier: 1, dynamic_vanilla: false }],
+      }];
+      actionsEditor.renderTable();
+      const body = document.getElementById('actions-table-body');
+      expect(body.textContent).toContain('/give @a apple');
+      expect(body.textContent).not.toContain('/give @a apple !rc');
+    });
+
+    it('renders a checkbox for vanilla commands in detail', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say Welcome {user}', multiplier: 1, dynamic_vanilla: true, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const checkbox = document.querySelector('.cmd-rc input');
+      expect(checkbox).not.toBeNull();
+      expect(checkbox.checked).toBe(true);
+    });
+
+    it('does not render the checkbox for non-vanilla commands', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'rcon', command: 'say hi', multiplier: 1, dynamic_vanilla: false, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      expect(document.querySelector('.cmd-rc')).toBeNull();
+    });
+
+    it('updateCmd toggles the dynamic_vanilla field', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say hi', multiplier: 1, dynamic_vanilla: false }],
+      }];
+      actionsEditor.updateCmd(0, 0, 'dynamic_vanilla', true);
+      expect(actionsEditor.triggers[0].commands[0].dynamic_vanilla).toBe(true);
+      expect(actionsEditor.isDirty).toBe(true);
+    });
+  });
+
   /* ─── _askServerRestart dialog ─── */
   describe('_askServerRestart', () => {
     it('resolves true when "Restart Now" is clicked', async () => {

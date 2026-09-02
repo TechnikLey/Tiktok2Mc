@@ -2271,6 +2271,15 @@ input[type="color"] {
   text-align: center;
   outline: none;
 }
+.cmd-rc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
 .cmd-overlay-fields { display: flex; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
 .cmd-overlay-fields input {
   padding: 6px var(--space-3);
