@@ -204,6 +204,26 @@ def _check_xcb_cursor() -> bool:
     return False
 
 
+_DISPLAY_ENV_VARS = (
+    "DISPLAY",
+    "XAUTHORITY",
+    "WAYLAND_DISPLAY",
+    "XDG_RUNTIME_DIR",
+    "DBUS_SESSION_BUS_ADDRESS",
+)
+
+
+def _display_env() -> dict[str, str]:
+    """Forward the current display/graphical session vars.
+
+    pkexec sanitizes the environment and drops these, so the elevated
+    supervisor would otherwise have no display context — breaking both
+    "Open Folder" (file manager can't show a window) and any graphical
+    children. Returning only currently-set values keeps the child env sane.
+    """
+    return {k: v for k, v in os.environ.items() if k in _DISPLAY_ENV_VARS}
+
+
 def _linux_start_command() -> list[str]:
     """Return the command to launch start.bin as root on Linux.
 
@@ -413,6 +433,65 @@ class LauncherAPI:
             log.warning("Failed to save file: %s", e)
             return f"error:{e}"
 
+    def open_folder(self, path: str) -> str:
+        """Open *path* in the OS file manager, from the GUI process.
+
+        Runs in the GUI process rather than the (possibly elevated, display-less)
+        backend so that a file-manager window actually appears on Linux. Returns
+        ``"ok"`` on success or a short human-readable error message otherwise.
+        """
+        target = Path(path)
+        if not target.exists():
+            return f"Path does not exist: {target}"
+        try:
+            import platform
+
+            if platform.system() == "Windows":
+                os.startfile(str(target))  # type: ignore[attr-defined]
+                return "ok"
+            if platform.system() == "Darwin":
+                subprocess.run(
+                    ["open", str(target)],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return "ok"
+
+            # Linux: try the default opener, then known file managers. Because
+            # this runs in the GUI process, DISPLAY is available and a window
+            # should actually appear.
+            def _run_opener(cmd: list[str]) -> bool:
+                return (
+                    subprocess.run(
+                        cmd,
+                        check=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    ).returncode
+                    == 0
+                )
+
+            xdg = shutil.which("xdg-open")
+            if xdg and _run_opener([xdg, str(target)]):
+                return "ok"
+            for fm in (
+                "nautilus",
+                "dolphin",
+                "thunar",
+                "nemo",
+                "pcmanfm",
+                "caja",
+                "konqueror",
+            ):
+                fm_path = shutil.which(fm)
+                if fm_path and _run_opener([fm_path, str(target)]):
+                    return "ok"
+            return "No file manager could be started."
+        except OSError as e:
+            log.warning("[OPEN-FOLDER] Failed to open %s: %s", target, e)
+            return f"Failed to open folder: {e}"
+
     # ---- Server control ----
     def start_system(self) -> str:
         """Start the full system (start.exe)."""
@@ -438,8 +517,12 @@ class LauncherAPI:
                     # pkexec so the supervisor has the privileges it needs
                     # (Minecraft server binding, per-user install layout).
                     cmd = _linux_start_command()
+                    # pkexec strips DISPLAY/XAUTHORITY/wayland vars; forward
+                    # the current graphical session so the supervisor can open
+                    # file managers / GUI children in this X/Wayland session.
+                    env = {**os.environ, **_display_env()}
                     _full_system_proc = subprocess.Popen(
-                        cmd, stdout=lf, stderr=lf, stdin=subprocess.DEVNULL
+                        cmd, stdout=lf, stderr=lf, stdin=subprocess.DEVNULL, env=env
                     )
             log.info(
                 "Full system process started (PID %s)",

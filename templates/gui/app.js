@@ -1481,6 +1481,30 @@ async function serverCardAction(instanceId, action) {
 /* ─── Server Manager: Instance Actions ─── */
 
 async function openServerFolder(instanceId) {
+  // Preferred path: open the folder from the GUI process itself. On Linux the
+  // backend API runs elevated (pkexec) with a sanitized environment that has
+  // no DISPLAY, so a file manager started from the API can't show a window.
+  // The GUI process has the real display, so a pywebview bridge call works
+  // reliably here (same idea as the "Add Custom Version" file picker).
+  const api = typeof pywebview !== 'undefined' && pywebview.api;
+  if (api && api.open_folder) {
+    try {
+      const p = await fetchJSON('/servers/instances/' + encodeURIComponent(instanceId) + '/path');
+      const path = p.path;
+      if (!path) throw new Error(I18N.t('servers.openFolderFailedTitle'));
+      const result = await api.open_folder(String(path));
+      if (result && result !== 'true' && result !== 'ok') {
+        showToast(I18N.t('servers.openFolderFailed', { msg: String(result) }), 'error');
+      } else {
+        showToast(I18N.t('servers.folderOpened', { path }), 'success');
+      }
+      return;
+    } catch (e) {
+      showToast(I18N.t('servers.openFolderFailed', { msg: e.message }), 'error');
+      return;
+    }
+  }
+  // Fallback: backend endpoint (browser / remote dev, no pywebview bridge).
   try {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST', headers: _withApiKey({}) });
     const data = await res.json();

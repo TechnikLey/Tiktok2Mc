@@ -119,3 +119,22 @@ class TestOpenInstanceFolder:
     def test_open_instance_folder_missing_instance(self, client):
         resp = client.post("/api/v1/servers/instances/nope/open")
         assert resp.status_code == 404
+
+
+class TestInstanceFolderPath:
+    def test_returns_absolute_path(self, client, project_dir):
+        from pathlib import Path
+
+        (Path(project_dir) / "server" / "default").mkdir(parents=True, exist_ok=True)
+        resp = client.get("/api/v1/servers/instances/default/path")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["path"]
+        import os
+
+        assert os.path.isabs(body["path"])
+        assert "server" in body["path"]
+
+    def test_unknown_instance_404(self, client):
+        resp = client.get("/api/v1/servers/instances/nope/path")
+        assert resp.status_code == 404

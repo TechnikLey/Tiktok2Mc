@@ -699,6 +699,27 @@ async def _open_folder_linux(target: Path) -> tuple[bool, str]:
     return False, "No file manager (xdg-utils) is installed."
 
 
+@router.get("/servers/instances/{instance_id}/path")
+async def get_instance_folder_path(instance_id: str):
+    """Return the absolute on-disk folder path of a server instance.
+
+    The GUI uses this to resolve the instance folder and then opens it in the
+    OS file manager *from the GUI process*, which has the display context (the
+    backend may run elevated without one on Linux).
+    """
+    instances = _load_instances()
+    if instance_id not in instances:
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
+    target_path = _get_instance_dir(instance_id)
+    if not target_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"Directory does not exist: {target_path}"
+        )
+    return {"path": str(target_path)}
+
+
 @router.post("/servers/instances/{instance_id}/open")
 async def open_instance_folder(instance_id: str):
     instances = _load_instances()

@@ -931,6 +931,11 @@ def cmd_app(args):
             # the same _internal/ directory that the Qt onedir binaries use.
             _make_symlink("core/runtime/_internal", OUT_DIR / "_internal")
 
+            # Onefile binaries that live in core/ (server.bin, gui.bin, ...)
+            # resolve _internal/ relative to their own directory, so core/ needs
+            # the same symlink that the release root gets.
+            _make_symlink("runtime/_internal", OUT_DIR / "core" / "_internal")
+
         def _build_linux_qt_bundle(qt_tasks: list[dict]) -> bool:
             """Build all Qt binaries as one onedir bundle sharing a single PyQt6 runtime."""
             if IS_WINDOWS or not qt_tasks:
