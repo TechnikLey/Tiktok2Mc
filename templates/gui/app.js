@@ -1485,7 +1485,11 @@ async function openServerFolder(instanceId) {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST', headers: _withApiKey({}) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || I18N.t('servers.openFolderFailedTitle'));
-    if (!data.opened) showToast(I18N.t('servers.folderPath', { path: data.path }), 'info');
+    if (data.opened) {
+      showToast(I18N.t('servers.folderOpened', { path: data.path }), 'success');
+    } else {
+      showToast(I18N.t('servers.openFolderFailed', { msg: data.error || I18N.t('servers.folderPath', { path: data.path }) }), 'error');
+    }
   } catch (e) {
     showToast(I18N.t('servers.openFolderFailed', { msg: e.message }), 'error');
   }

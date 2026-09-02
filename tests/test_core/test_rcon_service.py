@@ -56,6 +56,24 @@ class TestRconServiceConnect:
         assert rcon.connected is False
 
     @pytest.mark.asyncio
+    async def test_connect_failure_sets_last_error(self, rcon):
+        with patch("core.api.services.rcon.MCRcon", side_effect=OSError("conn failed")):
+            await rcon.connect()
+        assert rcon.last_error
+        assert "conn failed" in rcon.last_error
+
+    @pytest.mark.asyncio
+    async def test_connect_success_clears_last_error(self, rcon):
+        with patch("core.api.services.rcon.MCRcon", side_effect=OSError("conn failed")):
+            await rcon.connect()
+        assert rcon.last_error
+        mock_conn = MagicMock()
+        with patch("core.api.services.rcon.MCRcon", return_value=mock_conn):
+            ok = await rcon.connect()
+        assert ok is True
+        assert rcon.last_error == ""
+
+    @pytest.mark.asyncio
     async def test_reconnect_disconnects_existing(self, rcon):
         mock_conn = MagicMock()
         with patch("core.api.services.rcon.MCRcon", return_value=mock_conn):

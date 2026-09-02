@@ -101,7 +101,10 @@ async def connect():
         raise _config_error() from exc
     ok = await svc.connect()
     if not ok:
-        raise HTTPException(status_code=502, detail="RCON connection failed")
+        raise HTTPException(
+            status_code=502,
+            detail=svc.last_error or "RCON connection failed",
+        )
     # Start console log capture so server.console events flow to the GUI
     server_dir = get_root_dir() / "server" / "default"
     start_instance_capture("default", server_dir)
@@ -136,7 +139,10 @@ async def send_command(req: CommandRequest):
             raise _config_error() from exc
         ok = await svc.connect()
         if not ok:
-            raise HTTPException(status_code=502, detail="RCON not connected")
+            raise HTTPException(
+                status_code=502,
+                detail=svc.last_error or "RCON not connected",
+            )
     try:
         resp = await svc.command(req.command)
         return CommandResponse(response=resp)

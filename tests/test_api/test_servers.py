@@ -64,6 +64,58 @@ class TestOpenInstanceFolder:
         monkeypatch.setattr("asyncio.to_thread", raise_fnf)
         assert await _open_with_check(["xdg-open", "/tmp/foo"]) is False
 
+    async def test_open_folder_linux_xdg_success(self, monkeypatch):
+        from pathlib import Path
+        from unittest.mock import AsyncMock, MagicMock
+
+        from core.api.routes.servers import _open_folder_linux
+
+        monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
+        proc = MagicMock()
+        proc.returncode = 0
+        monkeypatch.setattr("asyncio.to_thread", AsyncMock(return_value=proc))
+        ok, reason = await _open_folder_linux(Path("/tmp/foo"))
+        assert ok is True
+        assert reason == ""
+
+    async def test_open_folder_linux_falls_back_to_file_manager(self, monkeypatch):
+        from pathlib import Path
+        from unittest.mock import AsyncMock
+
+        from core.api.routes.servers import _open_folder_linux
+
+        which_map = {
+            "xdg-open": "/usr/bin/xdg-open",
+            "nautilus": "/usr/bin/nautilus",
+        }
+        monkeypatch.setattr("shutil.which", lambda name: which_map.get(name))
+
+        results = {
+            "/usr/bin/xdg-open": 1,
+            "/usr/bin/nautilus": 0,
+        }
+
+        async def fake_to_thread(fn, *args, **_k):
+            cmd = args[0]
+            proc = AsyncMock()
+            proc.returncode = results.get(cmd[0], 1)
+            return proc
+
+        monkeypatch.setattr("asyncio.to_thread", fake_to_thread)
+        ok, reason = await _open_folder_linux(Path("/tmp/foo"))
+        assert ok is True
+        assert reason == ""
+
+    async def test_open_folder_linux_no_file_manager(self, monkeypatch):
+        from pathlib import Path
+
+        from core.api.routes.servers import _open_folder_linux
+
+        monkeypatch.setattr("shutil.which", lambda name: None)
+        ok, reason = await _open_folder_linux(Path("/tmp/foo"))
+        assert ok is False
+        assert "No file manager" in reason
+
     def test_open_instance_folder_missing_instance(self, client):
         resp = client.post("/api/v1/servers/instances/nope/open")
         assert resp.status_code == 404

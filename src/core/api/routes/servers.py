@@ -665,6 +665,40 @@ async def _open_with_check(cmd: list[str]) -> bool:
         return False
 
 
+_LINUX_FILE_MANAGERS = [
+    "nautilus",
+    "dolphin",
+    "thunar",
+    "nemo",
+    "pcmanfm",
+    "caja",
+    "konqueror",
+]
+
+
+async def _open_folder_linux(target: Path) -> tuple[bool, str]:
+    """Open *target* in a Linux file manager, trying several fallbacks.
+
+    Returns ``(success, hint)`` where *hint* is a short reason when it could
+    not be opened. ``xdg-open`` is preferred (uses the default file manager);
+    if it fails we fall back to known file-manager binaries so the window
+    actually opens instead of silently doing nothing.
+    """
+    xdg = shutil.which("xdg-open")
+    if xdg and await _open_with_check([xdg, str(target)]):
+        return True, ""
+    # xdg-open failed — fall through to direct file-manager binaries.
+    for fm in _LINUX_FILE_MANAGERS:
+        fm_path = shutil.which(fm)
+        if not fm_path:
+            continue
+        if await _open_with_check([fm_path, str(target)]):
+            return True, ""
+    if xdg:
+        return False, "No file manager could be started (xdg-open failed)."
+    return False, "No file manager (xdg-utils) is installed."
+
+
 @router.post("/servers/instances/{instance_id}/open")
 async def open_instance_folder(instance_id: str):
     instances = _load_instances()
@@ -680,6 +714,7 @@ async def open_instance_folder(instance_id: str):
 
     # Open the folder in the OS file explorer
     opened = False
+    error = ""
     system = platform.system()
     try:
         if system == "Windows":
@@ -687,12 +722,15 @@ async def open_instance_folder(instance_id: str):
             opened = True
         elif system == "Darwin":
             opened = await _open_with_check(["open", str(target_path)])
+            if not opened:
+                error = "The 'open' command failed."
         else:
-            opened = await _open_with_check(["xdg-open", str(target_path)])
+            opened, error = await _open_folder_linux(target_path)
     except OSError as e:
         log.warning("Failed to open folder %s: %s", target_path, e)
+        error = str(e)
 
-    return {"path": str(target_path), "opened": opened}
+    return {"path": str(target_path), "opened": opened, "error": error}
 
 
 @router.put("/servers/instances/{instance_id}/version")

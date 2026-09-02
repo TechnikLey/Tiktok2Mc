@@ -20,6 +20,7 @@ class RconService:
         self._conn: MCRcon | None = None
         self._lock = asyncio.Lock()
         self._connected = False
+        self._last_error = ""
 
     def configure(self, host: str, port: int, password: str) -> None:
         self._host = host
@@ -47,11 +48,24 @@ class RconService:
             await asyncio.wait_for(asyncio.to_thread(conn.connect), timeout=5.0)
             self._conn = conn
             self._connected = True
+            self._last_error = ""
             log.info("[RCON] Connected to %s:%s", self._host, self._port)
             return True
-        except (MCRconException, OSError, TimeoutError) as e:
+        except TimeoutError as e:
             self._conn = None
             self._connected = False
+            self._last_error = (
+                f"Timed out connecting to RCON at {self._host}:{self._port} — "
+                "is the Minecraft server running with RCON enabled?"
+            )
+            log.warning("[RCON] Connection timed out: %s", e)
+            return False
+        except (MCRconException, OSError, ValueError) as e:
+            self._conn = None
+            self._connected = False
+            self._last_error = (
+                f"RCON connection to {self._host}:{self._port} failed: {e}"
+            )
             log.warning("[RCON] Connection failed: %s", e)
             return False
 
@@ -89,6 +103,11 @@ class RconService:
     @property
     def port(self) -> int:
         return self._port
+
+    @property
+    def last_error(self) -> str:
+        """Human-readable reason from the last failed connection attempt."""
+        return self._last_error
 
 
 _rcon_service = RconService()
