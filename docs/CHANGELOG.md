@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Update splash window** — updates now show an always-on-top progress window displaying the current phase (checking, downloading, installing, done) with a progress bar. The window closes automatically once the update finishes and the tool is running again, so you always know what's happening.
+- **Actions Editor validation** — the visual Actions Editor now checks your triggers as you type and shows any problems (errors and warnings) in a panel above the editor, so you can see what's wrong right away. Saving is blocked until all errors and warnings are resolved. Common issues it flags: `{comment}` used on a non-comment trigger, `{user}`/`{comment}` in a shell command (where they can't be substituted), `{user}` in a vanilla command without the `!rc` suffix, and duplicate triggers.
+- **`!rc` toggle in the Actions Editor** — vanilla commands can now be switched to "Send via RCON" directly in the editor (adds the `!rc` suffix), so `{user}` is replaced with the viewer's name without typing it manually.
 
 ### Changed
 
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Linux installer accepted wrong Java version** — the Linux installer only checked whether Java was present but did not verify the version, allowing Java 21 to pass even though Java 25 is required. It now validates the major version and warns if it is too old, with correct package names for all distros.
 - **Linux binaries fail to start (missing libpython)** — PyInstaller 6.x on Linux resolves `libpython3.12.so.1.0` relative to the executable directory, so `--onefile` binaries (`start.bin`, `update.bin`) need an `_internal/` directory alongside them. The build now creates a root-level `_internal` symlink pointing to the shared runtime.
 - **Linux GUI crashes with missing xcb-cursor** — Qt6 >= 6.5 requires `libxcb-cursor.so.0` on Linux, but the install hints and dependency checks did not mention it. The GUI now detects the missing library before Qt init and prints the correct install command. The Linux installer also checks for it.
+- **`!rc` setting lost after saving** — turning on "Send via RCON" (`!rc`) in the Actions Editor and then saving would silently revert the command back. The setting is now properly saved and kept.
 
 ---
 
