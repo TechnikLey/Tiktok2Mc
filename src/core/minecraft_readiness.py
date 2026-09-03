@@ -5,6 +5,9 @@ from pathlib import Path
 
 from mcrcon import MCRcon, MCRconException
 
+# Apply thread-safe mcrcon timeout patch (see core.mcrcon_compat).
+from core import mcrcon_compat  # noqa: F401
+
 log = logging.getLogger(__name__)
 
 

@@ -3,6 +3,11 @@ import logging
 
 from mcrcon import MCRcon, MCRconException
 
+# Apply thread-safe mcrcon timeout patch (must import before MCRcon is used).
+# See core.mcrcon_compat for why — the upstream signal-based timeouts fail in
+# worker threads, which is how RCON is used from the async API server.
+from core import mcrcon_compat  # noqa: F401
+
 log = logging.getLogger(__name__)
 
 

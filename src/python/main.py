@@ -45,6 +45,7 @@ from TikTokLive.events import (
     ShareEvent,
 )
 
+from core import mcrcon_compat  # noqa: F401  (thread-safe mcrcon timeouts)
 from core.api.services.datapack import sync_datapack
 from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
