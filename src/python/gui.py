@@ -227,9 +227,15 @@ def _display_env() -> dict[str, str]:
 def _linux_start_command() -> list[str]:
     """Return the command to launch start.bin as root on Linux.
 
-    start.py enforces root on Linux. When the GUI is already root (e.g.
-    launched via sudo/pkexec) start.bin runs directly; otherwise we elevate
-    through pkexec (PolicyKit). Falls back to gksudo/sudo where available.
+    start.py requires root on Linux to bind low ports and manage Minecraft
+    server processes.  When the GUI is already root (e.g. launched via
+    sudo/pkexec) start.bin runs directly; otherwise we elevate through
+    pkexec (PolicyKit shows a graphical auth prompt — works without a TTY).
+    Falls back to ``sudo -n`` (non-interactive, passwordless only) where
+    available, because plain ``sudo`` without ``-n`` hangs waiting for a
+    password when stdin is /dev/null (the GUI spawns detached subprocesses).
+
+    Returns the command as a list suitable for ``subprocess.Popen``.
     """
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         return [str(START_EXE)]
@@ -238,7 +244,7 @@ def _linux_start_command() -> list[str]:
             return [cli, str(START_EXE)]
     sudo = shutil.which("sudo")
     if sudo:
-        return [sudo, str(START_EXE)]
+        return [sudo, "-n", str(START_EXE)]
     # No elevation tool found — best effort, may fail at runtime.
     return [str(START_EXE)]
 
@@ -352,6 +358,89 @@ def _spawn_update_splash(lang: str) -> bool:
     except OSError as e:
         log.warning("Could not spawn update splash: %s", e)
         return False
+
+
+def _kill_orphaned_sessions() -> None:
+    """Best-effort: kill any tmux/screen sessions the supervisor may have left.
+
+    Called when the supervisor process is already gone (e.g. after a force-
+    kill or unexpected crash) so its child sessions (Minecraft server, bridge,
+    overlay) don't remain running.
+    """
+    if IS_WINDOWS:
+        return
+
+    tmux = shutil.which("tmux")
+    screen = shutil.which("screen")
+    if not tmux and not screen:
+        return
+
+    if tmux:
+        try:
+            res = subprocess.run(
+                [tmux, "list-sessions", "-F", "#{session_name}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            for name in res.stdout.splitlines():
+                name = name.strip()
+                if name.startswith("mc-"):
+                    try:
+                        subprocess.run(
+                            [tmux, "kill-session", "-t", name],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=5,
+                            check=False,
+                        )
+                        log.info("Killed orphaned tmux session: %s", name)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    if screen:
+        try:
+            res = subprocess.run(
+                [screen, "-ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            for line in res.stdout.splitlines():
+                # screen -ls output lines look like: "  12345.session-name  (03/01/2026 10:00:00 AM)  (Detached)"
+                if ".mc-" in line:
+                    parts = line.strip().split()
+                    if parts:
+                        screen_name = parts[0]
+                        try:
+                            subprocess.run(
+                                [screen, "-X", "-S", screen_name, "quit"],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=5,
+                                check=False,
+                            )
+                            log.info("Killed orphaned screen session: %s", screen_name)
+                        except (OSError, subprocess.TimeoutExpired):
+                            pass
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    # Clean up session env files
+    try:
+        env_dir = ROOT_DIR / "tmp"
+        if env_dir.is_dir():
+            for f in env_dir.glob("session_env_*.sh"):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+    except OSError:
+        pass
 
 
 class LauncherAPI:
@@ -494,7 +583,7 @@ class LauncherAPI:
 
     # ---- Server control ----
     def start_system(self) -> str:
-        """Start the full system (start.exe)."""
+        """Start the full system (start.bin)."""
         global _full_system_proc
         if _full_system_proc is not None:
             return "already_running"
@@ -528,6 +617,32 @@ class LauncherAPI:
                 "Full system process started (PID %s)",
                 _full_system_proc.pid if _full_system_proc else "?",
             )
+            # Brief check to catch immediate failure (e.g. pkexec/sudo rejected,
+            # binary not found, or password required but no TTY available).
+            if not IS_WINDOWS and _full_system_proc is not None:
+                time.sleep(1.0)
+                if _full_system_proc.poll() is not None:
+                    exit_code = _full_system_proc.returncode
+                    _full_system_proc = None
+                    if exit_code in (126, 127):
+                        log.error(
+                            "Full system failed to start (exit code %s). "
+                            "The executable may not be found or is not executable. "
+                            "Check that %s exists and is executable (chmod +x).",
+                            exit_code,
+                            START_EXE,
+                        )
+                        return "error:executable_not_found_or_not_executable"
+                    if exit_code != 0:
+                        log.error(
+                            "Full system failed to start (exit code %s). "
+                            "On Linux, root privileges are required. Ensure pkexec "
+                            "is installed (PolicyKit) for graphical password prompts, "
+                            "or run 'sudo -k' and then start from a terminal with: "
+                            "sudo ./start.bin",
+                            exit_code,
+                        )
+                        return f"error:elevation_failed_exit_{exit_code}"
             return "started"
         except OSError as e:
             log.error("Failed to start full system: %s", e)
@@ -542,6 +657,9 @@ class LauncherAPI:
             _full_system_proc.poll() if _full_system_proc is not None else "N/A",
         )
         if _full_system_proc is None or _full_system_proc.poll() is not None:
+            # Process already gone — but tmux/screen sessions may still be
+            # running as orphans.  Try to clean them up.
+            _kill_orphaned_sessions()
             return "not_running"
 
         # Write marker FIRST so a new GUI can detect the shutdown
@@ -581,9 +699,13 @@ class LauncherAPI:
             else:
                 _full_system_proc.terminate()
             _full_system_proc = None
+            # After force-killing the supervisor, its tmux/screen children
+            # may still be alive.  Clean them up.
+            _kill_orphaned_sessions()
             return "stopped"
         except OSError as e:
             log.warning("Failed to terminate system process: %s", e)
+            _kill_orphaned_sessions()
             return "error"
 
     def get_api_status(self) -> str:
@@ -756,6 +878,11 @@ def _cleanup_processes():
         log.info("Cleanup: process force-killed.")
     except OSError as exc:
         log.warning("Cleanup: force-kill failed: %s", exc)
+
+    # After force-killing the supervisor, its tmux/screen children
+    # may still be alive.  Clean them up.
+    if not IS_WINDOWS:
+        _kill_orphaned_sessions()
 
 
 atexit.register(_cleanup_processes)

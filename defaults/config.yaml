@@ -45,9 +45,12 @@ auto_update_config: true
 # ---------------------------------------------------------------------------
 #  SUDO WARNING (Linux only — has no effect on Windows)
 # ---------------------------------------------------------------------------
-# On Linux, running without sudo can cause update and permission issues.
-# Set to false to hide this warning if you have configured your system
-# to handle permissions properly without sudo.
+# On Linux, the supervisor (start.bin) requires root to bind low ports
+# (< 1024) and manage tmux/screen sessions.  When launched from the GUI,
+# authentication is requested automatically via pkexec (graphical prompt).
+# When launched from a terminal, use: sudo ./start.bin
+# Set to false to hide the warning if you have configured your system
+# to handle permissions without root (e.g. using a custom port >= 1024).
 show_sudo_warning: true
 
 # ---------------------------------------------------------------------------

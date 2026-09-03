@@ -30,7 +30,7 @@ from core.logger import (  # noqa: E402
     install_global_exception_hook,
     start_heartbeat,
 )
-from core.paths import get_base_dir  # noqa: E402
+from core.paths import get_base_dir, get_root_dir  # noqa: E402
 from core.yaml_utils import load_yaml  # noqa: E402
 
 log = initialize_logging(__name__)
@@ -76,7 +76,7 @@ def _api_ready(timeout: float = 20.0) -> bool:
 
 def _load_overlay_names() -> list[str]:
     """Read overlay names from the global config file."""
-    config_path = (BASE_DIR.parent / "config" / "config.yaml").resolve()
+    config_path = (get_root_dir() / "config" / "config.yaml").resolve()
     try:
         cfg = load_yaml(config_path)
     except (OSError, ValueError, YAMLError) as exc:

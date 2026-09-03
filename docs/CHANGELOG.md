@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Linux Minecraft server not starting via `start.bin`/`gui.bin`** — when tmux/screen was used, child processes (including the Minecraft server) lost environment variables (e.g. `RESOLVED_PORT_*`, `JAVA_HOME`, `PATH`) because session creation only forwarded a few display vars. Sessions now source a per-session env file with the full parent environment, and tmux also forwards `RESOLVED_PORT_*` variables explicitly so the server resolves ports correctly.
+- **Linux GUI elevation hardening** — the GUI now uses `sudo -n` (non-interactive) as its fallback so it no longer hangs waiting for a password on a TTY-less stdin; it detects a user already running as root and reports clear errors (exit 126/127/elevation) instead of failing silently. Orphaned tmux/screen sessions are now cleaned up when the system is stopped.
+- **Linux root-required messaging** — `start.py`, `update.py`, the `config.yaml` sudo warning, and the installer's "Full System" desktop entry now explain why root is needed and how to proceed. The desktop entry wraps `start.bin` in `pkexec` for a graphical prompt.
 - **TikTok connection failure protection** — if the TikTok connection failed repeatedly in the past, the tool would keep retrying silently or the account could get blocked. After multiple failed connection attempts, a warning dialog now appears in the GUI where you can choose to re-enable the connection or keep it disabled. The fail counter resets once the connection is successful again.
 - **Documentation updates** — `README.md`, `GUIDE.md`, and both developer books (EN/DE) have been updated. The Linux section now includes run instructions for the portable archive, the Build & Release workflow is documented, and admonition syntax has been corrected across all docs.
 

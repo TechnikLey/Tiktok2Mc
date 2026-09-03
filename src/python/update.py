@@ -138,13 +138,20 @@ def _init():
         if os.geteuid() != 0:
             if sys.stdin.isatty():
                 log.error(
-                    "This script must be run as root on Linux to perform updates."
+                    "The updater requires root privileges on Linux to replace\n"
+                    "application files and set executable permissions.\n"
+                    "\n"
+                    "Start with: sudo ./update.bin\n"
+                    "Or let the GUI handle updates (it elevates automatically)."
                 )
                 wait_for_key()
                 sys.exit(1)
             else:
                 log.warning(
-                    "Not running as root (no TTY). Continuing anyway — updates may fail."
+                    "Not running as root (no TTY). Continuing anyway — "
+                    "updates may fail if file replacement requires elevated "
+                    "permissions. Set show_sudo_warning: false in config to "
+                    "suppress this warning."
                 )
     CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")

@@ -153,11 +153,26 @@ except (FileNotFoundError, ValueError, RuntimeError) as e:
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         if sys.stdin.isatty():
-            log.error("This script must be run as root on Linux to start the tool.")
+            log.error(
+                "This application requires root privileges on Linux.\n"
+                "\n"
+                "Root is needed for:\n"
+                "  - Binding the Minecraft server port (25565 < 1024)\n"
+                "  - Starting and managing child processes (tmux/screen)\n"
+                "  - Writing to the installation directory\n"
+                "\n"
+                "Start with: sudo ./start.bin\n"
+                "Or via GUI: the GUI will prompt for authentication automatically.\n"
+                "\n"
+                "If you have configured a custom port >= 1024, you can set\n"
+                "  show_sudo_warning: false\n"
+                "in config/config.yaml to suppress this check."
+            )
             _input_confirm_exit("Press Enter to exit...")
         else:
             log.warning(
-                "Not running as root. Continuing anyway (no TTY). Some features may fail."
+                "Not running as root. Some features may fail (e.g. port binding, "
+                "tmux/screen session management). Continuing anyway (no TTY)."
             )
 
 # -----------------------------

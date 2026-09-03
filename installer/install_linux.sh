@@ -223,14 +223,22 @@ fi
 # --- Create desktop entries (respects GUI mode) ---
 DESKTOP_DIR="$DATA_HOME/applications"
 mkdir -p "$DESKTOP_DIR"
+# The Full System (start.bin) requires root on Linux to manage the Minecraft
+# server and bind low ports.  We wrap it in pkexec (graphical PolicyKit
+# prompt) so the .desktop shortcut works without opening a terminal that
+# exits immediately with "run as root".
+PKEXEC_BIN=""
+if command -v pkexec &> /dev/null; then
+    PKEXEC_BIN="pkexec "
+fi
 DESKTOP_FILE="$DESKTOP_DIR/tiktok2mc.desktop"
 if [ "$GUI_MODE" = "start.bin" ]; then
     cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
-Exec=$INSTALL_DIR/start.bin
-Terminal=true
+Exec=${PKEXEC_BIN}$INSTALL_DIR/start.bin
+Terminal=false
 Type=Application
 Categories=Game;Network;
 EOF
@@ -246,14 +254,15 @@ Categories=Game;Network;
 EOF
 fi
 
-# Also create a "Start Full System" desktop entry (always start.bin)
+# Also create a "Start Full System" desktop entry (always start.bin, run
+# via GUI launcher which handles root elevation, falling back to pkexec)
 FULLSYSTEM_FILE="$DESKTOP_DIR/tiktok2mc-fullsystem.desktop"
 cat > "$FULLSYSTEM_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc (Full System)
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
-Exec=$INSTALL_DIR/start.bin
-Terminal=true
+Exec=${PKEXEC_BIN}$INSTALL_DIR/start.bin
+Terminal=false
 Type=Application
 Categories=Game;Network;
 EOF
