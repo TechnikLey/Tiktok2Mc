@@ -360,6 +360,46 @@ def _spawn_update_splash(lang: str) -> bool:
         return False
 
 
+def _monitor_elevation(proc: subprocess.Popen) -> None:
+    """Background monitor for the elevated start.bin launch on Linux.
+
+    pkexec shows a graphical password prompt and only runs the target after
+    the user authenticates (which can take many seconds).  We therefore must
+    NOT block or poll in the start_system() bridge call, or the prompt would
+    be cut off.  This daemon thread instead waits a generous grace period and
+    then, if the process exited prematurely, logs the reason so it is
+    diagnosable without interfering with password entry.
+    """
+    try:
+        # Give the user ample time to enter the password before deciding a
+        # launch has genuinely failed.
+        proc.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        return  # still running (user authenticated or is authenticating) — fine
+    except OSError:
+        return
+
+    if proc.poll() is not None and proc.returncode not in (0, None):
+        code = proc.returncode
+        if code in (126, 127):
+            log.error(
+                "Full system failed to start (exit code %s). "
+                "The executable may not be found or is not executable. "
+                "Check that %s exists and is executable (chmod +x).",
+                code,
+                START_EXE,
+            )
+        else:
+            log.error(
+                "Full system failed to start (exit code %s). "
+                "On Linux, root privileges are required. Ensure pkexec "
+                "is installed (PolicyKit) for graphical password prompts, "
+                "or run 'sudo -k' and then start from a terminal with: "
+                "sudo ./start.bin",
+                code,
+            )
+
+
 def _kill_orphaned_sessions() -> None:
     """Best-effort: kill any tmux/screen sessions the supervisor may have left.
 
@@ -617,32 +657,20 @@ class LauncherAPI:
                 "Full system process started (PID %s)",
                 _full_system_proc.pid if _full_system_proc else "?",
             )
-            # Brief check to catch immediate failure (e.g. pkexec/sudo rejected,
-            # binary not found, or password required but no TTY available).
+            # IMPORTANT: do NOT block or race here.  pkexec shows a graphical
+            # password prompt and only proceeds once the user authenticates;
+            # any hard wait/poll in this bridge call would dismiss the prompt
+            # or cut off password entry.  Instead return immediately and let
+            # the launcher's waitForApi() poll the API until the system (with
+            # privileges) is actually up.  A background monitor reports
+            # genuine immediate failures (e.g. pkexec/sudo rejected) without
+            # blocking the auth dialog.
             if not IS_WINDOWS and _full_system_proc is not None:
-                time.sleep(1.0)
-                if _full_system_proc.poll() is not None:
-                    exit_code = _full_system_proc.returncode
-                    _full_system_proc = None
-                    if exit_code in (126, 127):
-                        log.error(
-                            "Full system failed to start (exit code %s). "
-                            "The executable may not be found or is not executable. "
-                            "Check that %s exists and is executable (chmod +x).",
-                            exit_code,
-                            START_EXE,
-                        )
-                        return "error:executable_not_found_or_not_executable"
-                    if exit_code != 0:
-                        log.error(
-                            "Full system failed to start (exit code %s). "
-                            "On Linux, root privileges are required. Ensure pkexec "
-                            "is installed (PolicyKit) for graphical password prompts, "
-                            "or run 'sudo -k' and then start from a terminal with: "
-                            "sudo ./start.bin",
-                            exit_code,
-                        )
-                        return f"error:elevation_failed_exit_{exit_code}"
+                threading.Thread(
+                    target=_monitor_elevation,
+                    args=(_full_system_proc,),
+                    daemon=True,
+                ).start()
             return "started"
         except OSError as e:
             log.error("Failed to start full system: %s", e)
