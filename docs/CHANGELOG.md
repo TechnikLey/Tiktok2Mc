@@ -133,6 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updater handles temporary errors** — the update checker now retries on temporary GitHub API errors instead of failing immediately.
 - **`{user}` placeholder in vanilla commands** — the `{user}` placeholder now works in vanilla Minecraft commands when using the `!rc` suffix. A warning is shown if you forget to add the suffix.
 - **Security hardening** — cross-origin and DNS-rebinding requests are rejected, secrets are redacted in API responses, `{user}` is sanitized against RCON slash-command injection, and overlay/theme inputs are XSS-hardened.
+- **Overlay slots phantom `url` field on save** — saving the Settings tab could add an empty `url: ""` key to overlay slots that never had one (e.g. the default `{name: "default"}`), because the editor always rendered a URL input and `collect()` wrote the empty value back. The URL input is now only rendered when the slot already has a `url` key; a "+ URL" button lets you add one explicitly.
+- **Like triggers wiped on unrelated save** — editing any other setting in the Settings tab could silently delete all like triggers, because `collectLikeTriggers()` used global `document.querySelector` to read DOM values. When the like triggers section was filtered out by search (not in the DOM), all selectors returned null and the array was overwritten with `[]`. The query now scopes to the editor content and skips collection entirely when the section is not rendered.
 
 ---
 

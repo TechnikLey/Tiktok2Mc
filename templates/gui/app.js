@@ -4877,9 +4877,12 @@ class ConfigEditor {
     const rows = (slots || []).map((slot, i) => {
       const nameId = id + '_name_' + i;
       const urlId = id + '_url_' + i;
+      const urlInput = 'url' in slot
+        ? `<input type="text" id="${urlId}" value="${escapeHtml(slot.url || '')}" placeholder="OBS Browser Source URL" data-path="${path}[${i}].url" data-type="string" oninput="editor.onFieldInput()" style="flex:1;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">`
+        : `<button class="btn btn-secondary" style="font-size:0.8rem;padding:0.3rem 0.6rem;" onclick="editor.addOverlaySlotUrl('${path}', ${i})">+ URL</button>`;
       return `<div class="overlay-slot-row">
         <input type="text" id="${nameId}" value="${escapeHtml(slot.name || '')}" placeholder="Slot name" data-path="${path}[${i}].name" data-type="string" oninput="editor.onFieldInput()" style="width:140px;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">
-        <input type="text" id="${urlId}" value="${escapeHtml(slot.url || '')}" placeholder="OBS Browser Source URL" data-path="${path}[${i}].url" data-type="string" oninput="editor.onFieldInput()" style="flex:1;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">
+        ${urlInput}
         <button class="btn-icon" onclick="editor.removeOverlaySlot('${path}', ${i})" title="Remove slot">&times;</button>
       </div>`;
     }).join('');
@@ -4898,6 +4901,15 @@ class ConfigEditor {
     arr.push({ name: '', url: '' });
     this.setValue(path, arr);
     this.render();
+  }
+
+  addOverlaySlotUrl(path, index) {
+    const arr = this.getValue(path) || [];
+    if (arr[index] && !('url' in arr[index])) {
+      arr[index].url = '';
+      this.setValue(path, arr);
+      this.render();
+    }
   }
 
   removeOverlaySlot(path, index) {
@@ -5026,13 +5038,15 @@ class ConfigEditor {
     const path = 'like_triggers';
     const current = this.getValue(path);
     if (!Array.isArray(current)) return;
+    const firstEl = this.content.querySelector('[data-li-id="0"]');
+    if (!firstEl) return;
     const triggers = [];
     for (let i = 0; i < current.length; i++) {
-      const enEl = document.querySelector(`[data-li-enabled="${i}"]`);
-      const idEl = document.querySelector(`[data-li-id="${i}"]`);
-      const evEl = document.querySelector(`[data-li-every="${i}"]`);
-      const fnEl = document.querySelector(`[data-li-function="${i}"]`);
-      const plEl = document.querySelector(`[data-li-payload="${i}"]`);
+      const enEl = this.content.querySelector(`[data-li-enabled="${i}"]`);
+      const idEl = this.content.querySelector(`[data-li-id="${i}"]`);
+      const evEl = this.content.querySelector(`[data-li-every="${i}"]`);
+      const fnEl = this.content.querySelector(`[data-li-function="${i}"]`);
+      const plEl = this.content.querySelector(`[data-li-payload="${i}"]`);
       if (!idEl) continue;
       triggers.push({
         id: idEl.value,
@@ -8746,6 +8760,7 @@ const consoleTerminal = {
     const btn = document.getElementById('btn-console-connect');
     const input = document.getElementById('console-input');
     const status = document.getElementById('console-status');
+    const output = document.getElementById('console-output');
     btn.disabled = true;
     try {
       await fetch(API + '/rcon/disconnect', { method: 'POST', headers: _withApiKey({}) });
@@ -8755,6 +8770,7 @@ const consoleTerminal = {
     status.className = 'console-status offline';
     btn.textContent = I18N.t('console.connect');
     input.disabled = true;
+    output.innerHTML = '';
     this._print(I18N.t('console.disconnectedMsg'), 'system');
     btn.disabled = false;
   },
