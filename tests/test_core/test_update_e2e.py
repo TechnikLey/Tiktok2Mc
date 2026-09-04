@@ -840,6 +840,8 @@ class TestUpdaterSelfUpdateResumeRelaunch:
             patch("python.update.os.chmod"),
             patch("python.update.download_with_progress"),
             patch("python.update.zipfile.ZipFile") as mock_zip,
+            # Force the Windows code path so Popen is used instead of os.execv
+            patch.object(python.update.sys, "platform", "win32"),
         ):
 
             def fake_populate(path):

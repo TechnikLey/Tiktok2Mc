@@ -132,11 +132,13 @@ class TestLauncherAPIStartSystem:
         assert result == "started"
         mock_popen.assert_called_once()
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="needs_password guard on Linux")
     def test_returns_error_on_process_failure(self, monkeypatch, tmp_path):
         fake_exe = tmp_path / "start.exe"
         fake_exe.write_text("")
         monkeypatch.setattr("python.gui.START_EXE", fake_exe)
         monkeypatch.setattr("python.gui._full_system_proc", None)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
 
         monkeypatch.setattr(
             "subprocess.Popen", MagicMock(side_effect=OSError("Permission denied"))
@@ -145,6 +147,17 @@ class TestLauncherAPIStartSystem:
         api = LauncherAPI()
         result = api.start_system()
         assert result.startswith("error:")
+
+    def test_returns_needs_password_on_linux_nonroot(self, monkeypatch, tmp_path):
+        fake_exe = tmp_path / "start.exe"
+        fake_exe.write_text("")
+        monkeypatch.setattr("python.gui.START_EXE", fake_exe)
+        monkeypatch.setattr("python.gui._full_system_proc", None)
+        monkeypatch.setattr("python.gui.IS_WINDOWS", False)
+
+        api = LauncherAPI()
+        result = api.start_system()
+        assert result == "needs_password"
 
 
 class TestLauncherAPIStop:
@@ -272,12 +285,19 @@ class TestSpawnUpdateSplash:
         assert _spawn_update_splash("en") is False
 
     def test_spawns_copy_on_windows(self, monkeypatch, tmp_path):
+        import subprocess as _subprocess
+
         from python.gui import SUFFIX
 
         (tmp_path / f"update_progress{SUFFIX}").write_text("")
         monkeypatch.setattr("python.gui.BASE_DIR", tmp_path)
         monkeypatch.setattr("python.gui.ROOT_DIR", tmp_path)
         monkeypatch.setattr("python.gui.IS_WINDOWS", True)
+        # DETACHED_PROCESS / CREATE_NEW_PROCESS_GROUP are Windows-only constants
+        monkeypatch.setattr(_subprocess, "DETACHED_PROCESS", 0x00000008, raising=False)
+        monkeypatch.setattr(
+            _subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200, raising=False
+        )
         mock_popen = MagicMock()
         monkeypatch.setattr("python.gui.subprocess.Popen", mock_popen)
 
@@ -366,6 +386,7 @@ class TestGuiStartup:
         monkeypatch.setattr("python.gui._open_window", mock_open)
         monkeypatch.setattr("python.gui._api_ready", lambda **kw: False)
         monkeypatch.setattr("python.gui._gui_already_running", lambda: False)
+        monkeypatch.setattr("python.gui._check_xcb_cursor", lambda: True)
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
@@ -385,6 +406,7 @@ class TestGuiStartup:
         monkeypatch.setattr("python.gui._open_window", mock_open)
         monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
         monkeypatch.setattr("python.gui._gui_already_running", lambda: False)
+        monkeypatch.setattr("python.gui._check_xcb_cursor", lambda: True)
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
@@ -460,6 +482,7 @@ class TestShutdownMarker:
         monkeypatch.setattr("python.gui._open_window", mock_open)
         monkeypatch.setattr("python.gui._api_ready", lambda **kw: True)
         monkeypatch.setattr("python.gui._gui_already_running", lambda: False)
+        monkeypatch.setattr("python.gui._check_xcb_cursor", lambda: True)
         monkeypatch.setattr("sys.argv", ["gui.py"])
 
         from python.gui import main
