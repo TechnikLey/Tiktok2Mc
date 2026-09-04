@@ -136,6 +136,34 @@ describe('Console terminal', () => {
     });
   });
 
+  describe('Server console output gating', () => {
+    beforeEach(() => {
+      window.consoleTerminal._connected = false;
+    });
+
+    function emitConsoleLine(line) {
+      const { _sseSource } = window;
+      if (!_sseSource) return;
+      _sseSource.onmessage({
+        data: JSON.stringify({ type: 'server.console', data: { line, instance_id: 'default' } }),
+      });
+    }
+
+    it('does not show server lines when RCON is not connected', () => {
+      document.getElementById('console-output').innerHTML = '';
+      window.consoleTerminal._connected = false;
+      emitConsoleLine('Delayed TNT config got updated');
+      expect(document.getElementById('console-output').textContent).not.toContain('Delayed TNT config got updated');
+    });
+
+    it('shows server lines when RCON is connected', () => {
+      document.getElementById('console-output').innerHTML = '';
+      window.consoleTerminal._connected = true;
+      emitConsoleLine('Hello from server');
+      expect(document.getElementById('console-output').textContent).toContain('Hello from server');
+    });
+  });
+
   describe('Disabled RCON command API', () => {
     it('shows a settings hint when the API answers with MC-0012', async () => {
       const prevFetch = window.fetch;

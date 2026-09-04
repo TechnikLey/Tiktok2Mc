@@ -8461,7 +8461,10 @@ function connectLogStream() {
       if (type === 'log') {
         liveLog.add(payload.msg || payload.message || '', payload.level || 'info', payload.source || '');
       } else if (type === 'server.console') {
-        if (payload.line && (!_consoleInstanceId || payload.instance_id === _consoleInstanceId)) {
+        // Only surface server output when an RCON session is active —
+        // otherwise the console would show log lines even when the user
+        // has not connected.
+        if (consoleTerminal._connected && payload.line && (!_consoleInstanceId || payload.instance_id === _consoleInstanceId)) {
           consoleTerminal._print(payload.line, 'server');
         }
       } else if (type === 'server.restarting') {
