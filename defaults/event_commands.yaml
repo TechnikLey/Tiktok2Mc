@@ -47,14 +47,14 @@
 #
 #            Known commands per target:
 #              timer:
-#                start, pause, resume, reset, add_time, set_time
+#                start, pause, resume, reset, add_time, set_time, save_dims
 #              spotify-control:
 #                play, pause, next, previous, volume, volume_up,
 #                volume_down, shuffle, repeat, save, playtrack
 #              win-counter:
-#                add_win, remove_win
+#                add_win, remove_win, save_dims
 #              death-counter:
-#                player_death
+#                player_death, add_death, reset, save_dims
 #
 #
 # -------------------------------------------------------------------

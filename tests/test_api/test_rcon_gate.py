@@ -75,3 +75,34 @@ class TestHttpCommandGate:
         resp = client.get("/api/v1/rcon/status")
         assert resp.status_code == 200
         assert resp.json()["connected"] is True
+
+
+class TestRconConfigFailure:
+    def test_connect_config_failure_returns_json_500(
+        self, client, project_dir, monkeypatch
+    ):
+        """A config-loading crash must return a JSON body, not plain 'Internal Server Error'."""
+
+        class Boom:
+            def read_config(self):
+                raise RuntimeError("corrupt yaml")
+
+        monkeypatch.setattr(rcon_routes, "_get_api_service", lambda: Boom())
+        resp = client.post("/api/v1/rcon/connect")
+        assert resp.status_code == 500
+        body = resp.json()
+        assert "detail" in body
+        assert "Internal Server Error" not in resp.text
+
+    def test_status_config_failure_returns_json_500(
+        self, client, project_dir, monkeypatch
+    ):
+        class Boom:
+            def read_config(self):
+                raise RuntimeError("corrupt yaml")
+
+        monkeypatch.setattr(rcon_routes, "_get_api_service", lambda: Boom())
+        resp = client.get("/api/v1/rcon/status")
+        assert resp.status_code == 500
+        assert "detail" in resp.json()
+        assert "Internal Server Error" not in resp.text

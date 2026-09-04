@@ -279,6 +279,18 @@
         .modal-msg { font-size: 0.8rem; margin-top: 0.5rem; padding: 0.5rem; border-radius: var(--radius-lg); display: none; text-align: center; }
         .modal-msg.error { display: block; background: var(--color-danger-subtle); color: var(--color-danger); border: 1px solid rgba(239,68,68,0.2); }
         .modal-msg.success { display: block; background: var(--color-success-subtle); color: var(--color-success); border: 1px solid rgba(34,197,94,0.2); }
+
+        .password-dialog { margin-top: 0.75rem; padding: 0.85rem; border-radius: var(--radius-lg); background: var(--color-surface); border: 1px solid var(--color-border); }
+        .password-dialog__text { font-size: 0.8rem; color: var(--color-text-muted); margin: 0 0 0.5rem 0; }
+        .password-dialog__row { display: flex; gap: 0.5rem; }
+        .password-dialog__input { flex: 1; padding: 0.55rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-input); color: var(--color-text); font-size: 0.9rem; }
+        .password-dialog__input:focus { outline: none; border-color: var(--color-accent); }
+        .password-dialog__input::placeholder { color: var(--color-text-muted); opacity: 0.5; }
+        .password-dialog__submit { padding: 0.55rem 1rem; border: none; border-radius: var(--radius-lg); background: var(--color-accent); color: var(--color-bg); font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: background var(--transition-fast); }
+        .password-dialog__submit:hover { background: var(--color-accent-hover); }
+        .password-dialog__error { font-size: 0.8rem; color: var(--color-danger); margin: 0.4rem 0 0 0; }
+        .password-dialog__cancel { background: none; border: none; color: var(--color-text-muted); font-size: 0.8rem; cursor: pointer; margin-top: 0.4rem; padding: 0; }
+        .password-dialog__cancel:hover { color: var(--color-text); }
     </style>
 </head>
 <body>
@@ -304,6 +316,16 @@
             <button id="btn-start" class="start-btn" onclick="startSystem()" data-i18n="launcher.startSystem">
                 Start System
             </button>
+
+            <div id="password-dialog" class="password-dialog" style="display:none">
+                <p class="password-dialog__text" data-i18n="launcher.passwordHint">Enter your password to start the system with administrator privileges:</p>
+                <div class="password-dialog__row">
+                    <input id="password-input" type="password" class="password-dialog__input" data-i18n-placeholder="launcher.passwordPlaceholder" placeholder="Password" />
+                    <button id="btn-password-submit" class="password-dialog__submit" onclick="submitPassword()" data-i18n="launcher.passwordSubmit">Start</button>
+                </div>
+                <p id="password-error" class="password-dialog__error" style="display:none"></p>
+                <button class="password-dialog__cancel" onclick="cancelPassword()" data-i18n="launcher.passwordCancel">Cancel</button>
+            </div>
 
             <button id="btn-remote" class="remote-btn" onclick="openRemoteModal()">
                 <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -419,26 +441,168 @@
             }, 2000);
         }
 
-        async function waitForApi(maxAttempts, onReady) {
-            let attempts = 0;
+        const UPDATE_ACTIVE_PHASES = ['checking', 'downloading', 'installing'];
+        const WAIT_TIMEOUT_MS = 30000;
+        const UPDATE_TIMEOUT_MS = 600000;
+
+        let guiCloseRequested = false;
+
+        function resetStartButton() {
+            setButton(false);
+            document.getElementById('btn-start').textContent = I18N.t('launcher.startSystem');
+        }
+
+        function requestGuiCloseForUpdate() {
+            if (guiCloseRequested) return;
+            guiCloseRequested = true;
+            setStatus('installing', I18N.t('launcher.updateInstalling'));
+            // Give the message a beat on screen, then hand over to the
+            // always-on-top update splash window (it closes itself when the
+            // restarted app is back).
+            setTimeout(() => {
+                try {
+                    if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.close_for_update) {
+                        const lang = (typeof I18N !== 'undefined' && I18N.lang) ? I18N.lang() : 'en';
+                        pywebview.api.close_for_update(lang).catch(() => {});
+                    } else if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.close_app) {
+                        pywebview.api.close_app().catch(() => {});
+                    }
+                } catch (_) {}
+            }, 800);
+        }
+
+        async function getUpdateStatus() {
+            try {
+                if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.get_update_status) {
+                    return await pywebview.api.get_update_status();
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        function updateStatusText(s) {
+            if (!s) return null;
+            if (s.phase === 'checking') return I18N.t('launcher.updateChecking');
+            if (s.phase === 'downloading') {
+                if (typeof s.progress === 'number' && s.progress >= 0) return I18N.t('launcher.updateDownloading', { p: s.progress });
+                return I18N.t('launcher.updateDownloadingWait');
+            }
+            if (s.phase === 'installing') return I18N.t('launcher.updateInstalling');
+            if (s.phase === 'done') return I18N.t('launcher.updateRestarting');
+            return null;
+        }
+
+        async function waitForApi(onReady, onUpdateError) {
+            let deadline = Date.now() + WAIT_TIMEOUT_MS;
             const poll = setInterval(async () => {
                 if (isStarting === false) {
                     clearInterval(poll);
                     return;
                 }
                 const ready = await checkApi();
-                attempts++;
                 if (ready) {
                     clearInterval(poll);
                     onReady();
-                } else if (attempts > maxAttempts) {
+                    return;
+                }
+                const update = await getUpdateStatus();
+                if (update && update.phase === 'error') {
                     clearInterval(poll);
                     isStarting = false;
-                    setButton(false);
+                    resetStartButton();
+                    setStatus('offline', I18N.t('common.offline'));
+                    showMessage(I18N.t('launcher.updateFailed', { msg: update.message || '' }), 'error');
+                    onUpdateError && onUpdateError();
+                    return;
+                }
+                if (update && UPDATE_ACTIVE_PHASES.includes(update.phase)) {
+                    deadline = Date.now() + UPDATE_TIMEOUT_MS;
+                    const text = updateStatusText(update);
+                    if (text) setStatus('starting', text);
+                    if (update.phase === 'installing') requestGuiCloseForUpdate();
+                } else if (update && update.phase === 'done') {
+                    setStatus('starting', I18N.t('launcher.updateRestarting'));
+                }
+                if (Date.now() > deadline) {
+                    clearInterval(poll);
+                    isStarting = false;
+                    resetStartButton();
                     setStatus('offline', I18N.t('common.offline'));
                     showMessage(I18N.t('launcher.timeout'), 'error');
+                    onUpdateError && onUpdateError();
                 }
             }, 500);
+        }
+
+        function showPasswordDialog() {
+            const dialog = document.getElementById('password-dialog');
+            dialog.style.display = 'block';
+            const input = document.getElementById('password-input');
+            input.value = '';
+            input.focus();
+            document.getElementById('password-error').style.display = 'none';
+        }
+
+        function hidePasswordDialog() {
+            document.getElementById('password-dialog').style.display = 'none';
+            document.getElementById('password-error').style.display = 'none';
+        }
+
+        function cancelPassword() {
+            hidePasswordDialog();
+        }
+
+        async function submitPassword() {
+            const input = document.getElementById('password-input');
+            const password = input.value;
+            if (!password) {
+                input.focus();
+                return;
+            }
+
+            const errEl = document.getElementById('password-error');
+            errEl.style.display = 'none';
+
+            const submitBtn = document.getElementById('btn-password-submit');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span>';
+
+            try {
+                const result = await pywebview.api.start_system_with_password(password);
+                if (result === 'started') {
+                    hidePasswordDialog();
+                    isStarting = true;
+                    setButton(true);
+                    setStatus('starting', I18N.t('common.starting'));
+                    waitForApi(() => {
+                        isStarting = false;
+                        showMessage(I18N.t('launcher.started'), 'success');
+                        setTimeout(() => { window.location.href = GUI_URL; }, 600);
+                    });
+                    return;
+                }
+                if (result === 'wrong_password') {
+                    errEl.textContent = I18N.t('launcher.wrongPassword');
+                    errEl.style.display = 'block';
+                    input.value = '';
+                    input.focus();
+                } else if (String(result).startsWith('missing:')) {
+                    const path = String(result).replace('missing:', '');
+                    showMessage(I18N.t('launcher.executableMissing', { path }), 'error');
+                    hidePasswordDialog();
+                } else if (String(result).startsWith('error:')) {
+                    errEl.textContent = I18N.t('launcher.startFailed', { msg: result });
+                    errEl.style.display = 'block';
+                } else {
+                    hidePasswordDialog();
+                }
+            } catch (e) {
+                errEl.textContent = I18N.t('launcher.startFailed', { msg: e.message || e });
+                errEl.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = I18N.t('launcher.passwordSubmit');
+            }
         }
 
         async function startSystem() {
@@ -462,6 +626,14 @@
                 }
 
                 const result = await pywebview.api.start_system();
+                if (result === 'needs_password') {
+                    isStarting = false;
+                    setButton(false);
+                    btn.textContent = originalText;
+                    setStatus('offline', I18N.t('common.offline'));
+                    showPasswordDialog();
+                    return;
+                }
                 if (result === 'already_running') {
                     showMessage(I18N.t('launcher.alreadyRunning'), 'success');
                     window.location.href = GUI_URL;
@@ -485,7 +657,7 @@
                     return;
                 }
 
-                waitForApi(60, () => {
+                waitForApi(() => {
                     isStarting = false;
                     showMessage(I18N.t('launcher.started'), 'success');
                     setTimeout(() => { window.location.href = GUI_URL; }, 600);

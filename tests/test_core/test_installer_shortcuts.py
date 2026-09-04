@@ -103,7 +103,7 @@ class TestLinuxInstallerShortcuts:
         assert "gui.bin" in content
         assert "start.bin" in content
         # Both main and full-system entries exist, in the per-user location
-        assert "Exec=$INSTALL_DIR/start.bin" in content
+        assert "Exec=${PKEXEC_BIN}$INSTALL_DIR/start.bin" in content
         assert "$DATA_HOME/applications" in content
 
     def test_linux_has_full_system_entry(self):

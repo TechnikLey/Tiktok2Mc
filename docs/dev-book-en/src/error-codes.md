@@ -61,6 +61,7 @@ The complete, machine-readable list is available via `GET /api/v1/diagnostics/er
 | `HOOK-0008` | Hook lifecycle callback failed | An `on_live_start`/`on_live_end`/`on_unload` callback raised an exception |
 | `HOOK-0009` | Hook permission denied | A guarded HookAPI call lacked the required `permissions` entry in `hook.json` |
 | `HOOK-0010` | Hook timer callback failed | A `register_timer()` callback raised an exception; the timer keeps running |
+| `HOOK-0011` | Hook query handler failed | A `register_query()` handler raised while another hook called it via `query_hook()`; the caller receives `None` |
 
 ### PLUGIN (Plugin System)
 

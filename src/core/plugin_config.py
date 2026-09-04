@@ -77,17 +77,14 @@ def _deep_update(base: dict, overlay: dict) -> None:
 
 
 def discover_plugins_dir() -> Path:
-    """Return the resolved plugins directory (dev or release layout)."""
-    from core.paths import get_root_dir
+    """Return the resolved plugins directory (dev or release layout).
 
-    root = get_root_dir()
-    dev_dir = root / "src" / "plugins"
-    if dev_dir.is_dir():
-        return dev_dir
-    rel_dir = root / "plugins"
-    if rel_dir.is_dir():
-        return rel_dir
-    return dev_dir
+    Delegates to ``core.paths.get_plugins_dir`` — the single source of
+    truth for the dev/release plugin directory resolution.
+    """
+    from core.paths import get_plugins_dir
+
+    return get_plugins_dir()
 
 
 def load_plugin_manifest(plugin_dir: Path) -> dict | None:

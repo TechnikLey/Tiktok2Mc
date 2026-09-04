@@ -160,6 +160,55 @@ document.getElementById('btn-update-now').addEventListener('click', () => {
 
 document.getElementById('btn-update-dismiss').addEventListener('click', hideUpdateNotification);
 
+/* ─── TikTok Connection Failure Dialog ─── */
+let _tiktokFailedDialogActive = false;
+
+function showTiktokFailedDialog(maxFails) {
+  const dlg = document.getElementById('tiktok-failed-dialog');
+  if (!dlg || _tiktokFailedDialogActive) return;
+  const msg = document.getElementById('tiktok-failed-message');
+  if (msg) {
+    msg.textContent = I18N.t('dialog.tiktokFailed.message', { count: maxFails || 1 });
+  }
+  const hint = document.getElementById('tiktok-failed-hint');
+  if (hint) {
+    hint.textContent = I18N.t('dialog.tiktokFailed.hint');
+  }
+  dlg.classList.remove('hidden');
+  _tiktokFailedDialogActive = true;
+  _tiktokConnectDisabled = true;
+  _updateTiktokStatusDisplay();
+}
+
+function hideTiktokFailedDialog() {
+  const dlg = document.getElementById('tiktok-failed-dialog');
+  if (!dlg) return;
+  dlg.classList.add('hidden');
+  _tiktokFailedDialogActive = false;
+}
+
+document.getElementById('btn-tiktok-failed-reconnect')?.addEventListener('click', async () => {
+  hideTiktokFailedDialog();
+  try {
+    const result = await postJSON('/triggers/tiktok-connection', {});
+    if (result.status === 'ok' || result.status === 'success') {
+      _tiktokConnectDisabled = !result.connected;
+      _updateTiktokStatusDisplay();
+      showToast(I18N.t('triggers.connectionNow', { state: result.connected ? I18N.t('triggers.on') : I18N.t('triggers.off') }), 'success');
+      log(`[TIKTOK] Reconnect requested from failure dialog: ${result.connected ? 'ON' : 'OFF'}`, 'info');
+    } else {
+      showToast((result.message || I18N.t('triggers.toggleFailedTitle')), 'error');
+    }
+  } catch (e) {
+    showToast(I18N.t('triggers.toggleFailed', { msg: e.message }), 'error');
+  }
+});
+
+document.getElementById('btn-tiktok-failed-keep-off')?.addEventListener('click', () => {
+  hideTiktokFailedDialog();
+  showToast(I18N.t('dialog.tiktokFailed.keepOffConfirmed'), 'info');
+});
+
 /* ─── Server Manager — lifecycle polling is started/stopped in view switch code ─── */
 
 /* ─── Server Manager Modal Wiring ─── */
@@ -1000,7 +1049,7 @@ function renderJavaStatusBanner(data) {
     return;
   }
   const reason = (data && data.reason) || 'No Java runtime was found on this system.';
-  const minVer = (data && data.minJavaVersion) || 21;
+  const minVer = (data && data.minJavaVersion) || 25;
   const hints = (data && data.hints) || [];
   const installMsg = data && data.install && data.install.message ? '<br><em>' + escapeHtml(data.install.message) + '</em>' : '';
   const hintBlock = hints.length
@@ -1432,11 +1481,39 @@ async function serverCardAction(instanceId, action) {
 /* ─── Server Manager: Instance Actions ─── */
 
 async function openServerFolder(instanceId) {
+  // Preferred path: open the folder from the GUI process itself. On Linux the
+  // backend API runs elevated (pkexec) with a sanitized environment that has
+  // no DISPLAY, so a file manager started from the API can't show a window.
+  // The GUI process has the real display, so a pywebview bridge call works
+  // reliably here (same idea as the "Add Custom Version" file picker).
+  const api = typeof pywebview !== 'undefined' && pywebview.api;
+  if (api && api.open_folder) {
+    try {
+      const p = await fetchJSON('/servers/instances/' + encodeURIComponent(instanceId) + '/path');
+      const path = p.path;
+      if (!path) throw new Error(I18N.t('servers.openFolderFailedTitle'));
+      const result = await api.open_folder(String(path));
+      if (result && result !== 'true' && result !== 'ok') {
+        showToast(I18N.t('servers.openFolderFailed', { msg: String(result) }), 'error');
+      } else {
+        showToast(I18N.t('servers.folderOpened', { path }), 'success');
+      }
+      return;
+    } catch (e) {
+      showToast(I18N.t('servers.openFolderFailed', { msg: e.message }), 'error');
+      return;
+    }
+  }
+  // Fallback: backend endpoint (browser / remote dev, no pywebview bridge).
   try {
     const res = await fetch(API + '/servers/instances/' + encodeURIComponent(instanceId) + '/open', { method: 'POST', headers: _withApiKey({}) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || I18N.t('servers.openFolderFailedTitle'));
-    if (!data.opened) showToast(I18N.t('servers.folderPath', { path: data.path }), 'info');
+    if (data.opened) {
+      showToast(I18N.t('servers.folderOpened', { path: data.path }), 'success');
+    } else {
+      showToast(I18N.t('servers.openFolderFailed', { msg: data.error || I18N.t('servers.folderPath', { path: data.path }) }), 'error');
+    }
   } catch (e) {
     showToast(I18N.t('servers.openFolderFailed', { msg: e.message }), 'error');
   }
@@ -2633,7 +2710,7 @@ function renderPluginManager() {
     const enableDisabled = hasError || !compatible ? ' disabled' : '';
     const platformBadge = !compatible
       ? '<span class="plugin-status status-disabled" title="' + I18N.t('plugins.platformIncompatible') + '">' + _platformLabel(p.platform) + ' ⚠️</span>'
-      : (p.platform && p.platform !== 'all' ? '<span class="plugin-status status-info">' + _platformLabel(p.platform) + '</span>' : '<span class="text-muted">—</span>');
+      : (p.platform && p.platform !== 'all' ? '<span class="plugin-status status-info">' + _platformLabel(p.platform) + '</span>' : '<span class="text-muted">' + _platformLabel(p.platform) + '</span>');
     const action = p.enabled
       ? `<button class="btn btn-danger" style="padding:0.3rem 0.6rem;font-size:0.8rem;" onclick="promptDisablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.disable')}</button>`
       : `<button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.8rem;"${enableDisabled} onclick="promptEnablePlugin('${escapeHtml(p.name)}', '${escapeHtml(p.display_name || p.name)}')">${I18N.t('common.enable')}</button>`;
@@ -4092,6 +4169,8 @@ const HELP_TEXT = {
   'rcon.http_command_api': 'Direct command endpoint (POST /api/v1/rcon/command) used by the dashboard Console tab. Disabled by default for security and stability — direct commands bypass the bridge\'s RCON queue and throttling. Enable only if you use the console or extensions need it; trigger actions keep working via the queue either way.',
   'tiktok.user': 'Your TikTok username — without the @ symbol. This is required for the tool to connect to your live stream.',
   'tiktok.reconnect_delay_seconds': 'Seconds to wait before attempting to reconnect after a connection loss.',
+  'tiktok.failed_connection_popup_enabled': 'When enabled, after the configured number of consecutive failed connection attempts the tool pauses reconnecting and shows a warning in the GUI where you can choose to reconnect or keep the connection disabled. Repeated failed attempts can make TikTok block your device.',
+  'tiktok.max_connect_fails': 'Number of consecutive failed connection attempts after which the tool pauses reconnecting and shows the warning popup. Set to 1 to pause after the first failure.',
   'tiktok.autosave_interval_seconds': 'How often (in seconds) the gift revenue log file is saved to disk. The log is stored at data/gift_revenue_log.jsonl.',
   'tiktok.follow_tracking.mode': 'all_time tracks follows across ALL streams. Once a user is recorded, their future follows are ignored even after restarting. per_stream resets the list every time the tool starts.',
   'tiktok.follow_tracking.file': 'Path to the file storing tracked follower names. Default: data/followed_users.txt.',
@@ -4156,6 +4235,8 @@ const HELP_TEXT_DE = {
   'rcon.http_command_api': 'Direkter Befehls-Endpunkt (POST /api/v1/rcon/command), den der Konsole-Tab im Dashboard nutzt. Aus Sicherheits- und Stabilitätsgründen standardmäßig deaktiviert — direkte Befehle umgehen die RCON-Queue und das Throttling der Bridge. Aktiviere ihn nur, wenn du die Konsole nutzt oder Erweiterungen ihn brauchen; Trigger-Aktionen funktionieren über die Queue weiterhin.',
   'tiktok.user': 'Dein TikTok-Benutzername — ohne das @-Zeichen. Dies ist erforderlich, damit sich das Tool mit deinem Live-Stream verbinden kann.',
   'tiktok.reconnect_delay_seconds': 'Sekunden, die vor dem erneuten Verbindungsversuch nach einem Verbindungsverlust gewartet werden.',
+  'tiktok.failed_connection_popup_enabled': 'Wenn aktiviert, pausiert das Tool nach der konfigurierten Anzahl aufeinanderfolgender fehlgeschlagener Verbindungsversuche das Wiederverbinden und zeigt eine Warnung in der GUI, in der du wählen kannst, ob du erneut verbinden oder die Verbindung deaktiviert lassen möchtest. Wiederholte Fehlversuche können dazu führen, dass TikTok dein Gerät blockiert.',
+  'tiktok.max_connect_fails': 'Anzahl aufeinanderfolgender fehlgeschlagener Verbindungsversuche, nach denen das Tool das Wiederverbinden pausiert und das Warn-Popup anzeigt. Setze 1, um nach dem ersten Fehlversuch zu pausieren.',
   'tiktok.autosave_interval_seconds': 'Wie oft (in Sekunden) die Geschenk-Umsatzlog-Datei auf der Festplatte gespeichert wird. Die Log-Datei liegt unter data/gift_revenue_log.jsonl.',
   'tiktok.follow_tracking.mode': 'all_time verfolgt Follower über ALLE Streams hinweg. Sobald ein Nutzer erfasst wurde, werden zukünftige Follows auch nach einem Neustart ignoriert. per_stream setzt die Liste bei jedem Start des Tools zurück.',
   'tiktok.follow_tracking.file': 'Pfad zur Datei, die die verfolgten Followernamen speichert. Standard: data/followed_users.txt.',
@@ -4220,6 +4301,8 @@ const FIELD_META = {
   'rcon.http_command_api': { basic: true, type: 'bool' },
   'tiktok.user': { basic: true, type: 'text', required: true },
   'tiktok.reconnect_delay_seconds': { basic: true, type: 'number', min: 0 },
+  'tiktok.failed_connection_popup_enabled': { basic: true, type: 'bool' },
+  'tiktok.max_connect_fails': { basic: true, type: 'number', min: 1 },
   'tiktok.autosave_interval_seconds': { basic: true, type: 'number', min: 1 },
   'tiktok.follow_tracking': { basic: true },
   'tiktok.follow_tracking.mode': { basic: true, type: 'select', options: ['all_time','per_stream'] },
@@ -4794,9 +4877,12 @@ class ConfigEditor {
     const rows = (slots || []).map((slot, i) => {
       const nameId = id + '_name_' + i;
       const urlId = id + '_url_' + i;
+      const urlInput = 'url' in slot
+        ? `<input type="text" id="${urlId}" value="${escapeHtml(slot.url || '')}" placeholder="OBS Browser Source URL" data-path="${path}[${i}].url" data-type="string" oninput="editor.onFieldInput()" style="flex:1;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">`
+        : `<button class="btn btn-secondary" style="font-size:0.8rem;padding:0.3rem 0.6rem;" onclick="editor.addOverlaySlotUrl('${path}', ${i})">+ URL</button>`;
       return `<div class="overlay-slot-row">
         <input type="text" id="${nameId}" value="${escapeHtml(slot.name || '')}" placeholder="Slot name" data-path="${path}[${i}].name" data-type="string" oninput="editor.onFieldInput()" style="width:140px;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">
-        <input type="text" id="${urlId}" value="${escapeHtml(slot.url || '')}" placeholder="OBS Browser Source URL" data-path="${path}[${i}].url" data-type="string" oninput="editor.onFieldInput()" style="flex:1;padding:0.4rem 0.6rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:monospace;font-size:0.85rem;">
+        ${urlInput}
         <button class="btn-icon" onclick="editor.removeOverlaySlot('${path}', ${i})" title="Remove slot">&times;</button>
       </div>`;
     }).join('');
@@ -4815,6 +4901,15 @@ class ConfigEditor {
     arr.push({ name: '', url: '' });
     this.setValue(path, arr);
     this.render();
+  }
+
+  addOverlaySlotUrl(path, index) {
+    const arr = this.getValue(path) || [];
+    if (arr[index] && !('url' in arr[index])) {
+      arr[index].url = '';
+      this.setValue(path, arr);
+      this.render();
+    }
   }
 
   removeOverlaySlot(path, index) {
@@ -4943,13 +5038,15 @@ class ConfigEditor {
     const path = 'like_triggers';
     const current = this.getValue(path);
     if (!Array.isArray(current)) return;
+    const firstEl = this.content.querySelector('[data-li-id="0"]');
+    if (!firstEl) return;
     const triggers = [];
     for (let i = 0; i < current.length; i++) {
-      const enEl = document.querySelector(`[data-li-enabled="${i}"]`);
-      const idEl = document.querySelector(`[data-li-id="${i}"]`);
-      const evEl = document.querySelector(`[data-li-every="${i}"]`);
-      const fnEl = document.querySelector(`[data-li-function="${i}"]`);
-      const plEl = document.querySelector(`[data-li-payload="${i}"]`);
+      const enEl = this.content.querySelector(`[data-li-enabled="${i}"]`);
+      const idEl = this.content.querySelector(`[data-li-id="${i}"]`);
+      const evEl = this.content.querySelector(`[data-li-every="${i}"]`);
+      const fnEl = this.content.querySelector(`[data-li-function="${i}"]`);
+      const plEl = this.content.querySelector(`[data-li-payload="${i}"]`);
       if (!idEl) continue;
       triggers.push({
         id: idEl.value,
@@ -6695,7 +6792,7 @@ class ReactionEditor {
       // Publish to EventBus so the event-command mapper dispatches the reaction
       await postJSON('/events', { type: event, data: { test: true, source: 'reaction_test' } });
       // Also attempt to send via trigger service if it's a known TikTok event type
-      const knownTiktokEvents = ['follow', 'like', 'join', 'share', 'comment', 'gift'];
+      const knownTiktokEvents = ['follow', 'join', 'share', 'comment', 'gift'];
       const tiktokPrefix = event.startsWith('tiktok.') ? event.slice(7) : '';
       if (knownTiktokEvents.includes(tiktokPrefix)) {
         await postJSON('/triggers/execute', {
@@ -8364,7 +8461,10 @@ function connectLogStream() {
       if (type === 'log') {
         liveLog.add(payload.msg || payload.message || '', payload.level || 'info', payload.source || '');
       } else if (type === 'server.console') {
-        if (payload.line && (!_consoleInstanceId || payload.instance_id === _consoleInstanceId)) {
+        // Only surface server output when an RCON session is active —
+        // otherwise the console would show log lines even when the user
+        // has not connected.
+        if (consoleTerminal._connected && payload.line && (!_consoleInstanceId || payload.instance_id === _consoleInstanceId)) {
           consoleTerminal._print(payload.line, 'server');
         }
       } else if (type === 'server.restarting') {
@@ -8385,6 +8485,15 @@ function connectLogStream() {
           _tiktokConnectDisabled = payload.disabled;
         }
         _updateTiktokStatusDisplay();
+      } else if (type === 'tiktok.connect_failed') {
+        // Repeated connection failures: pause + let the user choose whether
+        // to re-enable or keep the TikTok connection disabled.
+        showTiktokFailedDialog(payload.max_fails || 1);
+        liveLog.add(
+          (payload.reason || '') + ' — ' + I18N.t('dialog.tiktokFailed.title'),
+          'warning',
+          'tiktok'
+        );
       } else if (type.startsWith('tiktok.')) {
         // Test triggers (trigger tester / external simulations) must never
         // count as proof of an active live connection.
@@ -8627,7 +8736,7 @@ const consoleTerminal = {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(API + '/rcon/connect', { method: 'POST', signal: controller.signal, headers: _withApiKey({}) });
-      if (!res.ok) throw new Error((await res.json()).detail || I18N.t('console.commandFailed'));
+      if (!res.ok) throw new Error((await _parseErrorDetail(res)) || I18N.t('console.commandFailed'));
       this._connected = true;
       status.textContent = I18N.t('console.connected');
       status.className = 'console-status connected';
@@ -8654,6 +8763,7 @@ const consoleTerminal = {
     const btn = document.getElementById('btn-console-connect');
     const input = document.getElementById('console-input');
     const status = document.getElementById('console-status');
+    const output = document.getElementById('console-output');
     btn.disabled = true;
     try {
       await fetch(API + '/rcon/disconnect', { method: 'POST', headers: _withApiKey({}) });
@@ -8663,6 +8773,7 @@ const consoleTerminal = {
     status.className = 'console-status offline';
     btn.textContent = I18N.t('console.connect');
     input.disabled = true;
+    output.innerHTML = '';
     this._print(I18N.t('console.disconnectedMsg'), 'system');
     btn.disabled = false;
   },
@@ -8676,7 +8787,7 @@ const consoleTerminal = {
         headers: _withApiKey({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ command: cmd })
       });
-      if (!res.ok) throw new Error((await res.json()).detail || I18N.t('console.commandFailed'));
+      if (!res.ok) throw new Error((await _parseErrorDetail(res)) || I18N.t('console.commandFailed'));
       const data = await res.json();
       if (data.response) {
         this._print(data.response, 'output');
@@ -9003,6 +9114,9 @@ class EventTester {
     this._gifts = [];
     this._selectedGift = null;
     this._giftSelectLoaded = false;
+    this._milestones = [];
+    this._selectedMilestone = null;
+    this._milestonesLoaded = false;
   }
 
   onTypeChange() {
@@ -9010,12 +9124,17 @@ class EventTester {
     const customGroup = document.getElementById('custom-trigger-group');
     const giftGroup = document.getElementById('gift-trigger-group');
     const commentFields = document.getElementById('comment-fields');
+    const likeMilestoneGroup = document.getElementById('like-milestone-group');
     if (customGroup) customGroup.style.display = type === 'custom' ? 'block' : 'none';
     if (giftGroup) giftGroup.style.display = type === 'gift' ? 'block' : 'none';
     if (commentFields) commentFields.style.display = type === 'comment' ? 'flex' : 'none';
+    if (likeMilestoneGroup) likeMilestoneGroup.style.display = type === 'like' ? 'block' : 'none';
 
     if (type === 'gift' && !this._giftSelectLoaded) {
       this._loadGifts();
+    }
+    if (type === 'like' && !this._milestonesLoaded) {
+      this._loadMilestones();
     }
   }
 
@@ -9028,6 +9147,64 @@ class EventTester {
     } catch (e) {
       showToast(I18N.t('triggers.giftsLoadFailed', { msg: e.message }), 'error');
       this._gifts = [];
+    }
+  }
+
+  async _loadMilestones() {
+    try {
+      const data = await fetchJSON('/triggers/like-milestones');
+      this._milestones = (data.milestones || []).filter(m => m.enabled);
+      this._milestonesLoaded = true;
+      this._renderMilestoneSelect(this._milestones);
+    } catch (e) {
+      showToast(I18N.t('triggers.giftsLoadFailed', { msg: e.message }), 'error');
+      this._milestones = [];
+    }
+  }
+
+  _renderMilestoneSelect(milestones) {
+    const select = document.getElementById('like-milestone-select');
+    const info = document.getElementById('like-milestone-info');
+    if (!select) return;
+    select.innerHTML = '';
+    if (!milestones.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = I18N.t('triggers.noMilestones');
+      opt.disabled = true;
+      select.appendChild(opt);
+      if (info) info.textContent = '';
+      return;
+    }
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = I18N.t('triggers.chooseMilestone');
+    placeholder.disabled = true;
+    placeholder.selected = !this._selectedMilestone;
+    select.appendChild(placeholder);
+    for (const m of milestones) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.id} — ${I18N.t('triggers.milestoneInfo', { every: m.every, function: m.function })}`;
+      if (this._selectedMilestone && this._selectedMilestone.id === m.id) opt.selected = true;
+      select.appendChild(opt);
+    }
+    if (info && this._selectedMilestone) {
+      info.textContent = I18N.t('triggers.milestoneInfo', { every: this._selectedMilestone.every, function: this._selectedMilestone.function });
+    } else if (info) {
+      info.textContent = '';
+    }
+  }
+
+  onMilestoneChange() {
+    const select = document.getElementById('like-milestone-select');
+    const info = document.getElementById('like-milestone-info');
+    const id = select ? select.value : '';
+    this._selectedMilestone = this._milestones.find(m => m.id === id) || null;
+    if (info && this._selectedMilestone) {
+      info.textContent = I18N.t('triggers.milestoneInfo', { every: this._selectedMilestone.every, function: this._selectedMilestone.function });
+    } else if (info) {
+      info.textContent = '';
     }
   }
 
@@ -9187,6 +9364,12 @@ class EventTester {
       }
       giftId = String(this._selectedGift.id);
       triggerName = this._selectedGift.name || giftId;
+    } else if (type === 'like') {
+      if (!this._selectedMilestone || !this._selectedMilestone.function) {
+        this._showError(I18N.t('triggers.selectMilestoneRequired'));
+        return;
+      }
+      triggerName = this._selectedMilestone.function;
     }
 
     const userInput = document.getElementById('trigger-user');

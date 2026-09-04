@@ -6,6 +6,8 @@ class ActionsEditor {
     this.gifts = [];
     this.giftSearch = '';
     this.availableScripts = [];
+    this.diagnostics = [];
+    this._validateTimer = null;
 
     this.el = document.getElementById('actions-editor');
     this.tableBody = document.getElementById('actions-table-body');
@@ -66,12 +68,60 @@ class ActionsEditor {
   _updateSaveButton() {
     const btn = document.getElementById('actions-editor-save');
     if (!btn) return;
-    btn.disabled = !this.isDirty;
-    btn.style.opacity = this.isDirty ? '1' : '0.5';
-    btn.style.cursor = this.isDirty ? 'pointer' : 'not-allowed';
+    const hasIssues = (this.diagnostics || []).some(d => d.severity === 'ERROR' || d.severity === 'WARNING');
+    const canSave = this.isDirty && !hasIssues;
+    btn.disabled = !canSave;
+    btn.style.opacity = canSave ? '1' : '0.5';
+    btn.style.cursor = canSave ? 'pointer' : 'not-allowed';
+    btn.title = hasIssues ? I18N.t('actions.saveBlockedWarnings') : '';
   }
 
-  /* ── Data Loading ── */
+  /* ── Validation ── */
+
+  async _validate() {
+    try {
+      const data = await postJSON('/actions/validate-triggers', { triggers: this.triggers });
+      this.diagnostics = data.diagnostics || [];
+    } catch (e) {
+      this.diagnostics = [];
+      console.error(I18N.t('actions.validateFailed', { msg: e.message }));
+    }
+    this._renderDiagnostics();
+    this._updateSaveButton();
+  }
+
+  _scheduleValidate() {
+    if (this._validateTimer) clearTimeout(this._validateTimer);
+    this._validateTimer = setTimeout(() => this._validate(), 400);
+  }
+
+  _renderDiagnostics() {
+    const panel = document.getElementById('actions-diagnostics');
+    if (!panel) return;
+    const diags = this.diagnostics || [];
+    if (!diags.length) {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+      return;
+    }
+    panel.style.display = 'block';
+    const errors = diags.filter(d => d.severity === 'ERROR');
+    const warnings = diags.filter(d => d.severity === 'WARNING');
+    let html = '<div class="actions-diag-summary">';
+    if (errors.length) html += `<span class="diag-count diag-errors">${errors.length} ${I18N.t('actions.errors')}</span>`;
+    if (warnings.length) html += `<span class="diag-count diag-warnings">${warnings.length} ${I18N.t('actions.warnings')}</span>`;
+    html += '</div><ul class="actions-diag-list">';
+    diags.forEach(d => {
+      const name = this.triggers[d.line] ? (this.triggers[d.line].name || '') : '';
+      html += `<li class="diag-${d.severity === 'ERROR' ? 'error' : 'warning'}">
+        <span class="diag-badge">${d.severity === 'ERROR' ? I18N.t('actions.error') : I18N.t('actions.warning')}</span>
+        <span class="diag-msg">${escapeHtml(d.message)}</span>
+        ${name ? `<span class="diag-trigger">(${escapeHtml(name)})</span>` : ''}
+      </li>`;
+    });
+    html += '</ul>';
+    panel.innerHTML = html;
+  }
 
   async load() {
     try {
@@ -84,6 +134,7 @@ class ActionsEditor {
       showToast(I18N.t('actions.loadFailed', { msg: e.message }), 'error');
     }
     this._populateScriptDropdowns();
+    await this._validate();
   }
 
   async loadGifts() {
@@ -114,7 +165,9 @@ class ActionsEditor {
       const cmdSummary = (t.commands || []).length
         ? t.commands.map(c => {
             const prefix = { vanilla: '/', rcon: '!', script: '$', overlay: '>>', named_overlay: `@${c.overlay_name}>>`, shell: '&' }[c.type] || '/';
-            return prefix + (c.command || '').substring(0, 30);
+            let summary = prefix + (c.command || '').substring(0, 30);
+            if (c.type === 'vanilla' && c.dynamic_vanilla) summary += ' !rc';
+            return summary;
           }).join('; ')
         : I18N.t('actions.noCommands');
       return `<tr class="actions-row ${i === this.selectedIndex ? 'selected' : ''} ${t.enabled ? '' : 'disabled'}" data-index="${i}" onclick="actionsEditor.selectTrigger(${i})">
@@ -183,8 +236,8 @@ class ActionsEditor {
             data-trigger-idx="${index}"
             data-cmd-idx="${ci}"
             onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)"
-            onfocus="actionsEditor._showScriptDropdown(event, ${index}, ${ci})"
-            oninput="actionsEditor._filterScriptDropdown(event)">
+            oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'command', this.value); actionsEditor._filterScriptDropdown(event)"
+            onfocus="actionsEditor._showScriptDropdown(event, ${index}, ${ci})">
           <div class="cmd-script-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;">
             <div class="cmd-script-list"></div>
           </div>
@@ -193,23 +246,32 @@ class ActionsEditor {
         // For vanilla, rcon, shell: show command input
         const placeholders = { 'vanilla': I18N.t('actions.command'), 'rcon': I18N.t('actions.command'), 'shell': I18N.t('actions.shellCommand') };
         const placeholder = placeholders[cmd.type] || I18N.t('actions.command');
-        html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
-      }
-
-      if (cmd.type !== 'overlay' && cmd.type !== 'named_overlay') {
-        html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
+        html += `<input class="cmd-input" type="text" value="${escapeHtml(cmd.command)}" placeholder="${placeholder}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'command', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'command', this.value)">`;
       }
 
       html += `<button class="btn-icon" onclick="actionsEditor.removeCmd(${index}, ${ci})" title="${I18N.t('actions.removeCommand')}">&times;</button>
         </div>`;
 
+      // Meta row: multiplier + dynamic vanilla (nicely formatted, below the input)
+      html += `<div class="cmd-meta">`;
+      if (cmd.type !== 'overlay' && cmd.type !== 'named_overlay') {
+        html += `<label class="cmd-mult">x <input type="number" min="1" value="${cmd.multiplier || 1}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'multiplier', parseInt(this.value) || 1)" style="width:50px;"></label>`;
+      }
+      if (cmd.type === 'vanilla') {
+        html += `<label class="cmd-rc" title="${I18N.t('actions.dynamicVanillaHint')}">
+          <input type="checkbox" ${cmd.dynamic_vanilla ? 'checked' : ''} onchange="actionsEditor.updateCmd(${index}, ${ci}, 'dynamic_vanilla', this.checked)">
+          <span>${I18N.t('actions.dynamicVanillaShort')}</span>
+        </label>`;
+      }
+      html += `</div>`;
+
       if (cmd.type === 'overlay' || cmd.type === 'named_overlay') {
         html += `<div class="cmd-overlay-fields">
-          <input type="text" value="${escapeHtml(cmd.title || '')}" placeholder="${I18N.t('actions.titleField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'title', this.value)">
-          <input type="text" value="${escapeHtml(cmd.subtitle || '')}" placeholder="${I18N.t('actions.subtitleField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'subtitle', this.value)">
+          <input type="text" value="${escapeHtml(cmd.title || '')}" placeholder="${I18N.t('actions.titleField')}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'title', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'title', this.value)">
+          <input type="text" value="${escapeHtml(cmd.subtitle || '')}" placeholder="${I18N.t('actions.subtitleField')}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'subtitle', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'subtitle', this.value)">
           <input type="number" min="1" max="30" value="${cmd.duration || 3}" placeholder="${I18N.t('actions.durationField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'duration', parseInt(this.value) || 3)" style="width:90px;">`;
         if (cmd.type === 'named_overlay') {
-          html += `<input type="text" value="${escapeHtml(cmd.overlay_name || 'default')}" placeholder="${I18N.t('actions.overlayNameField')}" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'overlay_name', this.value)" style="width:120px;">`;
+          html += `<input type="text" value="${escapeHtml(cmd.overlay_name || 'default')}" placeholder="${I18N.t('actions.overlayNameField')}" oninput="actionsEditor._updateCmdLive(${index}, ${ci}, 'overlay_name', this.value)" onchange="actionsEditor.updateCmd(${index}, ${ci}, 'overlay_name', this.value)" style="width:120px;">`;
         }
         html += `</div>`;
       }
@@ -331,6 +393,7 @@ class ActionsEditor {
     this.triggers.splice(index, 1);
     this.isDirty = true;
     this._updateSaveButton();
+    this._scheduleValidate();
     if (this.triggers.length === 0) {
       this.selectedIndex = -1;
       this.renderTable();
@@ -379,6 +442,7 @@ class ActionsEditor {
     this.isDirty = true;
     this._updateSaveButton();
     this.renderTable();
+    this._scheduleValidate();
   }
 
   updateCmd(ti, ci, field, value) {
@@ -388,6 +452,17 @@ class ActionsEditor {
       this.isDirty = true;
     this._updateSaveButton();
       this.renderTable();
+      this._scheduleValidate();
+    }
+  }
+
+  _updateCmdLive(ti, ci, field, value) {
+    const cmd = this.triggers[ti]?.commands?.[ci];
+    if (cmd) {
+      cmd[field] = value;
+      this.isDirty = true;
+      this._updateSaveButton();
+      this._scheduleValidate();
     }
   }
 
@@ -400,6 +475,7 @@ class ActionsEditor {
     this._updateSaveButton();
     this.renderDetail(ti);
     this.renderTable();
+    this._scheduleValidate();
   }
 
   removeCmd(ti, ci) {
@@ -410,6 +486,7 @@ class ActionsEditor {
     this._updateSaveButton();
     this.renderDetail(ti);
     this.renderTable();
+    this._scheduleValidate();
   }
 
   /* ── Add Event Modal (replaces prompt) ── */
@@ -582,6 +659,7 @@ class ActionsEditor {
     this.renderTable();
     this.selectTrigger(this.triggers.length - 1);
     this._closeAddModal();
+    this._scheduleValidate();
   }
 
   _showAddError(msg) {
@@ -610,6 +688,12 @@ class ActionsEditor {
             return;
           }
         }
+      }
+
+      await this._validate();
+      if (this.diagnostics.some(d => d.severity === 'ERROR' || d.severity === 'WARNING')) {
+        showToast(I18N.t('actions.saveBlockedWarnings'), 'error');
+        return;
       }
 
       const body = { triggers: this.triggers };

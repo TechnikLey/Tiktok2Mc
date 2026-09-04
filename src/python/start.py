@@ -78,6 +78,7 @@ from core.shutdown import (  # noqa: E402
     ShutdownReason,
     get_shutdown_controller,
 )
+from core.update_exit import EXIT_MESSAGES, EXIT_NO_UPDATE, EXIT_OK  # noqa: E402
 from core.utils import load_config  # noqa: E402
 from core.validation_framework import (  # noqa: E402
     run_startup_validation,
@@ -152,11 +153,26 @@ except (FileNotFoundError, ValueError, RuntimeError) as e:
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
         if sys.stdin.isatty():
-            log.error("This script must be run as root on Linux to start the tool.")
+            log.error(
+                "This application requires root privileges on Linux.\n"
+                "\n"
+                "Root is needed for:\n"
+                "  - Binding the Minecraft server port (25565 < 1024)\n"
+                "  - Starting and managing child processes (tmux/screen)\n"
+                "  - Writing to the installation directory\n"
+                "\n"
+                "Start with: sudo ./start.bin\n"
+                "Or via GUI: the GUI will prompt for authentication automatically.\n"
+                "\n"
+                "If you have configured a custom port >= 1024, you can set\n"
+                "  show_sudo_warning: false\n"
+                "in config/config.yaml to suppress this check."
+            )
             _input_confirm_exit("Press Enter to exit...")
         else:
             log.warning(
-                "Not running as root. Continuing anyway (no TTY). Some features may fail."
+                "Not running as root. Some features may fail (e.g. port binding, "
+                "tmux/screen session management). Continuing anyway (no TTY)."
             )
 
 # -----------------------------
@@ -328,16 +344,6 @@ _SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 # -----------------------------
 # Updater
 # -----------------------------
-_UPDATE_EXIT_MESSAGES = {
-    1: "Unexpected error while updating.",
-    5: "No update needed.",
-    10: "Could not reach the update server.",
-    11: "No update file found for this platform.",
-    12: "Checksum file is missing.",
-    13: "Checksum verification failed — file may be corrupted.",
-    14: "Download failed.",
-    15: "Could not install the update (files locked or read-only?).",
-}
 
 
 def replace_updater_if_exists() -> None:
@@ -355,6 +361,11 @@ def start_UPDATE_EXE_PATH():
     """Run updater synchronously — must wait for exit code."""
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
     log_dir = ROOT_DIR / "logs" / "update_logs"
+    # Capture updater output on every platform; hidden Windows runs (the
+    # normal case) would otherwise discard stdout/stderr entirely.
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M")
+    log_file = log_dir / f"updater_{timestamp}.log"
     if IS_WINDOWS:
         update_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
         flags = (
@@ -362,14 +373,15 @@ def start_UPDATE_EXE_PATH():
             if update_hidden
             else subprocess.CREATE_NEW_CONSOLE
         )
-        proc = subprocess.Popen(cmd, creationflags=flags)
+        if update_hidden:
+            with open(log_file, "a", encoding="utf-8") as lf:
+                proc = subprocess.Popen(cmd, creationflags=flags, stdout=lf, stderr=lf)
+        else:
+            proc = subprocess.Popen(cmd, creationflags=flags)
     else:
         log.info(
             "Starting updater. This may take a few minutes. Please do not close or interrupt the program..."
         )
-        log_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M")
-        log_file = log_dir / f"updater_{timestamp}.log"
         with open(log_file, "a", encoding="utf-8") as lf:
             proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, start_new_session=True)
 
@@ -443,37 +455,28 @@ if UPDATE_ENABLED and UPDATE_AUTO_INSTALL:
             )
             sys.exit(0)
 
-        if result == 5:
-            set_last_update_result(5, ok=True, message="No update needed.")
+        if result == EXIT_NO_UPDATE:
+            set_last_update_result(
+                EXIT_NO_UPDATE, ok=True, message=EXIT_MESSAGES[EXIT_NO_UPDATE]
+            )
             log.info("Continuing...")
             break
 
-        elif result == 0:
-            set_last_update_result(0, ok=True, message="Update installed successfully.")
-            log.info("\nUpdate has been installed. Restarting automatically...")
-            _executable = sys.executable
-            _args = [_executable] + sys.argv[1:]
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "utf-8"
-            # PyInstaller 6.9+ requires reset env for processes that outlive us.
-            env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-            if IS_WINDOWS:
-                restart_hidden = not CONSOLE_VISIBLE or not ALLOW_CLOSE or LOG_LEVEL < 2
-                flags = (
-                    subprocess.CREATE_NO_WINDOW
-                    if restart_hidden
-                    else subprocess.CREATE_NEW_CONSOLE
-                )
-                subprocess.Popen(_args, creationflags=flags, close_fds=True, env=env)
-            else:
-                subprocess.Popen(_args, env=env, start_new_session=True, close_fds=True)
+        elif result == EXIT_OK:
+            set_last_update_result(EXIT_OK, ok=True, message=EXIT_MESSAGES[EXIT_OK])
+            # The updater relaunches the application itself after installing the
+            # files (see update.py _relaunch_tool_after_update). We must not
+            # restart here: on Windows the updater overwrites our executable
+            # while it is running, so an early restart would be terminated by
+            # the kill signal again and never come back up.
+            log.info("\nUpdate installed. Waiting for the updater to restart...")
             sys.exit(0)
 
         else:
             set_last_update_result(
                 result,
                 ok=False,
-                message=_UPDATE_EXIT_MESSAGES.get(
+                message=EXIT_MESSAGES.get(
                     result, f"Updater failed with exit code {result}."
                 ),
             )

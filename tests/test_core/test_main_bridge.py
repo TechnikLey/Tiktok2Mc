@@ -1936,3 +1936,111 @@ class TestBridgeOriginGuard:
             self._make_request(remote_addr="192.168.1.50", host="192.168.1.50:29188"),
         )
         assert main_mod._bridge_origin_check() is None
+
+
+# =========================================================================
+# Connection-failure protection (repeated fails -> GUI popup + pause)
+# =========================================================================
+
+
+class TestConnectFailureThreshold:
+    def _reset(self, main_mod):
+        main_mod.ctx.failed_connection_popup_enabled = True
+        main_mod.ctx.max_connect_fails = 3
+        main_mod.ctx.connect_fail_count = 0
+        main_mod.ctx.connect_fail_popup_triggered = False
+        main_mod.ctx.disable_tiktok_connect = False
+
+    def test_counts_failures_below_threshold(self, monkeypatch):
+        from src.python import main as main_mod
+
+        self._reset(main_mod)
+        published = []
+        monkeypatch.setattr(
+            main_mod, "_publish_tiktok_connect_failed", published.append
+        )
+
+        assert main_mod._check_connect_failure_threshold("reconnect") is False
+        assert main_mod._check_connect_failure_threshold("reconnect") is False
+        assert main_mod.ctx.connect_fail_count == 2
+        assert main_mod.ctx.disable_tiktok_connect is False
+        assert published == []
+
+    def test_pauses_and_publishes_at_threshold(self, monkeypatch):
+        from src.python import main as main_mod
+
+        self._reset(main_mod)
+        published = []
+
+        def fake_publish(max_fails, reason):
+            published.append((max_fails, reason))
+
+        monkeypatch.setattr(main_mod, "_publish_tiktok_connect_failed", fake_publish)
+        monkeypatch.setattr(main_mod, "_publish_tiktok_status", lambda *a, **k: None)
+
+        assert main_mod._check_connect_failure_threshold("reconnect") is False
+        assert main_mod._check_connect_failure_threshold("reconnect") is False
+        assert main_mod._check_connect_failure_threshold("DEVICE_BLOCKED") is True
+
+        assert main_mod.ctx.connect_fail_count == 3
+        assert main_mod.ctx.disable_tiktok_connect is True
+        assert main_mod.ctx.connect_fail_popup_triggered is True
+        assert len(published) == 1
+        assert published[0] == (3, "DEVICE_BLOCKED")
+
+    def test_only_triggers_once_per_burst(self, monkeypatch):
+        from src.python import main as main_mod
+
+        self._reset(main_mod)
+        published = []
+
+        def fake_publish(max_fails, reason):
+            published.append((max_fails, reason))
+
+        monkeypatch.setattr(main_mod, "_publish_tiktok_connect_failed", fake_publish)
+        monkeypatch.setattr(main_mod, "_publish_tiktok_status", lambda *a, **k: None)
+
+        for _ in range(5):
+            main_mod._check_connect_failure_threshold("reconnect")
+
+        assert main_mod.ctx.disable_tiktok_connect is True
+        assert len(published) == 1
+
+    def test_disabled_popup_never_pauses(self, monkeypatch):
+        from src.python import main as main_mod
+
+        self._reset(main_mod)
+        main_mod.ctx.failed_connection_popup_enabled = False
+        published = []
+        monkeypatch.setattr(
+            main_mod, "_publish_tiktok_connect_failed", published.append
+        )
+
+        # Even well past the threshold, no pause and no popup.
+        for _ in range(10):
+            assert main_mod._check_connect_failure_threshold("reconnect") is False
+        assert main_mod.ctx.disable_tiktok_connect is False
+        assert published == []
+
+    def test_publish_connect_failed_payload(self, monkeypatch):
+        from src.python import main as main_mod
+
+        submitted = {}
+
+        def fake_run_in_background(fn, *args):
+            submitted["fn"] = fn
+            submitted["args"] = args
+
+        monkeypatch.setattr(main_mod, "_run_in_background", fake_run_in_background)
+
+        main_mod._publish_tiktok_connect_failed(3, "reconnect")
+
+        fn = submitted.get("fn")
+        args = submitted.get("args")
+        assert fn is main_mod._post_tiktok_status
+        assert isinstance(args, tuple) and args
+        body = json.loads(args[0])
+        assert body == {
+            "type": "tiktok.connect_failed",
+            "data": {"max_fails": 3, "reason": "reconnect"},
+        }

@@ -46,6 +46,7 @@ import enum
 import json
 import logging
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -168,6 +169,28 @@ def _read_log_tail(log_file: Path | None, max_lines: int = 30) -> str:
         return ""
 
 
+def _read_instance_dir_log_tail(cwd: Path | None, max_lines: int = 40) -> str:
+    """Best-effort diagnostic tail of a child's output in its working dir.
+
+    Used as a fallback when the child runs inside a tmux/screen session (so
+    no ``proc.log_file`` exists) — e.g. the Minecraft server's
+    ``logs/latest.log``. Returns an empty string when nothing is readable.
+    """
+    if cwd is None:
+        return ""
+    for rel in ("logs/latest.log", "logs/debug.log", "latest.log"):
+        path = cwd / rel
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text("utf-8", errors="replace").splitlines()
+        except (OSError, ValueError):
+            continue
+        if lines:
+            return "\n".join(lines[-max_lines:])
+    return ""
+
+
 def _update_process_health(proc_name: str, state: ProcessState) -> None:
     """Update the health monitor for a managed process."""
     try:
@@ -188,9 +211,26 @@ def _update_process_health(proc_name: str, state: ProcessState) -> None:
 
 
 def _build_display_env_tmux() -> list[str]:
-    """Build -e flags for tmux new-session to forward display vars."""
+    """Build -e flags for tmux new-session to forward display vars and
+    any RESOLVED_PORT_* / SERVER_HOST environment variables.
+
+    tmux may reuse an existing server process with its own environment,
+    so we explicitly forward the vars the child processes need (display
+    context for GUI children, port resolution for the server).
+    """
+    vars_to_forward = (
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR",
+        "SERVER_HOST",
+    )
+    # Also forward RESOLVED_PORT_* vars (needed by server.bin for port
+    # resolution).
+    for k in os.environ:
+        if k.startswith("RESOLVED_PORT_"):
+            vars_to_forward = vars_to_forward + (k,)
     args: list[str] = []
-    for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "SERVER_HOST"):
+    for var in vars_to_forward:
         val = os.environ.get(var)
         if val:
             args.extend(["-e", f"{var}={val}"])
@@ -198,15 +238,69 @@ def _build_display_env_tmux() -> list[str]:
 
 
 def _build_display_env_screen() -> list[str]:
-    """Build env prefix for screen sessions to forward display vars."""
+    """Build env prefix for screen sessions to forward display vars and
+    any RESOLVED_PORT_* host vars.
+
+    screen spawns a fresh shell, but we still forward the critical vars
+    explicitly in case screen uses the caller's environment directly.
+    """
+    vars_to_forward = (
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR",
+        "SERVER_HOST",
+    )
+    for k in os.environ:
+        if k.startswith("RESOLVED_PORT_"):
+            vars_to_forward = vars_to_forward + (k,)
     env_args: list[str] = []
-    for var in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "SERVER_HOST"):
+    for var in vars_to_forward:
         val = os.environ.get(var)
         if val:
             env_args.append(f"{var}={val}")
     if env_args:
         return ["env"] + env_args
     return []
+
+
+def _write_env_file(env: dict[str, str], dest: Path) -> None:
+    """Write an env file that a tmux/screen session can source.
+
+    This ensures the child inherits the full parent environment (including
+    RESOLVED_PORT_*, JAVA_HOME, PATH, etc.) rather than relying on
+    selective ``-e`` forwarding which may drop variables.
+    """
+    with dest.open("w", encoding="utf-8") as f:
+        for key, val in sorted(env.items()):
+            safe_val = val.replace("\\", "\\\\").replace('"', '\\"')
+            f.write(f'export {key}="{safe_val}"\n')
+
+
+def _build_session_env_file(env: dict[str, str], session_name: str) -> Path | None:
+    """Write a temporary env file for a tmux/screen session.
+
+    The filename is keyed to *session_name* (unique per managed process) so
+    multiple concurrent sessions started by the same supervisor do not
+    overwrite each other's env files.
+    """
+    try:
+        env_dir = get_root_dir() / "tmp"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        env_file = env_dir / f"session_env_{_sanitize_session_name(session_name)}.sh"
+        _write_env_file(env, env_file)
+        return env_file
+    except OSError as exc:
+        log.debug("[SUPERVISOR] Could not write session env file: %s", exc)
+        return None
+
+
+def _session_env_file(session_name: str) -> Path:
+    """Return the (sanitized) path of the env file for *session_name*."""
+    return (
+        get_root_dir()
+        / "tmp"
+        / f"session_env_{_sanitize_session_name(session_name)}.sh"
+    )
 
 
 def _port_is_free(host: str, port: int) -> bool:
@@ -574,6 +668,21 @@ class ProcessSupervisor:
                             name,
                             proc.readiness_timeout,
                         )
+                        tail = _read_log_tail(proc.log_file)
+                        if not tail and proc.cwd:
+                            # On Linux processes usually run inside a
+                            # tmux/screen session and never write a
+                            # ``proc.log_file`` — fall back to the child's
+                            # output files in its working directory (e.g. the
+                            # Minecraft server's logs/latest.log) so the
+                            # reason is not lost.
+                            tail = _read_instance_dir_log_tail(proc.cwd)
+                        if tail:
+                            log.error(
+                                "[SUPERVISOR] %s output (last lines):\n%s",
+                                name,
+                                tail,
+                            )
                     proc.state = ProcessState.FAILED
                     _update_process_health(name, ProcessState.FAILED)
                     return False
@@ -627,6 +736,21 @@ class ProcessSupervisor:
         if not shutil.which(cmd[0]) and not Path(cmd[0]).exists():
             raise FileNotFoundError(f"Executable not found: {cmd[0]}")
 
+        # On Linux, verify the executable has the +x bit before attempting
+        # to start it — otherwise the error is cryptic (exit code 126).
+        if not IS_WINDOWS and Path(cmd[0]).exists() and not os.access(cmd[0], os.X_OK):
+            log.error(
+                "[SUPERVISOR] %s: executable permission missing: %s. "
+                "Fix with: chmod +x %s",
+                proc.name,
+                cmd[0],
+                cmd[0],
+            )
+            raise _ProcessStartupError(
+                f"{proc.name}: executable permission missing on {cmd[0]}. "
+                f"Fix with: chmod +x {cmd[0]}"
+            )
+
         if IS_WINDOWS:
             flags = (
                 subprocess.CREATE_NO_WINDOW
@@ -667,14 +791,51 @@ class ProcessSupervisor:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            await asyncio.to_thread(
-                subprocess.Popen,
-                ["tmux", "new-session", "-d", "-s", session_name]
-                + _build_display_env_tmux()
-                + cmd,
-                cwd=cwd,
-                env=env,
-            )
+            env_file = _build_session_env_file(env, session_name)
+            session_cmd = [
+                "tmux",
+                "new-session",
+                "-d",
+                "-s",
+                session_name,
+            ] + _build_display_env_tmux()
+            if env_file is not None:
+                session_cmd.extend(
+                    [
+                        "bash",
+                        "-c",
+                        f'source "{env_file}" && exec {" ".join(shlex.quote(c) for c in cmd)}',
+                    ]
+                )
+            else:
+                session_cmd.extend(cmd)
+            try:
+                tmux_proc = await asyncio.to_thread(
+                    subprocess.Popen,
+                    session_cmd,
+                    cwd=cwd,
+                    env=env,
+                )
+                if env_file is not None:
+                    try:
+                        tmux_proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    if tmux_proc.poll() is not None and tmux_proc.returncode != 0:
+                        log.error(
+                            "[SUPERVISOR] tmux session '%s' failed to start "
+                            "(exit code %s). Check that tmux is installed and "
+                            "executable.",
+                            session_name,
+                            tmux_proc.returncode,
+                        )
+            except FileNotFoundError:
+                log.error(
+                    "[SUPERVISOR] tmux not found. Install it with: "
+                    "sudo apt install tmux / sudo dnf install tmux / "
+                    "sudo pacman -S tmux"
+                )
+                raise _ProcessStartupError("tmux not found — cannot start session")
             proc.session_name = session_name
             self._linux_sessions.append(session_name)
             proc.proc = None
@@ -686,12 +847,32 @@ class ProcessSupervisor:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            await asyncio.to_thread(
-                subprocess.Popen,
-                ["screen", "-dmS", session_name] + _build_display_env_screen() + cmd,
-                cwd=cwd,
-                env=env,
-            )
+            env_file = _build_session_env_file(env, session_name)
+            session_cmd = ["screen", "-dmS", session_name] + _build_display_env_screen()
+            if env_file is not None:
+                session_cmd.extend(
+                    [
+                        "bash",
+                        "-c",
+                        f'source "{env_file}" && exec {" ".join(shlex.quote(c) for c in cmd)}',
+                    ]
+                )
+            else:
+                session_cmd.extend(cmd)
+            try:
+                await asyncio.to_thread(
+                    subprocess.Popen,
+                    session_cmd,
+                    cwd=cwd,
+                    env=env,
+                )
+            except FileNotFoundError:
+                log.error(
+                    "[SUPERVISOR] screen not found. Install it with: "
+                    "sudo apt install screen / sudo dnf install screen / "
+                    "sudo pacman -S screen"
+                )
+                raise _ProcessStartupError("screen not found — cannot start session")
             proc.session_name = session_name
             self._linux_sessions.append(session_name)
             proc.proc = None
@@ -701,6 +882,8 @@ class ProcessSupervisor:
             log_file = log_dir / f"{_sanitize_session_name(proc.name)}.log"
             proc.log_file = log_file
             kwargs = {"cwd": cwd, "env": env, "stdin": subprocess.DEVNULL}
+            if not IS_WINDOWS:
+                kwargs["start_new_session"] = True
 
             def _spawn_with_log() -> subprocess.Popen | None:
                 with open(log_file, "w", encoding="utf-8") as lf:
@@ -723,7 +906,20 @@ class ProcessSupervisor:
                 if proc.proc.poll() is not None:
                     code = proc.proc.returncode
                     tail = _read_log_tail(proc.log_file)
-                    msg = f"{proc.name} exited immediately with code {code}"
+                    msg = (
+                        f"{proc.name} exited immediately with code {code} "
+                        f"(command: {cmd[0]!r})"
+                    )
+                    if not IS_WINDOWS and code == 126:
+                        msg += (
+                            "\nThis usually means the executable lacks execute "
+                            "permission. Fix: chmod +x <executable>"
+                        )
+                    elif not IS_WINDOWS and code == 127:
+                        msg += (
+                            "\nThis usually means the executable was not found "
+                            "or a required dependency is missing."
+                        )
                     if tail:
                         msg += f"\n--- subprocess output (last 30 lines) ---\n{tail}"
                     raise _ProcessStartupError(msg, intentional=(code == 0))
@@ -837,6 +1033,13 @@ class ProcessSupervisor:
                 log.warning(
                     "[SUPERVISOR] Session stop failed for %s: %s", proc.name, exc
                 )
+            # Clean up session env file
+            try:
+                env_file = _session_env_file(proc.session_name)
+                if env_file.exists():
+                    env_file.unlink()
+            except OSError:
+                pass
             return
 
         # Direct Popen stop
@@ -1175,6 +1378,48 @@ class ProcessSupervisor:
     def clear_shutdown_status(self) -> None:
         try:
             (self._runtime_dir / "shutdown_status").unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    def kill_all_linux_sessions(self) -> None:
+        """Kill all tracked tmux/screen sessions.
+
+        Called by external processes (e.g. gui.py) when the supervisor
+        process has been terminated but its child sessions may still be
+        running.
+        """
+        if IS_WINDOWS or not self._session_tool:
+            return
+        for name in list(self._linux_sessions):
+            try:
+                if self._session_tool == "tmux":
+                    subprocess.run(
+                        ["tmux", "kill-session", "-t", name],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5,
+                        check=False,
+                    )
+                elif self._session_tool == "screen":
+                    subprocess.run(
+                        ["screen", "-X", "-S", name, "quit"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5,
+                        check=False,
+                    )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                log.debug("[SUPERVISOR] Session cleanup failed for %s: %s", name, exc)
+        self._linux_sessions.clear()
+        # Clean up session env files
+        try:
+            env_dir = get_root_dir() / "tmp"
+            if env_dir.is_dir():
+                for f in env_dir.glob("session_env_*.sh"):
+                    try:
+                        f.unlink()
+                    except OSError:
+                        pass
         except OSError:
             pass
 

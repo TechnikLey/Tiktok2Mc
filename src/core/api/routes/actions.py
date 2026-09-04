@@ -46,12 +46,7 @@ def _build_gift_image_map() -> dict[str, str]:
     for f in pics_dir.iterdir():
         if f.suffix.lower() != ".png":
             continue
-        stem = f.stem
-        us_pos = stem.find("_")
-        if us_pos == -1:
-            continue
-        name_part = stem[us_pos + 1 :]
-        normalized = _normalize_name(name_part)
+        normalized = _normalize_name(f.stem)
         mapping[normalized] = f"/gifts-pictures/{f.name}"
     return mapping
 
@@ -129,6 +124,17 @@ async def validate_actions():
 async def validate_actions_content(body: RawActionsUpdateRequest):
     try:
         diagnostics = _get_service().validate(body.content)
+        return {"diagnostics": diagnostics}
+    except Exception as e:  # any unexpected error becomes an HTTP 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/actions/validate-triggers")
+async def validate_triggers_structured(body: ActionsUpdateRequest):
+    try:
+        diagnostics = _get_service().validate_triggers(
+            [t.model_dump() for t in body.triggers]
+        )
         return {"diagnostics": diagnostics}
     except Exception as e:  # any unexpected error becomes an HTTP 500
         raise HTTPException(status_code=500, detail=str(e))

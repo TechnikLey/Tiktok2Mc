@@ -44,7 +44,7 @@ class TestConfigEndpoints:
         cfg["config_version"] = "0.7"
         resp = client.put("/api/v1/config", json={"config": cfg, "backup": False})
         assert resp.status_code == 200
-        assert resp.json()["config"]["config_version"] == "1.0"
+        assert resp.json()["config"]["config_version"] == "1.1"
 
     def test_update_config_backup_default_is_true(self, client):
         current = client.get("/api/v1/config").json()

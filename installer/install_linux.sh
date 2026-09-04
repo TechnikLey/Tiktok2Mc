@@ -116,15 +116,41 @@ if [ "$INSTALL_TYPE" = "2" ]; then
 fi
 
 # --- Java check ---
+MIN_JAVA=25
 if command -v java &> /dev/null; then
     JAVA_VER=$(java -version 2>&1 | awk -F '"' 'NR==1 {print $2}')
-    log_ok "Java found: $JAVA_VER"
+    JAVA_MAJOR=$(echo "$JAVA_VER" | awk -F '.' '{print $1}')
+    if [ "$JAVA_MAJOR" -ge "$MIN_JAVA" ] 2>/dev/null; then
+        log_ok "Java $JAVA_VER found (>= $MIN_JAVA)"
+    else
+        log_warn "Java $JAVA_VER found, but version $MIN_JAVA+ is required."
+        log_warn "Install a newer Java version:"
+        log_warn "  Debian/Ubuntu: sudo apt install openjdk-${MIN_JAVA}-jre-headless"
+        log_warn "  Fedora:        sudo dnf install java-${MIN_JAVA}-openjdk-headless"
+        log_warn "  Arch:          sudo pacman -S jre-openjdk"
+    fi
 else
-    log_warn "Java not found. TikTok2Mc includes Java auto-detection,"
-    log_warn "but you may need to install OpenJDK 17+ manually:"
-    log_warn "  Debian/Ubuntu: sudo apt install openjdk-17-jre"
-    log_warn "  Fedora:        sudo dnf install java-17-openjdk"
-    log_warn "  Arch:          sudo pacman -S jre17-openjdk"
+    log_warn "Java not found. TikTok2Mc requires Java $MIN_JAVA+."
+    log_warn "Install it with one of:"
+    log_warn "  Debian/Ubuntu: sudo apt install openjdk-${MIN_JAVA}-jre-headless"
+    log_warn "  Fedora:        sudo dnf install java-${MIN_JAVA}-openjdk-headless"
+    log_warn "  Arch:          sudo pacman -S jre-openjdk"
+fi
+
+# --- Qt xcb-cursor check (Qt6 >= 6.5 requires libxcb-cursor) ---
+if command -v ldconfig &> /dev/null; then
+    if ! ldconfig -p 2>/dev/null | grep -q libxcb-cursor; then
+        log_warn "libxcb-cursor.so.0 not found — the GUI will not start without it."
+        log_warn "Install it with:"
+        log_warn "  Debian/Ubuntu: sudo apt install libxcb-cursor0"
+        log_warn "  Fedora:        sudo dnf install libxcb-cursor"
+        log_warn "  Arch:          sudo pacman -S libxcb"
+    fi
+elif [ -z "$(find /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu -name 'libxcb-cursor.so*' 2>/dev/null | head -1)" ]; then
+    log_warn "libxcb-cursor.so.0 not found — the GUI will not start without it."
+    log_warn "  Debian/Ubuntu: sudo apt install libxcb-cursor0"
+    log_warn "  Fedora:        sudo dnf install libxcb-cursor"
+    log_warn "  Arch:          sudo pacman -S libxcb"
 fi
 
 # --- Extract embedded archive ---
@@ -197,14 +223,22 @@ fi
 # --- Create desktop entries (respects GUI mode) ---
 DESKTOP_DIR="$DATA_HOME/applications"
 mkdir -p "$DESKTOP_DIR"
+# The Full System (start.bin) requires root on Linux to manage the Minecraft
+# server and bind low ports.  We wrap it in pkexec (graphical PolicyKit
+# prompt) so the .desktop shortcut works without opening a terminal that
+# exits immediately with "run as root".
+PKEXEC_BIN=""
+if command -v pkexec &> /dev/null; then
+    PKEXEC_BIN="pkexec "
+fi
 DESKTOP_FILE="$DESKTOP_DIR/tiktok2mc.desktop"
 if [ "$GUI_MODE" = "start.bin" ]; then
     cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
-Exec=$INSTALL_DIR/start.bin
-Terminal=true
+Exec=${PKEXEC_BIN}$INSTALL_DIR/start.bin
+Terminal=false
 Type=Application
 Categories=Game;Network;
 EOF
@@ -220,14 +254,15 @@ Categories=Game;Network;
 EOF
 fi
 
-# Also create a "Start Full System" desktop entry (always start.bin)
+# Also create a "Start Full System" desktop entry (always start.bin, run
+# via GUI launcher which handles root elevation, falling back to pkexec)
 FULLSYSTEM_FILE="$DESKTOP_DIR/tiktok2mc-fullsystem.desktop"
 cat > "$FULLSYSTEM_FILE" << EOF
 [Desktop Entry]
 Name=TikTok2Mc (Full System)
 Comment=Start the complete TikTok2Mc stack including API and Minecraft server
-Exec=$INSTALL_DIR/start.bin
-Terminal=true
+Exec=${PKEXEC_BIN}$INSTALL_DIR/start.bin
+Terminal=false
 Type=Application
 Categories=Game;Network;
 EOF

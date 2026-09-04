@@ -45,6 +45,7 @@ from TikTokLive.events import (
     ShareEvent,
 )
 
+from core import mcrcon_compat  # noqa: F401  (thread-safe mcrcon timeouts)
 from core.api.services.datapack import sync_datapack
 from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
@@ -222,6 +223,12 @@ class BotContext:
         self.tiktok_client = None
         self.tiktok_client_loop = None
         self.tiktok_live = False
+
+        # Connection-failure protection (repeated fails -> GUI popup + pause)
+        self.failed_connection_popup_enabled = True
+        self.max_connect_fails = 5
+        self.connect_fail_count = 0
+        self.connect_fail_popup_triggered = False
 
         # Gift tracking
         self.gift_value_usd = 0
@@ -571,6 +578,12 @@ def _apply_config(config: dict) -> None:
     ctx.server_host = config.get("server_host", "127.0.0.1")
     ctx.tiktok_user = config.get("tiktok", {}).get("user", "")
     ctx.reconnect_delay = config.get("tiktok", {}).get("reconnect_delay_seconds", 10)
+    ctx.failed_connection_popup_enabled = bool(
+        config.get("tiktok", {}).get("failed_connection_popup_enabled", True)
+    )
+    ctx.max_connect_fails = max(
+        1, int(config.get("tiktok", {}).get("max_connect_fails", 5) or 5)
+    )
     ctx.mcserver_api_port = int(
         os.environ.get(
             "RESOLVED_PORT_WEBHOOK_PORT",
@@ -1385,6 +1398,57 @@ def _publish_tiktok_status(connected: bool):
     _run_in_background(_post_tiktok_status, body)
 
 
+def _publish_tiktok_connect_failed(max_fails: int, reason: str) -> None:
+    """Ask the GUI to show the connection-failure warning popup.
+
+    Sent after ``max_connect_fails`` consecutive failed connection attempts.
+    The reconnect loop pauses (``disable_tiktok_connect``) until the user
+    chooses to re-enable or keep the connection disabled.
+    """
+    data = {
+        "max_fails": int(max_fails),
+        "reason": reason,
+    }
+    _run_in_background(_notify_hooks_of_event, "tiktok.connect_failed", data)
+    body = json.dumps({"type": "tiktok.connect_failed", "data": data}).encode("utf-8")
+    _run_in_background(_post_tiktok_status, body)
+
+
+def _check_connect_failure_threshold(reason: str) -> bool:
+    """Count a failed connection attempt and, at the threshold, pause + notify.
+
+    Returns ``True`` when the failure popup was triggered and the reconnect
+    loop must pause (``disable_tiktok_connect`` is set). Only fires once per
+    burst of failures (guarded by ``connect_fail_popup_triggered``).
+    """
+    ctx.connect_fail_count += 1
+    log.warning(
+        "[TIKTOK] Connection failure %d/%d (%s)",
+        ctx.connect_fail_count,
+        ctx.max_connect_fails,
+        reason,
+    )
+    if (
+        not ctx.failed_connection_popup_enabled
+        or ctx.connect_fail_popup_triggered
+        or ctx.connect_fail_count < ctx.max_connect_fails
+    ):
+        return False
+
+    # Threshold reached: pause reconnects and ask the user how to proceed.
+    ctx.connect_fail_popup_triggered = True
+    with ctx.tiktok_lock:
+        ctx.disable_tiktok_connect = True
+    log.warning(
+        "[TIKTOK] Reached %d failed connection attempts — pausing reconnects "
+        "and asking via GUI whether to re-enable.",
+        ctx.max_connect_fails,
+    )
+    _publish_tiktok_connect_failed(ctx.max_connect_fails, reason)
+    _publish_tiktok_status(False)
+    return True
+
+
 def _post_tiktok_status(body: bytes) -> None:
     try:
         req = urllib.request.Request(
@@ -2158,6 +2222,11 @@ def handle_custom_trigger():
             )
             if new_state:
                 _stop_tiktok_client()
+            else:
+                # Re-enabling from the GUI popup also clears the failure state so
+                # a fresh counting burst starts instead of instantly re-pausing.
+                ctx.connect_fail_count = 0
+                ctx.connect_fail_popup_triggered = False
             _publish_tiktok_status(bool(ctx.tiktok_live))
             return {
                 "status": "ok",
@@ -2339,7 +2408,19 @@ def create_client(user):
             TIKTOK_0003, exc=exc, context_info={"source": "client_event_handler"}
         )
 
-    client.add_listener("error", _on_client_event_error)
+    # Register the handler-error listener defensively: newer TikTokLive versions
+    # (>=6.6.5) support a string event name in `add_listener`, but older builds
+    # require a `Type[Event]` and call `.get_type()` on the argument, which
+    # crashes on the "error" string. The listener is a best-effort safety net —
+    # never let an unsupported registration tear down the whole bridge at client
+    # creation.
+    try:
+        client.add_listener("error", _on_client_event_error)
+    except (AttributeError, TypeError):
+        log.warning(
+            "[TIKTOK] Error-listener registration unsupported by this TikTokLive "
+            "version; loop-crash recovery not registered"
+        )
 
     # Raw-event diagnostics: proves whether the websocket actually delivers
     # events to the bridge before handler dispatch. Prints each event type on
@@ -2593,6 +2674,10 @@ def create_client(user):
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
+        # A successful connection ends the failure streak — the next burst of
+        # failed attempts starts counting from zero again.
+        ctx.connect_fail_count = 0
+        ctx.connect_fail_popup_triggered = False
         # Raw-event diagnostics baseline.
         ctx._last_tiktok_event_ts = time.time()
         if _should_start_new_session():
@@ -3089,19 +3174,35 @@ async def run_bot():
             if "DEVICE_BLOCKED" in error_str or bool(
                 _RE_ERR_CODE_200.search(error_str)
             ):
+                reason = "DEVICE_BLOCKED"
                 log.error("[FAIL] TikTok block active (DEVICE_BLOCKED).")
                 log.info("[TIP] Wait 15 minutes or restart your router.")
                 get_crash_manager().report_exception(
                     TIKTOK_0001, exc=e, context_info={"block_reason": "DEVICE_BLOCKED"}
                 )
-                await asyncio.sleep(900)
             else:
+                reason = "reconnect"
                 log.warning(f"[..] Reconnect in {ctx.reconnect_delay}s...")
                 get_crash_manager().report_exception(
                     TIKTOK_0002,
                     exc=e,
                     context_info={"reconnect_delay": ctx.reconnect_delay},
                 )
+
+            # Repeated connection failures can get TikTok to block the device.
+            # Beyond the configured threshold, pause reconnects and ask the
+            # user (via the GUI popup) whether to re-enable or keep disabled.
+            reached = _check_connect_failure_threshold(reason)
+            if reached:
+                log.warning(
+                    "[TIKTOK] Reconnect paused after repeated connection failures."
+                )
+                await asyncio.sleep(2)
+            elif "DEVICE_BLOCKED" in error_str or bool(
+                _RE_ERR_CODE_200.search(error_str)
+            ):
+                await asyncio.sleep(900)
+            else:
                 await asyncio.sleep(ctx.reconnect_delay)
 
         finally:

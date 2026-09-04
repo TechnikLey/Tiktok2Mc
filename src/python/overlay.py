@@ -30,13 +30,16 @@ from core.logger import (  # noqa: E402
     install_global_exception_hook,
     start_heartbeat,
 )
-from core.paths import get_base_dir  # noqa: E402
+from core.paths import get_base_dir, get_root_dir  # noqa: E402
 from core.yaml_utils import load_yaml  # noqa: E402
 
 log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
-API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
+# The supervisor exports RESOLVED_PORT_API_PORT when port_policy.auto_resolve
+# relocated the API port; fall back to the default when unset (standalone runs).
+API_PORT = os.environ.get("RESOLVED_PORT_API_PORT", str(DEFAULT_PORT))
+API_URL = f"http://127.0.0.1:{API_PORT}"
 
 
 def _linux_install_hint() -> str:
@@ -49,9 +52,9 @@ def _linux_install_hint() -> str:
     except FileNotFoundError:
         return "Install Qt6 system libraries for your distribution."
     if "Debian" in os_release or "Ubuntu" in os_release:
-        return "sudo apt install libqt6webenginecore6 qt6-wayland"
+        return "sudo apt install libqt6webenginecore6 qt6-wayland libxcb-cursor0"
     elif "Fedora" in os_release:
-        return "sudo dnf install qt6-qtwebengine qt6-qtwayland"
+        return "sudo dnf install qt6-qtwebengine qt6-qtwayland libxcb-cursor"
     elif "Arch" in os_release or "Manjaro" in os_release:
         return "sudo pacman -S qt6-webengine qt6-wayland"
     return "Install Qt6 system libraries for your distribution."
@@ -73,7 +76,7 @@ def _api_ready(timeout: float = 20.0) -> bool:
 
 def _load_overlay_names() -> list[str]:
     """Read overlay names from the global config file."""
-    config_path = (BASE_DIR.parent / "config" / "config.yaml").resolve()
+    config_path = (get_root_dir() / "config" / "config.yaml").resolve()
     try:
         cfg = load_yaml(config_path)
     except (OSError, ValueError, YAMLError) as exc:

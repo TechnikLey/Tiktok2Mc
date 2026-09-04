@@ -589,6 +589,7 @@ class ActionCommand(BaseModel):
     type: str = "vanilla"  # vanilla, rcon, script, overlay, named_overlay, shell
     command: str = ""
     multiplier: int = 1
+    dynamic_vanilla: bool = False
     title: str = ""
     subtitle: str = ""
     duration: int = 3
@@ -624,6 +625,18 @@ class RawActionsUpdateRequest(BaseModel):
 
 class TriggerTypesResponse(BaseModel):
     types: list[str]
+
+
+class LikeMilestone(BaseModel):
+    id: str
+    every: int
+    function: str
+    payload: str = "Community"
+    enabled: bool = True
+
+
+class LikeMilestonesResponse(BaseModel):
+    milestones: list[LikeMilestone]
 
 
 class TriggerExecuteRequest(BaseModel):

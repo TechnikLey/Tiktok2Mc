@@ -645,6 +645,81 @@ async def delete_instance(instance_id: str):
     return {"status": "ok", "message": f"Server instance '{instance_id}' deleted"}
 
 
+async def _open_with_check(cmd: list[str]) -> bool:
+    """Run an opener command and report whether it actually succeeded.
+
+    ``xdg-open``/``open`` often fail silently (headless, missing file
+    manager), so we wait for the exit code instead of assuming success.
+    """
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        log.warning("Opener not found: %s", cmd[0])
+        return False
+
+
+_LINUX_FILE_MANAGERS = [
+    "nautilus",
+    "dolphin",
+    "thunar",
+    "nemo",
+    "pcmanfm",
+    "caja",
+    "konqueror",
+]
+
+
+async def _open_folder_linux(target: Path) -> tuple[bool, str]:
+    """Open *target* in a Linux file manager, trying several fallbacks.
+
+    Returns ``(success, hint)`` where *hint* is a short reason when it could
+    not be opened. ``xdg-open`` is preferred (uses the default file manager);
+    if it fails we fall back to known file-manager binaries so the window
+    actually opens instead of silently doing nothing.
+    """
+    xdg = shutil.which("xdg-open")
+    if xdg and await _open_with_check([xdg, str(target)]):
+        return True, ""
+    # xdg-open failed — fall through to direct file-manager binaries.
+    for fm in _LINUX_FILE_MANAGERS:
+        fm_path = shutil.which(fm)
+        if not fm_path:
+            continue
+        if await _open_with_check([fm_path, str(target)]):
+            return True, ""
+    if xdg:
+        return False, "No file manager could be started (xdg-open failed)."
+    return False, "No file manager (xdg-utils) is installed."
+
+
+@router.get("/servers/instances/{instance_id}/path")
+async def get_instance_folder_path(instance_id: str):
+    """Return the absolute on-disk folder path of a server instance.
+
+    The GUI uses this to resolve the instance folder and then opens it in the
+    OS file manager *from the GUI process*, which has the display context (the
+    backend may run elevated without one on Linux).
+    """
+    instances = _load_instances()
+    if instance_id not in instances:
+        raise HTTPException(
+            status_code=404, detail=f"Server instance '{instance_id}' not found"
+        )
+    target_path = _get_instance_dir(instance_id)
+    if not target_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"Directory does not exist: {target_path}"
+        )
+    return {"path": str(target_path)}
+
+
 @router.post("/servers/instances/{instance_id}/open")
 async def open_instance_folder(instance_id: str):
     instances = _load_instances()
@@ -660,31 +735,23 @@ async def open_instance_folder(instance_id: str):
 
     # Open the folder in the OS file explorer
     opened = False
+    error = ""
     system = platform.system()
     try:
         if system == "Windows":
             os.startfile(str(target_path))
             opened = True
         elif system == "Darwin":
-            await asyncio.to_thread(
-                subprocess.Popen,
-                ["open", str(target_path)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            opened = True
+            opened = await _open_with_check(["open", str(target_path)])
+            if not opened:
+                error = "The 'open' command failed."
         else:
-            await asyncio.to_thread(
-                subprocess.Popen,
-                ["xdg-open", str(target_path)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            opened = True
+            opened, error = await _open_folder_linux(target_path)
     except OSError as e:
         log.warning("Failed to open folder %s: %s", target_path, e)
+        error = str(e)
 
-    return {"path": str(target_path), "opened": opened}
+    return {"path": str(target_path), "opened": opened, "error": error}
 
 
 @router.put("/servers/instances/{instance_id}/version")

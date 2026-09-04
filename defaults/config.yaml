@@ -1,4 +1,4 @@
-config_version: 1.0
+config_version: 1.1
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
@@ -45,9 +45,12 @@ auto_update_config: true
 # ---------------------------------------------------------------------------
 #  SUDO WARNING (Linux only — has no effect on Windows)
 # ---------------------------------------------------------------------------
-# On Linux, running without sudo can cause update and permission issues.
-# Set to false to hide this warning if you have configured your system
-# to handle permissions properly without sudo.
+# On Linux, the supervisor (start.bin) requires root to bind low ports
+# (< 1024) and manage tmux/screen sessions.  When launched from the GUI,
+# authentication is requested automatically via pkexec (graphical prompt).
+# When launched from a terminal, use: sudo ./start.bin
+# Set to false to hide the warning if you have configured your system
+# to handle permissions without root (e.g. using a custom port >= 1024).
 show_sudo_warning: true
 
 # ---------------------------------------------------------------------------
@@ -182,6 +185,16 @@ tiktok:
 
   # Seconds to wait before attempting to reconnect after a connection loss.
   reconnect_delay_seconds: 30
+
+  # Connection-failure protection. Repeated failed connection attempts can make
+  # TikTok block your device for a while. When enabled, after
+  # `max_connect_fails` consecutive failed attempts the tool pauses reconnecting
+  # and shows a warning in the GUI where you can choose to re-enable the
+  # connection or keep it disabled.
+  #   failed_connection_popup_enabled: true/false  (master switch for the popup)
+  #   max_connect_fails: number of failed attempts before pausing (e.g. 5)
+  failed_connection_popup_enabled: true
+  max_connect_fails: 5
 
   # How often (in seconds) the gift revenue log file is saved to disk.
   # The log is stored at data/gift_revenue_log.jsonl.

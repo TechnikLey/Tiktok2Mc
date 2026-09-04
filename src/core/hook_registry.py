@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import sys
 import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel, Field, model_validator
 
 from core.backup import get_backup_manager
 
@@ -20,59 +24,44 @@ log = logging.getLogger(__name__)
 STORAGE_FILENAME = "hook_registry.json"
 
 
-class HookRegistration:
+class HookRegistration(BaseModel):
     """Canonical hook record stored in the registry.
 
-    Mirrors ``PluginRegistration`` but simpler — hooks don't have
-    separate processes, health monitoring, or heartbeat tracking.
+    Mirrors ``PluginRegistration`` (Pydantic v2) but simpler — hooks don't
+    have separate processes, health monitoring, or heartbeat tracking.
     """
 
-    def __init__(
-        self,
-        name: str,
-        version: str = "1.0.0",
-        enabled: bool = True,
-        display_name: str = "",
-        description: str = "",
-        author: str = "",
-        capabilities: list[str] | None = None,
-        plugin: str = "",
-        update_url: str = "",
-        source: str = "",
-        error: str = "",
-        registered_at: float | None = None,
-        updated_at: float | None = None,
-    ) -> None:
-        self.name = name
-        self.version = version
-        self.enabled = enabled
-        self.display_name = display_name
-        self.description = description
-        self.author = author
-        self.capabilities = capabilities or []
-        self.plugin = plugin
-        self.update_url = update_url
-        self.source = source
-        self.error = error
-        self.registered_at = registered_at or time.time()
-        self.updated_at = updated_at or time.time()
+    name: str = Field(..., min_length=1, description="Unique hook name")
+    version: str = Field("1.0.0", description="Hook version string")
+    enabled: bool = Field(True, description="Whether the hook is active")
+    display_name: str = Field("", description="Human-readable name for GUI")
+    description: str = Field("", description="Human-readable description")
+    author: str = Field("", description="Hook author or maintainer")
+    capabilities: list[str] = Field(
+        default_factory=list,
+        description="Feature flags (capabilities declared in the manifest)",
+    )
+    plugin: str = Field("", description="Bundling plugin name, if any")
+    update_url: str = Field("", description="URL for checking hook updates")
+    source: str = Field("", description="Origin/source path")
+    error: str = Field("", description="Error message if hook is broken")
+    registered_at: float | None = Field(
+        None, description="Unix timestamp of first registration"
+    )
+    updated_at: float | None = Field(None, description="Unix timestamp of last update")
+
+    @model_validator(mode="after")
+    def _default_timestamps(self) -> HookRegistration:
+        """Backfill missing timestamps so a freshly built record is usable."""
+        now = time.time()
+        if self.registered_at is None:
+            self.registered_at = now
+        if self.updated_at is None:
+            self.updated_at = now
+        return self
 
     def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "version": self.version,
-            "enabled": self.enabled,
-            "display_name": self.display_name,
-            "description": self.description,
-            "author": self.author,
-            "capabilities": self.capabilities,
-            "plugin": self.plugin,
-            "update_url": self.update_url,
-            "source": self.source,
-            "error": self.error,
-            "registered_at": self.registered_at,
-            "updated_at": self.updated_at,
-        }
+        return self.model_dump(mode="json")
 
     @classmethod
     def from_dict(cls, data: dict) -> HookRegistration:
@@ -83,7 +72,8 @@ class HookRegistry:
     """Thread-safe, file-persisted hook registry.
 
     Tracks all known hooks, their versions, and enable state.
-    Backups managed by the centralized ``BackupManager``.
+    Backups are managed by the centralized ``BackupManager`` (one backup
+    on startup like ``PluginRegistry``, not on every save).
     """
 
     def __init__(self, storage_dir: Path) -> None:
@@ -91,6 +81,12 @@ class HookRegistry:
         self._hooks: dict[str, HookRegistration] = {}
         self._lock = threading.Lock()
         self._load()
+        # One-time backup on startup (not on every save)
+        if self._file.exists():
+            try:
+                get_backup_manager().create_backup(self._file, category="hook_registry")
+            except OSError as exc:
+                log.warning("Failed to create startup hook registry backup: %s", exc)
 
     # ------------------------------------------------------------------
     # Public API
@@ -102,12 +98,14 @@ class HookRegistry:
         Preserves existing ``enabled`` and ``registered_at`` state
         when a hook is already registered.
         """
+        now = time.time()
+        data.registered_at = data.registered_at or now
+        data.updated_at = now
         with self._lock:
             existing = self._hooks.get(data.name)
             if existing is not None:
                 data.enabled = existing.enabled
                 data.registered_at = existing.registered_at
-            data.updated_at = time.time()
             self._hooks[data.name] = data
             self._save()
         return data
@@ -160,6 +158,11 @@ class HookRegistry:
     # Discovery helpers
     # ------------------------------------------------------------------
 
+    # Keys carried by discovery payloads that are not real HookRegistration
+    # fields (e.g. ``_error``, ``_manifest``, ``source_type``) must be excluded
+    # so Pydantic never rejects them.
+    _DISCOVERY_TEMP_KEYS = frozenset({"_error", "_manifest", "source_type"})
+
     def sync_from_discovery(self, discovered: list[dict]) -> int:
         """Sync registry with discovered hooks.
 
@@ -175,7 +178,9 @@ class HookRegistry:
             existing = self.get(info["name"])
             error = info.get("_error", info.get("error", ""))
             if existing is None:
-                reg_info = {k: v for k, v in info.items() if k != "_error"}
+                reg_info = {
+                    k: v for k, v in info.items() if k not in self._DISCOVERY_TEMP_KEYS
+                }
                 reg_info["error"] = error
                 self.register(HookRegistration(**reg_info))
                 count += 1
@@ -221,7 +226,7 @@ class HookRegistry:
                 data = json.load(fh)
             for item in data if isinstance(data, list) else []:
                 try:
-                    hook = HookRegistration.from_dict(item)
+                    hook = HookRegistration(**item)
                     self._hooks[hook.name] = hook
                 except (ValueError, TypeError) as exc:
                     log.warning("Skipping invalid hook registry entry: %s", exc)
@@ -232,20 +237,30 @@ class HookRegistry:
         data = [h.to_dict() for h in self._hooks.values()]
         tmp = self._file.with_suffix(".json.tmp")
         try:
-            if self._file.exists():
-                try:
-                    get_backup_manager().create_backup(
-                        self._file, category="hook_registry"
-                    )
-                except OSError as exc:
-                    log.warning("Failed to create hook registry backup: %s", exc)
-
             with tmp.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
                 fh.flush()
-            tmp.replace(self._file)
+                os.fsync(fh.fileno())
+            self._atomic_replace(tmp, self._file)
         except (OSError, TypeError) as exc:
             log.error("Failed to save hook registry: %s", exc)
+
+    @staticmethod
+    def _atomic_replace(src: Path, dst: Path) -> None:
+        """Atomically replace *dst* with *src*.
+
+        On Windows, ``os.replace`` cannot overwrite a file that is currently
+        open in another process.  We first attempt a normal replace; if that
+        fails with a permission error we remove the destination and retry.
+        """
+        try:
+            src.replace(dst)
+            return
+        except PermissionError:
+            if sys.platform != "win32" or not dst.exists():
+                raise
+        dst.unlink()
+        src.replace(dst)
 
 
 # ------------------------------------------------------------------

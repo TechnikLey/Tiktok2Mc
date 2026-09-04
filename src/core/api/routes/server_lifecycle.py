@@ -25,6 +25,30 @@ SERVER_PROCESS_NAME = "Minecraft Server"
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
 
+# The Minecraft server can take a while to finish its first boot on slower
+# machines (world generation, datapack load). Give it generous headroom so a
+# slow start is not mistaken for a crash, while still failing on a real stall.
+MC_READINESS_TIMEOUT = 240.0
+
+
+def _read_instance_log_tail(instance_dir: Path, max_lines: int = 40) -> str:
+    """Return diagnostic tail of the MC server log for *instance_dir*.
+
+    On failure the GUI should show why the server did not become ready,
+    instead of a generic message. Prefers ``latest.log`` and falls back to
+    ``debug.log`` when no ``latest.log`` exists.
+    """
+    for name in ("latest.log", "debug.log"):
+        path = instance_dir / "logs" / name
+        if not path.exists():
+            continue
+        try:
+            lines = path.read_text("utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        return "\n".join(lines[-max_lines:])
+    return ""
+
 
 async def auto_start_mc_instances() -> None:
     """Start all MC server instances that have ``auto_start: True``.
@@ -69,7 +93,7 @@ async def auto_start_mc_instances() -> None:
                 cwd=instance_dir,
                 hidden=True,
                 readiness_check=make_minecraft_readiness_check(instance_dir),
-                readiness_timeout=120.0,
+                readiness_timeout=MC_READINESS_TIMEOUT,
             )
             log.info(
                 "[AUTO-START] Registered and starting server instance '%s'", inst_id
@@ -328,7 +352,7 @@ async def server_instance_start(instance_id: str):
                 cwd=instance_dir,
                 hidden=True,
                 readiness_check=make_minecraft_readiness_check(instance_dir),
-                readiness_timeout=120.0,
+                readiness_timeout=MC_READINESS_TIMEOUT,
             )
             log.info(
                 "Dynamically registered server process '%s' with cmd: %s", pname, cmd
@@ -367,9 +391,20 @@ async def server_instance_start(instance_id: str):
 
             start_instance_capture(instance_id, _get_instance_dir(instance_id))
             return {"status": "started", "message": f"Server '{instance_id}' started"}
-        raise HTTPException(
-            status_code=500, detail=f"Server '{instance_id}' failed to start"
+        # Start failed: it either crashed or never became ready within the
+        # readiness window. Surface the actual server log so the GUI shows a
+        # concrete reason instead of a generic "failed to start".
+        from core.api.routes.servers import _get_instance_dir
+
+        tail = _read_instance_log_tail(_get_instance_dir(instance_id))
+        detail = (
+            f"Server '{instance_id}' did not become ready within "
+            f"{MC_READINESS_TIMEOUT:.0f}s."
         )
+        if tail:
+            detail += " Last server log output:\n" + tail
+        log.error("[SERVER-START] %s", detail)
+        raise HTTPException(status_code=500, detail=detail)
     except HTTPException:
         raise
     except Exception as e:  # any unexpected error becomes an HTTP 500
@@ -394,12 +429,15 @@ async def server_instance_stop(instance_id: str):
         }
 
     try:
+        # Stop console capture BEFORE killing the server process so the
+        # shutdown lines written during graceful termination are not
+        # captured and forwarded to the GUI console.
+        from core.api.services.console_capture import stop_instance_capture
+
+        stop_instance_capture(instance_id)
+
         success = await supervisor.stop(pname)
         if success:
-            # Stop console capture for this instance
-            from core.api.services.console_capture import stop_instance_capture
-
-            stop_instance_capture(instance_id)
             return {"status": "stopped", "message": f"Server '{instance_id}' stopped"}
         raise HTTPException(
             status_code=500, detail=f"Server '{instance_id}' failed to stop"

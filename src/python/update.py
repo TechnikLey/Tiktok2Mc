@@ -9,6 +9,7 @@
 # ==================================================
 
 import io
+import json
 import os
 import re
 import shutil
@@ -35,7 +36,18 @@ from core.logger import (
     initialize_logging,
     install_global_exception_hook,
 )
-from core.paths import get_base_dir
+from core.paths import get_base_dir, get_runtime_dir
+from core.update_exit import (
+    EXIT_API_ERROR,
+    EXIT_CHECKSUM_MISMATCH,
+    EXIT_DOWNLOAD_FAILED,
+    EXIT_INSTALL_FAILED,
+    EXIT_MISSING_CHECKSUM,
+    EXIT_NO_ASSET,
+    EXIT_NO_UPDATE,
+    EXIT_OK,
+    EXIT_UNEXPECTED,
+)
 from core.utils import load_config, normalize_config_version
 
 log = initialize_logging(__name__)
@@ -49,16 +61,8 @@ SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 # Exit codes — one code per failure class so ``start.py`` and the dashboard
 # can report precisely *why* an update did not happen. ``5`` is deliberately
 # kept as the benign "nothing to do" code (start.py treats it as "continue").
+# Defined centrally in core.update_exit (shared with start.py).
 # ---------------------------------------------------------------------------
-EXIT_OK = 0
-EXIT_UNEXPECTED = 1
-EXIT_NO_UPDATE = 5
-EXIT_API_ERROR = 10
-EXIT_NO_ASSET = 11
-EXIT_MISSING_CHECKSUM = 12
-EXIT_CHECKSUM_MISMATCH = 13
-EXIT_DOWNLOAD_FAILED = 14
-EXIT_INSTALL_FAILED = 15
 
 # API request hardening: a transient DNS/network/HTTP blip must not abort
 # an update run. Retry the version check a few times with backoff before
@@ -75,6 +79,7 @@ VERSION_FILE = None
 DEFAULT_CONFIG_FILE = None
 CONFIG_FILE = None
 START_FILE = None
+UPDATE_STATUS_FILE = None
 AUTO_MODE = False
 cfg = {}
 CONFIG_UPDATE_ENABLE = True
@@ -107,6 +112,7 @@ def _init():
         CONFIG_FILE, \
         START_FILE
     global \
+        UPDATE_STATUS_FILE, \
         AUTO_MODE, \
         cfg, \
         CONFIG_UPDATE_ENABLE, \
@@ -120,24 +126,32 @@ def _init():
     DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
     CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
     START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
+    UPDATE_STATUS_FILE = (get_runtime_dir() / "update_status.json").resolve()
     AUTO_MODE = "--auto" in sys.argv
     try:
         cfg = load_config(CONFIG_FILE)
     except (FileNotFoundError, ValueError, RuntimeError) as e:
-        log.error(f"{e}")
+        log.error("%s", e)
         wait_for_key()
         sys.exit(1)
     if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
         if os.geteuid() != 0:
             if sys.stdin.isatty():
                 log.error(
-                    "This script must be run as root on Linux to perform updates."
+                    "The updater requires root privileges on Linux to replace\n"
+                    "application files and set executable permissions.\n"
+                    "\n"
+                    "Start with: sudo ./update.bin\n"
+                    "Or let the GUI handle updates (it elevates automatically)."
                 )
                 wait_for_key()
                 sys.exit(1)
             else:
                 log.warning(
-                    "Not running as root (no TTY). Continuing anyway — updates may fail."
+                    "Not running as root (no TTY). Continuing anyway — "
+                    "updates may fail if file replacement requires elevated "
+                    "permissions. Set show_sudo_warning: false in config to "
+                    "suppress this warning."
                 )
     CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
@@ -214,7 +228,7 @@ def get_versions(path):
                     elif "updaterversion" in k.lower():
                         v["updater"] = extract_version(val)
     else:
-        log.error(f"Version file not found: {path}")
+        log.error("Version file not found: %s", path)
         wait_for_key()
 
     return v
@@ -238,10 +252,12 @@ def download_with_progress(url, target):
                     f.write(chunk)
                     done += len(chunk)
                     if total:
-                        sys.stdout.write(
-                            f"\r>> Downloading: {done / total * 100:5.1f}%"
-                        )
+                        percent = done / total * 100
+                        sys.stdout.write(f"\r>> Downloading: {percent:5.1f}%")
                         sys.stdout.flush()
+                        _write_update_status("downloading", progress=round(percent, 1))
+                    else:
+                        _write_update_status("downloading", message="Downloading")
     log.info("\nDownload complete.")
 
 
@@ -250,7 +266,7 @@ def download_with_progress(url, target):
 # =========================
 def migrate_config_if_needed() -> bool:
     if not DEFAULT_CONFIG_FILE.exists():
-        log.error(f"Master template missing: {DEFAULT_CONFIG_FILE}")
+        log.error("Master template missing: %s", DEFAULT_CONFIG_FILE)
         return False
 
     yaml_obj = YAML(typ="rt")
@@ -265,7 +281,7 @@ def migrate_config_if_needed() -> bool:
             log.info("No config found. Created new config from template.")
             return True
         except OSError as e:
-            log.error(f"Failed to copy template: {e}")
+            log.error("Failed to copy template: %s", e)
             return False
 
     # Load Template
@@ -296,21 +312,21 @@ def migrate_config_if_needed() -> bool:
         raw_user = "0.0"
 
     if user_ver >= default_ver:
-        log.info(f"Config is up to date ({raw_user}).")
+        log.info("Config is up to date (%s).", raw_user)
         return False
 
-    log.info(f"Migrating config: {raw_user} -> {raw_default}")
+    log.info("Migrating config: %s -> %s", raw_user, raw_default)
 
     # Backup (via centralized BackupManager)
     try:
         bm = get_backup_manager()
         bak = bm.create_backup(CONFIG_FILE, category="migration")
         if bak:
-            log.info(f"Backup created at: {bak}")
+            log.info("Backup created at: %s", bak)
         else:
             log.info("Backup skipped (identical content or too recent)")
     except OSError as e:
-        log.error(f"Migration aborted. Could not create backup: {e}")
+        log.error("Migration aborted. Could not create backup: %s", e)
         return False
 
     # Perform strict injection
@@ -322,10 +338,10 @@ def migrate_config_if_needed() -> bool:
     try:
         with CONFIG_FILE.open("w", encoding="utf-8") as f:
             yaml_obj.dump(template_data, f)
-        log.info(f"[SUCCESS] Config migrated successfully to {raw_default}.")
+        log.info("[SUCCESS] Config migrated successfully to %s.", raw_default)
         return True
     except (OSError, YAMLError) as e:
-        log.error(f"[FAIL] Error writing migrated config: {e}")
+        log.error("[FAIL] Error writing migrated config: %s", e)
         return False
 
 
@@ -367,13 +383,13 @@ def _inject_values_strictly(template, user_source, path=""):
             else:
                 if user_value is not None:
                     template[key] = user_value
-                    log.debug(f"Migrated: {current_path}")
+                    log.debug("Migrated: %s", current_path)
                 else:
                     log.debug(
                         f"Value for '{current_path}' is null/empty. Using default."
                     )
         else:
-            log.debug(f"Key '{current_path}' missing in user config. Using default.")
+            log.debug("Key '%s' missing in user config. Using default.", current_path)
 
 
 def load_yaml_with_debug(path, yaml_obj, label):
@@ -384,25 +400,122 @@ def load_yaml_with_debug(path, yaml_obj, label):
                 return CommentedMap()
             return data
     except YAMLError as e:
-        log.error(f"[FAIL] YAML error in {label}: {path}")
+        log.error("[FAIL] YAML error in %s: %s", label, path)
 
         # Print line / column if available
         if hasattr(e, "problem_mark") and e.problem_mark is not None:
             mark = e.problem_mark
-            log.error(f"[FAIL] Line: {mark.line + 1}, Column: {mark.column + 1}")
+            log.error("[FAIL] Line: %s, Column: %s", mark.line + 1, mark.column + 1)
 
-        log.error(f"[FAIL] Details: {e}")
+        log.error("[FAIL] Details: %s", e)
         return None
     except Exception as e:  # best-effort config load; caller falls back to defaults
-        log.error(f"[FAIL] Unexpected error while loading {label}: {path}")
-        log.error(f"[FAIL] Details: {e}")
+        log.error("[FAIL] Unexpected error while loading %s: %s", label, path)
+        log.error("[FAIL] Details: %s", e)
         return None
+
+
+# =========================
+# Update progress reporting (GUI launcher feedback)
+# =========================
+def _write_update_status(phase, progress=None, message=""):
+    """Best-effort progress report for the GUI launcher.
+
+    Writes JSON to ``core/runtime/update_status.json`` which ``gui.py``
+    exposes to the launcher page via ``LauncherAPI.get_update_status()``.
+    All failures are swallowed — progress reporting must never break an
+    update in progress.
+    """
+    if UPDATE_STATUS_FILE is None:
+        return
+    try:
+        UPDATE_STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        data = {"phase": phase, "progress": progress, "message": message}
+        UPDATE_STATUS_FILE.write_text(json.dumps(data), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _clear_update_status():
+    """Remove any stale progress file (best-effort)."""
+    if UPDATE_STATUS_FILE is None:
+        return
+    try:
+        if UPDATE_STATUS_FILE.exists():
+            UPDATE_STATUS_FILE.unlink()
+    except OSError:
+        pass
+
+
+def _relaunch_tool_after_update() -> bool:
+    """Relaunch ``start.exe`` after a successful auto-install.
+
+    ``start.py`` exits when the updater signals 'kill' so its files can
+    be replaced — the updater is the only actor left and must bring the
+    application back up.  No-op outside ``--auto`` mode (manual runs keep
+    the interactive prompt).  Returns ``True`` when the relaunch was
+    launched successfully.
+    """
+    if not AUTO_MODE:
+        return True
+    try:
+        cmd = [str(START_FILE)]
+        if sys.platform == "win32":
+            subprocess.Popen(
+                cmd,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                close_fds=True,
+            )
+        else:
+            subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        log.info("[OK] Application relaunched.")
+        return True
+    except OSError as exc:
+        log.warning("[WARN] Could not relaunch the application: %s", exc)
+        return False
+
+
+def _install_file_with_retry(src: Path, dst: Path) -> None:
+    """Replace ``dst`` with ``src``, retrying briefly on Windows locks.
+
+    Once the updater signals 'kill', ``start.py`` exits and the GUI closes
+    its window so its files can be replaced — but on Windows a just-
+    terminated process's executable handle is usually released only a moment
+    after that process has fully exited (antivirus scanners can add further
+    delay).  A short retry window closes that race.  Outside Windows the
+    first failure propagates immediately, preserving the original behavior.
+    Raises the last ``OSError`` when the file is still locked after the
+    retry window.
+    """
+    tries = (100 if sys.platform == "win32" else 0) + 1
+    last_error: OSError | None = None
+    for attempt in range(tries):
+        try:
+            shutil.copy2(src, dst)
+            return
+        except OSError as exc:
+            last_error = exc
+            if attempt < tries - 1:
+                time.sleep(0.1)
+    if last_error is not None:
+        raise last_error
 
 
 # =========================
 # Main update process
 # =========================
 def run_update():
+    # Clear any stale progress report from a previous run, then report a
+    # fresh "checking" status so the GUI launcher can show progress.
+    _clear_update_status()
+    _write_update_status("checking")
+
     # ==========================================
     # 0. RESUME CHECK
     # ==========================================
@@ -412,9 +525,11 @@ def run_update():
         try:
             idx = sys.argv.index("--resume")
             extracted_root = sys.argv[idx + 1]
-            log.info(f"[>] Resume: Using extracted files from {extracted_root}")
+            log.info("[>] Resume: Using extracted files from %s", extracted_root)
         except (ValueError, IndexError) as e:
-            log.error(f"Failed to parse --resume argument: {e}\n sys.argv: {sys.argv}")
+            log.error(
+                "Failed to parse --resume argument: %s\n sys.argv: %s", e, sys.argv
+            )
 
     local = get_versions(VERSION_FILE)
 
@@ -440,6 +555,10 @@ def run_update():
                     else:
                         log.error("[FAIL] API error: 403 Forbidden")
                     wait_for_key()
+                    _write_update_status(
+                        "error",
+                        message="Update server rejected the request (HTTP 403).",
+                    )
                     sys.exit(EXIT_API_ERROR)
                 response.raise_for_status()
                 release = response.json()
@@ -455,20 +574,23 @@ def run_update():
                     )
                     time.sleep(_API_RETRY_DELAY_SECONDS * attempt)
         if release is None:
-            log.error(f"[FAIL] API error: {api_error}")
+            log.error("[FAIL] API error: %s", api_error)
             wait_for_key()
+            _write_update_status("error", message="Could not reach the update server.")
             sys.exit(EXIT_API_ERROR)
 
         online_tag = release["tag_name"]
         online_tool_v = extract_version(online_tag)
 
         if not (version.parse(online_tool_v) > version.parse(local["tool"])):
-            log.info(f"Tool is up to date ({local['tool']}).")
+            log.info("Tool is up to date (%s).", local["tool"])
             wait_for_key()
+            _clear_update_status()
             sys.exit(EXIT_NO_UPDATE)
 
         if "beta" in online_tag.lower():
             if AUTO_MODE:
+                _clear_update_status()
                 sys.exit(EXIT_NO_UPDATE)  # skip beta in auto mode
             try:
                 choice = input(
@@ -477,9 +599,11 @@ def run_update():
             except EOFError:
                 choice = "n"
             if choice != "y":
+                _clear_update_status()
                 sys.exit(EXIT_NO_UPDATE)
 
         # Download & extract
+        _write_update_status("downloading", progress=0)
         log.info("[>>] Downloading package...")
         if sys.platform == "win32":
             asset = next(
@@ -504,6 +628,9 @@ def run_update():
 
         if not asset:
             log.error("[FAIL] No matching release asset found for this platform.")
+            _write_update_status(
+                "error", message="No update file found for this platform."
+            )
             sys.exit(EXIT_NO_ASSET)
 
         if TEMP_DIR.exists():
@@ -513,10 +640,11 @@ def run_update():
         try:
             download_with_progress(asset["url"], archive_path)
         except requests.exceptions.RequestException as e:
-            log.error(f"[FAIL] Download failed: {e}")
+            log.error("[FAIL] Download failed: %s", e)
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
             wait_for_key()
+            _write_update_status("error", message="Download failed.")
             sys.exit(EXIT_DOWNLOAD_FAILED)
 
         # ── Integrity verification ──────────────────────────────────
@@ -549,6 +677,7 @@ def run_update():
             )
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
+            _write_update_status("error", message="Checksum file is missing.")
             sys.exit(EXIT_MISSING_CHECKSUM)
 
         if not verify_checksum(archive_path, expected_hash):
@@ -557,6 +686,9 @@ def run_update():
             )
             if TEMP_DIR.exists():
                 shutil.rmtree(TEMP_DIR, ignore_errors=True)
+            _write_update_status(
+                "error", message="Checksum verification failed — file may be corrupted."
+            )
             sys.exit(EXIT_CHECKSUM_MISMATCH)
         # ─────────────────────────────────────────────────────────────
 
@@ -606,7 +738,7 @@ def run_update():
     # 1. UPDATER SELF-UPDATE (via execv)
     # ==========================================
     if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
-        log.info(f"[UPDATE] New updater found ({zip_v['updater']}).")
+        log.info("[UPDATE] New updater found (%s).", zip_v["updater"])
         new_up_src = extracted_root_path / "core" / f"update{SUFFIX}"
 
         if new_up_src.exists():
@@ -619,16 +751,16 @@ def run_update():
                 os.chmod(new_up_dest, 0o755)
             log.info("Starting new updater and resuming tool update...")
             # execv replaces the current process with the new updater
-            # Pass --resume so it continues directly at step 2
+            # Pass --resume so it continues directly at step 2. Forward --auto
+            # so the resume child can relaunch start.exe (start.py no longer
+            # restarts itself on EXIT_OK; see _relaunch_tool_after_update).
+            resume_args = ["--resume", str(extracted_root_path)]
+            if AUTO_MODE:
+                resume_args = ["--auto", *resume_args]
             if sys.platform == "win32":
-                subprocess.Popen(
-                    [str(new_up_dest), "--resume", str(extracted_root_path)]
-                )
+                subprocess.Popen([str(new_up_dest), *resume_args])
             else:
-                os.execv(
-                    str(new_up_dest),
-                    [str(new_up_dest), "--resume", str(extracted_root_path)],
-                )
+                os.execv(str(new_up_dest), [str(new_up_dest), *resume_args])
             sys.exit(EXIT_OK)
 
     log.info(
@@ -643,7 +775,7 @@ def run_update():
     try:
         signal_file.write_text("kill")
     except OSError as e:
-        log.warning(f"Could not write signal file: {e}")
+        log.warning("Could not write signal file: %s", e)
 
     # Also set API-based kill signal
     try:
@@ -672,6 +804,7 @@ def run_update():
         time.sleep(1)
 
     log.info("[..] Installing files...")
+    _write_update_status("installing", message="Installing update")
     walk_method = getattr(extracted_root_path, "walk", None)
     if walk_method is not None:
         walk_iter = walk_method()
@@ -722,10 +855,14 @@ def run_update():
 
             dst.parent.mkdir(parents=True, exist_ok=True)
             try:
-                shutil.copy2(src, dst)
+                _install_file_with_retry(src, dst)
             except OSError as exc:
-                log.error(f"[FAIL] Could not install file {dst}: {exc}")
+                log.error("[FAIL] Could not install file %s: %s", dst, exc)
                 wait_for_key()
+                _write_update_status(
+                    "error",
+                    message="Could not install the update (files locked or read-only?).",
+                )
                 sys.exit(EXIT_INSTALL_FAILED)
 
     # Set executable permissions for all files without extension and with .bin extension (Linux/Mac only)
@@ -737,15 +874,19 @@ def run_update():
                 if not os.path.splitext(fname)[1] or fname.endswith(".bin"):
                     try:
                         os.chmod(fpath, 0o755)
-                        log.info(f"[PERM] Set executable: {fpath}")
+                        log.info("[PERM] Set executable: %s", fpath)
                     except OSError as e:
-                        log.info(f"[PERM] Failed to set executable for {fpath}: {e}")
+                        log.info("[PERM] Failed to set executable for %s: %s", fpath, e)
 
     try:
         save_versions(zip_v["tool"], zip_v["updater"])
     except OSError as exc:
-        log.error(f"[FAIL] Could not write version.txt: {exc}")
+        log.error("[FAIL] Could not write version.txt: %s", exc)
         wait_for_key()
+        _write_update_status(
+            "error",
+            message="Could not install the update (files locked or read-only?).",
+        )
         sys.exit(EXIT_INSTALL_FAILED)
     if TEMP_DIR.exists():
         shutil.rmtree(TEMP_DIR, ignore_errors=True)
@@ -757,7 +898,7 @@ def run_update():
         if (BASE_DIR / "update_signal.tmp").exists():
             (BASE_DIR / "update_signal.tmp").unlink()
     except OSError as e:
-        log.warning(f"Could not remove signal file: {e}")
+        log.warning("Could not remove signal file: %s", e)
 
     # Also clear API signal
     try:
@@ -767,6 +908,17 @@ def run_update():
         )
     except requests.exceptions.RequestException:
         pass  # API server may already be gone
+
+    # Bring the application back up: start.py exited on the kill signal,
+    # so the updater must relaunch it after the files are replaced.
+    relaunched = _relaunch_tool_after_update()
+    if relaunched:
+        _write_update_status("done")
+    else:
+        _write_update_status(
+            "error",
+            message="Update installed, but the system could not be restarted automatically.",
+        )
 
     log.info("\nUpdate complete.")
     wait_for_key()
@@ -783,6 +935,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("Update interrupted by user.")
     except Exception as exc:  # top-level boundary: report via crash manager and exit
+        _write_update_status("error", message="Unexpected error while updating.")
         crash_mgr.report_exception(
             UPDATE_0001, exc=exc, context_info={"detail": "Update process failed"}
         )

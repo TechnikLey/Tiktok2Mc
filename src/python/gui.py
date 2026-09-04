@@ -9,7 +9,9 @@ Supports --gui-hidden for headless mode.
 import argparse
 import atexit
 import base64
+import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -43,7 +45,10 @@ log = initialize_logging(__name__)
 
 BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
-API_URL = f"http://127.0.0.1:{DEFAULT_PORT}"
+# The supervisor exports RESOLVED_PORT_API_PORT when port_policy.auto_resolve
+# relocated the API port; fall back to the default when unset (standalone runs).
+API_PORT = os.environ.get("RESOLVED_PORT_API_PORT", str(DEFAULT_PORT))
+API_URL = f"http://127.0.0.1:{API_PORT}"
 GUI_URL = f"{API_URL}/gui/index.html"
 # Release layout: core/templates/gui/  |  Dev layout: templates/gui/
 LAUNCHER_HTML = ROOT_DIR / "core" / "templates" / "gui" / "launcher.html"
@@ -176,12 +181,47 @@ def _linux_install_hint() -> str:
     except FileNotFoundError:
         return "Install Qt6 system libraries for your distribution."
     if "Debian" in os_release or "Ubuntu" in os_release:
-        return "sudo apt install libqt6webenginecore6 qt6-wayland"
+        return "sudo apt install libqt6webenginecore6 qt6-wayland libxcb-cursor0"
     elif "Fedora" in os_release:
-        return "sudo dnf install qt6-qtwebengine qt6-qtwayland"
+        return "sudo dnf install qt6-qtwebengine qt6-qtwayland libxcb-cursor"
     elif "Arch" in os_release or "Manjaro" in os_release:
         return "sudo pacman -S qt6-webengine qt6-wayland"
     return "Install Qt6 system libraries for your distribution."
+
+
+def _check_xcb_cursor() -> bool:
+    """Return True if libxcb-cursor.so.0 is available (required by Qt6 >= 6.5)."""
+    if sys.platform != "linux":
+        return True
+    import ctypes
+
+    for name in ("libxcb-cursor.so.0", "libxcb-cursor.so"):
+        try:
+            ctypes.CDLL(name)
+            return True
+        except OSError:
+            continue
+    return False
+
+
+_DISPLAY_ENV_VARS = (
+    "DISPLAY",
+    "XAUTHORITY",
+    "WAYLAND_DISPLAY",
+    "XDG_RUNTIME_DIR",
+    "DBUS_SESSION_BUS_ADDRESS",
+)
+
+
+def _display_env() -> dict[str, str]:
+    """Forward the current display/graphical session vars.
+
+    pkexec sanitizes the environment and drops these, so the elevated
+    supervisor would otherwise have no display context — breaking both
+    "Open Folder" (file manager can't show a window) and any graphical
+    children. Returning only currently-set values keeps the child env sane.
+    """
+    return {k: v for k, v in os.environ.items() if k in _DISPLAY_ENV_VARS}
 
 
 def _api_ready(timeout: float = 1.0) -> bool:
@@ -229,6 +269,195 @@ def _signed_shutdown_headers(identity: str) -> dict[str, str] | None:
     return headers
 
 
+def _prime_update_splash_cache() -> None:
+    """Cache the splash binary under ``data/cache`` at GUI startup.
+
+    Done once per launcher start — long before any update runs — so
+    ``close_for_update`` can always spawn the binary that matches this install
+    without relying on ``core/update_progress.exe`` still being intact in the
+    middle of the updater replacing files.
+    """
+    name = f"update_progress{SUFFIX}"
+    splash_src = BASE_DIR / name
+    if not splash_src.exists():
+        return
+    splash_dst = ROOT_DIR / "data" / "cache" / name
+    try:
+        splash_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(splash_src, splash_dst)
+    except OSError as e:
+        log.warning("Could not cache update splash binary: %s", e)
+
+
+def _spawn_update_splash(lang: str) -> bool:
+    """Best-effort: start the always-on-top update-progress window.
+
+    Runs from the copy cached under ``data/cache`` (primed at startup) because
+    the updater replaces ``core/update_progress.exe`` in place — reaching into
+    ``core`` mid-install could copy a partially state or the downloaded
+    package's version instead of the one matching this install. Returns False
+    (and only logs a warning) when the splash binary is missing, so updates
+    still proceed without it.
+    """
+    name = f"update_progress{SUFFIX}"
+    splash_dst = ROOT_DIR / "data" / "cache" / name
+    if not splash_dst.exists():
+        # Fallback for very first launcher run after an installer: cache not
+        # primed yet, copy straight from the core binary now.
+        _prime_update_splash_cache()
+        if not splash_dst.exists():
+            log.warning("Update splash binary not found: %s", BASE_DIR / name)
+            return False
+    try:
+        cmd = [str(splash_dst), "--lang", lang]
+        if IS_WINDOWS:
+            subprocess.Popen(
+                cmd,
+                creationflags=subprocess.DETACHED_PROCESS
+                | subprocess.CREATE_NEW_PROCESS_GROUP,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+        else:
+            subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                close_fds=True,
+            )
+        log.info("Update splash spawned: %s", splash_dst)
+        return True
+    except OSError as e:
+        log.warning("Could not spawn update splash: %s", e)
+        return False
+
+
+def _monitor_elevation(proc: subprocess.Popen) -> None:
+    """Background monitor for the elevated start.bin launch on Linux.
+
+    pkexec shows a graphical password prompt and only runs the target after
+    the user authenticates (which can take many seconds).  We therefore must
+    NOT block or poll in the start_system() bridge call, or the prompt would
+    be cut off.  This daemon thread instead waits a generous grace period and
+    then, if the process exited prematurely, logs the reason so it is
+    diagnosable without interfering with password entry.
+    """
+    try:
+        # Give the user ample time to enter the password before deciding a
+        # launch has genuinely failed.
+        proc.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        return  # still running (user authenticated or is authenticating) — fine
+    except OSError:
+        return
+
+    if proc.poll() is not None and proc.returncode not in (0, None):
+        code = proc.returncode
+        if code in (126, 127):
+            log.error(
+                "Full system failed to start (exit code %s). "
+                "The executable may not be found or is not executable. "
+                "Check that %s exists and is executable (chmod +x).",
+                code,
+                START_EXE,
+            )
+        else:
+            log.error(
+                "Full system failed to start (exit code %s). "
+                "On Linux, root privileges are required. Ensure pkexec "
+                "is installed (PolicyKit) for graphical password prompts, "
+                "or run 'sudo -k' and then start from a terminal with: "
+                "sudo ./start.bin",
+                code,
+            )
+
+
+def _kill_orphaned_sessions() -> None:
+    """Best-effort: kill any tmux/screen sessions the supervisor may have left.
+
+    Called when the supervisor process is already gone (e.g. after a force-
+    kill or unexpected crash) so its child sessions (Minecraft server, bridge,
+    overlay) don't remain running.
+    """
+    if IS_WINDOWS:
+        return
+
+    tmux = shutil.which("tmux")
+    screen = shutil.which("screen")
+    if not tmux and not screen:
+        return
+
+    if tmux:
+        try:
+            res = subprocess.run(
+                [tmux, "list-sessions", "-F", "#{session_name}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            for name in res.stdout.splitlines():
+                name = name.strip()
+                if name.startswith("mc-"):
+                    try:
+                        subprocess.run(
+                            [tmux, "kill-session", "-t", name],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=5,
+                            check=False,
+                        )
+                        log.info("Killed orphaned tmux session: %s", name)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    if screen:
+        try:
+            res = subprocess.run(
+                [screen, "-ls"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            for line in res.stdout.splitlines():
+                # screen -ls output lines look like: "  12345.session-name  (03/01/2026 10:00:00 AM)  (Detached)"
+                if ".mc-" in line:
+                    parts = line.strip().split()
+                    if parts:
+                        screen_name = parts[0]
+                        try:
+                            subprocess.run(
+                                [screen, "-X", "-S", screen_name, "quit"],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=5,
+                                check=False,
+                            )
+                            log.info("Killed orphaned screen session: %s", screen_name)
+                        except (OSError, subprocess.TimeoutExpired):
+                            pass
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    # Clean up session env files
+    try:
+        env_dir = ROOT_DIR / "tmp"
+        if env_dir.is_dir():
+            for f in env_dir.glob("session_env_*.sh"):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
 class LauncherAPI:
     """JS-accessible API for the launcher page.
 
@@ -260,6 +489,24 @@ class LauncherAPI:
                 log.warning("Failed to destroy window: %s", e)
         return "closing"
 
+    def close_for_update(self, lang: str = "en") -> str:
+        """Close the GUI for an auto-update, keeping the user informed.
+
+        Spawns the always-on-top update splash window first, then destroys
+        the webview window so the updater can replace ``core/gui.exe``. The
+        splash keeps showing the update status until the restarted app is
+        back, closing itself only when the new GUI/API is up.
+        """
+        log.warning("close_for_update() called (lang=%s)", lang)
+        _lang = "de" if lang in ("de", "Deutsch") else "en"
+        _spawn_update_splash(_lang)
+        if _window is not None:
+            try:
+                _window.destroy()
+            except Exception as e:  # webview teardown errors are best-effort
+                log.warning("Failed to destroy window: %s", e)
+        return "closing"
+
     def download_file(self, content: str, filename: str) -> str:
         """Save content to the user's Downloads folder and return the path."""
         downloads = Path.home() / "Downloads"
@@ -267,7 +514,7 @@ class LauncherAPI:
             downloads.mkdir(parents=True, exist_ok=True)
         except OSError:
             downloads = Path.home()
-        path = downloads / filename
+        path = downloads / Path(filename).name
         try:
             path.write_text(content, encoding="utf-8")
             return str(path)
@@ -282,7 +529,7 @@ class LauncherAPI:
             downloads.mkdir(parents=True, exist_ok=True)
         except OSError:
             downloads = Path.home()
-        path = downloads / filename
+        path = downloads / Path(filename).name
         try:
             path.write_bytes(base64.b64decode(data))
             return str(path)
@@ -290,9 +537,68 @@ class LauncherAPI:
             log.warning("Failed to save file: %s", e)
             return f"error:{e}"
 
+    def open_folder(self, path: str) -> str:
+        """Open *path* in the OS file manager, from the GUI process.
+
+        Runs in the GUI process rather than the (possibly elevated, display-less)
+        backend so that a file-manager window actually appears on Linux. Returns
+        ``"ok"`` on success or a short human-readable error message otherwise.
+        """
+        target = Path(path)
+        if not target.exists():
+            return f"Path does not exist: {target}"
+        try:
+            import platform
+
+            if platform.system() == "Windows":
+                os.startfile(str(target))  # type: ignore[attr-defined]
+                return "ok"
+            if platform.system() == "Darwin":
+                subprocess.run(
+                    ["open", str(target)],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return "ok"
+
+            # Linux: try the default opener, then known file managers. Because
+            # this runs in the GUI process, DISPLAY is available and a window
+            # should actually appear.
+            def _run_opener(cmd: list[str]) -> bool:
+                return (
+                    subprocess.run(
+                        cmd,
+                        check=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    ).returncode
+                    == 0
+                )
+
+            xdg = shutil.which("xdg-open")
+            if xdg and _run_opener([xdg, str(target)]):
+                return "ok"
+            for fm in (
+                "nautilus",
+                "dolphin",
+                "thunar",
+                "nemo",
+                "pcmanfm",
+                "caja",
+                "konqueror",
+            ):
+                fm_path = shutil.which(fm)
+                if fm_path and _run_opener([fm_path, str(target)]):
+                    return "ok"
+            return "No file manager could be started."
+        except OSError as e:
+            log.warning("[OPEN-FOLDER] Failed to open %s: %s", target, e)
+            return f"Failed to open folder: {e}"
+
     # ---- Server control ----
     def start_system(self) -> str:
-        """Start the full system (start.exe)."""
+        """Start the full system (start.bin)."""
         global _full_system_proc
         if _full_system_proc is not None:
             return "already_running"
@@ -300,19 +606,25 @@ class LauncherAPI:
         if not START_EXE.exists():
             return f"missing:{START_EXE}"
 
+        # On Linux, the supervisor (start.bin) needs root to bind low ports
+        # and manage Minecraft server processes.  If we're already root (e.g.
+        # gui.bin was launched via sudo), start directly; otherwise tell the
+        # launcher to show a password dialog so the user can authenticate.
+        if not IS_WINDOWS and not (hasattr(os, "geteuid") and os.geteuid() == 0):
+            return "needs_password"
+
         try:
             if IS_WINDOWS:
                 _full_system_proc = subprocess.Popen(
                     [str(START_EXE)],
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
-            else:
-                log_file = BASE_DIR / "logs" / "full_system.log"
-                log_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(log_file, "w", encoding="utf-8") as lf:
-                    _full_system_proc = subprocess.Popen(
-                        [str(START_EXE)], stdout=lf, stderr=lf, stdin=subprocess.DEVNULL
-                    )
+            elif hasattr(os, "geteuid") and os.geteuid() == 0:
+                # Already root — start directly.
+                _full_system_proc = subprocess.Popen(
+                    [str(START_EXE)],
+                    stdin=subprocess.DEVNULL,
+                )
             log.info(
                 "Full system process started (PID %s)",
                 _full_system_proc.pid if _full_system_proc else "?",
@@ -320,6 +632,85 @@ class LauncherAPI:
             return "started"
         except OSError as e:
             log.error("Failed to start full system: %s", e)
+            return f"error:{e}"
+
+    def start_system_with_password(self, password: str) -> str:
+        """Start the full system using sudo -S with the user's password.
+
+        The password is piped to sudo via stdin and immediately discarded.
+        This avoids pkexec (unreliable on some distros) and gives the user a
+        direct, predictable way to authenticate from the launcher UI.
+
+        Returns:
+            "started"        – system process launched (API will come up)
+            "wrong_password" – sudo rejected the password (exit code 1)
+            "error:..."      – other OS error
+        """
+        global _full_system_proc
+        if _full_system_proc is not None:
+            return "already_running"
+
+        if not START_EXE.exists():
+            return f"missing:{START_EXE}"
+
+        sudo = shutil.which("sudo")
+        if not sudo:
+            return "error:sudo not found — install sudo to start the system"
+
+        log_file = BASE_DIR / "logs" / "full_system.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        env = {**os.environ, **_display_env()}
+
+        try:
+            with open(log_file, "w", encoding="utf-8") as lf:
+                _full_system_proc = subprocess.Popen(
+                    [sudo, "-S", str(START_EXE)],
+                    stdin=subprocess.PIPE,
+                    stdout=lf,
+                    stderr=lf,
+                    env=env,
+                )
+            # Pipe the password to sudo's stdin and close it so sudo can
+            # proceed.  If the password is wrong sudo exits almost instantly.
+            try:
+                if _full_system_proc.stdin is not None:
+                    _full_system_proc.stdin.write((password + "\n").encode())
+                    _full_system_proc.stdin.flush()
+                    _full_system_proc.stdin.close()
+            except OSError:
+                pass
+
+            # Wait briefly for sudo to process the password.  A wrong
+            # password causes sudo to exit within milliseconds; a correct
+            # one keeps running for the full session.
+            time.sleep(1.0)
+            if _full_system_proc.poll() is not None:
+                code = _full_system_proc.returncode
+                _full_system_proc = None
+                if code == 1:
+                    log.warning("[ELEVATION] Wrong password (sudo exited 1)")
+                    return "wrong_password"
+                log.error(
+                    "[ELEVATION] sudo exited with code %s — cannot start the system",
+                    code,
+                )
+                return f"error:sudo failed (exit code {code})"
+
+            log.info(
+                "Full system process started via sudo (PID %s)",
+                _full_system_proc.pid,
+            )
+            threading.Thread(
+                target=_monitor_elevation,
+                args=(_full_system_proc,),
+                daemon=True,
+            ).start()
+            return "started"
+        except OSError as e:
+            log.error("Failed to start full system: %s", e)
+            if _full_system_proc is not None:
+                _full_system_proc.kill()
+                _full_system_proc = None
             return f"error:{e}"
 
     def stop_system(self) -> str:
@@ -331,6 +722,9 @@ class LauncherAPI:
             _full_system_proc.poll() if _full_system_proc is not None else "N/A",
         )
         if _full_system_proc is None or _full_system_proc.poll() is not None:
+            # Process already gone — but tmux/screen sessions may still be
+            # running as orphans.  Try to clean them up.
+            _kill_orphaned_sessions()
             return "not_running"
 
         # Write marker FIRST so a new GUI can detect the shutdown
@@ -370,9 +764,13 @@ class LauncherAPI:
             else:
                 _full_system_proc.terminate()
             _full_system_proc = None
+            # After force-killing the supervisor, its tmux/screen children
+            # may still be alive.  Clean them up.
+            _kill_orphaned_sessions()
             return "stopped"
         except OSError as e:
             log.warning("Failed to terminate system process: %s", e)
+            _kill_orphaned_sessions()
             return "error"
 
     def get_api_status(self) -> str:
@@ -390,6 +788,24 @@ class LauncherAPI:
         Returns ``{"shutting_down": True/False}``.
         """
         return {"shutting_down": _shutdown_pending()}
+
+    def get_update_status(self) -> dict[str, Any]:
+        """Return the current background-update progress (if any).
+
+        The updater writes ``core/runtime/update_status.json`` with
+        ``{"phase": ..., "progress": ..., "message": ...}``. Returns ``{}``
+        when no update is (or was) running.
+        """
+        status_file = ROOT_DIR / "core" / "runtime" / "update_status.json"
+        try:
+            if not status_file.exists():
+                return {}
+            data = json.loads(status_file.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                return {}
+            return dict(data)
+        except (OSError, ValueError):
+            return {}
 
     # ---- TikTok webview login ----
     def open_tiktok_login(self) -> str:
@@ -528,6 +944,11 @@ def _cleanup_processes():
     except OSError as exc:
         log.warning("Cleanup: force-kill failed: %s", exc)
 
+    # After force-killing the supervisor, its tmux/screen children
+    # may still be alive.  Clean them up.
+    if not IS_WINDOWS:
+        _kill_orphaned_sessions()
+
 
 atexit.register(_cleanup_processes)
 
@@ -646,8 +1067,23 @@ def main() -> None:
         sys.exit(0)
 
     _acquire_lock()
+    _prime_update_splash_cache()
 
     log.info("Starting GUI launcher...")
+
+    # Pre-flight: Qt6 >= 6.5 requires libxcb-cursor.so on Linux.
+    if sys.platform == "linux" and not _check_xcb_cursor():
+        hint = _linux_install_hint()
+        log.error(
+            "libxcb-cursor.so.0 not found — Qt6 cannot start the GUI. "
+            "Install it with: %s",
+            hint,
+        )
+        try:
+            input("Press Enter to exit...")
+        except EOFError:
+            pass
+        sys.exit(1)
 
     # If a previous supervisor is still shutting down, skip the API check
     # entirely and go straight to the launcher — the JS side will detect

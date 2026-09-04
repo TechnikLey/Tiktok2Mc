@@ -85,6 +85,11 @@ Die vollständige, maschinenlesbare Liste liefert `GET /api/v1/diagnostics/error
 | `PLUGIN-0016` | Plugin failed to stop gracefully | Plugin stoppte nicht innerhalb des Timeouts |
 | `PLUGIN-0017` | Plugin command queue full | Plugin-Command-Queue ist voll |
 | `PLUGIN-0020` | Plugin permission denied | Ein gesperrter BasePlugin-Helfer wurde ohne passenden `permissions`-Eintrag in der `plugin.json` aufgerufen |
+
+### API (Control Plane)
+
+| Code | Meldung | Beschreibung |
+|------|---------|--------------|
 | `API-0009` | Reserved event type rejected | Reservierte Kern-Event-Familie ohne vertrauten Bridge-Marker publiziert |
 | `API-0010` | Event payload violates declared schema | Fehlende Pflichtfelder oder falsche Typen gegenüber dem `data_schema` des Events |
 

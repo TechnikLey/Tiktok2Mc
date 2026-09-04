@@ -184,6 +184,58 @@ def _check_java():
     return shutil.which("java") is not None, None
 
 
+def _check_xcb_cursor():
+    """Check if libxcb-cursor.so.0 is available (Qt6 >= 6.5 on Linux)."""
+    if sys.platform != "linux":
+        return True, None
+    import ctypes
+
+    for name in ("libxcb-cursor.so.0", "libxcb-cursor.so"):
+        try:
+            ctypes.CDLL(name)
+            return True, None
+        except OSError:
+            continue
+    return False, None
+
+
+# Release-bundled files under tools/ that must exist before a build.
+# These are gitignored, so a missing file silently produces a broken
+# release (e.g. Minecraft server cannot start without server.jar/Java).
+def _tools_path(*parts: str):
+    return Path(__file__).resolve().parent / "tools" / Path(*parts)
+
+
+def _check_server_jar():
+    path = _tools_path("server.jar")
+    if path.exists():
+        return True, f"{path.stat().st_size:,} bytes"
+    return False, str(path)
+
+
+def _check_bundled_java():
+    path = _tools_path("Java")
+    java_bin = path / ("bin/java.exe" if sys.platform == "win32" else "bin/java")
+    if java_bin.exists():
+        return True, str(path)
+    return False, str(path)
+
+
+RELEASE_FILES = [
+    # (label, check_func, needed_for)
+    (
+        "tools/server.jar",
+        _check_server_jar,
+        "Minecraft server (server/default + versions)",
+    ),
+    (
+        "tools/Java/ (bundled JRE)",
+        _check_bundled_java,
+        "Self-contained Minecraft server runtime",
+    ),
+]
+
+
 SYSTEM_TOOLS = [
     # (name, check_func, pkg_names, required_for, optional, platform)
     # pkg_names: dict {pm_name: pkg} for auto-install
@@ -276,6 +328,19 @@ SYSTEM_TOOLS = [
             "dnf": "qt6-qtwebengine qt6-qtwayland",
             "pacman": "qt6-webengine qt6-wayland",
             "zypper": "qt6-webengine",
+        },
+        "gui",
+        False,
+        "linux",
+    ),
+    (
+        "xcb-cursor",
+        _check_xcb_cursor,
+        {
+            "apt": "libxcb-cursor0",
+            "dnf": "libxcb-cursor",
+            "pacman": "libxcb",
+            "zypper": "libxcb-cursor0",
         },
         "gui",
         False,
@@ -549,6 +614,33 @@ def main():
                     missing_system.append((name, pkg_names))
             elif not available:
                 skipped_count += 1
+
+    # ── Release files (bundled into the build) ──
+    if not args.pip_only:
+        header("Release Files")
+        missing_release = []
+        for label, check_func, needed_for in RELEASE_FILES:
+            available, info = check_func()
+            if available:
+                suffix = f"  {C.YELLOW}({info}){C.RESET}" if info else ""
+                cprint(f"  [{C.GREEN}OK{C.RESET}] {label} ({needed_for}){suffix}")
+            else:
+                cprint(
+                    f"  [{C.RED}MISSING{C.RESET}] {label} ({needed_for})"
+                    f"  {C.GRAY}({info}){C.RESET}"
+                )
+                cprint(
+                    f"      {C.YELLOW}WARNING: release may be broken —"
+                    f" place this file before building.{C.RESET}"
+                )
+                missing_release.append(label)
+                skipped_count += 1
+        if missing_release:
+            cprint(
+                f"\n  {C.YELLOW}{len(missing_release)} release file(s) missing —"
+                f" the built release will be incomplete.{C.RESET}",
+                C.RED,
+            )
 
     # ── Python packages ──
     if not args.system_only:

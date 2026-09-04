@@ -310,11 +310,11 @@ sync_datapack(INSTANCE_DIR, DP_SOURCE)
 
 # === Start Minecraft server ===
 log.info("\n--- Minecraft Server ---")
-log.info(f"RAM:     {Xms} -> {Xmx}")
-log.info(f"Java:    {JAVA_EXE}")
-log.info(f"Version: {MC_VERSION}")
-log.info(f"Path:    {INSTANCE_DIR}")
-log.info(f"Port:    {MC_PORT}")
+log.info("RAM:     %s -> %s", Xms, Xmx)
+log.info("Java:    %s", JAVA_EXE)
+log.info("Version: %s", MC_VERSION)
+log.info("Path:    %s", INSTANCE_DIR)
+log.info("Port:    %s", MC_PORT)
 log.info("--------------------------\n")
 
 heartbeat = start_heartbeat(log, interval=60.0)

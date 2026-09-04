@@ -9,19 +9,19 @@ This module replaces the duplicated parsing logic in:
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from core.diagnostics import Diagnostic
+from core.validator import (
+    _RE_DYNAMIC_VANILLA,
+    _RE_MULTIPLIER,
+    _RE_OVERLAY_PREFIX,
+    Severity,
+    _make_diag,
+)
 
 log = logging.getLogger(__name__)
-
-# ── Regex patterns ──────────────────────────────────────────────────────
-
-_RE_OVERLAY_PREFIX = re.compile(r"^@(\w+)>>")
-_RE_MULTIPLIER = re.compile(r"\s+x(\d+)\s*$")
-_RE_DYNAMIC_VANILLA = re.compile(r"\s+!rc\s*$")
 
 # ── Known event trigger names ──────────────────────────────────────────
 
@@ -209,11 +209,6 @@ def parse_mca(text: str, *, gifts: list[dict] | None = None) -> ParseResult:
     - Inline ``#`` on an active line = inline comment, stripped
     - Disabled triggers (##) are parsed normally but marked enabled=False
     """
-    from core.validator import (
-        Severity,
-        _make_diag,
-    )  # local import to avoid cycle
-
     result = ParseResult()
     lines = text.splitlines()
     seen_enabled: set[str] = set()

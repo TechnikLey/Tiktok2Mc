@@ -8,6 +8,7 @@ Covers the full update flow that the compiled update.exe performs:
   - Full run_update() flow with mocks
 """
 
+import json
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -16,6 +17,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+
+import python.update
 
 # =========================================================================
 # _inject_values_strictly — pure config injection logic
@@ -811,6 +814,90 @@ class TestRunUpdateOrchestration:
                 mock_popen.assert_called_once()
                 args = mock_popen.call_args[0][0]
                 assert "--resume" in args, f"Expected --resume in {args}"
+                assert "--auto" in args, f"Expected --auto forwarded in {args}"
+
+
+class TestUpdaterSelfUpdateResumeRelaunch:
+    """Self-update handoff must forward --auto so the resume child can
+    relaunch start.exe (start.py no longer restarts itself on EXIT_OK)."""
+
+    def _exercise_self_update(self, tmp_path: Path, auto_mode: bool):
+        """Run the full self-update orchestration and return the resume args."""
+        with (
+            TestRunUpdateOrchestration()._get_run_update(tmp_path) as (
+                run_update,
+                _base_dir,
+                _temp_dir,
+            ),
+            patch.object(python.update, "AUTO_MODE", auto_mode),
+            patch("python.update.requests.get") as mock_get,
+            patch("python.update.subprocess.Popen") as mock_popen,
+            patch("python.update.os.execv"),
+            patch("python.update.verify_checksum", return_value=True),
+            patch("python.update.sys.exit", side_effect=SystemExit),
+            patch("python.update.shutil.copy2"),
+            patch("python.update.shutil.rmtree"),
+            patch("python.update.os.chmod"),
+            patch("python.update.download_with_progress"),
+            patch("python.update.zipfile.ZipFile") as mock_zip,
+        ):
+
+            def fake_populate(path):
+                (path / "version.txt").write_text(
+                    "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
+                )
+                (path / "core").mkdir(exist_ok=True)
+                (path / "core" / "update.exe").write_text("new updater binary")
+
+            mock_zip.return_value.__enter__.return_value.extractall = fake_populate
+
+            release_resp = MagicMock()
+            release_resp.status_code = 200
+            release_resp.json.return_value = {
+                "tag_name": "v1.0.0",
+                "assets": [
+                    {
+                        "name": "Tiktok2Mc_v1.0.0_Windows.zip",
+                        "url": "https://fake.url/asset",
+                    },
+                    {
+                        "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
+                        "url": "https://fake.url/asset.sha256",
+                    },
+                ],
+            }
+            checksum_resp = MagicMock()
+            checksum_resp.status_code = 200
+            checksum_resp.text = "a" * 64 + "\n"
+
+            def mock_get_side_effect(url, **kwargs):
+                if "releases/latest" in url or "/releases" in url:
+                    return release_resp
+                if "asset.sha256" in url:
+                    return checksum_resp
+                if "updater/signal" in url:
+                    signal_resp = MagicMock()
+                    signal_resp.status_code = 200
+                    signal_resp.json.return_value = {"signal": None}
+                    return signal_resp
+                raise requests.exceptions.RequestException("unexpected URL")
+
+            mock_get.side_effect = mock_get_side_effect
+
+            with pytest.raises(SystemExit):
+                run_update()
+
+            _ = mock_popen  # silence lint
+            return mock_popen.call_args[0][0]
+
+    def test_forward_auto_when_auto_mode(self, tmp_path):
+        args = self._exercise_self_update(tmp_path, auto_mode=True)
+        assert "--auto" in args and "--resume" in args, args
+
+    def test_no_auto_forward_outside_auto_mode(self, tmp_path):
+        args = self._exercise_self_update(tmp_path, auto_mode=False)
+        assert "--resume" in args, args
+        assert "--auto" not in args, args
 
 
 # =========================================================================
@@ -951,3 +1038,215 @@ class TestUpdateSourceOverride:
             for n, v in snap.items():
                 setattr(python.update, n, v)
             monkeypatch.delenv("TIKTOK2MC_UPDATE_SOURCE", raising=False)
+
+
+# =========================================================================
+# Status reporting + relaunch helpers (GUI launcher feedback)
+# =========================================================================
+
+
+class TestUpdateStatusReporting:
+    """Tests the GUI-feedback helpers added to update.py.
+
+    ``_write_update_status`` / ``_clear_update_status`` publish progress for
+    ``gui.py::LauncherAPI.get_update_status``; ``_relaunch_tool_after_update``
+    restarts ``start.exe`` after a successful ``--auto`` install because
+    ``start.py`` already exited on the kill signal.
+    """
+
+    def test_write_status_writes_json(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+        ):
+            python.update._write_update_status("downloading", progress=42)
+        assert json.loads(status_file.read_text(encoding="utf-8")) == {
+            "phase": "downloading",
+            "progress": 42,
+            "message": "",
+        }
+
+    def test_write_status_with_message(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+        ):
+            python.update._write_update_status("error", message="Update failed.")
+        assert json.loads(status_file.read_text(encoding="utf-8"))["message"] == (
+            "Update failed."
+        )
+
+    def test_clear_status_removes_file(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        status_file.write_text("{}", encoding="utf-8")
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+        ):
+            python.update._clear_update_status()
+        assert not status_file.exists()
+
+    def test_status_helpers_are_noops_without_file(self):
+        """When _init() was never called, UPDATE_STATUS_FILE is None → no-ops."""
+        import python.update
+
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", None),
+            patch.object(python.update, "log"),
+        ):
+            python.update._write_update_status("checking")
+            python.update._clear_update_status()
+
+    def test_status_write_failure_is_swallowed(self, tmp_path):
+        import python.update
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+            patch.object(python.update, "log"),
+            patch.object(
+                status_file.__class__, "write_text", side_effect=OSError("locked")
+            ),
+        ):
+            python.update._write_update_status("checking")  # must not raise
+
+    def test_relaunch_skipped_outside_auto_mode(self):
+        import python.update
+
+        with (
+            patch.object(python.update, "AUTO_MODE", False),
+            patch.object(python.update, "subprocess") as mock_sp,
+            patch.object(python.update, "log"),
+        ):
+            assert python.update._relaunch_tool_after_update() is True
+        mock_sp.Popen.assert_not_called()
+
+    def test_relaunch_launches_start_exe(self):
+        import python.update
+
+        start_file = Path("install") / "start.exe"
+        with (
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "START_FILE", start_file),
+            patch.object(python.update, "subprocess") as mock_sp,
+            patch.object(python.update, "log"),
+        ):
+            assert python.update._relaunch_tool_after_update() is True
+        assert mock_sp.Popen.call_count == 1
+        cmd = mock_sp.Popen.call_args[0][0]
+        assert str(cmd[0]).endswith("start.exe")
+
+    def test_relaunch_returns_false_on_oserror(self):
+        import python.update
+
+        mock_sp = MagicMock()
+        mock_sp.Popen = MagicMock(side_effect=OSError("start.exe missing"))
+        with (
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "START_FILE", Path("start.exe")),
+            patch.object(python.update, "subprocess", mock_sp),
+            patch.object(python.update, "log"),
+        ):
+            assert python.update._relaunch_tool_after_update() is False
+
+
+class TestInstallFileWithRetry:
+    """Tests _install_file_with_retry (locked-file retry on Windows).
+
+    The retry is what closes the race between start.exe exiting on the kill
+    signal and the updater replacing it — on non-Windows platforms the first
+    failure must propagate immediately (original behavior).
+    """
+
+    @staticmethod
+    def _flaky_copy(fails: int, real_copy) -> tuple:
+        calls = {"n": 0}
+
+        def flaky(src, dst):
+            calls["n"] += 1
+            if calls["n"] <= fails:
+                raise OSError(32, "file in use")
+            return real_copy(src, dst)
+
+        return flaky, calls
+
+    def test_success_first_try(self, tmp_path):
+        import python.update
+
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="win32")),
+            patch.object(python.update, "log"),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert dst.read_text() == "data"
+
+    def test_retries_lock_then_succeeds(self, tmp_path):
+        import shutil
+
+        import python.update
+
+        real_copy = shutil.copy2
+        flaky, calls = self._flaky_copy(2, real_copy)
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="win32")),
+            patch.object(python.update.shutil, "copy2", flaky),
+            patch.object(python.update.time, "sleep"),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert calls["n"] == 3
+        assert dst.read_text() == "data"
+
+    def test_raises_after_retry_window(self, tmp_path):
+        import python.update
+
+        calls = {"n": 0}
+
+        def always_locked(_src, _dst):
+            calls["n"] += 1
+            raise OSError(32, "file in use")
+
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="win32")),
+            patch.object(python.update.shutil, "copy2", always_locked),
+            patch.object(python.update.time, "sleep"),
+            pytest.raises(OSError),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert calls["n"] == 101
+
+    def test_no_retry_outside_win32(self, tmp_path):
+        import python.update
+
+        calls = {"n": 0}
+
+        def always_fails(_src, _dst):
+            calls["n"] += 1
+            raise OSError("not locked")
+
+        src = tmp_path / "src.txt"
+        src.write_text("data")
+        dst = tmp_path / "dst.txt"
+        with (
+            patch.object(python.update, "sys", MagicMock(platform="linux")),
+            patch.object(python.update.shutil, "copy2", always_fails),
+            pytest.raises(OSError),
+        ):
+            python.update._install_file_with_retry(src, dst)
+        assert calls["n"] == 1

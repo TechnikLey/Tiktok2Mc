@@ -38,10 +38,9 @@ from core.error_codes import (
     OUTBOUND_0003,
     OUTBOUND_0004,
 )
+from core.event_patterns import match_event
 from core.health_monitor import HealthState, get_health_monitor
 from core.overlay_base import OverlayClient
-
-from .plugin_event_bridge import match_event
 
 log = logging.getLogger(__name__)
 

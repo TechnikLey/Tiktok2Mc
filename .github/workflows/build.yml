@@ -51,6 +51,17 @@ jobs:
           path: build/release/
           if-no-files-found: error
 
+      # The portable Linux archive must be built on the runner itself:
+      # upload-artifact dereferences the shared PyQt6 runtime symlinks, so
+      # re-archiving a downloaded bundle would exceed GitHub's 2 GiB limit.
+      - name: Upload Linux Portable Archive (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TikTok2Mc-Linux-Archive
+          path: build/TikTok2Mc-Linux.tar.gz
+          if-no-files-found: error
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -71,6 +82,12 @@ jobs:
           name: TikTok2Mc-Linux
           path: build-linux/
 
+      - name: Download Linux Portable Archive
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTok2Mc-Linux-Archive
+          path: archive-linux/
+
       - name: Create Archives
         run: |
           set -e
@@ -84,10 +101,10 @@ jobs:
             mv build-linux/TikTok2Mc-Linux-Setup.sh installer-linux/
           fi
 
-          # Archive the Windows application bundle.
-          # NOTE: the Linux bundle (Linux.tar.gz) is intentionally NOT archived:
-          # it exceeds GitHub's 2 GiB release-asset limit. Linux is delivered via
-          # its self-extracting Installer (-Linux-Setup.sh) instead.
+          # Archive the application bundles.
+          # The Linux bundle shares a single PyQt6 runtime, so Linux.tar.gz fits
+          # comfortably under GitHub's 2 GiB release-asset limit. It is produced
+          # on the build runner (symlinks intact) and downloaded as an artifact.
           cd build-windows && zip -9 -r ../TikTok2Mc-${{ github.ref_name }}-Windows.zip . && cd ..
 
           sha256sum TikTok2Mc-${{ github.ref_name }}-Windows.zip > TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
@@ -101,6 +118,10 @@ jobs:
             mv installer-linux/TikTok2Mc-Linux-Setup.sh ./TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh
             sha256sum TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh > TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh.sha256
           fi
+          if [ -f archive-linux/TikTok2Mc-Linux.tar.gz ]; then
+            cp archive-linux/TikTok2Mc-Linux.tar.gz ./TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz
+            sha256sum TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz > TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
+          fi
 
           ls -la
 
@@ -110,6 +131,8 @@ jobs:
           files: |
             TikTok2Mc-${{ github.ref_name }}-Windows.zip
             TikTok2Mc-${{ github.ref_name }}-Windows.zip.sha256
+            TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz
+            TikTok2Mc-${{ github.ref_name }}-Linux.tar.gz.sha256
             TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe
             TikTok2MC-${{ github.ref_name }}-Windows-Setup.exe.sha256
             TikTok2Mc-${{ github.ref_name }}-Linux-Setup.sh

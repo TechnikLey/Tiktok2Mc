@@ -318,7 +318,7 @@ event_commands:
 | death-counter | `player_death`, `add_death`, `reset`, `save_dims` |
 
 > [!NOTE]
-> `save_dims` is an internal command used by plugins to persist overlay window dimensions. It is registered by all built-in plugins but not typically invoked manually.
+> `save_dims` is an internal command used by plugins to persist overlay window dimensions. It is registered by the timer, death-counter and win-counter plugins but not typically invoked manually.
 
 The Event-Command Mapper can also be edited visually in the Dashboard.
 

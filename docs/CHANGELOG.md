@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.0.1]
+
+### Added
+
+- **Update splash window** — updates now show an always-on-top progress window displaying the current phase (checking, downloading, installing, done) with a progress bar. The window closes automatically once the update finishes and the tool is running again, so you always know what's happening.
+- **Actions Editor validation** — the visual Actions Editor now checks your triggers as you type and shows any problems (errors and warnings) in a panel above the editor, so you can see what's wrong right away. Saving is blocked until all errors and warnings are resolved. Common issues it flags: `{comment}` used on a non-comment trigger, `{user}`/`{comment}` in a shell command (where they can't be substituted), `{user}` in a vanilla command without the `!rc` suffix, and duplicate triggers.
+
+### Changed
+
+- **Linux Minecraft server not starting via `start.bin`/`gui.bin`** — when tmux/screen was used, child processes (including the Minecraft server) lost environment variables (e.g. `RESOLVED_PORT_*`, `JAVA_HOME`, `PATH`) because session creation only forwarded a few display vars. Sessions now source a per-session env file with the full parent environment, and tmux also forwards `RESOLVED_PORT_*` variables explicitly so the server resolves ports correctly.
+- **Linux GUI elevation hardening** — the GUI now uses `sudo -n` (non-interactive) as its fallback so it no longer hangs waiting for a password on a TTY-less stdin; it detects a user already running as root and reports clear errors (exit 126/127/elevation) instead of failing silently. Orphaned tmux/screen sessions are now cleaned up when the system is stopped.
+- **Linux root-required messaging** — `start.py`, `update.py`, the `config.yaml` sudo warning, and the installer's "Full System" desktop entry now explain why root is needed and how to proceed. The desktop entry wraps `start.bin` in `pkexec` for a graphical prompt.
+- **Linux "Start System" password prompt** — instead of relying on `pkexec`, the launcher now shows its own inline password dialog and starts the system with `sudo -S`, giving you a direct, predictable way to authenticate (with a clear "wrong password" message if needed).
+- **TikTok connection failure protection** — if the TikTok connection failed repeatedly in the past, the tool would keep retrying silently or the account could get blocked. After multiple failed connection attempts, a warning dialog now appears in the GUI where you can choose to re-enable the connection or keep it disabled. The fail counter resets once the connection is successful again.
+- **Config version bumped to 1.1** — new default keys (`failed_connection_popup_enabled`, `max_connect_fails`) are automatically merged into existing configs on startup via `auto_update_config`. No manual action needed.
+- **Updater version bumped to v2.1.0** — internal update compatibility.
+- **Documentation updates** — `README.md`, `GUIDE.md`, and both developer books (EN/DE) have been updated. The Linux section now includes run instructions for the portable archive, the Build & Release workflow is documented, and admonition syntax has been corrected across all docs.
+
+### Fixed
+
+- **Linux console "Connect" not working** — clicking "Connect" in the console tab on Linux would silently fall back to showing log-file output instead of connecting. The RCON connection now works properly, so you can send commands and see server responses in real time.
+- **Plugin platform info not showing in GUI** — the plugin manager always displayed "—" for the platform column, even when plugins declared a specific platform (e.g. "windows") in their `plugin.json`. The platform value is now correctly read from the manifest and displayed in the dashboard.
+- **Automatic updates failing / tool not starting** — when the tool was started (e.g. via the GUI) while an update was being installed, the automatic restart could be interrupted mid-update, leaving the tool in a broken or unstarted state with no way for the user to see what was wrong. The update process now handles the restart correctly itself and the new splash window shows the progress, so the tool reliably comes back up after every update.
+- **Portable Linux archive missing from releases** — the `Linux.tar.gz` download was unavailable because the build pipeline produced an archive exceeding GitHub's 2 GiB asset limit after symlinks were dereferenced. The archive is now built directly on the release runner so symlinks stay intact and the file fits within the limit.
+- **Event Tester gift images and like milestones not working** — the Event Tester did not display gift images for the selected gift, and testing like events failed because only like milestones (not raw likes) exist. Both now work correctly: gifts show their image, and a milestone selector appears when testing like events.
+- **GUI/overlay losing connection after port relocation** — when the API port was automatically relocated by `auto_resolve`, the GUI and overlay still tried to connect to the old default port. They now use the actual resolved port.
+- **Bridge crash on older TikTokLive versions** — fixed a startup crash that could occur with certain bundled TikTokLive library versions. The tool now handles incompatible listener APIs gracefully instead of shutting down.
+- **Download path traversal vulnerability** — file downloads from the web UI are now sanitized to prevent paths outside the intended download folder.
+- **Plugin recovery not logged** — when an unhealthy plugin comes back online, this is now recorded in the log so you can see that everything is working again.
+- **Linux installer accepted wrong Java version** — the Linux installer only checked whether Java was present but did not verify the version, allowing Java 21 to pass even though Java 25 is required. It now validates the major version and warns if it is too old, with correct package names for all distros.
+- **Linux binaries fail to start** — on some Linux systems, the tool's executables (`start.bin`, `update.bin`) would fail to launch with a missing library error. The build now bundles all required runtime files so the binaries start correctly.
+- **Linux GUI crashes with missing xcb-cursor** — Qt6 >= 6.5 requires `libxcb-cursor.so.0` on Linux, but the install hints and dependency checks did not mention it. The GUI now detects the missing library before Qt init and prints the correct install command. The Linux installer also checks for it.
+- **Linux "Start System" failed without root** — starting the Minecraft server on Linux required root privileges, but the GUI launched it without them, causing the server to fail silently. The tool now automatically requests the necessary permissions when starting the system on Linux.
+- **Wrong version path shown in Server Manager** — the download and custom-jar dialogs stated versions are saved to `servers/<version>/server.jar`, but they are actually stored in `versions/<version>/server.jar`. The texts now reflect the real location.
+- **Linux "Open Folder" not working** — clicking the folder button on Linux did nothing because the elevated backend process had no display access and `xdg-open` failures were silent. "Open Folder" now opens the folder directly from the GUI process, falls back to other file managers if needed, and shows an error if no file manager is available.
+- **Console connect error on Linux ("not valid JSON")** — when the RCON config failed to load, the backend returned a plain-text `Internal Server Error` body that the GUI could not parse. RCON config-loading failures now return proper JSON, and the console handles non-JSON error responses gracefully.
+- **Imprecise RCON connection errors** — the backend only reported a generic "RCON connection failed", with no way to tell why. It now surfaces the specific reason (e.g. connection timed out — is the Minecraft server running with RCON enabled? — or the OS/authentication error) in the console and shipped with the 502 response.
+- **`check_deps.py` release-file warnings** — the dependency check now also verifies that required release files (`tools/server.jar`, `tools/Java/` bundled JRE) are present and warns when they are missing, since a build without them produces a broken release.
+- **Minecraft server "Start" failing with an unknown error on Linux** — when starting, the tool waited for the server to become ready and marked it failed after a timeout, but never showed *why* (on Linux the server runs inside tmux/screen, so its console output wasn't captured). It now reads the server's real `logs/latest.log` tail and surfaces it in the GUI and logs, and the readiness timeout was raised to 240 s so slower machines (e.g. VMs) are not mistaken for a crash. If the server still can't boot, you now see the actual reason (Java error, EULA, port in use, world corruption, etc.).
+- **Linux binaries in subfolders not starting** — some executables stored in subfolders (e.g. `server.bin`, `gui.bin`) would fail to launch on Linux due to missing bundled runtime files. The build now ensures all binaries can find what they need, regardless of their location.
+- **`!rc` toggle missing in the Actions Editor** — the "Send via RCON" (`!rc`) option was missing entirely from the visual Actions Editor in the release, so vanilla commands could not be set to send via RCON from the GUI. The toggle is now available in the editor (it adds the `!rc` suffix) and is correctly saved and kept.
+- **Two sidebar tabs highlighted after Chatbot beta agree** — when clicking the Chatbot tab for the first time and accepting the beta modal, both the Chatbot tab and the previously active tab were highlighted in yellow. The `acceptBeta` handler now clears all active states before activating the Chatbot tab.
+- **Console showing server output without a connection** — the GUI console could briefly show 1–2 server log lines (e.g. "Delayed TNT config got updated") even before you connected RCON, because server output was streamed as soon as the server was running. Server output now only appears in the console while an RCON session is active; when you disconnect, the console clears.
+- **Stray shutdown lines lingering on Linux server stop** — when stopping a server, its last shutdown messages could still reach the console display. Server log capture is now stopped *before* the server is shut down, so those final lines are no longer forwarded.
+
+---
+
 ## [v1.0.0] - 2026-08-30
 
 > [!WARNING]
@@ -90,6 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updater handles temporary errors** — the update checker now retries on temporary GitHub API errors instead of failing immediately.
 - **`{user}` placeholder in vanilla commands** — the `{user}` placeholder now works in vanilla Minecraft commands when using the `!rc` suffix. A warning is shown if you forget to add the suffix.
 - **Security hardening** — cross-origin and DNS-rebinding requests are rejected, secrets are redacted in API responses, `{user}` is sanitized against RCON slash-command injection, and overlay/theme inputs are XSS-hardened.
+- **Overlay slots phantom `url` field on save** — saving the Settings tab could add an empty `url: ""` key to overlay slots that never had one (e.g. the default `{name: "default"}`), because the editor always rendered a URL input and `collect()` wrote the empty value back. The URL input is now only rendered when the slot already has a `url` key; a "+ URL" button lets you add one explicitly.
+- **Like triggers wiped on unrelated save** — editing any other setting in the Settings tab could silently delete all like triggers, because `collectLikeTriggers()` used global `document.querySelector` to read DOM values. When the like triggers section was filtered out by search (not in the DOM), all selectors returned null and the array was overwritten with `[]`. The query now scopes to the editor content and skips collection entirely when the section is not rendered.
 
 ---
 

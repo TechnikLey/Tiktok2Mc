@@ -79,9 +79,10 @@ The release publishes exactly these assets (each with an accompanying `.sha256`)
 - `TikTok2MC-<version>-Windows-Setup.exe` — Windows installer (NSIS)
 - `TikTok2MC-<version>-Windows.zip` — Windows portable archive
 - `TikTok2Mc-<version>-Linux-Setup.sh` — Linux self-extracting installer
+- `TikTok2Mc-<version>-Linux.tar.gz` — Linux portable archive
 
-> [!WARNING]
-> A portable `Linux.tar.gz` is **not** published. GitHub caps release assets at 2 GiB (2147483648 bytes), and the uncompressed Linux bundle exceeds that limit — most of it consists of already-compressed PNG gift assets that cannot be shrunk further. Linux is therefore delivered via its self-extracting installer (`-Linux-Setup.sh`) only. This is enforced in `.github/workflows/build.yml`, which deliberately skips archiving the Linux bundle in `Create Archives`. Re-add a Linux archive only if it stays well under the 2 GiB limit.
+> [!NOTE]
+> A portable `Linux.tar.gz` is published again since the Linux build shares a single PyQt6 runtime: the bundle compresses to well under GitHub's 2 GiB per-asset limit. Important: the archive is produced directly on the build runner and transferred via artifact — `upload-artifact@v4` dereferences the shared-runtime symlinks, so re-archiving the downloaded bundle would blow the limit again. If that ever changes, enforce the cap in `Create Archives` in `.github/workflows/build.yml`.
 
 Releases are triggered by moving a version tag to the desired commit and pushing:
 

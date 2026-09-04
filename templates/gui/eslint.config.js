@@ -20,6 +20,7 @@ const appGlobals = {
   _throwResError: "writable",
   showToast: "writable",
   showConfirmDialog: "writable",
+  _hideAllEditors: "writable",
   setRestartPending: "writable",
   escapeHtml: "writable",
   currentConfig: "writable",

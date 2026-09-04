@@ -967,8 +967,8 @@ MC_0002 = ErrorCode(
     subsystem=Subsystem.MC,
     severity=Severity.FATAL,
     message="Java runtime not available.",
-    description="No suitable Java runtime (17+) was found.",
-    recovery_hint="Install Java 17 or later, or ensure bundled Java is available.",
+    description="No suitable Java runtime (25+) was found.",
+    recovery_hint="Install Java 25 or later, or ensure bundled Java is available.",
     impact="Minecraft server cannot start.",
 )
 MC_0003 = ErrorCode(

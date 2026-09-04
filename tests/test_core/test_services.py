@@ -98,7 +98,7 @@ class TestApiService:
         cfg["config_version"] = "0.7"
         svc.write_config(cfg, backup=False)
         reread = svc.read_config()
-        assert reread["config_version"] == "1.0"
+        assert reread["config_version"] == "1.1"
 
     def test_write_config_creates_backup(self, svc, project_dir):
         cfg = svc.read_config()

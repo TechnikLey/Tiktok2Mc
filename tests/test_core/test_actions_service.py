@@ -121,6 +121,72 @@ class TestValidateTriggers:
         )
         assert "12345:&curl http://localhost" in raw
 
+    def test_comment_placeholder_on_non_comment_trigger_is_error(self):
+        svc = ActionsService()
+        triggers = [
+            {
+                "name": "follow",
+                "enabled": True,
+                "type": "Event",
+                "commands": [
+                    {"type": "vanilla", "command": "say {comment}", "multiplier": 1}
+                ],
+            }
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert any(d["code"] == "COMMENT_PLACEHOLDER_WRONG_TRIGGER" for d in diags)
+        assert all(
+            d["code"] != "COMMENT_PLACEHOLDER_WRONG_TRIGGER" or d["severity"] == "ERROR"
+            for d in diags
+        )
+
+    def test_comment_placeholder_on_comment_trigger_allowed(self):
+        svc = ActionsService()
+        triggers = [
+            {
+                "name": "comment",
+                "enabled": True,
+                "type": "Event",
+                "commands": [
+                    {"type": "vanilla", "command": "say {comment}", "multiplier": 1}
+                ],
+            }
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert not any(d["code"] == "COMMENT_PLACEHOLDER_WRONG_TRIGGER" for d in diags)
+
+    def test_placeholder_in_shell_is_warning(self):
+        svc = ActionsService()
+        triggers = [
+            {
+                "name": "follow",
+                "enabled": True,
+                "type": "Event",
+                "commands": [
+                    {"type": "shell", "command": "curl {user}", "multiplier": 1}
+                ],
+            }
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert any(d["code"] == "PLACEHOLDER_IN_SHELL" for d in diags)
+        shell = next(d for d in diags if d["code"] == "PLACEHOLDER_IN_SHELL")
+        assert shell["severity"] == "WARNING"
+
+    def test_no_placeholder_in_shell_no_warning(self):
+        svc = ActionsService()
+        triggers = [
+            {
+                "name": "follow",
+                "enabled": True,
+                "type": "Event",
+                "commands": [
+                    {"type": "shell", "command": "curl static", "multiplier": 1}
+                ],
+            }
+        ]
+        diags = svc.validate_triggers(triggers)
+        assert not any(d["code"] == "PLACEHOLDER_IN_SHELL" for d in diags)
+
     def test_serializes_shell_with_multiplier(self):
         svc = ActionsService()
         raw = svc.serialize(

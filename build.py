@@ -511,6 +511,7 @@ def cmd_app(args):
         "gui": "tiktok2mc.ico",
         "start": "tiktok2mc.ico",
         "update": "tiktok2mc-update.ico",
+        "update_progress": "tiktok2mc-update.ico",
         "server": "tiktok2mc-tool.ico",
         "overlay": "tiktok2mc-tool.ico",
         "test_trigger": "tiktok2mc-tool.ico",
@@ -524,6 +525,12 @@ def cmd_app(args):
         {"name": "server", "src": "src/python/server.py", "dest": "core"},
         {"name": "overlay", "src": "src/python/overlay.py", "dest": "core"},
         {"name": "start", "src": "src/python/start.py", "dest": ""},
+        {
+            "name": "update_progress",
+            "src": "src/python/update_progress.py",
+            "dest": "core",
+            "windowed": True,
+        },
         {"name": "test_trigger", "src": "src/python/send_trigger.py", "dest": "test"},
     ]
 
@@ -777,11 +784,13 @@ def cmd_app(args):
             return False
 
         def _needs_qt(source: Path, deps: set[str]) -> bool:
-            """Whether a binary pulls in webview (directly or via its local deps)."""
-            if _imports_module(source, "webview"):
+            """Whether a binary pulls in Qt (webview/PyQt6) directly or via deps."""
+            if _imports_module(source, "webview") or _imports_module(source, "PyQt6"):
                 return True
             for dep in sorted(deps):
-                if _imports_module(SCRIPT_DIR / dep, "webview"):
+                if _imports_module(SCRIPT_DIR / dep, "webview") or _imports_module(
+                    SCRIPT_DIR / dep, "PyQt6"
+                ):
                     return True
             return False
 
@@ -915,6 +924,17 @@ def cmd_app(args):
                 _make_symlink(
                     f"{rel_up}/core/runtime/_internal", link_dir / "_internal"
                 )
+
+            # Root-level _internal symlink for --onefile binaries (start, update).
+            # PyInstaller 6.x on Linux resolves libpython relative to the
+            # executable directory, so onefile binaries in the release root need
+            # the same _internal/ directory that the Qt onedir binaries use.
+            _make_symlink("core/runtime/_internal", OUT_DIR / "_internal")
+
+            # Onefile binaries that live in core/ (server.bin, gui.bin, ...)
+            # resolve _internal/ relative to their own directory, so core/ needs
+            # the same symlink that the release root gets.
+            _make_symlink("runtime/_internal", OUT_DIR / "core" / "_internal")
 
         def _build_linux_qt_bundle(qt_tasks: list[dict]) -> bool:
             """Build all Qt binaries as one onedir bundle sharing a single PyQt6 runtime."""

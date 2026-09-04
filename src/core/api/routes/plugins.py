@@ -115,7 +115,7 @@ async def register_plugin(body: PluginRegisterRequest):
             health_status="unknown",
             last_heartbeat=None,
             error="",
-            platform="all",
+            platform=body.platform,
         )
         result = registry.register(data)
         return PluginRegisterResponse(status="registered", plugin=result)
@@ -169,6 +169,7 @@ async def list_plugins():
                                 raw = json.load(fh)
                             plugin.dashboard_ui = bool(raw.get("dashboard_ui", False))
                             plugin.bundled = bool(raw.get("bundled", False))
+                            plugin.platform = raw.get("platform", plugin.platform)
                             plugin.queries = _queries_from_manifest(raw)
                         except (json.JSONDecodeError, OSError) as exc:
                             plugin.error = str(exc)
@@ -218,7 +219,7 @@ async def list_plugins():
                         updated_at=None,
                         health_status="unknown",
                         last_heartbeat=None,
-                        platform="all",
+                        platform=raw.get("platform", "unknown"),
                         dashboard_ui=bool(raw.get("dashboard_ui", False)),
                         bundled=bool(raw.get("bundled", False)),
                         queries=_queries_from_manifest(raw),

@@ -326,9 +326,65 @@ describe('ActionsEditor', () => {
     });
   });
 
+  /* ─── diagnostics panel & save blocking ─── */
+  describe('diagnostics & save blocking', () => {
+    it('_updateSaveButton blocks save when errors present', () => {
+      actionsEditor.isDirty = true;
+      actionsEditor.diagnostics = [{ severity: 'ERROR', message: 'bad', line: 0 }];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(true);
+    });
+
+    it('_updateSaveButton blocks save when warnings present', () => {
+      actionsEditor.isDirty = true;
+      actionsEditor.diagnostics = [{ severity: 'WARNING', message: 'warn', line: 0 }];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(true);
+    });
+
+    it('_updateSaveButton enables save when dirty and no issues', () => {
+      actionsEditor.isDirty = true;
+      actionsEditor.diagnostics = [];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(false);
+    });
+
+    it('_updateSaveButton stays disabled when not dirty even with no issues', () => {
+      actionsEditor.isDirty = false;
+      actionsEditor.diagnostics = [];
+      actionsEditor._updateSaveButton();
+      const btn = document.getElementById('actions-editor-save');
+      expect(btn.disabled).toBe(true);
+    });
+
+    it('_renderDiagnostics hides panel when no diagnostics', () => {
+      actionsEditor.triggers = [{ name: 'follow' }];
+      actionsEditor.diagnostics = [];
+      actionsEditor._renderDiagnostics();
+      const panel = document.getElementById('actions-diagnostics');
+      expect(panel.style.display).toBe('none');
+    });
+
+    it('_renderDiagnostics renders error and warning items', () => {
+      actionsEditor.triggers = [{ name: 'follow' }];
+      actionsEditor.diagnostics = [
+        { severity: 'ERROR', message: '{comment} wrong', line: 0 },
+        { severity: 'WARNING', message: '{user} needs !rc', line: 0 },
+      ];
+      actionsEditor._renderDiagnostics();
+      const panel = document.getElementById('actions-diagnostics');
+      expect(panel.style.display).toBe('block');
+      expect(panel.innerHTML).toContain('{comment} wrong');
+      expect(panel.innerHTML).toContain('{user} needs !rc');
+      expect(panel.innerHTML).toContain('follow');
+    });
+  });
+
   /* ─── _renderRawDiagnostics ─── */
-  describe('_renderRawDiagnostics', () => {
-    it('shows no issues when empty', () => {
+  describe('_renderRawDiagnostics', () => {    it('shows no issues when empty', () => {
       actionsEditor._renderRawDiagnostics([]);
       const list = document.getElementById('actions-raw-diag-list');
       expect(list.innerHTML).toContain('No issues found');
@@ -441,6 +497,87 @@ describe('ActionsEditor', () => {
       expect(select.value).toBe('shell');
       const input = document.querySelector('.cmd-input');
       expect(input.value).toBe('curl http://localhost');
+    });
+  });
+
+  /* ─── dynamic vanilla (!rc) ─── */
+  describe('dynamic vanilla (!rc)', () => {
+    it('shows the !rc suffix in the table summary for dynamic vanilla commands', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say Welcome {user}', multiplier: 1, dynamic_vanilla: true }],
+      }];
+      actionsEditor.renderTable();
+      const body = document.getElementById('actions-table-body');
+      expect(body.textContent).toContain('/say Welcome {user}');
+      expect(body.textContent).toContain('!rc');
+    });
+
+    it('does not show the !rc suffix when dynamic_vanilla is false', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'give @a apple', multiplier: 1, dynamic_vanilla: false }],
+      }];
+      actionsEditor.renderTable();
+      const body = document.getElementById('actions-table-body');
+      expect(body.textContent).toContain('/give @a apple');
+      expect(body.textContent).not.toContain('/give @a apple !rc');
+    });
+
+    it('renders a checkbox for vanilla commands in detail', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say Welcome {user}', multiplier: 1, dynamic_vanilla: true, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const checkbox = document.querySelector('.cmd-rc input');
+      expect(checkbox).not.toBeNull();
+      expect(checkbox.checked).toBe(true);
+    });
+
+    it('places the rc checkbox inside the meta row below the input', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say hi', multiplier: 1, dynamic_vanilla: true, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const meta = document.querySelector('.cmd-meta');
+      expect(meta).not.toBeNull();
+      const rc = meta.querySelector('.cmd-rc');
+      expect(rc).not.toBeNull();
+    });
+
+    it('remove button stays in the cmd-row (top right) for vanilla commands', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say hi', multiplier: 1, dynamic_vanilla: true, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      const row = document.querySelector('.cmd-row');
+      expect(row.querySelector('.btn-icon')).not.toBeNull();
+    });
+
+    it('does not render the checkbox for non-vanilla commands', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'rcon', command: 'say hi', multiplier: 1, dynamic_vanilla: false, title: '', subtitle: '', duration: 3, overlay_name: 'default' }],
+      }];
+      actionsEditor.selectedIndex = 0;
+      actionsEditor.renderDetail(0);
+      expect(document.querySelector('.cmd-rc')).toBeNull();
+    });
+
+    it('updateCmd toggles the dynamic_vanilla field', () => {
+      actionsEditor.triggers = [{
+        name: '7654', enabled: true, type: 'Gift',
+        commands: [{ type: 'vanilla', command: 'say hi', multiplier: 1, dynamic_vanilla: false }],
+      }];
+      actionsEditor.updateCmd(0, 0, 'dynamic_vanilla', true);
+      expect(actionsEditor.triggers[0].commands[0].dynamic_vanilla).toBe(true);
+      expect(actionsEditor.isDirty).toBe(true);
     });
   });
 

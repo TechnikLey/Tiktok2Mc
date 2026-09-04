@@ -294,7 +294,12 @@ def _session_isolation_snapshot(request):
     def _snapshot():
         snap = {}
         for p in project_root.rglob("*"):
-            if not p.is_file():
+            try:
+                if not p.is_file():
+                    continue
+            except OSError:
+                # Broken symlinks (e.g. stale Linux build artifacts on Windows)
+                # must not crash the whole test session.
                 continue
             try:
                 rel = p.relative_to(project_root)
