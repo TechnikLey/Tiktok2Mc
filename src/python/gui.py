@@ -224,31 +224,6 @@ def _display_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k in _DISPLAY_ENV_VARS}
 
 
-def _linux_start_command() -> list[str]:
-    """Return the command to launch start.bin as root on Linux.
-
-    start.py requires root on Linux to bind low ports and manage Minecraft
-    server processes.  When the GUI is already root (e.g. launched via
-    sudo/pkexec) start.bin runs directly; otherwise we elevate through
-    pkexec (PolicyKit shows a graphical auth prompt — works without a TTY).
-    Falls back to ``sudo -n`` (non-interactive, passwordless only) where
-    available, because plain ``sudo`` without ``-n`` hangs waiting for a
-    password when stdin is /dev/null (the GUI spawns detached subprocesses).
-
-    Returns the command as a list suitable for ``subprocess.Popen``.
-    """
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
-        return [str(START_EXE)]
-    for cli in (shutil.which("pkexec"), shutil.which("gksudo")):
-        if cli:
-            return [cli, str(START_EXE)]
-    sudo = shutil.which("sudo")
-    if sudo:
-        return [sudo, "-n", str(START_EXE)]
-    # No elevation tool found — best effort, may fail at runtime.
-    return [str(START_EXE)]
-
-
 def _api_ready(timeout: float = 1.0) -> bool:
     """Quick check if the API health endpoint responds."""
     try:
@@ -631,49 +606,111 @@ class LauncherAPI:
         if not START_EXE.exists():
             return f"missing:{START_EXE}"
 
+        # On Linux, the supervisor (start.bin) needs root to bind low ports
+        # and manage Minecraft server processes.  If we're already root (e.g.
+        # gui.bin was launched via sudo), start directly; otherwise tell the
+        # launcher to show a password dialog so the user can authenticate.
+        if not IS_WINDOWS and not (hasattr(os, "geteuid") and os.geteuid() == 0):
+            return "needs_password"
+
         try:
             if IS_WINDOWS:
                 _full_system_proc = subprocess.Popen(
                     [str(START_EXE)],
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
-            else:
-                log_file = BASE_DIR / "logs" / "full_system.log"
-                log_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(log_file, "w", encoding="utf-8") as lf:
-                    # start.bin must run as root on Linux (start.py enforces
-                    # this). When the GUI itself is not root, elevate via
-                    # pkexec so the supervisor has the privileges it needs
-                    # (Minecraft server binding, per-user install layout).
-                    cmd = _linux_start_command()
-                    # pkexec strips DISPLAY/XAUTHORITY/wayland vars; forward
-                    # the current graphical session so the supervisor can open
-                    # file managers / GUI children in this X/Wayland session.
-                    env = {**os.environ, **_display_env()}
-                    _full_system_proc = subprocess.Popen(
-                        cmd, stdout=lf, stderr=lf, stdin=subprocess.DEVNULL, env=env
-                    )
+            elif hasattr(os, "geteuid") and os.geteuid() == 0:
+                # Already root — start directly.
+                _full_system_proc = subprocess.Popen(
+                    [str(START_EXE)],
+                    stdin=subprocess.DEVNULL,
+                )
             log.info(
                 "Full system process started (PID %s)",
                 _full_system_proc.pid if _full_system_proc else "?",
             )
-            # IMPORTANT: do NOT block or race here.  pkexec shows a graphical
-            # password prompt and only proceeds once the user authenticates;
-            # any hard wait/poll in this bridge call would dismiss the prompt
-            # or cut off password entry.  Instead return immediately and let
-            # the launcher's waitForApi() poll the API until the system (with
-            # privileges) is actually up.  A background monitor reports
-            # genuine immediate failures (e.g. pkexec/sudo rejected) without
-            # blocking the auth dialog.
-            if not IS_WINDOWS and _full_system_proc is not None:
-                threading.Thread(
-                    target=_monitor_elevation,
-                    args=(_full_system_proc,),
-                    daemon=True,
-                ).start()
             return "started"
         except OSError as e:
             log.error("Failed to start full system: %s", e)
+            return f"error:{e}"
+
+    def start_system_with_password(self, password: str) -> str:
+        """Start the full system using sudo -S with the user's password.
+
+        The password is piped to sudo via stdin and immediately discarded.
+        This avoids pkexec (unreliable on some distros) and gives the user a
+        direct, predictable way to authenticate from the launcher UI.
+
+        Returns:
+            "started"        – system process launched (API will come up)
+            "wrong_password" – sudo rejected the password (exit code 1)
+            "error:..."      – other OS error
+        """
+        global _full_system_proc
+        if _full_system_proc is not None:
+            return "already_running"
+
+        if not START_EXE.exists():
+            return f"missing:{START_EXE}"
+
+        sudo = shutil.which("sudo")
+        if not sudo:
+            return "error:sudo not found — install sudo to start the system"
+
+        log_file = BASE_DIR / "logs" / "full_system.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        env = {**os.environ, **_display_env()}
+
+        try:
+            with open(log_file, "w", encoding="utf-8") as lf:
+                _full_system_proc = subprocess.Popen(
+                    [sudo, "-S", str(START_EXE)],
+                    stdin=subprocess.PIPE,
+                    stdout=lf,
+                    stderr=lf,
+                    env=env,
+                )
+            # Pipe the password to sudo's stdin and close it so sudo can
+            # proceed.  If the password is wrong sudo exits almost instantly.
+            try:
+                if _full_system_proc.stdin is not None:
+                    _full_system_proc.stdin.write((password + "\n").encode())
+                    _full_system_proc.stdin.flush()
+                    _full_system_proc.stdin.close()
+            except OSError:
+                pass
+
+            # Wait briefly for sudo to process the password.  A wrong
+            # password causes sudo to exit within milliseconds; a correct
+            # one keeps running for the full session.
+            time.sleep(1.0)
+            if _full_system_proc.poll() is not None:
+                code = _full_system_proc.returncode
+                _full_system_proc = None
+                if code == 1:
+                    log.warning("[ELEVATION] Wrong password (sudo exited 1)")
+                    return "wrong_password"
+                log.error(
+                    "[ELEVATION] sudo exited with code %s — cannot start the system",
+                    code,
+                )
+                return f"error:sudo failed (exit code {code})"
+
+            log.info(
+                "Full system process started via sudo (PID %s)",
+                _full_system_proc.pid,
+            )
+            threading.Thread(
+                target=_monitor_elevation,
+                args=(_full_system_proc,),
+                daemon=True,
+            ).start()
+            return "started"
+        except OSError as e:
+            log.error("Failed to start full system: %s", e)
+            if _full_system_proc is not None:
+                _full_system_proc.kill()
+                _full_system_proc = None
             return f"error:{e}"
 
     def stop_system(self) -> str:

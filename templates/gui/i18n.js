@@ -160,6 +160,11 @@
     'launcher.updateInstalling': 'Updating...',
     'launcher.updateRestarting': 'Update installed — restarting...',
     'launcher.updateFailed': 'Update failed: {msg}. Please try starting again.',
+    'launcher.passwordHint': 'Enter your password to start the system with administrator privileges:',
+    'launcher.passwordPlaceholder': 'Password',
+    'launcher.passwordSubmit': 'Start',
+    'launcher.passwordCancel': 'Cancel',
+    'launcher.wrongPassword': 'Wrong password — please try again.',
 
     /* ── Restart banner ── */
     'restart.pending': 'Restart pending, some changes require a restart to take effect.',
@@ -1276,6 +1281,11 @@
     'launcher.updateInstalling': 'Update wird installiert...',
     'launcher.updateRestarting': 'Update installiert — Neustart läuft...',
     'launcher.updateFailed': 'Update fehlgeschlagen: {msg}. Bitte versuche es erneut zu starten.',
+    'launcher.passwordHint': 'Gib dein Passwort ein, um das System mit Administratorrechten zu starten:',
+    'launcher.passwordPlaceholder': 'Passwort',
+    'launcher.passwordSubmit': 'Starten',
+    'launcher.passwordCancel': 'Abbrechen',
+    'launcher.wrongPassword': 'Falsches Passwort — bitte versuche es erneut.',
 
     /* ── Restart banner ── */
     'restart.pending': 'Neustart ausstehend, einige Änderungen erfordern einen Neustart.',
