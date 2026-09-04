@@ -429,12 +429,15 @@ async def server_instance_stop(instance_id: str):
         }
 
     try:
+        # Stop console capture BEFORE killing the server process so the
+        # shutdown lines written during graceful termination are not
+        # captured and forwarded to the GUI console.
+        from core.api.services.console_capture import stop_instance_capture
+
+        stop_instance_capture(instance_id)
+
         success = await supervisor.stop(pname)
         if success:
-            # Stop console capture for this instance
-            from core.api.services.console_capture import stop_instance_capture
-
-            stop_instance_capture(instance_id)
             return {"status": "stopped", "message": f"Server '{instance_id}' stopped"}
         raise HTTPException(
             status_code=500, detail=f"Server '{instance_id}' failed to stop"
