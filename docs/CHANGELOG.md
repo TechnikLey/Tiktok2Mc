@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v1.0.1]
+## [v1.0.1] - 2026-09-04
 
 ### Added
 
@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cross-platform test suite** — several tests only worked on Windows and failed on the Linux CI runner: `subprocess.DETACHED_PROCESS` / `CREATE_NO_WINDOW` constants don't exist on Linux, `main()` hit a blocking `input()` call on headless Linux (missing `libxcb-cursor.so`), and the updater self-update test assumed `subprocess.Popen` instead of `os.execv`. All tests now run correctly on both platforms.
 - **Linux console "Connect" not working** — clicking "Connect" in the console tab on Linux would silently fall back to showing log-file output instead of connecting. The RCON connection now works properly, so you can send commands and see server responses in real time.
 - **Plugin platform info not showing in GUI** — the plugin manager always displayed "—" for the platform column, even when plugins declared a specific platform (e.g. "windows") in their `plugin.json`. The platform value is now correctly read from the manifest and displayed in the dashboard.
 - **Automatic updates failing / tool not starting** — when the tool was started (e.g. via the GUI) while an update was being installed, the automatic restart could be interrupted mid-update, leaving the tool in a broken or unstarted state with no way for the user to see what was wrong. The update process now handles the restart correctly itself and the new splash window shows the progress, so the tool reliably comes back up after every update.
