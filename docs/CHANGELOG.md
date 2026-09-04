@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Linux root-required messaging** — `start.py`, `update.py`, the `config.yaml` sudo warning, and the installer's "Full System" desktop entry now explain why root is needed and how to proceed. The desktop entry wraps `start.bin` in `pkexec` for a graphical prompt.
 - **Linux "Start System" password prompt** — instead of relying on `pkexec`, the launcher now shows its own inline password dialog and starts the system with `sudo -S`, giving you a direct, predictable way to authenticate (with a clear "wrong password" message if needed).
 - **TikTok connection failure protection** — if the TikTok connection failed repeatedly in the past, the tool would keep retrying silently or the account could get blocked. After multiple failed connection attempts, a warning dialog now appears in the GUI where you can choose to re-enable the connection or keep it disabled. The fail counter resets once the connection is successful again.
+- **Config version bumped to 1.1** — new default keys (`failed_connection_popup_enabled`, `max_connect_fails`) are automatically merged into existing configs on startup via `auto_update_config`. No manual action needed.
+- **Updater version bumped to v2.1.0** — internal update compatibility.
 - **Documentation updates** — `README.md`, `GUIDE.md`, and both developer books (EN/DE) have been updated. The Linux section now includes run instructions for the portable archive, the Build & Release workflow is documented, and admonition syntax has been corrected across all docs.
 
 ### Fixed
