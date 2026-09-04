@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"Open Folder" did nothing on Linux** — the button opened the folder through the elevated backend process, but on Linux the backend runs via `pkexec`, which sanitizes the environment and strips `DISPLAY`/`XAUTHORITY`, so no file-manager window could appear. "Open Folder" now opens the folder from the GUI process itself (which has the display), and the supervisor forwards the graphical-session environment when it elevates.
 - **Linux onefile binaries in `core/` missing `_internal`** — `server.bin`, `gui.bin` and friends live in `core/`, but the `_internal` symlink (needed by PyInstaller 6.x on Linux to resolve `libpython`) was only created at the release root, so binaries in `core/` could fail to launch. The build now also creates `core/_internal`.
 - **`!rc` toggle missing in the Actions Editor** — the "Send via RCON" (`!rc`) option was missing entirely from the visual Actions Editor in the release, so vanilla commands could not be set to send via RCON from the GUI. The toggle is now available in the editor (it adds the `!rc` suffix) and is correctly saved and kept.
+- **Two sidebar tabs highlighted after Chatbot beta agree** — when clicking the Chatbot tab for the first time and accepting the beta modal, both the Chatbot tab and the previously active tab were highlighted in yellow. The `acceptBeta` handler now clears all active states before activating the Chatbot tab.
 
 ---
 
