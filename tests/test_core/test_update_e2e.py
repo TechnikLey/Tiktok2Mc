@@ -823,6 +823,8 @@ class TestUpdaterSelfUpdateResumeRelaunch:
 
     def _exercise_self_update(self, tmp_path: Path, auto_mode: bool):
         """Run the full self-update orchestration and return the resume args."""
+        import python.update as _upd
+
         with (
             TestRunUpdateOrchestration()._get_run_update(tmp_path) as (
                 run_update,
@@ -832,7 +834,7 @@ class TestUpdaterSelfUpdateResumeRelaunch:
             patch.object(python.update, "AUTO_MODE", auto_mode),
             patch("python.update.requests.get") as mock_get,
             patch("python.update.subprocess.Popen") as mock_popen,
-            patch("python.update.os.execv"),
+            patch("python.update.os.execv") as mock_execv,
             patch("python.update.verify_checksum", return_value=True),
             patch("python.update.sys.exit", side_effect=SystemExit),
             patch("python.update.shutil.copy2"),
@@ -840,8 +842,7 @@ class TestUpdaterSelfUpdateResumeRelaunch:
             patch("python.update.os.chmod"),
             patch("python.update.download_with_progress"),
             patch("python.update.zipfile.ZipFile") as mock_zip,
-            # Force the Windows code path so Popen is used instead of os.execv
-            patch.object(python.update.sys, "platform", "win32"),
+            patch("python.update._relaunch_tool_after_update", return_value=True),
         ):
 
             def fake_populate(path):
@@ -849,7 +850,9 @@ class TestUpdaterSelfUpdateResumeRelaunch:
                     "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
                 )
                 (path / "core").mkdir(exist_ok=True)
-                (path / "core" / "update.exe").write_text("new updater binary")
+                (path / "core" / f"update{_upd.SUFFIX}").write_text(
+                    "new updater binary"
+                )
 
             mock_zip.return_value.__enter__.return_value.extractall = fake_populate
 
@@ -889,8 +892,11 @@ class TestUpdaterSelfUpdateResumeRelaunch:
             with pytest.raises(SystemExit):
                 run_update()
 
-            _ = mock_popen  # silence lint
-            return mock_popen.call_args[0][0]
+            # On win32 the self-update uses subprocess.Popen([...]),
+            # on Linux it uses os.execv(path, [path, ...]).
+            if sys.platform == "win32":
+                return mock_popen.call_args[0][0]
+            return mock_execv.call_args[0][1]
 
     def test_forward_auto_when_auto_mode(self, tmp_path):
         args = self._exercise_self_update(tmp_path, auto_mode=True)
