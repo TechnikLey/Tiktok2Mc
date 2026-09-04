@@ -37,6 +37,7 @@ class ChatbotEditor {
       localStorage.setItem('tiktok2mc_chatbot_beta_ack', '1');
     } catch (_) { /* ignore */ }
     document.getElementById('chatbot-beta-modal')?.classList.add('hidden');
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector('.nav-item[data-view="chatbot"]')?.classList.add('active');
     return this.open();
   }
