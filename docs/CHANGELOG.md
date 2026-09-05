@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Automatic `server.jar` download** — the tool no longer bundles a Minecraft server jar. If an instance has no `server.jar` when you start it, the configured PaperMC version (default `1.21.11`) is downloaded automatically from the PaperMC servers and placed in the instance's folder. After downloading a version in the Server Manager, it is also copied into every instance that uses it and is missing the file.
+
+### Fixed
+
+- **Update splash window reliability** — the progress bar now shows real download progress during the download phase and stays visible (animated) during checking/installing/restarting. The window no longer closes as soon as the web API becomes reachable — it waits until the new GUI instance is actually running, so you no longer stare at a blank screen for several seconds after the update finishes.
+- **Tool no longer breaks when the update fails** — if the `update.exe` is missing (e.g. quarantined by antivirus) or the update download/install encounters an error, the tool now logs a clear message and **starts normally without the update** instead of getting stuck. Existing and future versions continue to work; you can retry the update later from the Dashboard.
+
+---
+
 ## [v1.0.1] - 2026-09-04
 
 ### Added

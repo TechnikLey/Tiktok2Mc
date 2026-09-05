@@ -358,7 +358,28 @@ def replace_updater_if_exists() -> None:
 
 
 def start_UPDATE_EXE_PATH():
-    """Run updater synchronously — must wait for exit code."""
+    """Run updater synchronously — must wait for exit code.
+
+    Returns ``None`` when the updater binary is missing or could not be
+    launched, so the caller skips the update and continues starting normally
+    instead of crashing (a missing ``update.exe`` or a launch failure must
+    never take the tool down).
+    """
+    if not UPDATE_EXE_PATH.exists():
+        log.warning(
+            "Updater binary not found at %s — skipping update check.",
+            UPDATE_EXE_PATH,
+        )
+        set_last_update_result(
+            None,
+            ok=False,
+            message=(
+                "The updater binary is missing, so the update check was skipped. "
+                "The tool will continue normally."
+            ),
+        )
+        return None
+
     cmd = [str(UPDATE_EXE_PATH), "--auto"]
     log_dir = ROOT_DIR / "logs" / "update_logs"
     # Capture updater output on every platform; hidden Windows runs (the
@@ -373,17 +394,55 @@ def start_UPDATE_EXE_PATH():
             if update_hidden
             else subprocess.CREATE_NEW_CONSOLE
         )
-        if update_hidden:
-            with open(log_file, "a", encoding="utf-8") as lf:
-                proc = subprocess.Popen(cmd, creationflags=flags, stdout=lf, stderr=lf)
-        else:
-            proc = subprocess.Popen(cmd, creationflags=flags)
+        try:
+            if update_hidden:
+                with open(log_file, "a", encoding="utf-8") as lf:
+                    proc = subprocess.Popen(
+                        cmd, creationflags=flags, stdout=lf, stderr=lf
+                    )
+            else:
+                proc = subprocess.Popen(cmd, creationflags=flags)
+        except OSError as e:
+            log.warning(
+                "Could not launch the updater (%s) — skipping update check: %s",
+                UPDATE_EXE_PATH,
+                e,
+            )
+            set_last_update_result(
+                None,
+                ok=False,
+                message=(
+                    "The updater could not be launched (it may be blocked or "
+                    "missing), so the update was skipped. The tool will continue "
+                    "normally."
+                ),
+            )
+            return None
     else:
         log.info(
             "Starting updater. This may take a few minutes. Please do not close or interrupt the program..."
         )
-        with open(log_file, "a", encoding="utf-8") as lf:
-            proc = subprocess.Popen(cmd, stdout=lf, stderr=lf, start_new_session=True)
+        try:
+            with open(log_file, "a", encoding="utf-8") as lf:
+                proc = subprocess.Popen(
+                    cmd, stdout=lf, stderr=lf, start_new_session=True
+                )
+        except OSError as e:
+            log.warning(
+                "Could not launch the updater (%s) — skipping update check: %s",
+                UPDATE_EXE_PATH,
+                e,
+            )
+            set_last_update_result(
+                None,
+                ok=False,
+                message=(
+                    "The updater could not be launched (it may be blocked or "
+                    "missing), so the update was skipped. The tool will continue "
+                    "normally."
+                ),
+            )
+            return None
 
     max_logs = cfg.get("update", {}).get("max_update_logs", 20)
     try:
@@ -445,6 +504,10 @@ if UPDATE_ENABLED and UPDATE_AUTO_INSTALL:
         result = start_UPDATE_EXE_PATH()
 
         if result is None:
+            # Updater missing or could not be launched (e.g. Windows Defender
+            # quarantined/quarantines it). Never crash the tool: notify and
+            # continue starting normally without an update.
+            log.warning("Skipping update (updater unavailable) — continuing startup.")
             break
 
         if result == "kill":

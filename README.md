@@ -21,13 +21,20 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 | **OS** | Windows 10+ or Linux |
 | **RAM** | 4 GB minimum, 8 GB recommended (Minecraft server: up to 4 GB, adjustable) |
 | **Free space** | ~1 GB for the tool, ~500 MB per additional Minecraft version |
+| **Internet** | needed on first start to auto-download the Minecraft server (`server.jar`, default PaperMC 1.21.11) and Java when missing |
 | **TikTok** | An active TikTok account — the live connection requires you to be streaming |
 | **Minecraft** | Java Edition (the tool bundles a PaperMC server, or use your own) |
+
+> [!NOTE]
+> The installer does **not** bundle `server.jar` or Java. On first start the tool downloads the Minecraft server version (default `1.21.11`) and, if no Java runtime is found, offers an automatic Java installation. Both only need an internet connection and happen once.
 
 ## Installation
 
 **Windows** — Download `TikTok2MC-<version>-Windows-Setup.exe` from [Releases](https://github.com/TechnikLey/Tiktok2Mc/releases) and run the installer. A portable ZIP is also available — extract anywhere and run.
 The installer is recommended, as it lets you configure the tool and create a desktop shortcut.
+
+> [!IMPORTANT]
+> **Windows Defender / SmartScreen:** the binaries are built with PyInstaller and are not code-signed, so Windows Defender may show a heuristic **false positive** (e.g. `Behavior:Win32/DefenseEvasion.A!ml`) or SmartScreen may warn about the "unknown publisher". Always verify the SHA256 checksums from the release first, then unblock the file (Properties → Unblock), restore/allow it in Protection history, and add the installation folder to the Defender exclusions (`Add-MpPreference -ExclusionPath "<folder>"`). See the [user guide](./docs/GUIDE.md) → *Windows Defender / antivirus* for step-by-step instructions.
 
 **Linux** — Download `TikTok2Mc-<version>-Linux-Setup.sh`, make it executable (`chmod +x`), and run it. The installer itself needs no `sudo` — it installs to `~/.local/share/TikTok2Mc` with a desktop entry and a `tiktok2mc` terminal command. A portable `TikTok2Mc-<version>-Linux.tar.gz` archive is also available — extract anywhere and run (`sudo ./start.bin`).
 

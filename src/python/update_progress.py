@@ -142,14 +142,18 @@ def classify(status: dict | None, *, new_gui: bool, port: bool, done_elapsed: fl
     - ``should_close`` retires the window
     - ``is_failure`` switches to the persistent error view
 
-    ``port`` (the control-plane answering) is treated as ground truth that the
-    restarted app is up: even when the status file is missing, stale, or uses
-    a phase this build does not know, an answering API port means the update
-    finished and the window may retire. Only an explicit ``error`` phase keeps
-    the failure view up regardless of the port.
+    The splash retires itself only once a *fresh* GUI instance is detected
+    (``new_gui`` — a new PID in the GUI lock file, written by the relaunched
+    ``gui.exe`` right as it opens its window). A bare answering ``port`` is
+    deliberately *not* enough to close: after an update ``start.exe`` relaunches
+    and its control-plane API comes up several seconds before the GUI window is
+    rendered, so closing on the port alone would leave the user staring at a
+    black screen for many seconds. Waiting for the relaunched GUI avoids that
+    gap and hands over cleanly to the freshly opened dashboard/launcher window.
+    Only an explicit ``error`` phase keeps the failure view up regardless.
     """
     if not status:
-        if port:
+        if new_gui:
             return "restarting", None, True, False
         return "preparing", None, False, False
     phase = status.get("phase")
@@ -163,12 +167,12 @@ def classify(status: dict | None, *, new_gui: bool, port: bool, done_elapsed: fl
     if phase == "done":
         if done_elapsed > 180:
             return "error", None, False, True
-        if new_gui or port:
+        if new_gui:
             return "restarting", None, True, False
         return "restarting", None, False, False
     if phase == "error":
         return "error", None, False, True
-    if port:
+    if new_gui:
         return "restarting", None, True, False
     return "preparing", None, False, False
 
@@ -204,7 +208,7 @@ def main() -> None:
         font=("Segoe UI", 11),
     ).pack(pady=(26, 10))
 
-    bar = ttk.Progressbar(root, length=340, mode="determinate", maximum=100)
+    bar = ttk.Progressbar(root, length=340, maximum=100)
     bar.pack(pady=(0, 14))
 
     close_btn = tk.Button(
@@ -226,17 +230,32 @@ def main() -> None:
     port_streak = 0
     failed = False
     closing = False
+    bar_indeterminate = False
 
     def apply(key: str, percent: int | float | None) -> None:
+        """Update the label and progress bar.
+
+        The bar is always shown so the user always sees the splash is alive:
+        - during ``downloading`` it fills with the real percentage
+        - during checking/installing/restarting it runs as an indeterminate
+          (animated) bar instead of disappearing or standing still.
+        """
+        nonlocal bar_indeterminate
         text = texts[key]
         if key == "downloading":
+            if bar_indeterminate:
+                bar.stop()
+                bar.configure(mode="determinate")
+                bar_indeterminate = False
             p = 0.0 if percent is None else round(float(percent), 1)
             text = text.format(p=p)
-            bar.place_forget()
-            bar.pack(pady=(0, 14))
             bar.config(value=max(0, min(100, int(p))))
         else:
-            bar.place_forget()
+            if not bar_indeterminate:
+                bar.stop()
+                bar.configure(mode="indeterminate")
+                bar_indeterminate = True
+                bar.start(10)
         status_var.set(text)
 
     def close_window(reason: str) -> None:
@@ -261,9 +280,10 @@ def main() -> None:
         else:
             port_streak = 0
         done_phase = bool(status and status.get("phase") == "done")
-        # Only watch for the restarted app once the updater is done — the
-        # lock file I/O below is pointless during download/install.
-        new_gui = new_gui_started(initial_pid) if done_phase else False
+        # Watch for the restarted GUI whenever the updater is installing or
+        # done — the splash must not close on the bare API port (which comes
+        # up before the GUI window), only when the relaunched GUI registers.
+        new_gui = new_gui_started(initial_pid) if (done_phase or not status) else False
         key, percent, should_close, is_failure = classify(
             status,
             new_gui=new_gui,
@@ -285,12 +305,10 @@ def main() -> None:
         root.after(500, on_timer)
 
     # A fresh app may already be up when the splash boots (very fast update).
+    # Only close immediately when the relaunched GUI is detected; otherwise
+    # fall through to the polling loop which waits for it.
     status = read_status()
-    if (
-        status
-        and status.get("phase") == "done"
-        and (new_gui_started(initial_pid) or port_open())
-    ):
+    if status and status.get("phase") == "done" and new_gui_started(initial_pid):
         log.info("Update splash closing: already up")
         root.destroy()
     else:

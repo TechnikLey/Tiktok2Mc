@@ -17,6 +17,7 @@ from ruamel.yaml.error import YAMLError
 from core.api.services import ApiService
 from core.api.services.datapack import sync_datapack
 from core.paths import get_root_dir, get_servers_dir, get_versions_dir
+from core.server_jar import copy_version_jar_to_instances
 
 log = logging.getLogger(__name__)
 
@@ -900,6 +901,22 @@ async def download_version(body: DownloadRequest):
             except OSError:
                 pass
         raise HTTPException(status_code=500, detail=download_exc)
+
+    # Auto-fill any instance that is missing its server.jar but uses this
+    # version — no manual move needed after downloading a version.
+    try:
+        copied = copy_version_jar_to_instances(version)
+        if copied:
+            log.info("Copied %s server.jar into %d instance(s)", version, copied)
+    except OSError as exc:
+        log.warning("Failed to auto-copy %s into instances: %s", version, exc)
+
+    # A stale .part file may exist if a previous failed download was cleaned up
+    # late; remove it so a later download does not trip over it.
+    try:
+        target_dir.joinpath("server.jar.part").unlink(missing_ok=True)
+    except OSError:
+        pass
 
     return DownloadResponse(
         status="ok",

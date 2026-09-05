@@ -17,11 +17,21 @@ class TestClassify:
             False,
         )
 
-    def test_no_status_closes_when_control_plane_up(self):
-        assert classify(None, new_gui=False, port=True, done_elapsed=0.0) == (
+    def test_no_status_closes_when_new_gui_up(self):
+        assert classify(None, new_gui=True, port=False, done_elapsed=0.0) == (
             "restarting",
             None,
             True,
+            False,
+        )
+
+    def test_no_status_waits_even_when_control_plane_up(self):
+        # A bare answering port is not enough to close — the GUI window may
+        # not be rendered yet, so wait for the relaunched GUI instead.
+        assert classify(None, new_gui=False, port=True, done_elapsed=0.0) == (
+            "preparing",
+            None,
+            False,
             False,
         )
 
@@ -79,12 +89,14 @@ class TestClassify:
             False,
         )
 
-    def test_done_closes_on_port_answering(self):
+    def test_done_keeps_waiting_when_only_port_answers(self):
+        # The API port comes up before the GUI window is rendered; wait for
+        # the relaunched GUI so the user never stares at a black screen.
         status = {"phase": "done"}
         assert classify(status, new_gui=False, port=True, done_elapsed=5.0) == (
             "restarting",
             None,
-            True,
+            False,
             False,
         )
 
@@ -111,7 +123,12 @@ class TestClassify:
             {"phase": "totally-new-phase"}, new_gui=False, port=False, done_elapsed=0.0
         ) == ("preparing", None, False, False)
 
-    def test_unknown_phase_closes_when_control_plane_up(self):
+    def test_unknown_phase_waits_when_only_control_plane_up(self):
         assert classify(
             {"phase": "totally-new-phase"}, new_gui=False, port=True, done_elapsed=0.0
+        ) == ("preparing", None, False, False)
+
+    def test_unknown_phase_closes_when_new_gui_up(self):
+        assert classify(
+            {"phase": "totally-new-phase"}, new_gui=True, port=False, done_elapsed=0.0
         ) == ("restarting", None, True, False)

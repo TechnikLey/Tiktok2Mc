@@ -21,6 +21,7 @@ from core.logger import (
     start_heartbeat,
 )
 from core.paths import get_root_dir
+from core.server_jar import ServerJarError, ensure_instance_jar
 from core.yaml_utils import load_yaml
 
 log = initialize_logging(__name__)
@@ -76,13 +77,32 @@ CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resol
 # NO version-based paths. NO legacy paths. NO fallback paths.
 SERVER_JAR = (INSTANCE_DIR / "server.jar").resolve()
 
+# If the jar is missing, try to obtain it automatically: download the version
+# configured in config.yaml (default 1.21.11) and place it in the instance
+# directory. This covers fresh installs/instances where the user never
+# manually dropped a jar into the folder.
 if not SERVER_JAR.exists():
-    log.error("server.jar not found at %s", SERVER_JAR)
-    log.error(
-        "Place a valid Minecraft server.jar in the instance directory and restart."
+    log.warning(
+        "server.jar not found at %s — attempting automatic download.", SERVER_JAR
     )
-    _wait_or_skip()
-    sys.exit(1)
+    try:
+        cfg_probe = load_yaml(CONFIG_FILE) if CONFIG_FILE.exists() else {}
+        want_version = str(cfg_probe.get("mc_version", "1.21.11"))
+        from core.server_jar import ServerJarError, ensure_instance_jar
+
+        SERVER_JAR = ensure_instance_jar(INSTANCE_DIR.name, want_version)
+        log.info(
+            "Automatically downloaded server.jar (%s) into the instance directory.",
+            want_version,
+        )
+    except (ServerJarError, OSError, ValueError) as e:
+        log.error("server.jar not found at %s", SERVER_JAR)
+        log.error(
+            "Place a valid Minecraft server.jar in the instance directory and restart."
+        )
+        log.error("Automatic download failed: %s", e)
+        _wait_or_skip()
+        sys.exit(1)
 
 log.info("Using instance jar: %s", SERVER_JAR)
 

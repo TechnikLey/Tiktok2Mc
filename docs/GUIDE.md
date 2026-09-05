@@ -54,6 +54,47 @@ The installer creates desktop and Start Menu shortcuts. Use Windows Add/Remove P
 > [!NOTE]
 > **Development builds** (from `python build.py app`) produce `TikTok2MC-Setup.exe` (unversioned). **Release assets** from GitHub Releases are versioned: `TikTok2MC-v1.0.0-Windows-Setup.exe`. Use the versioned name when downloading from Releases.
 
+#### Java and the Minecraft server — auto-installed on first start
+
+The installer does **not** bundle the Minecraft server `server.jar` or a Java runtime. Both are fetched automatically the first time they are needed:
+
+- **Minecraft server** — if no `server.jar` is found in `server/default/` (or any other server instance) when a server is started, the tool downloads the configured PaperMC version (default `1.21.11`) from the PaperMC servers and places it into the instance folder automatically. No manual copying is needed.
+- **Java** — if no suitable Java runtime is found, the Server Manager shows an **Install Java** button that downloads and installs Java automatically (or follow the on-screen hints for a manual install).
+
+Both downloads need an **internet connection** on first start. On very first launch the tool may therefore appear busy for a moment while it fetches these components — this is normal and only happens once.
+
+> [!TIP]
+> You can pre-install Java yourself to avoid the download — see the FAQ entry on Java below.
+
+#### Windows Defender / antivirus may flag the tool (false positive)
+
+The pre-built binaries are packaged with **PyInstaller**, and Windows Defender (and some other antivirus engines) sometimes flags unsigned PyInstaller executables with a **heuristic false positive** (for example `Behavior:Win32/DefenseEvasion.A!ml`). The tool does **not** contain malware. If Windows Defender blocks, quarantines, or warns about the installer, `start.exe`, `update.exe`, or any of the other executables, do the following:
+
+> [!IMPORTANT]
+> Only download the tool from the official [Releases page](https://github.com/TechnikLey/Tiktok2Mc/releases) and verify the **SHA256 checksums** published there. If the file you have triggers a warning, check the checksum first before allowing it.
+
+**1. Unblock a downloaded file (Mark of the Web / SmartScreen)**
+   Right-click the downloaded file → **Properties** → check **Unblock** → **OK**. If SmartScreen shows "Windows protected your PC", click **More info** → **Run anyway**.
+
+**2. Restore a quarantined file**
+   Open **Windows Security** → **Virus & threat protection** → **Protection history** → find the entry → **Actions** → **Allow on device** (or *Restore*).
+
+**3. Add an exclusion for the tool folder** (recommended for updates)
+   The file-based auto-updater replaces executables in place, so Defender can repeatedly flag newly built binaries. Add the tool's installation folder to the exclusions:
+
+   - *GUI:* **Windows Security** → **Virus & threat protection** → **Manage settings** (under "Virus & threat protection settings") → **Exclusions** → **Add or remove exclusions** → **Add a folder** → select the TikTok2Mc installation folder (e.g. `%LOCALAPPDATA%\Programs\TikTok2Mc` or wherever you installed/extracted it).
+   - *PowerShell (as Administrator):*
+     ```powershell
+     Add-MpPreference -ExclusionPath "<your-TikTok2Mc-folder>"
+     ```
+   - Also exclude the folder where the updater runs (the same install folder) so `update.exe` is not blocked mid-flight.
+
+**4. If the update is skipped**
+   If the auto-updater reports that it was skipped or could not be launched, check whether `update.exe` exists next to `start.exe` and is not quarantined — restore it (step 2) and add the exclusion (step 3). The tool continues to start normally without an update.
+
+**5. Report the false positive**
+   Submit the file to [Microsoft Security Intelligence](https://www.microsoft.com/en-us/wdsi/filesubmission) and select *Should not be detected (false positive)*. Include the file hash. Each build has a new hash, so you may need to re-submit after updates.
+
 ### Linux
 
 Download `TikTok2Mc-<version>-Linux-Setup.sh` from the Releases page. Open a terminal, navigate to the download folder, and run:
@@ -624,6 +665,12 @@ Set `update.enabled: false` in `config.yaml`.
 **To check for updates manually:**
 Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in the Updates card, or visit `http://127.0.0.1:29185/api/v1/updates/check` directly.
 
+#### If an update fails or is skipped
+
+Updates never break the tool. If anything goes wrong during the update check, download, or installation (offline, download error, missing `update.exe`, a blocked updater, or a failed install), the tool **simply starts without the update** and continues working with the version you already have. You can retry later with **Check for Updates** in the Dashboard.
+
+If the update was skipped because the **`update.exe` is missing** from the installation folder (for example quarantined by antivirus), a message appears in the logs. Restore the file (see *Windows Defender / antivirus* above) and the next start will check for updates again.
+
 ---
 
 ### Error codes in logs
@@ -667,6 +714,13 @@ A: There is no fixed schedule. Updates come out when new features or fixes are r
 **Q: Can I use a different Minecraft version?**
 
 A: Yes. Use the Server Manager in the Dashboard to switch the version, or replace the `.jar` file in `server/default/`. The new server must support RCON and datapacks (most do). The default version is 1.21.11 (PaperMC).
+
+> [!NOTE]
+> If an instance has no `server.jar` when you start it, the tool **downloads the configured version automatically** and places it in the instance's folder — you never have to copy jars around manually. After downloading a version in the Server Manager, it is also copied into every instance that uses it and is missing the file.
+
+**Q: Is Java included?**
+
+A: Not in the installer. Java is **detected automatically**: if no suitable runtime is found, use the **Install Java** button in the Server Manager (Windows) or the on-screen hints to install it manually. The first server start downloads Java (or the server jar) if it is missing, so make sure you have an internet connection the first time.
 
 **Q: Can I use modded servers (Forge, Fabric, Paper)?**
 

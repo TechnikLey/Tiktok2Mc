@@ -16,6 +16,7 @@ from core.java_utils import (
 from core.lifecycle import ProcessState, get_supervisor
 from core.minecraft_readiness import make_minecraft_readiness_check
 from core.paths import get_base_dir, get_config_file, get_root_dir
+from core.server_jar import ServerJarError, ensure_instance_jar
 
 log = logging.getLogger(__name__)
 
@@ -77,12 +78,20 @@ async def auto_start_mc_instances() -> None:
         # Non-default instance: dynamically register then start
         instance_dir = _get_instance_dir(inst_id)
         jar_path = instance_dir / "server.jar"
-        if not jar_path.exists():
-            log.warning(
-                "[AUTO-START] Instance '%s' has auto_start=True but no server.jar — skipping",
-                inst_id,
-            )
-            continue
+        if not jar_path.exists() or jar_path.stat().st_size == 0:
+            # Download the missing version automatically (and place it in the
+            # instance folder), instead of silently skipping the instance.
+            version = inst_data.get("version") or "1.21.11"
+            try:
+                ensure_instance_jar(inst_id, str(version))
+            except ServerJarError as exc:
+                log.warning(
+                    "[AUTO-START] Instance '%s' has no server.jar and the "
+                    "automatic download failed — skipping: %s",
+                    inst_id,
+                    exc,
+                )
+                continue
 
         port = inst_data.get("port", 25565)
         try:
@@ -336,11 +345,20 @@ async def server_instance_start(instance_id: str):
         inst_data = instances[instance_id]
         instance_dir = _get_instance_dir(instance_id)
         jar_path = instance_dir / "server.jar"
-        if not jar_path.exists():
-            raise HTTPException(
-                status_code=400,
-                detail=f"Instance '{instance_id}' does not have a server.jar. Create the instance first.",
-            )
+        if not jar_path.exists() or jar_path.stat().st_size == 0:
+            # Auto-download the configured version and place it in the
+            # instance directory instead of requiring a manual move.
+            version = str(inst_data.get("version") or "1.21.11")
+            try:
+                ensure_instance_jar(instance_id, version)
+            except ServerJarError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Instance '{instance_id}' has no server.jar and the "
+                        f"automatic download of version '{version}' failed: {exc}"
+                    ),
+                )
 
         port = inst_data.get("port", 25565)
         cmd = _build_server_cmd(instance_dir, port)
