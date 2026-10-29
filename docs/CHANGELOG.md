@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **New default Minecraft version: `26.3`** — new server instances now use Minecraft `26.3` (PaperMC). It needs **Java 25**. Older instances keep working unchanged, and you can still pick the previous version (`1.21.11`) in the Server Manager.
-- **Whitelist is on by default in `26.3`** — new `26.3` servers only allow players that are on the whitelist. If you don't want that, set `white-list=false` in the server's `server.properties` (or turn it off via the console).
 
 ---
 
