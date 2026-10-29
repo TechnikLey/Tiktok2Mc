@@ -27,7 +27,7 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 
 > [!NOTE]
 > The installer does **not** bundle `server.jar` or Java. On first start the tool downloads the Minecraft server version (default `26.3`) and, if no Java runtime is found, offers an automatic Java installation. Both only need an internet connection and happen once.
-> Heads-up for Minecraft **26.3**: freshly created `server.properties` files default to `white-list=true`. If viewers without a whitelist entry cannot join, set `white-list=false` in the instance's `server.properties` (existing servers created before 26.3 keep their old value).
+> Heads-up for Minecraft **26.3**: freshly created `server.properties` files default to `white-list=true`. If viewers without a whitelist entry cannot join, set `white-list=false` in the instance's `server.properties` (existing servers created before 26.3 keep their old value). This is a change by Mojang, not by the tool.
 
 ## Installation
 

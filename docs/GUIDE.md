@@ -716,7 +716,7 @@ A: There is no fixed schedule. Updates come out when new features or fixes are r
 A: Yes. Use the Server Manager in the Dashboard to switch the version, or replace the `.jar` file in `server/default/`. The new server must support RCON and datapacks (most do). The default version is 26.3 (PaperMC, "Wilderness Bound"); 1.21.11 remains a tested alternative.
 
 > [!NOTE]
-> Minecraft **26.3** changed a default: freshly created `server.properties` files enable `white-list=true`. If viewers without a whitelist entry cannot join your server, set `white-list=false` in `server/default/server.properties` (or the instance's `server.properties`) and restart the server. Instances that existed before 26.3 keep their previous value.
+> Minecraft **26.3** changed a default: freshly created `server.properties` files enable `white-list=true`. If viewers without a whitelist entry cannot join your server, set `white-list=false` in `server/default/server.properties` (or the instance's `server.properties`) and restart the server. Instances that existed before 26.3 keep their previous value. This comes from Mojang/Minecraft, not from the tool.
 
 > [!NOTE]
 > If an instance has no `server.jar` when you start it, the tool **downloads the configured version automatically** and places it in the instance's folder — you never have to copy jars around manually. After downloading a version in the Server Manager, it is also copied into every instance that uses it and is missing the file.
