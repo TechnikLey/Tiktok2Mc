@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Default Minecraft server version is now `26.3`** — new server instances are created with PaperMC `26.3` ("Wilderness Bound"), which requires **Java 25**. Version `1.21.11` is no longer the default but remains a fully tested alternative you can pick in the Server Manager. Both versions are validated against the tool's trigger commands (gifts, summons, item replace, clear, fill, TNT, datapacks), and `1.21.11` stays bundled / installed as before, so nothing needs to be re-downloaded for existing setups.
-- **Heads-up for new `26.3` instances: `white-list=true`** — freshly generated `server.properties` files in Minecraft `26.3` enable the whitelist by default, which can block viewers from connecting. After creating a new `26.3` instance, check `server.properties` and set `white-list=false` (via the console or the file) unless you explicitly want a whitelist.
+- **New default Minecraft version: `26.3`** — new server instances now use Minecraft `26.3` (PaperMC). It needs **Java 25**. Older instances keep working unchanged, and you can still pick the previous version (`1.21.11`) in the Server Manager.
+- **Whitelist is on by default in `26.3`** — new `26.3` servers only allow players that are on the whitelist. If you don't want that, set `white-list=false` in the server's `server.properties` (or turn it off via the console).
 
 ---
 
