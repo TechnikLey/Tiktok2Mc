@@ -1817,7 +1817,7 @@ async function openServerDownloadModal() {
   try {
     const data = await fetchJSON('/versions');
     _serverDownloadVersions = data.versions || [];
-    const safeSet = new Set(data.safe_versions || ['1.21.11']);
+    const safeSet = new Set(data.safe_versions || ['1.21.11', '26.3']);
     select.innerHTML = _serverDownloadVersions.map(v => {
       const label = v.version + (safeSet.has(v.version) ? I18N.t('servers.safeTag') : I18N.t('servers.untestedTag'));
       return `<option value="${escapeHtml(v.version)}">${escapeHtml(label)}</option>`;

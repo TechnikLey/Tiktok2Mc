@@ -14,7 +14,7 @@ router = APIRouter(tags=["Versions"])
 
 PAPER_API = "https://fill.papermc.io/v3/projects/paper"
 
-SAFE_VERSIONS = {"1.21.11"}
+SAFE_VERSIONS = {"1.21.11", "26.3"}
 
 _MIN_SUPPORTED_MAJOR = 1
 _MIN_SUPPORTED_MINOR = 13

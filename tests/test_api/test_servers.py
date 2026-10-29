@@ -12,7 +12,7 @@ class TestServersList:
         assert resp.status_code == 200
         body = resp.json()
         assert "current_version" in body
-        assert body["current_version"] == "1.21.11"
+        assert body["current_version"] == "26.3"
 
     def test_instance_reports_jar_after_installation(self, client, project_dir):
         jar_dir = project_dir / "server" / "default"

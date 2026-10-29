@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Automatic `server.jar` download** — the tool no longer bundles a Minecraft server jar. If an instance has no `server.jar` when you start it, the configured PaperMC version (default `1.21.11`) is downloaded automatically from the PaperMC servers and placed in the instance's folder. After downloading a version in the Server Manager, it is also copied into every instance that uses it and is missing the file.
+- **Automatic `server.jar` download** — the tool no longer bundles a Minecraft server jar. If an instance has no `server.jar` when you start it, the configured PaperMC version (default `26.3`) is downloaded automatically from the PaperMC servers and placed in the instance's folder. After downloading a version in the Server Manager, it is also copied into every instance that uses it and is missing the file.
 
 ### Fixed
 

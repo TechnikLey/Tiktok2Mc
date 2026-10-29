@@ -30,6 +30,9 @@ class TestIsSupportedVersion:
     def test_supported_stable(self):
         assert is_supported_version("1.21.11") is True
 
+    def test_supported_new_year_format(self):
+        assert is_supported_version("26.3") is True
+
     def test_minimum_supported(self):
         assert is_supported_version("1.13") is True
 

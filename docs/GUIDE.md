@@ -58,7 +58,7 @@ The installer creates desktop and Start Menu shortcuts. Use Windows Add/Remove P
 
 The installer does **not** bundle the Minecraft server `server.jar` or a Java runtime. Both are fetched automatically the first time they are needed:
 
-- **Minecraft server** — if no `server.jar` is found in `server/default/` (or any other server instance) when a server is started, the tool downloads the configured PaperMC version (default `1.21.11`) from the PaperMC servers and places it into the instance folder automatically. No manual copying is needed.
+- **Minecraft server** — if no `server.jar` is found in `server/default/` (or any other server instance) when a server is started, the tool downloads the configured PaperMC version (default `26.3`) from the PaperMC servers and places it into the instance folder automatically. No manual copying is needed.
 - **Java** — if no suitable Java runtime is found, the Server Manager shows an **Install Java** button that downloads and installs Java automatically (or follow the on-screen hints for a manual install).
 
 Both downloads need an **internet connection** on first start. On very first launch the tool may therefore appear busy for a moment while it fetches these components — this is normal and only happens once.
@@ -713,7 +713,10 @@ A: There is no fixed schedule. Updates come out when new features or fixes are r
 
 **Q: Can I use a different Minecraft version?**
 
-A: Yes. Use the Server Manager in the Dashboard to switch the version, or replace the `.jar` file in `server/default/`. The new server must support RCON and datapacks (most do). The default version is 1.21.11 (PaperMC).
+A: Yes. Use the Server Manager in the Dashboard to switch the version, or replace the `.jar` file in `server/default/`. The new server must support RCON and datapacks (most do). The default version is 26.3 (PaperMC, "Wilderness Bound"); 1.21.11 remains a tested alternative.
+
+> [!NOTE]
+> Minecraft **26.3** changed a default: freshly created `server.properties` files enable `white-list=true`. If viewers without a whitelist entry cannot join your server, set `white-list=false` in `server/default/server.properties` (or the instance's `server.properties`) and restart the server. Instances that existed before 26.3 keep their previous value.
 
 > [!NOTE]
 > If an instance has no `server.jar` when you start it, the tool **downloads the configured version automatically** and places it in the instance's folder — you never have to copy jars around manually. After downloading a version in the Server Manager, it is also copied into every instance that uses it and is missing the file.

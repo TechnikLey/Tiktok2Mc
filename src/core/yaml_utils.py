@@ -21,6 +21,7 @@ def create_yaml_rt() -> YAML:
     yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
 
+
 def load_yaml(path: Path) -> Any:
     """Load a YAML file with round-trip preservation (comments, ordering, formatting).
 

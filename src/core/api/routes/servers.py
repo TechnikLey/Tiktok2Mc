@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["Servers"])
 
 PAPER_API = "https://fill.papermc.io/v3/projects/paper"
-SAFE_VERSIONS = {"1.21.11"}
+SAFE_VERSIONS = {"1.21.11", "26.3"}
 
 _MIN_SUPPORTED_MAJOR = 1
 _MIN_SUPPORTED_MINOR = 13
@@ -254,7 +254,7 @@ INSTANCE_CONFIG_KEY = "instances"
 DEFAULT_INSTANCES: dict[str, dict[str, Any]] = {
     "default": {
         "name": "Default Server",
-        "version": "1.21.11",
+        "version": "26.3",
         "port": 25565,
         "enabled": True,
         "auto_start": True,
@@ -361,7 +361,7 @@ class RemoveResponse(BaseModel):
 
 class CreateInstanceRequest(BaseModel):
     name: str
-    version: str = "1.21.11"
+    version: str = "26.3"
     port: int = 25565
     java_args: str = ""
 
@@ -384,14 +384,14 @@ async def list_servers():
 
     try:
         cfg = _get_service().read_config()
-        current_version = cfg.get("mc_version", "1.21.11")
+        current_version = cfg.get("mc_version", "26.3")
     except Exception:
-        current_version = "1.21.11"
+        current_version = "26.3"
 
     raw_instances = _load_instances()
     instances: list[InstanceInfo] = []
     for inst_id, inst_data in raw_instances.items():
-        version = inst_data.get("version", "1.21.11")
+        version = inst_data.get("version", "26.3")
         instances.append(
             InstanceInfo(
                 id=inst_id,
@@ -562,7 +562,7 @@ async def list_instances():
             {
                 "id": inst_id,
                 "name": data.get("name", inst_id),
-                "version": data.get("version", "1.21.11"),
+                "version": data.get("version", "26.3"),
                 "port": data.get("port", 25565),
                 "enabled": data.get("enabled", True),
                 "auto_start": data.get("auto_start", False),
@@ -584,7 +584,7 @@ async def get_instance(instance_id: str):
     return {
         "id": instance_id,
         "name": data.get("name", instance_id),
-        "version": data.get("version", "1.21.11"),
+        "version": data.get("version", "26.3"),
         "port": data.get("port", 25565),
         "enabled": data.get("enabled", True),
         "auto_start": data.get("auto_start", False),

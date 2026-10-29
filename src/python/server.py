@@ -78,7 +78,7 @@ CONFIGSERVERAPI_FILE = (PLUGINS_DIR / "MinecraftServerAPI" / "config.yml").resol
 SERVER_JAR = (INSTANCE_DIR / "server.jar").resolve()
 
 # If the jar is missing, try to obtain it automatically: download the version
-# configured in config.yaml (default 1.21.11) and place it in the instance
+# configured in config.yaml (default 26.3) and place it in the instance
 # directory. This covers fresh installs/instances where the user never
 # manually dropped a jar into the folder.
 if not SERVER_JAR.exists():
@@ -87,7 +87,7 @@ if not SERVER_JAR.exists():
     )
     try:
         cfg_probe = load_yaml(CONFIG_FILE) if CONFIG_FILE.exists() else {}
-        want_version = str(cfg_probe.get("mc_version", "1.21.11"))
+        want_version = str(cfg_probe.get("mc_version", "26.3"))
         from core.server_jar import ServerJarError, ensure_instance_jar
 
         SERVER_JAR = ensure_instance_jar(INSTANCE_DIR.name, want_version)
@@ -160,7 +160,7 @@ MC_PORT = 25565
 WEBSERVERPORT = 29188
 APIPORT = 29187
 SERVER_HOST = "127.0.0.1"
-MC_VERSION = "1.21.11"
+MC_VERSION = "26.3"
 
 try:
     if CONFIG_FILE.exists():
@@ -185,7 +185,7 @@ try:
             )
         )
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
-        MC_VERSION = cfg.get("mc_version", "1.21.11")
+        MC_VERSION = cfg.get("mc_version", "26.3")
     else:
         log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
 except (OSError, ValueError, YAMLError) as e:
