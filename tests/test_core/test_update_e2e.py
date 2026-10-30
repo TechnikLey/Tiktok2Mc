@@ -842,6 +842,9 @@ class TestUpdaterSelfUpdateResumeRelaunch:
             patch("python.update.os.chmod"),
             patch("python.update.download_with_progress"),
             patch("python.update.zipfile.ZipFile") as mock_zip,
+            # Linux CI extracts via tarfile (update.py uses .tar.gz on
+            # non-win32), so give the tar path a fake context manager too.
+            patch("python.update.tarfile.open") as mock_tar,
             patch("python.update._relaunch_tool_after_update", return_value=True),
         ):
 
@@ -855,6 +858,8 @@ class TestUpdaterSelfUpdateResumeRelaunch:
                 )
 
             mock_zip.return_value.__enter__.return_value.extractall = fake_populate
+            mock_tar.return_value.__enter__.return_value.getmembers.return_value = []
+            mock_tar.return_value.__enter__.return_value.extractall = fake_populate
 
             release_resp = MagicMock()
             release_resp.status_code = 200
@@ -863,11 +868,19 @@ class TestUpdaterSelfUpdateResumeRelaunch:
                 "assets": [
                     {
                         "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                        "url": "https://fake.url/asset",
+                        "url": "https://fake.url/win-asset",
                     },
                     {
                         "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
-                        "url": "https://fake.url/asset.sha256",
+                        "url": "https://fake.url/win-asset.sha256",
+                    },
+                    {
+                        "name": "Tiktok2Mc_v1.0.0_Linux.tar.gz",
+                        "url": "https://fake.url/linux-asset",
+                    },
+                    {
+                        "name": "Tiktok2Mc_v1.0.0_Linux.tar.gz.sha256",
+                        "url": "https://fake.url/linux-asset.sha256",
                     },
                 ],
             }
