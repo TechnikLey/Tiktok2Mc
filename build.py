@@ -1392,7 +1392,6 @@ def cmd_app(args):
             ),
             ("tools/DelayedTNT.jar", "server/default/plugins/DelayedTNT.jar"),
             ("tools/DelayedTNT.jar", "server/plugins_source/DelayedTNT.jar"),
-            ("tools/server.jar", "server/default/server.jar"),
             ("tools/server.jar", "versions/1.21.11/server.jar"),
             ("tools/mca.vsix", "core/assets/mca.vsix"),
             ("AIPrompt.md", "AIPrompt.md"),
@@ -1406,6 +1405,9 @@ def cmd_app(args):
                 shutil.copy2(src_path, target)
 
         # ----- Version library preseed (PaperMC default version) -----
+        # server/default (the shipped default instance) must run the version
+        # the GUI shows as default (26.3), so its jar comes from the same
+        # PaperMC download instead of the 1.21.11 tools/server.jar.
         preseed_jar = OUT_DIR / "versions" / PRESEED_VERSION / "server.jar"
         if preseed_jar.exists():
             cprint(
@@ -1437,6 +1439,14 @@ def cmd_app(args):
                     "The tool downloads this jar automatically on first start.",
                     Color.YELLOW,
                 )
+        if preseed_jar.exists():
+            default_jar = OUT_DIR / "server" / "default" / "server.jar"
+            default_jar.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(preseed_jar, default_jar)
+            cprint(
+                f"server/default/server.jar set to PaperMC {PRESEED_VERSION}",
+                Color.GREEN,
+            )
 
         config_src = OUT_DIR / "config" / "config.yaml"
         config_default = OUT_DIR / "config" / "config.default.yaml"
