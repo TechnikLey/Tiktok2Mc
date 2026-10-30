@@ -1743,6 +1743,19 @@ def main():
     if parsed.check:
         _run_dep_check()
 
+    if parsed.command is None:
+        # Invoked without a task (e.g. just "python build.py"): show help
+        # instead of failing with argparse's usage error (exit code 1).
+        parser.print_help()
+        print(
+            "\nNo build task given. Examples:\n"
+            "  python build.py app          Build the executables\n"
+            "  python build.py test --all   Run the test suites\n"
+            "  python build.py spec         Regenerate the MCA spec\n"
+            "  python build.py --check      Only verify dependencies"
+        )
+        sys.exit(0)
+
     if parsed.command == "app":
         cmd_app(parsed)
     elif parsed.command == "vsix":
