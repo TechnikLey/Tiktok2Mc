@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -113,6 +114,12 @@ if _src not in sys.path:
     sys.path.insert(0, _src)
 
 from core.version import TOOL_VERSION, UPDATER_VERSION  # noqa: E402
+
+# Version library in the release: tools/server.jar (Paper 1.21.11) seeds
+# versions/1.21.11/server.jar. The tool's default version is additionally
+# fetched from PaperMC at build time (best effort) so the release ships
+# both tested versions in versions/.
+PRESEED_VERSION = "26.3"
 
 # ── MCA spec sources and paths
 MCA_SPEC_SOURCES = [
@@ -485,6 +492,26 @@ def _build_vsix_pipeline(start_time: float) -> None:
 # ── Command handlers ─────────────────────────────────────────────────────────
 
 
+def _download_paper_jar(version: str, dest: Path) -> None:
+    """Download the latest stable PaperMC server.jar for *version* to *dest*.
+
+    Uses the same PaperMC API and build-selection logic as the runtime
+    helper in ``core.server_jar`` so a build-time preseed and a first-run
+    download resolve to the same file.
+    """
+    from core.server_jar import resolve_download_url
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    url = resolve_download_url(version)
+    part = dest.with_suffix(".part")
+    req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as resp, part.open("wb") as out:
+        shutil.copyfileobj(resp, out, length=1024 * 256)
+    if part.stat().st_size == 0:
+        raise RuntimeError(f"Downloaded PaperMC {version} server.jar is empty")
+    part.replace(dest)
+
+
 def cmd_app(args):
     start = time.time()
     BUILD_INSTALLER = getattr(args, "installer", False)
@@ -555,6 +582,7 @@ def cmd_app(args):
             OUT_DIR / "server" / "java",
             OUT_DIR / "server" / "default",
             OUT_DIR / "versions" / "1.21.11",
+            OUT_DIR / "versions" / PRESEED_VERSION,
             OUT_DIR / "config",
             OUT_DIR / "data",
             OUT_DIR / "test",
@@ -1376,6 +1404,39 @@ def cmd_app(args):
                 target = OUT_DIR / dst_rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_path, target)
+
+        # ----- Version library preseed (PaperMC default version) -----
+        preseed_jar = OUT_DIR / "versions" / PRESEED_VERSION / "server.jar"
+        if preseed_jar.exists():
+            cprint(
+                f"versions/{PRESEED_VERSION}/server.jar already present",
+                Color.GRAY,
+            )
+        else:
+            try:
+                cprint(
+                    f"Downloading PaperMC {PRESEED_VERSION} server.jar for the "
+                    "release version library...",
+                    Color.CYAN,
+                )
+                _download_paper_jar(
+                    PRESEED_VERSION,
+                    OUT_DIR / "versions" / PRESEED_VERSION / "server.jar",
+                )
+                cprint(
+                    f"Preseeded versions/{PRESEED_VERSION}/server.jar "
+                    f"({preseed_jar.stat().st_size:,} bytes)",
+                    Color.GREEN,
+                )
+            except Exception as exc:  # best effort: tool downloads at runtime
+                cprint(
+                    f"[WARN] Could not preseed versions/{PRESEED_VERSION}: {exc}",
+                    Color.YELLOW,
+                )
+                cprint(
+                    "The tool downloads this jar automatically on first start.",
+                    Color.YELLOW,
+                )
 
         config_src = OUT_DIR / "config" / "config.yaml"
         config_default = OUT_DIR / "config" / "config.default.yaml"
