@@ -12,11 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **New default Minecraft version: `26.3`** — new server instances now use Minecraft `26.3` (PaperMC). It needs **Java 25**. Older instances keep working unchanged, and you can still pick the previous version (`1.21.11`) in the Server Manager.
-- **The release now ships both server versions** — the `versions/` folder contains `1.21.11` (from the bundled jar) and the preseeded `26.3` server jar, so no internet download is needed for either version on first start. The shipped default server instance (`server/default`) runs `26.3`, matching the version shown in the Dashboard.
+- **The server is ready to go right away** — the release now includes both versions: the default instance runs `26.3`, and `1.21.11` is available in the Server Manager. No download needed on first start.
 
 ### Fixed
 
-- **Phantom plugin updates removed** — Death Counter, Spotify Control, Timer and Win Counter no longer offer a "1.0.0 → 1.0.2" update. These plugins are built into the tool and update together with it; the update checker wrongly compared them against the tool's own release version.
+- **Phantom plugin updates removed** — Death Counter, Spotify Control, Timer and Win Counter no longer offer a "1.0.0 → 1.0.2" update. These plugins are built into the tool and stay in sync with it automatically.
 
 ---
 
