@@ -161,6 +161,31 @@ update_new = (ROOT_DIR / f"update_new{SUFFIX}").resolve()
 RUNTIME_DIR = (get_data_home_base() / "core" / "runtime").resolve()
 
 # -----------------------------
+# P3a launcher maintenance: queued launcher binaries (start_new/update_new)
+# installed, then the once-per-version config migration. Both run before
+# any child process is spawned and must never abort startup.
+# -----------------------------
+try:
+    from core.update_engine.launch_layout import (
+        run_first_start_config_hook,
+        swap_pending_launcher_binaries,
+    )
+
+    _swapped = swap_pending_launcher_binaries(ROOT_DIR, SUFFIX)
+    if _swapped.get("start") or _swapped.get("update"):
+        log.info("Launcher binaries swapped this boot: %s", _swapped)
+    _first_start = run_first_start_config_hook(ROOT_DIR)
+    if _first_start is not None:
+        log.info(
+            "First-start config maintenance for version %s: %s",
+            _first_start.get("version"),
+            "migrated" if _first_start.get("migrated") else "already up to date",
+        )
+except ImportError:
+    # Older core without the update engine → legacy behavior.
+    log.debug("update engine not available; skipping launcher maintenance")
+
+# -----------------------------
 # Load configuration
 # -----------------------------
 try:
