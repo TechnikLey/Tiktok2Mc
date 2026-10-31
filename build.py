@@ -17,6 +17,7 @@
 
 import argparse
 import ast
+import dataclasses
 import fnmatch
 import hashlib
 import json
@@ -31,6 +32,8 @@ import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 log = logging.getLogger(__name__)
@@ -113,13 +116,157 @@ _src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from core.version import TOOL_VERSION, UPDATER_VERSION  # noqa: E402
+from core.update_engine import manifest as update_manifest  # noqa: E402
+from core.update_engine.pointer import AppPointer, write_pointer  # noqa: E402
+from core.version import (  # noqa: E402
+    EXPECTED_CONFIG_VERSION,
+    TOOL_VERSION,
+    UPDATER_VERSION,
+)
 
 # Version library in the release: tools/server.jar (Paper 1.21.11) seeds
 # versions/1.21.11/server.jar. The tool's default version is additionally
 # fetched from PaperMC at build time (best effort) so the release ships
 # both tested versions in versions/.
 PRESEED_VERSION = "26.3"
+
+
+# ── P3a versioned release assembly ─────────────────────────────────────────
+
+
+def _assemble_versioned_release(
+    out_dir: Path,
+    tool_version: str,
+    updater_version: str,
+    suffix: str,
+) -> dict[str, object]:
+    """Convert the freshly built flat release tree into the P3a layout.
+
+    Steps (see ``docs/plans/p3a-update-architecture.md`` §9):
+
+    1. Move the program content (``core/`` + ``plugins/``) into
+       ``app-<tool_version>/``; the root keeps the *deliverable* shells
+       (start/update exes) plus config/data/docs/hooks/server/versions.
+    2. Write the root ``current.json`` pointer so fresh installs resolve
+       their app dir without running the updater first.
+    3. Generate + sign ``manifest.json`` / ``manifest.json.sig`` covering
+       exactly what the updater stages and verifies: the app dir, the root
+       launcher binaries, the pointer and the version file. Templates and
+       dependencies (config/data/docs/hooks...) are deliberately **not**
+       covered — user data is never part of an update.
+
+    Signing key: ``T2M_SIGNING_PRIVATE_KEY`` (raw hex Ed25519) when set
+    (CI). Otherwise a throwaway key signs the local dev build — such a
+    release is only installable with the matching ``T2M_SIGNING_PUBLIC_KEY``
+    override (the updater E2E harness does exactly that) and must never be
+    published.
+
+    Raises ``RuntimeError`` when the release tree is in an unexpected shape;
+    ``cmd_app``'s outer error boundary reports it as a build failure.
+    """
+    app_name = f"app-{tool_version}"
+    app_dir = out_dir / app_name
+    app_dir.mkdir(exist_ok=True)
+
+    moved: list[str] = []
+    for name in ("core", "plugins"):
+        source = out_dir / name
+        if not source.is_dir():
+            # Incremental (--only) rebuild against an already assembled
+            # release: the content lives in the app dir already.
+            continue
+        target = app_dir / name
+        if target.exists():
+            shutil.rmtree(target)
+        source.rename(target)
+        moved.append(name)
+    if not (app_dir / "core").is_dir():
+        raise RuntimeError(
+            f"Release assembly failed: no program content found "
+            f"(neither {out_dir / 'core'} nor {app_dir / 'core'})."
+        )
+
+    # Root pointer for fresh installs (app dir ships without its own copy —
+    # “current.json” at the zip root is what the launcher/updater read).
+    write_pointer(
+        out_dir,
+        AppPointer(
+            active_app_dir=app_name,
+            tool_version=tool_version,
+            installed_at_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            manifest_sha256=None,
+            previous_app_dir=None,
+        ),
+    )
+
+    # Manifest over app dir content + root binaries + pointer + version file.
+    manifest = update_manifest.generate_manifest(
+        app_dir,
+        tool_version=tool_version,
+        config_version_expected=EXPECTED_CONFIG_VERSION,
+        updater_version=updater_version,
+        prefix=app_name,
+    )
+    root_files: list[str] = [
+        f"start{suffix}",
+        f"update{suffix}",
+        "current.json",
+        "version.txt",
+    ]
+    extra_entries = []
+    from core.update_engine.manifest import ManifestFile
+
+    for rel in root_files:
+        fpath = out_dir / rel
+        if not fpath.is_file():
+            if rel in ("current.json", "version.txt"):
+                raise RuntimeError(
+                    f"Release assembly failed: root file {rel} is missing."
+                )
+            continue
+        data = fpath.read_bytes()
+        extra_entries.append(
+            ManifestFile(
+                path=rel,
+                sha256=hashlib.sha256(data).hexdigest(),
+                size=len(data),
+            )
+        )
+    manifest = dataclasses.replace(
+        manifest,
+        files=manifest.files + tuple(sorted(extra_entries, key=lambda e: e.path)),
+    )
+
+    private_key: Ed25519PrivateKey
+    private_hex = os.environ.get("T2M_SIGNING_PRIVATE_KEY", "").strip()
+    if private_hex:
+        private_key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(private_hex))
+        key_source = "T2M_SIGNING_PRIVATE_KEY"
+    else:
+        private_key = Ed25519PrivateKey.generate()
+        key_source = "ephemeral (dev build)"
+        cprint(
+            "\n"
+            "!! No T2M_SIGNING_PRIVATE_KEY set — using a throwaway key.\n"
+            "!! This build's manifest can only be verified with the matching\n"
+            "!! T2M_SIGNING_PUBLIC_KEY override (E2E harness). Do NOT publish!",
+            Color.YELLOW,
+        )
+    entries_total = len(manifest.files)
+    update_manifest.write_manifest(out_dir, manifest, private_key)
+    cprint(
+        f"Manifest signed with {key_source}: {entries_total} files "
+        f"(app dir {app_name} + root binaries)",
+        Color.GREEN,
+    )
+    return {
+        "app_dir": app_name,
+        "moved": moved,
+        "manifest": str(out_dir / update_manifest.MANIFEST_FILE),
+        "files": entries_total,
+        "key_source": key_source,
+    }
+
 
 # ── MCA spec sources and paths
 MCA_SPEC_SOURCES = [
@@ -1469,6 +1616,18 @@ def cmd_app(args):
         (OUT_DIR / "version.txt").write_text(
             f"ToolVersion: {TOOL_VERSION}\nUpdaterVersion: {UPDATER_VERSION}\n",
             encoding="utf-8",
+        )
+
+        # ----- P3a: versioned release assembly -----
+        _release_info = _assemble_versioned_release(
+            OUT_DIR, TOOL_VERSION, UPDATER_VERSION, SUFFIX
+        )
+        cprint(
+            "Versioned release assembled: app dir "
+            f"{_release_info['app_dir']} "
+            f"(moved: {', '.join(_release_info['moved']) or 'already present'}; "
+            f"manifest: {_release_info['manifest']})",
+            Color.GREEN,
         )
 
         if PARALLEL_TEMP_DIR.exists():
