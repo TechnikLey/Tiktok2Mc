@@ -31,6 +31,7 @@ from pathlib import Path
 import pytest
 
 import core.paths as paths_mod
+from core.update_engine import pointer as pointer_mod
 
 # Pristine originals captured at collection time (before the conftest
 # autouse path-patching fixture has ever run this session).
@@ -42,6 +43,7 @@ _REAL = {
         "get_runtime_dir",
         "get_plugin_data_dir",
         "get_base_file",
+        "get_plugins_dir",
     )
 }
 
@@ -117,3 +119,122 @@ class TestSuffix:
         expected = "main.exe" if paths_mod.SUFFIX == ".exe" else "main.bin"
         monkeypatch.setattr(paths_mod, "get_base_dir", lambda: tmp_path)
         assert Path(_REAL["get_base_file"]()).name == expected
+
+
+# ---------------------------------------------------------------------------
+# P3a: versioned layout / data home (new behavior, additive)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def isolated_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neutralize LOCALAPPDATA-derived alt home for deterministic tests."""
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+
+class TestVersionedLayout:
+    def test_flat_layout_resolves_none(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_env
+    ) -> None:
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        assert paths_mod.get_active_app_dir() is None
+
+    def test_pointer_layout_resolves_active(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        active = tmp_path / "app-1.2.0"
+        active.mkdir()
+        previous = tmp_path / "app-1.1.0"
+        previous.mkdir()
+        pointer_mod.write_pointer(
+            tmp_path, pointer_mod.AppPointer("app-1.2.0", "1.2.0")
+        )
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        got = paths_mod.get_active_app_dir()
+        assert got is not None and got.resolve() == active.resolve()
+
+
+class TestDataHome:
+    def test_versioned_layout_root_wins(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "app-1.2.0").mkdir()
+        pointer_mod.write_pointer(
+            tmp_path, pointer_mod.AppPointer("app-1.2.0", "1.2.0")
+        )
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        assert paths_mod.get_data_home_base() == tmp_path.resolve()
+
+    def test_user_data_at_root_wins(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_env
+    ) -> None:
+        (tmp_path / "config").mkdir()
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        assert paths_mod.get_data_home_base() == tmp_path.resolve()
+
+    def test_alt_home_when_it_exists(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        home = tmp_path / "var"
+        monkeypatch.setenv("LOCALAPPDATA", str(home))
+        (home / "Tiktok2Mc" / "config").mkdir(parents=True)
+        assert paths_mod.get_data_home_base() == (home / "Tiktok2Mc").resolve()
+
+    def test_empty_root_falls_back_to_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_env
+    ) -> None:
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        assert paths_mod.get_data_home_base() == tmp_path.resolve()
+
+    def test_config_file_follows_data_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        home = tmp_path / "var"
+        monkeypatch.setenv("LOCALAPPDATA", str(home))
+        (home / "Tiktok2Mc" / "config").mkdir(parents=True)
+        assert (
+            _REAL["get_config_file"]()
+            == (home / "Tiktok2Mc" / "config" / "config.yaml").resolve()
+        )
+
+
+class TestLegacyPinsStillHold:
+    """P3a must be additive: legacy layouts keep resolving exactly as before."""
+
+    def test_base_file_unchanged_in_flat_layout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_env
+    ) -> None:
+        monkeypatch.setattr(paths_mod, "get_base_dir", lambda: tmp_path)
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        expected = (tmp_path / f"main{paths_mod.SUFFIX}").resolve()
+        assert paths_mod.get_base_file() == expected
+
+    def test_base_file_prefers_active_core_nested(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        active = tmp_path / "app-1.2.0"
+        (active / "core").mkdir(parents=True)
+        (active / "core" / f"main{paths_mod.SUFFIX}").write_bytes(b"")
+        pointer_mod.write_pointer(
+            tmp_path, pointer_mod.AppPointer("app-1.2.0", "1.2.0")
+        )
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        monkeypatch.setattr(paths_mod, "get_base_dir", lambda: tmp_path)
+        assert (
+            _REAL["get_base_file"]()
+            == (active / "core" / f"main{paths_mod.SUFFIX}").resolve()
+        )
+
+    def test_plugins_dir_prefers_active_app_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        active = tmp_path / "app-1.2.0"
+        (active / "plugins").mkdir(parents=True)
+        pointer_mod.write_pointer(
+            tmp_path, pointer_mod.AppPointer("app-1.2.0", "1.2.0")
+        )
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        got = _REAL["get_plugins_dir"]()
+        assert got.resolve() == (active / "plugins").resolve()

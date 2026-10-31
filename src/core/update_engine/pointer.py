@@ -22,15 +22,18 @@ import os
 import shutil
 import threading
 from dataclasses import asdict, dataclass
-from logging import Logger
+
+# NOTE: plain stdlib logger — ``core.logger.initialize_logging`` performs
+# filesystem work (log dir creation) and must not run at module import time:
+# this module is imported lazily from ``core.paths`` inside test sessions
+# where the write guard is active.
+from logging import Logger, getLogger
 from pathlib import Path
 from typing import Any, Final
 
 from packaging.version import InvalidVersion, Version
 
-from core.logger import initialize_logging
-
-log: Logger = initialize_logging(__name__)
+log: Logger = getLogger(__name__)
 
 APP_DIR_PREFIX: Final[str] = "app-"
 POINTER_FILE: Final[str] = "current.json"

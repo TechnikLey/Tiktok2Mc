@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from logging import Logger
+from logging import Logger, getLogger
 from pathlib import Path, PurePosixPath
 
 from cryptography.exceptions import InvalidSignature
@@ -33,10 +33,10 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
+# NOTE: plain stdlib logger — see pointer.py for the import-time rationale.
 from core.checksum import compute_sha256
-from core.logger import initialize_logging
 
-log: Logger = initialize_logging(__name__)
+log: Logger = getLogger(__name__)
 
 MANIFEST_FILE: str = "manifest.json"
 SIGNATURE_SUFFIX: str = ".sig"
