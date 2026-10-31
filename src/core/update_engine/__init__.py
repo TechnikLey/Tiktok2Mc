@@ -14,4 +14,4 @@ this package at runtime; avoid a cycle).
 
 from __future__ import annotations
 
-__all__ = ["manifest", "pointer"]
+__all__ = ["launch_layout", "manifest", "migration", "pointer"]

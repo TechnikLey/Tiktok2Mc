@@ -64,7 +64,7 @@ from core.logger import (  # noqa: E402
     start_heartbeat,
 )
 from core.models import AppConfig  # noqa: E402
-from core.paths import get_base_dir, get_root_dir  # noqa: E402
+from core.paths import get_base_dir, get_data_home_base, get_root_dir  # noqa: E402
 from core.port_scanner import (  # noqa: E402
     PortPolicy,
     build_resolved_map,
@@ -126,20 +126,39 @@ _RUNTIME_HEARTBEAT_TIMEOUT = 120.0
 # -----------------------------
 BASE_DIR = get_base_dir()
 ROOT_DIR = get_root_dir()
-CONFIG_FILE = (ROOT_DIR / "config" / "config.yaml").resolve()
+
+# P3a: one-time migration of legacy flat installs + resolution of the
+# active versioned app directory (pointer → newest app dir → legacy
+# behavior). Runs before any child process is spawned.
+try:
+    from core.update_engine.launch_layout import resolve_app_base
+
+    _APP_BASE, _MIGRATED_THIS_BOOT = resolve_app_base(BASE_DIR, ROOT_DIR)
+    if _MIGRATED_THIS_BOOT:
+        log.info("Layout migration performed this boot; app base: %s", _APP_BASE)
+    else:
+        log.debug("Launcher app base resolved: %s", _APP_BASE)
+except ImportError:
+    # Older core without the update engine → legacy behavior.
+    log.warning("update engine not available; staying in legacy layout")
+    _APP_BASE = BASE_DIR
+
+CONFIG_FILE = (get_data_home_base() / "config" / "config.yaml").resolve()
 
 # -----------------------------
 # Executable paths
 # -----------------------------
-APP_EXE_PATH = (BASE_DIR / "core" / f"app{SUFFIX}").resolve()
-SERVER_EXE_PATH = (BASE_DIR / "core" / f"server{SUFFIX}").resolve()
-UPDATE_EXE_PATH = (BASE_DIR / f"update{SUFFIX}").resolve()
-GUI_EXE_PATH = (BASE_DIR / "core" / f"gui{SUFFIX}").resolve()
-OVERLAY_EXE_PATH = (BASE_DIR / "core" / f"overlay{SUFFIX}").resolve()
-update_new = (BASE_DIR / f"update_new{SUFFIX}").resolve()
+# Versioned layout: program binaries live in the active app dir; the
+# launcher/updater remain at the install root (they outlive version swaps).
+APP_EXE_PATH = (_APP_BASE / "core" / f"app{SUFFIX}").resolve()
+SERVER_EXE_PATH = (_APP_BASE / "core" / f"server{SUFFIX}").resolve()
+UPDATE_EXE_PATH = (ROOT_DIR / f"update{SUFFIX}").resolve()
+GUI_EXE_PATH = (_APP_BASE / "core" / f"gui{SUFFIX}").resolve()
+OVERLAY_EXE_PATH = (_APP_BASE / "core" / f"overlay{SUFFIX}").resolve()
+update_new = (ROOT_DIR / f"update_new{SUFFIX}").resolve()
 
-# Runtime directory for signal files (IPC between processes)
-RUNTIME_DIR = (ROOT_DIR / "core" / "runtime").resolve()
+# Runtime directory for signal files (IPC between processes; data-home aware)
+RUNTIME_DIR = (get_data_home_base() / "core" / "runtime").resolve()
 
 # -----------------------------
 # Load configuration
