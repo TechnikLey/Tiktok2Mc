@@ -1,17 +1,33 @@
 #!/usr/bin/env python3
 # ==================================================
-# update.py - Auto-updater for the Streaming Tool
+# update.py - Auto-updater for the Streaming Tool (P3a)
 # ==================================================
-# Checks GitHub releases for new versions, downloads
-# and extracts the update package, copies whitelisted
-# files into the installation directory, and migrates
-# the user config to match the latest template.
+# Omaha-style state machine:
+#
+#   CHECK → FETCH → VERIFY_SIG → VERIFY_SHA → STAGE → FLIP → PRUNE → NOTIFY
+#
+# - CHECK      local install version vs. latest GitHub release tag
+# - FETCH      download the platform archive (+ .sha256 companion)
+# - VERIFY_SIG download manifest.json + manifest.json.sig, verify the
+#              detached Ed25519 signature (fail closed)
+# - VERIFY_SHA archive checksum, then per-file sha256 against the manifest
+# - STAGE      extracted ``app-<ver>/`` directory is verified and moved
+#              into the install root (atomically via os.replace)
+# - FLIP       atomically repoint ``current.json`` at the new version
+# - PRUNE      old ``app-<ver>/`` dirs survive one rollback generation,
+#              older ones are removed
+# - NOTIFY     progress file for the GUI launcher + ``--auto`` relaunch
+#
+# The updater never touches running processes (no kill choreography);
+# a new version becomes active on the next tool restart through the
+# ``current.json`` pointer. Launcher binaries (``start``/``update``) are
+# swapped by the launcher on the next boot.
 # ==================================================
 
+import hashlib
 import io
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -21,14 +37,10 @@ import zipfile
 from pathlib import Path
 
 import requests
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from packaging import version
-from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap
-from ruamel.yaml.error import YAMLError
 
-from core.api.server import DEFAULT_PORT
-from core.backup import get_backup_manager
-from core.checksum import verify_checksum
+from core.checksum import compute_sha256, verify_checksum
 from core.crash_manager import get_crash_manager
 from core.error_codes import UPDATE_0001
 from core.logger import (
@@ -37,6 +49,9 @@ from core.logger import (
     install_global_exception_hook,
 )
 from core.paths import get_base_dir, get_runtime_dir
+from core.update_engine import manifest as manifest_mod
+from core.update_engine import pointer as pointer_mod
+from core.update_engine.migration import extract_version, parse_version_txt
 from core.update_exit import (
     EXIT_API_ERROR,
     EXIT_CHECKSUM_MISMATCH,
@@ -46,9 +61,18 @@ from core.update_exit import (
     EXIT_NO_ASSET,
     EXIT_NO_UPDATE,
     EXIT_OK,
+    EXIT_SIGNATURE_MISMATCH,
     EXIT_UNEXPECTED,
 )
-from core.utils import load_config, normalize_config_version
+from core.utils import load_config
+
+# The updater verifies release manifests against the public key shipped with
+# the code; CI replaces the key material at build time (see build.py). Tests
+# override it via the T2M_SIGNING_PUBLIC_KEY environment variable.
+try:
+    from core.release_keys import RELEASE_SIGNING_PUBLIC_KEY
+except ImportError:  # pragma: no cover - built binaries always bundle core
+    RELEASE_SIGNING_PUBLIC_KEY = ""
 
 log = initialize_logging(__name__)
 
@@ -75,14 +99,11 @@ _API_RETRY_DELAY_SECONDS = 2
 # ---------------------------------------------------------------------------
 BASE_DIR = None
 TEMP_DIR = None
-VERSION_FILE = None
-DEFAULT_CONFIG_FILE = None
-CONFIG_FILE = None
 START_FILE = None
+VERSION_FILE = None
 UPDATE_STATUS_FILE = None
 AUTO_MODE = False
 cfg = {}
-CONFIG_UPDATE_ENABLE = True
 GITHUB_TOKEN = None
 HEADERS_API = {
     "Accept": "application/vnd.github+json",
@@ -92,6 +113,7 @@ HEADERS_ASSET = {
     "Accept": "application/octet-stream",
     "User-Agent": "Streaming-Tool-Updater",
 }
+SIGNING_PUBLIC_KEY = ""
 
 
 # ---------------------------------------------------------------------------
@@ -107,29 +129,24 @@ def _init():
     global \
         BASE_DIR, \
         TEMP_DIR, \
+        START_FILE, \
         VERSION_FILE, \
-        DEFAULT_CONFIG_FILE, \
-        CONFIG_FILE, \
-        START_FILE
-    global \
         UPDATE_STATUS_FILE, \
         AUTO_MODE, \
         cfg, \
-        CONFIG_UPDATE_ENABLE, \
         GITHUB_TOKEN, \
         HEADERS_API, \
         HEADERS_ASSET, \
+        SIGNING_PUBLIC_KEY, \
         API_URL
     BASE_DIR = get_base_dir()
     TEMP_DIR = (BASE_DIR / "_update_tmp").resolve()
     VERSION_FILE = (BASE_DIR / "version.txt").resolve()
-    DEFAULT_CONFIG_FILE = (BASE_DIR / "config" / "config.default.yaml").resolve()
-    CONFIG_FILE = (BASE_DIR / "config" / "config.yaml").resolve()
     START_FILE = (BASE_DIR / f"start{SUFFIX}").resolve()
     UPDATE_STATUS_FILE = (get_runtime_dir() / "update_status.json").resolve()
     AUTO_MODE = "--auto" in sys.argv
     try:
-        cfg = load_config(CONFIG_FILE)
+        cfg = load_config((BASE_DIR / "config" / "config.yaml").resolve())
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         log.error("%s", e)
         wait_for_key()
@@ -153,7 +170,6 @@ def _init():
                     "permissions. Set show_sudo_warning: false in config to "
                     "suppress this warning."
                 )
-    CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or cfg.get("github_token")
     HEADERS_API = {
         "Accept": "application/vnd.github+json",
@@ -172,72 +188,40 @@ def _init():
     # so the default hardcoded GitHub URL is used unchanged.
     API_URL = os.environ.get("TIKTOK2MC_UPDATE_SOURCE") or API_URL
 
+    # Test-only hook (mirrors TIKTOK2MC_UPDATE_SOURCE): test key for the
+    # manifest signature. Production binaries verify against the public key
+    # embedded below; the E2E harness runs the *compiled* updater and needs
+    # its own per-test key.
+    SIGNING_PUBLIC_KEY = (
+        os.environ.get("T2M_SIGNING_PUBLIC_KEY") or RELEASE_SIGNING_PUBLIC_KEY
+    )
 
-# Directories and individual files that may be overwritten by an update
-WHITELIST_DIRS = {
-    "core",
-    "scripts",
-    "config",
-    "plugins/deathcounter",
-    "plugins/timer",
-    "plugins/wincounter",
-    "plugins/spotify",
-}
 
-# Individual files in subdirectories that may be overwritten.
-WHITELIST_DIR_FILES = {
-    "hooks/random/main.py",
-    "hooks/example_hook/main.py",
-}
-
-WHITELIST_FILES = {
-    "version.txt",
-    "README.md",
-    "LICENSE",
-    f"start{SUFFIX}",
-}
-
+# ---------------------------------------------------------------------------
+# Release source (single source of truth: the GitHub repo coordinates).
+# ---------------------------------------------------------------------------
 GITHUB_USER = "TechnikLey"
 GITHUB_REPO = "Tiktok2Mc"
 API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
 
-CONFIG_UPDATE_ENABLE = cfg.get("auto_update_config", True)
+MANIFEST_ASSET = "manifest.json"
+SIG_ASSET = "manifest.json.sig"
 
 
 # =========================
 # Helper functions
 # =========================
-def extract_version(text):
-    if not text:
-        return "0.0.0"
-    m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", str(text))
-    return m.group(1) if m else "0.0.0"
+def get_local_tool_version(root: Path) -> str:
+    """Return the locally installed tool version.
 
-
-def get_versions(path):
-    v = {"tool": "0.0.0", "updater": "0.0.0"}
-    if isinstance(path, str):
-        path = Path(path)
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            for line in f:
-                if ":" in line:
-                    k, val = map(str.strip, line.split(":", 1))
-                    if "toolversion" in k.lower():
-                        v["tool"] = extract_version(val)
-                    elif "updaterversion" in k.lower():
-                        v["updater"] = extract_version(val)
-    else:
-        log.error("Version file not found: %s", path)
-        wait_for_key()
-
-    return v
-
-
-def save_versions(tool_v, updater_v):
-    with VERSION_FILE.open("w", encoding="utf-8") as f:
-        f.write(f"ToolVersion: {tool_v}\n")
-        f.write(f"UpdaterVersion: {updater_v}\n")
+    Resolution: ``current.json`` ``tool_version`` (versioned layout) →
+    ``version.txt`` (legacy/migrated layouts) → ``0.0.0``.
+    """
+    pointer = pointer_mod.read_pointer(root)
+    if pointer is not None:
+        return pointer.tool_version
+    versions = parse_version_txt(root / "version.txt")
+    return versions["tool"]
 
 
 def download_with_progress(url, target):
@@ -261,158 +245,36 @@ def download_with_progress(url, target):
     log.info("\nDownload complete.")
 
 
-# =========================
-# Config migration
-# =========================
-def migrate_config_if_needed() -> bool:
-    if not DEFAULT_CONFIG_FILE.exists():
-        log.error("Master template missing: %s", DEFAULT_CONFIG_FILE)
-        return False
-
-    yaml_obj = YAML(typ="rt")
-    yaml_obj.preserve_quotes = True
-    yaml_obj.indent(mapping=2, sequence=4, offset=2)
-    yaml_obj.width = 120
-
-    # Case 1: No user config exists
-    if not CONFIG_FILE.exists():
-        try:
-            shutil.copy2(DEFAULT_CONFIG_FILE, CONFIG_FILE)
-            log.info("No config found. Created new config from template.")
-            return True
-        except OSError as e:
-            log.error("Failed to copy template: %s", e)
-            return False
-
-    # Load Template
-    template_data = load_yaml_with_debug(DEFAULT_CONFIG_FILE, yaml_obj, "Template")
-    if template_data is None:
-        return False
-
-    # Clean up template start comments
-    template_data.yaml_set_start_comment("DO NOT EDIT the config_version")
-
-    # Load User Config
-    user_data = load_yaml_with_debug(CONFIG_FILE, yaml_obj, "User Config")
-    if user_data is None:
-        return False
-
-    # Version Check (supports "1.0", "0.7", legacy int 7, "v1.0.0")
+def download_bytes(url: str) -> bytes | None:
+    """Fetch a small asset into memory; ``None`` on any network/HTTP error."""
     try:
-        raw_default_val = template_data.get("config_version", "0.0")
-        raw_user_val = user_data.get("config_version", "0.0")
-        raw_default = normalize_config_version(raw_default_val)
-        raw_user = normalize_config_version(raw_user_val)
-        default_ver = version.parse(raw_default)
-        user_ver = version.parse(raw_user)
-    except (ValueError, TypeError) as e:
-        log.warning("Version keys are invalid (%s). Forcing migration...", e)
-        default_ver, user_ver = version.parse("1.0"), version.parse("0.0")
-        raw_default = "1.0"
-        raw_user = "0.0"
-
-    if user_ver >= default_ver:
-        log.info("Config is up to date (%s).", raw_user)
-        return False
-
-    log.info("Migrating config: %s -> %s", raw_user, raw_default)
-
-    # Backup (via centralized BackupManager)
-    try:
-        bm = get_backup_manager()
-        bak = bm.create_backup(CONFIG_FILE, category="migration")
-        if bak:
-            log.info("Backup created at: %s", bak)
-        else:
-            log.info("Backup skipped (identical content or too recent)")
-    except OSError as e:
-        log.error("Migration aborted. Could not create backup: %s", e)
-        return False
-
-    # Perform strict injection
-    _inject_values_strictly(template_data, user_data)
-
-    # Force the new version number
-    template_data["config_version"] = raw_default
-
-    try:
-        with CONFIG_FILE.open("w", encoding="utf-8") as f:
-            yaml_obj.dump(template_data, f)
-        log.info("[SUCCESS] Config migrated successfully to %s.", raw_default)
-        return True
-    except (OSError, YAMLError) as e:
-        log.error("[FAIL] Error writing migrated config: %s", e)
-        return False
-
-
-def _inject_values_strictly(template, user_source, path=""):
-    # 1. BASE GUARD: If user_source is None or not a dictionary-like object
-    if user_source is None:
-        if path:
-            log.warning(
-                f"Configuration path '{path}' is empty in user config. Skipping."
-            )
-        return
-    if not isinstance(user_source, (dict, CommentedMap)):
-        if path:
-            log.warning(
-                f"Expected a section at '{path}', but found {type(user_source).__name__}. Skipping."
-            )
-        return
-    # 2. ITERATE: Only if user_source is guaranteed to be a dict
-    for key in template:
-        current_path = f"{path}.{key}" if path else key
-        # Check if user actually has this key
-        if key in user_source:
-            user_value = user_source[key]
-            template_value = template[key]
-            # CASE A: Both are nested structures -> Recurse
-            if isinstance(template_value, (dict, CommentedMap)):
-                if isinstance(user_value, (dict, CommentedMap)):
-                    _inject_values_strictly(template_value, user_value, current_path)
-                elif user_value is None:
-                    # User left a whole category empty (e.g., 'Java: ')
-                    log.warning(
-                        f"Section '{current_path}' is empty in user config. Keeping defaults."
-                    )
-                else:
-                    log.warning(
-                        f"Type mismatch at '{current_path}': Expected a section, got a value. Skipping."
-                    )
-            # CASE B: Template expects a simple value (String, Int, Bool, List)
-            else:
-                if user_value is not None:
-                    template[key] = user_value
-                    log.debug("Migrated: %s", current_path)
-                else:
-                    log.debug(
-                        f"Value for '{current_path}' is null/empty. Using default."
-                    )
-        else:
-            log.debug("Key '%s' missing in user config. Using default.", current_path)
-
-
-def load_yaml_with_debug(path, yaml_obj, label):
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml_obj.load(f)
-            if data is None:
-                return CommentedMap()
-            return data
-    except YAMLError as e:
-        log.error("[FAIL] YAML error in %s: %s", label, path)
-
-        # Print line / column if available
-        if hasattr(e, "problem_mark") and e.problem_mark is not None:
-            mark = e.problem_mark
-            log.error("[FAIL] Line: %s, Column: %s", mark.line + 1, mark.column + 1)
-
-        log.error("[FAIL] Details: %s", e)
+        response = requests.get(url, headers=HEADERS_ASSET, timeout=30)
+        response.raise_for_status()
+        return response.content
+    except requests.exceptions.RequestException as exc:
+        log.error("Asset download failed (%s): %s", url, exc)
         return None
-    except Exception as e:  # best-effort config load; caller falls back to defaults
-        log.error("[FAIL] Unexpected error while loading %s: %s", label, path)
-        log.error("[FAIL] Details: %s", e)
-        return None
+
+
+def safe_extract_zip(zip_path: Path, dest: Path) -> None:
+    with zipfile.ZipFile(zip_path, "r") as z:
+        # Validate all member paths first (zip slip protection)
+        resolved_dest = dest.resolve()
+        for member in z.infolist():
+            target = (dest / member.filename).resolve()
+            if not target.is_relative_to(resolved_dest):
+                raise ValueError(f"Zip slip attempt: {member.filename}")
+        z.extractall(dest)
+
+
+def safe_extract_tar(tar_path: Path, dest: Path) -> None:
+    with tarfile.open(tar_path, "r:gz") as t:
+        resolved_dest = dest.resolve()
+        for member in t.getmembers():
+            target = (dest / member.name).resolve()
+            if not target.is_relative_to(resolved_dest):
+                raise ValueError(f"Path traversal attempt: {member.name}")
+        t.extractall(dest)
 
 
 # =========================
@@ -448,13 +310,13 @@ def _clear_update_status():
 
 
 def _relaunch_tool_after_update() -> bool:
-    """Relaunch ``start.exe`` after a successful auto-install.
+    """Relaunch ``start.exe`` after a successful update.
 
-    ``start.py`` exits when the updater signals 'kill' so its files can
-    be replaced — the updater is the only actor left and must bring the
-    application back up.  No-op outside ``--auto`` mode (manual runs keep
-    the interactive prompt).  Returns ``True`` when the relaunch was
-    launched successfully.
+    With the P3a pointer design the running processes are never touched, so
+    a relaunch is purely a convenience for ``--auto`` mode: the launcher
+    boots into the version the pointer now names. No-op outside ``--auto``
+    mode (manual runs keep the interactive prompt).  Returns ``True`` when
+    the relaunch was launched successfully.
     """
     if not AUTO_MODE:
         return True
@@ -481,30 +343,430 @@ def _relaunch_tool_after_update() -> bool:
         return False
 
 
-def _install_file_with_retry(src: Path, dst: Path) -> None:
-    """Replace ``dst`` with ``src``, retrying briefly on Windows locks.
+# =========================
+# Persistent status file (kept for legacy readers; the pointer is the
+# truth for which version is installed)
+# =========================
+def save_versions(tool_v, updater_v) -> None:
+    """Keep the legacy ``version.txt`` in sync for pre-P3a readers."""
+    try:
+        VERSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with VERSION_FILE.open("w", encoding="utf-8") as f:
+            f.write(f"ToolVersion: {tool_v}\n")
+            f.write(f"UpdaterVersion: {updater_v}\n")
+    except OSError as exc:
+        log.warning("Could not write version.txt: %s", exc)
 
-    Once the updater signals 'kill', ``start.py`` exits and the GUI closes
-    its window so its files can be replaced — but on Windows a just-
-    terminated process's executable handle is usually released only a moment
-    after that process has fully exited (antivirus scanners can add further
-    delay).  A short retry window closes that race.  Outside Windows the
-    first failure propagates immediately, preserving the original behavior.
-    Raises the last ``OSError`` when the file is still locked after the
-    retry window.
-    """
-    tries = (100 if sys.platform == "win32" else 0) + 1
-    last_error: OSError | None = None
-    for attempt in range(tries):
+
+# =========================
+# Steps
+# =========================
+def _step_check(root: Path) -> tuple[str, dict]:
+    """CHECK: fetch the latest release info and compare versions."""
+    log.info("[..] Checking for new version via GitHub...")
+    release = None
+    api_error: requests.exceptions.RequestException | None = None
+    for attempt in range(1, _MAX_API_ATTEMPTS + 1):
         try:
-            shutil.copy2(src, dst)
-            return
+            response = requests.get(API_URL, headers=HEADERS_API, timeout=10)
+            if response.status_code == 403:
+                if "rate limit" in response.text.lower():
+                    log.error("[FAIL] GitHub API rate limit exceeded.")
+                    log.info("To increase the limit, set a GitHub token:")
+                    log.info("  - Environment variable: set GITHUB_TOKEN=your_token")
+                    log.info("  - Or in config.yaml: github_token: your_token")
+                    log.info("Create a token at: https://github.com/settings/tokens")
+                else:
+                    log.error("[FAIL] API error: 403 Forbidden")
+                wait_for_key()
+                _write_update_status(
+                    "error",
+                    message="Update server rejected the request (HTTP 403).",
+                )
+                sys.exit(EXIT_API_ERROR)
+            response.raise_for_status()
+            release = response.json()
+            break
+        except requests.exceptions.RequestException as e:
+            api_error = e
+            if attempt < _MAX_API_ATTEMPTS:
+                log.warning(
+                    "[..] Update server unreachable (attempt %d/%d): %s — retrying...",
+                    attempt,
+                    _MAX_API_ATTEMPTS,
+                    e,
+                )
+                time.sleep(_API_RETRY_DELAY_SECONDS * attempt)
+    if release is None:
+        log.error("[FAIL] API error: %s", api_error)
+        wait_for_key()
+        _write_update_status("error", message="Could not reach the update server.")
+        sys.exit(EXIT_API_ERROR)
+
+    online_tag = release["tag_name"]
+    online_tool_v = extract_version(online_tag)
+    local_tool_v = get_local_tool_version(root)
+
+    if not (version.parse(online_tool_v) > version.parse(local_tool_v)):
+        log.info("Tool is up to date (%s).", local_tool_v)
+        wait_for_key()
+        _clear_update_status()
+        sys.exit(EXIT_NO_UPDATE)
+
+    if "beta" in online_tag.lower():
+        if AUTO_MODE:
+            _clear_update_status()
+            sys.exit(EXIT_NO_UPDATE)  # skip beta in auto mode
+        try:
+            choice = input(
+                f"[!] Beta version {online_tag} available. Install? (y/N): "
+            ).lower()
+        except EOFError:
+            choice = "n"
+        if choice != "y":
+            _clear_update_status()
+            sys.exit(EXIT_NO_UPDATE)
+    return online_tool_v, release
+
+
+def _select_asset(release: dict) -> tuple[dict | None, str]:
+    """Pick the platform archive asset and its local file name."""
+    if sys.platform == "win32":
+        asset = next(
+            (
+                a
+                for a in release.get("assets", [])
+                if "Windows" in a["name"] and a["name"].endswith(".zip")
+            ),
+            None,
+        )
+        archive_name = "release.zip"
+    else:
+        asset = next(
+            (
+                a
+                for a in release.get("assets", [])
+                if "Linux" in a["name"] and a["name"].endswith(".tar.gz")
+            ),
+            None,
+        )
+        archive_name = "release.tar.gz"
+    return asset, archive_name
+
+
+def _step_fetch(release: dict) -> tuple[Path, str, bytes, bytes]:
+    """FETCH + VERIFY_SIG: download archive, manifest and detached signature.
+
+    Returns ``(archive_path, archive_asset_name, manifest_raw, sig_raw)``.
+    """
+    _write_update_status("downloading", progress=0)
+    log.info("[>>] Downloading package...")
+    asset, archive_name = _select_asset(release)
+    if not asset:
+        log.error("[FAIL] No matching release asset found for this platform.")
+        _write_update_status("error", message="No update file found for this platform.")
+        sys.exit(EXIT_NO_ASSET)
+
+    if TEMP_DIR.exists():
+        shutil.rmtree(TEMP_DIR, ignore_errors=True)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    archive_path = TEMP_DIR / archive_name
+    try:
+        download_with_progress(asset["url"], archive_path)
+    except requests.exceptions.RequestException as e:
+        log.error("[FAIL] Download failed: %s", e)
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        wait_for_key()
+        _write_update_status("error", message="Download failed.")
+        sys.exit(EXIT_DOWNLOAD_FAILED)
+
+    # -- Manifest + detached signature (verified against the embedded key) --
+    manifest_url = next(
+        (a["url"] for a in release.get("assets", []) if a["name"] == MANIFEST_ASSET),
+        None,
+    )
+    sig_url = next(
+        (a["url"] for a in release.get("assets", []) if a["name"] == SIG_ASSET),
+        None,
+    )
+    if manifest_url is None:
+        log.error("[FAIL] Release does not contain a %s asset.", MANIFEST_ASSET)
+        _write_update_status("error", message="Release manifest is missing.")
+        sys.exit(EXIT_NO_ASSET)
+    manifest_raw = download_bytes(manifest_url)
+    if manifest_raw is None:
+        wait_for_key()
+        _write_update_status("error", message="Release manifest download failed.")
+        sys.exit(EXIT_DOWNLOAD_FAILED)
+    if sig_url is None:
+        log.error("[FAIL] Release does not contain a %s asset.", SIG_ASSET)
+        _write_update_status("error", message="Manifest signature is missing.")
+        sys.exit(EXIT_SIGNATURE_MISMATCH)
+    sig_raw = download_bytes(sig_url)
+    if not sig_raw:
+        wait_for_key()
+        _write_update_status("error", message="Manifest signature is missing.")
+        sys.exit(EXIT_SIGNATURE_MISMATCH)
+
+    return archive_path, asset["name"], manifest_raw, sig_raw
+
+
+def _verify_signature(manifest_raw: bytes, sig_raw: bytes) -> dict:
+    """VERIFY_SIG: fail closed unless the manifest is validly signed."""
+    try:
+        public_key = Ed25519PublicKey.from_public_bytes(
+            bytes.fromhex(SIGNING_PUBLIC_KEY)
+        )
+    except ValueError:
+        log.error("[FAIL] No valid signing public key configured; cannot update.")
+        wait_for_key()
+        _write_update_status("error", message="Updater is missing its signing key.")
+        sys.exit(EXIT_SIGNATURE_MISMATCH)
+
+    if not manifest_mod.verify_signature(manifest_raw, sig_raw, public_key):
+        log.error("[FAIL] Manifest signature verification failed — rejecting update.")
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        wait_for_key()
+        _write_update_status(
+            "error",
+            message="Manifest signature verification failed — update rejected.",
+        )
+        sys.exit(EXIT_SIGNATURE_MISMATCH)
+
+    try:
+        manifest = manifest_mod.parse_manifest_bytes(manifest_raw)
+    except manifest_mod.ManifestError as exc:
+        log.error("[FAIL] Manifest payload invalid: %s", exc)
+        wait_for_key()
+        _write_update_status("error", message="Release manifest is invalid.")
+        sys.exit(EXIT_SIGNATURE_MISMATCH)
+    log.info(
+        "[OK] Manifest signature verified (tool %s, %d files)",
+        manifest.tool_version,
+        len(manifest.files),
+    )
+    return manifest.to_dict()
+
+
+def _verify_archive_checksum(
+    archive_path: Path, asset_name: str, release: dict
+) -> None:
+    """Archive-level integrity: the per-release ``.sha256`` companion."""
+    expected_hash = None
+    companion_name = asset_name + ".sha256"
+    for a in release.get("assets", []):
+        if a["name"].lower() == companion_name.lower():
+            try:
+                r = requests.get(
+                    a["url"],
+                    headers=HEADERS_ASSET,
+                    timeout=10,
+                )
+                r.raise_for_status()
+                for line in r.text.strip().splitlines():
+                    parts = line.strip().split()
+                    if parts:
+                        candidate = parts[0].lower()
+                        if len(candidate) == 64 and all(
+                            c in "0123456789abcdef" for c in candidate
+                        ):
+                            expected_hash = candidate
+                            break
+            except requests.exceptions.RequestException as exc:
+                log.debug("Could not fetch checksum asset: %s", exc)
+            break
+    if not expected_hash:
+        log.error(
+            "[FAIL] Could not determine expected checksum (no .sha256 asset). Aborting update."
+        )
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        _write_update_status("error", message="Checksum file is missing.")
+        sys.exit(EXIT_MISSING_CHECKSUM)
+
+    if not verify_checksum(archive_path, expected_hash):
+        log.error("[FAIL] Downloaded archive checksum does not match expected value.")
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        _write_update_status(
+            "error", message="Checksum verification failed — file may be corrupted."
+        )
+        sys.exit(EXIT_CHECKSUM_MISMATCH)
+
+
+def _extract_archive(archive_path: Path) -> Path:
+    """Extract safely and locate the release content root inside ``TEMP_DIR``."""
+    log.info("[..] Extracting...")
+    _write_update_status("installing", message="Extracting package")
+    try:
+        if sys.platform == "win32":
+            safe_extract_zip(archive_path, TEMP_DIR)
+        else:
+            safe_extract_tar(archive_path, TEMP_DIR)
+    except (ValueError, zipfile.BadZipFile, tarfile.TarError) as exc:
+        log.error("[FAIL] Extraction failed: %s", exc)
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        wait_for_key()
+        _write_update_status(
+            "error", message="Extraction failed — archive may be corrupted."
+        )
+        sys.exit(EXIT_INSTALL_FAILED)
+
+    # The release zip may carry its content directly or inside one wrapper
+    # directory; the pointer file at the content root identifies it.
+    if (TEMP_DIR / "current.json").exists() or (TEMP_DIR / "version.txt").exists():
+        return TEMP_DIR
+    for child in sorted(TEMP_DIR.iterdir()):
+        if child.is_dir() and (
+            (child / "current.json").exists() or (child / "version.txt").exists()
+        ):
+            return child
+    return TEMP_DIR  # fallback: behave like the legacy flow
+
+
+def _verify_files(content_root: Path, manifest: dict) -> None:
+    """Per-file sha256 verification against the (signed) manifest."""
+    try:
+        manifest_obj = manifest_mod.Manifest.from_dict(manifest)
+    except (
+        manifest_mod.ManifestError
+    ) as exc:  # pragma: no cover - _verify_signature parsed it already
+        log.error("[FAIL] Manifest payload invalid: %s", exc)
+        wait_for_key()
+        _write_update_status("error", message="Release manifest is invalid.")
+        sys.exit(EXIT_SIGNATURE_MISMATCH)
+
+    failing = manifest_mod.verify_files(content_root, manifest_obj)
+    if failing:
+        log.error(
+            "[FAIL] %d packaged file(s) failed checksum verification: %s",
+            len(failing),
+            ", ".join(failing[:8]),
+        )
+        if TEMP_DIR.exists():
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
+        wait_for_key()
+        _write_update_status(
+            "error", message="Verification failed — packaged files are corrupted."
+        )
+        sys.exit(EXIT_CHECKSUM_MISMATCH)
+
+
+def _step_stage(content_root: Path, manifest: dict) -> tuple[Path, dict | None]:
+    """STAGE: move the verified app dir into the install root.
+
+    Returns ``(app_dir, old_pointer)``.
+    """
+    app_dir_name = f"app-{manifest['tool_version']}"
+    staged_app_dir = content_root / app_dir_name
+    if not staged_app_dir.is_dir():
+        log.error(
+            "[FAIL] Staged content is missing its app directory (%s).", app_dir_name
+        )
+        wait_for_key()
+        _write_update_status(
+            "error", message="Package layout is unexpected — no app directory."
+        )
+        sys.exit(EXIT_INSTALL_FAILED)
+
+    old_pointer = pointer_mod.read_pointer(BASE_DIR)
+    if old_pointer is not None and old_pointer.active_app_dir == app_dir_name:
+        # Guard: never stage the currently active version over itself.
+        log.info("[..] Version %s is already active — nothing to do.", app_dir_name)
+        _clear_update_status()
+        sys.exit(EXIT_OK)
+
+    final_app_dir = BASE_DIR / app_dir_name
+    if final_app_dir.exists():
+        # Leftover from an interrupted previous run (or a re-download of the
+        # same version after a crash) — it is not active, wipe it.
+        log.warning("Removing stale app dir before staging: %s", final_app_dir.name)
+        shutil.rmtree(final_app_dir, ignore_errors=True)
+
+    log.info("[>>] Staging %s...", app_dir_name)
+    try:
+        os.replace(staged_app_dir, final_app_dir)
+    except OSError as exc:
+        log.error("[FAIL] Could not move staged app dir: %s", exc)
+        wait_for_key()
+        _write_update_status(
+            "error",
+            message="Could not install the update (files locked or read-only?).",
+        )
+        sys.exit(EXIT_INSTALL_FAILED)
+    return final_app_dir, old_pointer
+
+
+def _flip_pointer(
+    app_dir: Path,
+    old_pointer: pointer_mod.AppPointer | None,
+    manifest: dict,
+    manifest_sha256: str,
+) -> None:
+    """FLIP: atomically point ``current.json`` at the new version."""
+    previous = None
+    if old_pointer is not None and old_pointer.active_app_dir != app_dir.name:
+        previous = old_pointer.active_app_dir
+    pointer_mod.write_pointer(
+        BASE_DIR,
+        pointer_mod.AppPointer(
+            active_app_dir=app_dir.name,
+            tool_version=manifest["tool_version"],
+            installed_at_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            manifest_sha256=manifest_sha256,
+            previous_app_dir=previous,
+        ),
+    )
+    log.info("[OK] Pointer now active: %s", app_dir.name)
+
+
+def _swap_launcher_binaries(content_root: Path) -> None:
+    """Stage updated root launcher binaries next to their installed ones.
+
+    ``start``/``update`` stay at the install root across version flips and
+    are swapped by the launcher at the next boot, so they are written to
+    ``<name>_new`` and never override a running binary.
+    """
+    for name in (f"start{SUFFIX}", f"update{SUFFIX}"):
+        source = content_root / name
+        if not source.is_file():
+            continue
+        target = BASE_DIR / name
+        pending = BASE_DIR / (name[: -len(SUFFIX)] + f"_new{SUFFIX}")
+        if target.is_file() and compute_sha256(source) == compute_sha256(target):
+            if pending.is_file():
+                try:
+                    pending.unlink()
+                except OSError:
+                    pass  # next run re-checks
+            continue
+        try:
+            shutil.copy2(source, pending)
+            if sys.platform != "win32":
+                os.chmod(pending, 0o755)
+            log.info("[>>] Queued launcher update: %s", pending.name)
         except OSError as exc:
-            last_error = exc
-            if attempt < tries - 1:
-                time.sleep(0.1)
-    if last_error is not None:
-        raise last_error
+            # A refusal to overwrite the launcher must not abort the app
+            # update; the pointer already names the new program version.
+            log.warning("Could not queue %s: %s", pending.name, exc)
+
+
+def _step_prune(app_dir_name: str) -> list[str]:
+    """PRUNE: keep the newest rollback generation, drop older dirs."""
+    keep_previous = pointer_mod.read_pointer(BASE_DIR)
+    previous = keep_previous.previous_app_dir if keep_previous is not None else None
+    removed = pointer_mod.prune_versions(BASE_DIR, app_dir_name, previous)
+    if removed:
+        log.info("[OK] Pruned old version dirs: %s", ", ".join(removed))
+    return removed
+
+
+def _cleanup_temp() -> None:
+    if TEMP_DIR and TEMP_DIR.exists():
+        shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
 
 # =========================
@@ -516,401 +778,57 @@ def run_update():
     _clear_update_status()
     _write_update_status("checking")
 
-    # ==========================================
-    # 0. RESUME CHECK
-    # ==========================================
-    extracted_root = None
-    # Check if a path was passed as argument (resuming after updater self-update)
+    # Legacy argument from the pre-P3a self-update chain — the new flow has
+    # no resume; the full state machine is idempotent, just run it.
     if "--resume" in sys.argv:
-        try:
-            idx = sys.argv.index("--resume")
-            extracted_root = sys.argv[idx + 1]
-            log.info("[>] Resume: Using extracted files from %s", extracted_root)
-        except (ValueError, IndexError) as e:
-            log.error(
-                "Failed to parse --resume argument: %s\n sys.argv: %s", e, sys.argv
-            )
+        log.info("[>] Legacy --resume argument ignored; running full update flow.")
 
-    local = get_versions(VERSION_FILE)
+    root = BASE_DIR
 
-    # If no resume, then normal API check and download
-    if not extracted_root:
-        log.info("[..] Checking for new version via GitHub...")
-        release = None
-        api_error: requests.exceptions.RequestException | None = None
-        for attempt in range(1, _MAX_API_ATTEMPTS + 1):
-            try:
-                response = requests.get(API_URL, headers=HEADERS_API, timeout=10)
-                if response.status_code == 403:
-                    if "rate limit" in response.text.lower():
-                        log.error("[FAIL] GitHub API rate limit exceeded.")
-                        log.info("To increase the limit, set a GitHub token:")
-                        log.info(
-                            "  - Environment variable: set GITHUB_TOKEN=your_token"
-                        )
-                        log.info("  - Or in config.yaml: github_token: your_token")
-                        log.info(
-                            "Create a token at: https://github.com/settings/tokens"
-                        )
-                    else:
-                        log.error("[FAIL] API error: 403 Forbidden")
-                    wait_for_key()
-                    _write_update_status(
-                        "error",
-                        message="Update server rejected the request (HTTP 403).",
-                    )
-                    sys.exit(EXIT_API_ERROR)
-                response.raise_for_status()
-                release = response.json()
-                break
-            except requests.exceptions.RequestException as e:
-                api_error = e
-                if attempt < _MAX_API_ATTEMPTS:
-                    log.warning(
-                        "[..] Update server unreachable (attempt %d/%d): %s — retrying...",
-                        attempt,
-                        _MAX_API_ATTEMPTS,
-                        e,
-                    )
-                    time.sleep(_API_RETRY_DELAY_SECONDS * attempt)
-        if release is None:
-            log.error("[FAIL] API error: %s", api_error)
-            wait_for_key()
-            _write_update_status("error", message="Could not reach the update server.")
-            sys.exit(EXIT_API_ERROR)
+    # 1) CHECK
+    _online_tool_v, release = _step_check(root)
 
-        online_tag = release["tag_name"]
-        online_tool_v = extract_version(online_tag)
-
-        if not (version.parse(online_tool_v) > version.parse(local["tool"])):
-            log.info("Tool is up to date (%s).", local["tool"])
-            wait_for_key()
-            _clear_update_status()
-            sys.exit(EXIT_NO_UPDATE)
-
-        if "beta" in online_tag.lower():
-            if AUTO_MODE:
-                _clear_update_status()
-                sys.exit(EXIT_NO_UPDATE)  # skip beta in auto mode
-            try:
-                choice = input(
-                    f"[!] Beta version {online_tag} available. Install? (y/N): "
-                ).lower()
-            except EOFError:
-                choice = "n"
-            if choice != "y":
-                _clear_update_status()
-                sys.exit(EXIT_NO_UPDATE)
-
-        # Download & extract
-        _write_update_status("downloading", progress=0)
-        log.info("[>>] Downloading package...")
-        if sys.platform == "win32":
-            asset = next(
-                (
-                    a
-                    for a in release.get("assets", [])
-                    if "Windows" in a["name"] and a["name"].endswith(".zip")
-                ),
-                None,
-            )
-            archive_name = "release.zip"
-        else:
-            asset = next(
-                (
-                    a
-                    for a in release.get("assets", [])
-                    if "Linux" in a["name"] and a["name"].endswith(".tar.gz")
-                ),
-                None,
-            )
-            archive_name = "release.tar.gz"
-
-        if not asset:
-            log.error("[FAIL] No matching release asset found for this platform.")
-            _write_update_status(
-                "error", message="No update file found for this platform."
-            )
-            sys.exit(EXIT_NO_ASSET)
-
-        if TEMP_DIR.exists():
-            shutil.rmtree(TEMP_DIR, ignore_errors=True)
-        TEMP_DIR.mkdir(parents=True, exist_ok=True)
-        archive_path = TEMP_DIR / archive_name
-        try:
-            download_with_progress(asset["url"], archive_path)
-        except requests.exceptions.RequestException as e:
-            log.error("[FAIL] Download failed: %s", e)
-            if TEMP_DIR.exists():
-                shutil.rmtree(TEMP_DIR, ignore_errors=True)
-            wait_for_key()
-            _write_update_status("error", message="Download failed.")
-            sys.exit(EXIT_DOWNLOAD_FAILED)
-
-        # ── Integrity verification ──────────────────────────────────
-        expected_hash = None
-        # Look for a companion .sha256 asset in the same release
-        for a in release.get("assets", []):
-            if a["name"].lower() == asset["name"].lower() + ".sha256":
-                try:
-                    r = requests.get(
-                        a["url"],
-                        headers=HEADERS_ASSET,
-                        timeout=10,
-                    )
-                    r.raise_for_status()
-                    for line in r.text.strip().splitlines():
-                        parts = line.strip().split()
-                        if parts:
-                            candidate = parts[0].lower()
-                            if len(candidate) == 64 and all(
-                                c in "0123456789abcdef" for c in candidate
-                            ):
-                                expected_hash = candidate
-                                break
-                except requests.exceptions.RequestException as exc:
-                    log.debug("Could not fetch checksum asset: %s", exc)
-                break
-        if not expected_hash:
-            log.error(
-                "[FAIL] Could not determine expected checksum (no .sha256 asset, no fallback). Aborting update."
-            )
-            if TEMP_DIR.exists():
-                shutil.rmtree(TEMP_DIR, ignore_errors=True)
-            _write_update_status("error", message="Checksum file is missing.")
-            sys.exit(EXIT_MISSING_CHECKSUM)
-
-        if not verify_checksum(archive_path, expected_hash):
-            log.error(
-                "[FAIL] Downloaded archive checksum does not match expected value."
-            )
-            if TEMP_DIR.exists():
-                shutil.rmtree(TEMP_DIR, ignore_errors=True)
-            _write_update_status(
-                "error", message="Checksum verification failed — file may be corrupted."
-            )
-            sys.exit(EXIT_CHECKSUM_MISMATCH)
-        # ─────────────────────────────────────────────────────────────
-
-        def safe_extract_zip(zip_path: Path, dest: Path) -> None:
-            with zipfile.ZipFile(zip_path, "r") as z:
-                # Validate all member paths first (zip slip protection)
-                resolved_dest = dest.resolve()
-                for member in z.infolist():
-                    target = (dest / member.filename).resolve()
-                    if not target.is_relative_to(resolved_dest):
-                        raise ValueError(f"Zip slip attempt: {member.filename}")
-                z.extractall(dest)
-
-        def safe_extract_tar(tar_path: Path, dest: Path) -> None:
-            with tarfile.open(tar_path, "r:gz") as t:
-                resolved_dest = dest.resolve()
-                for member in t.getmembers():
-                    target = (dest / member.name).resolve()
-                    if not target.is_relative_to(resolved_dest):
-                        raise ValueError(f"Path traversal attempt: {member.name}")
-                t.extractall(dest)
-
-        if sys.platform == "win32":
-            safe_extract_zip(archive_path, TEMP_DIR)
-        else:
-            safe_extract_tar(archive_path, TEMP_DIR)
-
-        if (TEMP_DIR / "version.txt").exists():
-            extracted_root = TEMP_DIR
-        else:
-            found = False
-            for x in TEMP_DIR.iterdir():
-                if x.is_dir() and (x / "version.txt").exists():
-                    extracted_root = x
-                    found = True
-                    break
-            if not found:
-                extracted_root = TEMP_DIR  # Fallback
-
-    # Read versions from the downloaded package
-    extracted_root_path = (
-        Path(extracted_root) if isinstance(extracted_root, str) else extracted_root
-    )
-    zip_v = get_versions(extracted_root_path / "version.txt")
-
-    # ==========================================
-    # 1. UPDATER SELF-UPDATE (via execv)
-    # ==========================================
-    if version.parse(zip_v["updater"]) > version.parse(local["updater"]):
-        log.info("[UPDATE] New updater found (%s).", zip_v["updater"])
-        new_up_src = extracted_root_path / "core" / f"update{SUFFIX}"
-
-        if new_up_src.exists():
-            new_up_dest = BASE_DIR / f"update_new{SUFFIX}"
-            shutil.copy2(new_up_src, new_up_dest)
-            # Save only updater version
-            save_versions(local["tool"], zip_v["updater"])
-            # Set executable permissions on Linux/Mac
-            if sys.platform != "win32":
-                os.chmod(new_up_dest, 0o755)
-            log.info("Starting new updater and resuming tool update...")
-            # execv replaces the current process with the new updater
-            # Pass --resume so it continues directly at step 2. Forward --auto
-            # so the resume child can relaunch start.exe (start.py no longer
-            # restarts itself on EXIT_OK; see _relaunch_tool_after_update).
-            resume_args = ["--resume", str(extracted_root_path)]
-            if AUTO_MODE:
-                resume_args = ["--auto", *resume_args]
-            if sys.platform == "win32":
-                subprocess.Popen([str(new_up_dest), *resume_args])
-            else:
-                os.execv(str(new_up_dest), [str(new_up_dest), *resume_args])
-            sys.exit(EXIT_OK)
-
-    log.info(
-        f"[UPDATE] Updater is up to date ({local['updater']}). Proceeding with tool update..."
-    )
-
-    # ==========================================
-    # 2. TOOL UPDATE (copy files)
-    # ==========================================
-    # Signal the start script to shut down so files are unlocked
-    signal_file = BASE_DIR / "update_signal.tmp"
+    _write_update_status("downloading", progress=0)
+    # 2) FETCH (+ VERIFY_SIG transport)
+    archive_path, asset_name, manifest_raw, sig_raw = _step_fetch(release)
+    manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
     try:
-        signal_file.write_text("kill")
-    except OSError as e:
-        log.warning("Could not write signal file: %s", e)
+        (TEMP_DIR / MANIFEST_ASSET).write_bytes(manifest_raw)
+        (TEMP_DIR / SIG_ASSET).write_bytes(sig_raw)
+    except OSError as exc:  # pragma: no cover - temp writes rarely fail
+        log.warning("Could not persist manifest for inspection: %s", exc)
 
-    # Also set API-based kill signal
-    try:
-        requests.put(
-            f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
-            json={"signal": "kill"},
-            timeout=5,
-        )
-    except requests.exceptions.RequestException:
-        pass  # fallback to file-based signaling
+    # 3) VERIFY_SIG
+    manifest = _verify_signature(manifest_raw, sig_raw)
 
-    # Wait for start script to consume the signal (file deleted) or timeout
-    for _ in range(30):
-        if not signal_file.exists():
-            break
-        # Also check API signal acknowledgment
-        try:
-            resp = requests.get(
-                f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
-                timeout=2,
-            )
-            if resp.status_code == 200 and resp.json().get("signal") is None:
-                break  # acknowledged via API
-        except requests.exceptions.RequestException:
-            pass
-        time.sleep(1)
+    # 4) VERIFY_SHA (transport + content)
+    _verify_archive_checksum(archive_path, asset_name, release)
+    content_root = _extract_archive(archive_path)
+    _verify_files(content_root, manifest)
 
-    log.info("[..] Installing files...")
+    # 5) STAGE
     _write_update_status("installing", message="Installing update")
-    walk_method = getattr(extracted_root_path, "walk", None)
-    if walk_method is not None:
-        walk_iter = walk_method()
+    app_dir, old_pointer = _step_stage(content_root, manifest)
+
+    # 6) FLIP
+    _flip_pointer(app_dir, old_pointer, manifest, manifest_sha256)
+
+    # 7) PRUNE
+    _step_prune(app_dir.name)
+
+    # Launcher binaries ride along in the same package (swapped next boot).
+    _swap_launcher_binaries(content_root)
+
+    # Legacy version file stays in sync for pre-P3a readers.
+    updater_version = manifest.get("updater_version") or ""
+    if updater_version:
+        save_versions(manifest["tool_version"], updater_version)
     else:
-        import os as _os
+        legacy = parse_version_txt(root / "version.txt")
+        save_versions(manifest["tool_version"], legacy["updater"])
 
-        def _fallback_walk():
-            for root, dirs, files in _os.walk(extracted_root_path):
-                yield Path(root), dirs, files
-
-        walk_iter = _fallback_walk()
-    for root, dirs, files in walk_iter:
-        rel_path = root.relative_to(extracted_root_path)
-        rel_path_str = str(rel_path).replace("\\", "/")
-        if (
-            rel_path_str != "."
-            and not any(
-                rel_path_str == d or rel_path_str.startswith(d + "/")
-                for d in WHITELIST_DIRS
-            )
-            and not any(f.startswith(rel_path_str + "/") for f in WHITELIST_DIR_FILES)
-        ):
-            continue
-
-        for file in files:
-            if rel_path_str == "." and file not in WHITELIST_FILES:
-                continue
-            # For subdirectories not covered by WHITELIST_DIRS, only copy whitelisted files
-            if rel_path_str != ".":
-                dir_whitelisted = any(
-                    rel_path_str == d or rel_path_str.startswith(d + "/")
-                    for d in WHITELIST_DIRS
-                )
-                if (
-                    not dir_whitelisted
-                    and f"{rel_path_str}/{file}" not in WHITELIST_DIR_FILES
-                ):
-                    continue
-            if file.lower() == f"update{SUFFIX}".lower():
-                continue
-            if file.lower() == "config.yaml":
-                continue
-
-            src = root / file
-            dst = BASE_DIR / rel_path / file
-            if rel_path_str.split("/")[0] == "server" and dst.exists():
-                continue
-
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                _install_file_with_retry(src, dst)
-            except OSError as exc:
-                log.error("[FAIL] Could not install file %s: %s", dst, exc)
-                wait_for_key()
-                _write_update_status(
-                    "error",
-                    message="Could not install the update (files locked or read-only?).",
-                )
-                sys.exit(EXIT_INSTALL_FAILED)
-
-    # Set executable permissions for all files without extension and with .bin extension (Linux/Mac only)
-    if sys.platform != "win32":
-        for dirpath, dirnames, filenames in os.walk(BASE_DIR):
-            for fname in filenames:
-                fpath = os.path.join(dirpath, fname)
-                # Check if file has no extension or .bin extension
-                if not os.path.splitext(fname)[1] or fname.endswith(".bin"):
-                    try:
-                        os.chmod(fpath, 0o755)
-                        log.info("[PERM] Set executable: %s", fpath)
-                    except OSError as e:
-                        log.info("[PERM] Failed to set executable for %s: %s", fpath, e)
-
-    try:
-        save_versions(zip_v["tool"], zip_v["updater"])
-    except OSError as exc:
-        log.error("[FAIL] Could not write version.txt: %s", exc)
-        wait_for_key()
-        _write_update_status(
-            "error",
-            message="Could not install the update (files locked or read-only?).",
-        )
-        sys.exit(EXIT_INSTALL_FAILED)
-    if TEMP_DIR.exists():
-        shutil.rmtree(TEMP_DIR, ignore_errors=True)
-
-    if CONFIG_UPDATE_ENABLE:
-        migrate_config_if_needed()
-
-    try:
-        if (BASE_DIR / "update_signal.tmp").exists():
-            (BASE_DIR / "update_signal.tmp").unlink()
-    except OSError as e:
-        log.warning("Could not remove signal file: %s", e)
-
-    # Also clear API signal
-    try:
-        requests.delete(
-            f"http://127.0.0.1:{DEFAULT_PORT}/api/v1/updater/signal",
-            timeout=5,
-        )
-    except requests.exceptions.RequestException:
-        pass  # API server may already be gone
-
-    # Bring the application back up: start.py exited on the kill signal,
-    # so the updater must relaunch it after the files are replaced.
+    # 8) NOTIFY
+    _cleanup_temp()
     relaunched = _relaunch_tool_after_update()
     if relaunched:
         _write_update_status("done")

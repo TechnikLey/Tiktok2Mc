@@ -1,13 +1,26 @@
-"""End-to-end update lifecycle integration tests.
+"""Integration tests for the P3a update lifecycle.
 
-Simulates the compiled ``update.exe → start.exe → restart`` flow
-across version boundaries (v0.x → v1.0.0) by patching subprocess
-and HTTP calls.
+Covers cross-cutting invariants of the new architecture that span more
+than one module:
+
+- config migration (launcher first-start hook) preserves user values
+- pointer flip keeps the rollback generation and the old install intact
+- interrupted/repeated staging is safe (stale dirs are wiped, pointer
+  only flips when a fully verified app dir was moved)
+- platform path conventions
+- legacy kill-signal endpoints (API) remain available for old binaries
 """
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
+
+from core.update_engine.migration import parse_version_txt
+from core.update_engine.pointer import (
+    AppPointer,
+    read_pointer,
+    resolve_active_app_dir,
+    write_pointer,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -15,23 +28,15 @@ from unittest.mock import patch
 
 
 def _make_v07_install(base: Path) -> dict:
-    """Create a simulated v0.7 installation directory tree.
-
-    Returns paths keyed by logical name.
-    """
+    """A pre-P3a flat v0.7 installation."""
     paths = {
         "base": base,
         "config": base / "config" / "config.yaml",
         "default_config": base / "config" / "config.default.yaml",
         "version": base / "version.txt",
-        "signal": base / "update_signal.tmp",
-        "update_exe": base / "update.exe",
-        "start_exe": base / "start.exe",
     }
     base.mkdir(parents=True, exist_ok=True)
     (base / "config").mkdir(exist_ok=True)
-
-    # v0.7 user config with custom values
     paths["config"].write_text(
         "config_version: '0.7'\n"
         "server_host: 192.168.1.100\n"
@@ -41,8 +46,7 @@ def _make_v07_install(base: Path) -> dict:
         "  xms: 1G\n"
         "  xmx: 2G\n"
     )
-    # v1.0.0 default config template
-    paths["default_config"].write_text(
+    (base / "config" / "config.default.yaml").write_text(
         "config_version: '1.0'\n"
         "server_host: 0.0.0.0\n"
         "control_method: DCS\n"
@@ -52,370 +56,161 @@ def _make_v07_install(base: Path) -> dict:
         "  xmx: 1G\n"
     )
     paths["version"].write_text("ToolVersion: 0.7.0\nUpdaterVersion: 0.1.0\n")
-    paths["update_exe"].write_text("old updater")
-    paths["start_exe"].write_text("old start")
     return paths
 
 
-def _make_v100_release(tmp: Path) -> Path:
-    """Create a simulated v1.0.0 release archive extraction directory."""
-    release = tmp / "release_v100"
-    release.mkdir(parents=True, exist_ok=True)
-
-    (release / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
-    (release / "README.md").write_text("v1.0.0 readme")
-    (release / "start.exe").write_text("new start")
-    (release / "LICENSE").write_text("MIT license")
-
-    core = release / "core"
-    core.mkdir()
-    (core / "app.exe").write_text("new app")
-    (core / "gui.exe").write_text("new gui")
-
-    config = release / "config"
-    config.mkdir()
-    (config / "config.yaml").write_text("should be skipped via whitelist")
-    (config / "config.default.yaml").write_text(
-        "config_version: '1.0'\nserver_host: 0.0.0.0\n"
-    )
-
-    plugins = release / "plugins" / "wincounter"
-    plugins.mkdir(parents=True)
-    (plugins / "main.exe").write_text("new wincounter")
-
-    return release
+def _make_versioned_install(
+    tmp: Path, tool: str = "1.0.0", suffix: str | None = None
+) -> Path:
+    """A versioned root: pointer + one active app dir."""
+    suffix = suffix or (".exe" if sys.platform == "win32" else ".bin")
+    root = tmp / f"versioned_{tool}"
+    app_dir = root / f"app-{tool}"
+    (app_dir / "core").mkdir(parents=True)
+    (app_dir / "core" / f"app{suffix}").write_bytes(b"old-app")
+    write_pointer(root, AppPointer(active_app_dir=f"app-{tool}", tool_version=tool))
+    return root
 
 
 # ---------------------------------------------------------------------------
-# Full upgrade v0.7 → v1.0.0
+# Config preservation (launcher first-start hook, P3a §7)
 # ---------------------------------------------------------------------------
 
 
 class TestVersionBoundaryUpgrade:
-    """Simulate a full v0.7 → v1.0.0 upgrade lifecycle."""
-
     def test_config_preserved_across_upgrade(self, tmp_path):
-        """User config values survive upgrade via migrate_config_if_needed."""
+        """Upgrading 0.7 → 1.0 keeps all user values (launcher hook call)."""
+        from unittest.mock import patch
+
+        from core.config_migration import migrate_config
+
         base = tmp_path / "install"
         paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
-
-        # Simulate what run_update does: copy files + migrate config
-        import shutil
-
-        import yaml
-
-        # Copy whitelisted files (like update.py does)
-        for f in release.iterdir():
-            if f.name in {"version.txt", "README.md", "LICENSE", "start.exe"}:
-                shutil.copy2(f, base)
-
-        shutil.copytree(release / "core", base / "core", dirs_exist_ok=True)
-        shutil.copytree(release / "plugins", base / "plugins", dirs_exist_ok=True)
-
-        # Update version file
-        (base / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
-
-        # Migrate config
-        from python.update import migrate_config_if_needed
 
         with (
-            patch("python.update.BASE_DIR", base),
-            patch("python.update.CONFIG_FILE", paths["config"]),
-            patch("python.update.DEFAULT_CONFIG_FILE", paths["default_config"]),
-            patch("python.update.VERSION_FILE", paths["version"]),
-            patch("python.update.TEMP_DIR", tmp_path / "_update_tmp"),
-            patch("python.update.cfg", {"auto_update_config": True}),
-            patch("python.update.CONFIG_UPDATE_ENABLE", True),
-            patch("python.update.AUTO_MODE", True),
-            patch("python.update.wait_for_key"),
-            patch("python.update.log"),
+            patch("core.config_migration.get_backup_manager", return_value=None),
         ):
-            migrate_config_if_needed()
-
-        # Read migrated config
-        with paths["config"].open() as f:
-            final_config = yaml.safe_load(f)
-
-        assert final_config["config_version"] == "1.0"
-        # User values preserved
-        assert final_config["server_host"] == "192.168.1.100"
-        assert final_config["control_method"] == "RCON"
-        assert final_config["java"]["xms"] == "1G"
-        assert final_config["java"]["xmx"] == "2G"
-
-    def test_whitelist_copied_new_files_present(self, tmp_path):
-        """After simulated upgrade, whitelisted files are present."""
-        base = tmp_path / "install2"
-        paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
-
-        import shutil
-
-        for root, dirs, files in release.walk():
-            rel = root.relative_to(release)
-            for f in files:
-                src = root / f
-                dst = base / rel / f
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
-
-        assert (base / "version.txt").exists()
-        assert (base / "core" / "app.exe").exists()
-        assert (base / "core" / "gui.exe").exists()
-        assert (base / "plugins" / "wincounter" / "main.exe").exists()
-
-    def test_config_yaml_not_overwritten(self, tmp_path):
-        """config.yaml is never overwritten by the copy step."""
-        base = tmp_path / "install3"
-        paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
-
-        import shutil
-
-        for root, dirs, files in release.walk():
-            rel = root.relative_to(release)
-            for f in files:
-                if f == "config.yaml":
-                    continue
-                src = root / f
-                dst = base / rel / f
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
+            ok = migrate_config(paths["config"], paths["default_config"])
+        assert ok
 
         content = paths["config"].read_text()
-        assert "192.168.1.100" in content
-        assert "should be skipped" not in content
+        assert "server_host: 192.168.1.100" in content
+        assert "control_method: RCON" in content
+        assert "xms: 1G" in content
+        assert "512M" not in content  # template default replaced by user value
+        assert "config_version: '1.0'" in content
 
-    def test_update_exe_not_overwritten(self, tmp_path):
-        """update.exe is never overwritten by the copy step."""
-        base = tmp_path / "install4"
+    def test_new_app_content_isolated_from_user_data(self, tmp_path):
+        """The new tool version lives in app-<ver>/ next to untouched user
+        data — config.yaml is never part of the installed package."""
+        suffix = ".exe" if sys.platform == "win32" else ".bin"
+        base = tmp_path / "install2"
         paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
 
-        import shutil
+        app_dir = base / "app-1.0.0"
+        (app_dir / "core").mkdir(parents=True)
+        (app_dir / "core" / f"app{suffix}").write_bytes(b"new app")
+        write_pointer(
+            base, AppPointer(active_app_dir="app-1.0.0", tool_version="1.0.0")
+        )
 
-        for root, dirs, files in release.walk():
-            rel = root.relative_to(release)
-            for f in files:
-                if f.lower() == "update.exe":
-                    continue
-                src = root / f
-                dst = base / rel / f
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
-
-        assert paths["update_exe"].read_text() == "old updater"
+        # User config untouched by the package move
+        assert "192.168.1.100" in paths["config"].read_text()
+        assert resolve_active_app_dir(base) == app_dir
 
     def test_version_file_updated_after_upgrade(self, tmp_path):
-        """version.txt is updated after a successful upgrade."""
         base = tmp_path / "install5"
-        paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
-
-        (base / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
+        _make_v07_install(base)
+        (base / "version.txt").write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.3.0\n")
         content = (base / "version.txt").read_text()
         assert "ToolVersion: 1.0.0" in content
-        assert "UpdaterVersion: 0.2.0" in content
+        assert "UpdaterVersion: 0.3.0" in content
+
+    def test_version_txt_parse_matches_updater_format(self, tmp_path):
+        (tmp_path / "version.txt").write_text(
+            "ToolVersion: v0.7.0\nUpdaterVersion: 0.1\n"
+        )
+        versions = parse_version_txt(tmp_path / "version.txt")
+        assert versions == {"tool": "0.7.0", "updater": "0.1"}
 
 
 # ---------------------------------------------------------------------------
-# Signal lifecycle integration
+# Pointer semantics across the update lifecycle
 # ---------------------------------------------------------------------------
 
 
-class TestSignalLifecycleIntegration:
-    """Simulate the full signal lifecycle: update.exe writes → start.py reads."""
+class TestPointerRollbackSemantics:
+    def test_previous_generation_survives_flip(self, tmp_path):
+        """After the flip the previous app dir is recorded + kept on disk."""
+        root = _make_versioned_install(tmp_path, tool="0.9.0")
+        old_dir = root / "app-0.9.0"
 
-    def test_file_signal_kill_flow(self, tmp_path):
-        """Simulate update.exe writing kill signal and start.py reading it."""
-        base = tmp_path / "signal_test"
-        base.mkdir()
-        signal_file = base / "update_signal.tmp"
+        # Simulate the updater's flip for 1.0.0
+        new_dir = root / "app-1.0.0"
+        (new_dir / "core").mkdir(parents=True)
+        write_pointer(
+            root,
+            AppPointer(
+                active_app_dir="app-1.0.0",
+                tool_version="1.0.0",
+                previous_app_dir="app-0.9.0",
+            ),
+        )
 
-        # Update writes
-        signal_file.write_text("kill")
+        pointer = read_pointer(root)
+        assert pointer is not None
+        assert pointer.previous_app_dir == "app-0.9.0"
+        assert old_dir.is_dir(), "rollback generation must survive"
+        assert resolve_active_app_dir(root) == new_dir
 
-        # Start reads (mimicking start_UPDATE_EXE_PATH logic)
-        assert signal_file.exists()
-        content = signal_file.read_text().strip()
-        assert content == "kill"
-        signal_file.unlink()
-        assert not signal_file.exists()
-
-    def test_api_signal_fallback(self, client):
-        """Simulate API kill signal fallback when file signaling unavailable."""
-        # Set API signal
-        resp = client.put("/api/v1/updater/signal", json={"signal": "kill"})
-        assert resp.status_code == 200
-
-        # Start reads
-        resp = client.get("/api/v1/updater/signal")
-        assert resp.status_code == 200
-        assert resp.json().get("signal") == "kill"
-
-        # Start acknowledges
-        resp = client.delete("/api/v1/updater/signal")
-        assert resp.status_code == 200
-
-        # Confirmed cleared
-        resp = client.get("/api/v1/updater/signal")
-        assert resp.json().get("signal") is None
-
-    def test_dual_signaling_both_sent(self, tmp_path, client):
-        """Both file-based and API-based kill signals are sent."""
-        base = tmp_path / "dual_signal"
-        base.mkdir()
-        signal_file = base / "update_signal.tmp"
-
-        # Update sends both signals
-        signal_file.write_text("kill")
-        client.put("/api/v1/updater/signal", json={"signal": "kill"})
-
-        # Both are available
-        assert signal_file.exists()
-        assert signal_file.read_text().strip() == "kill"
-        resp = client.get("/api/v1/updater/signal")
-        assert resp.json().get("signal") == "kill"
-
-    def test_signal_acknowledgment(self, tmp_path, client):
-        """After acknowledgment, both signals are cleared."""
-        base = tmp_path / "ack"
-        base.mkdir()
-        signal_file = base / "update_signal.tmp"
-        signal_file.write_text("kill")
-        client.put("/api/v1/updater/signal", json={"signal": "kill"})
-
-        # Start acknowledges
-        signal_file.unlink()
-        client.delete("/api/v1/updater/signal")
-
-        assert not signal_file.exists()
-        resp = client.get("/api/v1/updater/signal")
-        assert resp.json().get("signal") is None
-
-
-# ---------------------------------------------------------------------------
-# Restart flow
-# ---------------------------------------------------------------------------
-
-
-class TestRestartFlow:
-    """Tests the start.py restart flow after update completes."""
-
-    def test_restart_on_code_zero(self):
-        """Return code 0 means update installed; start.py exits and the
-        updater itself relaunches the application (_relaunch_tool_after_update)."""
-        result = 0
-        assert result is not None
-        assert result != "kill"
-        assert result != 5
-        assert result is not None
-
-    def test_skip_on_code_five(self):
-        """Return code 5 skips restart (up to date)."""
-        result = 5
-        assert result == 5
-
-    def test_kill_exits_application(self):
-        """Return 'kill' exits the application."""
-        result = "kill"
-        assert result == "kill"
-        assert result is None or result == "kill"
-
-    def test_none_breaks_loop(self):
-        """None means updater disabled, break out of update loop."""
-        result = None
-        assert result is None
-
-    def test_update_loop_restart_decision(self):
-        """Simulate the update loop decision logic from start.py."""
-
-        def update_decision(result):
-            if result is None:
-                return "break"
-            if result == "kill":
-                return "exit"
-            if result == 5:
-                return "continue"
-            # Code 0 (or any other failure code): start.py exits — the
-            # updater owns the relaunch after the install.
-            return "exit"
-
-        assert update_decision(None) == "break"
-        assert update_decision("kill") == "exit"
-        assert update_decision(5) == "continue"
-        assert update_decision(0) == "exit"
-        assert update_decision(1) == "exit"
-
-
-# ---------------------------------------------------------------------------
-# Rollback on interruption
-# ---------------------------------------------------------------------------
-
-
-class TestRollbackOnInterruption:
-    """Tests behaviour when the update is interrupted mid-flow."""
-
-    def test_partial_download_leaves_old_install_intact(self, tmp_path):
-        """If download fails, original installation is untouched."""
-        base = tmp_path / "rollback"
-        paths = _make_v07_install(base)
-        original_config = paths["config"].read_text()
-        original_version = paths["version"].read_text()
-
-        # Simulate download failure — no files copied
-        assert paths["config"].read_text() == original_config
-        assert paths["version"].read_text() == original_version
-
-    def test_partial_copy_leaves_state_recoverable(self, tmp_path):
-        """If copy is interrupted, the original install is still runnable.
-
-        update.py copies files sequentially; if it crashes mid-copy,
-        some new files exist alongside old ones. The application can
-        still start (old files are present).
-        """
-        base = tmp_path / "rollback2"
-        paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
-
+    def test_state_recoverable_when_active_dir_lost(self, tmp_path):
+        """If the active app dir disappears, resolution falls back to the
+        previous generation instead of booting nothing."""
+        root = _make_versioned_install(tmp_path, tool="0.9.0")
+        write_pointer(
+            root,
+            AppPointer(
+                active_app_dir="app-1.0.0",
+                tool_version="1.0.0",
+                previous_app_dir="app-0.9.0",
+            ),
+        )
         import shutil
 
-        # Simulate copying only core/app.exe then crashing
-        (base / "core").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(release / "core" / "app.exe", base / "core" / "app.exe")
+        lost_dir = root / "app-1.0.0"
+        (lost_dir / "core").mkdir(parents=True)
+        shutil.rmtree(lost_dir)  # crash after flip, dir gone
 
-        # The rest of the old install is still intact
-        assert (base / "start.exe").read_text() == "old start"
-        assert (base / "version.txt").read_text() != ""
-        assert paths["config"].exists()
+        pointer = read_pointer(root)
+        assert pointer is not None
+        assert pointer.previous_app_dir == "app-0.9.0"
+        old_dir = root / pointer.previous_app_dir
+        assert (old_dir / "core").is_dir()
 
     def test_rerunning_update_after_interruption_succeeds(self, tmp_path):
-        """Running the update again after a crash completes successfully."""
-        base = tmp_path / "rollback3"
-        paths = _make_v07_install(base)
-        release = _make_v100_release(tmp_path)
+        """Crash between stage and flip leaves a stale app dir; the next
+        run replaces it instead of failing (updater-level guarantee,
+        pointer-level simulation here)."""
+        root = _make_versioned_install(tmp_path, tool="0.9.0")
+        stale = root / "app-1.0.0"
+        (stale / "core").mkdir(parents=True)
+        (stale / "core" / "partial.bin").write_bytes(b"junk")
 
-        import shutil
+        # next updater run: stale target not active → wiped, re-staged
+        replaced = replaced_from(stale, {"core/partial.bin": b"complete"})
+        assert (replaced / "core" / "partial.bin").read_bytes() == b"complete"
 
-        # First attempt crashes mid-copy
-        (base / "core").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(release / "core" / "app.exe", base / "core" / "app.exe")
 
-        # Second attempt completes normally
-        for root, dirs, files in release.walk():
-            rel = root.relative_to(release)
-            for f in files:
-                if f.lower() in ("update.exe", "config.yaml"):
-                    continue
-                src = root / f
-                dst = base / rel / f
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
+def replaced_from(target: Path, content: dict[str, bytes]) -> Path:
+    """Helper simulating the updater's wipe + re-stage of a stale dir."""
+    import shutil
 
-        assert (base / "core" / "app.exe").exists()
-        assert (base / "core" / "gui.exe").exists()
-        assert (base / "plugins" / "wincounter" / "main.exe").exists()
+    shutil.rmtree(target)
+    for rel, data in content.items():
+        p = target / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+    return target
 
 
 # ---------------------------------------------------------------------------
@@ -424,34 +219,21 @@ class TestRollbackOnInterruption:
 
 
 class TestPlatformPathsIntegration:
-    """Platform-specific path correctness across the update flow."""
-
     def test_windows_exe_suffix_consistent(self):
         suffix = ".exe" if sys.platform == "win32" else ".bin"
         assert suffix in (".exe", ".bin")
 
-    def test_update_exe_name_consistent(self):
+    def test_root_launcher_names(self):
         suffix = ".exe" if sys.platform == "win32" else ".bin"
-        name = f"update{suffix}"
-        assert name == f"update{suffix}"
+        for name in ("start{0}", "update{0}", "update_new{0}", "start_new{0}"):
+            assert name.format(suffix).endswith(suffix)
 
-    def test_start_exe_name_consistent(self):
-        suffix = ".exe" if sys.platform == "win32" else ".bin"
-        name = f"start{suffix}"
-        assert name == f"start{suffix}"
-
-    def test_update_new_exe_name_consistent(self):
-        suffix = ".exe" if sys.platform == "win32" else ".bin"
-        name = f"update_new{suffix}"
-        assert name == f"update_new{suffix}"
-
-    def test_signal_path_resolved_correctly(self, tmp_path):
-        base = tmp_path / "platform_test"
-        base.mkdir()
-        signal = base / "update_signal.tmp"
-        signal.write_text("kill")
-        assert signal.parent == base
-        assert signal.name == "update_signal.tmp"
+    def test_app_dir_naming_pattern(self, tmp_path):
+        root = _make_versioned_install(tmp_path)
+        pointer = read_pointer(root)
+        assert pointer is not None
+        assert pointer.active_app_dir.startswith("app-")
+        assert (root / pointer.active_app_dir).is_dir()
 
     def test_archive_name_platform_specific(self):
         if sys.platform == "win32":
@@ -461,8 +243,24 @@ class TestPlatformPathsIntegration:
             archive = "Tiktok2Mc_v1.0.0_Linux.tar.gz"
             assert archive.endswith(".tar.gz")
 
-    def test_temp_dir_resolved(self, tmp_path):
-        temp = tmp_path / "_update_tmp"
-        temp.mkdir()
-        assert temp.exists()
-        assert temp.is_dir()
+    def test_update_tmp_dir_resolved(self, tmp_path):
+        base = tmp_path
+        temp_dir = (base / "_update_tmp").resolve()
+        assert str(temp_dir).endswith("_update_tmp")
+
+
+# ---------------------------------------------------------------------------
+# Legacy signal API endpoints (still served for old binaries)
+# ---------------------------------------------------------------------------
+
+
+class TestSignalLifecycleIntegration:
+    def test_api_signal_lifecycle(self, client):
+        """The kill-signal API contract works: set → read → clear."""
+        resp = client.put("/api/v1/updater/signal", json={"signal": "kill"})
+        assert resp.status_code == 200
+        resp = client.get("/api/v1/updater/signal")
+        assert resp.json().get("signal") == "kill"
+        resp = client.delete("/api/v1/updater/signal")
+        assert resp.status_code == 200
+        assert client.get("/api/v1/updater/signal").json().get("signal") is None

@@ -1,1011 +1,844 @@
-"""End-to-end update validation tests.
+"""End-to-end update validation tests (P3a pointer architecture).
 
-Covers the full update flow that the compiled update.exe performs:
-  - Config migration (_inject_values_strictly, migrate_config_if_needed)
-  - Whitelist file copy path filtering
-  - Signal orchestration
-  - Version file I/O
-  - Full run_update() flow with mocks
+Covers the full update flow the compiled update.exe performs:
+
+- CHECK  local version resolution (pointer → version.txt) + release check
+- FETCH  asset selection, download, manifest/.sig fetch
+- VERIFY_SIG  detached Ed25519 manifest signature (fail closed)
+- VERIFY_SHA  archive .sha256 + per-file manifest checksums
+- STAGE  staged ``app-<ver>/`` move into the install root
+- FLIP   atomic ``current.json`` pointer flip (rollback data)
+- PRUNE  old app version dirs (one rollback generation kept)
+- NOTIFY progress file + relaunch in ``--auto`` mode
+
+The old whitelist-copy / kill-signal choreography is gone; running
+processes are never touched.
 """
 
+from __future__ import annotations
+
+import hashlib
 import json
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
-from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import python.update
+from core.update_engine import manifest as manifest_mod
+from core.update_engine.pointer import AppPointer, read_pointer, write_pointer
 
-# =========================================================================
-# _inject_values_strictly — pure config injection logic
-# =========================================================================
-
-
-# Reimplement the function inline for testability (it's pure logic).
-# The canonical version lives in src/python/update.py.
-def _inject_values_strictly(template, user_source, path=""):
-    if user_source is None:
-        return
-    if not isinstance(user_source, (dict)):
-        return
-    for key in template:
-        current_path = f"{path}.{key}" if path else key
-        if key in user_source:
-            user_value = user_source[key]
-            template_value = template[key]
-            if isinstance(template_value, dict):
-                if isinstance(user_value, dict):
-                    _inject_values_strictly(template_value, user_value, current_path)
-                elif user_value is None:
-                    pass
-                else:
-                    pass
-            else:
-                if user_value is not None:
-                    template[key] = user_value
-        else:
-            pass
-
-
-class TestInjectValuesStrictly:
-    """Config injection logic — the core of config migration."""
-
-    def test_preserves_user_values(self):
-        template = {"server_host": "0.0.0.0", "config_version": "1.0"}
-        user = {"server_host": "127.0.0.1", "config_version": "1.0"}
-        _inject_values_strictly(template, user)
-        assert template["server_host"] == "127.0.0.1"
-        assert template["config_version"] == "1.0"
-
-    def test_keeps_default_when_user_missing_key(self):
-        template = {"server_host": "0.0.0.0", "java": {"xms": "512M"}}
-        user = {"server_host": "127.0.0.1"}
-        _inject_values_strictly(template, user)
-        assert template["server_host"] == "127.0.0.1"
-        assert template["java"]["xms"] == "512M"
-
-    def test_recursive_nested_dicts(self):
-        template = {"java": {"xms": "512M", "xmx": "1G"}, "rcon": {"port": 25575}}
-        user = {"java": {"xms": "1G"}, "rcon": {}}
-        _inject_values_strictly(template, user)
-        assert template["java"]["xms"] == "1G"
-        assert template["java"]["xmx"] == "1G"
-        assert template["rcon"]["port"] == 25575
-
-    def test_skips_user_keys_not_in_template(self):
-        template = {"server_host": "0.0.0.0"}
-        user = {"server_host": "127.0.0.1", "unknown_key": "should_be_dropped"}
-        _inject_values_strictly(template, user)
-        assert template["server_host"] == "127.0.0.1"
-        assert "unknown_key" not in template
-
-    def test_preserves_booleans_and_numbers(self):
-        template = {"auto_update_config": False, "control_method": "DCS"}
-        user = {"auto_update_config": True, "control_method": "RCON"}
-        _inject_values_strictly(template, user)
-        assert template["auto_update_config"] is True
-        assert template["control_method"] == "RCON"
-
-    def test_handles_none_user_value(self):
-        template = {"server_host": "0.0.0.0", "shutdown": {}}
-        user = {"server_host": None, "shutdown": None}
-        _inject_values_strictly(template, user)
-        assert template["server_host"] == "0.0.0.0"
-        assert template["shutdown"] == {}
-
-    def test_handles_none_user_source_root(self):
-        template = {"config_version": "1.0"}
-        _inject_values_strictly(template, None)
-        assert template["config_version"] == "1.0"
-
-    def test_handles_empty_user_source(self):
-        template = {"server_host": "0.0.0.0"}
-        _inject_values_strictly(template, {})
-        assert template["server_host"] == "0.0.0.0"
-
-    def test_overwrites_template_list_with_user_list(self):
-        template = {"shutdown": {"countdown_times": [5, 10, 30]}}
-        user = {"shutdown": {"countdown_times": [10, 20, 60]}}
-        _inject_values_strictly(template, user)
-        assert template["shutdown"]["countdown_times"] == [10, 20, 60]
+TAG = "v1.0.0"
+TOOL = "1.0.0"
+UPDATER = "0.3.0"
 
 
 # =========================================================================
-# Config migration (migrate_config_if_needed)
+# Fixtures / helpers
 # =========================================================================
 
 
-class TestMigrateConfigIfNeeded:
-    """Tests the config migration flow — the function is imported from
-    update.py after setting up the necessary path structure."""
-
-    @contextmanager
-    def _import_migrate(self, tmp_path: Path, auto_update: bool = True):
-        """Context manager: patch module globals in update.py, yield the function."""
-        import python.update
-
-        base_dir = tmp_path / "base"
-        base_dir.mkdir()
-        config_dir = base_dir / "config"
-        config_dir.mkdir()
-        default_config = config_dir / "config.default.yaml"
-        user_config = config_dir / "config.yaml"
-
-        with (
-            patch.object(python.update, "BASE_DIR", base_dir),
-            patch.object(python.update, "CONFIG_FILE", user_config),
-            patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config),
-            patch.object(python.update, "VERSION_FILE", base_dir / "version.txt"),
-            patch.object(python.update, "TEMP_DIR", tmp_path / "_update_tmp"),
-            patch.object(python.update, "START_FILE", base_dir / "start.exe"),
-            patch.object(python.update, "cfg", {"auto_update_config": auto_update}),
-            patch.object(python.update, "CONFIG_UPDATE_ENABLE", auto_update),
-            patch.object(python.update, "AUTO_MODE", True),
-            patch.object(python.update, "wait_for_key"),
-            patch.object(python.update, "log"),
-        ):
-            yield python.update.migrate_config_if_needed, default_config, user_config
-
-    def test_creates_config_when_missing(self, tmp_path):
-        with self._import_migrate(tmp_path) as (migrate, default_config, user_config):
-            default_config.write_text("server_host: 127.0.0.1\nconfig_version: '1.0'\n")
-            assert not user_config.exists()
-            result = migrate()
-            assert result is True
-            assert user_config.exists()
-
-    def test_skips_when_up_to_date(self, tmp_path):
-        with self._import_migrate(tmp_path) as (migrate, default_config, user_config):
-            default_config.write_text("config_version: '1.0'\n")
-            user_config.write_text("config_version: '1.0'\n")
-            result = migrate()
-            assert result is False
-
-    def test_migrates_legacy_version(self, tmp_path):
-        with self._import_migrate(tmp_path) as (migrate, default_config, user_config):
-            default_config.write_text("config_version: '1.0'\nserver_host: 0.0.0.0\n")
-            user_config.write_text("config_version: '0.7'\nserver_host: 127.0.0.1\n")
-            result = migrate()
-            assert result is True
-            import yaml
-
-            with user_config.open() as f:
-                data = yaml.safe_load(f)
-            assert data["config_version"] == "1.0"
-            assert data["server_host"] == "127.0.0.1"
-
-    def test_returns_false_when_default_missing(self, tmp_path):
-        with self._import_migrate(tmp_path) as (migrate, _default_config, _user_config):
-            result = migrate()
-            assert result is False
-
-    def test_migrates_legacy_int_version(self, tmp_path):
-        with self._import_migrate(tmp_path) as (migrate, default_config, user_config):
-            default_config.write_text("config_version: '1.0'\nserver_host: 0.0.0.0\n")
-            user_config.write_text("config_version: 7\nserver_host: 192.168.1.1\n")
-            result = migrate()
-            assert result is True
-            import yaml
-
-            with user_config.open() as f:
-                data = yaml.safe_load(f)
-            assert data["config_version"] == "1.0"
-            assert data["server_host"] == "192.168.1.1"
+def _runtime_suffix() -> str:
+    return python.update.SUFFIX
 
 
-# =========================================================================
-# Whitelist file copy logic
-# =========================================================================
+def _archive_asset(platform: str) -> tuple[str, str]:
+    """Return (asset_name, url) for the platform archive."""
+    if platform == "win32":
+        return "Tiktok2Mc_v1.0.0_Windows.zip", "https://fake/Windows.zip"
+    return "Tiktok2Mc_v1.0.0_Linux.tar.gz", "https://fake/Linux.tar.gz"
 
 
-class TestUpdateWhitelist:
-    """Tests the whitelist path filtering used during file copy."""
-
-    WHITELIST_DIRS: ClassVar[set[str]] = {
-        "core",
-        "scripts",
-        "config",
-        "plugins/deathcounter",
-        "plugins/timer",
-        "plugins/wincounter",
-        "plugins/spotify",
-    }
-    WHITELIST_DIR_FILES: ClassVar[set[str]] = {
-        "hooks/random/main.py",
-        "hooks/example_hook/main.py",
-    }
-    WHITELIST_FILES: ClassVar[set[str]] = {
-        "version.txt",
-        "README.md",
-        "LICENSE",
-        "start.exe",
-    }
-
-    def _should_copy(self, rel_path_str: str, file: str) -> bool:
-        """Reimplements the path-filtering logic from update.py lines 484-503."""
-        import sys
-
-        SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
-        WHITELIST_FILES = {
-            "version.txt",
-            "README.md",
-            "LICENSE",
-            f"start{SUFFIX}",
-        }
-
-        if (
-            rel_path_str != "."
-            and not any(
-                rel_path_str == d or rel_path_str.startswith(d + "/")
-                for d in self.WHITELIST_DIRS
-            )
-            and not any(
-                f.startswith(rel_path_str + "/") for f in self.WHITELIST_DIR_FILES
-            )
-        ):
-            return False
-
-        if rel_path_str == "." and file not in WHITELIST_FILES:
-            return False
-
-        if rel_path_str != ".":
-            dir_whitelisted = any(
-                rel_path_str == d or rel_path_str.startswith(d + "/")
-                for d in self.WHITELIST_DIRS
-            )
-            if (
-                not dir_whitelisted
-                and f"{rel_path_str}/{file}" not in self.WHITELIST_DIR_FILES
-            ):
-                return False
-
-        if file.lower() == f"update{SUFFIX}".lower():
-            return False
-        return file.lower() != "config.yaml"
-
-    def test_whitelisted_root_files_copied(self):
-        suffix = ".exe" if sys.platform == "win32" else ".bin"
-        assert self._should_copy(".", "version.txt") is True
-        assert self._should_copy(".", "README.md") is True
-        assert self._should_copy(".", f"start{suffix}") is True
-
-    def test_non_whitelisted_root_files_skipped(self):
-        assert self._should_copy(".", "secret.key") is False
-        assert self._should_copy(".", "user_data.db") is False
-
-    def test_whitelisted_dir_files_copied(self):
-        assert self._should_copy("core/api", "server.py") is True
-        assert self._should_copy("plugins/wincounter", "main.py") is True
-
-    def test_non_whitelisted_dir_skipped(self):
-        assert self._should_copy("node_modules", "package.json") is False
-        assert self._should_copy("temp", "cache.bin") is False
-
-    def test_config_yaml_never_copied(self):
-        assert self._should_copy("config", "config.yaml") is False
-
-    def test_update_exe_never_copied(self):
-        assert self._should_copy(".", "update.exe") is False
-
-    def test_hooks_whitelisted(self):
-        assert self._should_copy("hooks/random", "main.py") is True
-        assert self._should_copy("hooks/example_hook", "main.py") is True
-        assert (
-            self._should_copy("plugins/spotify/hooks/spotify_control", "main.py")
-            is True
+def _release_payload(
+    *,
+    tag: str = TAG,
+    with_archive: bool = True,
+    with_manifest: bool = True,
+    with_sig: bool = True,
+    with_sha256: bool = True,
+    platform: str = "win32",
+) -> dict:
+    assets: list[dict] = []
+    if with_archive:
+        name, url = _archive_asset(platform)
+        assets.append({"name": name, "url": url})
+    if with_manifest:
+        assets.append({"name": "manifest.json", "url": "https://fake/manifest.json"})
+    if with_sig:
+        assets.append(
+            {"name": "manifest.json.sig", "url": "https://fake/manifest.json.sig"}
         )
-
-    def test_non_whitelisted_hook_skipped(self):
-        assert self._should_copy("hooks", "custom_hook.py") is False
-
-    def test_deeply_nested_whitelisted_path(self):
-        assert self._should_copy("plugins/wincounter/subdir", "data.json") is True
-
-    def test_deeply_nested_non_whitelisted(self):
-        assert self._should_copy("plugins/unknown_plugin", "main.py") is False
-
-    def test_server_existing_files_skipped_check(self):
-        """The server/ directory is NOT whitelisted — only root server.exe is."""
-        assert self._should_copy("server", "main.exe") is False
+    if with_sha256 and with_archive:
+        name, _ = _archive_asset(platform)
+        assets.append({"name": name + ".sha256", "url": "https://fake/x.sha256"})
+    return {"tag_name": tag, "assets": assets}
 
 
-# =========================================================================
-# Version file I/O
-# =========================================================================
+def _release_content(tool: str = TOOL, updater: str = UPDATER) -> dict[str, bytes]:
+    """The extracted release zip content (root-relative, POSIX paths)."""
+    suffix = _runtime_suffix()
+    app = f"app-{tool}"
+    return {
+        f"{app}/version.txt": f"ToolVersion: {tool}\n".encode("utf-8"),
+        f"{app}/core/app{suffix}": b"new-app-binary",
+        f"{app}/core/gui{suffix}": b"new-gui-binary",
+        f"{app}/core/update{suffix}": b"new-updater-binary",
+        f"start{suffix}": b"new-start-binary",
+        f"update{suffix}": b"new-update-binary",
+        "current.json": json.dumps(
+            {"active_app_dir": app, "tool_version": tool}
+        ).encode("utf-8"),
+        "version.txt": (f"ToolVersion: {tool}\nUpdaterVersion: {updater}\n").encode(
+            "utf-8"
+        ),
+    }
 
 
-class TestVersionFileIO:
-    """Tests version.txt read/write used by the updater."""
+def _signed_manifest(
+    files: dict[str, bytes], *, key: Ed25519PrivateKey | None = None
+) -> tuple[bytes, bytes, str]:
+    """Serialize + sign a manifest over *files*; return (raw, sig, pub_hex)."""
+    private_key = key or Ed25519PrivateKey.generate()
+    from core.update_engine.manifest import Manifest, ManifestFile
 
-    def test_write_and_read_version_file(self, tmp_path):
-        vf = tmp_path / "version.txt"
-        vf.write_text("ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n")
-        content = vf.read_text()
-        assert "ToolVersion: 1.0.0" in content
-        assert "UpdaterVersion: 0.2.0" in content
-
-    def test_parse_version_file(self, tmp_path):
-        vf = tmp_path / "version.txt"
-        vf.write_text("ToolVersion: v1.0.0-beta\nUpdaterVersion: 0.2.0\n")
-        versions = {}
-        for line in vf.read_text().strip().splitlines():
-            if ":" in line:
-                k, val = map(str.strip, line.split(":", 1))
-                versions[k.lower()] = val
-        assert "toolversion" in versions
-        import re
-
-        m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", versions["toolversion"])
-        assert m.group(1) == "1.0.0-beta"
-
-    def test_missing_version_file(self, tmp_path):
-        vf = tmp_path / "version.txt"
-        assert not vf.exists()
-
-    def test_round_trip_preserves_format(self, tmp_path):
-        vf = tmp_path / "version.txt"
-        original = "ToolVersion: 1.0.0\nUpdaterVersion: 0.2.0\n"
-        vf.write_text(original)
-        assert vf.read_text() == original
+    entries = [
+        ManifestFile(
+            path=path,
+            sha256=hashlib.sha256(data).hexdigest(),
+            size=len(data),
+        )
+        for path, data in sorted(files.items())
+    ]
+    manifest = Manifest(
+        tool_version=TOOL,
+        config_version_expected="1.0",
+        files=tuple(entries),
+        updater_version=UPDATER,
+        channel="stable",
+        created_utc="2026-01-01T00:00:00Z",
+    )
+    raw = manifest_mod.serialize_manifest(manifest)
+    signature = private_key.sign(raw)
+    return raw, signature, private_key.public_key().public_bytes_raw().hex()
 
 
-# =========================================================================
-# Extract version
-# =========================================================================
-
-
-class TestExtractVersion:
-    """Tests the extract_version regex."""
-
-    def test_standard_semver(self):
-        import re
-
-        def extract_version(text):
-            if not text:
-                return "0.0.0"
-            m = re.search(r"(\d+\.\d+(\.\d+)?(-beta|-alpha)?)", str(text))
-            return m.group(1) if m else "0.0.0"
-
-        assert extract_version("v1.0.0") == "1.0.0"
-        assert extract_version("1.5.2") == "1.5.2"
-        assert extract_version("v2.0.0-beta") == "2.0.0-beta"
-        assert extract_version("0.7") == "0.7"
-        assert extract_version("") == "0.0.0"
-        assert extract_version(None) == "0.0.0"
-        assert extract_version("no-version-here") == "0.0.0"
+def _make_install(tmp_path: Path, tool: str = "0.9.0", updater: str = "0.1.0") -> Path:
+    """A realistic pre-P3a flat install under tmp_path/install."""
+    suffix = _runtime_suffix()
+    base = tmp_path / "install"
+    core = base / "core"
+    core.mkdir(parents=True)
+    (core / f"app{suffix}").write_bytes(b"old-app-binary")
+    (core / f"gui{suffix}").write_bytes(b"old-gui-binary")
+    (base / "runtime_marker").write_text("x", encoding="utf-8")
+    config = base / "config"
+    config.mkdir(exist_ok=True)
+    (config / "config.yaml").write_text("config_version: '0.9'\n", encoding="utf-8")
+    (base / "version.txt").write_text(
+        f"ToolVersion: {tool}\nUpdaterVersion: {updater}\n", encoding="utf-8"
+    )
+    (base / f"start{suffix}").write_bytes(b"old-start-binary")
+    (base / f"update{suffix}").write_bytes(b"old-update-binary")
+    return base
 
 
 # =========================================================================
-# Full run_update orchestration (with mocks)
+# Local version resolution (CHECK)
+# =========================================================================
+
+
+class TestLocalVersionResolution:
+    def test_prefers_pointer(self, tmp_path):
+        write_pointer(
+            tmp_path, AppPointer(active_app_dir="app-1.0.0", tool_version="1.2.3")
+        )
+        (tmp_path / "version.txt").write_text("ToolVersion: 0.1.0\n")
+        assert python.update.get_local_tool_version(tmp_path) == "1.2.3"
+
+    def test_falls_back_to_version_txt(self, tmp_path):
+        (tmp_path / "version.txt").write_text("ToolVersion: 0.7.0\n")
+        assert python.update.get_local_tool_version(tmp_path) == "0.7.0"
+
+    def test_missing_everything(self, tmp_path):
+        assert python.update.get_local_tool_version(tmp_path) == "0.0.0"
+
+
+class TestSelectAsset:
+    @pytest.mark.parametrize("platform", ["win32", "linux"])
+    def test_platform_selection(self, tmp_path, platform):
+        payload = _release_payload(platform=platform)
+        with patch.object(python.update.sys, "platform", platform):
+            asset, archive_name = python.update._select_asset(payload)
+        assert asset is not None
+        name, _ = _archive_asset(platform)
+        assert asset["name"] == name
+        assert archive_name in ("release.zip", "release.tar.gz")
+
+    def test_no_assets(self, tmp_path):
+        asset, _archive_name = python.update._select_asset({"assets": []})
+        assert asset is None
+
+
+# =========================================================================
+# Orchestration
 # =========================================================================
 
 
 class TestRunUpdateOrchestration:
-    """Tests the full run_update() flow with mocked external dependencies."""
+    """Full run_update() flow with mocked external dependencies."""
 
     @contextmanager
-    def _get_run_update(self, tmp_path: Path):
-        """Context manager: patch module globals in update.py, yield function + paths."""
-        # Mock core.api.server BEFORE importing python.update to avoid
-        # the heavy FastAPI import chain (routes, eventbus, overlay, etc.)
-        if "core.api.server" not in sys.modules:
-            _mock_server = MagicMock()
-            _mock_server.DEFAULT_PORT = 29185
-            sys.modules["core.api.server"] = _mock_server
+    def _flow(
+        self,
+        tmp_path: Path,
+        release: dict,
+        files: dict[str, bytes] | None = None,
+        release_files: dict[str, bytes] | None = None,
+        manifest_raw: bytes | None = None,
+        sig_raw: bytes | None = None,
+        pub_key_hex: str | None = None,
+        verify_checksum_result: bool = True,
+        download_error: Exception | None = None,
+        local_tool: str = "0.9.0",
+    ):
+        """Set up a complete, patched run_update() environment.
 
-        import python.update
-        from core.backup import BackupManager
+        Yields ``(exit_mock, phases, base_dir)``.
+        """
+        files = files if files is not None else _release_content()
+        manifest_raw_signed, sig_signed, key_hex = _signed_manifest(
+            release_files or files
+        )
+        manifest_raw = manifest_raw if manifest_raw is not None else manifest_raw_signed
+        sig_raw = sig_raw if sig_raw is not None else sig_signed
 
-        base_dir = tmp_path / "install"
-        base_dir.mkdir()
-        config_dir = base_dir / "config"
-        config_dir.mkdir()
-        user_config = config_dir / "config.yaml"
-        user_config.write_text("config_version: '0.7'\nserver_host: 127.0.0.1\n")
-        default_config = config_dir / "config.default.yaml"
-        default_config.write_text("config_version: '1.0'\nserver_host: 0.0.0.0\n")
-        version_file = base_dir / "version.txt"
-        version_file.write_text("ToolVersion: 0.7.0\nUpdaterVersion: 0.1.0\n")
-        temp_dir = tmp_path / "_update_tmp"
-        temp_dir.mkdir()
+        base = _make_install(tmp_path, tool=local_tool)
+        temp_dir = base / "_update_tmp"
+        status_file = tmp_path / "update_status.json"
 
-        # Create a BackupManager rooted at base_dir so backups stay inside
-        # the test's tmp_path and relative_to() works in assertions.
-        test_bm = BackupManager(root_dir=base_dir)
+        # patched python.update.sys ("win32" default) selects zip extraction
+        platform = getattr(self, "_forced_platform", "win32")
 
-        with (
-            patch.object(python.update, "BASE_DIR", base_dir),
-            patch.object(python.update, "CONFIG_FILE", user_config),
-            patch.object(python.update, "DEFAULT_CONFIG_FILE", default_config),
-            patch.object(python.update, "VERSION_FILE", version_file),
-            patch.object(python.update, "TEMP_DIR", temp_dir),
-            patch.object(python.update, "START_FILE", base_dir / "start.exe"),
-            patch.object(python.update, "cfg", {"auto_update_config": True}),
-            patch.object(python.update, "CONFIG_UPDATE_ENABLE", True),
-            patch.object(python.update, "AUTO_MODE", True),
-            patch.object(python.update, "get_base_dir", return_value=base_dir),
-            patch.object(python.update, "wait_for_key"),
-            patch.object(python.update, "log"),
-            patch("core.backup._backup_manager", test_bm),
-            patch("core.backup.get_backup_manager", return_value=test_bm),
-        ):
-            yield python.update.run_update, base_dir, temp_dir
+        archive_bytes = b"ARCHIVEDATA"
 
-    def test_up_to_date_skips_update(self, tmp_path):
-        """When local version >= remote version, should exit with code 5."""
-        with (
-            self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir),
-            patch("python.update.requests.get") as mock_get,
-            patch("python.update.sys.exit", side_effect=SystemExit) as mock_exit,
-        ):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "tag_name": "v0.7.0",
-                "assets": [],
-            }
-            mock_get.return_value = mock_response
+        release_resp = MagicMock()
+        release_resp.status_code = 200
+        release_resp.json.return_value = release
 
-            with pytest.raises(SystemExit):
-                run_update()
-            mock_exit.assert_called_once_with(5)
+        manifest_resp = MagicMock()
+        manifest_resp.status_code = 200
+        manifest_resp.content = manifest_raw
 
-    def test_transient_api_error_is_retried(self, tmp_path):
-        """A transient network/DNS failure must not abort the update —
-        the version check should be retried and succeed on the second attempt."""
-        with (
-            self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir),
-            patch("python.update.requests.get") as mock_get,
-            patch("python.update.time.sleep") as mock_sleep,
-            patch("python.update.sys.exit", side_effect=SystemExit) as mock_exit,
-        ):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "tag_name": "v0.7.0",
-                "assets": [],
-            }
-            mock_get.side_effect = [
-                requests.exceptions.ConnectionError(
-                    "Failed to resolve 'api.github.com'"
+        sig_resp = MagicMock()
+        sig_resp.status_code = 200
+        sig_resp.content = sig_raw
+
+        sha_resp = MagicMock()
+        sha_resp.status_code = 200
+        sha_resp.text = hashlib.sha256(archive_bytes).hexdigest() + "  x\n"
+
+        def mock_get(url, **_kwargs):
+            if "releases/latest" in url:
+                return release_resp
+            if url.endswith("/manifest.json"):
+                return manifest_resp
+            if url.endswith("/manifest.json.sig"):
+                return sig_resp
+            if url.endswith(".sha256"):
+                return sha_resp
+            raise AssertionError(f"unexpected URL: {url}")
+
+        recorded_phases: list[tuple] = []
+
+        def capture_phase(phase, progress=None, message=""):
+            recorded_phases.append((phase, progress, message))
+
+        def fake_download(url, target):
+            if download_error is not None:
+                raise download_error
+            Path(target).write_bytes(archive_bytes)
+
+        with ExitStack() as stack:
+            ctx = [
+                patch.object(python.update.sys, "platform", platform),
+                patch.object(python.update, "BASE_DIR", base),
+                patch.object(python.update, "TEMP_DIR", temp_dir),
+                patch.object(
+                    python.update, "START_FILE", base / f"start{_runtime_suffix()}"
                 ),
-                mock_response,
+                patch.object(python.update, "VERSION_FILE", base / "version.txt"),
+                patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
+                patch.object(python.update, "AUTO_MODE", True),
+                patch.object(python.update, "cfg", {"auto_update_config": False}),
+                patch.object(python.update, "GITHUB_TOKEN", None),
+                patch.object(
+                    python.update, "SIGNING_PUBLIC_KEY", pub_key_hex or key_hex
+                ),
+                patch.object(python.update, "wait_for_key"),
+                patch("python.update.requests.get", side_effect=mock_get),
+                patch(
+                    "python.update.download_with_progress", side_effect=fake_download
+                ),
+                patch("python.update._write_update_status", side_effect=capture_phase),
+                patch("python.update._relaunch_tool_after_update", return_value=True),
+                patch(
+                    "python.update.verify_checksum",
+                    return_value=verify_checksum_result,
+                ),
+                patch("python.update.sys.exit", side_effect=SystemExit),
             ]
 
-            with pytest.raises(SystemExit):
-                run_update()
-            mock_exit.assert_called_once_with(5)
-            mock_sleep.assert_called_once_with(2)
-            assert mock_get.call_count == 2
+            # Extraction layer depends on the forced platform
+            if platform == "win32":
 
-    @pytest.mark.skipif(
-        sys.platform != "win32", reason="Simulates Windows-only release assets"
-    )
-    def test_new_version_downloads_and_installs(self, tmp_path):
-        """Simulate a complete update: download -> extract -> copy."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
+                def populate(dest):
+                    for rel, data in files.items():
+                        p = Path(dest) / rel
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_bytes(data)
 
-            def fake_populate(path):
-                (path / "version.txt").write_text(
-                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
+                stack.enter_context(
+                    patch("python.update.tarfile.open", autospec=True)
+                )  # unused on win32 but keeps the mock surface identical
+
+                zf = stack.enter_context(patch("python.update.zipfile.ZipFile"))
+                zf.return_value.__enter__.return_value.extractall = lambda dest, **_kw: (
+                    populate(dest)
                 )
-                (path / "README.md").write_text("new readme")
-                core_dir = path / "core"
-                core_dir.mkdir()
-                (core_dir / "new_file.py").write_text("# new")
-                (path / "config").mkdir()
-                (path / "config" / "config.yaml").write_text("should_be_skipped\n")
-                (path / "update.exe").write_text("should_be_skipped\n")
+            else:
+                tar_mock = stack.enter_context(patch("python.update.tarfile.open"))
+                tar_ctx = tar_mock.return_value.__enter__.return_value
+                tar_ctx.getmembers.return_value = []
 
-            with (
-                patch("python.update.requests.get") as mock_get,
-                patch("python.update.verify_checksum", return_value=True),
-                patch("python.update.sys.exit", side_effect=SystemExit),
-                patch("python.update.shutil.copy2") as mock_copy2,
-                patch("python.update.shutil.rmtree"),
-                patch("python.update.download_with_progress"),
-                patch("python.update.zipfile.ZipFile") as mock_zip,
-            ):
-                mock_zip.return_value.__enter__.return_value.extractall = fake_populate
+                def populate(dest):
+                    for rel, data in files.items():
+                        p = Path(dest) / rel
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_bytes(data)
 
-                release_resp = MagicMock()
-                release_resp.status_code = 200
-                release_resp.json.return_value = {
-                    "tag_name": "v1.0.0",
-                    "assets": [
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                            "url": "https://fake.url/asset",
-                        },
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
-                            "url": "https://fake.url/asset.sha256",
-                        },
-                    ],
-                }
-                checksum_resp = MagicMock()
-                checksum_resp.status_code = 200
-                checksum_resp.text = "a" * 64 + "\n"  # valid 64-char hex
+                tar_ctx.extractall = lambda dest, **_kw: populate(dest)
 
-                def mock_get_side_effect(url, **kwargs):
-                    if "releases/latest" in url or "/releases" in url:
-                        return release_resp
-                    if "asset.sha256" in url:
-                        return checksum_resp
-                    if "updater/signal" in url:
-                        signal_resp = MagicMock()
-                        signal_resp.status_code = 200
-                        signal_resp.json.return_value = {"signal": None}
-                        return signal_resp
-                    raise requests.exceptions.RequestException("unexpected URL")
+            entered = [stack.enter_context(c) for c in ctx]
+            exit_mock = entered[-1]
+            yield exit_mock, recorded_phases, base
 
-                mock_get.side_effect = mock_get_side_effect
+    # -----------------------------------------------------------------
+    # Happy path
+    # -----------------------------------------------------------------
 
-                with pytest.raises(SystemExit):
-                    run_update()
-
-                copied_dsts = [
-                    call_args[0][1] for call_args in mock_copy2.call_args_list
-                ]
-                dst_names = [
-                    str(p.relative_to(base_dir)).replace("\\", "/") for p in copied_dsts
-                ]
-                assert "core/new_file.py" in dst_names
-                assert "config/config.yaml" not in dst_names
-                assert "update.exe" not in " ".join(dst_names).lower()
-                assert "README.md" in dst_names or "readme.md" in dst_names
-
-    @pytest.mark.skipif(
-        sys.platform != "win32", reason="Simulates Windows-only release assets"
-    )
-    def test_kill_signal_written_before_copy(self, tmp_path):
-        """The updater writes update_signal.tmp BEFORE copying files."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
-
-            def fake_populate(path):
-                (path / "version.txt").write_text(
-                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
-                )
-
-            signal_path = base_dir / "update_signal.tmp"
-            signal_written = [False]
-            original_write_text = Path.write_text
-
-            def tracking_write_text(self, content):
-                if self == signal_path:
-                    signal_written[0] = True
-                return original_write_text(self, content)
-
-            with (
-                patch("python.update.requests.get") as mock_get,
-                patch("python.update.verify_checksum", return_value=True),
-                patch("python.update.sys.exit", side_effect=SystemExit),
-                patch("python.update.time.sleep"),
-                patch("python.update.shutil.rmtree"),
-                patch("python.update.shutil.copy2"),
-                patch("python.update.download_with_progress"),
-                patch("python.update.zipfile.ZipFile") as mock_zip,
-            ):
-                mock_zip.return_value.__enter__.return_value.extractall = fake_populate
-
-                release_resp = MagicMock()
-                release_resp.status_code = 200
-                release_resp.json.return_value = {
-                    "tag_name": "v1.0.0",
-                    "assets": [
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                            "url": "https://fake.url/asset",
-                        },
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
-                            "url": "https://fake.url/asset.sha256",
-                        },
-                    ],
-                }
-                checksum_resp = MagicMock()
-                checksum_resp.status_code = 200
-                checksum_resp.text = "a" * 64 + "\n"
-
-                def mock_get_side_effect(url, **kwargs):
-                    if "releases/latest" in url or "/releases" in url:
-                        return release_resp
-                    if "asset.sha256" in url:
-                        return checksum_resp
-                    if "updater/signal" in url:
-                        signal_resp = MagicMock()
-                        signal_resp.status_code = 200
-                        signal_resp.json.return_value = {"signal": None}
-                        return signal_resp
-                    raise requests.exceptions.RequestException("unexpected URL")
-
-                mock_get.side_effect = mock_get_side_effect
-
-                with patch.object(Path, "write_text", tracking_write_text):
-                    with pytest.raises(SystemExit):
-                        run_update()
-                    assert signal_written[0], "Signal file should have been written"
-
-    @pytest.mark.skipif(
-        sys.platform != "win32", reason="Simulates Windows-only release assets"
-    )
-    def test_dual_signaling_file_and_api(self, tmp_path):
-        """Update writes both file-based and API-based kill signals."""
-        with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
-
-            def fake_populate(path):
-                (path / "version.txt").write_text(
-                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
-                )
-
-            api_put_called = [False]
-
-            def tracking_put(url, **kwargs):
-                if "updater/signal" in url:
-                    api_put_called[0] = True
-
-            with (
-                patch("python.update.requests.get") as mock_get,
-                patch("python.update.requests.put", side_effect=tracking_put),
-                patch("python.update.requests.delete"),
-                patch("python.update.verify_checksum", return_value=True),
-                patch("python.update.sys.exit", side_effect=SystemExit),
-                patch("python.update.time.sleep"),
-                patch("python.update.shutil.rmtree"),
-                patch("python.update.shutil.copy2"),
-                patch("python.update.download_with_progress"),
-                patch("python.update.zipfile.ZipFile") as mock_zip,
-            ):
-                mock_zip.return_value.__enter__.return_value.extractall = fake_populate
-
-                release_resp = MagicMock()
-                release_resp.status_code = 200
-                release_resp.json.return_value = {
-                    "tag_name": "v1.0.0",
-                    "assets": [
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                            "url": "https://fake.url/asset",
-                        },
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
-                            "url": "https://fake.url/asset.sha256",
-                        },
-                    ],
-                }
-                checksum_resp = MagicMock()
-                checksum_resp.status_code = 200
-                checksum_resp.text = "a" * 64 + "\n"
-
-                def mock_get_side_effect(url, **kwargs):
-                    if "releases/latest" in url or "/releases" in url:
-                        return release_resp
-                    if "asset.sha256" in url:
-                        return checksum_resp
-                    if "updater/signal" in url:
-                        signal_resp = MagicMock()
-                        signal_resp.status_code = 200
-                        signal_resp.json.return_value = {"signal": None}
-                        return signal_resp
-                    raise requests.exceptions.RequestException("unexpected URL")
-
-                mock_get.side_effect = mock_get_side_effect
-
-                with pytest.raises(SystemExit):
-                    run_update()
-
-                assert api_put_called[0], "API kill signal should have been sent"
-
-    @pytest.mark.skipif(
-        sys.platform != "win32", reason="Simulates Windows-only release assets"
-    )
-    def test_signal_wait_polling_loop(self, tmp_path):
-        """After sending kill signal, updater polls until signal is consumed or timeout."""
-        with self._get_run_update(tmp_path) as (run_update, base_dir, _temp_dir):
-
-            def fake_populate(path):
-                (path / "version.txt").write_text(
-                    "ToolVersion: 1.0.0\nUpdaterVersion: 0.1.0\n"
-                )
-
-            # Pre-write the signal file — run_update overwrites it then polls
-            signal_file = base_dir / "update_signal.tmp"
-            signal_file.write_text("kill")
-
-            with (
-                patch("python.update.requests.get") as mock_get,
-                patch("python.update.requests.put"),
-                patch("python.update.requests.delete"),
-                patch("python.update.sys.exit", side_effect=SystemExit),
-                patch("python.update.time.sleep"),
-                patch("python.update.shutil.rmtree"),
-                patch("python.update.shutil.copy2"),
-                patch("python.update.download_with_progress"),
-                patch("python.update.zipfile.ZipFile") as mock_zip,
-            ):
-                mock_zip.return_value.__enter__.return_value.extractall = fake_populate
-
-                mock_resp = MagicMock()
-                mock_resp.status_code = 200
-                mock_resp.json.return_value = {
-                    "tag_name": "v1.0.0",
-                    "assets": [
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                            "url": "https://fake.url/asset",
-                        }
-                    ],
-                }
-                mock_get.return_value = mock_resp
-
-                with pytest.raises(SystemExit):
-                    run_update()
-
-                assert True  # didn't hang
-
-    @pytest.mark.skipif(
-        sys.platform != "win32", reason="Simulates Windows-only release assets"
-    )
-    def test_updater_self_update_triggers_resume(self, tmp_path):
-        """When a new updater version is detected, the old updater should
-        copy the new updater and exit (to be resumed via --resume)."""
-        with self._get_run_update(tmp_path) as (run_update, _base_dir, _temp_dir):
-
-            def fake_populate(path):
-                (path / "version.txt").write_text(
-                    "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
-                )
-                (path / "core").mkdir(exist_ok=True)
-                (path / "core" / "update.exe").write_text("new updater binary")
-
-            with (
-                patch("python.update.requests.get") as mock_get,
-                patch("python.update.subprocess.Popen") as mock_popen,
-                patch("python.update.verify_checksum", return_value=True),
-                patch("python.update.sys.exit", side_effect=SystemExit),
-                patch("python.update.shutil.copy2"),
-                patch("python.update.shutil.rmtree"),
-                patch("python.update.os.chmod"),
-                patch("python.update.download_with_progress"),
-                patch("python.update.zipfile.ZipFile") as mock_zip,
-            ):
-                mock_zip.return_value.__enter__.return_value.extractall = fake_populate
-
-                release_resp = MagicMock()
-                release_resp.status_code = 200
-                release_resp.json.return_value = {
-                    "tag_name": "v1.0.0",
-                    "assets": [
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                            "url": "https://fake.url/asset",
-                        },
-                        {
-                            "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
-                            "url": "https://fake.url/asset.sha256",
-                        },
-                    ],
-                }
-                checksum_resp = MagicMock()
-                checksum_resp.status_code = 200
-                checksum_resp.text = "a" * 64 + "\n"
-
-                def mock_get_side_effect(url, **kwargs):
-                    if "releases/latest" in url or "/releases" in url:
-                        return release_resp
-                    if "asset.sha256" in url:
-                        return checksum_resp
-                    if "updater/signal" in url:
-                        signal_resp = MagicMock()
-                        signal_resp.status_code = 200
-                        signal_resp.json.return_value = {"signal": None}
-                        return signal_resp
-                    raise requests.exceptions.RequestException("unexpected URL")
-
-                mock_get.side_effect = mock_get_side_effect
-
-                with pytest.raises(SystemExit):
-                    run_update()
-
-                mock_popen.assert_called_once()
-                args = mock_popen.call_args[0][0]
-                assert "--resume" in args, f"Expected --resume in {args}"
-                assert "--auto" in args, f"Expected --auto forwarded in {args}"
-
-
-class TestUpdaterSelfUpdateResumeRelaunch:
-    """Self-update handoff must forward --auto so the resume child can
-    relaunch start.exe (start.py no longer restarts itself on EXIT_OK)."""
-
-    def _exercise_self_update(self, tmp_path: Path, auto_mode: bool):
-        """Run the full self-update orchestration and return the resume args."""
-        import python.update as _upd
+    @pytest.mark.parametrize("platform", ["win32", "linux"])
+    def test_full_update_lifecycle(self, tmp_path, platform):
+        """0.9 → 1.0: stage → flip → prune → notify with real files."""
+        self._forced_platform = platform
+        base_dir = tmp_path / "install"
+        # Seed an old pointer + previous version dir so FLIP/PRUNE are exercised.
+        old_app_dir = base_dir / "app-0.9.0"
+        old_app_dir.mkdir(parents=True)
+        (old_app_dir / "core").mkdir()
+        (old_app_dir / "core" / f"app{_runtime_suffix()}").write_bytes(
+            b"old-app-binary"
+        )
+        ancient = base_dir / "app-0.8.0"
+        ancient.mkdir()
+        write_pointer(base_dir, AppPointer("app-0.9.0", "0.9.0", previous_app_dir=None))
 
         with (
-            TestRunUpdateOrchestration()._get_run_update(tmp_path) as (
-                run_update,
-                _base_dir,
-                _temp_dir,
+            self._flow(tmp_path, _release_payload(platform=platform)) as (
+                exit_mock,
+                phases,
+                _base,
             ),
-            patch.object(python.update, "AUTO_MODE", auto_mode),
-            patch("python.update.requests.get") as mock_get,
-            patch("python.update.subprocess.Popen") as mock_popen,
-            patch("python.update.os.execv") as mock_execv,
-            patch("python.update.verify_checksum", return_value=True),
-            patch("python.update.sys.exit", side_effect=SystemExit),
-            patch("python.update.shutil.copy2"),
-            patch("python.update.shutil.rmtree"),
-            patch("python.update.os.chmod"),
-            patch("python.update.download_with_progress"),
-            patch("python.update.zipfile.ZipFile") as mock_zip,
-            # Linux CI extracts via tarfile (update.py uses .tar.gz on
-            # non-win32), so give the tar path a fake context manager too.
-            patch("python.update.tarfile.open") as mock_tar,
-            patch("python.update._relaunch_tool_after_update", return_value=True),
+            pytest.raises(SystemExit),
         ):
+            python.update.run_update()
 
-            def fake_populate(path):
-                (path / "version.txt").write_text(
-                    "ToolVersion: 1.0.0\nUpdaterVersion: 9.9.9\n"
-                )
-                (path / "core").mkdir(exist_ok=True)
-                (path / "core" / f"update{_upd.SUFFIX}").write_text(
-                    "new updater binary"
-                )
+        exit_mock.assert_called_once_with(0)
 
-            mock_zip.return_value.__enter__.return_value.extractall = fake_populate
-            mock_tar.return_value.__enter__.return_value.getmembers.return_value = []
-            mock_tar.return_value.__enter__.return_value.extractall = fake_populate
+        app_dir = base_dir / "app-1.0.0"
+        assert (app_dir / "core" / f"app{_runtime_suffix()}").read_bytes() == (
+            b"new-app-binary"
+        )
+        assert (app_dir / "core" / f"gui{_runtime_suffix()}").is_file()
 
-            release_resp = MagicMock()
-            release_resp.status_code = 200
-            release_resp.json.return_value = {
-                "tag_name": "v1.0.0",
-                "assets": [
-                    {
-                        "name": "Tiktok2Mc_v1.0.0_Windows.zip",
-                        "url": "https://fake.url/win-asset",
-                    },
-                    {
-                        "name": "Tiktok2Mc_v1.0.0_Windows.zip.sha256",
-                        "url": "https://fake.url/win-asset.sha256",
-                    },
-                    {
-                        "name": "Tiktok2Mc_v1.0.0_Linux.tar.gz",
-                        "url": "https://fake.url/linux-asset",
-                    },
-                    {
-                        "name": "Tiktok2Mc_v1.0.0_Linux.tar.gz.sha256",
-                        "url": "https://fake.url/linux-asset.sha256",
-                    },
-                ],
-            }
-            checksum_resp = MagicMock()
-            checksum_resp.status_code = 200
-            checksum_resp.text = "a" * 64 + "\n"
+        pointer = read_pointer(base_dir)
+        assert pointer is not None
+        assert pointer.active_app_dir == "app-1.0.0"
+        assert pointer.tool_version == "1.0.0"
+        assert pointer.previous_app_dir == "app-0.9.0"
 
-            def mock_get_side_effect(url, **kwargs):
-                if "releases/latest" in url or "/releases" in url:
-                    return release_resp
-                if "asset.sha256" in url:
-                    return checksum_resp
-                if "updater/signal" in url:
-                    signal_resp = MagicMock()
-                    signal_resp.status_code = 200
-                    signal_resp.json.return_value = {"signal": None}
-                    return signal_resp
-                raise requests.exceptions.RequestException("unexpected URL")
+        # PRUNE: the rollback generation (0.9.0) survives, 0.8.0 is removed.
+        assert not ancient.exists()
+        assert old_app_dir.exists()
+        assert app_dir.exists()
 
-            mock_get.side_effect = mock_get_side_effect
+        # Legacy version file synced for pre-P3a readers.
+        version_txt = (base_dir / "version.txt").read_text(encoding="utf-8")
+        assert "ToolVersion: 1.0.0" in version_txt
+        assert "UpdaterVersion: 0.3.0" in version_txt
 
-            with pytest.raises(SystemExit):
-                run_update()
+        # Launcher binaries are queued, not overwritten (running process!).
+        assert (base_dir / f"start_new{_runtime_suffix()}").read_bytes() == (
+            b"new-start-binary"
+        )
+        assert (base_dir / f"start{_runtime_suffix()}").read_bytes() == (
+            b"old-start-binary"
+        )
 
-            # On win32 the self-update uses subprocess.Popen([...]),
-            # on Linux it uses os.execv(path, [path, ...]).
-            if sys.platform == "win32":
-                return mock_popen.call_args[0][0]
-            return mock_execv.call_args[0][1]
+        # Temp dir cleaned up, progress phases complete.
+        assert not (base_dir / "_update_tmp").exists()
+        assert phases[0][0] == "checking"
+        assert any(p[0] == "downloading" for p in phases)
+        assert any(p[0] == "installing" for p in phases)
+        assert phases[-1][0] == "done"
 
-    def test_forward_auto_when_auto_mode(self, tmp_path):
-        args = self._exercise_self_update(tmp_path, auto_mode=True)
-        assert "--auto" in args and "--resume" in args, args
+    # -----------------------------------------------------------------
+    # CHECK variations
+    # -----------------------------------------------------------------
 
-    def test_no_auto_forward_outside_auto_mode(self, tmp_path):
-        args = self._exercise_self_update(tmp_path, auto_mode=False)
-        assert "--resume" in args, args
-        assert "--auto" not in args, args
+    def test_up_to_date_skips_update(self, tmp_path):
+        self._forced_platform = "win32"
+        write_pointer(tmp_path / "install", AppPointer("app-1.0.0", "1.0.0"))
+        with (
+            self._flow(
+                tmp_path,
+                _release_payload(),
+                local_tool="1.0.0",
+            ) as (exit_mock, _phases, _base),
+            pytest.raises(SystemExit),
+        ):
+            # pointer already names the newest version → nothing to do
+            python.update.run_update()
+        exit_mock.assert_called_once_with(5)
+
+    def test_beta_skipped_in_auto_mode(self, tmp_path):
+        self._forced_platform = "win32"
+        with (
+            self._flow(tmp_path, _release_payload(tag="v1.1.0-beta")) as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(5)
+
+    def test_transient_api_error_is_retried(self, tmp_path):
+        """A transient network failure must be retried (backoff), then
+        the flow continues — here it ends benignly with 'no update'."""
+        self._forced_platform = "win32"
+        release = _release_payload(tag="v0.9.0")
+        release_resp = MagicMock()
+        release_resp.status_code = 200
+        release_resp.json.return_value = release
+        calls: list = []
+
+        def mock_get(url, **_kw):
+            calls.append(url)
+            if "releases/latest" in url and len(calls) == 1:
+                raise requests.exceptions.ConnectionError("DNS hiccup")
+            if "releases/latest" in url:
+                return release_resp
+            raise AssertionError(f"unexpected URL: {url}")
+
+        base = _make_install(tmp_path)
+        temp_dir = base / "_update_tmp"
+        with (
+            patch.object(python.update, "BASE_DIR", base),
+            patch.object(python.update, "TEMP_DIR", temp_dir),
+            patch.object(python.update, "START_FILE", base / "start.exe"),
+            patch.object(python.update, "VERSION_FILE", base / "version.txt"),
+            patch.object(
+                python.update,
+                "UPDATE_STATUS_FILE",
+                tmp_path / "update_status.json",
+            ),
+            patch.object(python.update, "AUTO_MODE", True),
+            patch.object(python.update, "wait_for_key"),
+            patch("python.update.requests.get", side_effect=mock_get),
+            patch("python.update.time.sleep"),
+            patch("python.update.sys.exit", side_effect=SystemExit),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        assert len(calls) == 2  # retry happened
+
+    def test_no_platform_asset(self, tmp_path):
+        self._forced_platform = "win32"
+        with (
+            self._flow(tmp_path, _release_payload(with_archive=False)) as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(11)
+
+    def test_download_failure(self, tmp_path):
+        self._forced_platform = "win32"
+        with (
+            self._flow(
+                tmp_path,
+                _release_payload(),
+                download_error=requests.exceptions.ConnectionError("drop"),
+            ) as (exit_mock, _phases, _base),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(14)
+
+    # -----------------------------------------------------------------
+    # VERIFY_SIG / VERIFY_SHA
+    # -----------------------------------------------------------------
+
+    def test_signature_mismatch_rejects_update(self, tmp_path):
+        """Manifest signed by someone else must be rejected with code 16."""
+        self._forced_platform = "win32"
+        files = _release_content()
+        _raw, _sig, attacker_hex = _signed_manifest(files)
+        wrong_key = Ed25519PrivateKey.generate()
+        manifest_raw, sig_raw, _key = _signed_manifest(
+            files, key=Ed25519PrivateKey.generate()
+        )
+        with (
+            self._flow(
+                tmp_path,
+                _release_payload(),
+                manifest_raw=manifest_raw,
+                sig_raw=sig_raw,
+                pub_key_hex=attacker_hex,
+            ) as (exit_mock, _phases, _base),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(16)
+
+    def test_missing_manifest_asset(self, tmp_path):
+        self._forced_platform = "win32"
+        with (
+            self._flow(tmp_path, _release_payload(with_manifest=False)) as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(11)
+
+    def test_missing_signature_asset(self, tmp_path):
+        self._forced_platform = "win32"
+        with (
+            self._flow(tmp_path, _release_payload(with_sig=False)) as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(16)
+
+    def test_archive_checksum_mismatch(self, tmp_path):
+        self._forced_platform = "win32"
+        with (
+            self._flow(tmp_path, _release_payload(), verify_checksum_result=False) as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(13)
+
+    def test_manifest_file_checksum_mismatch(self, tmp_path):
+        """Packaged content differs from the signed manifest → code 13."""
+        self._forced_platform = "win32"
+        files = _release_content()
+        release_files = dict(files)
+        release_files[f"app-1.0.0/core/app{_runtime_suffix()}"] = b"tampered"
+        with (
+            self._flow(
+                tmp_path,
+                _release_payload(),
+                files=files,
+                release_files=release_files,
+            ) as (exit_mock, _phases, _base),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(13)
+
+    # -----------------------------------------------------------------
+    # STAGE guard rails
+    # -----------------------------------------------------------------
+
+    def test_already_active_version_exits_ok(self, tmp_path):
+        """Pointer already names the target version → benign exit, no move."""
+        self._forced_platform = "win32"
+        base_dir = tmp_path / "install"
+        target = base_dir / "app-1.0.0"
+        target.mkdir(parents=True)
+        (target / "core").mkdir()
+        (target / "core" / f"junk{_runtime_suffix()}").write_bytes(b"junk")
+        # pointer is "stale" (tool 0.9.0) but its active dir == release target
+        write_pointer(base_dir, AppPointer("app-1.0.0", "0.9.0"))
+
+        with (
+            self._flow(tmp_path, _release_payload(), local_tool="0.9.0") as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(0)
+        # the junk dir is untouched — never staged over itself
+        assert (target / "core" / f"junk{_runtime_suffix()}").exists()
+        pointer = read_pointer(base_dir)
+        assert pointer is not None and pointer.tool_version == "0.9.0"
+
+    def test_stale_target_dir_is_replaced(self, tmp_path):
+        """A leftover non-active app dir from an interrupted run is wiped."""
+        self._forced_platform = "win32"
+        base_dir = tmp_path / "install"
+        junk = base_dir / "app-1.0.0"
+        (junk / "core").mkdir(parents=True)
+        (junk / "core" / f"stale{_runtime_suffix()}").write_bytes(b"stale")
+        write_pointer(base_dir, AppPointer("app-0.9.0", "0.9.0"))
+
+        files = _release_content()
+
+        with (
+            self._flow(tmp_path, _release_payload()) as (
+                exit_mock,
+                _phases,
+                _base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+
+        exit_mock.assert_called_once_with(0)
+        assert (junk / "core" / f"app{_runtime_suffix()}").read_bytes() == (
+            b"new-app-binary"
+        )
+        assert not (junk / "core" / f"stale{_runtime_suffix()}").exists()
+        pointer = read_pointer(base_dir)
+        assert pointer is not None and pointer.active_app_dir == "app-1.0.0"
+
+    def test_legacy_first_flip_has_no_previous(self, tmp_path):
+        """A flat install's first flip records rollback data only for the
+        versioned layout — previous_app_dir is None here."""
+        self._forced_platform = "win32"
+        with (
+            self._flow(tmp_path, _release_payload()) as (
+                exit_mock,
+                _phases,
+                base,
+            ),
+            pytest.raises(SystemExit),
+        ):
+            python.update.run_update()
+        exit_mock.assert_called_once_with(0)
+        pointer = read_pointer(base)
+        assert pointer is not None and pointer.previous_app_dir is None
+        # The flat core/ is untouched (user data: never moved by the updater)
+        assert (base / "core" / f"app{_runtime_suffix()}").read_bytes() == (
+            b"old-app-binary"
+        )
 
 
 # =========================================================================
-# Signal cleanup after update
+# Status reporting + relaunch helpers (GUI launcher feedback)
 # =========================================================================
 
 
-class TestUpdateSignalCleanup:
-    """Tests that signal files are cleaned up after update completes."""
+class TestUpdateStatusReporting:
+    def test_write_status_writes_json(self, tmp_path):
+        import python.update as upd
 
-    def test_signal_file_deleted_after_update(self, tmp_path):
-        signal_file = tmp_path / "update_signal.tmp"
-        signal_file.write_text("kill")
-        assert signal_file.exists()
-        if signal_file.exists():
-            signal_file.unlink()
-        assert not signal_file.exists()
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(upd, "UPDATE_STATUS_FILE", status_file),
+            patch.object(upd, "log"),
+        ):
+            upd._write_update_status("downloading", progress=42)
+        assert json.loads(status_file.read_text(encoding="utf-8")) == {
+            "phase": "downloading",
+            "progress": 42,
+            "message": "",
+        }
 
-    def test_api_signal_cleared_after_update(self, client):
-        resp = client.put("/api/v1/updater/signal", json={"signal": "kill"})
-        assert resp.status_code == 200
-        resp = client.delete("/api/v1/updater/signal")
-        assert resp.status_code == 200
-        resp = client.get("/api/v1/updater/signal")
-        assert resp.json().get("signal") is None
+    def test_write_status_with_message(self, tmp_path):
+        import python.update as upd
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(upd, "UPDATE_STATUS_FILE", status_file),
+            patch.object(upd, "log"),
+        ):
+            upd._write_update_status("error", message="Update failed.")
+        assert json.loads(status_file.read_text(encoding="utf-8"))["message"] == (
+            "Update failed."
+        )
+
+    def test_clear_status_removes_file(self, tmp_path):
+        import python.update as upd
+
+        status_file = tmp_path / "update_status.json"
+        status_file.write_text("{}", encoding="utf-8")
+        with (
+            patch.object(upd, "UPDATE_STATUS_FILE", status_file),
+            patch.object(upd, "log"),
+        ):
+            upd._clear_update_status()
+        assert not status_file.exists()
+
+    def test_status_helpers_are_noops_without_file(self):
+        import python.update as upd
+
+        with (
+            patch.object(upd, "UPDATE_STATUS_FILE", None),
+            patch.object(upd, "log"),
+        ):
+            upd._write_update_status("checking")
+            upd._clear_update_status()
+
+    def test_status_write_failure_is_swallowed(self, tmp_path):
+        import python.update as upd
+
+        status_file = tmp_path / "update_status.json"
+        with (
+            patch.object(upd, "UPDATE_STATUS_FILE", status_file),
+            patch.object(upd, "log"),
+            patch.object(
+                status_file.__class__, "write_text", side_effect=OSError("locked")
+            ),
+        ):
+            upd._write_update_status("checking")  # must not raise
+
+    def test_relaunch_skipped_outside_auto_mode(self):
+        import python.update as upd
+
+        with (
+            patch.object(upd, "AUTO_MODE", False),
+            patch.object(upd, "subprocess") as mock_sp,
+            patch.object(upd, "log"),
+        ):
+            assert upd._relaunch_tool_after_update() is True
+        mock_sp.Popen.assert_not_called()
+
+    def test_relaunch_launches_start_exe(self):
+        import python.update as upd
+
+        start_file = Path("install") / "start.exe"
+        with (
+            patch.object(upd, "AUTO_MODE", True),
+            patch.object(upd, "START_FILE", start_file),
+            patch.object(upd, "subprocess") as mock_sp,
+            patch.object(upd, "log"),
+        ):
+            assert upd._relaunch_tool_after_update() is True
+        assert mock_sp.Popen.call_count == 1
+        cmd = mock_sp.Popen.call_args[0][0]
+        assert str(cmd[0]).endswith("start.exe")
+
+    def test_relaunch_returns_false_on_oserror(self):
+        import python.update as upd
+
+        mock_sp = MagicMock()
+        mock_sp.Popen = MagicMock(side_effect=OSError("start.exe missing"))
+        with (
+            patch.object(upd, "AUTO_MODE", True),
+            patch.object(upd, "START_FILE", Path("start.exe")),
+            patch.object(upd, "subprocess", mock_sp),
+            patch.object(upd, "log"),
+        ):
+            assert upd._relaunch_tool_after_update() is False
 
 
 # =========================================================================
-# Platform path correctness
+# Launcher binary queueing (no execv/--resume chain anymore)
 # =========================================================================
 
 
-class TestUpdatePlatformPaths:
-    """Windows/Linux path conventions used in the updater."""
+class TestLauncherBinaryQueueing:
+    def _exercise(
+        self,
+        tmp_path: Path,
+        *,
+        new_bytes: bytes = b"new-start-binary",
+    ) -> dict[str, Path]:
+        base = _make_install(tmp_path)
+        content_root = base / "_update_tmp" / "content"
+        content_root.mkdir(parents=True)
+        suffix = _runtime_suffix()
+        (content_root / f"start{suffix}").write_bytes(new_bytes)
+        (content_root / f"update{suffix}").write_bytes(new_bytes)
+        with (
+            patch.object(python.update, "BASE_DIR", base),
+            patch.object(python.update, "log"),
+        ):
+            python.update._swap_launcher_binaries(content_root)
+        return {
+            "start": base / f"start{suffix}",
+            "start_new": base / f"start_new{suffix}",
+            "update": base / f"update{suffix}",
+            "update_new": base / f"update_new{suffix}",
+            "content_root": content_root,
+        }
 
-    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific")
-    def test_windows_suffix(self):
-        import sys as _sys
+    def test_different_binaries_queued(self, tmp_path):
+        paths = self._exercise(tmp_path)
+        assert paths["start"].read_bytes() == b"old-start-binary"
+        assert paths["start_new"].exists()
+        assert paths["start_new"].read_bytes() == b"new-start-binary"
+        assert paths["update_new"].exists()
 
-        assert _sys.platform == "win32"
-
-    @pytest.mark.skipif(sys.platform == "win32", reason="Linux-specific")
-    def test_linux_suffix(self):
-        import sys as _sys
-
-        assert _sys.platform != "win32"
-
-    def test_suffix_constant_consistent(self):
-        suffix = ".exe" if sys.platform == "win32" else ".bin"
-        base = Path(__file__).resolve().parent.parent.parent / "src"
-        update_exe = base / "python" / f"update{suffix}"
-        assert update_exe.name == f"update{suffix}"
-
-    def test_signal_file_path_resolved(self, tmp_path):
-        base = tmp_path
-        signal_file = base / "update_signal.tmp"
-        assert signal_file.parent == base
-        assert signal_file.suffix == ".tmp"
-
-    def test_update_tmp_dir_resolved(self, tmp_path):
-        base = tmp_path
-        temp_dir = (base / "_update_tmp").resolve()
-        assert str(temp_dir).endswith("_update_tmp")
+    def test_identical_binaries_not_queued(self, tmp_path):
+        base = _make_install(tmp_path)
+        content_root = base / "_update_tmp" / "content"
+        content_root.mkdir(parents=True)
+        suffix = _runtime_suffix()
+        (content_root / f"start{suffix}").write_bytes(b"old-start-binary")
+        with (
+            patch.object(python.update, "BASE_DIR", base),
+            patch.object(python.update, "log"),
+        ):
+            python.update._swap_launcher_binaries(content_root)
+        assert not (base / f"start_new{suffix}").exists()
 
 
 # =========================================================================
-# Update source override (TIKTOK2MC_UPDATE_SOURCE)
+# Update source + signing key override (test-only env hooks)
 # =========================================================================
 
 
 class TestUpdateSourceOverride:
-    """Tests the test-only update source override in update.py._init()."""
+    """``_init()`` must keep honoring the test-only env hooks."""
 
     _GLOBALS = (
         "BASE_DIR",
         "TEMP_DIR",
-        "VERSION_FILE",
-        "DEFAULT_CONFIG_FILE",
-        "CONFIG_FILE",
         "START_FILE",
+        "VERSION_FILE",
+        "UPDATE_STATUS_FILE",
         "AUTO_MODE",
         "cfg",
-        "CONFIG_UPDATE_ENABLE",
         "GITHUB_TOKEN",
         "HEADERS_API",
         "HEADERS_ASSET",
         "API_URL",
+        "SIGNING_PUBLIC_KEY",
     )
 
     def _run_init(self, monkeypatch, tmp_path: Path) -> None:
@@ -1018,11 +851,6 @@ class TestUpdateSourceOverride:
             encoding="utf-8",
         )
         monkeypatch.setattr(python.update, "get_base_dir", lambda: base)
-        monkeypatch.setattr(
-            python.update,
-            "load_config",
-            lambda _path: {"auto_update_config": True},
-        )
         monkeypatch.setattr(sys, "argv", ["update.py", "--auto"])
         python.update._init()
 
@@ -1060,214 +888,33 @@ class TestUpdateSourceOverride:
                 setattr(python.update, n, v)
             monkeypatch.delenv("TIKTOK2MC_UPDATE_SOURCE", raising=False)
 
-
-# =========================================================================
-# Status reporting + relaunch helpers (GUI launcher feedback)
-# =========================================================================
-
-
-class TestUpdateStatusReporting:
-    """Tests the GUI-feedback helpers added to update.py.
-
-    ``_write_update_status`` / ``_clear_update_status`` publish progress for
-    ``gui.py::LauncherAPI.get_update_status``; ``_relaunch_tool_after_update``
-    restarts ``start.exe`` after a successful ``--auto`` install because
-    ``start.py`` already exited on the kill signal.
-    """
-
-    def test_write_status_writes_json(self, tmp_path):
+    def test_signing_key_env_override(self, monkeypatch, tmp_path):
         import python.update
 
-        status_file = tmp_path / "update_status.json"
-        with (
-            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
-            patch.object(python.update, "log"),
-        ):
-            python.update._write_update_status("downloading", progress=42)
-        assert json.loads(status_file.read_text(encoding="utf-8")) == {
-            "phase": "downloading",
-            "progress": 42,
-            "message": "",
-        }
+        test_key = Ed25519PrivateKey.generate()
+        test_hex = test_key.public_key().public_bytes_raw().hex()
+        snap = {n: getattr(python.update, n, None) for n in self._GLOBALS}
+        try:
+            monkeypatch.setenv("T2M_SIGNING_PUBLIC_KEY", test_hex)
+            self._run_init(monkeypatch, tmp_path)
+            assert python.update.SIGNING_PUBLIC_KEY == test_hex
+        finally:
+            for n, v in snap.items():
+                setattr(python.update, n, v)
+            monkeypatch.delenv("T2M_SIGNING_PUBLIC_KEY", raising=False)
 
-    def test_write_status_with_message(self, tmp_path):
+    def test_no_signing_env_uses_embedded_key(self, monkeypatch, tmp_path):
         import python.update
 
-        status_file = tmp_path / "update_status.json"
-        with (
-            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
-            patch.object(python.update, "log"),
-        ):
-            python.update._write_update_status("error", message="Update failed.")
-        assert json.loads(status_file.read_text(encoding="utf-8"))["message"] == (
-            "Update failed."
-        )
-
-    def test_clear_status_removes_file(self, tmp_path):
-        import python.update
-
-        status_file = tmp_path / "update_status.json"
-        status_file.write_text("{}", encoding="utf-8")
-        with (
-            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
-            patch.object(python.update, "log"),
-        ):
-            python.update._clear_update_status()
-        assert not status_file.exists()
-
-    def test_status_helpers_are_noops_without_file(self):
-        """When _init() was never called, UPDATE_STATUS_FILE is None → no-ops."""
-        import python.update
-
-        with (
-            patch.object(python.update, "UPDATE_STATUS_FILE", None),
-            patch.object(python.update, "log"),
-        ):
-            python.update._write_update_status("checking")
-            python.update._clear_update_status()
-
-    def test_status_write_failure_is_swallowed(self, tmp_path):
-        import python.update
-
-        status_file = tmp_path / "update_status.json"
-        with (
-            patch.object(python.update, "UPDATE_STATUS_FILE", status_file),
-            patch.object(python.update, "log"),
-            patch.object(
-                status_file.__class__, "write_text", side_effect=OSError("locked")
-            ),
-        ):
-            python.update._write_update_status("checking")  # must not raise
-
-    def test_relaunch_skipped_outside_auto_mode(self):
-        import python.update
-
-        with (
-            patch.object(python.update, "AUTO_MODE", False),
-            patch.object(python.update, "subprocess") as mock_sp,
-            patch.object(python.update, "log"),
-        ):
-            assert python.update._relaunch_tool_after_update() is True
-        mock_sp.Popen.assert_not_called()
-
-    def test_relaunch_launches_start_exe(self):
-        import python.update
-
-        start_file = Path("install") / "start.exe"
-        with (
-            patch.object(python.update, "AUTO_MODE", True),
-            patch.object(python.update, "START_FILE", start_file),
-            patch.object(python.update, "subprocess") as mock_sp,
-            patch.object(python.update, "log"),
-        ):
-            assert python.update._relaunch_tool_after_update() is True
-        assert mock_sp.Popen.call_count == 1
-        cmd = mock_sp.Popen.call_args[0][0]
-        assert str(cmd[0]).endswith("start.exe")
-
-    def test_relaunch_returns_false_on_oserror(self):
-        import python.update
-
-        mock_sp = MagicMock()
-        mock_sp.Popen = MagicMock(side_effect=OSError("start.exe missing"))
-        with (
-            patch.object(python.update, "AUTO_MODE", True),
-            patch.object(python.update, "START_FILE", Path("start.exe")),
-            patch.object(python.update, "subprocess", mock_sp),
-            patch.object(python.update, "log"),
-        ):
-            assert python.update._relaunch_tool_after_update() is False
-
-
-class TestInstallFileWithRetry:
-    """Tests _install_file_with_retry (locked-file retry on Windows).
-
-    The retry is what closes the race between start.exe exiting on the kill
-    signal and the updater replacing it — on non-Windows platforms the first
-    failure must propagate immediately (original behavior).
-    """
-
-    @staticmethod
-    def _flaky_copy(fails: int, real_copy) -> tuple:
-        calls = {"n": 0}
-
-        def flaky(src, dst):
-            calls["n"] += 1
-            if calls["n"] <= fails:
-                raise OSError(32, "file in use")
-            return real_copy(src, dst)
-
-        return flaky, calls
-
-    def test_success_first_try(self, tmp_path):
-        import python.update
-
-        src = tmp_path / "src.txt"
-        src.write_text("data")
-        dst = tmp_path / "dst.txt"
-        with (
-            patch.object(python.update, "sys", MagicMock(platform="win32")),
-            patch.object(python.update, "log"),
-        ):
-            python.update._install_file_with_retry(src, dst)
-        assert dst.read_text() == "data"
-
-    def test_retries_lock_then_succeeds(self, tmp_path):
-        import shutil
-
-        import python.update
-
-        real_copy = shutil.copy2
-        flaky, calls = self._flaky_copy(2, real_copy)
-        src = tmp_path / "src.txt"
-        src.write_text("data")
-        dst = tmp_path / "dst.txt"
-        with (
-            patch.object(python.update, "sys", MagicMock(platform="win32")),
-            patch.object(python.update.shutil, "copy2", flaky),
-            patch.object(python.update.time, "sleep"),
-        ):
-            python.update._install_file_with_retry(src, dst)
-        assert calls["n"] == 3
-        assert dst.read_text() == "data"
-
-    def test_raises_after_retry_window(self, tmp_path):
-        import python.update
-
-        calls = {"n": 0}
-
-        def always_locked(_src, _dst):
-            calls["n"] += 1
-            raise OSError(32, "file in use")
-
-        src = tmp_path / "src.txt"
-        src.write_text("data")
-        dst = tmp_path / "dst.txt"
-        with (
-            patch.object(python.update, "sys", MagicMock(platform="win32")),
-            patch.object(python.update.shutil, "copy2", always_locked),
-            patch.object(python.update.time, "sleep"),
-            pytest.raises(OSError),
-        ):
-            python.update._install_file_with_retry(src, dst)
-        assert calls["n"] == 101
-
-    def test_no_retry_outside_win32(self, tmp_path):
-        import python.update
-
-        calls = {"n": 0}
-
-        def always_fails(_src, _dst):
-            calls["n"] += 1
-            raise OSError("not locked")
-
-        src = tmp_path / "src.txt"
-        src.write_text("data")
-        dst = tmp_path / "dst.txt"
-        with (
-            patch.object(python.update, "sys", MagicMock(platform="linux")),
-            patch.object(python.update.shutil, "copy2", always_fails),
-            pytest.raises(OSError),
-        ):
-            python.update._install_file_with_retry(src, dst)
-        assert calls["n"] == 1
+        snap = {n: getattr(python.update, n, None) for n in self._GLOBALS}
+        try:
+            monkeypatch.delenv("T2M_SIGNING_PUBLIC_KEY", raising=False)
+            self._run_init(monkeypatch, tmp_path)
+            assert (
+                python.update.SIGNING_PUBLIC_KEY
+                == python.update.RELEASE_SIGNING_PUBLIC_KEY
+            )
+        finally:
+            for n, v in snap.items():
+                setattr(python.update, n, v)
+            monkeypatch.delenv("T2M_SIGNING_PUBLIC_KEY", raising=False)

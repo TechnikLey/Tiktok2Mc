@@ -23,6 +23,10 @@ EXIT_MISSING_CHECKSUM: Final[int] = 12
 EXIT_CHECKSUM_MISMATCH: Final[int] = 13
 EXIT_DOWNLOAD_FAILED: Final[int] = 14
 EXIT_INSTALL_FAILED: Final[int] = 15
+# P3a: detached Ed25519 manifest signature invalid/missing-content.
+# Appended AFTER the legacy block; numeric values are E2E API and existing
+# codes are never renumbered.
+EXIT_SIGNATURE_MISMATCH: Final[int] = 16
 
 EXIT_MESSAGES: Final[dict[int, str]] = {
     EXIT_OK: "Update installed successfully.",
@@ -34,4 +38,5 @@ EXIT_MESSAGES: Final[dict[int, str]] = {
     EXIT_CHECKSUM_MISMATCH: "Checksum verification failed — file may be corrupted.",
     EXIT_DOWNLOAD_FAILED: "Download failed.",
     EXIT_INSTALL_FAILED: "Could not install the update (files locked or read-only?).",
+    EXIT_SIGNATURE_MISMATCH: "Update manifest signature verification failed — update rejected.",
 }
