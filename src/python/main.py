@@ -75,7 +75,7 @@ from core.logger import (
 )
 from core.mca_parser import parse_mca
 from core.overlay_utils import send_overlay_text
-from core.paths import get_base_dir, get_runtime_dir
+from core.paths import get_base_dir, get_data_home_base, get_runtime_dir
 from core.tiktok_chatbot import get_chatbot
 from core.validator import Severity, print_diagnostics, validate_file
 from core.yaml_utils import load_yaml
@@ -127,7 +127,7 @@ def _env_path(name: str) -> Path | None:
     return Path(value).resolve() if value else None
 
 
-_BASE_PARENT = _env_path("TIKTOK2MC_BASE_PARENT") or BASE_DIR.parent
+_BASE_PARENT = _env_path("TIKTOK2MC_BASE_PARENT") or get_data_home_base()
 CONFIG_FILE = (_BASE_PARENT / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (_BASE_PARENT / "data" / "actions.mca").resolve()
 COMMENT_COMMANDS_FILE = (_BASE_PARENT / "data" / "comment_commands.yaml").resolve()
