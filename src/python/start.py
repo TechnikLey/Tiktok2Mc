@@ -1439,6 +1439,9 @@ async def main() -> None:
     if ALLOW_CLOSE:
         log.info("\nStarting programs... (start script visible)")
 
+    # Start GUI shell early so the user gets immediate visual feedback while
+    # backend services (API, bridge, Minecraft server) are still starting.
+    await supervisor.start_shell()
     # Start backend services.
     await supervisor.start_all()
     # Start additional MC server instances that have auto_start enabled.
@@ -1448,8 +1451,7 @@ async def main() -> None:
         await auto_start_mc_instances()
     except Exception as exc:
         log.warning("[AUTO-START] Failed to auto-start MC instances: %s", exc)
-    # Start GUI shell (if registered).
-    await supervisor.start_shell()
+    # GUI shell already started above.
 
     if ALLOW_CLOSE and not IS_WINDOWS and SESSION_TOOL and supervisor._linux_sessions:
         log.info("\n--- Active %s sessions ---", SESSION_TOOL)
