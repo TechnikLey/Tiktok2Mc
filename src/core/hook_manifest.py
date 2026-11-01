@@ -75,9 +75,8 @@ def discover_hooks_dirs() -> list[Path]:
         dirs.append(main_hooks)
 
     # Plugin-bundled hooks
-    dev_plugins = root / "src" / "plugins"
-    rel_plugins = root / "plugins"
-    plugins_dir = dev_plugins if dev_plugins.is_dir() else rel_plugins
+    from core.paths import get_plugins_dir
+    plugins_dir = get_plugins_dir()
     if plugins_dir.is_dir():
         for child in sorted(plugins_dir.iterdir()):
             if child.is_dir():

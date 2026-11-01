@@ -63,16 +63,9 @@ class PluginWatcher:
         if self._plugins_dir is not None:
             return self._plugins_dir
         try:
-            from core.paths import get_root_dir
+            from core.paths import get_plugins_dir
 
-            root = get_root_dir()
-            dev_dir = root / "src" / "plugins"
-            if dev_dir.is_dir():
-                return dev_dir
-            rel_dir = root / "plugins"
-            if rel_dir.is_dir():
-                return rel_dir
-            return None
+            return get_plugins_dir()
         except (ImportError, OSError):
             return None
 

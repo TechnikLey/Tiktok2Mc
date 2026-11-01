@@ -4113,13 +4113,14 @@ const SECTION_ORDER = [
   'plugin_sandbox',
   'port_policy','api_key',
   'outbound',
-  'like_triggers'
+  'like_triggers',
+  'gifts'
 ];
 
 const CATEGORIES = {
   'Connection': ['tiktok','rcon','server_host','control_method','api'],
   'Minecraft': ['java','mc_version','minecraft_server_api'],
-  'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key'],
+  'System': ['console','overlay','theme','update','shutdown','auto_update_config','show_sudo_warning','gui','plugin_sandbox','port_policy','api_key','gifts'],
   'Integration': ['outbound'],
   'Chat & Commands': ['like_triggers']
 };
@@ -4146,7 +4147,7 @@ const SECTION_META = {
   port_policy: { title: 'Port Policy', desc: 'Controls what happens when a required port is already in use. Can auto-resolve to the next free port.', category: 'System' },
   api_key: { title: 'API Key', desc: 'Optional API key for authentication when the server is exposed beyond localhost.', category: 'System' },
   plugin_sandbox: { title: 'Plugin Sandbox', desc: 'Restricts plugin subprocess resources to limit the impact of misbehaving or compromised plugins.', category: 'System' },
-  outbound: { title: 'Outbound Webhooks', desc: 'Send stream events to external services in real time — e.g. announce every gift, follow or subscriber automatically in your Discord server. Add a channel, paste its webhook URL, pick the events and switch it on.', category: 'Integration' },
+  gifts: { title: 'Gifts', desc: 'Gift synchronization settings.', category: 'System' },
 };
 
 const SECTION_META_DE = {
@@ -4171,7 +4172,7 @@ const SECTION_META_DE = {
   port_policy: { title: 'Port-Richtlinie', desc: 'Steuert, was passiert, wenn ein benötigter Port bereits belegt ist. Kann automatisch zum nächsten freien Port wechseln.' },
   api_key: { title: 'API-Schlüssel', desc: 'Optionaler API-Schlüssel für die Authentifizierung, wenn der Server über localhost hinaus erreichbar ist.' },
   plugin_sandbox: { title: 'Plugin-Sandbox', desc: 'Beschränkt Ressourcen von Plugin-Subprozessen, um die Auswirkungen fehlerhafter oder kompromittierter Plugins zu begrenzen.' },
-  outbound: { title: 'Outbound-Webhooks', desc: 'Sendet Live-Events in Echtzeit an externe Dienste — z. B. automatisch jedes Geschenk, jeden Follow oder Subscriber in deinem Discord-Server ankündigen. Channel hinzufügen, Webhook-URL einfügen, Events wählen und einschalten.' },
+  gifts: { title: 'Geschenke', desc: 'Einstellungen zur Geschenk-Synchronisierung.' },
 };
 
 const CATEGORY_LABELS_DE = {

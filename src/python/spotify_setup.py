@@ -76,7 +76,8 @@ def _prompt_input(label: str, required: bool = True) -> str:
 
 def _get_config_file() -> Path:
     root = get_root_dir()
-    return root / "src" / "plugins" / "spotify" / "config.yaml"
+    from core.paths import get_plugins_dir
+    return get_plugins_dir() / "spotify" / "config.yaml"
 
 
 def _load_spotify_config() -> dict[str, Any]:
