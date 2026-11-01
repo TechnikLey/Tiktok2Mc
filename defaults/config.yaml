@@ -201,6 +201,10 @@ tiktok:
   # The log is stored at data/gift_revenue_log.jsonl.
   autosave_interval_seconds: 60
 
+  # USD payout per diamond used to estimate gift revenue.
+  # Default: 0.004 (creator cash-out per diamond). Adjust to your region/package.
+  diamond_value_usd: 0.004
+
   # Follow tracking — prevents viewers from farming the follow trigger
   # by repeatedly unfollowing and refollowing.
   #

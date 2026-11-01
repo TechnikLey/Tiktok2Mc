@@ -40,8 +40,8 @@ describe('filterRevenueEntries', () => {
 
 describe('revenueGrossFromNet', () => {
   it('derives gross (viewer spend) from net using real TikTok rates', () => {
-    expect(window.revenueGrossFromNet(10)).toBe(52);
-    expect(window.revenueGrossFromNet(65)).toBe(338);
+    expect(window.revenueGrossFromNet(10)).toBe(65);
+    expect(window.revenueGrossFromNet(65)).toBe(422.5);
     expect(window.revenueGrossFromNet(0)).toBe(0);
     expect(window.revenueGrossFromNet(undefined)).toBe(0);
   });
@@ -51,8 +51,8 @@ describe('revenueEnrichEntry', () => {
   it('adds gross and TikTok share to a raw entry', () => {
     const enriched = window.revenueEnrichEntry({ date: '2026-08-01', estimated_revenue_usd: 10 });
     expect(enriched.netUsd).toBe(10);
-    expect(enriched.grossUsd).toBe(52);
-    expect(enriched.tiktokUsd).toBe(42);
+    expect(enriched.grossUsd).toBe(65);
+    expect(enriched.tiktokUsd).toBe(55);
   });
 });
 
@@ -61,8 +61,8 @@ describe('computeRevenueStats', () => {
     const stats = window.computeRevenueStats(ENTRIES);
     expect(stats.count).toBe(4);
     expect(stats.totalUsd).toBe(65);
-    expect(stats.totalGrossUsd).toBe(338);
-    expect(stats.tiktokUsd).toBe(273);
+    expect(stats.totalGrossUsd).toBe(422.5);
+    expect(stats.tiktokUsd).toBe(357.5);
     expect(stats.averageUsd).toBe(16.25);
     expect(stats.best).toEqual({ date: '2026-08-03', value: 30 });
     expect(stats.worst).toEqual({ date: '2026-08-04', value: 5 });
@@ -137,8 +137,8 @@ describe('EUR formatting (German UI)', () => {
     window.renderRevenueSummary(ENTRIES);
     const text = document.getElementById('revenue-summary').textContent;
     expect(text).toContain('55,90 €');
-    expect(text).toContain('290,68 €');
-    expect(text).toContain('234,78 €');
+    expect(text).toContain('363,35 €');
+    expect(text).toContain('307,45 €');
   });
 });
 
@@ -164,8 +164,8 @@ describe('revenue rendering', () => {
     const el = document.getElementById('revenue-summary');
     const text = el.textContent;
     expect(text).toContain('$65.00');
-    expect(text).toContain('$338.00');
-    expect(text).toContain('$273.00');
+    expect(text).toContain('$422.50');
+    expect(text).toContain('$357.50');
     expect(text).toContain('16.25');
     expect(text).toContain('2026-08-03');
     expect(text).toContain('Last 7 vs prev 7');
@@ -199,9 +199,9 @@ describe('revenue rendering', () => {
     const rows = el.querySelectorAll('tbody tr');
     expect(rows.length).toBe(4);
     expect(rows[0].textContent).toContain('2026-08-01');
-    expect(rows[0].textContent).toContain('$52.00');
+    expect(rows[0].textContent).toContain('$65.00');
     expect(rows[0].textContent).toContain('$10.00');
-    expect(rows[0].textContent).toContain('$42.00');
+    expect(rows[0].textContent).toContain('$55.00');
     expect(rows[2].textContent).toContain('2026-08-03');
     expect(rows[2].textContent).toContain('+$10.00');
     expect(rows[3].textContent).toContain('-$25.00');

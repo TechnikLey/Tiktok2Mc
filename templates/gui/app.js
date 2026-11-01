@@ -2046,13 +2046,23 @@ async function testOverlay(encodedName, btn) {
 let _revenueData = { entries: [], file: {} };
 
 /* Real TikTok payout model (community-estimated 2026 rates).
-   Net = diamond value × $0.005 (creator cash-out). Gross = what the
+   Net = diamond value × $0.004 (creator cash-out). Gross = what the
    viewer actually spent: 2 coins become 1 diamond, coins cost ≈ $0.013
    on average, so gross = net × (2 × 0.013) / 0.005 ≈ net × 5.2 and the
    creator keeps ≈ 19 % of the viewer's spend. */
-const REVENUE_NET_PER_DIAMOND_USD = 0.005;
+let REVENUE_NET_PER_DIAMOND_USD = 0.004;
 const REVENUE_COINS_PER_DIAMOND = 2;
 const REVENUE_USD_PER_COIN = 0.013;
+
+async function loadRevenueConfig() {
+  try {
+    const data = await fetchJSON('/config');
+    const rate = Number(data && data.config && data.config.tiktok && data.config.tiktok.diamond_value_usd);
+    if (Number.isFinite(rate) && rate > 0) REVENUE_NET_PER_DIAMOND_USD = rate;
+  } catch (e) {
+    // keep default
+  }
+}
 
 function _revenueRound2(value) {
   return Math.round(value * 100) / 100;
@@ -2086,6 +2096,8 @@ function revenueEnrichEntry(e) {
 }
 
 async function loadRevenueView() {
+  await loadRevenueConfig();
+  refreshUsdToEurRate();
   try {
     const data = await fetchJSON('/revenue');
     _revenueData = data && Array.isArray(data.entries) ? data : { entries: [], file: {} };
@@ -2210,7 +2222,24 @@ function formatEUR(value) {
   return (neg ? '-' : '') + grouped + ',' + dec + ' €';
 }
 
-const USD_TO_EUR_RATE = 0.86; // 1 USD ≈ 0.86 EUR (2026 average)
+let USD_TO_EUR_RATE = 0.86; // 1 USD ≈ 0.86 EUR (default; refreshed at runtime)
+
+async function refreshUsdToEurRate() {
+  try {
+    const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=EUR');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const rate = Number(data && data.rates && data.rates.EUR);
+    if (Number.isFinite(rate) && rate > 0) {
+      USD_TO_EUR_RATE = rate;
+      return rate;
+    }
+    throw new Error('invalid rate');
+  } catch (e) {
+    // keep default (today's value) on error
+    return USD_TO_EUR_RATE;
+  }
+}
 
 function formatCurrency(value) {
   const v = Number(value) || 0;

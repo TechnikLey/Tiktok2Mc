@@ -234,6 +234,7 @@ class BotContext:
         self.gift_value_usd = 0
         self.gift_day_start_value = 0
         self.gift_current_log_date = None
+        self.diamond_value_usd = 0.004
 
         # Session tracking (reset on each live connection)
         self.session_start_ts = None
@@ -595,6 +596,9 @@ def _apply_config(config: dict) -> None:
     )
     ctx.autosave_interval_seconds = config.get("tiktok", {}).get(
         "autosave_interval_seconds", 60
+    )
+    ctx.diamond_value_usd = float(
+        config.get("tiktok", {}).get("diamond_value_usd", 0.004) or 0.004
     )
 
     ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
@@ -2456,8 +2460,15 @@ def create_client(user):
             gift_id = str(event.gift.id)
 
             with ctx.gift_lock:
-                ctx.gift_value_usd += event.value
-                ctx.session_gift_value_usd += event.value
+                diamonds = getattr(event, "repeat_count", 1) * getattr(
+                    event.gift, "diamond_count", 0
+                )
+                if diamonds:
+                    value_usd = diamonds * ctx.diamond_value_usd
+                else:
+                    value_usd = event.value
+                ctx.gift_value_usd += value_usd
+                ctx.session_gift_value_usd += value_usd
                 ctx.session_gifts += count
 
             username = username_from_event_safe(event)

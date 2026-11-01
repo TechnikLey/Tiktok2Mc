@@ -606,7 +606,7 @@
     'revenue.legendGross': 'Gross (viewer spend)',
     'revenue.legendNet': 'Net (payout)',
     'revenue.legendFee': 'TikTok fee',
-    'revenue.estimateNote': 'Estimates based on TikTok rates: 1 diamond = $0.005 payout, 2 coins = 1 diamond, coins ≈ $0.013 each. Actual payouts vary by region, package and app store.',
+    'revenue.estimateNote': 'Estimates based on TikTok rates: 1 diamond = $0.004 payout, 2 coins = 1 diamond, coins ≈ $0.013 each. Actual payouts vary by region, package and app store.',
 
     /* ── Event Tester ── */
     'triggers.title': 'Event Tester',
@@ -1728,7 +1728,7 @@
     'revenue.legendGross': 'Brutto (Zuschauer gaben aus)',
     'revenue.legendNet': 'Netto (Auszahlung)',
     'revenue.legendFee': 'TikTok-Gebühr',
-    'revenue.estimateNote': 'Schätzungen basieren auf TikTok-Sätzen: 1 Diamant = 0,005 $ (≈ 0,004 €) Auszahlung, 2 Coins = 1 Diamant, Coins ≈ 0,013 $ (≈ 0,011 €)/Stück. Umrechnung: 1 $ ≈ 0,86 €. Tatsächliche Auszahlungen variieren je nach Region, Paket und App-Store.',
+    'revenue.estimateNote': 'Schätzungen basieren auf TikTok-Sätzen: 1 Diamant = 0,004 $ (≈ 0,004 €) Auszahlung, 2 Coins = 1 Diamant, Coins ≈ 0,013 $ (≈ 0,011 €)/Stück. Umrechnung: 1 $ ≈ 0,86 €. Tatsächliche Auszahlungen variieren je nach Region, Paket und App-Store.',
 
     /* ── Event Tester ── */
     'triggers.title': 'Event-Tester',
