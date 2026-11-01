@@ -1510,7 +1510,7 @@ def cmd_app(args):
                 pool.map(copy_one, all_files)
 
         sync_folder("assets", OUT_DIR / "core" / "assets")
-        sync_folder("templates", OUT_DIR / "core" / "templates")
+        sync_folder("templates", OUT_DIR / "core" / "templates", exclude=["gui/node_modules/**"])
         sync_folder("tools/Java", OUT_DIR / "server" / "java")
         sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
         for hook_src_dir in set(plugin_hook_dirs):
