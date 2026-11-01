@@ -8,6 +8,7 @@ import core.paths
 from core.api.models import (
     ActionsResponse,
     ActionsUpdateRequest,
+    GiftSyncRequest,
     RawActionsResponse,
     RawActionsUpdateRequest,
 )
@@ -170,6 +171,18 @@ async def get_gifts():
         gifts.sort(key=lambda g: (g.get("coins", 0), g.get("name", "")))
         return {"gifts": gifts}
     except Exception as e:  # any unexpected error becomes an HTTP 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/gifts/sync")
+def sync_gifts_catalog(body: GiftSyncRequest | None = None):
+    import core.gift_sync as gift_sync
+
+    if body is None:
+        body = GiftSyncRequest()
+    try:
+        return gift_sync.sync_gifts(source=body.source)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

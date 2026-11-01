@@ -148,6 +148,21 @@ class ActionsEditor {
     }
   }
 
+  async syncGifts() {
+    const btn = document.getElementById('syncGiftsBtn');
+    if (btn) { btn.disabled = true; btn.textContent = I18N.t('actions.syncingGifts'); }
+    try {
+      const res = await postJSON('/gifts/sync', { source: 'auto' });
+      showToast(I18N.t('actions.syncGiftsDone', { total: res.total, added: res.added, removed: res.removed }), 'success');
+      await this.loadGifts();
+      this._renderGiftList && this._renderGiftList();
+    } catch (e) {
+      showToast(I18N.t('actions.syncGiftsFailed', { msg: e.message }), 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = I18N.t('actions.syncGifts'); }
+    }
+  }
+
   /* ── Tab Switching ── */
 
   /* ── Table Rendering ── */

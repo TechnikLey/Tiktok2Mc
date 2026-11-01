@@ -38,6 +38,16 @@ def get_root_dir() -> Path:
     return base.parent.parent.resolve()
 
 
+def get_gifts_file() -> Path:
+    """Return the runtime gift catalog (``core/gifts.json``).
+
+    Resolution contract mirrors ``_load_gifts`` in the actions route:
+    the synced file at ``<root>/core/gifts.json`` wins over the shipped
+    factory template ``<root>/defaults/gifts.json``.
+    """
+    return get_root_dir().resolve() / "core" / "gifts.json"
+
+
 def get_base_file() -> Path:
     """Return the main executable location (P3a-aware).
 

@@ -218,6 +218,19 @@ tiktok:
     mode: "all_time"
 
 # ===========================================================================
+# GIFT CATALOG SYNC
+# ===========================================================================
+# The gift ID→name database (core/gifts.json) is auto-refreshed from TikTok's
+# official live-gift endpoint at app start (and on demand via the GUI button
+# in the Actions editor). The factory template (defaults/gifts.json) is never
+# modified, so a stale/missing catalog still has a shipped fallback.
+gifts:
+  auto_sync: true
+  # Source: "auto" (official endpoint, then antiops GitHub mirror fallback),
+  # "official" (TikTok endpoint only), or "fallback" (antiops mirror only).
+  source: "auto"
+
+# ===========================================================================
 #  LIKE TRIGGERS
 # ===========================================================================
 # Like triggers fire when the total stream likes reach a threshold.

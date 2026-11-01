@@ -295,6 +295,28 @@ async def lifespan(app: FastAPI):
     get_dashboard_publisher().start()
     get_tiktok_live_tracker().start()
     get_chatbot_status_tracker().start()
+    # Auto-sync the gift catalog once at boot (config-gated, best-effort).
+    # Failures never block startup — the stale catalog keeps serving.
+    try:
+        cfg = ApiService().read_config()
+        gifts_cfg = cfg.get("gifts", {}) or {}
+        if gifts_cfg.get("auto_sync", True):
+            try:
+                from core.gift_sync import sync_gifts
+
+                summary = sync_gifts(source=gifts_cfg.get("source", "auto"))
+                if summary.get("ok"):
+                    log.info(
+                        "Gift catalog synced at boot: %d gifts (%s)",
+                        summary.get("total", 0),
+                        summary.get("source"),
+                    )
+                else:
+                    log.warning("Gift catalog sync failed: %s", summary.get("error"))
+            except Exception as exc:
+                log.warning("Gift catalog sync failed: %s", exc)
+    except Exception:  # RCON-style: config read may fail; sync optional
+        log.warning("Gift catalog sync skipped: could not read config")
     # Pre-configure RCON from config for the console feature
     try:
         cfg = ApiService().read_config()

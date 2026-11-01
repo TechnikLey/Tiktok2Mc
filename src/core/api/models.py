@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -380,6 +380,31 @@ class PluginRegisterRequest(BaseModel):
     health_status: str = "unknown"
     last_heartbeat: float | None = None
     platform: str = "all"
+
+
+class GiftSyncRequest(BaseModel):
+    """Body for ``POST /api/v1/gifts/sync``."""
+
+    source: Literal["auto", "official", "fallback"] = Field(
+        default="auto",
+        description=(
+            "Gift source: 'auto' tries the official endpoint first, then the "
+            "antiops GitHub mirror; 'official' / 'fallback' pin one source."
+        ),
+    )
+
+
+class GiftSyncResponse(BaseModel):
+    """Result of a gift catalog sync run."""
+
+    ok: bool
+    source: str | None = None
+    total: int = 0
+    added: int = 0
+    removed: int = 0
+    renamed: int = 0
+    target: str | None = None
+    error: str | None = None
 
 
 class PluginUpdateRequest(BaseModel):
