@@ -173,11 +173,11 @@ CORE_TEMPLATES: list[dict[str, Any]] = [
 
 def _plugins_dir() -> Path | None:
     """Return the plugins directory (dev or release layout), or None."""
-    root = core.paths.get_root_dir()
-    for candidate in (root / "src" / "plugins", root / "plugins"):
-        if candidate.is_dir():
-            return candidate
-    return None
+    try:
+        d = core.paths.get_plugins_dir()
+        return d if d.is_dir() else None
+    except Exception:
+        return None
 
 
 def collect_known_event_keys(plugins_dir: Path | None = None) -> set[str]:

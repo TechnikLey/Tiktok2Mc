@@ -538,6 +538,7 @@ _CONFIG_SCHEMA: dict[str, type] = {
     "config_version": str,
     "console": dict,
     "control_method": str,
+    "gifts": dict,
     "gui": dict,
     "instances": dict,
     "java": dict,
