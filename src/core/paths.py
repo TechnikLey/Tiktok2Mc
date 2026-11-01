@@ -43,9 +43,24 @@ def get_gifts_file() -> Path:
 
     Resolution contract mirrors ``_load_gifts`` in the actions route:
     the synced file at ``<root>/core/gifts.json`` wins over the shipped
-    factory template ``<root>/defaults/gifts.json``.
+    factory template ``<root>/defaults/gifts.json``. In a versioned layout
+    (P3a) the file ships inside the active app dir, so that location is
+    checked first.
     """
-    return get_root_dir().resolve() / "core" / "gifts.json"
+    try:
+        active = get_active_app_dir()
+    except Exception:
+        active = None
+    candidates = []
+    if active is not None:
+        candidates.append(active / "core" / "gifts.json")
+    root = get_root_dir().resolve()
+    candidates.append(root / "core" / "gifts.json")
+    for c in candidates:
+        if c.exists():
+            return c.resolve()
+    # Fall back to the (possibly not-yet-synced) root location.
+    return (root / "core" / "gifts.json").resolve()
 
 
 def get_base_file() -> Path:
