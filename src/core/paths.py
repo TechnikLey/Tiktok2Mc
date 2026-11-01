@@ -94,12 +94,18 @@ def get_data_home_base() -> Path:
 
     Resolution order:
 
-    1. Versioned layout detected under the install root → the root itself.
-    2. User data already lives at the install root (legacy/dev) → root.
-    3. Alternate home (``%LOCALAPPDATA%/Tiktok2Mc`` / ``~/.local/share/...``)
+    1. ``T2M_DATA_HOME`` environment override (test-only hook, mirrors
+       ``TIKTOK2MC_UPDATE_SOURCE`` — must win over every auto-detection).
+    2. Versioned layout detected under the install root → the root itself.
+    3. User data already lives at the install root (legacy/dev) → root.
+    4. Alternate home (``%LOCALAPPDATA%/Tiktok2Mc`` / ``~/.local/share/...``)
        — only when it already exists there.
-    4. Install root (fresh legacy install, nothing exists yet).
+    5. Install root (fresh legacy install, nothing exists yet).
     """
+    override = os.environ.get("T2M_DATA_HOME", "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+
     root = get_root_dir()
 
     if get_active_app_dir() is not None:

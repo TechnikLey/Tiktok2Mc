@@ -2,22 +2,45 @@
 
 Runs the **compiled** updater (`update.exe` / `update.bin`) against a
 GitHub-compatible local mock server, so the real production code path of
-`src/python/update.py` is exercised end to end: version check, asset
-selection, download, checksum verification, extraction, updater
-self-update, whitelisted file copy, config migration and exit codes.
+`src/python/update.py` is exercised end to end. The flow is the P3a
+Omaha-style state machine:
+
+```
+CHECK → FETCH → VERIFY_SIG → VERIFY_SHA → STAGE → FLIP → PRUNE → NOTIFY
+```
+
+- **CHECK** version resolution (`current.json` pointer → `version.txt`)
+- **FETCH** platform archive + `manifest.json` + `manifest.json.sig` assets
+- **VERIFY_SIG** detached Ed25519 signature against the embedded key
+  (test-only override: `T2M_SIGNING_PUBLIC_KEY`)
+- **VERIFY_SHA** archive `.sha256`, then per-file sha256 vs. the manifest
+- **STAGE** verified `app-<ver>/` moved into the install root
+- **FLIP** atomic `current.json` pointer update (records `previous_app_dir`)
+- **PRUNE** old `app-<ver>/` dirs (newest rollback generation kept)
+- **NOTIFY** progress file + `--auto` relaunch
+
+The updater **never touches running processes** and does **not** copy
+whitelisted files or migrate the user config anymore — the launcher does
+that at the next boot (`resolve_app_base`,
+`swap_pending_launcher_binaries`, first-start config hook; covered by the
+`launch_maintenance` / `config_migration_parity` scenarios).
 
 * `mock_github.py` — local server that mimics the GitHub Releases API
-  (release JSON + asset download + `.sha256` companion asset). Stdlib only.
+  (release JSON + archive + `.sha256` + `manifest.json`/`.sig` asset
+  serving). Stdlib only.
 * `run_update_test.py` — the harness: builds a realistic old installation,
-  serves a fake release and runs the compiled updater against it. The only
-  simulated part is the HTTP source; everything else is the real binary.
+  assembles a P3a release (app dir, pointer, signed manifest — mirroring
+  `build.py`'s assembly), serves it and runs the compiled updater against
+  it. The only simulated part is the HTTP source; everything else is the
+  real binary.
 
 ## Requirements
 
 * A compiled updater: `python build.py app --only update`.
 * The control-plane port `29185` must be free — the harness binds it to
-  simulate the app's kill-signal endpoint and refuses to start if a real
-  Tiktok2Mc instance is running.
+  reserve the port (and keep the legacy kill-signal endpoint alive for
+  pre-P3a updater binaries) and refuses to start if a real Tiktok2Mc
+  instance is running.
 
 ## Usage
 
@@ -39,18 +62,29 @@ output. The test installation, release archive and both mock servers live
 exclusively in the scratch dir — nothing in `src/`, `config/` or `data/`
 is touched.
 
-## Update source override
+## Test-only env overrides (compiled binary hooks)
 
-The compiled updater reads `TIKTOK2MC_UPDATE_SOURCE` (set by the harness)
-to point at the local mock instead of the hardcoded GitHub URL. The hook
-lives in `src/python/update.py::_init()`:
+Both hooks live in `src/python/update.py::_init()`; production never sets
+these variables:
 
-```python
-API_URL = os.environ.get("TIKTOK2MC_UPDATE_SOURCE") or API_URL
-```
+* `TIKTOK2MC_UPDATE_SOURCE` — point the updater at the local mock instead
+  of the hardcoded GitHub URL:
 
-Production never sets this variable, so the default GitHub URL is used
-unchanged. See `tests/test_core/test_update_e2e.py::TestUpdateSourceOverride`.
+  ```python
+  API_URL = os.environ.get("TIKTOK2MC_UPDATE_SOURCE") or API_URL
+  ```
+
+* `T2M_SIGNING_PUBLIC_KEY` — make the updater trust the harness's per-run
+  Ed25519 key (raw 64-byte hex). The harness signs the release manifest
+  with its own generated key (`Harness.release_key`); scenarios that test
+  signature failures sign with `Harness.bad_key` instead.
+* `T2M_DATA_HOME` — isolate the *user data home* (``core.paths``): scenarios
+  that exercise launcher-side maintenance (``config_migration_parity``) set
+  it to the scratch install, so the first-start config hook reads/writes the
+  scratch config and runtime marker instead of the developer's real
+  ``config/`` and ``core/runtime/``.
+
+See `tests/test_core/test_update_e2e.py::TestUpdateSourceOverride`.
 
 ## Exit codes
 
@@ -60,38 +94,50 @@ failure reason (`GET /api/v1/updates/result`).
 
 | Code | Meaning |
 |------|---------|
-| `0`  | Update installed successfully |
+| `0`  | Update staged + pointer flipped successfully |
 | `1`  | Unexpected error (crash / bad startup config) |
 | `5`  | No update needed (also beta declined / auto-skip) — benign |
 | `10` | API / network error while checking for updates |
-| `11` | No release asset for this platform |
-| `12` | Checksum file is missing |
-| `13` | Checksum verification failed |
+| `11` | No release asset (or no `manifest.json` asset) for this platform |
+| `12` | Archive `.sha256` companion asset missing |
+| `13` | Checksum verification failed (archive or per-file manifest) |
 | `14` | Download failed |
-| `15` | Install failed (locked / read-only file) |
+| `15` | Install failed (files locked / read-only) |
+| `16` | Manifest signature verification failed — update rejected |
 
 The harness scenarios assert these codes (see `run_update_test.py`).
+
+## Scenarios
+
+| Scenario | What it pins |
+|----------|--------------|
+| `success` | legacy flat install → assembled release: app dir staged, pointer flipped, launcher binaries queued, config untouched |
+| `versioned_update` | stale target dir wiped/re-staged, previous generation kept as rollback, ancient dirs pruned |
+| `up_to_date` | exit `5`, install untouched |
+| `missing_asset` | no platform archive → `11` |
+| `missing_manifest` | no `manifest.json` asset → `11` |
+| `missing_sig` | no `.sig` asset → `16` |
+| `sig_fail` | manifest signed by an unknown key → `16`, nothing installed |
+| `bad_checksum` | archive `.sha256` mismatch → `13` |
+| `tampered_file` | packaged file differs from the signed manifest → `13` |
+| `invalid_version` | malformed release tag → benign `5` |
+| `api_error` | HTTP 500 → retried, then `10` |
+| `download_error` | archive 404 → `14` |
+| `abort_download` | kill mid-download → nothing installed |
+| `self_update` | updated `update` binary queued as `update_new` for the next boot |
+| `locked_file` | locked stale target dir → `15`, pointer intact (Windows) |
+| `retry_after_failure` | failed run then clean success |
+| `beta_prompt` | beta decline/accept |
+| `launch_maintenance` | launcher boots: `resolve_app_base` + `swap_pending_launcher_binaries` choreography, stable afterwards |
+| `config_migration_parity` | updater leaves config alone; launcher first-start hook migrates with user values preserved |
 
 ## Known Windows Defender false positive
 
 Windows Defender may flag a freshly built, unsigned `update.exe` as
 `Behavior:Win32/DefenseEvasion.A!ml`. This is **not** caused by the
-`TIKTOK2MC_UPDATE_SOURCE` test hook.
-
-Investigation summary (Aug 2026, `Behavior:Win32/DefenseEvasion.A!ml`):
-
-* PyInstaller builds are **non-deterministic**: three builds of the
-  identical source produced three different binaries (different sizes and
-  SHA-256 hashes). Each build therefore gets a fresh ML verdict.
-* The apparent A/B "trigger" did not reproduce: three fresh builds *with*
-  the hook were all clean and ran fine, while the original flagged build
-  was the first binary Windows Defender ever saw from this pipeline.
-* `!ml` verdicts on unsigned PyInstaller onefile executables are a known
-  heuristic false-positive category; the first build is sometimes flagged,
-  subsequent builds of the same source are not.
-
-This is an environment/reputation issue, so the fix belongs in the
-environment, not in code: code-sign the updater or add a Defender
-exclusion for `build/` (and the scratch directory). Do not modify the
-hook or the harness to work around it — any rebuild produces a new binary
-and a new ML verdict.
+`TIKTOK2MC_UPDATE_SOURCE` / `T2M_SIGNING_PUBLIC_KEY` test hooks — the
+heuristic simply reacts to a new, unsigned executable that spawns and
+replaces files. It is a false positive: build artifacts from `build.py`
+are always reproducible from this repository's sources, and CI releases
+are built in a clean environment. Do not work around this in code; run
+the uplifted binary from inside the scratch dir and keep Defender on.

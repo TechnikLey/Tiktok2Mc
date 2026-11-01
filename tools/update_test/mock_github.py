@@ -29,6 +29,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+MANIFEST_ASSET = "manifest.json"
+SIG_ASSET = "manifest.json.sig"
 RELEASE_PATH = "/repos/TechnikLey/Tiktok2Mc/releases/latest"
 
 
@@ -148,14 +150,21 @@ def build_release_json(
     tag_name: str,
     archive_url: str,
     archive_name: str,
+    *,
     include_checksum: bool = True,
+    include_manifest: bool = True,
+    include_sig: bool = True,
 ) -> dict[str, Any]:
     """Build a GitHub-shaped release JSON for the mock server.
 
     ``archive_url`` is the absolute asset URL the server will serve.
-    The companion ``.sha256`` asset is added when *include_checksum* is
-    set, pointing at ``<archive_url>.sha256``.
+    Companion assets are added as configured:
+
+    - ``<archive_url>.sha256`` when *include_checksum* is set,
+    - ``manifest.json`` / ``manifest.json.sig`` (P3a signed release
+      manifest) when *include_manifest* / *include_sig* are set.
     """
+    asset_base = archive_url[: -len(archive_name)]
     assets: list[dict[str, str]] = [
         {"name": archive_name, "url": archive_url},
     ]
@@ -166,4 +175,8 @@ def build_release_json(
                 "url": f"{archive_url}.sha256",
             }
         )
+    if include_manifest:
+        assets.append({"name": MANIFEST_ASSET, "url": f"{asset_base}{MANIFEST_ASSET}"})
+    if include_sig:
+        assets.append({"name": SIG_ASSET, "url": f"{asset_base}{SIG_ASSET}"})
     return {"tag_name": tag_name, "assets": assets}

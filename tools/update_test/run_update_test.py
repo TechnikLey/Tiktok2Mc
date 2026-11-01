@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
-"""End-to-end updater test harness (update.exe / update.bin).
+"""End-to-end updater test harness (update.exe / update.bin) — P3a flow.
 
 Builds a realistic old installation, serves a GitHub-compatible fake
-release via ``mock_github.py`` and runs the *compiled* updater against
-it, so the real production code path of ``src/python/update.py`` is
-exercised end to end: version check, asset selection, download, checksum
-verification, extraction, updater self-update, whitelisted file copy,
-config migration and exit codes.
+release (assembled P3a layout + signed manifest) via ``mock_github.py``
+and runs the *compiled* updater against it, so the real production code
+path of ``src/python/update.py`` is exercised end to end: version check,
+asset selection, download, manifest signature verification (Ed25519,
+detached ``.sig``), archive + per-file checksums, staging of
+``app-<ver>/`` into the install root, atomic ``current.json`` pointer
+flip, pruning of old version dirs and exit codes.
+
+The updater never touches running processes (no kill choreography) and
+no longer copies whitelisted files or migrates the user config — the
+launcher does that at the next boot (``resolve_app_base`` +
+``swap_pending_launcher_binaries``; covered by the ``launch_maintenance``
+scenario and unit tests).
 
 The only simulated part is the HTTP source: a local server that behaves
 like the GitHub Releases API. Everything else is the real compiled
@@ -53,7 +61,12 @@ for _p in (_ROOT / "src", _ROOT):
         sys.path.insert(0, str(_p))
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # noqa: E402
+    Ed25519PrivateKey,
+)
 from mock_github import (  # noqa: E402
+    MANIFEST_ASSET,
+    SIG_ASSET,
     MockGitHubServer,
     MockGitHubState,
     build_release_json,
@@ -61,7 +74,21 @@ from mock_github import (  # noqa: E402
 from ruamel.yaml import YAML  # noqa: E402
 
 from core.api.server import DEFAULT_PORT  # noqa: E402
-from core.version import TOOL_VERSION, UPDATER_VERSION  # noqa: E402
+from core.update_engine.manifest import (  # noqa: E402
+    ManifestFile,
+    generate_manifest,
+    write_manifest,
+)
+from core.update_engine.pointer import (  # noqa: E402
+    AppPointer,
+    read_pointer,
+    write_pointer,
+)
+from core.version import (  # noqa: E402
+    EXPECTED_CONFIG_VERSION,
+    TOOL_VERSION,
+    UPDATER_VERSION,
+)
 
 if os.name == "nt":
     os.system("")
@@ -70,6 +97,7 @@ SUFFIX = ".exe" if sys.platform == "win32" else ".bin"
 PLATFORM_LABEL = "Windows" if sys.platform == "win32" else "Linux"
 ARCHIVE_EXT = "zip" if sys.platform == "win32" else "tar.gz"
 UPDATE_SOURCE_ENV = "TIKTOK2MC_UPDATE_SOURCE"
+SIGNING_KEY_ENV = "T2M_SIGNING_PUBLIC_KEY"
 SIGNAL_PATH = "/api/v1/updater/signal"
 
 C = "\033[96m"
@@ -79,7 +107,8 @@ R = "\033[91m"
 X = "\033[0m"
 
 # ---------------------------------------------------------------------------
-# Templates (realistic, versioned configs so migration can be asserted)
+# Templates (realistic, versioned configs so the launcher-side migration
+# can be asserted afterwards)
 # ---------------------------------------------------------------------------
 
 INSTALL_CONFIG = (
@@ -125,7 +154,7 @@ class RunResult:
 
 
 # ---------------------------------------------------------------------------
-# Control-plane signal simulation
+# Control-plane port reservation
 # ---------------------------------------------------------------------------
 
 
@@ -168,13 +197,12 @@ class _SignalHandler(BaseHTTPRequestHandler):
 
 
 class SignalAPIServer:
-    """Fake control-plane kill-signal endpoint on ``DEFAULT_PORT``.
+    """Reserve ``DEFAULT_PORT`` while the harness runs (legacy endpoint).
 
-    In production this endpoint is provided by the running app and
-    ``start.py`` consumes the kill signal. Binding it here means the
-    compiled updater's API signaling behaves exactly like production,
-    and — because we hold the port — no real instance can be
-    accidentally signalled during the test.
+    The P3a updater never talks to this endpoint anymore; binding it here
+    primarily **reserves the control-plane port** so no real Tiktok2Mc
+    instance can be running during the test. The legacy signal contract
+    stays served for backwards compatibility with pre-P3a updaters.
     """
 
     def __init__(self) -> None:
@@ -193,35 +221,6 @@ class SignalAPIServer:
         self._httpd.shutdown()
         self._httpd.server_close()
         self._thread.join(timeout=5.0)
-
-
-class FileSignalConsumer(threading.Thread):
-    """Mimics start.py: deletes ``update_signal.tmp`` as soon as it appears.
-
-    Without a consumer the compiled updater would wait up to 30 seconds
-    in its kill-signal wait loop. Consuming the file (exactly like
-    ``start.py`` does) keeps the flow realistic and fast.
-    """
-
-    def __init__(self, install: Path) -> None:
-        super().__init__(daemon=True, name="signal-consumer")
-        self._signal = install / "update_signal.tmp"
-        # NOTE: must not be named ``_stop`` — that would shadow
-        # ``threading.Thread._stop()`` and ``join()`` would call the
-        # ``threading.Event`` instance instead of the method.
-        self._stop_event = threading.Event()
-
-    def run(self) -> None:
-        while not self._stop_event.wait(0.2):
-            try:
-                if self._signal.exists():
-                    self._signal.unlink()
-            except OSError:
-                pass
-
-    def stop(self) -> None:
-        self._stop_event.set()
-        self.join(timeout=2.0)
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +245,13 @@ class Harness:
         self.old_updater = old_updater
         self.new_tool = new_tool
         self.new_updater = new_updater
+        # Per-run signing key: the harness signs the release manifest with
+        # its own key and tells the compiled updater to trust it via the
+        # T2M_SIGNING_PUBLIC_KEY env override (mirrors
+        # TIKTOK2MC_UPDATE_SOURCE). Signature-failure scenarios sign with a
+        # deliberately wrong key (self.bad_key).
+        self.release_key = Ed25519PrivateKey.generate()
+        self.bad_key = Ed25519PrivateKey.generate()
 
     # ---- helpers ---------------------------------------------------------
 
@@ -279,6 +285,12 @@ class Harness:
             data = yaml.load(f)
         return data or {}
 
+    def read_pointer(self, install: Path) -> AppPointer | None:
+        return read_pointer(install)
+
+    def app_dir(self, install: Path, tool: str | None = None) -> Path:
+        return install / f"app-{tool or self.new_tool}"
+
     def save_output(self, scenario: str, output: str) -> Path:
         log_dir = self.scratch / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -286,18 +298,27 @@ class Harness:
         path.write_text(output, encoding="utf-8")
         return path
 
-    # ---- install / release / archive ------------------------------------
+    # ---- installations ---------------------------------------------------
 
-    def prepare_install(self) -> Path:
+    def _base_install(self) -> Path:
         install = self.scratch / "install"
         if install.exists():
             shutil.rmtree(install)
         install.mkdir(parents=True)
         shutil.copy2(self.updater, install / f"update{SUFFIX}")
         self.write(
-            install / "version.txt",
-            f"ToolVersion: {self.old_tool}\nUpdaterVersion: {self.old_updater}\n",
+            install / "version.txt", self._version_txt(self.old_tool, self.old_updater)
         )
+        self.write(install / "config" / "config.yaml", INSTALL_CONFIG)
+        self.write(install / "config" / "config.default.yaml", INSTALL_DEFAULT)
+        return install
+
+    def _version_txt(self, tool: str, updater: str) -> str:
+        return f"ToolVersion: {tool}\nUpdaterVersion: {updater}\n"
+
+    def prepare_install(self) -> Path:
+        """Legacy flat installation (pre-P3a): program content at root."""
+        install = self._base_install()
         self.write(install / "README.md", "old readme")
         self.write(install / "LICENSE", "old license")
         self.write(install / f"start{SUFFIX}", "old start")
@@ -305,33 +326,103 @@ class Harness:
         self.write(install / "core" / f"server{SUFFIX}", "old server")
         self.write(install / "core" / "marker.txt", "OLD")
         self.write(install / "plugins" / "wincounter" / "main.py", "old wincounter")
-        self.write(install / "config" / "config.yaml", INSTALL_CONFIG)
-        self.write(install / "config" / "config.default.yaml", INSTALL_DEFAULT)
         return install
+
+    def prepare_versioned_install(self) -> Path:
+        """Versioned installation with pointer, two old versions and a
+        stale leftover app dir for the target version."""
+        install = self._base_install()
+        # Versioned installs keep the launcher binaries at the root.
+        self.write(install / f"start{SUFFIX}", "old start")
+        for tool, content in ((self.old_tool, "old app"), ("0.6.0", "ancient app")):
+            app_dir = install / f"app-{tool}"
+            self.write(app_dir / "core" / f"app{SUFFIX}", content)
+            self.write(app_dir / "core" / "marker.txt", tool.upper())
+        self.write(
+            self.app_dir(install) / "core" / f"app{SUFFIX}", "stale app"
+        )  # leftover from an interrupted previous run
+        write_pointer(
+            install,
+            AppPointer(
+                active_app_dir=f"app-{self.old_tool}",
+                tool_version=self.old_tool,
+            ),
+        )
+        return install
+
+    # ---- release (P3a layout + signed manifest) ---------------------------
 
     def prepare_release(
         self, *, with_updater: bool = False, updater_version: str | None = None
     ) -> Path:
+        """Assembled P3a release: app-<ver>/ program content + root shells
+        + pointer + signed manifest (the production ``build.py`` output)."""
         release = self.scratch / "release"
         if release.exists():
             shutil.rmtree(release)
         release.mkdir(parents=True)
         rel_updater = updater_version or self.new_updater
-        self.write(
-            release / "version.txt",
-            f"ToolVersion: {self.new_tool}\nUpdaterVersion: {rel_updater}\n",
-        )
-        self.write(release / "README.md", "new readme")
-        self.write(release / "LICENSE", "new license")
+        app_dir = self.app_dir(release)
+
+        # -- program content (goes into app-<ver>/) --
+        self.write(app_dir / "core" / f"app{SUFFIX}", "new app")
+        self.write(app_dir / "core" / f"server{SUFFIX}", "new server")
+        self.write(app_dir / "core" / "marker.txt", "NEW")
+        self.write(app_dir / "plugins" / "wincounter" / "main.py", "new wincounter")
+
+        # -- root shells + user-facing trees (NOT updated by the updater) --
         self.write(release / f"start{SUFFIX}", "new start")
-        self.write(release / "core" / f"app{SUFFIX}", "new app")
-        self.write(release / "core" / f"server{SUFFIX}", "new server")
-        self.write(release / "core" / "marker.txt", "NEW")
-        self.write(release / "config" / "config.yaml", "must_not_be_copied\n")
-        self.write(release / "config" / "config.default.yaml", RELEASE_DEFAULT)
-        self.write(release / "plugins" / "wincounter" / "main.py", "new wincounter")
         if with_updater:
-            shutil.copy2(self.updater, release / "core" / f"update{SUFFIX}")
+            # simuliert ein aktualisiertes Update-Binary im Release
+            self.write(release / f"update{SUFFIX}", f"new update {rel_updater}")
+        else:
+            self.write(release / f"update{SUFFIX}", "new update")
+        self.write(release / "config" / "config.default.yaml", RELEASE_DEFAULT)
+        # Mirrors build.py: the per-version config template rides along in
+        # the app dir so the launcher first-start hook (candidate 1) picks
+        # up the NEW version's template, not the previous install's.
+        self.write(app_dir / "config" / "config.default.yaml", RELEASE_DEFAULT)
+        self.write(release / "README.md", "new readme (root, not staged)")
+
+        # -- pointer + version metadata (P3a fresh-install contract) --
+        write_pointer(
+            release,
+            AppPointer(
+                active_app_dir=f"app-{self.new_tool}",
+                tool_version=self.new_tool,
+            ),
+        )
+        self.write(
+            release / "version.txt", self._version_txt(self.new_tool, rel_updater)
+        )
+
+        # -- signed manifest (mirrors build.py's release assembly) --
+        manifest = generate_manifest(
+            app_dir,
+            tool_version=self.new_tool,
+            config_version_expected=EXPECTED_CONFIG_VERSION,
+            updater_version=rel_updater,
+            prefix=app_dir.name,
+        )
+        extra: list[ManifestFile] = []
+        for rel in (
+            f"start{SUFFIX}",
+            f"update{SUFFIX}",
+            "current.json",
+            "version.txt",
+        ):
+            data = (release / rel).read_bytes()
+            extra.append(
+                ManifestFile(
+                    path=rel,
+                    sha256=hashlib.sha256(data).hexdigest(),
+                    size=len(data),
+                )
+            )
+        from dataclasses import replace as _dc_replace
+
+        manifest = _dc_replace(manifest, files=manifest.files + tuple(extra))
+        write_manifest(release, manifest, self.release_key)
         return release
 
     def make_archive(self, release: Path) -> tuple[Path, str]:
@@ -347,6 +438,12 @@ class Harness:
                 for f in sorted(release.rglob("*")):
                     if f.is_file():
                         tf.add(f, arcname=f.relative_to(release).as_posix())
+        # The manifest + .sig double as standalone release assets, served
+        # by the mock server next to the archive (which also carries them).
+        for asset in (MANIFEST_ASSET, SIG_ASSET):
+            src = release / asset
+            if src.is_file():
+                shutil.copy2(src, self.scratch / asset)
         return path, name
 
     def write_checksum(self, archive: Path, archive_name: str) -> None:
@@ -361,6 +458,8 @@ class Harness:
         tag_name: str,
         archive_name: str,
         include_checksum: bool = True,
+        include_manifest: bool = True,
+        include_sig: bool = True,
         release_status: int = 200,
         release_body: bytes = b"",
         asset_delay: float = 0.0,
@@ -382,6 +481,8 @@ class Harness:
                 f"{server.base_url}/assets/{archive_name}",
                 archive_name,
                 include_checksum=include_checksum,
+                include_manifest=include_manifest,
+                include_sig=include_sig,
             )
         state.release_json = release_json
         server.start()
@@ -398,14 +499,16 @@ class Harness:
         stdin_data: bytes | None = None,
         timeout: float = 120.0,
         kill_after: float | None = None,
+        signing_key_hex: str | None = None,
     ) -> RunResult:
         env = os.environ.copy()
         env[UPDATE_SOURCE_ENV] = api_url
+        if signing_key_hex is None:
+            signing_key_hex = self.release_key.public_key().public_bytes_raw().hex()
+        env[SIGNING_KEY_ENV] = signing_key_hex
         cmd = [str(install / f"update{SUFFIX}")]
         if auto:
             cmd.append("--auto")
-        consumer = FileSignalConsumer(install)
-        consumer.start()
         proc = subprocess.Popen(
             cmd,
             env=env,
@@ -432,8 +535,6 @@ class Harness:
             return RunResult(
                 proc.returncode, out.decode(errors="replace"), timed_out=True
             )
-        finally:
-            consumer.stop()
 
     @staticmethod
     def _kill_tree(proc: subprocess.Popen) -> None:
@@ -450,50 +551,47 @@ class Harness:
         else:
             proc.kill()
 
-    def wait_for_self_update(self, install: Path, timeout: float = 180.0) -> None:
-        """Wait for the ``update_new.exe --resume`` child process to finish."""
-        proc_name = f"update_new{SUFFIX}"
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            if (
-                not self._proc_running(proc_name)
-                and self.read_versions(install)["tool"] == self.new_tool
-            ):
-                return
-            time.sleep(1.0)
-        raise AssertionError("self-update child process did not finish in time")
-
-    @staticmethod
-    def _proc_running(name: str) -> bool:
-        try:
-            if sys.platform == "win32":
-                r = subprocess.run(
-                    ["tasklist", "/FI", f"IMAGENAME eq {name}", "/NH"],
-                    capture_output=True,
-                    text=True,
-                    errors="replace",  # tasklist output is not always cp1252-clean
-                    timeout=15,
-                    check=False,
-                )
-                return (r.stdout or "").lower().find(name.lower()) != -1
-            r = subprocess.run(
-                ["pgrep", "-x", name],
-                capture_output=True,
-                text=True,
-                errors="replace",
-                timeout=15,
-                check=False,
-            )
-            return r.returncode == 0
-        except (OSError, subprocess.TimeoutExpired):
-            return True  # assume still running; keeps the wait loop conservative
-
     # ---- assertions ------------------------------------------------------
 
     def assert_updated(
-        self, install: Path, expected_updater: str | None = None
+        self,
+        install: Path,
+        expected_updater: str | None = None,
+        *,
+        expected_update_new: str = "new update",
     ) -> None:
+        """The updater staged ``app-<ver>/``, flipped the pointer and left
+        user data + running binaries alone."""
         target_updater = expected_updater or self.new_updater
+        pointer = self.read_pointer(install)
+        if pointer is not None:
+            self.expect(
+                pointer.active_app_dir == f"app-{self.new_tool}",
+                f"pointer = {pointer.active_app_dir!r} (expected app-{self.new_tool!r})",
+            )
+            self.expect(
+                pointer.tool_version == self.new_tool,
+                f"pointer tool_version = {pointer.tool_version!r}",
+            )
+        self.expect(
+            (self.app_dir(install) / "core" / f"app{SUFFIX}").read_text(
+                encoding="utf-8"
+            )
+            == "new app",
+            "app dir core/app was not staged",
+        )
+        self.expect(
+            (self.app_dir(install) / "core" / "marker.txt").read_text(encoding="utf-8")
+            == "NEW",
+            "app dir core/marker.txt was not staged",
+        )
+        self.expect(
+            (self.app_dir(install) / "plugins" / "wincounter" / "main.py").read_text(
+                encoding="utf-8"
+            )
+            == "new wincounter",
+            "plugin file was not staged",
+        )
         v = self.read_versions(install)
         self.expect(
             v["tool"] == self.new_tool,
@@ -503,69 +601,51 @@ class Harness:
             v["updater"] == target_updater,
             f"version.txt updater = {v['updater']!r} (expected {target_updater!r})",
         )
+        # Running processes are untouched: the launcher binaries are QUEUED.
         self.expect(
-            (install / "core" / f"app{SUFFIX}").read_text(encoding="utf-8")
-            == "new app",
-            "core/app.exe was not updated",
+            (install / f"start{SUFFIX}").read_text(encoding="utf-8")
+            in ("old start", "small new start"),
+            "start was overwritten while it might be running",
         )
         self.expect(
-            (install / "core" / "marker.txt").read_text(encoding="utf-8") == "NEW",
-            "core/marker.txt was not updated",
+            (install / f"start_new{SUFFIX}").read_text(encoding="utf-8") == "new start",
+            "start_new was not queued for the next launcher boot",
         )
         self.expect(
-            (install / "plugins" / "wincounter" / "main.py").read_text(encoding="utf-8")
-            == "new wincounter",
-            "plugin file was not updated",
+            (install / f"update_new{SUFFIX}").read_text(encoding="utf-8")
+            == expected_update_new,
+            f"update_new was not queued as {expected_update_new!r}",
         )
-        self.expect(
-            (install / "README.md").read_text(encoding="utf-8") == "new readme",
-            "README.md was not updated",
-        )
-        self.expect(
-            (install / f"start{SUFFIX}").read_text(encoding="utf-8") == "new start",
-            "start was not updated",
-        )
+        # User data never travels with the update package.
         self.expect(
             (install / "config" / "config.yaml").read_text(encoding="utf-8")
-            != "must_not_be_copied\n",
-            "config.yaml must never be overwritten by the release file",
-        )
-        cfg = self.read_config(install)
-        self.expect(
-            str(cfg.get("config_version")) == "1.0",
-            f"config_version = {cfg.get('config_version')!r} (expected '1.0')",
-        )
-        self.expect(
-            cfg.get("server_host") == "192.168.1.100",
-            f"user config value server_host was not preserved: {cfg.get('server_host')!r}",
-        )
-        self.expect(
-            cfg.get("java", {}).get("xms") == "1G",
-            f"user config value java.xms was not preserved: {cfg.get('java', {}).get('xms')!r}",
+            == INSTALL_CONFIG,
+            "config.yaml must never be overwritten by the updater",
         )
         self.expect(
             not (install / "_update_tmp").exists(),
             "_update_tmp was not cleaned up",
         )
+        self.expect(
+            not (install / "update_signal.tmp").exists(),
+            "P3a updater must not create update_signal.tmp",
+        )
 
     def assert_unchanged(self, install: Path) -> None:
-        v = self.read_versions(install)
+        pointer = self.read_pointer(install)
         self.expect(
-            v["tool"] == self.old_tool,
-            f"version.txt tool = {v['tool']!r} (expected {self.old_tool!r})",
-        )
-        self.expect(
-            v["updater"] == self.old_updater,
-            f"version.txt updater = {v['updater']!r} (expected {self.old_updater!r})",
+            pointer is None or pointer.tool_version == self.old_tool,
+            "pointer flipped although nothing should have been installed",
         )
         self.expect(
             (install / "core" / f"app{SUFFIX}").read_text(encoding="utf-8")
             == "old app",
-            "core/app.exe was modified although nothing should have been installed",
+            "core/app was modified although nothing should have been installed",
         )
+        v = self.read_versions(install)
         self.expect(
-            (install / "core" / "marker.txt").read_text(encoding="utf-8") == "OLD",
-            "core/marker.txt was modified although nothing should have been installed",
+            v["tool"] == self.old_tool,
+            f"version.txt tool = {v['tool']!r} (expected {self.old_tool!r})",
         )
 
 
@@ -575,6 +655,7 @@ class Harness:
 
 
 def scenario_success(h: Harness) -> bool:
+    """Legacy flat install 0.7 -> assembled P3a release."""
     install = h.prepare_install()
     release = h.prepare_release()
     archive, name = h.make_archive(release)
@@ -587,7 +668,7 @@ def scenario_success(h: Harness) -> bool:
     h.save_output("success", r.output)
     h.expect(r.returncode == 0, f"exit {r.returncode} (expected 0)\n{r.output}")
     h.assert_updated(install)
-    print(f"{G}  OK: files updated, config migrated, exit 0{X}")
+    print(f"{G}  OK: app dir staged, pointer flipped, launcher queued, exit 0{X}")
     return True
 
 
@@ -612,8 +693,7 @@ def scenario_up_to_date(h: Harness) -> bool:
 def scenario_missing_asset(h: Harness) -> bool:
     install = h.prepare_install()
     release = h.prepare_release()
-    archive, name = h.make_archive(release)
-    h.write_checksum(archive, name)
+    _, name = h.make_archive(release)
     release_json = {
         "tag_name": f"v{h.new_tool}",
         "assets": [
@@ -638,22 +718,64 @@ def scenario_missing_asset(h: Harness) -> bool:
     return True
 
 
-def scenario_missing_checksum(h: Harness) -> bool:
+def scenario_missing_manifest(h: Harness) -> bool:
     install = h.prepare_install()
     release = h.prepare_release()
-    _, name = h.make_archive(release)
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
     server = h.start_server(
-        tag_name=f"v{h.new_tool}", archive_name=name, include_checksum=False
+        tag_name=f"v{h.new_tool}", archive_name=name, include_manifest=False
     )
     try:
         r = h.run_updater(install, server.api_url)
     finally:
         server.stop()
-    h.save_output("missing_checksum", r.output)
-    h.expect(r.returncode == 12, f"exit {r.returncode} (expected 12)\n{r.output}")
-    h.expect("checksum" in r.output.lower(), "expected checksum message")
+    h.save_output("missing_manifest", r.output)
+    h.expect(r.returncode == 11, f"exit {r.returncode} (expected 11)\n{r.output}")
     h.assert_unchanged(install)
-    print(f"{G}  OK: missing checksum aborts update, exit 12{X}")
+    print(f"{G}  OK: missing manifest aborts update, exit 11{X}")
+    return True
+
+
+def scenario_missing_sig(h: Harness) -> bool:
+    install = h.prepare_install()
+    release = h.prepare_release()
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
+    server = h.start_server(
+        tag_name=f"v{h.new_tool}", archive_name=name, include_sig=False
+    )
+    try:
+        r = h.run_updater(install, server.api_url)
+    finally:
+        server.stop()
+    h.save_output("missing_sig", r.output)
+    h.expect(r.returncode == 16, f"exit {r.returncode} (expected 16)\n{r.output}")
+    h.assert_unchanged(install)
+    print(f"{G}  OK: missing .sig rejects update, exit 16{X}")
+    return True
+
+
+def scenario_sig_fail(h: Harness) -> bool:
+    """Manifest signed with an unknown key must be rejected (fail closed)."""
+    install = h.prepare_install()
+    release = h.prepare_release()
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
+    server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
+    try:
+        # The updater is told to trust h.release_key (the default), but the
+        # served signature was made with an attacker key.
+        manifest_raw = (h.scratch / MANIFEST_ASSET).read_bytes()
+        (h.scratch / SIG_ASSET).write_bytes(h.bad_key.sign(manifest_raw))
+        r = h.run_updater(install, server.api_url)
+    finally:
+        server.stop()
+    h.save_output("sig_fail", r.output)
+    h.expect(r.returncode == 16, f"exit {r.returncode} (expected 16)\n{r.output}")
+    h.expect("signature" in r.output.lower(), "expected signature verification message")
+    h.assert_unchanged(install)
+    print(f"{G}  OK: unknown signing key rejected, exit 16{X}")
     return True
 
 
@@ -672,6 +794,42 @@ def scenario_bad_checksum(h: Harness) -> bool:
     h.expect("checksum" in r.output.lower(), "expected checksum message")
     h.assert_unchanged(install)
     print(f"{G}  OK: bad checksum aborts update, install untouched{X}")
+    return True
+
+
+def scenario_tampered_file(h: Harness) -> bool:
+    """Archive sha256 matches but a packaged file differs from the signed
+    per-file manifest → reject (per-file verification)."""
+    install = h.prepare_install()
+    release = h.prepare_release()
+    # Tamper AFTER manifest signing: rebuild the app file in the *release*,
+    # then re-pack WITHOUT regenerating manifest checksums. To keep archive
+    # and .sha256 consistent, re-create the archive + checksum manually.
+    target = h.app_dir(release) / "core" / f"app{SUFFIX}"
+    target.write_text("tampered app", encoding="utf-8")
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
+    from core.update_engine.manifest import parse_manifest_bytes
+
+    manifest = parse_manifest_bytes((h.scratch / MANIFEST_ASSET).read_bytes())
+    entry = next(
+        iter(
+            f for f in manifest.files if f.path == f"app-{h.new_tool}/core/app{SUFFIX}"
+        )
+    )
+    h.expect(
+        entry.sha256 != hashlib.sha256(target.read_bytes()).hexdigest(),
+        "tamper did not change hash",
+    )
+    server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
+    try:
+        r = h.run_updater(install, server.api_url)
+    finally:
+        server.stop()
+    h.save_output("tampered_file", r.output)
+    h.expect(r.returncode == 13, f"exit {r.returncode} (expected 13)\n{r.output}")
+    h.assert_unchanged(install)
+    print(f"{G}  OK: tampered packaged file rejected via manifest, exit 13{X}")
     return True
 
 
@@ -701,14 +859,14 @@ def scenario_api_error(h: Harness) -> bool:
         release_body=b"boom",
     )
     try:
-        r = h.run_updater(install, server.api_url)
+        r = h.run_updater(install, server.api_url, timeout=60.0)
     finally:
         server.stop()
     h.save_output("api_error", r.output)
     h.expect(r.returncode == 10, f"exit {r.returncode} (expected 10)\n{r.output}")
     h.expect("API error" in r.output, "expected API error message")
     h.assert_unchanged(install)
-    print(f"{G}  OK: API error handled, exit 10{X}")
+    print(f"{G}  OK: API error handled (retried, then abort), exit 10{X}")
     return True
 
 
@@ -757,28 +915,35 @@ def scenario_self_update(h: Harness) -> bool:
     server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
     try:
         r = h.run_updater(install, server.api_url)
-        h.wait_for_self_update(install)
     finally:
         server.stop()
     h.expect(r.returncode == 0, f"exit {r.returncode} (expected 0)\n{r.output}")
     h.expect(
-        (install / f"update_new{SUFFIX}").exists(),
-        f"update_new{SUFFIX} was not created",
+        (install / f"update_new{SUFFIX}").read_text(encoding="utf-8").endswith("9.9.9"),
+        f"update_new{SUFFIX} does not carry the new updater version",
     )
-    h.assert_updated(install, expected_updater="9.9.9")
-    print(f"{G}  OK: updater self-update + resume completed{X}")
+    h.assert_updated(
+        install, expected_updater="9.9.9", expected_update_new="new update 9.9.9"
+    )
+    print(f"{G}  OK: updater binary queued at root for the next launcher boot{X}")
     return True
 
 
 def scenario_locked_file(h: Harness) -> bool:
+    """A file locked inside the (stale) target dir must abort with 15.
+
+    The updater wipes the stale target dir, then moves the staged dir into
+    place — a held lock keeps the stale dir alive, so the move fails.
+    """
     if sys.platform != "win32":
         print(f"{Y}  (skipped — Windows-only scenario){X}")
         return True
-    install = h.prepare_install()
+    install = h.prepare_versioned_install()
     release = h.prepare_release()
     archive, name = h.make_archive(release)
     h.write_checksum(archive, name)
     server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
+    target = h.app_dir(install) / "core" / f"app{SUFFIX}"
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.CreateFileW.restype = ctypes.c_void_p
     kernel32.CreateFileW.argtypes = [
@@ -792,13 +957,12 @@ def scenario_locked_file(h: Harness) -> bool:
     ]
     kernel32.CloseHandle.restype = ctypes.c_int
     kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-    dst = install / "core" / f"app{SUFFIX}"
     handle = kernel32.CreateFileW(
-        str(dst), 0x80000000, 0, None, 3, 0, None
+        str(target), 0x80000000, 0, None, 3, 0, None
     )  # no shared access
     if not handle or handle == ctypes.c_void_p(-1).value:
         server.stop()
-        print(f"{Y}  (skipped — could not lock {dst.name}){X}")
+        print(f"{Y}  (skipped — could not lock {target.name}){X}")
         return True
     try:
         r = h.run_updater(install, server.api_url)
@@ -806,11 +970,12 @@ def scenario_locked_file(h: Harness) -> bool:
         kernel32.CloseHandle(handle)
         server.stop()
     h.expect(r.returncode == 15, f"exit {r.returncode} (expected 15)\n{r.output}")
+    pointer = h.read_pointer(install)
     h.expect(
-        (install / "core" / f"app{SUFFIX}").read_text(encoding="utf-8") == "old app",
-        "locked app.exe was overwritten despite the lock",
+        pointer is None or pointer.tool_version == h.old_tool,
+        "pointer was flipped although the install failed",
     )
-    print(f"{G}  OK: locked file aborts update, locked file untouched{X}")
+    print(f"{G}  OK: locked target dir aborts update with pointer intact, exit 15{X}")
     return True
 
 
@@ -871,24 +1036,211 @@ def scenario_beta_prompt(h: Harness) -> bool:
     return True
 
 
+def scenario_versioned_install(h: Harness) -> bool:
+    """Versioned install: stale target dir replaced, pointer correctly
+    flipped (previous kept as rollback), ancient version pruned."""
+    install = h.prepare_versioned_install()
+    release = h.prepare_release()
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
+    server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
+    try:
+        r = h.run_updater(install, server.api_url)
+    finally:
+        server.stop()
+    h.expect(r.returncode == 0, f"exit {r.returncode} (expected 0)\n{r.output}")
+
+    pointer = h.read_pointer(install)
+    h.expect(pointer is not None, "pointer missing after update")
+    assert pointer is not None  # for type checkers
+    h.expect(
+        pointer.active_app_dir == f"app-{h.new_tool}",
+        f"pointer = {pointer.active_app_dir!r}",
+    )
+    h.expect(
+        pointer.previous_app_dir == f"app-{h.old_tool}",
+        f"previous_app_dir = {pointer.previous_app_dir!r} (expected app-{h.old_tool})",
+    )
+    # Stale leftover target dir was wiped and re-staged.
+    h.expect(
+        (h.app_dir(install) / "core" / f"app{SUFFIX}").read_text(encoding="utf-8")
+        == "new app",
+        "stale target dir was not replaced by the staged content",
+    )
+    # The rollback generation survived, the ancient generation was pruned.
+    h.expect(
+        (install / f"app-{h.old_tool}" / "core" / f"app{SUFFIX}").read_text(
+            encoding="utf-8"
+        )
+        == "old app",
+        "rollback generation (previous version) must be kept",
+    )
+    h.expect(
+        not (install / "app-0.6.0").exists(),
+        "old version dir was not pruned",
+    )
+    h.assert_updated(install)
+    print(f"{G}  OK: stale dir replaced, previous kept, old dir pruned{X}")
+    return True
+
+
+def scenario_launch_maintenance(h: Harness) -> bool:
+    """Full choreography: updater run (legacy flat install) → next boot's
+    launcher maintenance (layout migration + queued binary swap → stable)."""
+    from core.update_engine.launch_layout import (
+        resolve_app_base,
+        swap_pending_launcher_binaries,
+    )
+
+    install = h.prepare_install()
+    release = h.prepare_release()
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
+    server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
+    try:
+        r = h.run_updater(install, server.api_url)
+    finally:
+        server.stop()
+    h.expect(r.returncode == 0, f"exit {r.returncode} (expected 0)\n{r.output}")
+
+    # Boot 1: layout resolves from the pointer; legacy flat core/ is not
+    # touched (the updater already left it for the pointer-based layout).
+    app_base, migrated = resolve_app_base(install, install)
+    h.expect(
+        app_base == h.app_dir(install),
+        f"app base = {app_base} (expected {h.app_dir(install)})",
+    )
+    h.expect(migrated is False, "unexpected migration of a pointer-based install")
+
+    # Boot 2: queued launcher binaries get installed.
+    swapped = swap_pending_launcher_binaries(install, SUFFIX)
+    h.expect(swapped == {"start": True, "update": True}, f"swapped = {swapped!r}")
+    h.expect(
+        (install / f"update{SUFFIX}").read_text(encoding="utf-8") == "new update",
+        "queued updater binary was not installed",
+    )
+    h.expect(
+        (install / f"start{SUFFIX}").read_text(encoding="utf-8") == "new start",
+        "queued start binary was not installed",
+    )
+
+    # Boot 3: nothing pending → stable, no further changes.
+    swapped = swap_pending_launcher_binaries(install, SUFFIX)
+    h.expect(swapped == {"start": False, "update": False}, f"reswapped: {swapped!r}")
+    app_base2, migrated2 = resolve_app_base(install, install)
+    h.expect(
+        app_base2 == app_base and migrated2 == migrated, "boot 3 drifted from boot 1"
+    )
+    print(f"{G}  OK: launcher boots stable into the new version{X}")
+    return True
+
+
+def scenario_config_migration_parity(h: Harness) -> bool:
+    """Config migration parity: the updater leaves the user config alone;
+    the launcher first-start hook migrates it (template from the app dir)
+    while preserving user values."""
+    from core.update_engine.launch_layout import run_first_start_config_hook
+
+    install = h.prepare_install()
+    release = h.prepare_release()
+    archive, name = h.make_archive(release)
+    h.write_checksum(archive, name)
+    server = h.start_server(tag_name=f"v{h.new_tool}", archive_name=name)
+    try:
+        r = h.run_updater(install, server.api_url)
+    finally:
+        server.stop()
+    h.expect(r.returncode == 0, f"exit {r.returncode} (expected 0)\n{r.output}")
+
+    # Updater phase: user config untouched.
+    cfg = h.read_config(install)
+    h.expect(
+        str(cfg.get("config_version")) != "1.0",
+        "updater migrated the config (must not)",
+    )
+
+    # Launcher phase: first-start hook. The hook resolves user data via
+    # core.paths — the T2M_DATA_HOME override (test-only hook, mirrors
+    # TIKTOK2MC_UPDATE_SOURCE) isolates it into the scratch install so the
+    # harness never touches the developer's real config/runtime.
+    old_home = os.environ.get("T2M_DATA_HOME")
+    os.environ["T2M_DATA_HOME"] = str(install)
+    try:
+        result = run_first_start_config_hook(install)
+        h.expect(result is not None, "first-start hook was a no-op")
+        assert result is not None
+        cfg = h.read_config(install)
+        h.expect(
+            str(cfg.get("config_version")) == "1.0",
+            f"config_version = {cfg.get('config_version')!r}",
+        )
+        h.expect(
+            cfg.get("server_host") == "192.168.1.100",
+            f"user server_host lost: {cfg.get('server_host')!r}",
+        )
+        h.expect(
+            cfg.get("java", {}).get("xms") == "1G",
+            f"user java.xms lost: {cfg.get('java', {}).get('xms')!r}",
+        )
+        second = run_first_start_config_hook(install)
+        h.expect(second is None, "hook must be a no-op in the same tool version")
+    finally:
+        if old_home is None:
+            os.environ.pop("T2M_DATA_HOME", None)
+        else:
+            os.environ["T2M_DATA_HOME"] = old_home
+    print(f"{G}  OK: config migrated by the launcher hook with values preserved{X}")
+    return True
+
+
 SCENARIOS: list[tuple[str, str, Callable[[Harness], bool]]] = [
-    ("success", "older -> newer version, full update", scenario_success),
+    (
+        "success",
+        "legacy flat install -> assembled release, full update",
+        scenario_success,
+    ),
+    (
+        "versioned_update",
+        "stale dir replaced, previous kept, old dir pruned",
+        scenario_versioned_install,
+    ),
     ("up_to_date", "installed version == latest -> no update", scenario_up_to_date),
     ("missing_asset", "release has no platform archive", scenario_missing_asset),
-    ("missing_checksum", "release has no .sha256 asset", scenario_missing_checksum),
+    (
+        "missing_manifest",
+        "release has no manifest.json asset",
+        scenario_missing_manifest,
+    ),
+    ("missing_sig", "release has no .sig asset", scenario_missing_sig),
+    ("sig_fail", "manifest signed with unknown key", scenario_sig_fail),
     ("bad_checksum", "archive checksum does not match", scenario_bad_checksum),
+    (
+        "tampered_file",
+        "packaged file differs from signed manifest",
+        scenario_tampered_file,
+    ),
     ("invalid_version", "malformed release tag", scenario_invalid_version),
     ("api_error", "GitHub API returns HTTP 500", scenario_api_error),
     ("download_error", "archive download fails (404)", scenario_download_error),
     ("abort_download", "updater killed mid-download", scenario_abort_download),
     ("self_update", "new updater version in release", scenario_self_update),
-    ("locked_file", "in-use destination file (Windows)", scenario_locked_file),
+    ("locked_file", "locked stale target dir (Windows)", scenario_locked_file),
     (
         "retry_after_failure",
         "failed update then successful retry",
         scenario_retry_after_failure,
     ),
     ("beta_prompt", "beta release prompt (decline + accept)", scenario_beta_prompt),
+    (
+        "launch_maintenance",
+        "bootstrap migration + queued binary swap across launcher boots",
+        scenario_launch_maintenance,
+    ),
+    (
+        "config_migration_parity",
+        "config migration moved to the launcher first-start hook",
+        scenario_config_migration_parity,
+    ),
 ]
 
 
@@ -953,7 +1305,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list:
         for name, desc, _ in SCENARIOS:
-            print(f"  {name:<20} {desc}")
+            print(f"  {name:<22} {desc}")
         return 0
 
     updater = (
@@ -990,7 +1342,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"{R}Unknown scenario: {args.scenario}{X}")
         for name, desc, _ in SCENARIOS:
-            print(f"  {name:<20} {desc}")
+            print(f"  {name:<22} {desc}")
         return 2
 
     print(f"{C}Updater:      {updater}{X}")

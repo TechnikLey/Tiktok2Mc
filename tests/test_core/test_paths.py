@@ -39,6 +39,7 @@ _REAL = {
     name: getattr(paths_mod, name)
     for name in (
         "get_root_dir",
+        "get_data_home_base",
         "get_config_file",
         "get_runtime_dir",
         "get_plugin_data_dir",
@@ -98,6 +99,28 @@ class TestUserDataPathPins:
             _REAL["get_config_file"]()
             == (tmp_path / "config" / "config.yaml").resolve()
         )
+
+    def test_data_home_env_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """``T2M_DATA_HOME`` (test-only hook) wins over every detection."""
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        home = tmp_path / "isolated_home"
+        home.mkdir()
+        monkeypatch.setenv("T2M_DATA_HOME", str(home))
+        assert _REAL["get_data_home_base"]() == home.resolve()
+        assert _REAL["get_config_file"]() == (home / "config" / "config.yaml")
+        assert _REAL["get_runtime_dir"]() == (home / "core" / "runtime")
+
+    def test_data_home_env_absent_falls_through(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("T2M_DATA_HOME", raising=False)
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
+        root = tmp_path / "install"
+        (root / "config").mkdir(parents=True)
+        monkeypatch.setattr(paths_mod, "get_root_dir", lambda: root)
+        assert _REAL["get_data_home_base"]() == root.resolve()
 
     def test_runtime_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)

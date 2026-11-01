@@ -150,10 +150,11 @@ def _assemble_versioned_release(
     2. Write the root ``current.json`` pointer so fresh installs resolve
        their app dir without running the updater first.
     3. Generate + sign ``manifest.json`` / ``manifest.json.sig`` covering
-       exactly what the updater stages and verifies: the app dir, the root
+       exactly what the updater stages and verifies: the app dir (including
+       its per-version ``config/config.default.yaml`` template), the root
        launcher binaries, the pointer and the version file. Templates and
-       dependencies (config/data/docs/hooks...) are deliberately **not**
-       covered — user data is never part of an update.
+       dependencies at the root (config/data/docs/hooks...) are deliberately
+       **not** covered — user data is never part of an update.
 
     Signing key: ``T2M_SIGNING_PRIVATE_KEY`` (raw hex Ed25519) when set
     (CI). Otherwise a throwaway key signs the local dev build — such a
@@ -198,6 +199,17 @@ def _assemble_versioned_release(
             previous_app_dir=None,
         ),
     )
+
+    # Per-version config template rides along in the app dir (manifest
+    # covers it): the launcher first-start hook resolves the NEW version's
+    # template from the active app dir first (candidate 1), so config
+    # migration after an update uses this release's template — not the
+    # previous install's root-level leftover.
+    root_config_template = out_dir / "config" / "config.default.yaml"
+    if root_config_template.is_file():
+        app_template_dir = app_dir / "config"
+        app_template_dir.mkdir(exist_ok=True)
+        shutil.copy2(root_config_template, app_template_dir / "config.default.yaml")
 
     # Manifest over app dir content + root binaries + pointer + version file.
     manifest = update_manifest.generate_manifest(

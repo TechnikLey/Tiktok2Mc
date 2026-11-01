@@ -130,6 +130,9 @@ class TestAssembleVersionedRelease:
         assert f"update{suffix}" in covered
         assert "current.json" in covered
         assert "version.txt" in covered
+        # The per-version config template rides along in the app dir
+        # (launcher first-start hook resolves it as candidate 1).
+        assert "app-1.0.0/config/config.default.yaml" in covered
         # Templates/user trees are never part of an update.
         assert not any(p.startswith("config/") for p in covered)
         assert not any(p.startswith("hooks/") for p in covered)
