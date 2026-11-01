@@ -459,12 +459,23 @@ def create_app(
             return await call_next(request)
 
     # Serve the central GUI dashboard at /gui
-    # Release layout: core/templates/gui/   Dev layout: templates/gui/
+    # Release layout: <active-app-dir>/core/templates/gui/
+    #                 or <root>/core/templates/gui/
+    # Dev layout:     <root>/templates/gui/
     root = get_root_dir()
-    gui_dir = root / "core" / "templates" / "gui"
-    if not gui_dir.exists():
-        gui_dir = root / "templates" / "gui"
-    if gui_dir.exists():
+    try:
+        from core.paths import get_active_app_dir
+
+        _active = get_active_app_dir()
+    except Exception:
+        _active = None
+    gui_candidates = []
+    if _active is not None:
+        gui_candidates.append(_active / "core" / "templates" / "gui")
+    gui_candidates.append(root / "core" / "templates" / "gui")
+    gui_candidates.append(root / "templates" / "gui")
+    gui_dir = next((p for p in gui_candidates if p.exists()), None)
+    if gui_dir is not None:
         app.mount(
             "/gui",
             StaticFiles(directory=str(gui_dir), html=True),
@@ -472,11 +483,13 @@ def create_app(
         )
 
     # Serve gift images at /gifts-pictures
-    # Release layout: core/assets/gifts_picture/   Dev layout: assets/gifts_picture/
-    gifts_pics = root / "core" / "assets" / "gifts_picture"
-    if not gifts_pics.exists():
-        gifts_pics = root / "assets" / "gifts_picture"
-    if gifts_pics.exists():
+    pics_candidates = []
+    if _active is not None:
+        pics_candidates.append(_active / "core" / "assets" / "gifts_picture")
+    pics_candidates.append(root / "core" / "assets" / "gifts_picture")
+    pics_candidates.append(root / "assets" / "gifts_picture")
+    gifts_pics = next((p for p in pics_candidates if p.exists()), None)
+    if gifts_pics is not None:
         app.mount(
             "/gifts-pictures",
             StaticFiles(directory=str(gifts_pics)),

@@ -50,10 +50,21 @@ ROOT_DIR = get_root_dir()
 API_PORT = os.environ.get("RESOLVED_PORT_API_PORT", str(DEFAULT_PORT))
 API_URL = f"http://127.0.0.1:{API_PORT}"
 GUI_URL = f"{API_URL}/gui/index.html"
-# Release layout: core/templates/gui/  |  Dev layout: templates/gui/
-LAUNCHER_HTML = ROOT_DIR / "core" / "templates" / "gui" / "launcher.html"
-if not LAUNCHER_HTML.exists():
-    LAUNCHER_HTML = ROOT_DIR / "templates" / "gui" / "launcher.html"
+# Release layout: <active-app-dir>/core/templates/gui/  |  <root>/core/templates/gui/  |  Dev: templates/gui/
+from core.paths import get_active_app_dir as _gad
+
+_active = _gad()
+LAUNCHER_HTML = None
+for _cand in (
+    (_active / "core" / "templates" / "gui" / "launcher.html") if _active else None,
+    ROOT_DIR / "core" / "templates" / "gui" / "launcher.html",
+    ROOT_DIR / "templates" / "gui" / "launcher.html",
+):
+    if _cand is not None and _cand.exists():
+        LAUNCHER_HTML = _cand
+        break
+if LAUNCHER_HTML is None:
+    LAUNCHER_HTML = ROOT_DIR / "core" / "templates" / "gui" / "launcher.html"
 
 IS_WINDOWS = sys.platform == "win32"
 SUFFIX = ".exe" if IS_WINDOWS else ".bin"
