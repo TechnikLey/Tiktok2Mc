@@ -807,6 +807,38 @@ class LauncherAPI:
         except (OSError, ValueError):
             return {}
 
+    def get_pending_update(self) -> dict[str, Any]:
+        """Whether a version is staged but not yet active (P3a pointer).
+
+        The updater flips ``current.json`` without touching running
+        processes; the new version activates on the next restart. The
+        launcher shows a banner while the pointer's ``tool_version``
+        differs from the last-run marker the launcher writes on boot
+        (``core/runtime/last_run_version.txt``, data-home aware).
+
+        Returns ``{"pending": bool, "version": str | None}``. A missing
+        marker (fresh install / brand-new version file) counts as *not
+        pending*: the pointer version is exactly what boots next.
+        """
+        try:
+            from core.paths import get_runtime_dir
+            from core.update_engine.pointer import read_pointer
+
+            pointer = read_pointer(ROOT_DIR)
+            if pointer is None or not pointer.tool_version:
+                return {"pending": False, "version": None}
+            marker = get_runtime_dir() / "last_run_version.txt"
+            try:
+                last_run = marker.read_text(encoding="utf-8").strip()
+            except OSError:
+                last_run = ""
+            return {
+                "pending": bool(last_run) and last_run != pointer.tool_version,
+                "version": pointer.tool_version,
+            }
+        except Exception:
+            return {"pending": False, "version": None}
+
     # ---- TikTok webview login ----
     def open_tiktok_login(self) -> str:
         """Open a TikTok login window; cookies are captured automatically.

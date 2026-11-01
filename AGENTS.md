@@ -17,7 +17,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 | Path | Purpose / new code goes here |
 |---|---|
 | `src/python/*.py` | Entry points, one binary each (see `build.py` tasks): `start`, `main` (bridge), `gui` (pywebview), `server`, `overlay`, `update`, `update_progress` (Tk update-splash), `send_trigger` (CLI trigger tester) |
-| `src/core/` | Shared library `core.*` — API, trigger_engine, validator, paths, logger, plugins/hooks, utils |
+| `src/core/` | Shared library `core.*` — API, trigger_engine, validator, paths, logger, update_engine (P3a: pointer/manifest/migration/launch_layout), config_migration, plugins/hooks, utils |
 | `src/core/api/routes/` | New REST endpoints (must be registered in `routes/__init__.py`) |
 | `src/core/api/services/` | Business logic for routes; `actions.py` = `.mca` parse/serialize; `__init__.py` = `ApiService` (config read/write) |
 | `src/core/trigger_engine/` | `TriggerEngine` — **only** place for trigger execution/test logic |
@@ -92,7 +92,7 @@ Four layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS L
   - When: after any `.mca` handling change (Python `validator.py`/`services/actions.py`, JS `server/`, spec generation).
 
 ### 7.4 Updater E2E test harness
-- **Purpose:** `tools/update_test/` runs the **compiled** updater (`update.exe`/`update.bin`) against a local GitHub-compatible mock server, exercising the real `src/python/update.py` path: version check, asset selection, download, checksum, extraction, self-update, whitelisted copy, config migration, exit codes. Only the HTTP source is simulated (via `TIKTOK2MC_UPDATE_SOURCE`); everything else is the real binary.
+- **Purpose:** `tools/update_test/` runs the **compiled** updater (`update.exe`/`update.bin`) against a local GitHub-compatible mock server, exercising the real `src/python/update.py` path: version check, asset selection, download, manifest signature verification (Ed25519, fail closed), archive + per-file checksums, staging into `app-<ver>/`, atomic `current.json` pointer flip, prune, self-update queueing, launcher maintenance, config migration parity, exit codes. Only the HTTP source is simulated (via `TIKTOK2MC_UPDATE_SOURCE` / `T2M_SIGNING_PUBLIC_KEY` / `T2M_DATA_HOME`); everything else is the real binary. 19 scenarios: `python tools/update_test/run_update_test.py --list`.
   - Commands: `python build.py app --only update` (build first — the harness never builds itself) → `python tools/update_test/run_update_test.py --list` / `success` / `all` (add `--clean` for a from-scratch run). Port `29185` must be free.
   - When: after any change to `src/python/update.py` or the release asset naming/checksums; also update scenarios/`mock_github.py` in `tools/update_test/` if behavior changed.
   - Note: Windows Defender may flag the freshly built unsigned `update.exe` (`Behavior:Win32/DefenseEvasion.A!ml`) — heuristic false positive, see `tools/update_test/README.md`; do not work around it in code.

@@ -57,7 +57,7 @@ python build.py --use-cache all   # Funktioniert mit app, all, ci
 
 ### Updater-End-to-End-Test
 
-`tools/update_test/` führt den **kompilierten** Updater gegen einen lokalen Mock-Server der GitHub-Releases-API aus, sodass der echte Updater-Codepfad (Versionscheck, Asset-Auswahl, Download, Checksumme, Entpacken, Self-Update, Whitelist-Kopien, Config-Migration, Exit-Codes) ohne Netzwerk und ohne laufende Instanz getestet wird:
+`tools/update_test/` führt den **kompilierten** Updater gegen einen lokalen Mock-Server der GitHub-Releases-API aus, sodass der echte Updater-Codepfad getestet wird: Versionscheck, Asset-Auswahl, Download, **verifizierte Signatur des Release-Manifests (Ed25519, fail closed)**, Archiv- plus Datei-Prüfsummen, Staging nach `app-<ver>/`, atomarer `current.json`-Pointer-Flip, Prune, Self-Update-Queueing, Launcher-Maintenance, Config-Migrations-Parität und Exit-Codes.
 
 ```bash
 python build.py app --only update                    # Updater-Binary bauen
@@ -65,7 +65,7 @@ python tools/update_test/run_update_test.py --list   # Szenarien anzeigen
 python tools/update_test/run_update_test.py all --clean   # alle Szenarien ausführen
 ```
 
-Der Harness simuliert nur die HTTP-Quelle (via `TIKTOK2MC_UPDATE_SOURCE`); alles andere läuft mit dem echten Binary. Er arbeitet ausschließlich in seinem eigenen Scratch-Verzeichnis — dein Repository (`src/`, `config/`, `data/`) wird von einem Testlauf nie angefasst. Port `29185` muss frei sein. Details — inklusive des bekannten Windows-Defender-False-Positive bei frisch gebautem, unsigniertem `update.exe` — stehen in `tools/update_test/README.md`.
+Der Harness simuliert nur die HTTP-Quelle (via `TIKTOK2MC_UPDATE_SOURCE`, `T2M_SIGNING_PUBLIC_KEY` und `T2M_DATA_HOME`); alles andere läuft mit dem echten Binary. Er arbeitet ausschließlich in seinem eigenen Scratch-Verzeichnis — dein Repository (`src/`, `config/`, `data/`) wird von einem Testlauf nie angefasst. Port `29185` muss frei sein. Details — inklusive des bekannten Windows-Defender-False-Positive bei frisch gebautem, unsigniertem `update.exe` — stehen in `tools/update_test/README.md`.
 
 ### Build & Release (CI)
 

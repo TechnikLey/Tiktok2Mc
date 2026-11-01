@@ -57,7 +57,7 @@ python build.py --use-cache all   # Works with app, all, ci
 
 ### Test the updater end-to-end
 
-`tools/update_test/` runs the **compiled** updater against a local mock of the GitHub Releases API, so the real updater code path (version check, asset selection, download, checksum, extraction, self-update, whitelisted copy, config migration, exit codes) is exercised without a network or a running instance:
+`tools/update_test/` runs the **compiled** updater against a local mock of the GitHub Releases API, so the real updater code path is exercised end to end: version check, asset selection, download, **verified release-manifest signature (Ed25519, fail closed)**, archive plus per-file checksums, staging into `app-<ver>/`, atomic `current.json` pointer flip, prune, self-update queueing, launcher maintenance, config migration parity and exit codes.
 
 ```bash
 python build.py app --only update                    # build the updater binary
@@ -65,7 +65,7 @@ python tools/update_test/run_update_test.py --list   # show scenarios
 python tools/update_test/run_update_test.py all --clean   # run all scenarios
 ```
 
-The harness only simulates the HTTP source (via `TIKTOK2MC_UPDATE_SOURCE`); everything else runs the real binary. It operates exclusively inside its own scratch directory — your repository (`src/`, `config/`, `data/`) is never touched by a test run. Port `29185` must be free. Details — including the known Windows Defender false positive on freshly built unsigned `update.exe` — are in `tools/update_test/README.md`.
+The harness only simulates the HTTP source (via the `TIKTOK2MC_UPDATE_SOURCE`, `T2M_SIGNING_PUBLIC_KEY` and `T2M_DATA_HOME` test hooks); everything else runs the real binary. It operates exclusively inside its own scratch directory — your repository (`src/`, `config/`, `data/`) is never touched by a test run. Port `29185` must be free. Details — including the known Windows Defender false positive on freshly built unsigned `update.exe` — are in `tools/update_test/README.md`.
 
 ### Build & Release (CI)
 
