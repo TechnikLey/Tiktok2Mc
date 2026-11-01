@@ -95,11 +95,16 @@ def _restore_secrets_in_place(incoming: Any, stored: Any) -> bool:
 
 
 def _standalone_hooks_dir() -> Path | None:
-    """Return the standalone hooks directory (dev or release layout)."""
+    """Return the standalone hooks directory (dev, app, or release layout)."""
+    from core.paths import get_active_app_dir
+
     root = core.paths.get_root_dir()
     dev_hooks = root / "src" / "hooks"
     if dev_hooks.is_dir():
         return dev_hooks
+    active = get_active_app_dir()
+    if active is not None and (active / "hooks").is_dir():
+        return active / "hooks"
     rel_hooks = root / "hooks"
     return rel_hooks if rel_hooks.is_dir() else None
 

@@ -201,6 +201,14 @@ async def get_registered_scripts():
                 candidates = []
                 base_dir = get_base_dir()
                 root_dir = get_root_dir()
+                try:
+                    from core.paths import get_active_app_dir
+
+                    active = get_active_app_dir()
+                    if active is not None:
+                        candidates.append(active / "hooks")
+                except Exception:
+                    pass
                 candidates.append((base_dir / ".." / "hooks").resolve())
                 candidates.append(root_dir / "src" / "hooks")
                 candidates.append(root_dir / "hooks")

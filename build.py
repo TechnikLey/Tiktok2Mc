@@ -170,7 +170,7 @@ def _assemble_versioned_release(
     app_dir.mkdir(exist_ok=True)
 
     moved: list[str] = []
-    for name in ("core", "plugins"):
+    for name in ("core", "plugins", "hooks"):
         source = out_dir / name
         if not source.is_dir():
             # Incremental (--only) rebuild against an already assembled

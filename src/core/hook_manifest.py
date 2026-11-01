@@ -62,17 +62,33 @@ def discover_hooks_dirs() -> list[Path]:
     1. ``hooks/`` — standalone hooks shipped with the tool
     2. ``plugins/*/hooks/`` — hooks bundled with specific plugins
     """
-    from core.paths import get_root_dir
+    from core.paths import get_root_dir, get_active_app_dir
 
     root = get_root_dir()
     dirs: list[Path] = []
+    seen_paths: set[Path] = set()
 
-    # Main hooks directory (dev or release layout)
-    dev_hooks = root / "src" / "hooks"
-    rel_hooks = root / "hooks"
-    main_hooks = dev_hooks if dev_hooks.is_dir() else rel_hooks
-    if main_hooks.is_dir():
-        dirs.append(main_hooks)
+    def _add(p: Path) -> None:
+        try:
+            rp = p.resolve()
+        except OSError:
+            rp = p
+        if rp in seen_paths:
+            return
+        if p.is_dir():
+            seen_paths.add(rp)
+            dirs.append(p)
+
+    # Dev layout: src/hooks
+    _add(root / "src" / "hooks")
+
+    # Shipped hooks in the active (versioned) app dir
+    active = get_active_app_dir()
+    if active is not None:
+        _add(active / "hooks")
+
+    # User-installed / overridden hooks at the data root
+    _add(root / "hooks")
 
     # Plugin-bundled hooks
     from core.paths import get_plugins_dir
