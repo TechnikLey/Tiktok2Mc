@@ -133,17 +133,9 @@ class PluginLauncher:
         if self._plugins_dir is not None:
             return self._plugins_dir
         try:
-            from core.paths import get_root_dir
+            from core.paths import get_plugins_dir
 
-            root = get_root_dir()
-            # Dev layout: src/plugins/   Release layout: plugins/
-            dev_dir = root / "src" / _PLUGINS_DIR_NAME
-            if dev_dir.is_dir():
-                return dev_dir
-            rel_dir = root / _PLUGINS_DIR_NAME
-            if rel_dir.is_dir():
-                return rel_dir
-            return None
+            return get_plugins_dir()
         except (ImportError, OSError):
             return None
 
@@ -201,10 +193,13 @@ class PluginLauncher:
         """
         import sys
 
-        from core.paths import get_root_dir
+        from core.paths import get_root_dir, get_active_app_dir
 
-        root = get_root_dir()
         frozen = getattr(sys, "frozen", False)
+        if frozen:
+            root = get_active_app_dir() or get_root_dir()
+        else:
+            root = get_root_dir()
         suffix = ".exe" if sys.platform == "win32" else ".bin"
 
         for manifest in manifests:

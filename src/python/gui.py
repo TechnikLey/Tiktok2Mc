@@ -807,7 +807,9 @@ class LauncherAPI:
         ``{"phase": ..., "progress": ..., "message": ...}``. Returns ``{}``
         when no update is (or was) running.
         """
-        status_file = ROOT_DIR / "core" / "runtime" / "update_status.json"
+        from core.paths import get_runtime_dir
+
+        status_file = get_runtime_dir() / "update_status.json"
         try:
             if not status_file.exists():
                 return {}

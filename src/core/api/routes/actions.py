@@ -37,11 +37,19 @@ def _normalize_name(name: str) -> str:
 
 
 def _build_gift_image_map() -> dict[str, str]:
+    try:
+        from core.paths import get_active_app_dir
+        active = get_active_app_dir()
+    except Exception:
+        active = None
     root = core.paths.get_root_dir()
-    pics_dir = root / "assets" / "gifts_picture"
-    if not pics_dir.exists():
-        pics_dir = root / "core" / "assets" / "gifts_picture"
-    if not pics_dir.exists():
+    candidates = []
+    if active is not None:
+        candidates.append(active / "core" / "assets" / "gifts_picture")
+    candidates.append(root / "core" / "assets" / "gifts_picture")
+    candidates.append(root / "assets" / "gifts_picture")
+    pics_dir = next((p for p in candidates if p.exists()), None)
+    if pics_dir is None:
         return {}
     mapping = {}
     for f in pics_dir.iterdir():
@@ -142,16 +150,10 @@ async def validate_triggers_structured(body: ActionsUpdateRequest):
 
 
 def _load_gifts() -> list[dict]:
-    root = core.paths.get_root_dir()
-    gifts_file = root / "core" / "gifts.json"
+    from core.paths import get_gifts_file
+
+    gifts_file = get_gifts_file()
     if not gifts_file.exists():
-        gifts_file = root / "defaults" / "gifts.json"
-    if not gifts_file.exists():
-        log.warning(
-            "gifts.json not found at %s or %s",
-            root / "defaults" / "gifts.json",
-            root / "core" / "gifts.json",
-        )
         return []
     try:
         return json.loads(gifts_file.read_text(encoding="utf-8"))

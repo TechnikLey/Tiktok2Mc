@@ -40,10 +40,13 @@ class ActionsService:
 
     @staticmethod
     def _resolve_path() -> Path:
+        from core.paths import get_data_home_base, get_root_dir
+
         root = get_root_dir()
+        data_home = get_data_home_base()
 
         # Try active data file first
-        data_path = root / "data" / "actions.mca"
+        data_path = data_home / "data" / "actions.mca"
         if data_path.exists():
             return data_path.resolve()
 

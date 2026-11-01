@@ -177,7 +177,7 @@ async def list_plugins():
         # Scan filesystem for unregistered plugins (broken manifests)
         plugins_dir = core.paths.get_plugins_dir()
         if not plugins_dir.is_dir():
-            plugins_dir = core.paths.get_root_dir() / "plugins"
+            plugins_dir = core.paths.get_plugins_dir()
         if plugins_dir.is_dir():
             for child in sorted(plugins_dir.iterdir()):
                 if not child.is_dir():
