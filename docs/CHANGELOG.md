@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Built-ins tab** - `$random` is now a built-in action with its own "Built-ins" tab in the dashboard. It has a proper config editor (filter mode + trigger list) just like hooks.
+- **Empty `plugins/` and `hooks/` folders in the release root** - community plugins and hooks can be dropped there and survive tool updates.
+
+### Changed
+
+- **No shipped plugins/hooks anymore** - Death Counter, Spotify, Timer, Win Counter and the random hook are no longer bundled. They are managed as community plugins/hooks with their own updaters.
+- **Plugins and hooks live in the root folder** - they are no longer inside the versioned app folder, so they persist across updates.
+- **Faster GUI startup** - the dashboard window opens before all background services start.
+
+### Fixed
+
+- **GUI path issues in versioned builds** - templates and assets now load correctly from the active app directory.
+- **Config editor for built-ins** - title and back button are translated and the empty area above the settings is gone.
+
+---
+
 ## [v1.1.0] - 2026-10-30
 
 ### Changed
