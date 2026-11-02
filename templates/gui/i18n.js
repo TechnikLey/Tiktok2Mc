@@ -244,6 +244,8 @@
     /* ── Hooks ── */
     'hooks.title': 'Hooks',
     'builtins.title': 'Built-ins',
+    'builtins.configuration': 'Configuration',
+    'builtins.backTo': '← Back to Built-ins',
     'hooks.management': 'Hook Management',
     'hooks.configuration': 'Configuration',
     'hooks.backTo': '← Back to Hooks',
@@ -1368,6 +1370,8 @@
     /* ── Hooks ── */
     'hooks.title': 'Hooks',
     'builtins.title': 'Built-ins',
+    'builtins.configuration': 'Configuration',
+    'builtins.backTo': '← Back to Built-ins',
     'hooks.management': 'Hook-Verwaltung',
     'hooks.configuration': 'Konfiguration',
     'hooks.backTo': '← Zurück zu Hooks',

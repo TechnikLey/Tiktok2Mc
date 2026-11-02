@@ -4039,7 +4039,7 @@ class BuiltinConfigEditor {
   renderSidebar() {
     let html = '<div class="sidebar-header">Categories</div>';
     if (!this.hasSchema) {
-      html += '<div class="sidebar-group"><a class="sidebar-item active" onclick="hookEditor.scrollTo(\'section_raw\')">Raw JSON</a></div>';
+      html += '<div class="sidebar-group"><a class="sidebar-item active" onclick="builtinEditor.scrollTo(\'section_raw\')">Raw JSON</a></div>';
       this.sidebar.innerHTML = html;
       return;
     }
@@ -4050,7 +4050,7 @@ class BuiltinConfigEditor {
       const hasErr = fields.some(f => this.fieldHasError(f.key));
       const isActive = this.activeCategory === cat;
       html += '<div class="sidebar-group">';
-      html += `<a class="sidebar-item ${hasErr ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="hookEditor.scrollTo('${catId}')">${escapeHtml(cat)}${hasErr ? '<span class="badge">!</span>' : ''}</a>`;
+      html += `<a class="sidebar-item ${hasErr ? 'has-error' : ''} ${isActive ? 'active' : ''}" onclick="builtinEditor.scrollTo('${catId}')">${escapeHtml(cat)}${hasErr ? '<span class="badge">!</span>' : ''}</a>`;
       html += '</div>';
     }
     this.sidebar.innerHTML = html;
@@ -4099,13 +4099,13 @@ class BuiltinConfigEditor {
     if (field.advanced && !this._advancedMode) {
       const label = field.label || toTitle(field.key.split('.').pop());
       const help = field.help || '';
-      return `<div class="editor-field editor-field--locked" onclick="hookEditor._unlockAdvanced()">
+      return `<div class="editor-field editor-field--locked" onclick="builtinEditor._unlockAdvanced()">
         <div class="field-label">
           <span class="lock-icon">\uD83D\uDD12</span> ${escapeHtml(label)}
         </div>
         <div class="field-widget">
           <div class="locked-overlay">
-            <span class="locked-text">Advanced setting — <a href="#" onclick="event.preventDefault();hookEditor._unlockAdvanced()">unlock advanced features</a> to edit</span>
+            <span class="locked-text">Advanced setting — <a href="#" onclick="event.preventDefault();builtinEditor._unlockAdvanced()">unlock advanced features</a> to edit</span>
           </div>
           ${help ? `<p class="field-desc">${escapeHtml(help)}</p>` : ''}
         </div>
@@ -4194,14 +4194,14 @@ class BuiltinConfigEditor {
             html += `<td><input type="text" id="${cid}" value="${escapeHtml(cval !== undefined ? String(cval) : '')}" data-path="${escapeHtml(cpath)}" data-type="string"></td>`;
           }
         }
-        html += `<td class="row-actions"><button class="btn-icon" onclick="hookEditor.removeArrayItem('${path}', ${i})">Remove</button></td></tr>`;
+        html += `<td class="row-actions"><button class="btn-icon" onclick="builtinEditor.removeArrayItem('${path}', ${i})">Remove</button></td></tr>`;
       }
       html += '</tbody></table>';
-      html += `<button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="hookEditor.addArrayObjectItem('${path}')">+ Add Row</button>`;
+      html += `<button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="builtinEditor.addArrayObjectItem('${path}')">+ Add Row</button>`;
       return html;
     } else if (itemType === 'string') {
-      const chips = arr.map((v, idx) => `<span class="tag-chip">${escapeHtml(v)}<span class="remove" onclick="hookEditor.removeTagByIndex('${path}', ${idx})">&times;</span></span>`).join('');
-      return `<div class="tag-box" id="${id}_box">${chips}<input type="text" id="${id}_inp" placeholder="Add..." onkeydown="hookEditor.tagKey(event, '${path}')"></div>`;
+      const chips = arr.map((v, idx) => `<span class="tag-chip">${escapeHtml(v)}<span class="remove" onclick="builtinEditor.removeTagByIndex('${path}', ${idx})">&times;</span></span>`).join('');
+      return `<div class="tag-box" id="${id}_box">${chips}<input type="text" id="${id}_inp" placeholder="Add..." onkeydown="builtinEditor.tagKey(event, '${path}')"></div>`;
     } else {
       return `<textarea id="${id}" data-path="${escapeHtml(path)}" data-type="json" rows="4" style="font-family:monospace;">${escapeHtml(JSON.stringify(arr, null, 2))}</textarea>`;
     }
@@ -4228,7 +4228,7 @@ class BuiltinConfigEditor {
       <div class="section-header"><h3>${I18N.t('hooks.rawConfig')}</h3></div>
       <div class="section-body">
         <p class="field-desc">${I18N.t('hooks.noSchema')}</p>
-        <textarea id="hook-raw-json" rows="20" style="font-family:monospace;width:100%;" onchange="hookEditor.parseRawJson()">${escapeHtml(JSON.stringify(this.config, null, 2))}</textarea>
+        <textarea id="hook-raw-json" rows="20" style="font-family:monospace;width:100%;" onchange="builtinEditor.parseRawJson()">${escapeHtml(JSON.stringify(this.config, null, 2))}</textarea>
         <p class="field-desc">${I18N.t('hooks.noSchemaCareful')}</p>
       </div>
     </div>`;
