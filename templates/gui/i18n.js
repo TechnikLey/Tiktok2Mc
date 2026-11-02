@@ -96,6 +96,7 @@
     'nav.status': 'Status',
     'nav.plugins': 'Plugins',
     'nav.hooks': 'Hooks',
+    'nav.builtins': 'Built-ins',
     'nav.overlays': 'Overlays',
     'nav.actions': 'Actions',
     'nav.reactions': 'Reactions',
@@ -242,6 +243,7 @@
 
     /* ── Hooks ── */
     'hooks.title': 'Hooks',
+    'builtins.title': 'Built-ins',
     'hooks.management': 'Hook Management',
     'hooks.configuration': 'Configuration',
     'hooks.backTo': '← Back to Hooks',
@@ -1218,6 +1220,7 @@
     'nav.status': 'Status',
     'nav.plugins': 'Plugins',
     'nav.hooks': 'Hooks',
+    'nav.builtins': 'Built-ins',
     'nav.overlays': 'Overlays',
     'nav.actions': 'Aktionen',
     'nav.reactions': 'Reaktionen',
@@ -1364,6 +1367,7 @@
 
     /* ── Hooks ── */
     'hooks.title': 'Hooks',
+    'builtins.title': 'Built-ins',
     'hooks.management': 'Hook-Verwaltung',
     'hooks.configuration': 'Konfiguration',
     'hooks.backTo': '← Zurück zu Hooks',
