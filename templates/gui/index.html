@@ -196,75 +196,37 @@
 
             <!-- ─── Hooks ─── -->
             <div class="view" id="view-builtins">
-                <div class="view-header"><h2 data-i18n="builtins.title">Built-ins</h2>            <div id="builtins-config-section" class="hidden">
-                <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
-                    <h2 id="builtins-config-title" data-i18n="builtins.configuration">Configuration</h2>
-                    <button class="btn btn--secondary" onclick="closeInlineBuiltinConfig()" data-i18n="builtins.backTo">← Back to Built-ins</button>
-                </div>
-                <div class="plugins-config-layout">
-                    <nav class="editor-sidebar" id="builtins-config-sidebar"></nav>
-                    <div class="editor-main">
-                        <div class="editor-topbar">
-                            <div class="editor-search">
-                                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                                <input type="text" id="builtins-config-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="builtinEditor.onInlineSearch(this.value)">
-                            </div>
-                            <div class="header-actions">
-                                <button class="btn btn-advanced" id="builtins-config-advanced-btn" onclick="builtinEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
-                                <button class="btn btn--primary btn-save-disabled" id="builtins-config-save" onclick="builtinEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
-                            </div>
-                        </div>
-                        <div class="editor-content" id="builtins-config-content"></div>
-                    </div>
-                </div>
-            </div>
-
-
-</div>
-                <section class="view-section" id="builtin-list-section">
-                    <div id="builtin-list"></div>
-                </section>
-            </div>
-            <div class="view" id="view-hooks">
-                <div id="hook-list-section">
-                    <div class="view-header">
-                        <h2 data-i18n="hooks.title">Hooks</h2>
-                        <button class="btn btn--secondary" onclick="refreshHooks()" style="padding:0.3rem 0.8rem;font-size:0.85rem;">⟳ Refresh</button>
-                        <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
-                    </div>
+                <div id="builtin-list-section">
+                    <div class="view-header"><h2 data-i18n="builtins.title">Built-ins</h2></div>
                     <section class="view-section">
-                        <h3 data-i18n="hooks.management">Hook Management</h3>
-                        <div id="hook-manager-table"></div>
+                        <div id="builtin-list"></div>
                     </section>
                 </div>
-
-                <div id="hooks-config-section" class="hidden">
+                <div id="builtins-config-section" class="hidden">
                     <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
-                        <h2 id="hooks-config-title" data-i18n="hooks.configuration">Configuration</h2>
-                        <button class="btn btn--secondary" onclick="closeInlineHookConfig()" data-i18n="hooks.backTo">← Back to Hooks</button>
+                        <h2 id="builtins-config-title" data-i18n="builtins.configuration">Configuration</h2>
+                        <button class="btn btn--secondary" onclick="closeInlineBuiltinConfig()" data-i18n="builtins.backTo">← Back to Built-ins</button>
                     </div>
                     <div class="plugins-config-layout">
-                        <nav class="editor-sidebar" id="hooks-config-sidebar"></nav>
+                        <nav class="editor-sidebar" id="builtins-config-sidebar"></nav>
                         <div class="editor-main">
                             <div class="editor-topbar">
                                 <div class="editor-search">
                                     <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                                    <input type="text" id="hooks-config-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="hookEditor.onInlineSearch(this.value)">
+                                    <input type="text" id="builtins-config-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="builtinEditor.onInlineSearch(this.value)">
                                 </div>
                                 <div class="header-actions">
-                                    <button class="btn btn-advanced" id="hooks-config-advanced-btn" onclick="hookEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
-                                    <button class="btn btn--primary btn-save-disabled" id="hooks-config-save" onclick="hookEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
-                                    <button class="btn-help" onclick="Help.openHelp('hooks')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                                    <button class="btn btn-advanced" id="builtins-config-advanced-btn" onclick="builtinEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
+                                    <button class="btn btn--primary btn-save-disabled" id="builtins-config-save" onclick="builtinEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
                                 </div>
                             </div>
-                            <div class="editor-content" id="hooks-config-content"></div>
+                            <div class="editor-content" id="builtins-config-content"></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ─── Log ─── -->
-            <div class="view" id="view-log">
+<div class="view" id="view-log">
                 <div class="view-header">
                     <h2 data-i18n="log.title">Live Log</h2>
                     <button class="btn-help" onclick="Help.openHelp('log')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
