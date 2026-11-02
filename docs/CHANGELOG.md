@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Random hook is now a built-in function** - the random hook is now a built-in function of the tool. It behaves the same as before.
 - **Gift list matches TikTok's live catalog** - a sync replaces the runtime catalog (`core/gifts.json`) with TikTok's current gift list, so the catalog always stays in sync with TikTok's official list: new gifts are added automatically, while regional or seasonal gifts that TikTok no longer returns disappear from the editor.
 
+### Removed
+
+- **Update splash window** - updates no longer open a separate progress window. The launcher now shows the update status and progress, and the updater restarts the app once the new version is installed.
+
 ### Fixed
 
 - **Outdated gift names and IDs in the gift database** - new TikTok gifts were missing and renamed gifts still showed their old names (over 150 current gifts were not in the shipped snapshot). The catalog now stays current.
