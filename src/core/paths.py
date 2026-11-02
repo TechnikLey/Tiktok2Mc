@@ -198,19 +198,20 @@ def get_plugin_config_file() -> Path:
 
 
 def get_plugins_dir() -> Path:
-    """Return the resolved plugins directory (dev, versioned, or legacy)."""
+    """Return the resolved plugins directory.
+
+    Community plugins live in the data root (``root/plugins``) so they
+    persist across tool updates; dev mode uses ``src/plugins``.
+    """
     root = get_root_dir()
     dev_dir = root / "src" / "plugins"
     if dev_dir.is_dir():
         return dev_dir
-    # P3a: inside a versioned app dir, plugins ship per version.
-    active = get_active_app_dir()
-    if active is not None and (active / "plugins").is_dir():
-        return (active / "plugins").resolve()
     rel_dir = root / "plugins"
     if rel_dir.is_dir():
         return rel_dir
-    return dev_dir
+    # Fall back to creating/returning the root location even if absent.
+    return rel_dir
 
 
 def get_versions_dir() -> Path:

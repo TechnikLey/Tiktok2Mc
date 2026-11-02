@@ -82,10 +82,8 @@ def discover_hooks_dirs() -> list[Path]:
     # Dev layout: src/hooks
     _add(root / "src" / "hooks")
 
-    # Shipped hooks in the active (versioned) app dir
-    active = get_active_app_dir()
-    if active is not None:
-        _add(active / "hooks")
+    # Shipped hooks in the active (versioned) app dir are no longer used;
+    # community hooks live in root/hooks (handled below).
 
     # User-installed / overridden hooks at the data root
     _add(root / "hooks")
