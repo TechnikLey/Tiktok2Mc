@@ -170,7 +170,7 @@ def _assemble_versioned_release(
     app_dir.mkdir(exist_ok=True)
 
     moved: list[str] = []
-    for name in ("core", "plugins", "hooks"):
+    for name in ("core",):
         source = out_dir / name
         if not source.is_dir():
             # Incremental (--only) rebuild against an already assembled
@@ -1519,7 +1519,11 @@ def cmd_app(args):
         for hook_src_dir in set(plugin_hook_dirs):
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)
-        sync_folder("docs", OUT_DIR / "docs", exclude=["public/**", ".gitignore"])
+        # Community-managed folders must not be shipped empty in the release root.
+        for _name in ("plugins", "hooks"):
+            _p = OUT_DIR / _name
+            if _p.is_dir() and not any(_p.iterdir()):
+                _p.rmdir()
 
         FILES = [
             ("defaults/config.yaml", "config/config.yaml"),
