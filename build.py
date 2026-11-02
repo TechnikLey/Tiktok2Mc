@@ -1519,11 +1519,9 @@ def cmd_app(args):
         for hook_src_dir in set(plugin_hook_dirs):
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)
-        # Community-managed folders must not be shipped empty in the release root.
+        # Community-managed folders live in the release root (persist across updates).
         for _name in ("plugins", "hooks"):
-            _p = OUT_DIR / _name
-            if _p.is_dir() and not any(_p.iterdir()):
-                _p.rmdir()
+            (OUT_DIR / _name).mkdir(exist_ok=True)
 
         FILES = [
             ("defaults/config.yaml", "config/config.yaml"),
