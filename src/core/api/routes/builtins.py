@@ -21,8 +21,12 @@ async def get_builtins():
     return {"builtins": list_builtins()}
 
 
-@router.get("/{name}/config")
-async def get_builtin_config(name: str):
+@router.get("/{name}/config/schema")
+async def get_builtin_config_schema(name: str):
+    for b in list_builtins():
+        if b["name"] == name:
+            return {"config_schema": b.get("config_schema")}
+    raise HTTPException(status_code=404, detail="Unknown builtin")
     service = _get_api_service()
     try:
         cfg = service.read_config()

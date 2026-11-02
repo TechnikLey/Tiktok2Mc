@@ -197,7 +197,7 @@
             <!-- ─── Hooks ─── -->
             <div class="view" id="view-builtins">
                 <div class="view-header"><h2 data-i18n="builtins.title">Built-ins</h2></div>
-                <section class="view-section">
+                <section class="view-section" id="builtin-list-section">
                     <div id="builtin-list"></div>
                 </section>
             </div>
@@ -235,6 +235,29 @@
                             </div>
                             <div class="editor-content" id="hooks-config-content"></div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="builtins-config-section" class="hidden">
+                <div class="view-header" style="display:flex;align-items:center;justify-content:space-between;">
+                    <h2 id="builtins-config-title" data-i18n="builtins.configuration">Configuration</h2>
+                    <button class="btn btn--secondary" onclick="closeInlineBuiltinConfig()" data-i18n="builtins.backTo">← Back to Built-ins</button>
+                </div>
+                <div class="plugins-config-layout">
+                    <nav class="editor-sidebar" id="builtins-config-sidebar"></nav>
+                    <div class="editor-main">
+                        <div class="editor-topbar">
+                            <div class="editor-search">
+                                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                <input type="text" id="builtins-config-search" data-i18n-placeholder="editor.searchPlaceholder" placeholder="Search settings..." oninput="builtinEditor.onInlineSearch(this.value)">
+                            </div>
+                            <div class="header-actions">
+                                <button class="btn btn-advanced" id="builtins-config-advanced-btn" onclick="builtinEditor._toggleAdvanced()" data-i18n="common.advanced">Advanced</button>
+                                <button class="btn btn--primary btn-save-disabled" id="builtins-config-save" onclick="builtinEditor.save()" disabled data-i18n="editor.saveChanges">Save Changes</button><span class="kbd-hint">Ctrl+S</span>
+                            </div>
+                        </div>
+                        <div class="editor-content" id="builtins-config-content"></div>
                     </div>
                 </div>
             </div>
