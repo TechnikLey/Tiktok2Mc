@@ -11,23 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Built-ins tab** - Add a new Built-in tab in the GUI to manage functions that are built into the tool (e.g. Random hook)
-- **Automatic gift catalog sync** - the gift database behind the Actions editor now refreshes itself at every app start from TikTok's official gift endpoint, with the [tiktok-trending-data](https://github.com/antiops/tiktok-trending-data) GitHub from [antiops](https://github.com/antiops) as a fallback . A new **Sync gifts** button in the Actions editor refreshes it on demand, and a **Gifts** section in the settings editor controls auto-sync and the source.
-- **Update-ready banner** - after an update has been installed, the launcher shows "Update X is ready active after the next restart", so you know a restart is needed before the new version is live.
+- **Built-ins tab** - Add a new Built-ins tab in the GUI to manage functions that are built into the tool (e.g. Random hook)
+- **Automatic gift catalog sync** - the gift database behind the Actions editor now refreshes itself at every app start from TikTok's official gift endpoint, with the [tiktok-trending-data](https://github.com/antiops/tiktok-trending-data) mirror from [antiops](https://github.com/antiops) as a fallback. A new **Sync gifts** button in the Actions editor refreshes it on demand, and a **Gifts** section in the settings editor controls auto-sync and the source.
+- **Update-ready banner** - after an update has been installed, the launcher shows "Update X is ready — active after the next restart", so you know a restart is needed before the new version is live.
 - **Configurable diamond payout rate** - the Revenue view now reads the payout per diamond from the new `tiktok.diamond_value_usd` setting (default `0.004`) and converts USD→EUR with the current exchange rate instead of a fixed value.
 
 ### Changed
 
-- **Rework the hole Update system** - the update system has been reworked to be more robust and reliable. The update process now uses a signed manifest and per-file checksums to verify the integrity of the downloaded files before switching over to the new version. This prevents broken installations due to failed downloads or interrupted updates. Also is never overwriting the current installation so no Update Problems can occur anymore.
+- **Complete update system rework** - the update system has been rebuilt to be more robust and reliable. Every download is verified against a signed manifest and per-file checksums before the switch-over, so failed downloads or interrupted updates can no longer break your installation. The running installation is never overwritten in place, and your config, data, plugins and hooks stay exactly where they are.
 - **No shipped plugins anymore** - Death Counter, Spotify, Timer, Win Counter are removed from the shipped release.
 - **No shipped hooks anymore** - Random hook is removed from the shipped release.
 - **Faster GUI startup** - the dashboard window opens before all background services start.
 - **Random hook is now a built-in function** - the random hook is now a built-in function of the tool. It behaves the same as before.
-- **Gift list matches TikTok's live catalog** - a sync replaces the runtime catalog (`core/gifts.json`) with TikTok's current Gift list, so regional or seasonal gifts that TikTok no longer returns disappear from the editor. Also new Gifts are added automatically. The catalog is now always up to date with TikTok's official list.
+- **Gift list matches TikTok's live catalog** - a sync replaces the runtime catalog (`core/gifts.json`) with TikTok's current gift list, so the catalog always stays in sync with TikTok's official list: new gifts are added automatically, while regional or seasonal gifts that TikTok no longer returns disappear from the editor.
 
 ### Fixed
 
-- **Outdated gift names and IDs in the Database** - new TikTok gifts were missing and renamed gifts still showed their old names (over 150 current gifts were not in the shipped snapshot). The catalog now stays current.
+- **Outdated gift names and IDs in the gift database** - new TikTok gifts were missing and renamed gifts still showed their old names (over 150 current gifts were not in the shipped snapshot). The catalog now stays current.
 
 ---
 
