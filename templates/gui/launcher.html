@@ -458,9 +458,8 @@
             if (guiCloseRequested) return;
             guiCloseRequested = true;
             setStatus('installing', I18N.t('launcher.updateInstalling'));
-            // Give the message a beat on screen, then hand over to the
-            // always-on-top update splash window (it closes itself when the
-            // restarted app is back).
+            // Give the message a beat on screen, then close the GUI so the
+            // updater can replace it and restart the app.
             setTimeout(() => {
                 try {
                     if (typeof pywebview !== 'undefined' && pywebview.api && pywebview.api.close_for_update) {

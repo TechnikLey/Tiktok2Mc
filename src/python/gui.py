@@ -51,7 +51,7 @@ API_PORT = os.environ.get("RESOLVED_PORT_API_PORT", str(DEFAULT_PORT))
 API_URL = f"http://127.0.0.1:{API_PORT}"
 GUI_URL = f"{API_URL}/gui/index.html"
 # Release layout: <active-app-dir>/core/templates/gui/  |  <root>/core/templates/gui/  |  Dev: templates/gui/
-from core.paths import get_active_app_dir as _gad
+from core.paths import get_active_app_dir as _gad  # noqa: E402
 
 _active = _gad()
 LAUNCHER_HTML = None
@@ -280,72 +280,6 @@ def _signed_shutdown_headers(identity: str) -> dict[str, str] | None:
     return headers
 
 
-def _prime_update_splash_cache() -> None:
-    """Cache the splash binary under ``data/cache`` at GUI startup.
-
-    Done once per launcher start — long before any update runs — so
-    ``close_for_update`` can always spawn the binary that matches this install
-    without relying on ``core/update_progress.exe`` still being intact in the
-    middle of the updater replacing files.
-    """
-    name = f"update_progress{SUFFIX}"
-    splash_src = BASE_DIR / name
-    if not splash_src.exists():
-        return
-    splash_dst = ROOT_DIR / "data" / "cache" / name
-    try:
-        splash_dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(splash_src, splash_dst)
-    except OSError as e:
-        log.warning("Could not cache update splash binary: %s", e)
-
-
-def _spawn_update_splash(lang: str) -> bool:
-    """Best-effort: start the always-on-top update-progress window.
-
-    Runs from the copy cached under ``data/cache`` (primed at startup) because
-    the updater replaces ``core/update_progress.exe`` in place — reaching into
-    ``core`` mid-install could copy a partially state or the downloaded
-    package's version instead of the one matching this install. Returns False
-    (and only logs a warning) when the splash binary is missing, so updates
-    still proceed without it.
-    """
-    name = f"update_progress{SUFFIX}"
-    splash_dst = ROOT_DIR / "data" / "cache" / name
-    if not splash_dst.exists():
-        # Fallback for very first launcher run after an installer: cache not
-        # primed yet, copy straight from the core binary now.
-        _prime_update_splash_cache()
-        if not splash_dst.exists():
-            log.warning("Update splash binary not found: %s", BASE_DIR / name)
-            return False
-    try:
-        cmd = [str(splash_dst), "--lang", lang]
-        if IS_WINDOWS:
-            subprocess.Popen(
-                cmd,
-                creationflags=subprocess.DETACHED_PROCESS
-                | subprocess.CREATE_NEW_PROCESS_GROUP,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                close_fds=True,
-            )
-        else:
-            subprocess.Popen(
-                cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-                close_fds=True,
-            )
-        log.info("Update splash spawned: %s", splash_dst)
-        return True
-    except OSError as e:
-        log.warning("Could not spawn update splash: %s", e)
-        return False
-
-
 def _monitor_elevation(proc: subprocess.Popen) -> None:
     """Background monitor for the elevated start.bin launch on Linux.
 
@@ -501,16 +435,12 @@ class LauncherAPI:
         return "closing"
 
     def close_for_update(self, lang: str = "en") -> str:
-        """Close the GUI for an auto-update, keeping the user informed.
+        """Close the GUI so the updater can replace ``core/gui.exe``.
 
-        Spawns the always-on-top update splash window first, then destroys
-        the webview window so the updater can replace ``core/gui.exe``. The
-        splash keeps showing the update status until the restarted app is
-        back, closing itself only when the new GUI/API is up.
+        The updater restarts the app afterwards, and the launcher shows the
+        update progress in the meantime.
         """
         log.warning("close_for_update() called (lang=%s)", lang)
-        _lang = "de" if lang in ("de", "Deutsch") else "en"
-        _spawn_update_splash(_lang)
         if _window is not None:
             try:
                 _window.destroy()
@@ -1112,7 +1042,6 @@ def main() -> None:
         sys.exit(0)
 
     _acquire_lock()
-    _prime_update_splash_cache()
 
     log.info("Starting GUI launcher...")
 

@@ -144,7 +144,7 @@ def _assemble_versioned_release(
 
     Steps (see ``docs/plans/p3a-update-architecture.md`` §9):
 
-    1. Move the program content (``core/`` + ``plugins/``) into
+    1. Move the program content (``core/``) into
        ``app-<tool_version>/``; the root keeps the *deliverable* shells
        (start/update exes) plus config/data/docs/hooks/server/versions.
     2. Write the root ``current.json`` pointer so fresh installs resolve
@@ -697,7 +697,6 @@ def cmd_app(args):
         "gui": "tiktok2mc.ico",
         "start": "tiktok2mc.ico",
         "update": "tiktok2mc-update.ico",
-        "update_progress": "tiktok2mc-update.ico",
         "server": "tiktok2mc-tool.ico",
         "overlay": "tiktok2mc-tool.ico",
         "test_trigger": "tiktok2mc-tool.ico",
@@ -711,12 +710,6 @@ def cmd_app(args):
         {"name": "server", "src": "src/python/server.py", "dest": "core"},
         {"name": "overlay", "src": "src/python/overlay.py", "dest": "core"},
         {"name": "start", "src": "src/python/start.py", "dest": ""},
-        {
-            "name": "update_progress",
-            "src": "src/python/update_progress.py",
-            "dest": "core",
-            "windowed": True,
-        },
         {"name": "test_trigger", "src": "src/python/send_trigger.py", "dest": "test"},
     ]
 
@@ -1512,10 +1505,12 @@ def cmd_app(args):
                 pool.map(copy_one, all_files)
 
         sync_folder("assets", OUT_DIR / "core" / "assets")
-        sync_folder("templates", OUT_DIR / "core" / "templates", exclude=["gui/node_modules/**"])
+        sync_folder(
+            "templates", OUT_DIR / "core" / "templates", exclude=["gui/node_modules/**"]
+        )
         sync_folder("tools/Java", OUT_DIR / "server" / "java")
         # Shipped hooks are no longer part of the release (community-managed).
-# sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
+        # sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
         for hook_src_dir in set(plugin_hook_dirs):
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)

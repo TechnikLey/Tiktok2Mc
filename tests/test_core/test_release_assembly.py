@@ -36,7 +36,6 @@ def _make_release_tree(out_dir: Path, suffix: str) -> None:
     (out_dir / "core").mkdir(parents=True)
     (out_dir / "core" / f"app{suffix}").write_bytes(b"app-binary")
     (out_dir / "core" / f"gui{suffix}").write_bytes(b"gui-binary")
-    (out_dir / "core" / f"update_progress{suffix}").write_bytes(b"splash")
     (out_dir / "plugins").mkdir()
     (out_dir / "plugins" / "example").mkdir()
     (out_dir / "plugins" / "example" / "main.py").write_text(
@@ -69,19 +68,19 @@ class TestAssembleVersionedRelease:
         info = build._assemble_versioned_release(out_dir, "1.0.0", "0.3.0", suffix)
 
         app_dir = out_dir / "app-1.0.0"
-        # core/ + plugins/ moved, nothing left at the root.
+        # core/ moves into the versioned app dir; plugins/hooks stay at the
+        # root so they persist across updates.
         assert (app_dir / "core" / f"app{suffix}").read_bytes() == b"app-binary"
         assert (app_dir / "core" / f"gui{suffix}").is_file()
-        assert (app_dir / "plugins" / "example" / "main.py").is_file()
         assert not (out_dir / "core").exists()
-        assert not (out_dir / "plugins").exists()
+        assert (out_dir / "plugins" / "example" / "main.py").is_file()
         # Root keeps the deliverable shells and user-facing trees.
         assert (out_dir / f"start{suffix}").is_file()
         assert (out_dir / "config" / "config.default.yaml").is_file()
         assert (out_dir / "hooks" / "example" / "hook.json").is_file()
         assert info == {
             "app_dir": "app-1.0.0",
-            "moved": ["core", "plugins"],
+            "moved": ["core"],
             "manifest": str(out_dir / "manifest.json"),
             "files": len(
                 build.update_manifest.parse_manifest_bytes(

@@ -30,7 +30,6 @@ from python.gui import (  # noqa: E402
     _api_ready,
     _clear_shutdown_marker,
     _shutdown_pending,
-    _spawn_update_splash,
     _write_shutdown_marker,
 )
 
@@ -227,101 +226,19 @@ class TestLauncherAPICloseFlow:
         api.reset_close_request()
         assert api.close_requested() is False
 
-    def test_close_for_update_spawns_splash_and_destroys_window(self, monkeypatch):
-        spawn_calls = []
-
-        def fake_spawn(lang):
-            spawn_calls.append(lang)
-            return True
-
+    def test_close_for_update_destroys_window(self, monkeypatch):
         mock_window = MagicMock()
-        monkeypatch.setattr("python.gui._spawn_update_splash", fake_spawn)
         monkeypatch.setattr("python.gui._window", mock_window)
 
         api = LauncherAPI()
         assert api.close_for_update() == "closing"
-        assert spawn_calls == ["en"]
         mock_window.destroy.assert_called_once()
 
-    def test_close_for_update_passes_german_lang(self, monkeypatch):
-        spawn_calls = []
-
-        def fake_spawn(lang):
-            spawn_calls.append(lang)
-            return True
-
-        monkeypatch.setattr("python.gui._spawn_update_splash", fake_spawn)
-        monkeypatch.setattr("python.gui._window", None)
-
-        api = LauncherAPI()
-        assert api.close_for_update("de") == "closing"
-        assert spawn_calls == ["de"]
-
     def test_close_for_update_without_window(self, monkeypatch):
-        monkeypatch.setattr("python.gui._spawn_update_splash", lambda lang: True)
         monkeypatch.setattr("python.gui._window", None)
 
         api = LauncherAPI()
         assert api.close_for_update() == "closing"
-
-
-class TestSpawnUpdateSplash:
-    """Tests for the update splash spawn helper."""
-
-    def test_returns_false_when_binary_missing(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("python.gui.BASE_DIR", tmp_path)
-        monkeypatch.setattr("python.gui.ROOT_DIR", tmp_path)
-        assert _spawn_update_splash("en") is False
-
-    def test_returns_false_on_copy_error(self, monkeypatch, tmp_path):
-        from python.gui import SUFFIX
-
-        (tmp_path / f"update_progress{SUFFIX}").write_text("")
-        monkeypatch.setattr("python.gui.BASE_DIR", tmp_path)
-        monkeypatch.setattr("python.gui.ROOT_DIR", tmp_path)
-        monkeypatch.setattr(
-            "python.gui.shutil.copy2", MagicMock(side_effect=OSError("no space"))
-        )
-        assert _spawn_update_splash("en") is False
-
-    def test_spawns_copy_on_windows(self, monkeypatch, tmp_path):
-        import subprocess as _subprocess
-
-        from python.gui import SUFFIX
-
-        (tmp_path / f"update_progress{SUFFIX}").write_text("")
-        monkeypatch.setattr("python.gui.BASE_DIR", tmp_path)
-        monkeypatch.setattr("python.gui.ROOT_DIR", tmp_path)
-        monkeypatch.setattr("python.gui.IS_WINDOWS", True)
-        # DETACHED_PROCESS / CREATE_NEW_PROCESS_GROUP are Windows-only constants
-        monkeypatch.setattr(_subprocess, "DETACHED_PROCESS", 0x00000008, raising=False)
-        monkeypatch.setattr(
-            _subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200, raising=False
-        )
-        mock_popen = MagicMock()
-        monkeypatch.setattr("python.gui.subprocess.Popen", mock_popen)
-
-        assert _spawn_update_splash("de") is True
-        mock_popen.assert_called_once()
-        args, kwargs = mock_popen.call_args
-
-        copied = tmp_path / "data" / "cache" / f"update_progress{SUFFIX}"
-        assert args[0] == [str(copied), "--lang", "de"]
-        assert kwargs["creationflags"] is not None
-
-    def test_spawns_copy_on_linux(self, monkeypatch, tmp_path):
-        from python.gui import SUFFIX
-
-        (tmp_path / f"update_progress{SUFFIX}").write_text("")
-        monkeypatch.setattr("python.gui.BASE_DIR", tmp_path)
-        monkeypatch.setattr("python.gui.ROOT_DIR", tmp_path)
-        monkeypatch.setattr("python.gui.IS_WINDOWS", False)
-        mock_popen = MagicMock()
-        monkeypatch.setattr("python.gui.subprocess.Popen", mock_popen)
-
-        assert _spawn_update_splash("en") is True
-        _, kwargs = mock_popen.call_args
-        assert "start_new_session" in kwargs
 
 
 class TestGuiAlreadyRunning:
