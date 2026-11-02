@@ -3018,6 +3018,49 @@ async function refreshHooks() {
   }
 }
 
+async function renderBuiltinManager() {
+  const div = document.getElementById('builtin-list');
+  if (!div) return;
+  div.innerHTML = '<p class="muted">Loading...</p>';
+  try {
+    const data = await fetchJSON('/builtins');
+    const builtins = data.builtins || [];
+    if (!builtins.length) {
+      div.innerHTML = '<p class="muted">No built-in actions.</p>';
+      return;
+    }
+    let html = '';
+    for (const b of builtins) {
+      const name = escapeHtml(b.name);
+      const cfgRes = await fetchJSON('/builtins/' + encodeURIComponent(b.name) + '/config').catch(() => ({ config: {} }));
+      const cfg = cfgRes.config || {};
+      html += '<div class="builtin-card" style="border:1px solid var(--border);padding:1rem;margin-bottom:1rem;border-radius:8px;">';
+      html += '<h3>' + escapeHtml(b.display_name || b.name) + '</h3>';
+      html += '<p class="muted">' + escapeHtml(b.description || '') + '</p>';
+      html += '<label>Config (JSON)</label>';
+      html += '<textarea id="builtin-cfg-' + name + '" rows="8" style="width:100%;font-family:monospace;">' + escapeHtml(JSON.stringify(cfg, null, 2)) + '</textarea>';
+      html += '<div style="margin-top:0.5rem;"><button class="btn btn--primary" onclick="saveBuiltinConfig(\'' + name + '\')">Save</button></div>';
+      html += '</div>';
+    }
+    div.innerHTML = html;
+  } catch (e) {
+    div.innerHTML = '<p class="muted">Failed to load built-ins: ' + escapeHtml(e.message) + '</p>';
+  }
+}
+
+async function saveBuiltinConfig(name) {
+  const ta = document.getElementById('builtin-cfg-' + name);
+  if (!ta) return;
+  let cfg;
+  try { cfg = JSON.parse(ta.value); } catch (e) { showToast('Invalid JSON', 'error'); return; }
+  try {
+    await putJSON('/builtins/' + encodeURIComponent(name) + '/config', { config: cfg });
+    showToast('Saved', 'success');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
 function renderHookManager() {
   const tableDiv = document.getElementById('hook-manager-table');
   if (!tableDiv) return;
@@ -9024,6 +9067,9 @@ function switchViewNow(viewId) {
   }
   if (viewId === 'hooks') {
     renderHookManager();
+  }
+  if (viewId === 'builtins') {
+    renderBuiltinManager();
   }
   if (viewId === 'overlays') {
     renderOverlayUrls();

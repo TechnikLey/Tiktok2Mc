@@ -402,3 +402,14 @@ plugin_sandbox:
   max_files: 256
   max_processes: 32
   priority_class: "below_normal"
+
+# =============================================================================
+#  BUILT-IN SCRIPT ACTIONS
+# =============================================================================
+# Internal $-actions provided by the tool itself (not community hooks).
+builtins:
+  random:
+    mode: deny-all
+    triggers:
+      - likes
+      - like_2

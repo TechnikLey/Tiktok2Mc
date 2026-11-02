@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from .actions import router as actions_router
 from .backups import router as backups_router
+from .builtins import router as builtins_router
 from .chatbot import router as chatbot_router
 from .comment_commands import router as comment_commands_router
 from .config import router as config_router
@@ -48,6 +49,7 @@ api_router.include_router(updater_router)
 api_router.include_router(system_router)
 api_router.include_router(reload_router)
 api_router.include_router(actions_router)
+api_router.include_router(builtins_router)
 api_router.include_router(backups_router)
 api_router.include_router(overlay_router)
 api_router.include_router(outbound_router)

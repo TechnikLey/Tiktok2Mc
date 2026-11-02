@@ -787,8 +787,10 @@ def cmd_app(args):
             all_build_tasks.append(task)
 
         src_plugins_root = SCRIPT_DIR / "src" / "plugins"
+        # Shipped plugins are no longer part of the release; plugins/hooks are
+        # 100% community-managed and updated by their own updaters.
         plugin_hook_dirs: list[Path] = []
-        if src_plugins_root.exists():
+        if False and src_plugins_root.exists():
             for py_file in src_plugins_root.rglob("*.py"):
                 if "__pycache__" in str(py_file):
                     continue
@@ -1512,7 +1514,8 @@ def cmd_app(args):
         sync_folder("assets", OUT_DIR / "core" / "assets")
         sync_folder("templates", OUT_DIR / "core" / "templates", exclude=["gui/node_modules/**"])
         sync_folder("tools/Java", OUT_DIR / "server" / "java")
-        sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
+        # Shipped hooks are no longer part of the release (community-managed).
+# sync_folder("src/hooks", OUT_DIR / "hooks", exclude=["example_hook/**"])
         for hook_src_dir in set(plugin_hook_dirs):
             rel_hook = hook_src_dir.relative_to(SCRIPT_DIR / "src")
             sync_folder(hook_src_dir, OUT_DIR / rel_hook)

@@ -3107,6 +3107,13 @@ async def run_bot():
         ctx.config,
         ctx.valid_functions,
     )
+    # Built-in script actions (no longer shipped as hooks).
+    try:
+        from core.builtin_random import register_random_action
+
+        register_random_action(ctx.hook_api, ctx.config)
+    except Exception as exc:
+        log.error(f"Failed to register built-in random action: {exc}")
     load_event_hooks(ctx.hook_api, config=ctx.config)
 
     # Clear any stale reload signals from a previous run before the watcher starts.
