@@ -1,4 +1,4 @@
-config_version: 1.1
+config_version: 1.2
 
 # =============================================================================
 #  TIKTOK2MC — CONFIGURATION FILE
@@ -206,7 +206,9 @@ tiktok:
   diamond_value_usd: 0.004
 
   # Follow tracking — prevents viewers from farming the follow trigger
-  # by repeatedly unfollowing and refollowing.
+  # by repeatedly unfollowing and refollowing. Followers are stored in a
+  # small SQLite database (fast even with 100K+ entries; legacy .txt lists
+  # are imported automatically).
   #
   #   mode: "all_time"  — Tracks follows across ALL streams (default).
   #                        Once a user is recorded, their future follows
@@ -220,6 +222,21 @@ tiktok:
   # a follow action the first time they follow during a tracked stream.
   follow_tracking:
     mode: "all_time"
+
+  # Like rate limiting — caps how many likes a single viewer can contribute
+  # to the like counter per rolling minute. This prevents a single account
+  # from farming like-trigger milestones by spamming likes.
+  #
+  #   enabled: false                   — Default: disabled.
+  #   max_per_user_per_minute: 500     — Maximum likes counted per viewer
+  #                                      in any rolling 60-second window.
+  #                                      Set to 0 for an unlimited rate.
+  #
+  # Likes above the limit are ignored by the like counter (and therefore by
+  # like_triggers), but other viewers are unaffected.
+  like_rate_limit:
+    enabled: false
+    max_per_user_per_minute: 500
 
 # ===========================================================================
 # GIFT CATALOG SYNC

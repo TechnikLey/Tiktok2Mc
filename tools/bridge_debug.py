@@ -176,7 +176,6 @@ def make_sandbox(user: str, like_every: int | None) -> Path:
     shutil.copy2(ROOT / "defaults" / "config.yaml", cfg)
     for name in ("actions.mca", "comment_commands.yaml"):
         shutil.copy2(ROOT / "defaults" / name, sandbox / "data" / name)
-    (sandbox / "data" / "followed_users.txt").write_text("", encoding="utf-8")
 
     from ruamel.yaml import YAML
 

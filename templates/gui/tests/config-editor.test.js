@@ -43,6 +43,26 @@ describe('ConfigEditor', () => {
     });
   });
 
+  /* ─── nested settings ─── */
+  describe('nested settings', () => {
+    it('renders the like rate limit controls', () => {
+      editor.open({
+        tiktok: {
+          user: 'test_user',
+          like_rate_limit: { enabled: false, max_per_user_per_minute: 500 },
+        },
+      });
+      const html = editor.content.innerHTML;
+      expect(html).toContain('data-path="tiktok.like_rate_limit.enabled"');
+      expect(html).toContain(
+        'data-path="tiktok.like_rate_limit.max_per_user_per_minute"'
+      );
+      expect(html).toContain('type="checkbox"');
+      expect(html).toContain('type="number"');
+      expect(html).toContain('min="0"');
+    });
+  });
+
   /* ─── isDirty ─── */
   describe('isDirty', () => {
     it('returns false when data is unchanged', () => {

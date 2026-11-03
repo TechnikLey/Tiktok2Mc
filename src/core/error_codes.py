@@ -1372,8 +1372,8 @@ WORKER_0005 = ErrorCode(
     code="WORKER-0005",
     subsystem=Subsystem.WORKER,
     severity=Severity.WARNING,
-    message="Follow tracking file write failed.",
-    description="Writing the followed_users.txt file failed.",
+    message="Follow tracking database write failed.",
+    description="Writing the followed_users.db SQLite database failed.",
     recovery_hint="Check file permissions.",
     impact="Follow tracking may lose data.",
 )

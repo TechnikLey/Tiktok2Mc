@@ -22,12 +22,14 @@ import secrets
 import shlex
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import threading
 import time
 import urllib.parse
 import urllib.request
+from contextlib import closing
 from pathlib import Path
 
 from flask import Flask, request
@@ -131,7 +133,14 @@ _BASE_PARENT = _env_path("TIKTOK2MC_BASE_PARENT") or get_data_home_base()
 CONFIG_FILE = (_BASE_PARENT / "config" / "config.yaml").resolve()
 ACTIONS_FILE = (_BASE_PARENT / "data" / "actions.mca").resolve()
 COMMENT_COMMANDS_FILE = (_BASE_PARENT / "data" / "comment_commands.yaml").resolve()
-FOLLOWED_USERS_FILE = (_BASE_PARENT / "data" / "followed_users.txt").resolve()
+FOLLOWED_USERS_DB = (_BASE_PARENT / "data" / "followed_users.db").resolve()
+_FOLLOW_DB_SCHEMA = """
+CREATE TABLE IF NOT EXISTS followers (
+    username TEXT PRIMARY KEY,
+    followed_at TEXT NOT NULL DEFAULT (datetime('now'))
+) WITHOUT ROWID
+"""
+_SQLITE_HEADER = b"SQLite format 3\x00"
 _RUNTIME_DIR_ENV = _env_path("TIKTOK2MC_RUNTIME_DIR")
 RUNTIME_DIR = _RUNTIME_DIR_ENV or get_runtime_dir()
 RELOAD_CONFIG_SIGNAL = (RUNTIME_DIR / "reload_config").resolve()
@@ -163,8 +172,13 @@ class BotContext:
 
         # Follow tracking
         self.follow_tracking_mode = "all_time"
-        self.follow_tracking_file = FOLLOWED_USERS_FILE
+        self.follow_tracking_db = FOLLOWED_USERS_DB
         self._followed_cache = set()
+
+        # Like rate limiting (per-viewer rolling one-minute window)
+        self.like_rate_limit_enabled = False
+        self.like_rate_limit_max_per_user_per_minute = 500
+        self._like_rate_windows: dict[str, list[tuple[float, int]]] = {}
 
         # Comment commands
         self.comment_cmd_enable = False
@@ -568,6 +582,34 @@ def _check_dup_cmd_config():
         sys.exit(1)
 
 
+def _parse_like_rate_limit_config(raw: object) -> tuple[bool, int]:
+    """Parse ``tiktok.like_rate_limit`` into ``(enabled, max_per_minute)``.
+
+    Invalid values fall back to the documented defaults (disabled, 500) and
+    an explicit ``0`` disables the cap while keeping the setting available.
+    """
+    if raw is None:
+        cfg: dict = {}
+    elif isinstance(raw, dict):
+        cfg = raw
+    else:
+        log.warning(
+            "[CONFIG] 'tiktok.like_rate_limit' must be an object — using defaults"
+        )
+        cfg = {}
+
+    enabled = bool(cfg.get("enabled", False))
+    try:
+        limit = int(cfg.get("max_per_user_per_minute", 500))
+    except (TypeError, ValueError):
+        log.warning(
+            "[CONFIG] Invalid 'tiktok.like_rate_limit.max_per_user_per_minute' "
+            "— using default 500"
+        )
+        limit = 500
+    return enabled, max(0, limit)
+
+
 def _apply_config(config: dict) -> None:
     """Apply a loaded config dict to the bridge context."""
     ctx.config = config
@@ -603,19 +645,31 @@ def _apply_config(config: dict) -> None:
 
     ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
     ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
-    raw_path = str(ft_cfg.get("file", "data/followed_users.txt"))
-    ctx.follow_tracking_file = (_BASE_PARENT / raw_path).resolve()
-    ctx._followed_cache = set()
-    if ctx.follow_tracking_file.exists():
-        with open(ctx.follow_tracking_file, "r", encoding="utf-8") as f:
-            ctx._followed_cache = {line.strip().lower() for line in f if line.strip()}
-        log.info(
-            f"[CONFIG] Follow tracking ({ctx.follow_tracking_mode}): {len(ctx._followed_cache)} known followers loaded"
-        )
+    ctx.follow_tracking_db, ctx._followed_cache = _initialize_follow_tracking(
+        FOLLOWED_USERS_DB, ctx.follow_tracking_mode
+    )
+    log.info(
+        "[CONFIG] Follow tracking (%s): %d known followers loaded from %s",
+        ctx.follow_tracking_mode,
+        len(ctx._followed_cache),
+        ctx.follow_tracking_db,
+    )
     if ctx.follow_tracking_mode == "per_stream":
-        ctx.follow_tracking_file.write_text("")
-        ctx._followed_cache.clear()
         log.info("[CONFIG] Follow tracking mode 'per_stream' — follower list reset")
+
+    lrl_cfg = config.get("tiktok", {}).get("like_rate_limit", {})
+    ctx.like_rate_limit_enabled, ctx.like_rate_limit_max_per_user_per_minute = (
+        _parse_like_rate_limit_config(lrl_cfg)
+    )
+    log.info(
+        "[CONFIG] Like rate limit: %s",
+        (
+            f"{ctx.like_rate_limit_max_per_user_per_minute or 'unlimited'} "
+            "likes per viewer per minute"
+            if ctx.like_rate_limit_enabled
+            else "disabled"
+        ),
+    )
 
     ctx.like_triggers = validate_like_triggers(
         config.get("like_triggers", config.get("tiktok", {}).get("like_triggers", []))
@@ -1548,12 +1602,143 @@ async def _tiktok_status_heartbeat():
         await asyncio.sleep(30)
 
 
+def _follow_db_path(configured: Path) -> Path:
+    """Return the SQLite path for a configured follower store.
+
+    Existing installs defaulted to ``data/followed_users.txt``; those paths
+    are transparently mapped to a sibling ``.db`` file and imported once.
+    """
+    if configured.suffix.lower() == ".txt":
+        return configured.with_suffix(".db")
+    return configured
+
+
+def _is_sqlite_database(path: Path) -> bool:
+    try:
+        with path.open("rb") as fh:
+            return fh.read(len(_SQLITE_HEADER)) == _SQLITE_HEADER
+    except OSError:
+        return False
+
+
+def _open_follow_db(path: Path, *, initialize: bool = True) -> sqlite3.Connection:
+    """Open (and optionally initialize) the follower database.
+
+    WAL keeps background inserts from blocking reads; the schema creation is
+    idempotent so a missing/upgraded database repairs itself.
+    """
+    os.makedirs(path.parent, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=10.0)
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    if initialize:
+        conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute(_FOLLOW_DB_SCHEMA)
+    return conn
+
+
+def _backup_legacy_follow_file(path: Path) -> Path | None:
+    """Rename a migrated text list so it is not imported repeatedly."""
+    backup = path.with_name(path.name + ".migrated")
+    if backup.exists():
+        backup = path.with_name(f"{path.name}.{int(time.time())}.migrated")
+    try:
+        path.replace(backup)
+    except OSError as e:
+        log.warning("[FOLLOW] Could not archive legacy follower list %s: %s", path, e)
+        return None
+    log.info("[FOLLOW] Legacy follower list archived as %s", backup)
+    return backup
+
+
+def _migrate_legacy_follow_file(legacy: Path, db_path: Path) -> None:
+    """Import a legacy newline-separated follower file into SQLite."""
+    if legacy == db_path:
+        archived = _backup_legacy_follow_file(legacy)
+        if archived is None:
+            return
+        source = archived
+    else:
+        source = legacy
+
+    users: list[str] = []
+    try:
+        with source.open("r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                user = line.strip().lstrip("\ufeff").lower()
+                if user:
+                    users.append(user)
+    except OSError as e:
+        log.warning("[FOLLOW] Could not read legacy follower list %s: %s", source, e)
+        return
+
+    try:
+        with closing(_open_follow_db(db_path)) as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO followers (username) VALUES (?)",
+                ((user,) for user in users),
+            )
+            conn.commit()
+    except (sqlite3.Error, OSError) as e:
+        log.warning("[FOLLOW] Could not migrate follower list to %s: %s", db_path, e)
+        return
+
+    if source == legacy and legacy != db_path:
+        _backup_legacy_follow_file(legacy)
+    log.info(
+        "[FOLLOW] Imported %d follower(s) from legacy text list into %s",
+        len(users),
+        db_path,
+    )
+
+
+def _initialize_follow_tracking(configured: Path, mode: str) -> tuple[Path, set[str]]:
+    """Initialize the follower DB and return ``(db_path, known_followers)``."""
+    db_path = _follow_db_path(configured)
+    legacy: Path | None = None
+    if configured.exists() and not _is_sqlite_database(configured):
+        legacy = configured
+    elif not db_path.exists():
+        # Older installs used data/followed_users.txt without a config key.
+        sibling_txt = db_path.with_suffix(".txt")
+        if (
+            sibling_txt != configured
+            and sibling_txt.exists()
+            and not _is_sqlite_database(sibling_txt)
+        ):
+            legacy = sibling_txt
+
+    if legacy is not None:
+        _migrate_legacy_follow_file(legacy, db_path)
+
+    try:
+        with closing(_open_follow_db(db_path)) as conn:
+            if mode == "per_stream":
+                conn.execute("DELETE FROM followers")
+                conn.commit()
+            rows = conn.execute("SELECT username FROM followers").fetchall()
+    except (sqlite3.Error, OSError) as e:
+        log.warning("[FOLLOW] Could not initialize %s: %s", db_path, e)
+        return db_path, set()
+
+    cache = {str(row[0]).strip().lower() for row in rows if str(row[0]).strip()}
+    return db_path, cache
+
+
 def _append_follow_tracking(user_lower: str):
     try:
-        with open(ctx.follow_tracking_file, "a", encoding="utf-8") as f:
-            f.write(user_lower + "\n")
-    except OSError as e:
-        log.warning(f"[FOLLOW] Could not write to {ctx.follow_tracking_file}: {e}")
+        with closing(_open_follow_db(ctx.follow_tracking_db, initialize=False)) as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO followers (username) VALUES (?)",
+                (user_lower,),
+            )
+            conn.commit()
+    except (sqlite3.Error, OSError) as e:
+        log.warning(
+            "[FOLLOW] Could not write to %s: %s",
+            ctx.follow_tracking_db,
+            e,
+        )
 
 
 def _touch_runtime_shutdown():
@@ -1729,6 +1914,92 @@ def _update_like_totals(
     if diff > 0:
         session_likes += diff
     return session_likes, new_total
+
+
+LIKE_RATE_WINDOW_SECONDS = 60.0
+_LIKE_RATE_MAX_TRACKED_USERS = 4096
+
+
+def _like_rate_limit_active() -> bool:
+    """True when per-viewer like limiting is enabled and not unlimited."""
+    return (
+        ctx.like_rate_limit_enabled and ctx.like_rate_limit_max_per_user_per_minute > 0
+    )
+
+
+def _consume_like_allowance(
+    username: str | None, requested: int, now: float | None = None
+) -> int:
+    """Return how many of *requested* likes may count for *username* now.
+
+    Keeps a rolling one-minute window per viewer so a single account cannot
+    farm like-trigger milestones. Must be called while holding
+    ``ctx.like_lock`` (the like handler's critical section).
+    """
+    if requested <= 0:
+        return 0
+    if not _like_rate_limit_active():
+        return requested
+
+    timestamp = time.time() if now is None else now
+    limit = ctx.like_rate_limit_max_per_user_per_minute
+    key = (username or "unknown").strip().lower() or "unknown"
+    cutoff = timestamp - LIKE_RATE_WINDOW_SECONDS
+
+    window = ctx._like_rate_windows.get(key)
+    if window is None:
+        window = []
+        ctx._like_rate_windows[key] = window
+
+    # Entries are appended in chronological order, so drop the stale prefix.
+    stale = 0
+    for entry_ts, _count in window:
+        if entry_ts > cutoff:
+            break
+        stale += 1
+    if stale:
+        del window[:stale]
+
+    used = sum(count for _ts, count in window)
+    allowed = min(requested, max(0, limit - used))
+    if allowed:
+        window.append((timestamp, allowed))
+
+    # Bound memory if many distinct viewers like during a long stream.
+    if len(ctx._like_rate_windows) > _LIKE_RATE_MAX_TRACKED_USERS:
+        for user, entries in list(ctx._like_rate_windows.items()):
+            if user == key:
+                continue
+            if not entries or entries[-1][0] <= cutoff:
+                del ctx._like_rate_windows[user]
+
+    return allowed
+
+
+def _accumulate_like_event(
+    previous_total: int | None,
+    new_total: int,
+    session_likes: int,
+    event_count: int,
+    username: str | None,
+    now: float | None = None,
+) -> tuple[int, int]:
+    """Accumulate a LikeEvent, applying the per-viewer rate limit.
+
+    Returns ``(session_likes, last_total)``. When rate limiting is disabled
+    this is exactly :func:`_update_like_totals`.
+    """
+    if not _like_rate_limit_active():
+        return _update_like_totals(previous_total, new_total, session_likes)
+
+    raw_delta = 0 if previous_total is None else max(0, new_total - previous_total)
+    requested = raw_delta
+    if event_count > 0:
+        # Trust the event's own count, but never count more than the stream
+        # total actually advanced (protects against rewinds/duplicates).
+        requested = min(event_count, raw_delta)
+    allowed = _consume_like_allowance(username, requested, now)
+    return session_likes + allowed, new_total
 
 
 def _enqueue_like_triggers(total_since_start: int, username: str | None) -> None:
@@ -2251,7 +2522,7 @@ def handle_custom_trigger():
             # Test follows must always fire: bypass the real-follower dedup cache
             # (neither check nor record) so repeating the same test user still
             # triggers, and a later real follow of that user is not swallowed.
-            # persist=False keeps the test user out of followed_users.txt.
+            # persist=False keeps the test user out of the followers database.
             _process_follow(
                 user,
                 persist=False,
@@ -2537,8 +2808,12 @@ def create_client(user):
             # accumulate positive deltas (real new likes) instead of comparing
             # to a one-time baseline — otherwise total_since_start goes
             # negative and milestones never fire.
-            ctx.session_likes, ctx._last_like_total = _update_like_totals(
-                ctx._last_like_total, event.total, ctx.session_likes
+            ctx.session_likes, ctx._last_like_total = _accumulate_like_event(
+                ctx._last_like_total,
+                event.total,
+                ctx.session_likes,
+                int(getattr(event, "count", 0) or 0),
+                username,
             )
             total_since_start = ctx.session_likes
             log.debug(
@@ -2794,6 +3069,8 @@ def _reset_session():
     ctx.session_shares = 0
     ctx.session_joins = 0
     ctx.session_end_ts = None
+    with ctx.like_lock:
+        ctx._like_rate_windows.clear()
 
 
 def _session_summary_entry() -> dict:

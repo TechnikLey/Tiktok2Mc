@@ -7,7 +7,9 @@ a live TikTok connection or RCON server.
 import asyncio
 import datetime
 import json
+import sqlite3
 import threading
+from contextlib import closing
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -522,8 +524,8 @@ class TestProcessFollowOffload:
     def test_follow_persistence_offloaded_to_background(self, tmp_path, monkeypatch):
         from src.python import main as main_mod
 
-        tracking_file = tmp_path / "follows.txt"
-        monkeypatch.setattr(main_mod.ctx, "follow_tracking_file", tracking_file)
+        tracking_db = tmp_path / "follows.db"
+        monkeypatch.setattr(main_mod.ctx, "follow_tracking_db", tracking_db)
         monkeypatch.setattr(main_mod.ctx, "follow_lock", threading.Lock())
         monkeypatch.setattr(main_mod.ctx, "_followed_cache", set())
         monkeypatch.setattr(main_mod.ctx, "valid_functions", set())
@@ -541,7 +543,10 @@ class TestProcessFollowOffload:
         assert submitted.get("fn") is main_mod._append_follow_tracking
         assert submitted.get("args") == ("testuser",)
         submitted["fn"](*submitted["args"])
-        assert "testuser" in tracking_file.read_text(encoding="utf-8")
+        with closing(sqlite3.connect(tracking_db)) as conn:
+            assert conn.execute("SELECT username FROM followers").fetchone() == (
+                "testuser",
+            )
 
     def test_force_bypasses_dedup_and_does_not_record(self, monkeypatch):
         """Event Tester follow must fire even for an already-known user, and
@@ -586,6 +591,75 @@ class TestProcessFollowOffload:
         main_mod._process_follow("TestUser", persist=False)
 
         assert enqueued["items"] == []
+
+
+class TestFollowTrackingDatabase:
+    def test_legacy_txt_is_imported_and_archived(self, tmp_path):
+        from src.python import main as main_mod
+
+        legacy = tmp_path / "followed_users.txt"
+        legacy.write_text("Alice\n\nBOB\n  carol  \n", encoding="utf-8")
+
+        db_path, cache = main_mod._initialize_follow_tracking(legacy, "all_time")
+
+        assert db_path == tmp_path / "followed_users.db"
+        assert cache == {"alice", "bob", "carol"}
+        assert not legacy.exists()
+        assert (tmp_path / "followed_users.txt.migrated").exists()
+
+        # Reopening reads the same users from SQLite.
+        _, cache_again = main_mod._initialize_follow_tracking(legacy, "all_time")
+        assert cache_again == {"alice", "bob", "carol"}
+
+    def test_legacy_default_txt_is_imported_next_to_new_db(self, tmp_path):
+        from src.python import main as main_mod
+
+        # Old installs had no `file` key and used followed_users.txt implicitly.
+        legacy = tmp_path / "followed_users.txt"
+        legacy.write_text("alice\nbob\n", encoding="utf-8")
+        new_default = tmp_path / "followed_users.db"
+
+        db_path, cache = main_mod._initialize_follow_tracking(new_default, "all_time")
+
+        assert db_path == new_default
+        assert cache == {"alice", "bob"}
+        assert not legacy.exists()
+        assert (tmp_path / "followed_users.txt.migrated").exists()
+
+    def test_database_dedups_and_per_stream_resets(self, tmp_path):
+        from src.python import main as main_mod
+
+        db_path = tmp_path / "followers.db"
+        db_path, cache = main_mod._initialize_follow_tracking(db_path, "all_time")
+        assert cache == set()
+
+        with closing(main_mod._open_follow_db(db_path)) as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO followers (username) VALUES (?)",
+                [("alice",), ("alice",), ("bob",)],
+            )
+            conn.commit()
+
+        _, cache = main_mod._initialize_follow_tracking(db_path, "all_time")
+        assert cache == {"alice", "bob"}
+
+        _, cache = main_mod._initialize_follow_tracking(db_path, "per_stream")
+        assert cache == set()
+
+        with closing(sqlite3.connect(db_path)) as conn:
+            assert conn.execute("SELECT COUNT(*) FROM followers").fetchone() == (0,)
+
+    def test_non_txt_legacy_text_file_is_migrated_in_place(self, tmp_path):
+        from src.python import main as main_mod
+
+        legacy = tmp_path / "followers.db"
+        legacy.write_text("alice\nbob\n", encoding="utf-8")
+
+        db_path, cache = main_mod._initialize_follow_tracking(legacy, "all_time")
+
+        assert db_path == legacy
+        assert cache == {"alice", "bob"}
+        assert (tmp_path / "followers.db.migrated").exists()
 
 
 class TestHookActionOffload:
@@ -1295,6 +1369,103 @@ class TestUpdateLikeTotals:
 
     def test_equal_total_is_noop(self):
         assert self._call(500, 500, 10) == (10, 500)
+
+
+class TestLikeRateLimit:
+    """Per-viewer like cap (tiktok.like_rate_limit)."""
+
+    def _setup(self, monkeypatch, *, enabled=True, limit=500):
+        import src.python.main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "like_rate_limit_enabled", enabled)
+        monkeypatch.setattr(
+            main_mod.ctx, "like_rate_limit_max_per_user_per_minute", limit
+        )
+        monkeypatch.setattr(main_mod.ctx, "_like_rate_windows", {})
+        return main_mod
+
+    def test_caps_per_viewer_per_rolling_minute(self, monkeypatch):
+        main_mod = self._setup(monkeypatch)
+
+        assert main_mod._consume_like_allowance("Viewer", 400, now=0.0) == 400
+        # Only 100 of the next 200 still fit in the same minute.
+        assert main_mod._consume_like_allowance("Viewer", 200, now=10.0) == 100
+        assert main_mod._consume_like_allowance("Viewer", 100, now=20.0) == 0
+
+        # A different viewer has their own budget.
+        assert main_mod._consume_like_allowance("Other", 600, now=20.0) == 500
+
+        # Once the first event ages out (>60 s), allowance returns.
+        assert main_mod._consume_like_allowance("Viewer", 100, now=60.1) == 100
+
+    def test_username_case_and_unknown_bucket(self, monkeypatch):
+        main_mod = self._setup(monkeypatch)
+
+        assert main_mod._consume_like_allowance("Viewer", 500, now=0.0) == 500
+        assert main_mod._consume_like_allowance("viewer", 100, now=1.0) == 0
+        assert main_mod._consume_like_allowance(None, 500, now=1.0) == 500
+        assert main_mod._consume_like_allowance("unknown", 100, now=2.0) == 0
+
+    def test_disabled_or_zero_limit_is_unlimited(self, monkeypatch):
+        for enabled, limit in ((False, 500), (True, 0)):
+            main_mod = self._setup(monkeypatch, enabled=enabled, limit=limit)
+            assert main_mod._consume_like_allowance("Viewer", 10_000, now=0.0) == 10_000
+            assert main_mod.ctx._like_rate_windows == {}
+
+    def test_accumulate_applies_cap_and_updates_floor(self, monkeypatch):
+        main_mod = self._setup(monkeypatch)
+
+        session, total = main_mod._accumulate_like_event(
+            1000, 1600, 0, 600, "Viewer", now=0.0
+        )
+        assert (session, total) == (500, 1600)
+
+        # Excess likes from the same viewer are ignored for the rest of the
+        # minute, but the cumulative floor still advances.
+        session, total = main_mod._accumulate_like_event(
+            total, 1700, session, 100, "Viewer", now=10.0
+        )
+        assert (session, total) == (500, 1700)
+
+        # A different viewer counts normally.
+        session, total = main_mod._accumulate_like_event(
+            total, 1750, session, 50, "Other", now=11.0
+        )
+        assert (session, total) == (550, 1750)
+
+    def test_accumulate_ignores_rewinds_and_falls_back_without_count(self, monkeypatch):
+        main_mod = self._setup(monkeypatch)
+
+        session, total = main_mod._accumulate_like_event(
+            1000, 900, 10, 50, "Viewer", now=0.0
+        )
+        assert (session, total) == (10, 900)
+
+        # count missing/0: fall back to the positive stream delta.
+        session, total = main_mod._accumulate_like_event(
+            total, 1000, session, 0, "Viewer", now=1.0
+        )
+        assert (session, total) == (110, 1000)
+
+    def test_parse_config_defaults_and_invalid_values(self):
+        from src.python.main import _parse_like_rate_limit_config
+
+        assert _parse_like_rate_limit_config(None) == (False, 500)
+        assert _parse_like_rate_limit_config({}) == (False, 500)
+        assert _parse_like_rate_limit_config(
+            {"enabled": False, "max_per_user_per_minute": 42}
+        ) == (False, 42)
+        assert _parse_like_rate_limit_config(
+            {"enabled": True, "max_per_user_per_minute": 0}
+        ) == (True, 0)
+        assert _parse_like_rate_limit_config(
+            {"max_per_user_per_minute": "not-a-number"}
+        ) == (False, 500)
+        assert _parse_like_rate_limit_config("invalid") == (False, 500)
+        assert _parse_like_rate_limit_config({"max_per_user_per_minute": -10}) == (
+            False,
+            0,
+        )
 
 
 class TestValidateLikeTriggers:
