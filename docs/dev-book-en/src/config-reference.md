@@ -101,9 +101,11 @@ The system creates and uses the following files at runtime:
 | `core/runtime/plugin_start_<name>` | Signal file to start a plugin |
 | `core/runtime/plugin_stop_<name>` | Signal file to stop a plugin |
 
-## gifts.json Path (Dev vs. Release)
+## Gift Catalog (`gifts.json`)
 
-- **Development**: `defaults/gifts.json` (source of truth in the repo)
-- **Release/Installed**: `core/gifts.json` (copied by the build system)
+The gift catalog maps gift IDs to names and powers the gift picker in the Actions editor.
 
-Code reads from `core/gifts.json` first, then falls back to `defaults/gifts.json` (see `src/core/api/routes/actions.py`).
+- **`gifts.auto_sync`** (default `true`) — refresh the catalog at every app start.
+- **`gifts.source`** (default `auto`) — `auto` tries TikTok's official gift endpoint first and falls back to the [antiops mirror](https://github.com/antiops/tiktok-trending-data); `official` or `fallback` pin a single source.
+
+A successful sync **replaces** the runtime file `core/gifts.json` with TikTok's current list. The shipped factory template `defaults/gifts.json` is never modified and keeps serving as fallback when the runtime file is missing or unreadable; the previous runtime catalog is backed up before each overwrite. `GET /api/v1/gifts` reads `core/gifts.json` first and falls back to `defaults/gifts.json`; `POST /api/v1/gifts/sync` runs a sync on demand (used by the Actions editor's "Sync gifts" button).

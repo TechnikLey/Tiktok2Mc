@@ -2,6 +2,8 @@
 
 Every error in the system has a stable, documented code in the format `SUBSYSTEM-NNNN`.
 
+> **Generated reference:** the complete list of every registered code is generated from `src/core/error_codes.py` into `docs/reference/error-codes.md` (`python build.py docs`). The tables below highlight the most important codes; the generated page is authoritative and must never be edited by hand.
+
 ## Subsystems
 
 | Prefix | Subsystem |

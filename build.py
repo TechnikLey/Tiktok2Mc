@@ -1849,6 +1849,21 @@ def cmd_test(args):
         _run_mca_tests()
 
 
+def cmd_docs(_args):
+    script_dir = Path(__file__).resolve().parent
+    generator = script_dir / "tools" / "gen_reference.py"
+    if not generator.exists():
+        cprint(f"Reference generator not found: {generator}", Color.RED)
+        sys.exit(1)
+    result = subprocess.run(
+        [sys.executable, str(generator)], cwd=script_dir, check=False
+    )
+    if result.returncode != 0:
+        cprint("Reference generation failed.", Color.RED)
+        sys.exit(result.returncode)
+    cprint("Reference docs generated in docs/reference/.", Color.GREEN)
+
+
 def cmd_all(args):
     cprint("=== Building all ===", Color.CYAN)
     cmd_spec(args)
@@ -1921,6 +1936,7 @@ def main():
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("spec", help="Generate MCA language specification")
+    sub.add_parser("docs", help="Generate reference docs from code and config")
     sub.add_parser("vsix", help="Build VS Code extension (.vsix)")
     p_test = sub.add_parser("test", help="Run tests")
     p_test.add_argument(
@@ -1994,6 +2010,7 @@ def main():
             "  python build.py app          Build the executables\n"
             "  python build.py test --all   Run the test suites\n"
             "  python build.py spec         Regenerate the MCA spec\n"
+            "  python build.py docs         Regenerate the reference docs\n"
             "  python build.py --check      Only verify dependencies"
         )
         sys.exit(0)
@@ -2004,6 +2021,8 @@ def main():
         cmd_vsix(parsed)
     elif parsed.command == "spec":
         cmd_spec(parsed)
+    elif parsed.command == "docs":
+        cmd_docs(parsed)
     elif parsed.command == "test":
         cmd_test(parsed)
     elif parsed.command == "all":

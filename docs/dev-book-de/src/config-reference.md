@@ -101,9 +101,11 @@ Das System erzeugt und verwendet folgende Dateien zur Laufzeit:
 | `core/runtime/plugin_start_<name>` | Signal-Datei zum Starten eines Plugins |
 | `core/runtime/plugin_stop_<name>` | Signal-Datei zum Stoppen eines Plugins |
 
-## gifts.json Pfad (Entwicklung vs. Release)
+## Geschenk-Katalog (`gifts.json`)
 
-- **Entwicklung**: `defaults/gifts.json` (Quelle im Repository)
-- **Release/Installiert**: `core/gifts.json` (wird vom Build-System kopiert)
+Der Geschenk-Katalog ordnet Geschenk-IDs Namen zu und versorgt die Geschenk-Auswahl im Actions-Editor.
 
-Der Code liest zuerst `core/gifts.json`, dann fällt er auf `defaults/gifts.json` zurück (siehe `src/core/api/routes/actions.py`).
+- **`gifts.auto_sync`** (Standard `true`) — aktualisiert den Katalog bei jedem App-Start.
+- **`gifts.source`** (Standard `auto`) — `auto` versucht zuerst den offiziellen TikTok-Geschenk-Endpunkt und fällt dann auf den [antiops-Mirror](https://github.com/antiops/tiktok-trending-data) zurück; `official` oder `fallback` legen eine einzelne Quelle fest.
+
+Ein erfolgreicher Sync **ersetzt** die Laufzeitdatei `core/gifts.json` durch die aktuelle TikTok-Liste. Die mitgelieferte Werksvorlage `defaults/gifts.json` wird nie verändert und dient weiter als Fallback, wenn die Laufzeitdatei fehlt oder unlesbar ist; der vorherige Katalog wird vor jedem Überschreiben gesichert. `GET /api/v1/gifts` liest zuerst `core/gifts.json` und fällt dann auf `defaults/gifts.json` zurück; `POST /api/v1/gifts/sync` startet einen Sync auf Anfrage (genutzt vom „Geschenke synchronisieren"-Button im Actions-Editor).

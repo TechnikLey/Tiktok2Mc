@@ -4,4 +4,4 @@ authors = ["TechnikLey"]
 language = "en"
 
 [build]
-build-dir = "../public/de"
+build-dir = "../public/en"

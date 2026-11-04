@@ -100,6 +100,7 @@ Four layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS L
 ### 7.5 Build validation & dev tools
 - `python build.py test` — runs the MCA LSP test suite; `--all` also runs full pytest. `python build.py --check` runs `check_deps.py` first.
 - `python build.py spec` — regenerates `mca-language-server/mca-spec.json` (generated file — never hand-edit).
+- `python build.py docs` — regenerates `docs/reference/*.md` (error codes, config reference, API) from their sources: `src/core/error_codes.py`, the comments in `defaults/config.yaml`, and the FastAPI router. Run after changing any of those; the output is generated and must never be hand-edited.
 - `python check_deps.py` — verifies Python packages + system tools (node/npm); `--install` installs everything, `--system-only` checks tools only.
 - **Utility tools:** `rg` (ripgrep) for fast code search, `fd` for fast file search, `jq` for JSON parsing/inspection (configs, manifests, API output). Not part of `check_deps.py`.
 - **CI:** `test.yml` runs `pytest tests/` (+ a warnings pass) on push/PR to `main`; `build.yml` runs `python build.py --installer` on version tags (Windows + Linux) and creates the GitHub release; `mdbook.yml` builds the docs.
@@ -156,7 +157,7 @@ Working rules:
 - **Prefer small, scoped changes;** no drive-by refactors, touch only files the task needs.
 - **Run tests after changes** (see §7 priority); resolve failures before moving on.
 - **Keep docs and code in sync:** this AGENTS.md, `docs/dev-book-{en,de}/` (both languages), and the `.mca` spec.
-- **Never edit generated files:** `mca-language-server/mca-spec.json` (regenerate: `python build.py spec`), `build/`, `data/backups/`.
+- **Never edit generated files:** `mca-language-server/mca-spec.json` (regenerate: `python build.py spec`), `docs/reference/*.md` (regenerate: `python build.py docs`), `build/`, `data/backups/`.
 - **No new dependencies without reason** — check `requirements.txt`/`package.json` first.
 - **Ask before** touching live-stream behavior, config migration, or release packaging.
 
