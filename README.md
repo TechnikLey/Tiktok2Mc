@@ -43,7 +43,7 @@ The installer is recommended, as it lets you configure the tool and create a des
 > Running the tool on Linux requires root privileges (`sudo ./start.bin`) — otherwise it exits with an error. Launched via the desktop entry it runs but shows a warning and some features may fail (depends on your desktop environment: some assign a TTY, some don't). Set `show_sudo_warning: false` in `config.yaml` to skip the check. If `~/.local/bin` is not on your `PATH`, the installer will show you how to add it.
 
 ### Installation for advanced users
-You can also clone the repository and build the tool yourself. Keep in mind that a few dependencies must be installed on your system before it can be built — see the [developer documentation](./docs/dev-book-en/src/ch01-00-getting-started.md).
+You can also clone the repository and build the tool yourself. Keep in mind that a few dependencies must be installed on your system before it can be built — see [AGENTS.md](./AGENTS.md) for the setup, commands and architecture.
 Please note that building is very slow and resource-heavy: on low-end systems it can take a long time. Make sure you have enough free space, RAM, and CPU power available.
 
 ## Quick Start
@@ -82,18 +82,12 @@ All overlays are served through the central API at `http://127.0.0.1:29185`:
 
 ## Developer Documentation
 
-The developer documentation is best viewed online:
+There is no separate developer manual. The documentation lives in the source code:
 
-- **[English Dev Documentation](https://technikley.github.io/Tiktok2Mc/en)**
-- **[Deutsche Entwickler-Dokumentation](https://technikley.github.io/Tiktok2Mc/de)**
-
-> [!TIP]
-> The online docs are better organized and easier to navigate. You can also browse the Markdown files directly in the repository if you prefer:
-> - [English Dev Documentation](./docs/dev-book-en/src/Introduction.md)
-> - [Deutsche Entwickler-Dokumentation](./docs/dev-book-de/src/Introduction.md)
-
-> [!WARNING]
-> The developer documentation may not always be fully up to date.
+- **Docstrings** — public modules, classes and functions describe themselves. Start with `src/core/`, especially `paths.py`, `version.py`, `api/server.py` and `trigger_engine/`.
+- **[AGENTS.md](./AGENTS.md)** — architecture, repository layout, coding rules, test layers and every build/test command.
+- **Generated reference** — `docs/reference/` is produced from the source by `python build.py docs`: all error codes (`src/core/error_codes.py`), the full `config.yaml` reference (its comments), the REST API (FastAPI router) and the module/API reference (the docstrings in `src/core/`). Never edit these files by hand.
+- **Live API docs** — with the tool running, open `http://127.0.0.1:29185/docs` (Swagger UI) or `/redoc`.
 
 ## License
 

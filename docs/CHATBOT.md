@@ -1,9 +1,8 @@
 # TikTok-Chatbot — Design & Umsetzungsplan
 
 > Status: **Umgesetzt** (Kernmodul, Bridge-Wiring, API-Routen, GUI-Tab inkl.
-> Session-Login Variante A + B, Tests). Die Nutzer-/Entwickler-Doku liegt im
-> dev-book (`ch06-00-tiktok-chatbot.md`, EN+DE); dieses Dokument ist die
-> historische Design-Referenz.
+> Session-Login Variante A + B, Tests). Die Nutzer-Doku steht in
+> `docs/GUIDE.md`; dieses Dokument ist die historische Design-Referenz.
 > Dieses Dokument bündelt alle Erkenntnisse und Entscheidungen zum geplanten
 > TikTok-Chatbot für TikTok2Mc. Es dient als Referenz für die Umsetzung.
 
@@ -176,7 +175,7 @@ Webview-Flow mal nicht funktioniert).
 
 > **Status (2026-08-21):** Phase 1–4 umgesetzt (Kernmodul, Bridge-Wiring,
 > API-Routen, GUI-Tab, Tests; Session-Login Variante A manuell + Variante B
-> Webview). Offen: dev-book EN+DE.
+> Webview).
 
 ### Phase 1 — Brücke: Chat-Send-Kanal (~100 Zeilen) ✅
 
@@ -288,8 +287,7 @@ Webview-Flow mal nicht funktioniert).
 ### Phase 5 — Tests & Doku
 
 > pytest (Kern-, Session- und API-Tests) und vitest (GUI-Tab inkl.
-> Session-Flows) sind umgesetzt; ruff/pyright/eslint grün. Offen:
-> dev-book EN+DE.
+> Session-Flows) sind umgesetzt; ruff/pyright/eslint grün.
 
 13. Unit-Tests: Limiter, Template-Formatting, Send-Guard, Config-Roundtrip
     (conftest mockt TikTokLive — das Modul importiert den Client nur als

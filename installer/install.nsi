@@ -166,13 +166,13 @@ LangString COMP_TITLE ${LANG_ENGLISH} "Advanced Components"
 LangString COMP_SUBTITLE ${LANG_ENGLISH} "Select optional components to install."
 LangString COMP_PLUGINS ${LANG_ENGLISH} "Plugins (deathcounter, spotify, timer, wincounter)"
 LangString COMP_MC ${LANG_ENGLISH} "Minecraft Server (server.jar, tools)"
-LangString COMP_DOCS ${LANG_ENGLISH} "Documentation (GUIDE, CHANGELOG, dev-books)"
+LangString COMP_DOCS ${LANG_ENGLISH} "Documentation (GUIDE, CHANGELOG, reference)"
 
 LangString COMP_TITLE ${LANG_GERMAN} "Erweiterte Komponenten"
 LangString COMP_SUBTITLE ${LANG_GERMAN} "Wählen Sie optionale Komponenten zur Installation."
 LangString COMP_PLUGINS ${LANG_GERMAN} "Plugins (deathcounter, spotify, timer, wincounter)"
 LangString COMP_MC ${LANG_GERMAN} "Minecraft Server (server.jar, tools)"
-LangString COMP_DOCS ${LANG_GERMAN} "Dokumentation (GUIDE, CHANGELOG, dev-books)"
+LangString COMP_DOCS ${LANG_GERMAN} "Dokumentation (GUIDE, CHANGELOG, Referenz)"
 
 Function AdvancedComponentsCreate
   ${If} $InstallType == 0

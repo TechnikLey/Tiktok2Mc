@@ -7,6 +7,7 @@ edited by hand:
 - ``docs/reference/error-codes.md``  ← ``core.error_codes`` registry
 - ``docs/reference/config.md``       ← ``defaults/config.yaml`` + comments
 - ``docs/reference/api.md``          ← FastAPI router (``core.api.routes``)
+- ``docs/reference/modules.md``      ← module/class/function docstrings (``src/core``)
 
 Usage:
     python tools/gen_reference.py            # write docs/reference/*.md
@@ -16,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import html
 import re
 import sys
@@ -356,6 +358,113 @@ def render_api() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Modules and public API (docstrings)
+# ---------------------------------------------------------------------------
+def _first_paragraph(docstring: str | None) -> str:
+    """Return the first paragraph of a docstring as one clean line."""
+    text = (docstring or "").strip()
+    return _clean(text.split("\n\n", 1)[0]) if text else ""
+
+
+def _function_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """Render a readable function signature from its AST node."""
+    prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
+    try:
+        args = ast.unparse(node.args)
+    except Exception:  # noqa: BLE001 - unparse must never abort doc generation
+        args = "..."
+    return f"{prefix}{node.name}({args})"
+
+
+def collect_modules() -> list[dict]:
+    """Read every ``src/core`` module and extract its public documentation.
+
+    Uses the AST instead of importing: importing modules during doc
+    generation would execute side effects (logging setup, path probes).
+    """
+    modules: list[dict] = []
+    for path in sorted((SRC_DIR / "core").rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):  # pragma: no cover - defensive
+            continue
+        members: list[dict] = []
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if node.name.startswith("_"):
+                    continue
+                summary = _first_paragraph(ast.get_docstring(node))
+                if not summary:
+                    continue
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    label = f"`{_function_signature(node)}`"
+                else:
+                    label = f"**class `{node.name}`**"
+                members.append({"label": label, "summary": summary})
+        modules.append(
+            {
+                "name": path.relative_to(SRC_DIR)
+                .with_suffix("")
+                .as_posix()
+                .replace("/", "."),
+                "summary": _first_paragraph(ast.get_docstring(tree)),
+                "members": members,
+            }
+        )
+    return modules
+
+
+def render_modules() -> str:
+    """Render the module/API reference from source docstrings."""
+    modules = collect_modules()
+    documented = [m for m in modules if m["summary"] or m["members"]]
+    undocumented = [m["name"] for m in modules if not (m["summary"] or m["members"])]
+
+    lines = [
+        "# Module reference",
+        "",
+        GENERATED_NOTE,
+        "",
+        (
+            f"Public documentation for {len(modules)} modules under `src/core/`, "
+            "generated from their module, class and function docstrings. There is "
+            "no hand-written developer manual: improve this page by improving the "
+            "docstrings in the source."
+        ),
+        "",
+        "| Modules | With docstrings |",
+        "| --- | --- |",
+        f"| {len(modules)} | {len(documented)} |",
+    ]
+
+    for module in documented:
+        lines.extend(["", f"## `{module['name']}`", ""])
+        if module["summary"]:
+            lines.extend([module["summary"], ""])
+        for member in module["members"]:
+            lines.append(f"- {member['label']} — {member['summary']}")
+
+    if undocumented:
+        lines.extend(
+            [
+                "",
+                "## Modules without docstrings",
+                "",
+                (
+                    "These modules have no module docstring and no documented "
+                    "public members yet:"
+                ),
+                "",
+            ]
+        )
+        lines.extend(f"- `{name}`" for name in undocumented)
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 def build_reference() -> dict[str, str]:
@@ -364,6 +473,7 @@ def build_reference() -> dict[str, str]:
         "error-codes.md": render_error_codes(),
         "config.md": render_config(),
         "api.md": render_api(),
+        "modules.md": render_modules(),
     }
 
 

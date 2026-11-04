@@ -97,6 +97,7 @@ class TestWriteAndCheck:
             "error-codes.md",
             "config.md",
             "api.md",
+            "modules.md",
         }
         assert all(path.is_file() for path in written)
         assert generator.check_reference(tmp_path) == []
@@ -114,6 +115,26 @@ class TestWriteAndCheck:
         assert config_page in stale
         assert tmp_path / "api.md" in stale
         assert tmp_path / "error-codes.md" not in stale
+
+
+class TestModuleReference:
+    def test_modules_are_listed_with_docstrings(self, generator: ModuleType) -> None:
+        text = generator.render_modules()
+
+        assert "| Modules | With docstrings |" in text
+        assert "## `core.gift_sync`" in text
+        assert "## `core.api.server`" in text
+        assert "## Modules without docstrings" in text
+
+    def test_generated_notice_present(self, generator: ModuleType) -> None:
+        assert generator.GENERATED_NOTE in generator.render_modules()
+
+    def test_private_members_are_skipped(self, generator: ModuleType) -> None:
+        modules = {module["name"]: module for module in generator.collect_modules()}
+        labels = [member["label"] for member in modules["core.gift_sync"]["members"]]
+
+        assert any("sync_gifts(" in label for label in labels)
+        assert not any("_backup_existing" in label for label in labels)
 
 
 class TestCellEscaping:

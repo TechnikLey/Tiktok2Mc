@@ -2,9 +2,7 @@
 
 This guide explains how to use TikTok2Mc. No programming knowledge is required.
 
-If you want to learn more about the tool or develop your own plugins, see the developer documentation:
-- [English Developer Docs](./dev-book-en/src/ch01-00-getting-started.md)
-- [German Developer Docs](./dev-book-de/src/ch01-00-getting-started.md)
+If you want to develop plugins or work on the tool itself, the documentation lives in the source code: see [AGENTS.md](../AGENTS.md) for the workflow and the docstrings in `src/core/` for the details.
 
 The recommended way to configure and control TikTok2Mc is the **Dashboard** (GUI) at `http://127.0.0.1:29185/` (or the desktop application). Everything can be done there — no file editing needed:
 

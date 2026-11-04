@@ -1,7 +1,6 @@
 /* ─── Help module ───
- * In-app context help for the dashboard. Unlike the dev docs
- * (docs/dev-book-{en,de}/), the content below ships inside the GUI itself, so
- * end users never need to read developer documentation.
+ * In-app context help for the dashboard. The content below ships inside the
+ * GUI itself, so end users never need to read external documentation.
  *
  * Two responsibilities:
  *   1. Help topic content (per view, bilingual DE/EN) rendered in a modal.

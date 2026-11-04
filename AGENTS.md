@@ -3,7 +3,7 @@
 ## 1. Overview & Stack
 TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC commands (RCON/datapack), overlays, plugins, or shell commands. Multi-process Python desktop app: FastAPI control plane (port `29185`), web dashboard, plugin/hook system, Minecraft server manager.
 
-**Stack:** Python 3.12 · FastAPI/uvicorn · Flask (legacy webhook) · TikTokLive 6.6.6 · mcrcon · pywebview+PyQt6 · PyYAML+ruamel.yaml (comment-preserving) · PyInstaller · pytest · Vitest+jsdom · Node/VSCode LSP (`.mca`) · mdBook
+**Stack:** Python 3.12 · FastAPI/uvicorn · Flask (legacy webhook) · TikTokLive 6.6.6 · mcrcon · pywebview+PyQt6 · PyYAML+ruamel.yaml (comment-preserving) · PyInstaller · pytest · Vitest+jsdom · Node/VSCode LSP (`.mca`)
 
 ## 2. Architecture
 - **Supervisor** `src/python/start.py` runs the FastAPI control plane in-process (`create_app`, `core/api/server.py`) and spawns: `main.py` (bridge), `gui.py`, plugins, overlay, update. `run.py` = standalone dev API server.
@@ -27,7 +27,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 | `mca-language-server/` | VSCode extension + JS language server for `.mca` (parity with Python validator); tests in `server/test/` |
 | `defaults/` | Templates copied to `config/`+`data/` on first run: `config.yaml`, `actions.mca`, `gifts.json`, `event_commands.yaml`, server configs |
 | `tests/` | pytest: `test_core/`, `test_api/`, `conftest.py` (WriteGuard + heavy-dep mocks), `workspace/` (only writable area) |
-| `docs/dev-book-{en,de}/src/` | mdBook docs — keep both languages in sync |
+| `docs/reference/` | Generated developer reference (error codes, config, API) — never hand-edit; regenerate with `python build.py docs` |
 | `tools/` | `diff_test_mca.py` (Python↔JS diff), `generate_mca_spec.py`, `update_test/` (updater E2E harness, see `README.md`) |
 
 **Priority files (read first):** `src/core/paths.py` (dev/release layout) · `src/core/version.py` (all versions) · `src/core/api/server.py` (app factory/lifecycle) · `src/core/api/services/__init__.py` (`ApiService`, config read/write) · `src/core/validator.py` + `src/core/api/services/actions.py` (`.mca` source of truth) · `src/core/error_codes.py` · `src/core/trigger_engine/engine.py` · `src/core/base_plugin.py`
@@ -100,10 +100,10 @@ Four layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS L
 ### 7.5 Build validation & dev tools
 - `python build.py test` — runs the MCA LSP test suite; `--all` also runs full pytest. `python build.py --check` runs `check_deps.py` first.
 - `python build.py spec` — regenerates `mca-language-server/mca-spec.json` (generated file — never hand-edit).
-- `python build.py docs` — regenerates `docs/reference/*.md` (error codes, config reference, API) from their sources: `src/core/error_codes.py`, the comments in `defaults/config.yaml`, and the FastAPI router. Run after changing any of those; the output is generated and must never be hand-edited.
+- `python build.py docs` — regenerates `docs/reference/*.md` (error codes, configuration, API, module docstrings) from their sources: `src/core/error_codes.py`, the comments in `defaults/config.yaml`, the FastAPI router, and the docstrings of `src/core/`. Run after changing any of those; the output is generated and must never be hand-edited.
 - `python check_deps.py` — verifies Python packages + system tools (node/npm); `--install` installs everything, `--system-only` checks tools only.
 - **Utility tools:** `rg` (ripgrep) for fast code search, `fd` for fast file search, `jq` for JSON parsing/inspection (configs, manifests, API output). Not part of `check_deps.py`.
-- **CI:** `test.yml` runs `pytest tests/` (+ a warnings pass) on push/PR to `main`; `build.yml` runs `python build.py --installer` on version tags (Windows + Linux) and creates the GitHub release; `mdbook.yml` builds the docs.
+- **CI:** `test.yml` runs `pytest tests/` (+ a warnings pass) on push/PR to `main`; `build.yml` runs `python build.py --installer` on version tags (Windows + Linux) and creates the GitHub release.
 
 ### 7.6 Test style & validation priority
 - One `test_<module>.py` per module in `tests/test_core/` or `tests/test_api/`.
@@ -156,7 +156,7 @@ Working rules:
 - **Reuse existing systems** instead of re-implementing: `TriggerEngine` / `services/actions.py` for triggers, `core/validator.py` for validation, `get_x()` singletons, `ApiService`, `BasePlugin`.
 - **Prefer small, scoped changes;** no drive-by refactors, touch only files the task needs.
 - **Run tests after changes** (see §7 priority); resolve failures before moving on.
-- **Keep docs and code in sync:** this AGENTS.md, `docs/dev-book-{en,de}/` (both languages), and the `.mca` spec.
+- **Developer docs live in the source:** document public modules, classes and functions with docstrings (no separate developer manual). This AGENTS.md is the workflow guide; `docs/reference/*.md` is generated (`python build.py docs`) and never hand-edited. Keep the `.mca` spec in sync.
 - **Never edit generated files:** `mca-language-server/mca-spec.json` (regenerate: `python build.py spec`), `docs/reference/*.md` (regenerate: `python build.py docs`), `build/`, `data/backups/`.
 - **No new dependencies without reason** — check `requirements.txt`/`package.json` first.
 - **Ask before** touching live-stream behavior, config migration, or release packaging.

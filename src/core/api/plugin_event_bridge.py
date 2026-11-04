@@ -13,7 +13,7 @@ reach the plugin subprocesses.  The historical implementation lived in the
 bridge process and enqueued into an orphaned in-process queue, which meant
 declared subscriptions were silently never delivered.
 
-Delivery contracts (docs/dev-book ``ch03-05``):
+Delivery contracts:
 
 * ``event_subscriptions: ["tiktok.gift", "tiktok.*"]`` → a standardized
   ``tiktok_event`` command carrying ``event_type`` / ``user`` / ``data``

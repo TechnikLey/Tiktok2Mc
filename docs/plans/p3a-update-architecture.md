@@ -240,7 +240,7 @@ minimal.
 | Launcher First-Start-Hook + Migration (§7–8) | 2 d |
 | `build.py`: Layout + Manifest + beide Hüllen (§9) | 2 d |
 | E2E-Harness Szenarien (§10) | 2–3 d |
-| Doku-Sync (AGENTS.md §2), CHANGELOG, `docs/dev-book-*` (beide!) | 1 d |
+| Doku-Sync (AGENTS.md §2), CHANGELOG, generierte `docs/reference/` | 1 d |
 | **Summe** | **≈ 11–13 Arbeitstage** |
 
 *(Vorherige P3-Schätzung „in-place-Rollback + Zustandsmaschine" wäre ähnlich teuer gewesen

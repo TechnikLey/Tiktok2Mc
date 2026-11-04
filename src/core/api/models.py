@@ -199,7 +199,7 @@ class ReactionCommand(BaseModel):
 class CommentHandlerConfig(BaseModel):
     """Declares that a plugin receives prefixed TikTok comments.
 
-    See ``docs/dev-book`` ch03-05: comments starting with ``prefix`` are
+    See ``CommentHandlerConfig.prefix``: comments starting with ``prefix`` are
     forwarded to the plugin as a ``comment`` command with the prefix
     stripped from the text.
     """
