@@ -9,10 +9,10 @@ Connect your TikTok Live stream to a Minecraft server. When viewers send gifts, 
 - **Like milestones** — trigger commands at like thresholds (every 100, 100k likes by default)
 - **Chat commands** — viewers type commands like `#give` or `$skip` in TikTok chat
 - **TikTok chatbot** — optional bot that thanks viewers and replies to keywords in your live chat (beta)
-- **Stream overlays** — OBS browser-source overlays for timers, counters, and text alerts
+- **Stream overlays** — OBS browser-source overlays for text alerts (plus timers and counters when the reference plugins are installed)
 - **Web Dashboard** — manage actions, configuration, plugins, and your server at `http://127.0.0.1:29185`
 - **Plugin & hook system** — extend TikTok2Mc with Python plugins and hooks
-- **Auto-updates** — checks for new versions and installs them automatically
+- **Auto-updates** — checks for, verifies, and installs new versions automatically; active after a restart
 
 ## Requirements
 
@@ -64,10 +64,12 @@ All overlays are served through the central API at `http://127.0.0.1:29185`:
 |---------|-----|
 | Text overlay (default) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default` |
 | Text overlay (chroma key) | `http://127.0.0.1:29185/api/v1/overlay?overlay=default&chroma=true` |
-| Timer | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
-| Death Counter | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
-| Win Counter | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
-| Spotify Control | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
+| Timer (reference plugin) | `http://127.0.0.1:29185/api/v1/plugins/timer/overlay` |
+| Death Counter (reference plugin) | `http://127.0.0.1:29185/api/v1/plugins/death-counter/overlay` |
+| Win Counter (reference plugin) | `http://127.0.0.1:29185/api/v1/plugins/win-counter/overlay` |
+| Spotify Control (reference plugin) | `http://127.0.0.1:29185/api/v1/plugins/spotify-control/overlay` |
+
+> Plugin overlays are only available while the corresponding plugin is installed and enabled. Plugins are not bundled with the release — see [Plugins](./docs/GUIDE.md#plugins).
 
 **Real-time updates (SSE streams)** — for browser sources that need live updates without refresh:
 - Core overlay: `http://127.0.0.1:29185/api/v1/overlay/stream`

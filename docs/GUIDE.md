@@ -80,7 +80,7 @@ The pre-built binaries are packaged with **PyInstaller**, and Windows Defender (
    Open **Windows Security** → **Virus & threat protection** → **Protection history** → find the entry → **Actions** → **Allow on device** (or *Restore*).
 
 **3. Add an exclusion for the tool folder** (recommended for updates)
-   The file-based auto-updater replaces executables in place, so Defender can repeatedly flag newly built binaries. Add the tool's installation folder to the exclusions:
+   The auto-updater replaces executables when switching to a new version, so Defender can repeatedly flag newly built binaries. Add the tool's installation folder to the exclusions:
 
    - *GUI:* **Windows Security** → **Virus & threat protection** → **Manage settings** (under "Virus & threat protection settings") → **Exclusions** → **Add or remove exclusions** → **Add a folder** → select the TikTok2Mc installation folder (e.g. `%LOCALAPPDATA%\Programs\TikTok2Mc` or wherever you installed/extracted it).
    - *PowerShell (as Administrator):*
@@ -295,10 +295,13 @@ Additionally, some plugins or hooks may rely on this distinction, treating `#` a
 
 ### Gift IDs
 
-A full list of gift IDs and names is available in:
+The gift database (`core/gifts.json`) is kept up to date automatically:
 
-- **Development**: `defaults/gifts.json` (source file in the repository)
-- **Release / Installed**: `core/gifts.json` (copied by the build system)
+- **At startup** the tool fetches the current gift list from TikTok's official gift endpoint. If that fails, it falls back to the [antiops/tiktok-trending-data](https://github.com/antiops/tiktok-trending-data) mirror.
+- **Manually** with the **Sync gifts** button in the Actions editor's gift picker.
+- **Automatically disabled?** Set `gifts.auto_sync: false` in `config/config.yaml`. With `gifts.source` you can pin one source: `auto` (default), `official`, or `fallback`.
+
+The fetched list replaces the runtime catalog completely, so gifts TikTok no longer returns (for example regional or seasonal ones) disappear from the picker. The catalog shipped with the tool (`defaults/gifts.json`) is never modified and stays as a fallback, and a backup of the previous catalog is created before each sync.
 
 The Dashboard also includes a gift picker with search.
 
@@ -488,7 +491,7 @@ Each channel has its own circuit breaker: after repeated failed deliveries it pa
 
 ## Plugins
 
-Plugins are optional features you can turn on or off.
+Plugins are optional add-ons you can turn on or off. They are **not bundled with the release** anymore — the **Plugins** page shows the plugins found in your installation's `plugins/` folder. The reference plugins described below live in the repository under `src/plugins/`; copy a plugin folder into your installation's `plugins/` directory to use it. Built-in functions (like the Random hook) are managed on the **Built-ins** page instead.
 
 ### How to enable a plugin
 
@@ -499,7 +502,9 @@ Plugins are optional features you can turn on or off.
 > [!NOTE]
 > Everything starts disabled **except** core services (RCON, GUI, Overlay, Update, Minecraft Server API, Shutdown — these are enabled by default in `config.yaml`). Only plugins and comment commands start disabled. Turn on only what you need.
 
-### Available plugins
+### Reference plugins
+
+These plugins ship in the repository (not in the release) and can be installed by copying their folder into `plugins/`:
 
 | Plugin | What it does | Overlay URL |
 |--------|-------------|-------------|
@@ -542,7 +547,7 @@ Overlays are web pages you can add as a **Browser Source** in OBS Studio (or any
 
 There are two types of overlays:
 
-1. **Plugin overlays** — provided by plugins (Timer, Death Counter, Win Counter, Spotify Control). Each has its own URL.
+1. **Plugin overlays** — provided by installed plugins (e.g. Timer, Death Counter, Win Counter, Spotify Control). Each has its own URL.
 2. **Core overlay** — displays text messages triggered by `>>` commands in `actions.mca`. Served at `http://127.0.0.1:29185/api/v1/overlay?overlay=default`.
 
 ### How to add an overlay to OBS
@@ -633,17 +638,20 @@ A drop-down selector lets you switch between instances to view each server's con
 
 ## Updating the Tool
 
-The tool checks for updates automatically on startup (enabled by default). If a new version is available, it downloads and installs it.
+The tool checks for updates automatically on startup (enabled by default). If a new version is available, it is downloaded and staged in the background; the new version becomes active on the next restart.
 
-### What updates preserve — and what they replace
+### How updates work
 
-**Tool updates** (the app itself) are *merge* installs: new files are copied in, nothing is deleted. Your `config.yaml` files are never overwritten, and everything under `data/` (actions, backups, plugin data), your Minecraft worlds, and any **external plugins/hooks you installed yourself** are left untouched.
+- **Verified downloads** — every update package is checked against a signed manifest and per-file checksums before anything is installed. Incomplete, tampered, or unsigned packages are rejected and the update is skipped.
+- **The running installation is never overwritten in place** — the new version is unpacked into its own versioned folder (`app-<version>/`). Only after everything has been staged and verified does the tool switch the active version and clean up old ones.
+- **Your files stay where they are** — `config/`, `data/`, your Minecraft worlds, and plugins/hooks you installed yourself are never touched by an update. The updater always leaves your `config.yaml` exactly as it is; on the first start of the new version, missing configuration options are merged in if `auto_update_config` is enabled (default: true).
+- **Restart to activate** — after an update has been installed, the launcher shows *"Update X is ready — active after the next restart."* Restart the tool to use the new version.
 
 **Plugin/hook updates** via the dashboard replace the plugin's or hook's directory with the new version. Your `config.yaml` inside that directory is preserved automatically; all other files in the directory come from the new package. Persistent data is safe either way — plugins store it under `data/` (`plugin_data`), outside the updated directory.
 
 The dashboard's **Check for updates** action covers the tool as well as plugins and hooks: anything that declares an `update_url` in its manifest is checked and can be updated in one go.
 
-**Before updating, back up these files:**
+**Before updating, back up these files** (updates do not modify them, but a backup is always a good idea):
 - `config/config.yaml` — your settings
 - `data/actions.mca` — your action rules
 - `data/event_commands.yaml` — your event mappings
@@ -653,7 +661,7 @@ Copy them to a safe location outside the tool folder.
 
 ### Configuration migration
 
-When you update, new configuration options are automatically merged into your existing `config.yaml` if `auto_update_config` is enabled (default: true). Your user-defined values are preserved.
+When you start a newly updated version, new configuration options are automatically merged into your existing `config.yaml` if `auto_update_config` is enabled (default: true). Your user-defined values are preserved.
 
 **To disable auto-updates:**
 Set `update.enabled: false` in `config.yaml`.
@@ -667,7 +675,7 @@ Open the Dashboard (`http://127.0.0.1:29185/`) and click "Check for Updates" in 
 
 #### If an update fails or is skipped
 
-Updates never break the tool. If anything goes wrong during the update check, download, or installation (offline, download error, missing `update.exe`, a blocked updater, or a failed install), the tool **simply starts without the update** and continues working with the version you already have. You can retry later with **Check for Updates** in the Dashboard.
+Updates never break a working installation. If anything goes wrong during the update check, download, verification, or installation (offline, download error, checksum/signature mismatch, missing `update.exe`, a blocked updater, or a failed install), the tool **simply keeps running the version you already have**. You can retry later with **Check for Updates** in the Dashboard.
 
 If the update was skipped because the **`update.exe` is missing** from the installation folder (for example quarantined by antivirus), a message appears in the logs. Restore the file (see *Windows Defender / antivirus* above) and the next start will check for updates again.
 
@@ -675,7 +683,7 @@ If the update was skipped because the **`update.exe` is missing** from the insta
 
 ### Error codes in logs
 
-If you see a code like `[HOOK-0005]` or `[API-0001]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the error-code reference in the developer docs (`docs/dev-book-en/src/error-codes.md` or `docs/dev-book-de/src/error-codes.md`).
+If you see a code like `[HOOK-0005]` or `[API-0001]` in the console output, it is an **error code** that helps identify the problem. You can look up all error codes at `http://127.0.0.1:29185/api/v1/diagnostics/error-codes` when the tool is running, or check the generated error-code reference in the developer docs (`docs/reference/error-codes.md`, generated from the code with `python build.py docs`).
 
 ### Health and diagnostics
 
