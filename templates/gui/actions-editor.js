@@ -23,6 +23,7 @@ class ActionsEditor {
     this.addEventPanel = document.getElementById('actions-add-event-panel');
     this.addEventName = document.getElementById('actions-add-event-name');
     this.addGiftSearch = document.getElementById('actions-add-gift-search');
+    this.syncGiftsBtn = document.getElementById('syncGiftsBtn');
     this.addGiftList = document.getElementById('actions-add-gift-list');
     this.addGiftConfirm = document.getElementById('actions-add-gift-confirm');
     this.addGiftCancel = document.getElementById('actions-add-gift-cancel');
@@ -39,6 +40,7 @@ class ActionsEditor {
     this.addBtn?.addEventListener('click', () => this.openAddModal());
     this.addTypeSelect?.addEventListener('change', () => this._onAddTypeChange());
     this.addGiftSearch?.addEventListener('input', () => this._renderGiftList());
+    this.syncGiftsBtn?.addEventListener('click', () => this.syncGifts());
     this.addGiftConfirm?.addEventListener('click', () => this._confirmAddGift());
     this.addGiftCancel?.addEventListener('click', () => this._closeAddModal());
     this.addEventConfirm?.addEventListener('click', () => this._confirmAddEvent());

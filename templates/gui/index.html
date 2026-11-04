@@ -730,7 +730,10 @@
         <!-- Gift panel -->
         <div id="actions-add-gift-panel" class="form-group hidden">
           <label data-i18n="actions.searchGiftsLabel">Search Gifts</label>
-          <input type="text" id="actions-add-gift-search" class="form-input" placeholder="Search by name or ID..." data-i18n-placeholder="actions.searchGifts">
+          <div class="form-row">
+            <input type="text" id="actions-add-gift-search" class="form-input" placeholder="Search by name or ID..." data-i18n-placeholder="actions.searchGifts" style="flex:1;min-width:220px;">
+            <button type="button" class="btn btn--secondary" id="syncGiftsBtn" data-i18n="actions.syncGifts">Sync gifts</button>
+          </div>
           <div id="actions-add-gift-list" class="gift-list"></div>
         </div>
 

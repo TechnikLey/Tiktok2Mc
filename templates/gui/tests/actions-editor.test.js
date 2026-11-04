@@ -326,6 +326,61 @@ describe('ActionsEditor', () => {
     });
   });
 
+  /* ─── syncGifts ─── */
+  describe('syncGifts', () => {
+    let origPostJSON, origToast, origLoadGifts, origRender;
+
+    beforeEach(() => {
+      origPostJSON = postJSON;
+      origToast = showToast;
+      origLoadGifts = actionsEditor.loadGifts;
+      origRender = actionsEditor._renderGiftList;
+    });
+
+    afterEach(() => {
+      postJSON = origPostJSON;
+      showToast = origToast;
+      actionsEditor.loadGifts = origLoadGifts;
+      actionsEditor._renderGiftList = origRender;
+    });
+
+    it('posts to /gifts/sync and reloads the catalog', async () => {
+      let captured;
+      let reloaded = false;
+      let toast = null;
+      postJSON = async (url, body) => {
+        captured = { url, body };
+        return { ok: true, total: 859, added: 3, removed: 2 };
+      };
+      showToast = (msg, kind) => { toast = { msg, kind }; };
+      actionsEditor.loadGifts = async () => {
+        reloaded = true;
+        actionsEditor.gifts = [{ id: 1, name: 'Rose', coins: 1 }];
+      };
+      actionsEditor._renderGiftList = () => {};
+
+      await actionsEditor.syncGifts();
+
+      expect(captured.url).toBe('/gifts/sync');
+      expect(captured.body).toEqual({ source: 'auto' });
+      expect(reloaded).toBe(true);
+      expect(toast.kind).toBe('success');
+      expect(toast.msg).toContain('859');
+    });
+
+    it('shows an error toast when the sync fails', async () => {
+      let toast = null;
+      postJSON = async () => { throw new Error('offline'); };
+      showToast = (msg, kind) => { toast = { msg, kind }; };
+      actionsEditor.loadGifts = async () => {};
+
+      await actionsEditor.syncGifts();
+
+      expect(toast.kind).toBe('error');
+      expect(toast.msg).toContain('offline');
+    });
+  });
+
   /* ─── diagnostics panel & save blocking ─── */
   describe('diagnostics & save blocking', () => {
     it('_updateSaveButton blocks save when errors present', () => {
