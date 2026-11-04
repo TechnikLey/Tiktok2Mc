@@ -1,0 +1,4 @@
+# === DEVELOPER / DOCS (not shipped with the app) ===
+# Generates the browsable HTML API reference: python build.py docs-html
+# (Markdown reference, no extra dependency: python build.py docs)
+pdoc==16.0.0

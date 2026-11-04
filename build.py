@@ -9,6 +9,8 @@
 #   app              Build application (PyInstaller); use --only to build select .py files
 #   vsix             Build VS Code extension (.vsix)
 #   spec             Generate MCA language specification
+#   docs             Generate the Markdown developer reference
+#   docs-html        Generate the browsable HTML API reference (pdoc)
 #   test             Run tests (MCA / Python)
 #   all              Run spec + app + vsix
 #   ci               CI pipeline (validate + test + spec + app)
@@ -20,6 +22,7 @@ import ast
 import dataclasses
 import fnmatch
 import hashlib
+import importlib.util
 import json
 import logging
 import os
@@ -1864,6 +1867,84 @@ def cmd_docs(_args):
     cprint("Reference docs generated in docs/reference/.", Color.GREEN)
 
 
+def cmd_docs_html(_args):
+    """Render the browsable API reference with pdoc into ``docs/api-html``.
+
+    ``pdoc`` is a dev-only dependency (``requirements-dev.txt``). It respects
+    a package's ``__all__`` when recursing, and ``core`` declares one, so the
+    module list is collected explicitly with ``pkgutil.walk_packages``.
+    """
+    if importlib.util.find_spec("pdoc") is None:
+        cprint(
+            "pdoc is not installed. Install the dev dependencies with "
+            "'pip install -r requirements-dev.txt'.",
+            Color.RED,
+        )
+        sys.exit(1)
+
+    script_dir = Path(__file__).resolve().parent
+    src_dir = script_dir / "src"
+    sys.path.insert(0, str(src_dir))
+    try:
+        import pkgutil
+
+        import core
+
+        modules = [info.name for info in pkgutil.walk_packages(core.__path__, "core.")]
+    finally:
+        sys.path.remove(str(src_dir))
+
+    out_dir = script_dir / "docs" / "api-html"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(src_dir), env.get("PYTHONPATH", "")) if part
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pdoc",
+            "--docformat",
+            "markdown",
+            "--footer-text",
+            f"TikTok2Mc {TOOL_VERSION} developer reference (generated from docstrings)",
+            "-o",
+            str(out_dir),
+            *modules,
+        ],
+        cwd=script_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+    # pdoc re-walks packages that are also listed explicitly and warns about
+    # the resulting duplicate specs; the pages themselves are identical.
+    # Type-annotation warnings come from classes that define a ``list`` method.
+    noise = ("already been added", "Error parsing type annotation")
+    for line in (result.stderr or "").splitlines():
+        if any(marker in line for marker in noise):
+            continue
+        cprint(line, Color.YELLOW if line.startswith("Warn:") else Color.RESET)
+
+    if result.returncode != 0:
+        cprint("HTML documentation generation failed.", Color.RED)
+        sys.exit(result.returncode)
+
+    pages = sum(1 for _ in out_dir.rglob("*.html"))
+    cprint(
+        f"HTML docs generated: {pages} pages in docs/api-html/ "
+        "(open docs/api-html/index.html).",
+        Color.GREEN,
+    )
+
+
 def cmd_all(args):
     cprint("=== Building all ===", Color.CYAN)
     cmd_spec(args)
@@ -1937,6 +2018,9 @@ def main():
 
     sub.add_parser("spec", help="Generate MCA language specification")
     sub.add_parser("docs", help="Generate reference docs from code and config")
+    sub.add_parser(
+        "docs-html", help="Generate browsable HTML API docs with pdoc (dev only)"
+    )
     sub.add_parser("vsix", help="Build VS Code extension (.vsix)")
     p_test = sub.add_parser("test", help="Run tests")
     p_test.add_argument(
@@ -2011,6 +2095,7 @@ def main():
             "  python build.py test --all   Run the test suites\n"
             "  python build.py spec         Regenerate the MCA spec\n"
             "  python build.py docs         Regenerate the reference docs\n"
+            "  python build.py docs-html    Regenerate the browsable HTML docs\n"
             "  python build.py --check      Only verify dependencies"
         )
         sys.exit(0)
@@ -2023,6 +2108,8 @@ def main():
         cmd_spec(parsed)
     elif parsed.command == "docs":
         cmd_docs(parsed)
+    elif parsed.command == "docs-html":
+        cmd_docs_html(parsed)
     elif parsed.command == "test":
         cmd_test(parsed)
     elif parsed.command == "all":

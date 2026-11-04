@@ -21,6 +21,9 @@ server/
 !mca-language-server/server/
 logs/
 
+# Generated HTML API reference (python build.py docs-html)
+docs/api-html/
+
 # VS Code extension build artifacts
 *.vsix
 .vscode-test/

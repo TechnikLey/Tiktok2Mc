@@ -101,6 +101,7 @@ Four layers: Python (pytest + static analysis), GUI (vitest + ESLint), MCA (JS L
 - `python build.py test` — runs the MCA LSP test suite; `--all` also runs full pytest. `python build.py --check` runs `check_deps.py` first.
 - `python build.py spec` — regenerates `mca-language-server/mca-spec.json` (generated file — never hand-edit).
 - `python build.py docs` — regenerates `docs/reference/*.md` (error codes, configuration, API, module docstrings) from their sources: `src/core/error_codes.py`, the comments in `defaults/config.yaml`, the FastAPI router, and the docstrings of `src/core/`. Run after changing any of those; the output is generated and must never be hand-edited.
+- `python build.py docs-html` — renders the same docstrings as a browsable static HTML site (pdoc) into `docs/api-html/`; open `docs/api-html/index.html`. Dev-only: requires `pdoc` (`pip install -r requirements-dev.txt`). The output is generated and gitignored — never hand-edit or commit it.
 - `python check_deps.py` — verifies Python packages + system tools (node/npm); `--install` installs everything, `--system-only` checks tools only.
 - **Utility tools:** `rg` (ripgrep) for fast code search, `fd` for fast file search, `jq` for JSON parsing/inspection (configs, manifests, API output). Not part of `check_deps.py`.
 - **CI:** `test.yml` runs `pytest tests/` (+ a warnings pass) on push/PR to `main`; `build.yml` runs `python build.py --installer` on version tags (Windows + Linux) and creates the GitHub release.
@@ -136,6 +137,8 @@ cd templates/gui && npx eslint .      # GUI lint
 
 # Build
 python build.py spec                  # regenerate mca-spec.json
+python build.py docs                  # Markdown reference (docs/reference/)
+python build.py docs-html             # HTML API docs (docs/api-html/, needs pdoc)
 python build.py vsix                  # VSCode extension
 python build.py app --installer --only <name>  # single binary + installer
 python build.py all | ci | clean
@@ -157,7 +160,7 @@ Working rules:
 - **Prefer small, scoped changes;** no drive-by refactors, touch only files the task needs.
 - **Run tests after changes** (see §7 priority); resolve failures before moving on.
 - **Developer docs live in the source:** document public modules, classes and functions with docstrings (no separate developer manual). This AGENTS.md is the workflow guide; `docs/reference/*.md` is generated (`python build.py docs`) and never hand-edited. Keep the `.mca` spec in sync.
-- **Never edit generated files:** `mca-language-server/mca-spec.json` (regenerate: `python build.py spec`), `docs/reference/*.md` (regenerate: `python build.py docs`), `build/`, `data/backups/`.
+- **Never edit generated files:** `mca-language-server/mca-spec.json` (regenerate: `python build.py spec`), `docs/reference/*.md` (regenerate: `python build.py docs`), `docs/api-html/` (regenerate: `python build.py docs-html`; gitignored), `build/`, `data/backups/`.
 - **No new dependencies without reason** — check `requirements.txt`/`package.json` first.
 - **Ask before** touching live-stream behavior, config migration, or release packaging.
 

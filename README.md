@@ -87,6 +87,7 @@ There is no separate developer manual. The documentation lives in the source cod
 - **Docstrings** — public modules, classes and functions describe themselves. Start with `src/core/`, especially `paths.py`, `version.py`, `api/server.py` and `trigger_engine/`.
 - **[AGENTS.md](./AGENTS.md)** — architecture, repository layout, coding rules, test layers and every build/test command.
 - **Generated reference** — `docs/reference/` is produced from the source by `python build.py docs`: all error codes (`src/core/error_codes.py`), the full `config.yaml` reference (its comments), the REST API (FastAPI router) and the module/API reference (the docstrings in `src/core/`). Never edit these files by hand.
+- **Browsable HTML docs** — `pip install -r requirements-dev.txt`, then `python build.py docs-html` (pdoc). It renders the same docstrings with sidebar navigation, search, signatures and source links into `docs/api-html/`; open `docs/api-html/index.html`. The output is generated and not committed.
 - **Live API docs** — with the tool running, open `http://127.0.0.1:29185/docs` (Swagger UI) or `/redoc`.
 
 ## License
