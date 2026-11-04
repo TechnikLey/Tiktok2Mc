@@ -250,7 +250,7 @@ class TestLegacyPinsStillHold:
             == (active / "core" / f"main{paths_mod.SUFFIX}").resolve()
         )
 
-    def test_plugins_dir_prefers_active_app_dir(
+    def test_plugins_dir_stays_at_root_with_active_app_dir(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         active = tmp_path / "app-1.2.0"
@@ -260,4 +260,4 @@ class TestLegacyPinsStillHold:
         )
         monkeypatch.setattr(paths_mod, "get_root_dir", lambda: tmp_path)
         got = _REAL["get_plugins_dir"]()
-        assert got.resolve() == (active / "plugins").resolve()
+        assert got.resolve() == (tmp_path / "plugins").resolve()

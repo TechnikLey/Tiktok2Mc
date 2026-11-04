@@ -32,7 +32,11 @@ class TestActionsServiceOffline:
             actions_file = data_dir / "actions.mca"
             actions_file.write_text("follow:/say Hello!\n")
             monkeypatch.setattr(
-                "core.api.services.actions.get_root_dir",
+                "core.paths.get_root_dir",
+                lambda: tmp_path,
+            )
+            monkeypatch.setattr(
+                "core.paths.get_data_home_base",
                 lambda: tmp_path,
             )
             svc = ActionsService()
