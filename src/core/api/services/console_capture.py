@@ -1,3 +1,5 @@
+"""Tails a Minecraft server log and publishes new lines to the event bus."""
+
 import asyncio
 import logging
 import time
@@ -16,12 +18,19 @@ class ConsoleCapture:
     """
 
     def __init__(self, instance_id: str, server_dir: Path) -> None:
+        """Create a capture for one instance without starting it.
+
+Args:
+    instance_id: Instance identifier included in published events.
+    server_dir: Server directory containing ``logs/latest.log``."""
+
         self.instance_id = instance_id
         self._log_path = server_dir / "logs" / "latest.log"
         self._task: asyncio.Task | None = None
         self._running = False
 
     async def start(self) -> None:
+        """Start the background tail task if it is not already running."""
         if self._running:
             return
         self._running = True
@@ -33,6 +42,7 @@ class ConsoleCapture:
         )
 
     async def stop(self) -> None:
+        """Stop and await the tail task, ignoring cancellation."""
         self._running = False
         if self._task:
             self._task.cancel()
@@ -44,6 +54,11 @@ class ConsoleCapture:
         log.info("ConsoleCapture stopped for '%s'", self.instance_id)
 
     async def _run(self) -> None:
+        """Tail the log forever, restarting after unexpected errors.
+
+A five-second delay prevents a tight restart loop when the log cannot be
+read. Cancellation exits the loop cleanly."""
+
         while self._running:
             try:
                 await self._tail()
@@ -59,6 +74,14 @@ class ConsoleCapture:
 
     async def _tail(self) -> None:
         # Wait for the log file to exist
+        """Follow new lines and publish each one to the event bus.
+
+Waits for the log file to appear, starts at the current end so existing
+history is not replayed, and returns when the file is rotated or
+truncated so :meth:`_run` can reopen it. Log rotation is detected through
+the inode where available; on Windows the path check is used instead.
+The file handle is always closed."""
+
         while self._running and not self._log_path.exists():
             await asyncio.sleep(2)
 
@@ -100,6 +123,11 @@ class ConsoleCapture:
             await asyncio.to_thread(f.close)
 
     def _get_inode(self) -> int:
+        """Return the log file's inode, or ``0`` when unavailable.
+
+Windows and errors while statting fall back to ``0``, which still works
+with the path-existence check."""
+
         try:
             return self._log_path.stat().st_ino
         except (OSError, AttributeError):
@@ -140,6 +168,7 @@ def stop_instance_capture(instance_id: str) -> None:
 
 
 def get_instance_capture(instance_id: str) -> ConsoleCapture | None:
+    """Return the active capture for an instance, or ``None``."""
     return _captures.get(instance_id)
 
 
@@ -151,10 +180,12 @@ _console_capture: ConsoleCapture | None = None
 
 
 def get_console_capture() -> ConsoleCapture | None:
+    """Return the legacy default-instance capture, or ``None``."""
     return _console_capture
 
 
 def init_console_capture(server_dir: Path) -> ConsoleCapture:
+    """Create the legacy default-instance capture without starting it."""
     global _console_capture
     _console_capture = ConsoleCapture("default", server_dir)
     return _console_capture

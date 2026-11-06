@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Updater entry point implementing the signed, versioned update state machine."""
+
 # ==================================================
 # update.py - Auto-updater for the Streaming Tool (P3a)
 # ==================================================
@@ -118,6 +120,7 @@ SIGNING_PUBLIC_KEY = ""
 
 # ---------------------------------------------------------------------------
 def wait_for_key(msg="Press Enter to exit..."):
+    """Wait for Enter unless running in automatic (``--auto``) mode."""
     if not AUTO_MODE:
         try:
             input(msg)
@@ -126,6 +129,13 @@ def wait_for_key(msg="Press Enter to exit..."):
 
 
 def _init():
+    """Initialize paths, config, HTTP headers and signing key for the updater.
+
+Exits with status 1 when the config cannot be loaded. On Linux without
+root, it either exits or warns depending on TTY availability and
+``show_sudo_warning``. Test-only environment variables may override the
+update source and signing key."""
+
     global \
         BASE_DIR, \
         TEMP_DIR, \
@@ -225,6 +235,11 @@ def get_local_tool_version(root: Path) -> str:
 
 
 def download_with_progress(url, target):
+    """Stream ``url`` to ``target`` while reporting download progress.
+
+Progress is written to stdout and, best effort, to the GUI status file.
+Raises the underlying request or filesystem error on failure."""
+
     target = Path(target) if isinstance(target, str) else target
     with requests.get(url, headers=HEADERS_ASSET, stream=True) as r:
         r.raise_for_status()
@@ -257,6 +272,12 @@ def download_bytes(url: str) -> bytes | None:
 
 
 def safe_extract_zip(zip_path: Path, dest: Path) -> None:
+    """Extract a zip after rejecting entries outside ``dest``.
+
+Raises:
+    ValueError: If an archive member would escape the destination
+        (zip-slip protection)."""
+
     with zipfile.ZipFile(zip_path, "r") as z:
         # Validate all member paths first (zip slip protection)
         resolved_dest = dest.resolve()
@@ -268,6 +289,12 @@ def safe_extract_zip(zip_path: Path, dest: Path) -> None:
 
 
 def safe_extract_tar(tar_path: Path, dest: Path) -> None:
+    """Extract a gzipped tar after rejecting entries outside ``dest``.
+
+Raises:
+    ValueError: If an archive member would escape the destination
+        (path traversal protection)."""
+
     with tarfile.open(tar_path, "r:gz") as t:
         resolved_dest = dest.resolve()
         for member in t.getmembers():
@@ -765,6 +792,7 @@ def _step_prune(app_dir_name: str) -> list[str]:
 
 
 def _cleanup_temp() -> None:
+    """Remove the updater's temporary directory, ignoring errors."""
     if TEMP_DIR and TEMP_DIR.exists():
         shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
@@ -775,6 +803,13 @@ def _cleanup_temp() -> None:
 def run_update():
     # Clear any stale progress report from a previous run, then report a
     # fresh "checking" status so the GUI launcher can show progress.
+    """Run the complete update flow from version check to relaunch.
+
+Steps: check, fetch, verify signature and checksums, stage, atomically flip
+the version pointer, prune old versions, swap launcher binaries, update the
+legacy version file and notify the GUI. A legacy ``--resume`` argument is
+accepted and ignored because the flow is idempotent."""
+
     _clear_update_status()
     _write_update_status("checking")
 

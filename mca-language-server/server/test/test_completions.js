@@ -1,3 +1,10 @@
+/**
+ * @file Completion tests for the MCA language server.
+ *
+ * Covers trigger, prefix and placeholder completions, `$random` scripts,
+ * multipliers, named overlays and the pass-through `resolveCompletion`.
+ */
+
 const assert = require('assert');
 const { provideCompletions, resolveCompletion } = require('../src/completions');
 

@@ -1,3 +1,5 @@
+"""Dataclasses and enums shared by the trigger engine."""
+
 from __future__ import annotations
 
 import time
@@ -19,10 +21,15 @@ class TriggerType(str, Enum):
 
     @classmethod
     def builtin_types(cls) -> list[str]:
+        """Return the event type values excluding the synthetic ``custom`` trigger."""
         return [t.value for t in cls if t != cls.CUSTOM]
 
     @classmethod
     def is_valid(cls, name: str) -> bool:
+        """Return whether ``name`` names a built-in or the ``custom`` trigger type.
+
+Matching is case-insensitive; whitespace is not trimmed."""
+
         return name.lower() in cls.builtin_types() or name.lower() == cls.CUSTOM.value
 
 
@@ -48,6 +55,7 @@ class ValidationError:
     suggested_value: str = ""
 
     def to_dict(self) -> dict[str, str]:
+        """Return the JSON-friendly representation, omitting empty optional fields."""
         d = {"field": self.field, "message": self.message}
         if self.code:
             d["code"] = self.code
@@ -74,6 +82,7 @@ class TriggerResult:
     bridge_response: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return the result as a JSON-serialisable dictionary."""
         return {
             "success": self.success,
             "trigger_name": self.trigger_name,
@@ -96,6 +105,16 @@ class TriggerResult:
         errors: list[ValidationError],
         payload: dict[str, Any] | None = None,
     ) -> TriggerResult:
+        """Build a failed result for invalid trigger input.
+
+Args:
+    trigger_name: Name of the trigger that was tested.
+    errors: Validation problems to attach to the result.
+    payload: Original payload, or ``None`` when it could not be parsed.
+
+Returns:
+    A result with status ``VALIDATION_ERROR`` and a combined message."""
+
         return cls(
             success=False,
             trigger_name=trigger_name,
@@ -117,6 +136,20 @@ class TriggerResult:
         start_time: float,
         warnings: list[str] | None = None,
     ) -> TriggerResult:
+        """Build a result from the bridge's JSON response.
+
+Args:
+    trigger_name: Name of the executed trigger.
+    payload: Payload that was sent to the bridge.
+    bridge_data: Parsed response body, or ``None`` when the bridge returned
+        nothing.
+    start_time: ``time.time()`` value captured before the request.
+    warnings: Optional warnings collected while building the payload.
+
+Returns:
+    A success result, or an error result with a code derived from the bridge
+    message."""
+
         elapsed = (time.time() - start_time) * 1000
         if bridge_data is None:
             return cls(
@@ -164,6 +197,11 @@ class TriggerResult:
         start_time: float,
         warnings: list[str] | None = None,
     ) -> TriggerResult:
+        """Build a failed result for an unreachable bridge.
+
+``error_detail`` is preserved for diagnostics while the user-facing message
+stays generic."""
+
         elapsed = (time.time() - start_time) * 1000
         return cls(
             success=False,
@@ -186,6 +224,7 @@ class TriggerResult:
         exception: Exception,
         start_time: float,
     ) -> TriggerResult:
+        """Build a failed result for an unexpected exception during execution."""
         elapsed = (time.time() - start_time) * 1000
         return cls(
             success=False,

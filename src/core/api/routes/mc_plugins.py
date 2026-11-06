@@ -1,3 +1,5 @@
+"""REST endpoints for managing server-side Minecraft plugins per server instance."""
+
 import logging
 import re
 from pathlib import Path
@@ -18,6 +20,7 @@ _service: ApiService | None = None
 
 
 def _get_service() -> ApiService:
+    """Return the lazily created module-level ``ApiService``."""
     global _service
     if _service is None:
         _service = ApiService()
@@ -25,14 +28,17 @@ def _get_service() -> ApiService:
 
 
 def _get_plugins_dir(instance_id: str) -> Path:
+    """Return the resolved ``plugins`` directory for a server instance."""
     return (get_servers_dir() / instance_id / "plugins").resolve()
 
 
 def _instance_has_jar(instance_id: str) -> bool:
+    """Return whether the instance directory contains a ``server.jar``."""
     return (get_servers_dir() / instance_id / "server.jar").is_file()
 
 
 def _validate_instance_exists(instance_id: str) -> None:
+    """Raise 404 unless the instance exists and has a server jar."""
     if not _instance_has_jar(instance_id):
         raise HTTPException(
             status_code=404,
@@ -41,6 +47,11 @@ def _validate_instance_exists(instance_id: str) -> None:
 
 
 def _sanitize_plugin_name(name: str) -> str:
+    """Normalise a plugin filename to a single safe path segment.
+
+Strips ``.jar``/``.disabled`` suffixes and removes everything outside
+``A-Za-z0-9._-`` so the result cannot escape the plugins directory."""
+
     name = re.sub(r"\.(jar|disabled)$", "", name, flags=re.IGNORECASE)
     return re.sub(r"[^A-Za-z0-9._-]", "", name)
 
@@ -49,16 +60,19 @@ def _sanitize_plugin_name(name: str) -> str:
 
 
 class McPluginInfo(BaseModel):
+    """Metadata for one server-side Minecraft plugin file."""
     name: str
     filename: str
     enabled: bool
 
 
 class McPluginsListResponse(BaseModel):
+    """Response listing the plugins installed for an instance."""
     plugins: list[McPluginInfo]
 
 
 class McPluginActionResponse(BaseModel):
+    """Response for enabling or disabling a server-side plugin."""
     status: str
     plugin: str
     enabled: bool
@@ -66,12 +80,14 @@ class McPluginActionResponse(BaseModel):
 
 
 class McPluginDeleteResponse(BaseModel):
+    """Response for deleting a server-side plugin."""
     status: str
     plugin: str
     message: str
 
 
 class McPluginUploadResponse(BaseModel):
+    """Response for uploading a server-side plugin jar."""
     status: str
     plugin: str
     filename: str
@@ -85,6 +101,7 @@ class McPluginUploadResponse(BaseModel):
 async def list_mc_plugins(
     instance_id: Annotated[str, PathParam(description="Server instance ID")],
 ):
+    """List installed plugins for a server instance (``GET .../mc-plugins``)."""
     _validate_instance_exists(instance_id)
 
     plugins_dir = _get_plugins_dir(instance_id)
@@ -127,6 +144,7 @@ async def enable_mc_plugin(
     instance_id: Annotated[str, PathParam(description="Server instance ID")],
     plugin_name: Annotated[str, PathParam(description="Plugin name")],
 ):
+    """Enable a plugin by removing its ``.disabled`` suffix."""
     _validate_instance_exists(instance_id)
 
     name = _sanitize_plugin_name(plugin_name)
@@ -171,6 +189,7 @@ async def disable_mc_plugin(
     instance_id: Annotated[str, PathParam(description="Server instance ID")],
     plugin_name: Annotated[str, PathParam(description="Plugin name")],
 ):
+    """Disable a plugin by appending the ``.disabled`` suffix."""
     _validate_instance_exists(instance_id)
 
     name = _sanitize_plugin_name(plugin_name)
@@ -215,6 +234,7 @@ async def delete_mc_plugin(
     instance_id: Annotated[str, PathParam(description="Server instance ID")],
     plugin_name: Annotated[str, PathParam(description="Plugin name")],
 ):
+    """Delete a plugin jar (or its disabled variant) from an instance."""
     _validate_instance_exists(instance_id)
 
     name = _sanitize_plugin_name(plugin_name)
@@ -258,6 +278,11 @@ async def upload_mc_plugin(
     instance_id: Annotated[str, PathParam(description="Server instance ID")],
     file: Annotated[UploadFile, File(description="Plugin .jar file")],
 ):
+    """Stream an uploaded ``.jar`` into the instance's plugins directory.
+
+Only the filename extension is checked; the file is written directly to its
+target name and the server must be restarted to pick it up."""
+
     _validate_instance_exists(instance_id)
 
     if not file.filename or not file.filename.lower().endswith(".jar"):

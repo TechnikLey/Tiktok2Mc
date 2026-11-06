@@ -62,6 +62,13 @@ class OverlayClient:
     """Per-overlay circuit breaker."""
 
     def __init__(self, name: str, max_fails: int, cooldown: int) -> None:
+        """Create a circuit breaker for one named overlay.
+
+Args:
+    name: Overlay name used in logs and lookups.
+    max_fails: Consecutive failures before the overlay enters cooldown.
+    cooldown: Cooldown duration in seconds."""
+
         self.name = name
         self.max_fails = max_fails
         self.cooldown = cooldown
@@ -69,6 +76,10 @@ class OverlayClient:
         self._last_fail_time = 0.0
 
     def get_cooldown_status(self) -> tuple[bool, int]:
+        """Return whether the overlay is cooling down and the remaining seconds.
+
+A completed cooldown resets the failure count."""
+
         if self._fail_count >= self.max_fails:
             elapsed = time.time() - self._last_fail_time
             if elapsed < self.cooldown:
@@ -77,9 +88,11 @@ class OverlayClient:
         return False, 0
 
     def mark_success(self) -> None:
+        """Reset the failure count after a successful dispatch."""
         self._fail_count = 0
 
     def mark_failure(self) -> None:
+        """Record a failed dispatch and restart the cooldown window."""
         self._fail_count += 1
         self._last_fail_time = time.time()
 
@@ -93,6 +106,7 @@ class OverlayManagerBase:
     """Shared overlay manager base: config + circuit-breaker clients."""
 
     def __init__(self) -> None:
+        """Initialise the client map from the current overlay configuration."""
         self.clients: dict[str, OverlayClient] = {}
         self._init_clients()
 
@@ -104,6 +118,11 @@ class OverlayManagerBase:
         return merged
 
     def _init_clients(self) -> None:
+        """Rebuild the circuit-breaker clients from configuration.
+
+Missing names are skipped and a ``default`` client is always created so
+dispatch never fails just because the config is incomplete."""
+
         cfg = self._load_config()
         def_fails = cfg.get("max_fails", 3)
         def_cooldown = cfg.get("cooldown", 10)
@@ -136,20 +155,28 @@ class OverlayManagerBase:
         self._init_clients()
 
     def get_client(self, name: str) -> OverlayClient | None:
+        """Return the client for an overlay name, or ``None``."""
         return self.clients.get(name)
 
     def check_cooldown(self, name: str) -> tuple[bool, int]:
+        """Return the cooldown state for an overlay.
+
+Unknown overlays report no cooldown so the caller can surface a
+not-found error separately."""
+
         client = self.clients.get(name)
         if not client:
             return True, 0
         return client.get_cooldown_status()
 
     def mark_success(self, name: str) -> None:
+        """Mark a dispatch to the named overlay as successful."""
         client = self.clients.get(name)
         if client:
             client.mark_success()
 
     def mark_failure(self, name: str) -> None:
+        """Mark a dispatch to the named overlay as failed."""
         client = self.clients.get(name)
         if client:
             client.mark_failure()

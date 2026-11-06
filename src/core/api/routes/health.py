@@ -1,3 +1,5 @@
+"""Health and status endpoints reporting API, bridge and TikTok connection state."""
+
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -21,6 +23,7 @@ _service: ApiService | None = None
 
 
 def _get_service() -> ApiService:
+    """Return the lazily created module-level `ApiService` instance."""
     global _service
     if _service is None:
         _service = ApiService()
@@ -29,6 +32,7 @@ def _get_service() -> ApiService:
 
 @router.get("/health", response_model=HealthResponse)
 async def health():
+    """Return the minimal liveness response with API and tool versions."""
     return HealthResponse(
         status="ok",
         version=API_VERSION,
@@ -39,6 +43,11 @@ async def health():
 
 @router.get("/status", response_model=StatusDetail)
 async def status():
+    """Return aggregated runtime status for plugins, TikTok and the bridge.
+
+Bridge metrics are best effort: when they cannot be fetched the related
+fields stay ``None``. Unexpected errors are reported as HTTP 500."""
+
     try:
         plugins = get_registry().list()
         enabled = sum(1 for p in plugins if p.enabled)

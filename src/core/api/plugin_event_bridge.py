@@ -88,6 +88,11 @@ class PluginEventBridge:
     """Background task that forwards bus events to subscribed plugins."""
 
     def __init__(self) -> None:
+        """Create the bridge with no active task or declarations.
+
+Health monitoring is registered in the ``STARTING`` state; declarations
+are loaded lazily by :meth:`start` and :meth:`refresh_subscriptions`."""
+
         self._task: asyncio.Task | None = None
         self._running = False
         self._lock = threading.Lock()
@@ -140,6 +145,12 @@ class PluginEventBridge:
     # ------------------------------------------------------------------
 
     def _recipients_for(self, event_type: str) -> set[str]:
+        """Return the set of plugins subscribed to an event type.
+
+All subscription patterns are matched against ``event_type`` and their
+recipients are unioned, so a plugin subscribed through several patterns is
+notified only once per event."""
+
         with self._lock:
             subscriptions = dict(self._subscriptions)
         recipients: set[str] = set()
@@ -218,6 +229,13 @@ class PluginEventBridge:
     # ------------------------------------------------------------------
 
     async def _loop(self) -> None:
+        """Consume the event bus until the bridge is stopped.
+
+Waits at most five seconds for each event, ignores idle timeouts, and
+delegates delivery to :meth:`_dispatch`. A dispatch failure marks the
+bridge degraded but keeps the worker alive. The bus subscription is always
+released on exit, including cancellation."""
+
         from core.api.eventbus import event_bus
 
         q = event_bus.subscribe()  # all events; filtered in _dispatch
@@ -252,6 +270,12 @@ class PluginEventBridge:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        """Start the background delivery task.
+
+Calling this while the bridge is already running is a no-op. Declarations
+are refreshed before the task starts, and the health state becomes
+``RUNNING``."""
+
         if self._running:
             return
         self.refresh_subscriptions()
@@ -260,6 +284,12 @@ class PluginEventBridge:
         self._health.set_state("plugin_event_bridge", HealthState.RUNNING)
 
     async def stop(self) -> None:
+        """Stop the background task and mark the bridge stopped.
+
+Calling this when the bridge is not running is a no-op. The task is
+cancelled and awaited so its event-bus subscription is released before the
+health state becomes ``STOPPED``."""
+
         if not self._running:
             return
         self._running = False

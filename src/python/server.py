@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Standalone Minecraft server launcher for development and single-instance runs."""
+
 import argparse
 import os
 import subprocess
@@ -37,10 +39,16 @@ install_global_exception_hook("server")
 
 
 def _is_interactive() -> bool:
+    """Return whether both stdin and stdout are attached to a terminal."""
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
 def _wait_or_skip(prompt: str = "Press Enter to continue..."):
+    """Wait for Enter only in interactive sessions, ignoring EOF and interrupts.
+
+Args:
+    prompt: Prompt shown before waiting."""
+
     if _is_interactive():
         try:
             input(prompt)
@@ -276,6 +284,16 @@ if not EULA_FILE.exists():
 
 # === Update server.properties ===
 def set_server_property(file_path: Path, key, value):
+    """Set or append a ``key=value`` line in a properties file.
+
+Existing lines are replaced; a missing file is created first. Write errors
+are logged and otherwise ignored.
+
+Args:
+    file_path: Properties file to update.
+    key: Property name.
+    value: New property value."""
+
     try:
         if not file_path.exists():
             with file_path.open("w", encoding="utf-8") as f:

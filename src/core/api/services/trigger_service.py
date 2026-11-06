@@ -38,6 +38,12 @@ class TriggerService:
     MAX_HISTORY: int = 500
 
     def __init__(self, engine: TriggerEngine | None = None) -> None:
+        """Create the service around a trigger engine.
+
+Args:
+    engine: Engine to delegate execution to. When omitted, a new engine is
+        built with the bridge port resolved from the current configuration."""
+
         if engine is None:
             bridge_port = _resolve_bridge_port()
             config = EngineConfig(bridge_port=bridge_port)
@@ -51,9 +57,15 @@ class TriggerService:
     # ------------------------------------------------------------------
 
     def get_event_types(self) -> list[str]:
+        """Return the trigger type names supported by the engine."""
         return self._engine.get_event_types()
 
     def get_trigger_definitions(self) -> list[dict[str, Any]]:
+        """Return API-friendly trigger definitions.
+
+Each mapping exposes the display name, description, and whether the
+corresponding trigger needs a gift selection or comment input."""
+
         return [
             {
                 "name": d.name,
@@ -67,6 +79,11 @@ class TriggerService:
         ]
 
     def get_history(self) -> list[dict[str, Any]]:
+        """Return recorded executions, newest first.
+
+Each entry contains the completion timestamp, duration, trigger name,
+payload, status, error message, and success flag."""
+
         return [
             {
                 "timestamp": completed_at,
@@ -81,6 +98,12 @@ class TriggerService:
         ]
 
     def can_execute(self) -> tuple[bool, str]:
+        """Check whether the shared event-tester cooldown has elapsed.
+
+Returns:
+    ``(True, "")`` when execution is allowed, otherwise ``(False, reason)``
+    with a message containing the remaining wait time."""
+
         now = time.time()
         elapsed = now - self._last_execution
         if elapsed < self.DEBOUNCE_SECONDS:
@@ -91,6 +114,12 @@ class TriggerService:
     def execute_trigger(
         self, trigger: str, user: str = "System", gift_id: str | None = None
     ) -> dict[str, Any]:
+        """Execute a trigger through the event-tester path.
+
+The call is rejected while the 1.5-second cooldown is active. Accepted
+calls update the cooldown, delegate to the engine, record the result in
+history, and return the API representation."""
+
         ok, msg = self.can_execute()
         if not ok:
             return {"status": "error", "message": msg}
@@ -128,6 +157,12 @@ class TriggerService:
         return self._result_to_api_dict(result, trigger, user)
 
     def toggle_tiktok_connection(self) -> dict[str, Any]:
+        """Toggle the TikTok connection using the ``tiktok`` trigger.
+
+The call uses the same cooldown and history as other event-tester actions.
+The returned ``connected`` flag prefers the bridge's structured response;
+for older bridges it is inferred from the message text."""
+
         ok, msg = self.can_execute()
         if not ok:
             return {"status": "error", "message": msg}
@@ -167,6 +202,11 @@ class TriggerService:
         superfan: bool = False,
         fanclub: bool = False,
     ) -> dict[str, Any]:
+        """Simulate a comment through the trigger engine.
+
+The call uses the shared cooldown, passes the moderation flags through, and
+records the result in history."""
+
         ok, msg = self.can_execute()
         if not ok:
             return {"status": "error", "message": msg}
@@ -197,6 +237,11 @@ class TriggerService:
     def _result_to_api_dict(
         result: TriggerResult, trigger: str, user: str
     ) -> dict[str, Any]:
+        """Convert an engine result into the event-tester response shape.
+
+A successful result reports the engine status value; a failed result is
+normalized to ``"error"``. The message is always a string."""
+
         return {
             "status": result.status.value if result.success else "error",
             "message": result.error_message or "",
@@ -210,6 +255,7 @@ _trigger_service: TriggerService | None = None
 
 
 def get_trigger_service() -> TriggerService:
+    """Return the global :class:`TriggerService` singleton."""
     global _trigger_service
     if _trigger_service is None:
         _trigger_service = TriggerService()

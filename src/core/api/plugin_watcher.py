@@ -52,6 +52,11 @@ class PluginWatcher:
     """
 
     def __init__(self, plugins_dir: Path | None = None) -> None:
+        """Create a stopped watcher for an optional plugins directory.
+
+When ``plugins_dir`` is omitted, the directory is resolved lazily via
+``core.paths``. Process health is registered in the ``STARTING`` state."""
+
         self._plugins_dir: Path | None = plugins_dir
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -60,6 +65,11 @@ class PluginWatcher:
         self._health.register("plugin_watcher", HealthState.STARTING)
 
     def _resolve_plugins_dir(self) -> Path | None:
+        """Return the configured plugins directory, or resolve it lazily.
+
+Returns:
+    The directory path, or ``None`` when it cannot be resolved."""
+
         if self._plugins_dir is not None:
             return self._plugins_dir
         try:
@@ -70,6 +80,12 @@ class PluginWatcher:
             return None
 
     def start(self) -> None:
+        """Start the daemon polling thread.
+
+Starting an already-running watcher is a no-op. The current manifest names
+are captured first so pre-existing plugins are not re-registered as new;
+only directories added after this snapshot are auto-registered."""
+
         if self._thread is not None and self._thread.is_alive():
             return
         # Snapshot current state
@@ -83,6 +99,11 @@ class PluginWatcher:
         log.info("Plugin watcher started (poll interval: %ss)", _POLL_INTERVAL)
 
     def stop(self) -> None:
+        """Signal the polling thread to stop and wait for it.
+
+The thread is joined with a five-second timeout so shutdown cannot hang on
+a slow directory scan. The watcher health state becomes ``STOPPED``."""
+
         self._stop_event.set()
         if self._thread is not None:
             self._thread.join(timeout=5)
@@ -91,11 +112,20 @@ class PluginWatcher:
         log.info("Plugin watcher stopped")
 
     def _run(self) -> None:
+        """Poll for filesystem changes until the stop event is set."""
         while not self._stop_event.is_set():
             self._sync()
             self._stop_event.wait(_POLL_INTERVAL)
 
     def _sync(self) -> None:
+        """Reconcile the registry with the current plugin directories.
+
+Directories that appeared since the last scan are registered disabled;
+registry entries whose directories disappeared are removed. Only removals
+of previously known directories are acted on, so externally registered
+plugins are not unregistered merely because they have no folder here. File
+and manifest errors are logged and skipped."""
+
         plugins_dir = self._resolve_plugins_dir()
         if plugins_dir is None:
             return
@@ -148,6 +178,7 @@ _plugin_watcher: PluginWatcher | None = None
 
 
 def get_plugin_watcher() -> PluginWatcher:
+    """Return the global :class:`PluginWatcher`, creating it on first call."""
     global _plugin_watcher
     if _plugin_watcher is None:
         _plugin_watcher = PluginWatcher()

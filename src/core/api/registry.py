@@ -37,6 +37,12 @@ class PluginRegistry:
     """
 
     def __init__(self, storage_dir: Path) -> None:
+        """Load the registry from ``storage_dir`` and create a startup backup.
+
+Existing entries are read from ``api_plugin_registry.json``. A single
+backup is taken when the file already exists; failures are logged and do
+not prevent startup."""
+
         self._file: Path = (storage_dir / STORAGE_FILENAME).resolve()
         self._plugins: dict[str, PluginRegistration] = {}
         self._lock = threading.Lock()
@@ -83,10 +89,18 @@ class PluginRegistry:
         return False
 
     def get(self, name: str) -> PluginRegistration | None:
+        """Return the plugin registered under ``name``, or ``None``.
+
+The returned model is the live registry object, not a copy."""
+
         with self._lock:
             return self._plugins.get(name)
 
     def list(self) -> list[PluginRegistration]:
+        """Return all registered plugins in registration order.
+
+The list is a snapshot, but its entries are the live registry objects."""
+
         with self._lock:
             return list(self._plugins.values())
 
@@ -123,6 +137,12 @@ class PluginRegistry:
     # ------------------------------------------------------------------
 
     def _load(self) -> None:
+        """Populate the in-memory mapping from the registry file.
+
+A missing file leaves the registry empty. Malformed JSON or unreadable
+files are logged and ignored; individual invalid entries are skipped while
+valid entries are still loaded."""
+
         if not self._file.exists():
             return
         try:
@@ -138,6 +158,12 @@ class PluginRegistry:
             log.warning("Failed to load plugin registry: %s", exc)
 
     def _save(self) -> None:
+        """Persist the registry atomically.
+
+The JSON is written to a temporary file, flushed to disk, and then moved
+over the target. Errors are logged rather than raised, so a failed write
+does not break the caller's request."""
+
         data = [p.model_dump(mode="json") for p in self._plugins.values()]
         tmp = self._file.with_suffix(".json.tmp")
         try:

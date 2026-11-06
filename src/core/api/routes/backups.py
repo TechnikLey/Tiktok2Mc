@@ -1,3 +1,5 @@
+"""REST endpoints for creating, listing and restoring configuration/data backups."""
+
 import logging
 
 from fastapi import APIRouter, HTTPException

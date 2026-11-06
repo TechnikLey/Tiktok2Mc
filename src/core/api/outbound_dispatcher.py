@@ -54,6 +54,11 @@ class _SafeFormatDict(dict[str, Any]):
     """``str.format_map`` helper: unknown placeholders become ``""``."""
 
     def __missing__(self, key: str) -> str:
+        """Return an empty string for unknown template placeholders.
+
+This lets notification templates reference optional event fields without
+raising ``KeyError`` when an event does not carry them."""
+
         return ""
 
 
@@ -132,6 +137,13 @@ class OutboundChannel:
         return json.dumps(body).encode()
 
     def status(self) -> dict[str, Any]:
+        """Describe this channel for the API and GUI.
+
+Returns:
+    A mapping with the masked URL, format, subscribed event patterns, and
+    delivery counters. The circuit-breaker state is included as
+    ``breaker_open`` and ``cooldown_remaining``."""
+
         open_, remaining = (
             self.breaker.get_cooldown_status() if self.breaker else (False, 0)
         )
@@ -256,6 +268,11 @@ class OutboundDispatcher:
     """Background task that forwards bus events to outbound channels."""
 
     def __init__(self) -> None:
+        """Create the dispatcher with no channels and no active task.
+
+The process-level health monitor is registered in the ``STARTING`` state;
+:meth:`start` switches it to ``RUNNING`` once the event loop task exists."""
+
         self._task: asyncio.Task | None = None
         self._running = False
         self._lock = threading.Lock()
@@ -280,6 +297,11 @@ class OutboundDispatcher:
         log.info("[OUTBOUND] Loaded %d outbound channel(s)", len(channels))
 
     def _snapshot(self) -> tuple[bool, dict[str, OutboundChannel]]:
+        """Return a consistent copy of the master switch and channel mapping.
+
+The mapping is shallow-copied under the lock so dispatch can iterate it
+without holding the lock while network work is scheduled."""
+
         with self._lock:
             return self._master_enabled, dict(self._channels)
 
@@ -386,6 +408,13 @@ class OutboundDispatcher:
     # ------------------------------------------------------------------
 
     async def _loop(self) -> None:
+        """Consume the event bus until the dispatcher is stopped.
+
+Waits at most five seconds per event, ignores idle timeouts, and delegates
+to :meth:`_dispatch`. Dispatch failures mark the dispatcher degraded but do
+not terminate the worker. The bus subscription is always released on exit,
+including cancellation."""
+
         from core.api.eventbus import event_bus
 
         q = event_bus.subscribe()  # all events; filtered per channel
@@ -462,6 +491,12 @@ class OutboundDispatcher:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        """Start the background event-forwarding task.
+
+Calling this while the dispatcher is already running is a no-op. Channels
+are reloaded before the task starts, and the health state becomes
+``RUNNING``."""
+
         if self._running:
             return
         self.refresh_channels()
@@ -470,6 +505,13 @@ class OutboundDispatcher:
         self._health.set_state("outbound_dispatcher", HealthState.RUNNING)
 
     async def stop(self) -> None:
+        """Stop the task and drain in-flight deliveries.
+
+Running HTTP posts cannot be interrupted because they execute in worker
+threads, so they receive a short grace period before pending tasks are
+cancelled. The health state moves through ``STOPPING`` to ``STOPPED`` only
+when the dispatcher was actually running."""
+
         was_running = self._running
         self._running = False
         if self._task:

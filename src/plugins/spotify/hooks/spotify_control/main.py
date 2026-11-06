@@ -1,3 +1,5 @@
+"""Hook that exposes Spotify playback commands to trigger actions."""
+
 import logging
 
 from core.hook_api import HookAPI
@@ -8,6 +10,16 @@ PLUGIN_NAME = "spotify-control"
 
 
 def _command(api, command, **kwargs):
+    """Send a command to the Spotify plugin and report whether it was accepted.
+
+Args:
+    api: Hook API used for the request.
+    command: Plugin command name such as ``play``.
+    **kwargs: Arguments forwarded as the command's ``args`` object.
+
+Returns:
+    ``True`` when the API returned a response, ``False`` otherwise."""
+
     return (
         api.request(
             f"plugins/{PLUGIN_NAME}/command",
@@ -18,6 +30,14 @@ def _command(api, command, **kwargs):
 
 
 def _cmd_post(api, user, command, action_title):
+    """Run a playback command and show a short overlay confirmation on success.
+
+Args:
+    api: Hook API used for the request and overlay.
+    user: Display name shown in the confirmation.
+    command: Plugin command name.
+    action_title: Human-readable action label."""
+
     if _command(api, command):
         api.send_overlay_text(
             title="Spotify",
@@ -27,6 +47,11 @@ def _cmd_post(api, user, command, action_title):
 
 
 def _cmd_current(api, user):
+    """Show the currently playing track, or a status message, on the overlay.
+
+The state endpoint is queried first; progress is only shown when the
+duration is known."""
+
     data = api.request(f"plugins/{PLUGIN_NAME}/state")
     state = (data or {}).get("state") if isinstance(data, dict) else None
     if state and state.get("name"):
@@ -49,8 +74,29 @@ def _cmd_current(api, user):
 
 
 def register(api: HookAPI):
+    """Register the Spotify trigger actions exposed by this hook.
+
+Each action forwards to the Spotify plugin and reports success on the
+overlay. Chat-command handling lives in ``comment_commands`` instead."""
+
     def _make_handler(command, action_title):
+        """Build an action handler that runs ``command`` and reports ``action_title``.
+
+Args:
+    command: Plugin command name.
+    action_title: Human-readable action label.
+
+Returns:
+    A handler accepting ``(user, trigger, context)``."""
+
         def handler(user, trigger, context):
+            """Handle one Spotify trigger action.
+
+Args:
+    user: User who triggered the action.
+    trigger: Trigger name (unused).
+    context: Trigger context (unused)."""
+
             _cmd_post(api, str(user), command, action_title)
 
         return handler
@@ -69,6 +115,13 @@ def register(api: HookAPI):
     api.register_action("spotify_repeat", _make_handler("repeat", "Repeat"))
 
     def current_handler(user, trigger, context):
+        """Show the current track for the ``spotify_current`` action.
+
+Args:
+    user: User who triggered the action.
+    trigger: Trigger name (unused).
+    context: Trigger context (unused)."""
+
         _cmd_current(api, str(user))
 
     api.register_action("spotify_current", current_handler)

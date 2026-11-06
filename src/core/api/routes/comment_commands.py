@@ -1,3 +1,5 @@
+"""REST endpoints for the comment-command mapping in ``data/comment_commands.yaml``."""
+
 import logging
 from pathlib import Path
 
@@ -16,6 +18,12 @@ DATA_CONFIG_PATH = Path("data/comment_commands.yaml")
 
 
 def _config_path() -> Path:
+    """Resolve the comment-command file, preferring the user copy.
+
+Returns:
+    ``data/comment_commands.yaml`` when it exists, otherwise the default
+    file, otherwise the (not yet created) data path."""
+
     root = core.paths.get_root_dir()
     data_path = root / DATA_CONFIG_PATH
     if data_path.exists():
@@ -52,6 +60,11 @@ def _ensure_data_config() -> Path:
 
 @router.get("/comment-commands", response_model=CommentCommandsResponse)
 async def get_comment_commands():
+    """Return the comment-command mapping and the file it came from.
+
+When no file exists, an empty disabled mapping is returned without
+creating anything. Any unexpected error is reported as HTTP 500."""
+
     try:
         path = _config_path()
         if not path.exists():
@@ -72,6 +85,12 @@ async def get_comment_commands():
 
 @router.put("/comment-commands", response_model=CommentCommandsResponse)
 async def update_comment_commands(body: CommentCommandsUpdateRequest):
+    """Persist a new comment-command mapping to the data directory.
+
+The file is created from the defaults on first write and the previous
+version is backed up. Returns the written mapping and its path; unexpected
+errors are reported as HTTP 500."""
+
     try:
         path = _ensure_data_config()
         save_yaml(

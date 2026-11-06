@@ -1,3 +1,5 @@
+"""Wincounter plugin: tracks wins and exposes milestone and theme state."""
+
 import json
 import logging
 
@@ -10,12 +12,20 @@ class WinManager:
     """Thread-safe win counter with milestone tracking."""
 
     def __init__(self, stats_path, initial_needed=10, theme=None):
+        """Initialize the win counter and load persisted values from ``stats_path``.
+
+Args:
+    stats_path: JSON file used to persist the counter.
+    initial_needed: Wins required for the first milestone.
+    theme: Theme colors used for the ``win_color`` field."""
+
         self._stats_path = stats_path
         self._theme = theme or {}
         self.wins, self.needed, self.record_low = 0, initial_needed, 0
         self._load()
 
     def _load(self):
+        """Load wins, milestone target and record low, ignoring malformed files."""
         if self._stats_path.exists():
             try:
                 data = json.loads(self._stats_path.read_text(encoding="utf-8"))
@@ -26,6 +36,7 @@ class WinManager:
                 pass
 
     def save(self):
+        """Persist wins, needed and record low as JSON, creating the parent directory if needed."""
         try:
             self._stats_path.parent.mkdir(parents=True, exist_ok=True)
             self._stats_path.write_text(
@@ -43,6 +54,10 @@ class WinManager:
             pass
 
     def add(self, amount=1):
+        """Add wins, roll over completed milestones and persist the result.
+
+Each rollover consumes the current target and raises ``needed`` by 10."""
+
         self.wins += amount
         while self.wins >= self.needed:
             self.wins -= self.needed
@@ -50,11 +65,13 @@ class WinManager:
         self.save()
 
     def remove(self, amount=1):
+        """Subtract wins, update the record low and persist the result."""
         self.wins -= amount
         self.record_low = min(self.record_low, self.wins)
         self.save()
 
     def get_data(self):
+        """Return wins, target, record low and the theme-dependent score color."""
         return {
             "wins": self.wins,
             "needed": self.needed,
@@ -66,9 +83,11 @@ class WinManager:
 
 
 class WinCounterPlugin(BasePlugin):
+    """Plugin that tracks wins between milestone targets and emits events."""
     PLUGIN_NAME = "win-counter"
 
     def __init__(self):
+        """Load counter settings, restore progress and register command handlers."""
         super().__init__()
         cfg = self.config
         self._initial_needed = cfg.get("initial_needed", 10)
@@ -88,6 +107,12 @@ class WinCounterPlugin(BasePlugin):
     # -- event publishing ------------------------------------------------
 
     def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        """Publish ``win.<event_type>`` when that event is enabled in ``signal_on``.
+
+Args:
+    event_type: Signal name such as ``milestone`` or ``record_low``.
+    extra: Optional fields merged into the counter snapshot."""
+
         if event_type in self._signal_on:
             data = self._manager.get_data()
             if extra:
@@ -97,6 +122,7 @@ class WinCounterPlugin(BasePlugin):
     # -- command handlers ---------------------------------------------------
 
     def _on_add_win(self, args):
+        """Add wins, emit a milestone event when the target increases, then push state."""
         prev_needed = self._manager.needed
         self._manager.add(int(args.get("amount", 1)))
         if self._manager.needed != prev_needed:
@@ -107,6 +133,7 @@ class WinCounterPlugin(BasePlugin):
         self.push_state()
 
     def _on_remove_win(self, args):
+        """Remove wins, emit an event when a new record low is reached, then push state."""
         prev_record = self._manager.record_low
         self._manager.remove(int(args.get("amount", 1)))
         if self._manager.record_low != prev_record:
@@ -114,6 +141,11 @@ class WinCounterPlugin(BasePlugin):
         self.push_state()
 
     def _on_save_dims(self, args):
+        """Persist the overlay window size reported by the browser.
+
+Args:
+    args: Command arguments with optional ``width`` and ``height``."""
+
         self.save_window_state(
             args.get("width", 600),
             args.get("height", 300),
@@ -122,6 +154,7 @@ class WinCounterPlugin(BasePlugin):
     # -- overlay HTML -------------------------------------------------------
 
     def get_overlay_html(self) -> str:
+        """Return the OBS overlay showing score, target and record low via server-sent events."""
         return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -184,6 +217,7 @@ class WinCounterPlugin(BasePlugin):
 </html>"""
 
     def get_state(self):
+        """Return the current counter snapshot for state pushes."""
         return self._manager.get_data()
 
 

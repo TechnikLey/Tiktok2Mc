@@ -23,6 +23,7 @@ class DashboardPublisher:
     """Background task publishing periodic dashboard diagnostics."""
 
     def __init__(self) -> None:
+        """Create a stopped publisher with no background task."""
         self._task: asyncio.Task | None = None
         self._running = False
 
@@ -65,6 +66,11 @@ class DashboardPublisher:
     # ------------------------------------------------------------------
 
     async def _loop(self) -> None:
+        """Publish dashboard snapshots once per :data:`PUSH_INTERVAL`.
+
+Plugin states are always published; ECM diagnostics only when available.
+Individual push failures are logged and do not stop the loop."""
+
         log.info("[DASHBOARD] Publisher started (interval %.1fs)", PUSH_INTERVAL)
         while self._running:
             try:
@@ -97,12 +103,14 @@ class DashboardPublisher:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        """Start the background publisher if it is not already running."""
         if self._running:
             return
         self._running = True
         self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
+        """Cancel the publisher task and wait for it to finish."""
         if not self._running:
             return
         self._running = False
@@ -120,6 +128,7 @@ _publisher: DashboardPublisher | None = None
 
 
 def get_dashboard_publisher() -> DashboardPublisher:
+    """Return the process-wide publisher, creating it on first use."""
     global _publisher
     if _publisher is None:
         _publisher = DashboardPublisher()

@@ -1,3 +1,11 @@
+/**
+ * @file Hover tests for the MCA language server.
+ *
+ * Verifies that event/gift/custom triggers, separators, placeholders and
+ * `$random` resolve to hover content, and that empty/comment lines return
+ * `null`.
+ */
+
 const assert = require('assert');
 const { provideHover } = require('../src/hover');
 

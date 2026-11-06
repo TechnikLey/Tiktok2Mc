@@ -41,6 +41,12 @@ class PersistenceService:
     """
 
     def __init__(self, storage_dir: Path | None = None) -> None:
+        """Create a store rooted at ``storage_dir``.
+
+Args:
+    storage_dir: Directory holding the per-namespace JSON files. Defaults
+        to the plugin data directory."""
+
         self._storage_dir = storage_dir or get_plugin_data_dir()
         self._lock = threading.Lock()
 
@@ -50,6 +56,13 @@ class PersistenceService:
 
     @staticmethod
     def validate_namespace(namespace: str) -> str:
+        """Validate and return a namespace name.
+
+Namespaces must match ``[A-Za-z0-9_-]{1,64}``.
+
+Raises:
+    PersistenceError: If the namespace is not a valid string."""
+
         if not isinstance(namespace, str) or not _NAMESPACE_RE.match(namespace):
             raise PersistenceError(
                 f"Namespace must match [A-Za-z0-9_-]{{1,64}} (got: {namespace!r})"
@@ -58,6 +71,13 @@ class PersistenceService:
 
     @staticmethod
     def validate_key(key: str) -> str:
+        """Validate and return a storage key.
+
+Keys must match ``[A-Za-z0-9_.-]{1,128}``.
+
+Raises:
+    PersistenceError: If the key is not a valid string."""
+
         if not isinstance(key, str) or not _KEY_RE.match(key):
             raise PersistenceError(
                 f"Key must match [A-Za-z0-9_.-]{{1,128}} (got: {key!r})"
@@ -108,9 +128,18 @@ class PersistenceService:
     # ------------------------------------------------------------------
 
     def _file_for(self, namespace: str) -> Path:
+        """Return the JSON file backing a namespace.
+
+The namespace is assumed to be validated by the caller."""
+
         return self._storage_dir / f"{namespace}.json"
 
     def _read(self, namespace: str) -> dict[str, Any]:
+        """Read a namespace's mapping from disk.
+
+Returns an empty mapping when the file is missing, unreadable, malformed,
+or contains something other than a JSON object."""
+
         path = self._file_for(namespace)
         if not path.is_file():
             return {}
@@ -123,6 +152,12 @@ class PersistenceService:
             return {}
 
     def _write(self, namespace: str, store: dict[str, Any]) -> None:
+        """Atomically persist a namespace mapping.
+
+The data is written to a temporary ``.json.tmp`` file and then replaces the
+target. I/O and serialization failures are logged and re-raised as
+:class:`PersistenceError`."""
+
         path = self._file_for(namespace)
         try:
             self._storage_dir.mkdir(parents=True, exist_ok=True)
@@ -140,6 +175,7 @@ _persistence_service: PersistenceService | None = None
 
 
 def get_persistence_service() -> PersistenceService:
+    """Return the global :class:`PersistenceService` singleton."""
     global _persistence_service
     if _persistence_service is None:
         _persistence_service = PersistenceService()

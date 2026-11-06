@@ -1,3 +1,5 @@
+"""Direct RCON connection used by the API server for GUI console access."""
+
 import asyncio
 import logging
 
@@ -19,6 +21,7 @@ class RconService:
     """
 
     def __init__(self) -> None:
+        """Create a disconnected service with default RCON settings."""
         self._host = "localhost"
         self._port = 25575
         self._password = ""
@@ -28,15 +31,30 @@ class RconService:
         self._last_error = ""
 
     def configure(self, host: str, port: int, password: str) -> None:
+        """Set the connection parameters used by the next :meth:`connect`.
+
+An existing connection is not affected until it is reconnected."""
+
         self._host = host
         self._port = port
         self._password = password
 
     async def connect(self) -> bool:
+        """Connect under the service lock and report success.
+
+Uses the parameters from the last :meth:`configure` call and never
+raises for network failures; inspect :attr:`last_error` for the reason."""
+
         async with self._lock:
             return await self._connect()
 
     async def _connect(self) -> bool:
+        """Replace any existing connection with a fresh one.
+
+The constructor and the connect handshake are each limited to five
+seconds and run in worker threads because ``mcrcon`` is blocking. On
+failure the connection is cleared and ``False`` is returned."""
+
         if self._conn:
             try:
                 await asyncio.to_thread(self._conn.disconnect)
@@ -75,6 +93,7 @@ class RconService:
             return False
 
     async def disconnect(self) -> None:
+        """Close the connection if one is open and mark the service disconnected."""
         async with self._lock:
             if self._conn:
                 try:
@@ -86,6 +105,15 @@ class RconService:
             log.info("[RCON] Disconnected")
 
     async def command(self, cmd: str) -> str:
+        """Execute a console command and return its response.
+
+Runs the blocking ``mcrcon`` call in a worker thread.
+
+Raises:
+    ConnectionError: When no connection is open, or when the command
+        fails; in the latter case the broken connection is discarded so the
+        next call can reconnect."""
+
         async with self._lock:
             if not self._conn:
                 raise ConnectionError("Not connected to RCON")
@@ -99,14 +127,17 @@ class RconService:
 
     @property
     def connected(self) -> bool:
+        """Return whether the last connection attempt succeeded."""
         return self._connected
 
     @property
     def host(self) -> str:
+        """Return the configured RCON host."""
         return self._host
 
     @property
     def port(self) -> int:
+        """Return the configured RCON port."""
         return self._port
 
     @property
@@ -119,4 +150,5 @@ _rcon_service = RconService()
 
 
 def get_rcon_service() -> RconService:
+    """Return the process-wide RCON service used by the API."""
     return _rcon_service

@@ -1,3 +1,5 @@
+"""FastAPI application factory and process-wide startup/shutdown lifecycle."""
+
 import asyncio
 import ipaddress
 import json
@@ -74,6 +76,11 @@ def _is_local_machine_host(hostname: str | None) -> bool:
 
 
 async def _send_json_error(send, status: int, detail: str) -> None:
+    """Send a minimal JSON error response directly over ASGI.
+
+Used by middleware, which runs before/outside FastAPI's exception
+handling and therefore cannot raise ``HTTPException``."""
+
     body = json.dumps({"detail": detail}).encode()
     await send(
         {
@@ -115,10 +122,20 @@ class LocalOriginGuardMiddleware:
     """
 
     def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
+        """Wrap *app* and allow the given additional origins.
+
+``extra_origins`` is stored as a frozenset for O(1) membership checks."""
+
         self.app = app
         self.extra_origins = frozenset(extra_origins)
 
     async def __call__(self, scope, receive, send) -> None:
+        """Reject browser requests that are cross-origin or rebound.
+
+Checks the ``Origin`` and ``Sec-Fetch-Site`` headers, and for loopback
+clients also validates the ``Host`` header. Non-HTTP scopes and trusted
+requests are forwarded unchanged."""
+
         if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
@@ -150,6 +167,10 @@ class LocalOriginGuardMiddleware:
 
     @staticmethod
     async def _reject(scope, send, detail: str) -> None:
+        """Reject a request with JSON 403, or close a WebSocket handshake.
+
+WebSockets are closed with code 1008 before the handshake completes."""
+
         if scope["type"] != "websocket":
             await _send_json_error(send, 403, detail)
             return
@@ -170,10 +191,17 @@ class SameHostCORSMiddleware:
     """
 
     def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
+        """Wrap *app* and allow the given additional origins."""
         self.app = app
         self.extra_origins = frozenset(extra_origins)
 
     async def __call__(self, scope, receive, send) -> None:
+        """Reflect CORS headers when the origin matches the request host.
+
+Preflight requests are answered directly; normal requests are forwarded
+with the CORS headers appended to the response start message. Foreign
+origins pass through without CORS headers."""
+
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -211,6 +239,7 @@ class SameHostCORSMiddleware:
             return
 
         async def send_with_cors(message):
+            """Add the reflected CORS headers to a response start message."""
             if message["type"] == "http.response.start":
                 message = dict(message)
                 message["headers"] = [
@@ -268,6 +297,14 @@ def _discover_hooks_at_startup() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Start and stop all API-owned background services.
+
+Startup prepares the shutdown secret, event loop bindings, watchers,
+health monitoring, event bridges, trackers, the gift catalog and RCON.
+Shutdown disconnects RCON and stops every service in reverse order.
+Individual optional steps are best effort so the API still starts when
+they fail; ``CancelledError`` during shutdown is expected and swallowed."""
+
     from core.event_command_mapper import get_event_command_mapper
 
     log.info("API server v%s starting up ...", API_VERSION)
@@ -408,9 +445,15 @@ def create_app(
         """Suppress CancelledError spam when clients disconnect or the server shuts down."""
 
         def __init__(self, app):
+            """Store the wrapped ASGI application."""
             self.app = app
 
         async def __call__(self, scope, receive, send):
+            """Convert client disconnects into a 499 response when possible.
+
+Non-HTTP scopes are passed through. If the client is already gone while
+sending the response, the send error is ignored."""
+
             if scope["type"] != "http":
                 await self.app(scope, receive, send)
                 return
@@ -435,6 +478,13 @@ def create_app(
 
         @app.middleware("http")
         async def check_api_key(request: Request, call_next):
+            """Enforce the optional API key for non-local HTTP requests.
+
+            CORS preflight requests and localhost clients bypass the check.
+            Remote clients must send ``X-API-Key`` (or ``?key=`` for SSE
+            clients, which cannot set headers); a missing or wrong key yields
+            HTTP 401.
+            """
             # CORS preflights carry no API key by design; the actual request
             # (which does send it) is still checked below.
             if request.method == "OPTIONS":

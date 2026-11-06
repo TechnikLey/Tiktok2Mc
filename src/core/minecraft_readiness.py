@@ -1,3 +1,5 @@
+"""Readiness checks that wait until a Minecraft server accepts RCON commands."""
+
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
@@ -12,6 +14,10 @@ log = logging.getLogger(__name__)
 
 
 def _read_server_properties(instance_dir: Path) -> dict[str, str]:
+    """Parse ``server.properties`` into a key/value dictionary.
+
+Missing files yield an empty dictionary; malformed lines are skipped."""
+
     props: dict[str, str] = {}
     props_file = instance_dir / "server.properties"
     if not props_file.exists():
@@ -43,6 +49,11 @@ def make_minecraft_readiness_check(instance_dir: Path) -> Callable[[], Awaitable
 
     async def _check() -> bool:
         # Primary: RCON readiness (server accepting commands)
+        """Return whether the server currently accepts RCON commands.
+
+Falls back to the caller-provided check when RCON is disabled or not yet
+reachable."""
+
         if rcon_enabled and rcon_password:
             try:
 

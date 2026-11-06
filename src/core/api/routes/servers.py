@@ -1,3 +1,5 @@
+"""REST endpoints for managing Minecraft server instances, files and settings."""
+
 import asyncio
 import json
 import logging
@@ -31,6 +33,11 @@ _MIN_SUPPORTED_MINOR = 13
 
 
 def _flatten_versions(nested: dict) -> list[str]:
+    """Flatten the nested PaperMC version listing into version strings.
+
+Only list values are considered; unexpected shapes are ignored so a
+malformed upstream response still yields the versions that could be read."""
+
     result = []
     for versions in nested.values():
         if isinstance(versions, list):
@@ -39,14 +46,24 @@ def _flatten_versions(nested: dict) -> list[str]:
 
 
 def _semver_sort_key(v: str) -> tuple[int, ...]:
+    """Build a numeric sort key for dotted version strings.
+
+Non-numeric components (for example a pre-release suffix) sort as ``0``."""
+
     return tuple(int(p) if p.isdigit() else 0 for p in v.split("."))
 
 
 def _is_stable_version(version: str) -> bool:
+    """Return whether *version* is stable (contains no pre-release suffix)."""
     return "-" not in version
 
 
 def _is_supported_version(version: str) -> bool:
+    """Return whether *version* is stable and meets the minimum supported release.
+
+PaperMC builds for versions below ``_MIN_SUPPORTED_MAJOR._MIN_SUPPORTED_MINOR``
+are rejected because the bundled plugins and datapack do not support them."""
+
     if not _is_stable_version(version):
         return False
     parts = version.split(".")
@@ -64,6 +81,7 @@ _service: ApiService | None = None
 
 
 def _get_service() -> ApiService:
+    """Return the process-wide :class:`ApiService` used by the server routes."""
     global _service
     if _service is None:
         _service = ApiService()
@@ -71,10 +89,20 @@ def _get_service() -> ApiService:
 
 
 def _get_versions_dir() -> Path:
+    """Return the directory that holds downloaded server jars.
+
+The directory is not created here; use :func:`_ensure_versions_dir` when
+writing."""
+
     return get_versions_dir()
 
 
 def _get_instance_dir(instance_id: str) -> Path:
+    """Return the resolved data directory of a server instance.
+
+The caller is responsible for validating *instance_id* before using the
+result for filesystem operations."""
+
     return (get_servers_dir() / instance_id).resolve()
 
 
@@ -84,12 +112,14 @@ def _instance_has_jar(instance_id: str) -> bool:
 
 
 def _ensure_versions_dir() -> Path:
+    """Create the versions directory if needed and return it."""
     d = _get_versions_dir()
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _ensure_instance_dir(instance_id: str) -> Path:
+    """Create the data directory for *instance_id* if needed and return it."""
     d = _get_instance_dir(instance_id)
     d.mkdir(parents=True, exist_ok=True)
     return d
@@ -167,6 +197,19 @@ def _resolve_version_jar(version: str) -> Path | None:
 
 
 def _fetch_json(url: str, timeout: int = 30) -> dict | list:
+    """Fetch *url* and decode its JSON body.
+
+Args:
+    url: Absolute HTTP(S) URL to request.
+    timeout: Timeout in seconds for the request.
+
+Returns:
+    The decoded JSON value.
+
+Raises:
+    HTTPException: With status 502 when the request fails or the body is not
+        valid JSON."""
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -177,6 +220,11 @@ def _fetch_json(url: str, timeout: int = 30) -> dict | list:
 
 
 def _read_meta(version_dir: Path) -> dict[str, Any]:
+    """Read the ``.meta.json`` sidecar of a downloaded version.
+
+Returns an empty dictionary when the file is missing or unreadable, so
+callers can always treat the result as metadata with optional keys."""
+
     meta_file = version_dir / ".meta.json"
     if meta_file.exists():
         try:
@@ -187,6 +235,11 @@ def _read_meta(version_dir: Path) -> dict[str, Any]:
 
 
 def _write_meta(version_dir: Path, meta: dict[str, Any]) -> None:
+    """Write the ``.meta.json`` sidecar for a downloaded version.
+
+Failures are logged and swallowed: metadata is informational and must not
+break an otherwise successful download."""
+
     meta_file = version_dir / ".meta.json"
     try:
         meta_file.write_text(json.dumps(meta), encoding="utf-8")
@@ -195,10 +248,17 @@ def _write_meta(version_dir: Path, meta: dict[str, Any]) -> None:
 
 
 def _list_installed_versions() -> list[dict[str, Any]]:
+    """List downloaded server versions that contain a ``server.jar``.
+
+Hidden directories are ignored. Each entry contains the version name, the
+path relative to the project root, its type (``safe``, ``unsafe`` or
+``custom``), and the jar size."""
+
     versions_dir = _get_versions_dir()
     versions = []
 
     def _resolve_type(name: str, meta: dict) -> str:
+        """Classify a downloaded version as ``custom``, ``safe`` or ``unsafe``."""
         if meta.get("origin") == "custom":
             return "custom"
         return "safe" if name in SAFE_VERSIONS else "unsafe"
@@ -224,6 +284,7 @@ def _list_installed_versions() -> list[dict[str, Any]]:
 
 
 def _get_active_version() -> str | None:
+    """Return the configured ``mc_version`` or ``None`` if it cannot be read."""
     svc = _get_service()
     try:
         cfg = svc.read_config()
@@ -233,6 +294,11 @@ def _get_active_version() -> str | None:
 
 
 def _get_server_status(instance_id: str = "default") -> str:
+    """Return the supervisor state of an instance, or ``stopped`` when unknown.
+
+Status reporting is best effort: a missing supervisor or an unexpected
+lookup error must not fail the surrounding API request."""
+
     try:
         from core.lifecycle import get_supervisor
 
@@ -264,6 +330,12 @@ DEFAULT_INSTANCES: dict[str, dict[str, Any]] = {
 
 
 def _load_instances(svc: ApiService | None = None) -> dict[str, dict[str, Any]]:
+    """Load the configured server instances.
+
+Falls back to a copy of :data:`DEFAULT_INSTANCES` when the config section is
+missing, empty or not a mapping, and when the config cannot be read at all.
+A copy is returned so callers cannot mutate the module-level default."""
+
     if svc is None:
         svc = ApiService()
     try:
@@ -277,6 +349,11 @@ def _load_instances(svc: ApiService | None = None) -> dict[str, dict[str, Any]]:
 
 
 def _save_instances(instances: dict[str, dict[str, Any]]) -> None:
+    """Persist the complete instances mapping to the config.
+
+The whole ``instances`` section is replaced, not merged; a backup of the
+previous config is written first."""
+
     svc = ApiService()
     cfg = svc.read_config()
     cfg[INSTANCE_CONFIG_KEY] = instances
@@ -284,11 +361,17 @@ def _save_instances(instances: dict[str, dict[str, Any]]) -> None:
 
 
 def _get_instance(instance_id: str) -> dict[str, Any] | None:
+    """Return the stored configuration of one instance, or ``None``."""
     instances = _load_instances()
     return instances.get(instance_id)
 
 
 def _instance_process_name(instance_id: str) -> str:
+    """Return the supervisor process name for an instance.
+
+The default instance uses the historical name ``Minecraft Server``, while
+additional instances are suffixed with their id."""
+
     if instance_id == "default":
         return "Minecraft Server"
     return f"Minecraft Server:{instance_id}"
@@ -298,6 +381,7 @@ def _instance_process_name(instance_id: str) -> str:
 
 
 class ServerVersionInfo(BaseModel):
+    """Description of a downloaded server version available for instances."""
     version: str
     path: str
     type: str  # safe | unsafe | custom
@@ -306,6 +390,7 @@ class ServerVersionInfo(BaseModel):
 
 
 class InstanceInfo(BaseModel):
+    """Description of a configured server instance for the dashboard."""
     id: str
     name: str
     version: str
@@ -319,6 +404,7 @@ class InstanceInfo(BaseModel):
 
 
 class ServersListResponse(BaseModel):
+    """Combined response for the servers overview endpoint."""
     instances: list[InstanceInfo]
     installed: list[ServerVersionInfo]
     safe_versions: list[str]
@@ -326,10 +412,12 @@ class ServersListResponse(BaseModel):
 
 
 class DownloadRequest(BaseModel):
+    """Request body selecting a PaperMC version to download."""
     version: str
 
 
 class DownloadResponse(BaseModel):
+    """Result of a version download request."""
     status: str
     version: str
     path: str
@@ -337,16 +425,19 @@ class DownloadResponse(BaseModel):
 
 
 class SwitchRequest(BaseModel):
+    """Request body selecting the version to activate."""
     version: str
 
 
 class SwitchResponse(BaseModel):
+    """Result of switching the active server version."""
     status: str
     version: str
     message: str
 
 
 class CustomJarResponse(BaseModel):
+    """Result of uploading a custom server jar."""
     status: str
     version: str
     path: str
@@ -354,12 +445,14 @@ class CustomJarResponse(BaseModel):
 
 
 class RemoveResponse(BaseModel):
+    """Result of removing a downloaded version."""
     status: str
     version: str
     message: str
 
 
 class CreateInstanceRequest(BaseModel):
+    """Request body for creating a server instance."""
     name: str
     version: str = "26.3"
     port: int = 25565
@@ -367,6 +460,10 @@ class CreateInstanceRequest(BaseModel):
 
 
 class UpdateInstanceRequest(BaseModel):
+    """Partial update for a server instance.
+
+Fields left as ``None`` are not modified."""
+
     name: str | None = None
     version: str | None = None
     port: int | None = None
@@ -380,6 +477,7 @@ class UpdateInstanceRequest(BaseModel):
 
 @router.get("/servers", response_model=ServersListResponse)
 async def list_servers():
+    """Return installed versions, configured instances and the active version."""
     installed = _list_installed_versions()
 
     try:
@@ -419,6 +517,11 @@ async def list_servers():
 
 
 def _new_instance_id(name: str, existing: dict) -> str:
+    """Derive a filesystem-friendly instance id that is not already used.
+
+Names are lowercased, spaces and underscores become hyphens, other special
+characters are dropped, and a numeric suffix is appended on collisions."""
+
     base = name.lower().replace(" ", "-").replace("_", "-")
     base = "".join(c for c in base if c.isalnum() or c == "-")
     if not base:
@@ -433,6 +536,13 @@ def _new_instance_id(name: str, existing: dict) -> str:
 
 @router.post("/servers/instances")
 async def create_instance(body: CreateInstanceRequest):
+    """Create a server instance from a downloaded version.
+
+Rejects duplicate display names and ports (409) and versions that are not
+installed (400). The instance directory receives a copy of the version jar,
+a ``server.properties`` with the instance port and RCON enabled, an accepted
+EULA, and the default server's datapack and required plugins."""
+
     log.info(
         "CREATE_INSTANCE request: name='%s' version='%s' port=%d java_args='%s'",
         body.name,
@@ -555,6 +665,7 @@ def _set_server_property(file_path: Path, key: str, value: str) -> None:
 
 @router.get("/servers/instances")
 async def list_instances():
+    """Return all configured instances with their live status."""
     raw = _load_instances()
     result = []
     for inst_id, data in raw.items():
@@ -576,6 +687,11 @@ async def list_instances():
 
 @router.get("/servers/instances/{instance_id}")
 async def get_instance(instance_id: str):
+    """Return one configured instance with its live status.
+
+Raises:
+    HTTPException: With status 404 when the instance is unknown."""
+
     data = _get_instance(instance_id)
     if data is None:
         raise HTTPException(
@@ -596,6 +712,10 @@ async def get_instance(instance_id: str):
 
 @router.put("/servers/instances/{instance_id}")
 async def update_instance(instance_id: str, body: UpdateInstanceRequest):
+    """Apply the provided fields to an existing instance.
+
+Only fields set on the request body are changed."""
+
     instances = _load_instances()
     if instance_id not in instances:
         raise HTTPException(
@@ -620,6 +740,11 @@ async def update_instance(instance_id: str, body: UpdateInstanceRequest):
 
 @router.delete("/servers/instances/{instance_id}")
 async def delete_instance(instance_id: str):
+    """Remove an instance from the config and delete its data directory.
+
+The default instance cannot be deleted. Config removal happens first; a
+failure to delete the directory is logged but does not fail the request."""
+
     if instance_id == "default":
         raise HTTPException(
             status_code=400, detail="Cannot delete the default server instance"
@@ -723,6 +848,11 @@ async def get_instance_folder_path(instance_id: str):
 
 @router.post("/servers/instances/{instance_id}/open")
 async def open_instance_folder(instance_id: str):
+    """Open an instance folder in the operating system's file manager.
+
+Failure to open the folder is reported in the response instead of raising,
+because the API may run without a desktop session."""
+
     instances = _load_instances()
     if instance_id not in instances:
         raise HTTPException(
@@ -757,6 +887,10 @@ async def open_instance_folder(instance_id: str):
 
 @router.put("/servers/instances/{instance_id}/version")
 async def set_instance_version(instance_id: str, body: SwitchRequest):
+    """Record a version for an instance without changing its jar.
+
+The jar itself is replaced by :func:`switch_version` or on the next launch."""
+
     version = body.version.strip()
     if not version:
         raise HTTPException(status_code=400, detail="Version cannot be empty")
@@ -776,6 +910,12 @@ async def set_instance_version(instance_id: str, body: SwitchRequest):
 
 @router.post("/servers/download", response_model=DownloadResponse)
 async def download_version(body: DownloadRequest):
+    """Download a PaperMC server jar for *version*.
+
+The newest STABLE build is preferred over BETA and ALPHA. Downloads are
+retried three times; a partial jar is removed on failure. Successful
+downloads are copied into instances that use the version but lack a jar."""
+
     version = body.version.strip()
     if not version:
         raise HTTPException(status_code=400, detail="Version cannot be empty")
@@ -928,6 +1068,11 @@ async def download_version(body: DownloadRequest):
 
 @router.post("/servers/switch", response_model=SwitchResponse)
 async def switch_version(body: SwitchRequest):
+    """Activate a downloaded version for the default instance.
+
+The previous jar is backed up under its version directory, ``mc_version``
+is updated, and a running default server is restarted to apply the change."""
+
     version = body.version.strip()
     if not version:
         raise HTTPException(status_code=400, detail="Version cannot be empty")
@@ -1026,6 +1171,12 @@ async def upload_custom_jar(
     file: Annotated[UploadFile, File()],
     name: str = Form(...),
 ):
+    """Store an uploaded jar as a custom server version.
+
+The version name is restricted to alphanumerics, dot, underscore and hyphen;
+``..`` is rejected explicitly because it survives the character filter and
+would otherwise escape the versions directory."""
+
     if not file.filename or not file.filename.endswith(".jar"):
         raise HTTPException(status_code=400, detail="Only .jar files are accepted")
 
@@ -1069,6 +1220,11 @@ async def upload_custom_jar(
 
 @router.delete("/servers/{version}", response_model=RemoveResponse)
 async def remove_version(version: str):
+    """Delete a downloaded version directory.
+
+Only supported stable version identifiers are accepted, and the resolved
+path is checked to stay inside the versions directory."""
+
     version = version.strip()
     # Same semantic validation as download/switch: only supported PaperMC
     # version identifiers pass.  This rejects path fragments ("..", "\",

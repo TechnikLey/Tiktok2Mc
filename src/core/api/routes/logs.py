@@ -30,6 +30,12 @@ async def logs_stream():
     """
 
     async def generate():
+        """Yield unified log entries as server-sent events.
+
+Sends an initial comment when connected, keepalive comments after 30 s
+without entries, and unsubscribes from the bus when the client disconnects
+or the generator is cancelled."""
+
         q = event_bus.subscribe("log.unified")
         try:
             yield ": connected\n\n"

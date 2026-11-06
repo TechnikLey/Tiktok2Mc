@@ -53,6 +53,11 @@ class CrashManager:
     """
 
     def __init__(self, module_name: str) -> None:
+        """Initialise crash tracking for one module.
+
+Keeps at most 50 recent crash records and starts in the uninstalled
+state, so no global exception hook is replaced before `install`."""
+
         self.module_name = module_name
         self._health = get_health_monitor()
         self._crash_count: int = 0
@@ -84,6 +89,11 @@ class CrashManager:
         def _handle_exception(
             loop: asyncio.AbstractEventLoop, context: dict[str, Any]
         ) -> None:
+            """Report an asyncio loop error and delegate to the previous handler.
+
+Exceptions are forwarded to `report_exception`; messages without an
+exception object are only logged."""
+
             exc = context.get("exception")
             message = context.get("message", "Unknown asyncio error")
             future = context.get("future")
@@ -112,9 +122,15 @@ class CrashManager:
     # ------------------------------------------------------------------
 
     def _install_sys_excepthook(self) -> None:
+        """Replace ``sys.excepthook`` with a reporting wrapper.
+
+The original hook is preserved and always called, so normal traceback
+output is unchanged. ``KeyboardInterrupt`` is passed through untouched."""
+
         original = sys.excepthook
 
         def _hook(exc_type, exc_value, exc_tb):
+            """Report an uncaught main-thread exception and call the original hook."""
             if issubclass(exc_type, KeyboardInterrupt):
                 original(exc_type, exc_value, exc_tb)
                 return
@@ -130,11 +146,13 @@ class CrashManager:
         sys.excepthook = _hook
 
     def _install_threading_excepthook(self) -> None:
+        """Replace ``threading.excepthook`` with a reporting wrapper when available."""
         if not hasattr(threading, "excepthook"):
             return
         original = threading.excepthook
 
         def _hook(args):
+            """Log and report an uncaught thread exception, then call the original hook."""
             logger = log.getChild("threading")
             name = args.thread.name if args.thread else "unknown"
             exc_type = args.exc_type or type(Exception)
@@ -280,6 +298,11 @@ class CrashManager:
         """Add a done callback to an asyncio Task that reports unhandled exceptions."""
 
         def _on_done(t: asyncio.Task) -> None:
+            """Report an unhandled exception from a finished asyncio task.
+
+Cancelled tasks are ignored; retrieving the exception also marks it as
+observed so asyncio does not log it a second time."""
+
             if t.cancelled():
                 return
             exc = t.exception()
@@ -300,6 +323,7 @@ class CrashManager:
         """Add a done callback to a concurrent.futures.Future."""
 
         def _on_done(f: Future) -> None:
+            """Report an unhandled exception from a finished concurrent future."""
             if f.cancelled():
                 return
             exc = f.exception()
@@ -329,6 +353,7 @@ class CrashManager:
         """
 
         def _wrapped() -> None:
+            """Run the target, report any exception, and re-raise it."""
             try:
                 target()
             except (
@@ -369,12 +394,15 @@ class CrashManager:
     # ------------------------------------------------------------------
 
     def get_crash_history(self) -> list[dict[str, Any]]:
+        """Return a copy of the recent crash records, oldest first."""
         return list(self._last_crashes)
 
     def get_crash_count(self) -> int:
+        """Return the total number of reported crashes since startup."""
         return self._crash_count
 
     def get_stats(self) -> dict[str, Any]:
+        """Return module name, crash count and history size for diagnostics."""
         return {
             "module": self.module_name,
             "crash_count": self._crash_count,
@@ -401,6 +429,10 @@ def get_crash_manager() -> CrashManager:
 
 
 def _severity_to_logging_level(severity: Severity) -> int:
+    """Map an error-code severity to a standard logging level.
+
+Unknown severities fall back to ``WARNING``."""
+
     import logging
 
     mapping = {

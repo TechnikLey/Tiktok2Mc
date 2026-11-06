@@ -1,3 +1,5 @@
+"""REST endpoints for listing and downloading Minecraft server versions."""
+
 import asyncio
 import json
 import logging
@@ -21,10 +23,12 @@ _MIN_SUPPORTED_MINOR = 13
 
 
 def _is_stable_version(version: str) -> bool:
+    """Return whether ``version`` has no pre-release suffix."""
     return "-" not in version
 
 
 def _is_supported_version(version: str) -> bool:
+    """Return whether ``version`` is stable and at least the minimum supported version."""
     if not _is_stable_version(version):
         return False
     parts = version.split(".")
@@ -39,6 +43,7 @@ def _is_supported_version(version: str) -> bool:
 
 
 def _flatten_versions(nested: dict) -> list[str]:
+    """Flatten PaperMC's grouped version dictionary into a single list."""
     result = []
     for versions in nested.values():
         if isinstance(versions, list):
@@ -47,6 +52,7 @@ def _flatten_versions(nested: dict) -> list[str]:
 
 
 def _semver_sort_key(v: str) -> tuple[int, ...]:
+    """Build a numeric sort key for dotted versions; non-numeric parts sort as 0."""
     return tuple(int(p) if p.isdigit() else 0 for p in v.split("."))
 
 
@@ -54,6 +60,7 @@ _service: ApiService | None = None
 
 
 def _get_service() -> ApiService:
+    """Return the lazily created module-level ``ApiService``."""
     global _service
     if _service is None:
         _service = ApiService()
@@ -61,6 +68,11 @@ def _get_service() -> ApiService:
 
 
 def _fetch_json(url: str, timeout: int = 15) -> dict | list:
+    """Fetch and decode JSON from ``url``.
+
+Raises:
+    HTTPException: With status 502 when the request or decoding fails."""
+
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -73,6 +85,7 @@ def _fetch_json(url: str, timeout: int = 15) -> dict | list:
 
 
 class VersionInfo(BaseModel):
+    """One Minecraft server version offered by PaperMC."""
     version: str
     safe: bool
     build: int | None = None
@@ -80,16 +93,19 @@ class VersionInfo(BaseModel):
 
 
 class VersionsResponse(BaseModel):
+    """Response listing available server versions and the configured default."""
     versions: list[VersionInfo]
     current_version: str
     safe_versions: list[str]
 
 
 class SetVersionRequest(BaseModel):
+    """Request body selecting a Minecraft server version."""
     version: str
 
 
 class SetVersionResponse(BaseModel):
+    """Response describing the result of a version change."""
     status: str
     version: str
     safe: bool
@@ -98,6 +114,11 @@ class SetVersionResponse(BaseModel):
 
 @router.get("/versions", response_model=VersionsResponse)
 async def list_versions():
+    """List supported PaperMC versions and the configured default (``GET /versions``).
+
+Only stable versions at or above the minimum supported release are returned,
+sorted newest first."""
+
     svc = _get_service()
     cfg = svc.read_config()
     current_version = cfg.get("mc_version", "1.21.11")
@@ -127,6 +148,11 @@ async def list_versions():
 
 @router.post("/versions/set", response_model=SetVersionResponse)
 async def set_version(body: SetVersionRequest):
+    """Validate and persist the selected server version (``POST /versions/set``).
+
+Rejects unsupported or unavailable versions with 400. Untested versions are
+saved but reported with a ``warning`` status."""
+
     svc = _get_service()
     cfg = svc.read_config()
 

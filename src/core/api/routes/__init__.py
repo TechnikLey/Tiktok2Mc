@@ -1,3 +1,5 @@
+"""Aggregates all route modules into the router mounted by the app factory."""
+
 from fastapi import APIRouter
 
 from .actions import router as actions_router

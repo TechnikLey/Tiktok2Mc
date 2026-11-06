@@ -16,6 +16,7 @@ class BridgeMetricsService:
     """Fetches metrics from the bridge's /metrics endpoint."""
 
     def __init__(self) -> None:
+        """Create an empty metrics cache with a five-second TTL."""
         self._cache: dict[str, Any] = {}
         self._cache_time: float = 0.0
         self._cache_ttl: float = 5.0  # seconds
@@ -56,6 +57,7 @@ _bridge_metrics_service: BridgeMetricsService | None = None
 
 
 def get_bridge_metrics_service() -> BridgeMetricsService:
+    """Return the global :class:`BridgeMetricsService` singleton."""
     global _bridge_metrics_service
     if _bridge_metrics_service is None:
         _bridge_metrics_service = BridgeMetricsService()

@@ -35,6 +35,11 @@ router = APIRouter(tags=["Triggers"])
 
 @router.get("/triggers/types", response_model=TriggerTypesResponse)
 async def list_trigger_types():
+    """Return the trigger types supported by the event tester.
+
+Raises:
+    HTTPException: 500 when the trigger service cannot provide the list."""
+
     try:
         types = get_trigger_service().get_event_types()
         return TriggerTypesResponse(types=types)
@@ -45,6 +50,14 @@ async def list_trigger_types():
 
 @router.get("/triggers/like-milestones", response_model=LikeMilestonesResponse)
 async def get_like_milestones():
+    """Return the configured like milestones.
+
+Reads ``like_triggers`` from the global config and skips entries that are
+not mappings. Missing fields fall back to empty values or defaults.
+
+Raises:
+    HTTPException: 500 when the configuration cannot be read."""
+
     try:
         from core.api.services import ApiService
 
@@ -72,6 +85,15 @@ async def get_like_milestones():
 
 @router.post("/triggers/execute", response_model=TriggerResponse)
 async def execute_trigger(body: TriggerExecuteRequest):
+    """Execute a trigger as a simulated event-tester action.
+
+The service runs in a worker thread because it may POST synchronously to
+the bridge. After execution a ``tiktok.<trigger>`` test event is published
+asynchronously so subscribed extensions observe the simulation.
+
+Raises:
+    HTTPException: 500 for unexpected execution or configuration errors."""
+
     try:
         # The engine POSTs to the bridge synchronously (up to bridge_timeout).
         # Run it in a thread so a slow/dead bridge cannot stall the event loop.
@@ -158,6 +180,14 @@ async def dispatch_trigger(body: TriggerExecuteRequest):
 
 @router.post("/triggers/tiktok-connection", response_model=TiktokToggleResponse)
 async def toggle_tiktok_connection():
+    """Toggle the bridge's TikTok connection.
+
+The service call runs in a worker thread. The resulting connection state
+is published as ``system.tiktok_toggle`` for other components.
+
+Raises:
+    HTTPException: 500 when the toggle request fails."""
+
     try:
         result = await asyncio.to_thread(get_trigger_service().toggle_tiktok_connection)
         asyncio.ensure_future(
@@ -183,6 +213,14 @@ async def toggle_tiktok_connection():
 
 @router.post("/triggers/comment", response_model=TriggerResponse)
 async def send_test_comment(body: TriggerCommentRequest):
+    """Send a simulated comment through the trigger service.
+
+Runs the service call in a worker thread and publishes a ``tiktok.comment``
+test event carrying the same user and moderation flags.
+
+Raises:
+    HTTPException: 500 when the comment cannot be sent."""
+
     try:
         result = await asyncio.to_thread(
             get_trigger_service().send_comment,
@@ -221,6 +259,11 @@ async def send_test_comment(body: TriggerCommentRequest):
 
 @router.get("/triggers/history", response_model=TriggerHistoryResponse)
 async def get_trigger_history():
+    """Return the trigger service's recent execution history.
+
+Raises:
+    HTTPException: 500 when history entries cannot be read or validated."""
+
     try:
         entries = [
             TriggerHistoryEntry(**entry)

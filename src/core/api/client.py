@@ -61,12 +61,24 @@ class PluginAPIClient:
     """HTTP wrapper around plugin registry endpoints."""
 
     def __init__(self, base_url: str | None = None):
+        """Create a client for the plugin registry API.
+
+Args:
+    base_url: API root; defaults to ``API_BASE_URL`` or the local control
+        plane."""
+
         self.base_url = (base_url or _API_BASE).rstrip("/")
 
     def _url(self, path: str) -> str:
+        """Join the API base URL with *path*."""
         return f"{self.base_url}/{path.lstrip('/')}"
 
     def register(self, body: dict[str, Any]) -> dict[str, Any] | None:
+        """Register a plugin and return the server's plugin record.
+
+Returns ``None`` on HTTP errors, timeouts or any other network failure;
+registration is not retried here."""
+
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
             self._url("plugins/register"),
@@ -89,6 +101,10 @@ class PluginAPIClient:
             return None
 
     def unregister(self, name: str) -> bool:
+        """Delete a plugin registration.
+
+Returns ``True`` on any successful HTTP response, ``False`` on failure."""
+
         req = urllib.request.Request(
             self._url(f"plugins/{urllib.parse.quote(name, safe='')}"),
             method="DELETE",
@@ -106,6 +122,7 @@ class PluginAPIClient:
             return False
 
     def get(self, name: str) -> dict[str, Any] | None:
+        """Fetch one plugin registration, or ``None`` when missing or unreachable."""
         req = urllib.request.Request(
             self._url(f"plugins/{urllib.parse.quote(name, safe='')}"),
             method="GET",
@@ -125,6 +142,10 @@ class PluginAPIClient:
             return None
 
     def update(self, name: str, body: dict[str, Any]) -> dict[str, Any] | None:
+        """Update a plugin registration and return the updated record.
+
+Returns ``None`` on failure."""
+
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
             self._url(f"plugins/{urllib.parse.quote(name, safe='')}"),
@@ -147,6 +168,7 @@ class PluginAPIClient:
             return None
 
     def list(self) -> list[dict[str, Any]]:
+        """Return all registered plugins, or an empty list on failure."""
         req = urllib.request.Request(self._url("plugins"), method="GET")
         try:
             with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
@@ -168,6 +190,7 @@ _client: PluginAPIClient | None = None
 
 
 def _get_client() -> PluginAPIClient:
+    """Return the shared module-level client, creating it on first use."""
     global _client
     if _client is None:
         _client = PluginAPIClient()

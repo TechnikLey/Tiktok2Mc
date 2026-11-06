@@ -68,17 +68,27 @@ class _CircularBufferHandler(logging.Handler):
     """Keeps the last N formatted log records in memory."""
 
     def __init__(self, capacity: int = _CIRCULAR_BUFFER_SIZE) -> None:
+        """Create a handler that keeps at most *capacity* formatted lines.
+
+Old lines are discarded automatically once the buffer is full."""
+
         super().__init__()
         self._buffer: deque[str] = deque(maxlen=capacity)
         self._formatter = logging.Formatter(_LOG_FORMAT, _LOG_DATE_FORMAT)
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Format the record and append it to the in-memory buffer.
+
+Formatting errors are delegated to :meth:`logging.Handler.handleError`
+because a logging handler must never raise."""
+
         try:
             self._buffer.append(self._formatter.format(record))
         except Exception:  # a logging handler must never raise
             self.handleError(record)
 
     def get_recent(self, count: int = 100) -> list[str]:
+        """Return the newest *count* buffered lines in chronological order."""
         return list(self._buffer)[-count:]
 
 
@@ -97,6 +107,11 @@ class CrashReporter:
     _history_lock = threading.Lock()
 
     def __init__(self, module_name: str, log_dir: Path) -> None:
+        """Create a reporter that writes reports below ``<log_dir>/crash_reports``.
+
+The directory is created eagerly. The dedup fields suppress identical
+reports filed within :data:`_CRASH_DEDUP_SECONDS`."""
+
         self.module_name = module_name
         self.crash_dir = log_dir / "crash_reports"
         self.crash_dir.mkdir(parents=True, exist_ok=True)
@@ -118,6 +133,7 @@ class CrashReporter:
         return None
 
     def _generate_filename(self) -> Path:
+        """Return a unique, timestamped report path using UTC time."""
         timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S_%f")
         return self.crash_dir / f"crash_{timestamp}_{self.module_name}.json"
 
@@ -183,6 +199,11 @@ class CrashReporter:
         path = self._generate_filename()
 
         def _write() -> None:
+            """Write the report payload without letting I/O errors escape.
+
+Runs in a daemon thread so a failing or slow disk cannot block process
+shutdown."""
+
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
@@ -222,6 +243,15 @@ class Heartbeat:
         interval: float = _DEFAULT_HEARTBEAT_INTERVAL,
         subsystems: list[Callable[[], bool]] | None = None,
     ) -> None:
+        """Configure the heartbeat without starting it.
+
+Args:
+    logger: Logger that receives the periodic status line.
+    interval: Seconds between beats, clamped to at least five seconds to
+        avoid flooding the log.
+    subsystems: Optional health checks; each callable returning ``True`` is
+        reported as healthy."""
+
         self.logger = logger
         self.interval = max(interval, 5.0)
         self.subsystems = subsystems or []
@@ -229,6 +259,11 @@ class Heartbeat:
         self._thread: threading.Thread | None = None
 
     def _memory_snapshot(self) -> dict[str, Any] | None:
+        """Return current process memory usage, or ``None`` when unavailable.
+
+``psutil`` is an optional dependency and the snapshot is best effort, so
+missing data never interrupts the heartbeat."""
+
         if not _PSUTIL_AVAILABLE:
             return None
         try:
@@ -243,11 +278,18 @@ class Heartbeat:
             return None
 
     def _loop(self) -> None:
+        """Emit a beat immediately, then once per interval until stopped."""
         while not self._stop_event.is_set():
             self._beat()
             self._stop_event.wait(self.interval)
 
     def _beat(self) -> None:
+        """Log one heartbeat line with subsystem and memory status.
+
+A failing subsystem check is reported as ``error`` instead of aborting the
+beat. The process heartbeat is also forwarded to the health monitor; all
+monitoring work is best effort."""
+
         try:
             parts = ["heartbeat", "status=alive"]
             for i, check in enumerate(self.subsystems):
@@ -279,6 +321,10 @@ class Heartbeat:
             self.logger.debug("Heartbeat error: %s", exc)
 
     def start(self) -> None:
+        """Start the daemon thread if it is not already running.
+
+Calling this repeatedly is harmless."""
+
         if self._thread is not None:
             return
         self._stop_event.clear()
@@ -288,6 +334,7 @@ class Heartbeat:
         self._thread.start()
 
     def stop(self) -> None:
+        """Signal the thread to stop and wait up to two seconds for it to exit."""
         self._stop_event.set()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
@@ -308,11 +355,16 @@ class _EventBusHandler(logging.Handler):
     """
 
     def __init__(self) -> None:
+        """Create the handler with an empty, lazily resolved event-bus cache."""
         super().__init__()
         self._event_bus: Any = None
         self._lock = threading.Lock()
 
     def _get_bus(self) -> Any:
+        """Resolve the global event bus once, thread-safely.
+
+Returns ``None`` when the optional API module cannot be imported."""
+
         if self._event_bus is not None:
             return self._event_bus
         with self._lock:
@@ -327,6 +379,12 @@ class _EventBusHandler(logging.Handler):
         return self._event_bus
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Publish the formatted record as a ``log.unified`` event.
+
+Publishing is scheduled on the running event loop from the logging
+thread. Without a running loop the record is dropped, keeping logging
+non-blocking and safe during interpreter shutdown."""
+
         bus = self._get_bus()
         if bus is None:
             return
@@ -361,12 +419,17 @@ class _EventBusHandler(logging.Handler):
 
 
 def _get_log_dir() -> Path:
+    """Return the resolved ``logs`` directory below the project root."""
     from core.paths import get_root_dir
 
     return (get_root_dir() / "logs").resolve()
 
 
 def _stop_queue_listener(listener: logging.handlers.QueueListener | None) -> None:
+    """Stop an asynchronous log listener during shutdown.
+
+Exceptions are swallowed because interpreter shutdown must never fail."""
+
     if listener is not None:
         try:
             listener.stop()
@@ -478,6 +541,12 @@ def install_global_exception_hook(module_name: str) -> None:
     original_sys_excepthook = sys.excepthook
 
     def _sys_excepthook(exc_type, exc_value, exc_tb):
+        """Report an uncaught exception, then delegate to the original hook.
+
+``KeyboardInterrupt`` is passed through untouched. All other exceptions
+are logged at critical level and written to a crash report together with
+the 200 most recent log lines."""
+
         if issubclass(exc_type, KeyboardInterrupt):
             original_sys_excepthook(exc_type, exc_value, exc_tb)
             return

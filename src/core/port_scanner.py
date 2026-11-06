@@ -52,12 +52,24 @@ CONNECT_PORTS = {
 
 @dataclass
 class PortPolicy:
+    """Policy controlling how occupied ports are handled.
+
+Attributes:
+    auto_resolve: Move to the next free port instead of failing.
+    session_only: Keep resolved ports for this session only.
+    max_offset: Highest offset tried above the preferred port; ``-1``
+        scans without limit."""
+
     auto_resolve: bool = True
     session_only: bool = True
     max_offset: int = 10
 
     @classmethod
     def from_config(cls, cfg: dict[str, Any]) -> PortPolicy:
+        """Build a policy from the ``port_policy`` config section.
+
+Missing or malformed keys fall back to the dataclass defaults."""
+
         raw = cfg.get("port_policy", {})
         return cls(
             auto_resolve=raw.get("auto_resolve", True),
@@ -68,6 +80,15 @@ class PortPolicy:
 
 @dataclass
 class PortCheckResult:
+    """Outcome of checking one configured bind port.
+
+Attributes:
+    port: Preferred port from config or default.
+    key: Stable port identifier used in the resolved map.
+    description: Human-readable purpose of the port.
+    in_use: Whether the preferred port was occupied.
+    resolved_port: Alternative port chosen by auto-resolution."""
+
     port: int
     key: str
     description: str
@@ -254,6 +275,14 @@ def persist_to_config(
     from core.yaml_utils import load_yaml
 
     def apply_ports(cfg: dict[str, Any]) -> bool:
+        """Apply changed resolved ports to a config mapping.
+
+Only entries differing from their default are written and the dotted
+``config_path`` of each entry is created as needed.
+
+Returns:
+    ``True`` when at least one value changed."""
+
         changed = False
         for bp in bind_ports or BIND_PORTS:
             key = bp["key"]

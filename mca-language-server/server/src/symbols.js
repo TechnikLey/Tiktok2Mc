@@ -1,7 +1,9 @@
-// Document symbols, folding ranges for MCA files.
-//
-// Document symbols: each trigger (active or disabled) is a symbol node.
-// Folding ranges: comment blocks.
+/**
+ * @file Document symbols and folding ranges for MCA files.
+ *
+ * Each active or disabled trigger becomes a symbol; consecutive full-line
+ * comments become foldable comment blocks.
+ */
 
 const { parseLine } = require('./parser');
 
@@ -13,6 +15,14 @@ const SymbolKind = {
 };
 
 let KNOWN_SET = null;
+/**
+ * Return the cached set of known event trigger names.
+ *
+ * The set is built lazily so the language module can fail without preventing
+ * the server from starting.
+ *
+ * @returns {Set<string>} Known event trigger names.
+ */
 function getKnownSet() {
   if (!KNOWN_SET) {
     const { getEventTriggers } = require('./language');
@@ -21,6 +31,17 @@ function getKnownSet() {
   return KNOWN_SET;
 }
 
+/**
+ * Build outline/document symbols for every trigger in a document.
+ *
+ * Event triggers, numeric gift IDs and custom triggers receive different
+ * symbol kinds; disabled (`##`) triggers are included as constants. Malformed
+ * lines are skipped so the outline always remains usable.
+ *
+ * @param {import('vscode-languageserver-textdocument').TextDocument} document
+ *   Open document to inspect.
+ * @returns {object[]} LSP `DocumentSymbol` objects in source order.
+ */
 function provideDocumentSymbols(document) {
   const text = document.getText();
   const lines = text.split('\n');
@@ -76,6 +97,16 @@ function provideDocumentSymbols(document) {
   return symbols;
 }
 
+/**
+ * Build folding ranges for blocks of consecutive comment lines.
+ *
+ * Single comment lines are not foldable.
+ *
+ * @param {import('vscode-languageserver-textdocument').TextDocument} document
+ *   Open document to inspect.
+ * @returns {Array<{startLine: number, endLine: number, kind: string}>} LSP
+ *   folding ranges.
+ */
 function provideFoldingRanges(document) {
   const text = document.getText();
   const lines = text.split('\n');

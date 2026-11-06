@@ -1,3 +1,5 @@
+"""RCON console endpoints for direct command execution and log streaming."""
+
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -20,6 +22,7 @@ _api_service: ApiService | None = None
 
 
 def _get_api_service() -> ApiService:
+    """Return the lazily created module-level ``ApiService``."""
     global _api_service
     if _api_service is None:
         _api_service = ApiService()
@@ -39,6 +42,7 @@ def _command_api_enabled() -> bool:
 
 
 def _configure_from_config():
+    """Copy host, port and password from the current config into the RCON service."""
     svc = get_rcon_service()
     config = _get_api_service().read_config()
     rcon_cfg = config.get("rcon", {})
@@ -63,14 +67,17 @@ def _config_error() -> HTTPException:
 
 
 class CommandRequest(BaseModel):
+    """Request body containing one RCON command."""
     command: str
 
 
 class CommandResponse(BaseModel):
+    """Response containing the RCON command output."""
     response: str
 
 
 class StatusResponse(BaseModel):
+    """Response describing the current RCON connection state."""
     connected: bool
     host: str
     port: int
@@ -78,6 +85,7 @@ class StatusResponse(BaseModel):
 
 @router.get("/status", response_model=StatusResponse)
 async def get_status():
+    """Return the current RCON connection state (``GET /rcon/status``)."""
     svc = get_rcon_service()
     try:
         _configure_from_config()
@@ -93,6 +101,7 @@ async def get_status():
 
 @router.post("/connect")
 async def connect():
+    """Connect using the configured RCON settings (``POST /rcon/connect``)."""
     svc = get_rcon_service()
     try:
         _configure_from_config()
@@ -113,6 +122,7 @@ async def connect():
 
 @router.post("/disconnect")
 async def disconnect():
+    """Disconnect RCON and stop console capture for the default instance."""
     svc = get_rcon_service()
     await svc.disconnect()
     stop_instance_capture("default")
@@ -121,6 +131,10 @@ async def disconnect():
 
 @router.post("/command", response_model=CommandResponse)
 async def send_command(req: CommandRequest):
+    """Execute a command when the HTTP command API is enabled (``POST /rcon/command``).
+
+Raises 403 when ``rcon.http_command_api`` is disabled."""
+
     if not _command_api_enabled():
         log.warning(
             "%s rejected direct RCON command (rcon.http_command_api=false)",

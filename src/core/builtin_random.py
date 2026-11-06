@@ -33,6 +33,17 @@ def register_random_action(api, config: dict | None = None) -> None:
     )
 
     def random_handler(user, trigger, context):
+        """Execute ``$random`` by enqueuing one eligible trigger.
+
+The eligibility list is fixed when the action is registered: ``deny-all``
+excludes the configured triggers, every other mode includes only them.
+When no eligible action remains, the handler logs and does nothing.
+
+Args:
+    user: Display name of the viewer that invoked the action.
+    trigger: Original trigger name (unused).
+    context: Bridge context passed by the action API (unused)."""
+
         all_valid = sorted(api.get_valid_functions())
 
         if not all_valid:

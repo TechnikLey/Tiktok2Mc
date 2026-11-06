@@ -1,3 +1,5 @@
+"""Discovery, validation and import of in-process hook modules."""
+
 from __future__ import annotations
 
 import ast

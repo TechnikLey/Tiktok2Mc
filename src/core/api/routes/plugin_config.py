@@ -1,3 +1,5 @@
+"""REST endpoints for reading and writing per-plugin ``config.yaml`` files."""
+
 from typing import Any
 
 from fastapi import APIRouter, HTTPException

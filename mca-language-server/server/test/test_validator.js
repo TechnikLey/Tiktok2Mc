@@ -1,3 +1,10 @@
+/**
+ * @file Validator tests for the MCA language server.
+ *
+ * Covers every diagnostic rule (structure, brackets, prefixes, multipliers,
+ * placeholders and duplicates) plus empty, malformed and incomplete input.
+ */
+
 const assert = require('assert');
 const { validateDocument, DiagnosticSeverity } = require('../src/validator');
 

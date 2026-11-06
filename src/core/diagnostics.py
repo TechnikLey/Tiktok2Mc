@@ -29,6 +29,7 @@ from core.health_monitor import get_health_monitor
 
 
 class Severity(Enum):
+    """Severity level attached to a parser or validator diagnostic."""
     ERROR = "ERROR"
     WARNING = "WARNING"
     INFO = "INFO"
@@ -36,6 +37,16 @@ class Severity(Enum):
 
 @dataclass
 class Diagnostic:
+    """A single diagnostic emitted by the .mca parser or validator.
+
+Attributes:
+    line: One-based line number.
+    start_char: Start column of the highlighted range.
+    end_char: End column of the highlighted range.
+    message: Human-readable problem description.
+    severity: Severity level of the diagnostic.
+    code: Optional stable error code."""
+
     line: int
     start_char: int
     end_char: int
@@ -155,6 +166,7 @@ def _get_queue_stats(_crash_manager: Any = None) -> dict[str, Any]:
 
 
 def _timestamp_iso() -> str:
+    """Return the current UTC time as an ISO 8601 string."""
     return datetime.now(tz=UTC).isoformat()
 
 

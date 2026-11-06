@@ -92,6 +92,12 @@ def _load_overlay_names() -> list[str]:
 
 
 def main() -> None:
+    """Run the overlay process until the supervisor terminates it.
+
+Waits for the API server, reads the configured overlay names and either
+keeps a headless process alive or opens one pywebview window per overlay.
+Exits with status 1 when the API or GUI backend is unavailable."""
+
     parser = argparse.ArgumentParser(description="TikTok2Mc Overlay Process")
     parser.add_argument(
         "--gui-hidden", action="store_true", help="Hide GUI windows (headless mode)"

@@ -11,15 +11,18 @@ const ModalFocus = (() => {
 
   let _trigger = null;
 
+  /** Return whether an overlay is currently visible (the ``hidden`` class is absent). */
   function _isVisible(el) {
     return !el.classList.contains('hidden');
   }
 
+  /** Collect focusable controls in an overlay, ignoring anything inside a hidden subtree. */
   function _focusable(overlay) {
     return Array.from(overlay.querySelectorAll(FOCUSABLE_SELECTOR))
       .filter(n => !n.closest('.hidden'));
   }
 
+  /** Assign a stable id to the overlay heading and use it as the dialog's accessible label. */
   function _ensureLabel(overlay) {
     const heading = overlay.querySelector('h1, h2, h3');
     if (!heading) return;
@@ -27,6 +30,7 @@ const ModalFocus = (() => {
     overlay.setAttribute('aria-labelledby', heading.id);
   }
 
+  /** Prepare a newly opened overlay: dialog semantics, label, focus origin and initial focus. */
   function _onOpen(overlay) {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
@@ -38,6 +42,7 @@ const ModalFocus = (() => {
     if (items.length) items[0].focus();
   }
 
+  /** Restore focus to the element that opened the overlay and clear the saved origin. */
   function _onClose() {
     if (_trigger && _trigger.isConnected && typeof _trigger.focus === 'function') {
       _trigger.focus();
@@ -45,6 +50,7 @@ const ModalFocus = (() => {
     _trigger = null;
   }
 
+  /** Keep Tab and Shift+Tab cycling inside the topmost visible overlay. */
   function _trapTab(e) {
     if (e.key !== 'Tab') return;
     const open = Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).filter(_isVisible);
@@ -74,6 +80,11 @@ const ModalFocus = (() => {
     }
   });
 
+  /**
+   * Observe every overlay in the document and install the global Tab handler.
+   *
+   * Safe to call once after the DOM exists; repeated calls add duplicate listeners.
+   */
   function install() {
     document.querySelectorAll(OVERLAY_SELECTOR).forEach(overlay => {
       _observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });

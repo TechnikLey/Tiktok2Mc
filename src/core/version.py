@@ -1,3 +1,5 @@
+"""Single source of truth for tool, API, updater and config versions."""
+
 # Single source of truth for all version constants.
 # All other modules should import from here.
 

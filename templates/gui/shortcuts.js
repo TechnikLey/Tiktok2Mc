@@ -12,15 +12,18 @@ const Shortcuts = (() => {
 
   /* ── helpers ── */
 
+  /** Look up an element by id. */
   function _el(id) {
     return document.getElementById(id);
   }
 
+  /** Return true when the element is missing or currently hidden. */
   function _elHidden(id) {
     const el = _el(id);
     return !el || el.classList.contains('hidden');
   }
 
+  /** Return true when the event target accepts text input. */
   function _isTyping(e) {
     const t = e.target;
     if (!t || !t.tagName) return false;
@@ -28,6 +31,7 @@ const Shortcuts = (() => {
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable;
   }
 
+  /** Normalize an event key to the lowercase name used by binding strings. */
   function _keyName(e) {
     if (e.key === 'Escape') return 'escape';
     if (e.key === '?') return '?';
@@ -36,10 +40,17 @@ const Shortcuts = (() => {
     return e.key.toLowerCase();
   }
 
+  /** Split a binding such as ``ctrl+s`` into lowercase parts. */
   function _comboParts(combo) {
     return combo.split('+').map(p => p.toLowerCase());
   }
 
+  /**
+   * Return true when an event matches the modifiers and key of a binding.
+   *
+   * Shift is only required when explicitly listed, because layouts such as
+   * German QWERTZ need Shift to produce ``/``.
+   */
   function _matches(e, parts) {
     const wantCtrl = parts.includes('ctrl');
     const wantShift = parts.includes('shift');
@@ -55,10 +66,12 @@ const Shortcuts = (() => {
     return _keyName(e) === key;
   }
 
+  /** Return true while a wizard overlay is open. */
   function _anyModalOpen() {
     return !!document.querySelector('.wizard-overlay:not(.hidden)');
   }
 
+  /** Click an element by id when it exists. */
   function _click(id) {
     const el = _el(id);
     if (el) el.click();
@@ -76,6 +89,7 @@ const Shortcuts = (() => {
     });
   }
 
+  /** Return the registered combos and their translation keys for the help view. */
   function list() {
     return _bindings.map(b => ({ combo: b.combo, descKey: b.descKey }));
   }
@@ -101,6 +115,7 @@ const Shortcuts = (() => {
     }
   }
 
+  /** Focus the search field of the active editor or view, if it has one. */
   function focusSearch() {
     const editorMap = [
       ['config-editor', 'editor-search'],
@@ -156,6 +171,7 @@ const Shortcuts = (() => {
     { name: 'mobile-sidebar', isOpen: () => !!document.querySelector('.sidebar.mobile-open'), close: () => closeMobileSidebar() },
   ];
 
+  /** Close the topmost dismissible modal, or blur the active element when none is open. */
   function _closeTopModal() {
     for (const p of _modalProviders) {
       if (p.isOpen()) {
@@ -169,6 +185,7 @@ const Shortcuts = (() => {
 
   /* ── keydown dispatch ── */
 
+  /** Dispatch a keydown event to the first matching binding. */
   function _handleKeydown(e) {
     for (const b of _bindings) {
       if (!_matches(e, b.parts)) continue;
@@ -185,6 +202,7 @@ const Shortcuts = (() => {
   bind('/', focusSearch, { descKey: 'shortcuts.search' });
   bind('escape', _closeTopModal, { whenTyping: true, descKey: 'shortcuts.close' });
 
+  /** Attach the global keydown listener. */
   function install() {
     document.addEventListener('keydown', _handleKeydown);
   }

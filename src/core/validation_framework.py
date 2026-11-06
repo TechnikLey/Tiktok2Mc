@@ -54,6 +54,7 @@ class ValidationResult:
     detail: str = ""
 
     def format(self) -> str:
+        """Format the result as one human-readable status line."""
         status = "PASS" if self.passed else "FAIL"
         msg = f"[{status}] {self.name}"
         if self.message:
@@ -63,6 +64,7 @@ class ValidationResult:
         return msg
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the result for API and GUI output."""
         return {
             "name": self.name,
             "passed": self.passed,
@@ -82,21 +84,27 @@ class ValidationSuite:
     _stop_on_failure: bool = False
 
     def add(self, result: ValidationResult) -> None:
+        """Append a completed step to the suite."""
         self.steps.append(result)
 
     def all_passed(self) -> bool:
+        """Return whether every step passed."""
         return all(s.passed for s in self.steps)
 
     def failures(self) -> list[ValidationResult]:
+        """Return all failed steps."""
         return [s for s in self.steps if not s.passed]
 
     def warnings(self) -> list[ValidationResult]:
+        """Return passed steps whose severity is warning or higher."""
         return [s for s in self.steps if s.passed and s.severity >= Severity.WARNING]
 
     def critical_failures(self) -> list[ValidationResult]:
+        """Return failed steps whose severity is error or higher."""
         return [s for s in self.steps if not s.passed and s.severity >= Severity.ERROR]
 
     def summary(self) -> str:
+        """Render a multi-line report with one line per step."""
         total = len(self.steps)
         passed = sum(1 for s in self.steps if s.passed)
         failed = total - passed
@@ -108,6 +116,7 @@ class ValidationSuite:
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the suite, including aggregate counts."""
         return {
             "name": self.name,
             "description": self.description,
@@ -175,6 +184,7 @@ def run_with_timeout_sync(
     error_container: list[Exception | None] = [None]
 
     def _target():
+        """Run the wrapped callable and capture its result or exception."""
         try:
             result_container.append(func())
         except Exception as e:  # framework purpose: capture any failure from wrapped op

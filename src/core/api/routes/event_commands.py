@@ -1,3 +1,5 @@
+"""REST endpoints for the event-command mapping in ``data/event_commands.yaml``."""
+
 import logging
 from pathlib import Path
 
@@ -16,6 +18,12 @@ DATA_CONFIG_PATH = Path("data/event_commands.yaml")
 
 
 def _config_path() -> Path:
+    """Resolve the event-command file, preferring the user copy.
+
+Returns:
+    ``data/event_commands.yaml`` when it exists, otherwise the default
+    file, otherwise the (not yet created) data path."""
+
     root = core.paths.get_root_dir()
     data_path = root / DATA_CONFIG_PATH
     if data_path.exists():
@@ -42,6 +50,11 @@ def _ensure_data_config() -> Path:
 
 @router.get("/event-commands", response_model=EventCommandsResponse)
 async def get_event_commands():
+    """Return the event-command mapping and the file it came from.
+
+When no file exists, an empty mapping is returned without creating
+anything. Any unexpected error is reported as HTTP 500."""
+
     try:
         path = _config_path()
         if not path.exists():
@@ -58,6 +71,12 @@ async def get_event_commands():
 
 @router.put("/event-commands", response_model=EventCommandsResponse)
 async def update_event_commands(body: EventCommandsUpdateRequest):
+    """Persist a new event-command mapping to the data directory.
+
+The file is created from the defaults on first write and the previous
+version is backed up. Returns the written mapping and its path; unexpected
+errors are reported as HTTP 500."""
+
     try:
         path = _ensure_data_config()
         save_yaml(path, {"event_commands": body.event_commands}, backup=True)

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Core runtime library shared by the supervisor, bridge, API server and plugins.
+
+The package re-exports the stable public helpers; implementation modules remain
+importable on their own (``core.paths``, ``core.logger``, ...)."""
+
 from core.cli import parse_args
 from core.models import AppConfig
 from core.overlay import (

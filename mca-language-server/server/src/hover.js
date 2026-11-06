@@ -1,5 +1,10 @@
-// Hover provider — returns rich markdown documentation for tokens under the cursor.
-// Documentation is derived from the shared mca-spec.json.
+/**
+ * @file Hover provider for MCA files.
+ *
+ * Returns markdown documentation for the trigger, colon, command prefix,
+ * overlay target, placeholder, multiplier or semicolon under the cursor.
+ * Documentation is derived from the shared `mca-spec.json`.
+ */
 
 const {
   getCommandPrefixes, getEventTriggerDocs, getPlaceholders,
@@ -7,6 +12,19 @@ const {
 } = require('./language');
 const { parseLine } = require('./parser');
 
+/**
+ * Return hover contents for the token at a cursor position.
+ *
+ * Handles trigger names, the separator colon, command prefixes, named
+ * overlays, placeholders, multipliers and the command semicolon. Unparseable
+ * lines and unexpected errors yield `null` so hover never breaks the editor.
+ *
+ * @param {import('vscode-languageserver-textdocument').TextDocument} document
+ *   Open document.
+ * @param {{line: number, character: number}} position Cursor position.
+ * @returns {{contents: {kind: string, value: string}}|null} LSP hover object,
+ *   or `null` when no documentation applies.
+ */
 function provideHover(document, position) {
   try {
     const text = document.getText();

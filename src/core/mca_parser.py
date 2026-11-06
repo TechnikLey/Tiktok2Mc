@@ -68,6 +68,7 @@ class ParsedCommand:
     overlay_name: str = "default"
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the command to a JSON-compatible mapping."""
         return {
             "type": self.type,
             "command": self.body,
@@ -81,6 +82,10 @@ class ParsedCommand:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ParsedCommand:
+        """Build a command from a mapping produced by `to_dict`.
+
+Missing keys fall back to the same defaults as a freshly parsed command."""
+
         return cls(
             type=d.get("type", "vanilla"),
             body=d.get("command", ""),
@@ -103,6 +108,12 @@ class ParsedTrigger:
     commands: list[ParsedCommand] = field(default_factory=list)
 
     def to_dict(self, gifts: list[dict] | None = None) -> dict[str, Any]:
+        """Serialise the trigger, detecting its type from the gift catalog.
+
+Args:
+    gifts: Optional gift entries used to classify the trigger as a gift;
+        without them only numeric names are treated as gifts."""
+
         return {
             "name": self.name,
             "enabled": self.enabled,
@@ -111,6 +122,11 @@ class ParsedTrigger:
         }
 
     def _detect_type(self, gifts: list[dict] | None = None) -> str:
+        """Classify the trigger as ``Event``, ``Gift`` or ``Custom``.
+
+Gift matching accepts the catalog name with flexible spacing and the
+numeric gift id."""
+
         name = self.raw_name
         if name in EVENT_TRIGGERS:
             return "Event"

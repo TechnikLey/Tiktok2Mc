@@ -1,7 +1,10 @@
-// Validator – mirrors src/core/validator.py in the Python codebase.
-//
-// Produces an array of diagnostic objects matching the VS Code diagnostic
-// format (severity, range, message, code, source).
+/**
+ * @file Validator for MCA files.
+ *
+ * Mirrors `src/core/validator.py` in the Python codebase and produces
+ * diagnostic objects in the VS Code/LSP format (severity, range, message,
+ * code, source).
+ */
 
 const {
   getCommandPrefixes, getPlaceholders, getRules, getPatterns,
@@ -17,6 +20,17 @@ const DiagnosticSeverity = {
   Hint: 4,
 };
 
+/**
+ * Create an LSP diagnostic object.
+ *
+ * @param {number} line Zero-based line number.
+ * @param {number} startChar Start character offset.
+ * @param {number} endChar End character offset.
+ * @param {string} message Human-readable diagnostic message.
+ * @param {number} severity One of `DiagnosticSeverity`.
+ * @param {string} code Stable diagnostic code used for quick fixes.
+ * @returns {object} Diagnostic object with source `mca`.
+ */
 function diag(line, startChar, endChar, message, severity, code) {
   return {
     severity,
@@ -30,6 +44,18 @@ function diag(line, startChar, endChar, message, severity, code) {
   };
 }
 
+/**
+ * Validate a complete MCA document and return all diagnostics.
+ *
+ * Checks syntax, spaces and trailing separators, bracket balance, trigger-name
+ * validity, duplicate/disabled triggers, command prefixes, overlay rules,
+ * placeholders and multipliers. Every line is validated independently; an
+ * unexpected failure is reported as an `internal_error` diagnostic instead of
+ * aborting the whole document.
+ *
+ * @param {string} text Complete document contents.
+ * @returns {object[]} LSP diagnostics in source order.
+ */
 function validateDocument(text) {
   const diagnostics = [];
   const lines = text.split('\n');

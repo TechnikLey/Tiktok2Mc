@@ -1,3 +1,5 @@
+"""Event ingestion and SSE streaming endpoints used by the bridge and GUI."""
+
 import asyncio
 import json
 import logging
@@ -26,6 +28,7 @@ _EVENT_TYPE_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}(\.[A-Za-z0-9_.-]{1,128})$")
 
 
 def _is_trusted_bridge(source_header: str | None) -> bool:
+    """Return whether the request's source header identifies the bridge process."""
     return source_header == BRIDGE_SOURCE_VALUE
 
 
@@ -67,6 +70,11 @@ def _validate_payload(event_type: str, data: dict) -> None:
 
 
 def _validate_event_type(event_type: str) -> None:
+    """Reject event types that are not namespaced as ``<source>.<event>``.
+
+Raises:
+    HTTPException: 422 if the name does not match the allowed pattern."""
+
     if not _EVENT_TYPE_RE.match(event_type):
         raise HTTPException(
             status_code=422,
@@ -94,6 +102,12 @@ async def event_stream(
     filter_types = [t.strip() for t in types.split(",") if t.strip()] if types else []
 
     async def generate():
+        """Yield server-sent events for the subscribed event types.
+
+Sends an initial comment when connected, a keepalive comment after 30 s
+without events, and always unsubscribes from the bus when the client
+disconnects or the generator is cancelled."""
+
         q = event_bus.subscribe(*filter_types)
         try:
             # Signal that the connection is established

@@ -31,10 +31,20 @@ class SessionService:
     """Read and summarise the stream session log."""
 
     def __init__(self, path: Path | None = None) -> None:
+        """Create the service for an optional explicit session log path.
+
+When ``path`` is omitted, ``data/sessions.jsonl`` under the project root is
+used on first access."""
+
         self._sessions_path: Path | None = path
 
     @property
     def sessions_path(self) -> Path:
+        """Return the resolved sessions log path, resolving it once.
+
+The default is ``<root>/data/sessions.jsonl``; an injected path is used
+unchanged."""
+
         if self._sessions_path is None:
             self._sessions_path = (get_root_dir() / "data" / "sessions.jsonl").resolve()
         return self._sessions_path

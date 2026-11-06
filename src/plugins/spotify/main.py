@@ -1,3 +1,5 @@
+"""Spotify plugin: OAuth, playback control and trigger actions."""
+
 import hashlib
 import logging
 import os
@@ -46,7 +48,17 @@ def validate_spotify_client_secret(secret: str) -> tuple[bool, str]:
 
 
 class SpotifyClient:
+    """Minimal Spotify Web API client with OAuth token persistence."""
     def __init__(self, client_id, client_secret, redirect_uri, config_path=None):
+        """Create a client and load any previously stored tokens.
+
+Args:
+    client_id: Spotify application client ID.
+    client_secret: Spotify application client secret.
+    redirect_uri: OAuth redirect URI registered with Spotify.
+    config_path: Optional config file; defaults to ``config.yaml`` next to
+        this module."""
+
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
@@ -62,6 +74,7 @@ class SpotifyClient:
         self._load_tokens()
 
     def _load_tokens(self):
+        """Load and decrypt stored tokens and their expiry, ignoring failures."""
         with self._token_lock:
             try:
                 cfg = load_yaml(self.config_path)
@@ -78,6 +91,7 @@ class SpotifyClient:
                 log.info(f"[SPOTIFY] Failed to load tokens: {e}")
 
     def _save_tokens(self):
+        """Encrypt and persist the current tokens, ignoring write failures."""
         with self._token_lock:
             try:
                 cfg = load_yaml(self.config_path)
@@ -90,9 +104,15 @@ class SpotifyClient:
 
     @property
     def is_authenticated(self):
+        """Return whether an access token is available."""
         return bool(self.access_token)
 
     def get_auth_url(self):
+        """Build the authorization URL and a random state value.
+
+Returns:
+    A ``(url, state)`` tuple; callers should verify ``state`` on callback."""
+
         state = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
         params = {
             "client_id": self.client_id,
@@ -105,6 +125,14 @@ class SpotifyClient:
         return f"{SPOTIFY_AUTH}?{urlencode(params)}", state
 
     def exchange_code(self, code):
+        """Exchange an authorization code for tokens and persist them.
+
+Args:
+    code: Authorization code received on the OAuth callback.
+
+Returns:
+    ``True`` on success, ``False`` for an HTTP or JSON error."""
+
         data = {
             "grant_type": "authorization_code",
             "code": code,
@@ -129,6 +157,12 @@ class SpotifyClient:
         return True
 
     def refresh_access_token(self):
+        """Refresh the access token using the stored refresh token.
+
+Returns:
+    ``True`` on success, ``False`` when no refresh token exists or the
+    request fails."""
+
         if not self.refresh_token:
             return False
         data = {
@@ -154,14 +188,29 @@ class SpotifyClient:
             return False
 
     def _ensure_token(self):
+        """Return whether a usable access token is available, refreshing if needed."""
         if not self.access_token:
             return False
         return time.time() < self.expires_at - 60 or self.refresh_access_token()
 
     def _headers(self):
+        """Return the authorization header for the current access token."""
         return {"Authorization": f"Bearer {self.access_token}"}
 
     def _request(self, method, path, **kwargs):
+        """Send an authenticated request to the Spotify API.
+
+A 401 triggers one token refresh and a retry. Empty successful responses
+(204) become ``{}``; missing resources and errors become ``None``.
+
+Args:
+    method: HTTP method.
+    path: API path beginning with ``/``.
+    **kwargs: Extra arguments for ``requests.request``.
+
+Returns:
+    Parsed JSON, ``{}`` for an empty response, or ``None`` on failure."""
+
         if not self._ensure_token():
             return None
         url = f"{SPOTIFY_API}{path}"
@@ -189,49 +238,84 @@ class SpotifyClient:
             return None
 
     def get_playback(self):
+        """Return the current playback state, or ``None`` when unavailable."""
         return self._request("GET", "/me/player")
 
     def get_current_track(self):
+        """Return the currently playing track payload, or ``None``."""
         return self._request("GET", "/me/player/currently-playing")
 
     def play(self, device_id=None):
+        """Start or resume playback, optionally on a specific device.
+
+Args:
+    device_id: Spotify device to target; the active device is used when omitted."""
+
         kwargs = {}
         if device_id:
             kwargs["json"] = {"device_ids": [device_id]}
         return self._request("PUT", "/me/player/play", **kwargs)
 
     def pause(self, device_id=None):
+        """Pause playback, optionally on a specific device.
+
+Args:
+    device_id: Spotify device to target; the active device is used when omitted."""
+
         kwargs = {}
         if device_id:
             kwargs["json"] = {"device_ids": [device_id]}
         return self._request("PUT", "/me/player/pause", **kwargs)
 
     def next_track(self):
+        """Skip to the next track."""
         return self._request("POST", "/me/player/next")
 
     def previous_track(self):
+        """Skip to the previous track."""
         return self._request("POST", "/me/player/previous")
 
     def set_volume(self, percent):
+        """Set the playback volume, clamped to the 0-100 range.
+
+Args:
+    percent: Requested volume percentage."""
+
         return self._request(
             "PUT", f"/me/player/volume?volume_percent={max(0, min(100, percent))}"
         )
 
     def toggle_shuffle(self, state):
+        """Enable or disable shuffle playback.
+
+Args:
+    state: Truthy value for on; it is lowercased for the API query."""
+
         return self._request("PUT", f"/me/player/shuffle?state={str(state).lower()}")
 
     def set_repeat(self, state):
+        """Set the repeat mode.
+
+Args:
+    state: One of ``off``, ``context`` or ``track``; other values are ignored."""
+
         if state not in ("off", "context", "track"):
             return None
         return self._request("PUT", f"/me/player/repeat?state={state}")
 
     def save_current(self):
+        """Save the currently playing track to the user's library.
+
+Returns:
+    The API response, or ``None`` when no track is playing."""
+
         track = self._get_current_track_item()
         if not track:
             return None
         return self._request("PUT", "/me/tracks", json={"ids": [track["id"]]})
 
     def _get_current_track_item(self):
+        """Return the current track item, falling back to the playback state."""
         data = self.get_current_track()
         if data and data.get("item"):
             return data["item"]
@@ -241,6 +325,11 @@ class SpotifyClient:
         return None
 
     def transfer_playback(self, device_id=None):
+        """Move playback to a device.
+
+Without ``device_id`` the first available device is used. Returns ``None``
+when no device can be found."""
+
         if not device_id:
             devices = self._request("GET", "/me/player/devices")
             if devices and devices.get("devices"):
@@ -250,6 +339,14 @@ class SpotifyClient:
         return self._request("PUT", "/me/player", json={"device_ids": [device_id]})
 
     def search_track(self, query):
+        """Search for a single matching track.
+
+Args:
+    query: Spotify search query.
+
+Returns:
+    The raw search payload, or ``None`` on error."""
+
         params = {"q": query, "type": "track", "limit": 1}
         url = f"{SPOTIFY_API}/search"
         if not self._ensure_token():
@@ -273,12 +370,24 @@ class SpotifyClient:
             return None
 
     def play_specific(self, track_uri, device_id=None):
+        """Play a specific track URI, optionally on a device.
+
+Args:
+    track_uri: Spotify track URI.
+    device_id: Optional target device."""
+
         kwargs = {"json": {"uris": [track_uri]}}
         if device_id:
             kwargs["json"]["device_ids"] = [device_id]
         return self._request("PUT", "/me/player/play", **kwargs)
 
     def queue_track(self, track_uri, device_id=None):
+        """Append a track URI to the playback queue.
+
+Args:
+    track_uri: Spotify track URI.
+    device_id: Optional target device."""
+
         import urllib.parse as up
 
         params = f"uri={up.quote(track_uri, safe='')}"
@@ -288,6 +397,11 @@ class SpotifyClient:
 
 
 def _format_track(data):
+    """Flatten a Spotify playback payload into the overlay/state fields.
+
+Missing fields fall back to empty values, ``Unknown`` for the title and
+zero for durations."""
+
     item = data.get("item", {})
     progress = data.get("progress_ms", 0)
     is_playing = data.get("is_playing", False)
@@ -308,9 +422,15 @@ def _format_track(data):
 
 
 class SpotifyControlPlugin(BasePlugin):
+    """Plugin providing Spotify OAuth, playback control and overlay state."""
     PLUGIN_NAME = "spotify-control"
 
     def __init__(self):
+        """Load credentials and playback settings, then register command handlers.
+
+The client secret is decrypted when stored encrypted and validated with a
+warning when it looks suspicious."""
+
         super().__init__()
         cfg = self.config
         self._client_id = cfg.get("client_id", "")
@@ -359,6 +479,12 @@ class SpotifyControlPlugin(BasePlugin):
     # -- event publishing ------------------------------------------------
 
     def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        """Publish ``spotify.<event_type>`` when that signal is enabled.
+
+Args:
+    event_type: Signal name such as ``play`` or ``track_changed``.
+    extra: Optional fields included in the event payload."""
+
         if event_type in self._signal_on:
             data = {}
             if extra:
@@ -368,6 +494,10 @@ class SpotifyControlPlugin(BasePlugin):
     # -- tick (overlay polling) -------------------------------------------
 
     def on_tick(self):
+        """Poll playback while authenticated and refresh the overlay state.
+
+Errors are logged so a failed poll never terminates the plugin thread."""
+
         try:
             if self._client.is_authenticated:
                 self._notify_overlay()
@@ -377,6 +507,10 @@ class SpotifyControlPlugin(BasePlugin):
     # -- command handlers ---------------------------------------------------
 
     def _on_start_oauth(self, _):
+        """Open the Spotify authorization page and remember the state value.
+
+Does nothing when the client ID or secret is missing."""
+
         if not self._client_id or not self._client_secret:
             log.info("[SPOTIFY] Cannot start OAuth: missing client_id or client_secret")
             return
@@ -386,6 +520,11 @@ class SpotifyControlPlugin(BasePlugin):
         log.info("[SPOTIFY] OAuth URL opened in browser")
 
     def _on_oauth_callback(self, args):
+        """Validate the OAuth state and exchange the authorization code.
+
+A mismatching state is logged and ignored; without a code no exchange is
+attempted."""
+
         code = args.get("code", "")
         state = args.get("state", "")
         if state and self._auth_state is not None and state != self._auth_state:
@@ -395,18 +534,24 @@ class SpotifyControlPlugin(BasePlugin):
             self._notify_overlay()
 
     def _on_play(self, _):
+        """Resume playback, publish ``spotify.play`` and refresh the overlay."""
         if self._client.is_authenticated:
             self._client.play(self._device_id or None)
             self._maybe_signal("play")
             self._notify_overlay()
 
     def _on_pause(self, _):
+        """Pause playback, publish ``spotify.pause`` and refresh the overlay."""
         if self._client.is_authenticated:
             self._client.pause(self._device_id or None)
             self._maybe_signal("pause")
             self._notify_overlay()
 
     def _on_next(self, _):
+        """Skip to the next track, publish ``track_changed`` and refresh the overlay.
+
+The short sleep gives Spotify time to update before the overlay is polled."""
+
         if self._client.is_authenticated:
             self._client.next_track()
             self._maybe_signal("track_changed", {"direction": "next"})
@@ -414,6 +559,10 @@ class SpotifyControlPlugin(BasePlugin):
             self._notify_overlay()
 
     def _on_previous(self, _):
+        """Skip to the previous track, publish ``track_changed`` and refresh the overlay.
+
+The short sleep gives Spotify time to update before the overlay is polled."""
+
         if self._client.is_authenticated:
             self._client.previous_track()
             self._maybe_signal("track_changed", {"direction": "previous"})
@@ -421,11 +570,20 @@ class SpotifyControlPlugin(BasePlugin):
             self._notify_overlay()
 
     def _on_volume(self, args):
+        """Set the volume from the command's ``level`` argument.
+
+Args:
+    args: Command arguments; missing ``level`` leaves the volume unchanged."""
+
         level = args.get("level")
         if level is not None and self._client.is_authenticated:
             self._client.set_volume(int(level))
 
     def _on_volume_up(self, _):
+        """Raise the device volume by ``volume_step``, capped at 100.
+
+The current volume defaults to 50 when playback state is unavailable."""
+
         if self._client.is_authenticated:
             playback = self._client.get_playback()
             current = (
@@ -436,6 +594,10 @@ class SpotifyControlPlugin(BasePlugin):
             self._client.set_volume(min(100, current + self._volume_step))
 
     def _on_volume_down(self, _):
+        """Lower the device volume by ``volume_step``, clamped at zero.
+
+The current volume defaults to 50 when playback state is unavailable."""
+
         if self._client.is_authenticated:
             playback = self._client.get_playback()
             current = (
@@ -446,6 +608,12 @@ class SpotifyControlPlugin(BasePlugin):
             self._client.set_volume(max(0, current - self._volume_step))
 
     def _on_shuffle(self, args):
+        """Toggle or explicitly set shuffle mode.
+
+Args:
+    args: Optional ``state``; ``toggle`` (default) flips the current value,
+        while ``true``/``1`` enable and other values disable shuffle."""
+
         if not self._client.is_authenticated:
             return
         state_val = args.get("state", "toggle")
@@ -458,6 +626,12 @@ class SpotifyControlPlugin(BasePlugin):
         self._notify_overlay()
 
     def _on_repeat(self, args):
+        """Toggle or explicitly set the repeat mode.
+
+Args:
+    args: Optional ``state``; ``toggle`` (default) cycles
+        ``off`` → ``context`` → ``track``, other values are passed through."""
+
         if not self._client.is_authenticated:
             return
         state_val = args.get("state", "toggle")
@@ -474,15 +648,23 @@ class SpotifyControlPlugin(BasePlugin):
         self._notify_overlay()
 
     def _on_save(self, _):
+        """Save the current track to the user's library."""
         if self._client.is_authenticated:
             self._client.save_current()
 
     def _on_playtrack(self, args):
+        """Search for and play the track described by the ``text`` argument."""
         text = args.get("text", "")
         if text and self._client.is_authenticated:
             self._search_and_play(text)
 
     def _on_comment(self, args):
+        """Handle a chat-style Spotify command.
+
+Supports ``play``, ``pause``, ``skip``, ``prev``/``previous``/``back``,
+``volume <n>``, ``save``, ``shuffle``, ``repeat``/``loop`` and
+``playtrack <query>``. Unknown commands are ignored."""
+
         text = args.get("text", "").strip().lower()
         if not text:
             return
@@ -514,6 +696,11 @@ class SpotifyControlPlugin(BasePlugin):
     # -- overlay state ------------------------------------------------------
 
     def _notify_overlay(self):
+        """Refresh the published state and emit ``track_changed`` on new tracks.
+
+Progress is reset for a newly seen track unless it is already near the end,
+which avoids briefly showing a stale position on the overlay."""
+
         track_data = self._get_current_track_data()
         if track_data is None:
             if self._last_track_id:
@@ -541,6 +728,10 @@ class SpotifyControlPlugin(BasePlugin):
         self.push_state()
 
     def _get_current_track_data(self):
+        """Return formatted current-track data, falling back to the playback state.
+
+Returns ``None`` when neither endpoint reports a track."""
+
         data = self._client.get_current_track()
         if not data or not data.get("item"):
             playback = self._client.get_playback()
@@ -553,6 +744,12 @@ class SpotifyControlPlugin(BasePlugin):
     # -- search & play ------------------------------------------------------
 
     def _search_and_play(self, text: str):
+        """Search for a track and either play it or add it to the queue.
+
+``text`` may be ``artist - title``; a field-based query is tried first, then
+a free-text fallback. The result reports ``not_found`` or ``ok`` with the
+mode and selected track."""
+
         text = text.strip()
         if text.lower().startswith("playtrack"):
             text = text[len("playtrack") :].strip()
@@ -595,6 +792,7 @@ class SpotifyControlPlugin(BasePlugin):
     # -- overlay HTML -------------------------------------------------------
 
     def get_overlay_html(self) -> str:
+        """Return the OBS overlay for the current track and playback progress."""
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -744,6 +942,11 @@ setInterval(updateProgress, 1000);
     # -- run ----------------------------------------------------------------
 
     def run(self) -> None:
+        """Start the plugin, opening the OAuth flow first when setup is complete.
+
+OAuth is only started when the GUI is visible, no token is stored and both
+client credentials are configured."""
+
         if (
             not self.gui_hidden
             and not self._client.is_authenticated

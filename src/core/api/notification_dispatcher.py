@@ -62,12 +62,29 @@ ChannelHandler = Callable[[str, str, str, dict[str, Any]], bool]
 
 
 def _send_log(title: str, body: str, level: str, config: dict[str, Any]) -> bool:
+    """Deliver a notification to the application log.
+
+Always returns ``True`` because writing a log record cannot fail in a
+way the dispatcher needs to report."""
+
     message = f"[NOTIF] {title}" + (f" — {body}" if body else "")
     log.info(message)
     return True
 
 
 def _send_overlay(title: str, body: str, level: str, config: dict[str, Any]) -> bool:
+    """Deliver a notification as overlay text.
+
+Args:
+    title: Bold headline shown by the overlay.
+    body: Optional body text.
+    level: Severity label; currently unused by the overlay channel.
+    config: Channel settings; ``overlay_name`` defaults to ``"default"``
+        and ``duration`` to 4 seconds.
+
+Returns:
+    ``True`` when the overlay request was dispatched, otherwise ``False``."""
+
     from core.overlay import send_overlay_text
 
     duration = int(config.get("duration", 4))
@@ -76,6 +93,12 @@ def _send_overlay(title: str, body: str, level: str, config: dict[str, Any]) -> 
 
 
 def _send_sound(title: str, body: str, level: str, config: dict[str, Any]) -> bool:
+    """Play a configured sound file on Windows.
+
+Relative paths are resolved against the project root. The file is played
+asynchronously with ``winsound``. Missing configuration, a missing file,
+a non-Windows platform, or playback errors return ``False``."""
+
     raw = str(config.get("file", ""))
     if not raw:
         log.warning("%s: sound channel has no 'file' configured", NOTIF_0001.code)
@@ -102,6 +125,13 @@ def _send_sound(title: str, body: str, level: str, config: dict[str, Any]) -> bo
 
 
 def _send_tts(title: str, body: str, level: str, config: dict[str, Any]) -> bool:
+    """Speak a notification through Windows SAPI.
+
+Title and body are joined and passed to PowerShell on stdin. The optional
+``rate`` setting maps to the SAPI range -10..10 and ``timeout`` bounds the
+subprocess. Returns ``False`` on non-Windows platforms or when speech fails
+or times out."""
+
     text = " ".join(part for part in (title, body) if part)
     if platform.system() != "Windows":
         log.warning("%s: tts channel requires Windows (SAPI); skipped", NOTIF_0001.code)
@@ -149,6 +179,11 @@ def _send_tts(title: str, body: str, level: str, config: dict[str, Any]) -> bool
 
 
 def _send_discord(title: str, body: str, level: str, config: dict[str, Any]) -> bool:
+    """Post a notification to a Discord webhook.
+
+The webhook URL must use HTTP or HTTPS. Failures return ``False``; the URL
+is masked in error logs so the webhook token does not leak."""
+
     url = str(config.get("webhook_url", ""))
     if not url.startswith(("http://", "https://")):
         log.warning("%s: discord channel needs a valid webhook_url", NOTIF_0001.code)
@@ -188,6 +223,7 @@ CHANNEL_HANDLERS: dict[str, ChannelHandler] = {
 
 
 def _resolve_path(raw: str) -> Path:
+    """Resolve a configured path against the project root if relative."""
     from core.paths import get_root_dir
 
     path = Path(raw)
@@ -227,6 +263,11 @@ class NotificationDispatcher:
     """Fans out notifications to the configured channels."""
 
     def __init__(self) -> None:
+        """Create the dispatcher and load the current notification configuration.
+
+The initial ``reload()`` makes the instance usable immediately; callers do
+not need a separate configuration step."""
+
         self._lock = threading.Lock()
         self._enabled = True
         self._channels: dict[str, dict[str, Any]] = {}
@@ -251,10 +292,23 @@ class NotificationDispatcher:
         )
 
     def _snapshot(self) -> tuple[bool, dict[str, dict[str, Any]]]:
+        """Return a consistent copy of the enabled flag and channel settings.
+
+The channel mapping is shallow-copied so callers can work outside the lock
+without observing later configuration reloads."""
+
         with self._lock:
             return self._enabled, dict(self._channels)
 
     def status(self) -> dict[str, Any]:
+        """Describe the dispatcher state for the API.
+
+Returns:
+    A mapping with the ``enabled`` flag, the sorted names of built-in
+    channels, and the configured channel names mapped to their sorted
+    parameter keys. Parameter values are intentionally omitted to avoid
+    exposing secrets such as webhook URLs."""
+
         enabled, channels = self._snapshot()
         return {
             "enabled": enabled,
@@ -329,6 +383,13 @@ class NotificationDispatcher:
         targets, skipped = self.resolve_channels(names or None)
 
         async def _deliver(name: str) -> tuple[str, bool]:
+            """Deliver to one channel and report whether it succeeded.
+
+Global channel settings are merged with inline request parameters, with
+inline values taking precedence. The synchronous handler runs in a worker
+thread; any exception is logged as NOTIF-0001 and treated as a failure so
+one broken channel cannot abort the fan-out."""
+
             handler = CHANNEL_HANDLERS[name]
             cfg = {**configured.get(name, {}), **inline.get(name, {})}
             try:

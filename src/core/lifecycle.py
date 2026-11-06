@@ -76,6 +76,11 @@ class _ProcessStartupError(Exception):
     """
 
     def __init__(self, message: str, intentional: bool = False) -> None:
+        """Create a startup error and record whether the exit was intentional.
+
+Intentional exits (normally exit code 0) are not treated as failures by
+callers that inspect the flag."""
+
         super().__init__(message)
         self.intentional = intentional
 
@@ -153,6 +158,10 @@ class ManagedProcess:
 
 
 def _sanitize_session_name(name: str) -> str:
+    """Convert a process name into a tmux/screen-safe session name.
+
+Spaces and slashes become hyphens and the result is lowercased."""
+
     return name.replace(" ", "-").replace("/", "-").lower()
 
 
@@ -404,6 +413,12 @@ class ProcessSupervisor:
     """
 
     def __init__(self) -> None:
+        """Create an idle supervisor with no managed processes.
+
+Ensures the runtime directory exists and registers the supervisor and API
+server with the health monitor. State listeners and the asyncio loop are
+attached later by :meth:`configure` and the startup code."""
+
         self._lock = threading.RLock()
         self._state = SupervisorState.IDLE
         self._processes: dict[str, ManagedProcess] = {}
@@ -429,11 +444,23 @@ class ProcessSupervisor:
 
     @property
     def state(self) -> SupervisorState:
+        """Set the supervisor state and notify listeners.
+
+Logs real transitions only, mirrors the state to the health monitor and
+invokes every listener. Listener and health errors are caught so they
+cannot break the state machine."""
+
         with self._lock:
             return self._state
 
     @state.setter
     def state(self, value: SupervisorState) -> None:
+        """Set the supervisor state and notify listeners.
+
+        Logs real transitions only, mirrors the state to the health monitor
+        and invokes every listener. Listener and health errors are caught so
+        they cannot break the state machine.
+        """
         with self._lock:
             old = self._state
             self._state = value
@@ -464,17 +491,31 @@ class ProcessSupervisor:
                     log.warning("State listener failed: %s", exc)
 
     def add_state_listener(self, callback: Callable[[SupervisorState], None]) -> None:
+        """Register a callback invoked with each new supervisor state.
+
+Callbacks run synchronously from the setter; keep them short."""
+
         self._state_listeners.append(callback)
 
     def remove_state_listener(
         self, callback: Callable[[SupervisorState], None]
     ) -> None:
+        """Unregister a state listener; unknown callbacks are ignored."""
         try:
             self._state_listeners.remove(callback)
         except ValueError:
             pass
 
     def _assert_state(self, allowed: set[SupervisorState], action: str) -> None:
+        """Raise when the current state is not in *allowed*.
+
+Args:
+    allowed: States in which *action* may run.
+    action: Human-readable action name used in the error message.
+
+Raises:
+    RuntimeError: When the supervisor is in any other state."""
+
         if self.state not in allowed:
             raise RuntimeError(
                 f"Cannot {action} while supervisor is in state {self.state.value}"
@@ -490,6 +531,12 @@ class ProcessSupervisor:
         session_tool: str | None = None,
         api_base_url: str = "",
     ) -> None:
+        """Set the session tool and API base URL used for child processes.
+
+Args:
+    session_tool: ``tmux``, ``screen`` or ``None`` to spawn direct children.
+    api_base_url: URL children use to reach the control plane."""
+
         self._session_tool = session_tool
         self._api_base_url = api_base_url
 
@@ -555,10 +602,12 @@ class ProcessSupervisor:
         return True
 
     def get(self, name: str) -> ManagedProcess | None:
+        """Return a registered process by name, or ``None``."""
         with self._lock:
             return self._processes.get(name)
 
     def list_processes(self) -> list[ManagedProcess]:
+        """Return a snapshot of all registered processes."""
         with self._lock:
             return list(self._processes.values())
 
@@ -1376,6 +1425,7 @@ class ProcessSupervisor:
             pass
 
     def clear_shutdown_status(self) -> None:
+        """Delete the runtime shutdown-status file, ignoring I/O errors."""
         try:
             (self._runtime_dir / "shutdown_status").unlink(missing_ok=True)
         except OSError:

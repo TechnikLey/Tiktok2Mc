@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Small shared helpers for config-version normalisation and value coercion."""
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -67,6 +69,13 @@ def normalize_config_version(value: Any) -> str:
 
 
 def load_config(config: str | Path) -> dict:
+    """Load a YAML config file and return its parsed contents.
+
+Raises:
+    FileNotFoundError: If the file does not exist.
+    ValueError: If the file contains invalid YAML.
+    RuntimeError: For other I/O or YAML parser failures."""
+
     path = Path(config)
     try:
         data = load_yaml(path)

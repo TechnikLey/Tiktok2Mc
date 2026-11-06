@@ -66,6 +66,7 @@ class ChatbotReply:
     message: str = ""
 
     def to_dict(self) -> dict[str, str]:
+        """Serialise the reply rule to a JSON-compatible mapping."""
         return {"on": self.on, "match": self.match, "message": self.message}
 
 
@@ -91,6 +92,7 @@ class ChatbotConfig:
     tt_target_idc: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the configuration using the on-disk layout."""
         return {
             "enabled": self.enabled,
             "spam_protection": {
@@ -106,6 +108,11 @@ class ChatbotConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> ChatbotConfig:
+        """Build a configuration from stored data with safe defaults.
+
+Invalid numeric values are ignored, unknown reply events and empty
+messages are dropped, and missing sections keep their defaults."""
+
         cfg = cls()
         if not isinstance(data, dict):
             return cfg
@@ -180,6 +187,12 @@ class TikTokChatbot:
         config_path: Path | None = None,
         status_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
+        """Create the chatbot and load the persisted configuration.
+
+Args:
+    config_path: Optional override for ``config/chatbot.yaml``.
+    status_sink: Optional callback receiving every status snapshot."""
+
         self._config_path = config_path or core.paths.get_chatbot_config_file()
         self._status_sink = status_sink
         self.config = ChatbotConfig()
@@ -332,6 +345,10 @@ class TikTokChatbot:
             log.info("[CHATBOT] Worker stopped")
 
     async def _consume_events(self) -> None:
+        """Forward subscribed bus events to the synchronous handler.
+
+Marks each bus message as done even when handling fails."""
+
         assert self._sub_queue is not None
         while True:
             msg = await self._sub_queue.get()
@@ -341,6 +358,11 @@ class TikTokChatbot:
                 self._sub_queue.task_done()
 
     def _handle_event(self, msg: dict[str, Any]) -> None:
+        """Submit the first matching reply for one TikTok event.
+
+Does nothing while disabled or auto-disabled, and ignores events without
+a user name."""
+
         if not self.config.enabled or self._auto_disabled:
             return
         data = msg.get("data", {})
@@ -407,6 +429,11 @@ class TikTokChatbot:
             return False
 
     async def _send_with_protection(self, text: str) -> None:
+        """Apply spam protection and send one queued message.
+
+Enforces the per-minute window, duplicate suppression and minimum
+interval. Repeated failures auto-disable the bot and report an error."""
+
         now = time.monotonic()
 
         # Per-minute window limit.
@@ -447,6 +474,12 @@ class TikTokChatbot:
                 self.publish_status()
 
     async def _send(self, text: str) -> bool:
+        """Send text through the bound TikTok client.
+
+Returns:
+    ``True`` on success. Failures are recorded in ``last_error`` and
+    reported to the crash manager without stopping the worker."""
+
         client = self._client
         loop = self._client_loop
         if client is None or loop is None or loop.is_closed():
@@ -470,6 +503,7 @@ class TikTokChatbot:
     # ------------------------------------------------------------------
 
     def get_status(self) -> dict[str, Any]:
+        """Return a JSON-compatible snapshot of chatbot state and counters."""
         return {
             "enabled": self.config.enabled,
             "active": bool(self.config.enabled and not self._auto_disabled),
@@ -509,6 +543,7 @@ class _SafeMap(dict):
     """format_map helper that leaves unknown placeholders untouched."""
 
     def __missing__(self, key: str) -> str:
+        """Keep unknown placeholders visible instead of failing the format call."""
         return "{" + key + "}"
 
 

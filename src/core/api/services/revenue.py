@@ -21,10 +21,20 @@ class RevenueService:
     """Read and summarise the daily revenue log."""
 
     def __init__(self, path: Path | None = None) -> None:
+        """Create the service for an optional explicit log path.
+
+When ``path`` is omitted, ``data/revenue_log.jsonl`` under the project
+root is used on first access."""
+
         self._revenue_path: Path | None = path
 
     @property
     def revenue_path(self) -> Path:
+        """Return the resolved revenue log path, resolving it once.
+
+The default is ``<root>/data/revenue_log.jsonl``; an injected path is used
+unchanged."""
+
         if self._revenue_path is None:
             self._revenue_path = (
                 get_root_dir() / "data" / "revenue_log.jsonl"
@@ -127,6 +137,11 @@ class RevenueService:
 
 
 def _in_range(date: str, start_date: str | None, end_date: str | None) -> bool:
+    """Return whether an ISO date falls within the optional bounds.
+
+Both bounds are inclusive and compared lexicographically, which is valid
+for ``YYYY-MM-DD`` dates. ``None`` disables the respective bound."""
+
     if start_date and date < start_date:
         return False
     return not (end_date and date > end_date)

@@ -1,3 +1,5 @@
+"""Bridge communication for trigger execution (HTTP dispatch and response mapping)."""
+
 from __future__ import annotations
 
 import json

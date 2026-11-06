@@ -1,3 +1,5 @@
+"""Bidirectional WebSocket endpoint streaming events and accepting subscriptions."""
+
 import asyncio
 import json
 import logging
@@ -46,6 +48,13 @@ async def websocket_endpoint(ws: WebSocket):
     state_lock = asyncio.Lock()
 
     async def reader():
+        """Read subscription commands from the client until it disconnects.
+
+Malformed JSON is ignored. A ``subscribe`` command atomically replaces the
+active event queue; an empty event list means all event types. The old
+queue is unsubscribed only after the new one is installed so the writer
+never reads from a dead queue."""
+
         try:
             while True:
                 raw = await ws.receive_text()
@@ -70,6 +79,11 @@ async def websocket_endpoint(ws: WebSocket):
             pass
 
     async def writer():
+        """Forward queued events to the client until it disconnects.
+
+Sends a ``{"type": "ping"}`` message after 30 seconds without an event so
+proxies keep the socket open and disconnects are detected promptly."""
+
         try:
             while True:
                 async with state_lock:

@@ -1,3 +1,5 @@
+"""``TriggerEngine``: validates and dispatches test triggers to the bridge."""
+
 from __future__ import annotations
 
 import logging

@@ -1,7 +1,9 @@
-// Completion provider for MCA files.
-//
-// Provides context-aware completions derived from the shared mca-spec.json
-// (generated from the Python implementation).
+/**
+ * @file Completion provider for MCA files.
+ *
+ * Provides context-aware completions derived from the shared `mca-spec.json`
+ * (generated from the Python implementation).
+ */
 
 const {
   getEventTriggers, getEventTriggerDocs, getCommandPrefixes,
@@ -31,7 +33,16 @@ const PRIORITY = {
 };
 
 /**
- * Determine context from position in the line.
+ * Determine the syntactic context at a cursor position.
+ *
+ * Distinguishes trigger, command-start, script, overlay, multiplier,
+ * placeholder and command-body contexts. Offsets are relative to the supplied
+ * line.
+ *
+ * @param {string} line Full text of the cursor's line.
+ * @param {number} character Zero-based cursor offset in `line`.
+ * @returns {{type: string, triggerPart?: string, cmdPart?: string}} Context
+ *   descriptor; `type` selects the completion branch.
  */
 function getContext(line, character) {
   const before = line.slice(0, character);
@@ -90,6 +101,18 @@ function getContext(line, character) {
   return { type: 'command_body', cmdPart: trimmed };
 }
 
+/**
+ * Produce context-aware completion items for an MCA document.
+ *
+ * Completions are ordered with the `sortText` prefix so event triggers and
+ * command prefixes rank above generic snippets. On unexpected errors the
+ * provider falls back to the available command prefixes.
+ *
+ * @param {import('vscode-languageserver-textdocument').TextDocument} document
+ *   Open document.
+ * @param {{line: number, character: number}} position Cursor position.
+ * @returns {object[]} LSP `CompletionItem` objects.
+ */
 function provideCompletions(document, position) {
   const text = document.getText();
   const lines = text.split('\n');
@@ -263,6 +286,15 @@ function provideCompletions(document, position) {
   return completions;
 }
 
+/**
+ * Finalize a completion item.
+ *
+ * The provider already includes all documentation and edit data, so items are
+ * returned unchanged.
+ *
+ * @param {object} item Completion item selected by the client.
+ * @returns {object} The same completion item.
+ */
 function resolveCompletion(item) {
   return item;
 }

@@ -30,6 +30,7 @@ class ChatbotStatusTracker:
     """Thread-safe store of the last reported chatbot status."""
 
     def __init__(self) -> None:
+        """Create a tracker with no recorded status and no consumer task."""
         self._lock = threading.Lock()
         self._status: dict[str, Any] | None = None
         self._last_update: float = 0.0
@@ -40,11 +41,18 @@ class ChatbotStatusTracker:
     # ------------------------------------------------------------------
 
     def record(self, status: dict[str, Any]) -> None:
+        """Store a copy of the latest status and its arrival time."""
         with self._lock:
             self._status = dict(status)
             self._last_update = time.time()
 
     def snapshot(self) -> dict[str, Any] | None:
+        """Return the latest status, or ``None`` when it is stale or absent.
+
+A status older than :data:`STALE_AFTER_SECONDS` is treated as unknown,
+which hides state left behind by a dead bridge process. The stored
+dictionary itself is returned, not a copy."""
+
         now = time.time()
         with self._lock:
             status = self._status
@@ -58,6 +66,11 @@ class ChatbotStatusTracker:
     # ------------------------------------------------------------------
 
     async def _consume(self) -> None:
+        """Record ``chatbot.status`` events until cancelled.
+
+Malformed events are logged at debug level and skipped so the
+subscription loop keeps running."""
+
         q = event_bus.subscribe(EVENT_TYPE)
         try:
             while True:
@@ -74,11 +87,16 @@ class ChatbotStatusTracker:
             pass
 
     def start(self) -> None:
+        """Start the event consumer once.
+
+Must be called from a running event loop."""
+
         if self._task is not None:
             return
         self._task = asyncio.create_task(self._consume())
 
     async def stop(self) -> None:
+        """Cancel and await the consumer task, ignoring cancellation."""
         if self._task is None:
             return
         self._task.cancel()
@@ -94,6 +112,7 @@ _tracker: ChatbotStatusTracker | None = None
 
 
 def get_chatbot_status_tracker() -> ChatbotStatusTracker:
+    """Return the process-wide tracker, creating it on first use."""
     global _tracker
     if _tracker is None:
         _tracker = ChatbotStatusTracker()

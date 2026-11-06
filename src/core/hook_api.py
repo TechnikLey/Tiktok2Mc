@@ -1,3 +1,5 @@
+"""In-process API exposed to hooks: actions, RCON/overlay helpers and lifecycle callbacks."""
+
 from __future__ import annotations
 
 import asyncio
@@ -89,6 +91,11 @@ class HookContext(dict):
     """
 
     def __getattr__(self, key: str) -> object:
+        """Expose context keys as attributes.
+
+Raises:
+    AttributeError: If the key is not present, so typos fail fast."""
+
         try:
             return self[key]
         except KeyError:
@@ -116,6 +123,16 @@ class HookAPI:
         valid_functions: set[str],
         hook_configs: dict[str, dict] | None = None,
     ) -> None:
+        """Create the shared runtime API for event hooks.
+
+Args:
+    rcon_queue: Queue consumed by the bridge's RCON worker.
+    trigger_queue: Queue consumed by the bridge's trigger worker.
+    main_loop: Bridge event loop used for thread-safe enqueues.
+    config: Loaded global configuration.
+    valid_functions: Names of actions currently allowed to run.
+    hook_configs: Per-hook configuration mappings keyed by hook name."""
+
         self._rcon_queue = rcon_queue
         self._trigger_queue = trigger_queue
         self._main_loop = main_loop
@@ -199,6 +216,7 @@ class HookAPI:
         return self._hook_configs.get(name, {})
 
     def set_depth(self, depth: int) -> None:
+        """Set the chain depth used for the next trigger enqueue."""
         self._current_depth = depth
 
     def register_action(self, name: str, fn: Callable) -> None:
@@ -398,6 +416,10 @@ class HookAPI:
     def _enqueue_threadsafe(
         self, queue: asyncio.Queue, item: object, label: str
     ) -> None:
+        """Enqueue an item from any thread onto the bridge loop.
+
+Failures caused by a stopped loop are logged and drop the item."""
+
         try:
             self._main_loop.call_soon_threadsafe(
                 self._put_nowait_guarded, queue, item, label
@@ -406,6 +428,10 @@ class HookAPI:
             log.warning("[HOOK] %s dropped — main loop not running", label)
 
     def rcon_enqueue(self, commands: list[str]) -> None:
+        """Queue RCON commands for execution by the bridge.
+
+Requires the ``rcon`` permission; empty command lists are ignored."""
+
         if not commands:
             return
         if not self._allow("rcon", "rcon_enqueue"):
@@ -453,6 +479,7 @@ class HookAPI:
         )
 
     def log(self, msg: str) -> None:
+        """Write a hook-prefixed informational log message."""
         log.info(f"[HOOK] {msg}")
 
     def send_overlay_text(
@@ -462,6 +489,12 @@ class HookAPI:
         duration: int | None = 3,
         overlay_name: str | None = "default",
     ) -> bool:
+        """Display text on an overlay.
+
+Requires the ``overlay`` permission. ``None`` duration/name values fall
+back to 3 seconds and the ``default`` overlay. Returns ``False`` when the
+permission is missing or the overlay call fails."""
+
         if not self._allow("overlay", "send_overlay_text"):
             return False
         try:
@@ -480,6 +513,7 @@ class HookAPI:
             return False
 
     def get_valid_functions(self) -> set[str]:
+        """Return the set of actions currently valid to enqueue."""
         return self._valid_functions
 
     # --------------------------------------------------
@@ -531,6 +565,11 @@ class HookAPI:
         return self._name
 
     def _require_namespace(self) -> str:
+        """Return this view's hook namespace.
+
+Raises:
+    ValueError: If the API is not bound to a valid hook name."""
+
         if not self._name or not _NAMESPACE_OK.match(self._name):
             raise ValueError(
                 "Persistent store unavailable: API is not bound to a hook name."
@@ -538,6 +577,7 @@ class HookAPI:
         return self._name
 
     def _store_allowed(self, method: str) -> bool:
+        """Check the ``store`` permission and namespace before a store call."""
         if not self._allow("store", method):
             return False
         try:

@@ -89,6 +89,18 @@ INSTALL_HINTS = {
 
 @dataclass
 class JavaStatus:
+    """Result of Java runtime detection.
+
+Attributes:
+    ok: Whether a usable runtime was found.
+    path: Absolute path of the java executable.
+    version: Raw version string reported by ``java -version``.
+    source: Where the runtime came from (``config``, ``bundled`` or
+        ``system``).
+    reason: Explanation when detection failed or a candidate was rejected.
+    hints: Platform-specific install commands.
+    auto_installable: Whether the tool can install Java automatically."""
+
     ok: bool
     path: str = ""
     version: str = ""
@@ -175,6 +187,7 @@ def _package_manager() -> str | None:
 
 
 def _system_java_path() -> Path | None:
+    """Return the resolved path of ``java`` on PATH, or ``None``."""
     found = shutil.which("java")
     if not found:
         return None
@@ -248,6 +261,12 @@ def detect_java(root_dir: Path, config_path: Path | None = None) -> JavaStatus:
     notes: list[str] = []
 
     def _usable(source: str, java_path: Path) -> JavaStatus:
+        """Build a successful status for a verified Java executable.
+
+Args:
+    source: Detection source label.
+    java_path: Verified Java executable."""
+
         return JavaStatus(
             ok=True,
             path=str(java_path.resolve()),
@@ -363,6 +382,11 @@ def ensure_java(
 
 
 def _download_file(url: str, dest: Path, timeout: int = 120) -> None:
+    """Download ``url`` to ``dest`` with a fixed timeout.
+
+Raises:
+    OSError: If the request fails or the destination cannot be written."""
+
     req = urllib.request.Request(url, headers={"User-Agent": "TikTok2Mc/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp, dest.open("wb") as out:
         shutil.copyfileobj(resp, out, length=1024 * 256)

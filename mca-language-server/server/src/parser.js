@@ -1,13 +1,23 @@
-// MCA line parser.  Mirrors the logic in
-// src/core/validator.py (validate_text) and
-// src/core/api/services/actions.py (ActionsService.parse).
+/**
+ * @file MCA line parser.
+ *
+ * Mirrors the logic in `src/core/validator.py` (`validate_text`) and
+ * `src/core/api/services/actions.py` (`ActionsService.parse`).
+ */
 
 const { NAMED_OVERLAY_RE, TRIGGER_NAME_RE, QUOTED_TRIGGER_RE, MULTIPLIER_RE } = require('./language');
 
 /**
- * @param {string} rawLine  One line of an .mca file (including trailing newline).
- * @param {number} lineNumber  0-based line number.
- * @returns {object|null}
+ * Parse one line of an `.mca` file.
+ *
+ * Handles disabled triggers (`##`), full-line comments (`#`) and inline
+ * comments, and records absolute character offsets so diagnostics and hover
+ * can target the original text. Comment-only and blank lines return `null`.
+ *
+ * @param {string} rawLine One line of an `.mca` file (without the newline).
+ * @param {number} lineNumber Zero-based line number.
+ * @returns {object|null} Parsed line data, an error result with `isError`
+ *   when the line has no colon, or `null` for comments and blank lines.
  */
 function parseLine(rawLine, lineNumber) {
   const trimmed = rawLine.trimEnd();
@@ -112,6 +122,16 @@ function parseLine(rawLine, lineNumber) {
   };
 }
 
+/**
+ * Build a parse-error result for a malformed line.
+ *
+ * @param {number} line Zero-based line number.
+ * @param {number} startChar Start character offset.
+ * @param {number} endChar End character offset.
+ * @param {string} message Human-readable error message.
+ * @param {string} code Stable error identifier.
+ * @returns {object} Error result consumed by the validator.
+ */
 function errorResult(line, startChar, endChar, message, code) {
   return {
     lineNumber: line,
@@ -124,7 +144,11 @@ function errorResult(line, startChar, endChar, message, code) {
 }
 
 /**
- * Parse full MCA text into an array of parse results (including error objects).
+ * Parse full MCA text into an array of line results.
+ *
+ * @param {string} text Complete document contents.
+ * @returns {object[]} Parsed lines and error results; comment-only and blank
+ *   lines are omitted.
  */
 function parseDocument(text) {
   const lines = text.split('\n');

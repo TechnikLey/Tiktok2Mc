@@ -34,12 +34,20 @@ except ImportError:  # pragma: no cover
 
 
 def _get_key_file() -> Path:
+    """Return the path of the persisted encryption key file."""
     from core.paths import get_root_dir
 
     return get_root_dir() / "data" / ".enc_key"
 
 
 def _load_or_create_key() -> bytes:
+    """Read the encryption key, creating it on first use.
+
+Returns:
+    A URL-safe base64 encoded 32-byte Fernet key. The file is written with
+owner-only permissions where the platform supports it; permission errors
+are ignored."""
+
     key_file = _get_key_file()
     if key_file.exists():
         return key_file.read_bytes()
@@ -75,12 +83,17 @@ class SecureStorage:
     _instance: Self | None = None
 
     def __new__(cls) -> Self:
+        """Return the process-wide storage instance, initialising it once."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._init()
         return cls._instance
 
     def _init(self) -> None:
+        """Initialise the cipher from the persisted key.
+
+Falls back to XOR obfuscation when the ``cryptography`` package is absent."""
+
         key = _load_or_create_key()
         if _HAS_CRYPTOGRAPHY:
             self._fernet = Fernet(key)
@@ -89,6 +102,15 @@ class SecureStorage:
             self._key = base64.urlsafe_b64decode(key)
 
     def encrypt(self, value: str | None) -> str | None:
+        """Encrypt a string, returning ``None``/empty input unchanged.
+
+Args:
+    value: Plaintext value.
+
+Returns:
+    A Fernet token when cryptography is available, otherwise a
+base64-encoded XOR obfuscation of the plaintext."""
+
         if not value:
             return value
         if self._fernet is not None:
@@ -100,6 +122,11 @@ class SecureStorage:
         return base64.urlsafe_b64encode(obf).decode("utf-8")
 
     def decrypt(self, value: str | None) -> str | None:
+        """Decrypt a value produced by `encrypt`.
+
+Values that cannot be decrypted (for example plaintext written before
+encryption was enabled) are returned unchanged for backward compatibility."""
+
         if not value:
             return value
         if self._fernet is not None:

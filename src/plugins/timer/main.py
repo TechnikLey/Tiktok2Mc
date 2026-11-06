@@ -21,9 +21,11 @@ log = logging.getLogger(__name__)
 
 
 class TimerPlugin(BasePlugin):
+    """Configurable count-up/count-down timer driven by the plugin tick loop."""
     PLUGIN_NAME = "timer"
 
     def __init__(self):
+        """Read timer settings, initialize runtime state and register command handlers."""
         super().__init__()
         cfg = self.config
 
@@ -65,6 +67,7 @@ class TimerPlugin(BasePlugin):
             log.warning("[TIMER] Failed to publish event %s: %s", event_type, e)
 
     def _update_state(self):
+        """Publish the current timer snapshot through ``push_state``."""
         self.state = {
             "current": self._current,
             "initial": self._start_time,
@@ -76,12 +79,28 @@ class TimerPlugin(BasePlugin):
         self.push_state()
 
     def _should_reset(self, trigger: str) -> bool:
+        """Return whether reaching ``trigger`` resets the timer.
+
+Args:
+    trigger: Trigger name such as ``zero``."""
+
         return trigger in self._reset_on
 
     def _should_signal(self, trigger: str) -> bool:
+        """Return whether ``trigger`` should publish an event.
+
+Args:
+    trigger: Event name without the ``timer.`` prefix."""
+
         return trigger in self._signal_on
 
     def _maybe_signal(self, trigger: str, extra: dict | None = None):
+        """Publish ``timer.<trigger>`` if that signal is enabled.
+
+Args:
+    trigger: Signal name such as ``started`` or ``zero``.
+    extra: Optional fields merged into the timer snapshot."""
+
         if self._should_signal(trigger):
             data = {
                 "current": self._current,
@@ -93,6 +112,7 @@ class TimerPlugin(BasePlugin):
             self._publish(f"timer.{trigger}", data)
 
     def _format_display(self) -> str:
+        """Format the current time as ``seconds``, ``hh:mm:ss`` or the default ``mm:ss``."""
         t = self._current
         if self._format == "seconds":
             return str(t)
@@ -109,23 +129,27 @@ class TimerPlugin(BasePlugin):
     # ------------------------------------------------------------------
 
     def _start(self):
+        """Start or restart the timer by clearing the paused and waiting flags."""
         self._is_paused = False
         self._is_waiting = False
         self._maybe_signal("started")
         self._update_state()
 
     def _pause(self):
+        """Pause the timer without changing the current value."""
         self._is_paused = True
         self._maybe_signal("paused")
         self._update_state()
 
     def _resume(self):
+        """Resume a paused timer and clear the zero-reached waiting flag."""
         self._is_paused = False
         self._is_waiting = False
         self._maybe_signal("resumed")
         self._update_state()
 
     def _reset(self):
+        """Restore the initial value and clear the sent-milestone history."""
         self._current = 0 if self._direction == "up" else self._start_time
         self._is_waiting = False
         self._milestones_sent.clear()
@@ -133,6 +157,11 @@ class TimerPlugin(BasePlugin):
         self._update_state()
 
     def _on_add_time(self, args: dict):
+        """Add ``seconds`` to the current value, clamping at zero.
+
+Args:
+    args: Command arguments; ``seconds`` defaults to ``0``."""
+
         secs = int(args.get("seconds", 0))
         if self._direction == "up":
             self._current = max(0, self._current + secs)
@@ -141,11 +170,21 @@ class TimerPlugin(BasePlugin):
         self._update_state()
 
     def _on_set_time(self, args: dict):
+        """Set the current value, clamping at zero.
+
+Args:
+    args: Command arguments; ``seconds`` defaults to the configured start time."""
+
         secs = int(args.get("seconds", self._start_time))
         self._current = max(0, secs)
         self._update_state()
 
     def _on_save_dims(self, args: dict):
+        """Persist the overlay window size reported by the browser.
+
+Args:
+    args: Command arguments with optional ``width`` and ``height``."""
+
         width = args.get("width", 400)
         height = args.get("height", 200)
         self.save_window_state(width, height)
@@ -155,6 +194,11 @@ class TimerPlugin(BasePlugin):
     # ------------------------------------------------------------------
 
     def on_tick(self):
+        """Advance the timer, emit tick/milestone events and handle reaching zero.
+
+When the count-down reaches zero it emits ``timer.zero`` and either loops
+back to the start time or pauses, depending on ``reset_on`` and ``loop``."""
+
         if self._is_paused or self._is_waiting:
             self._update_state()
             return
@@ -199,6 +243,7 @@ class TimerPlugin(BasePlugin):
     # ------------------------------------------------------------------
 
     def get_overlay_html(self) -> str:
+        """Return the OBS overlay showing the formatted timer via server-sent events."""
         display = self._format_display()
         return f"""<!DOCTYPE html>
 <html lang="en">

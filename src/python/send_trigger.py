@@ -39,6 +39,11 @@ from core.trigger_engine import EngineConfig, TriggerEngine  # noqa: E402
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for test trigger requests.
+
+Returns:
+    A parser using this module's docstring as its epilog."""
+
     p = argparse.ArgumentParser(
         description="Send a test trigger or comment to the TikTok bridge.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -77,6 +82,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _list_types(engine: TriggerEngine) -> None:
+    """Print all trigger types known to ``engine``, including their flags."""
     defs = engine.get_trigger_definitions()
     print("Available trigger types:")
     print("=" * 60)
@@ -94,6 +100,15 @@ def _list_types(engine: TriggerEngine) -> None:
 
 
 def _format_result(result, verbose: bool = False) -> str:
+    """Format a trigger result for human-readable console output.
+
+Args:
+    result: Result returned by the trigger engine.
+    verbose: Include exception details and the raw bridge response.
+
+Returns:
+    The multiline report."""
+
     lines = []
     icon = "\u2713" if result.success else "\u2717"
     lines.append(f"{icon} Trigger:  {result.trigger_name}")
@@ -122,6 +137,14 @@ def _format_result(result, verbose: bool = False) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Send one test trigger or comment and report the outcome.
+
+Args:
+    argv: Optional argument list; defaults to ``sys.argv``.
+
+Returns:
+    ``0`` when the trigger succeeded, ``1`` on failure or missing trigger."""
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 

@@ -52,6 +52,11 @@ class TestPlugin(BasePlugin):
     def __init__(self):
         # super().__init__() loads config.yaml + plugin.json defaults, theme,
         # window state and registers with the health monitor.
+        """Initialize the sandbox, restore persisted state and register demo handlers.
+
+Only the counter and last message are restored from the plugin store; the
+state is pushed once after initialization."""
+
         super().__init__()
 
         cfg = self.config
@@ -146,6 +151,11 @@ class TestPlugin(BasePlugin):
     # query names in plugin.json give callers fast feedback for typos.
 
     def on_query(self, query: str, args: dict[str, Any]) -> Any:
+        """Answer the demo queries ``last_message`` and ``stats``.
+
+Unknown queries are delegated to ``BasePlugin``, which logs and returns
+``None``."""
+
         if query == "last_message":
             return {
                 "message": self._last_message,
@@ -164,6 +174,11 @@ class TestPlugin(BasePlugin):
     # plugin. The return value is JSON-serialized for the caller.
 
     def on_rpc(self, method: str, path: str, body: dict[str, Any]) -> Any:
+        """Handle the demo RPC endpoints ``GET /stats`` and ``POST /echo``.
+
+Raises:
+    ValueError: If the method/path combination is not implemented."""
+
         if method == "GET" and path == "/stats":
             return self._stats()
         if method == "POST" and path == "/echo":
@@ -203,6 +218,7 @@ class TestPlugin(BasePlugin):
     # ======================================================================
 
     def _stats(self) -> dict[str, Any]:
+        """Return counter, bump count and uptime for queries, RPC and state."""
         return {
             "counter": self._counter,
             "bumps_total": self._bumps_total,

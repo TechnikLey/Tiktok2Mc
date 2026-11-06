@@ -61,10 +61,12 @@ class HookRegistration(BaseModel):
         return self
 
     def to_dict(self) -> dict:
+        """Serialise the registration to a JSON-compatible mapping."""
         return self.model_dump(mode="json")
 
     @classmethod
     def from_dict(cls, data: dict) -> HookRegistration:
+        """Build a registration from stored data."""
         return cls(**data)
 
 
@@ -77,6 +79,7 @@ class HookRegistry:
     """
 
     def __init__(self, storage_dir: Path) -> None:
+        """Load the registry from ``storage_dir`` and create a startup backup."""
         self._file: Path = (storage_dir / STORAGE_FILENAME).resolve()
         self._hooks: dict[str, HookRegistration] = {}
         self._lock = threading.Lock()
@@ -120,10 +123,12 @@ class HookRegistry:
         return False
 
     def get(self, name: str) -> HookRegistration | None:
+        """Return a registration by hook name, or ``None``."""
         with self._lock:
             return self._hooks.get(name)
 
     def list(self) -> list[HookRegistration]:
+        """Return all registrations in insertion order."""
         with self._lock:
             return list(self._hooks.values())
 
@@ -219,6 +224,11 @@ class HookRegistry:
     # ------------------------------------------------------------------
 
     def _load(self) -> None:
+        """Populate the registry from its JSON file.
+
+A missing file is fine; malformed files and individual invalid entries
+are logged and skipped so one bad record cannot block startup."""
+
         if not self._file.exists():
             return
         try:
@@ -234,6 +244,11 @@ class HookRegistry:
             log.warning("Failed to load hook registry: %s", exc)
 
     def _save(self) -> None:
+        """Persist all registrations atomically.
+
+Writes a temporary file, flushes it to disk and replaces the target.
+Failures are logged instead of raised."""
+
         data = [h.to_dict() for h in self._hooks.values()]
         tmp = self._file.with_suffix(".json.tmp")
         try:

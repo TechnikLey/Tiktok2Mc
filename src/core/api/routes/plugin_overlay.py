@@ -1,3 +1,5 @@
+"""HTTP/SSE endpoints for plugin-provided overlays, dashboards and commands."""
+
 import asyncio
 import html
 import json
@@ -141,6 +143,13 @@ async def plugin_event_stream(name: str):
     """
 
     async def generate():
+        """Yield cached state first, then live updates as Server-Sent Events.
+
+Subscribes to the plugin's ``state_update`` events, emits an initial
+snapshot when one is cached, and sends a keepalive comment after 30
+seconds without an event. Disconnects and cancellation end the stream;
+the bus subscription is always released."""
+
         q = event_bus.subscribe(f"plugin.{name}.state_update")
         try:
             # Send latest cached state immediately

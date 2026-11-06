@@ -1,3 +1,5 @@
+"""REST endpoints for ``data/actions.mca`` and the gift catalog."""
+
 import json
 import logging
 import re
@@ -22,6 +24,7 @@ _service: ActionsService | None = None
 
 
 def _get_service() -> ActionsService:
+    """Return the lazily created module-level ``ActionsService``."""
     global _service
     if _service is None:
         _service = ActionsService()
@@ -29,6 +32,11 @@ def _get_service() -> ActionsService:
 
 
 def _normalize_name(name: str) -> str:
+    """Normalise a display name for gift-image matching.
+
+Lowercases, treats underscores and punctuation as spaces, and collapses
+repeated whitespace."""
+
     name = name.lower().strip()
     name = name.replace("_", " ")
     name = re.sub(r"[^a-z0-9\s]", " ", name)
@@ -37,6 +45,11 @@ def _normalize_name(name: str) -> str:
 
 
 def _build_gift_image_map() -> dict[str, str]:
+    """Map normalised gift names to served image URLs.
+
+Checks the active versioned app directory first, then the install root.
+Missing directories simply produce an empty map."""
+
     try:
         from core.paths import get_active_app_dir
         active = get_active_app_dir()
@@ -62,6 +75,7 @@ def _build_gift_image_map() -> dict[str, str]:
 
 @router.get("/actions", response_model=ActionsResponse)
 async def get_actions():
+    """Return all parsed action triggers (``GET /actions``)."""
     try:
         gifts = _load_gifts()
         triggers = _get_service().parse(gifts=gifts)
@@ -72,6 +86,11 @@ async def get_actions():
 
 @router.put("/actions", response_model=ActionsResponse)
 async def update_actions(body: ActionsUpdateRequest):
+    """Validate, serialise and persist structured triggers (``PUT /actions``).
+
+Raises 422 when validation reports errors; a backup is written before the
+file is replaced."""
+
     try:
         validation_diags = _get_service().validate_triggers(
             [t.model_dump() for t in body.triggers]
@@ -95,6 +114,7 @@ async def update_actions(body: ActionsUpdateRequest):
 
 @router.get("/actions/raw", response_model=RawActionsResponse)
 async def get_actions_raw():
+    """Return raw ``.mca`` content plus diagnostics (``GET /actions/raw``)."""
     try:
         content = _get_service().read_raw()
         diagnostics = _get_service().validate(content)
@@ -105,6 +125,10 @@ async def get_actions_raw():
 
 @router.put("/actions/raw")
 async def update_actions_raw(body: RawActionsUpdateRequest):
+    """Validate and persist raw ``.mca`` content (``PUT /actions/raw``).
+
+Content with error-severity diagnostics is rejected with 422."""
+
     try:
         diagnostics = _get_service().validate(body.content)
         errors = [d for d in diagnostics if d.get("severity") == Severity.ERROR.value]
@@ -122,6 +146,7 @@ async def update_actions_raw(body: RawActionsUpdateRequest):
 
 @router.get("/actions/validate")
 async def validate_actions():
+    """Validate the stored ``.mca`` file (``GET /actions/validate``)."""
     try:
         diagnostics = _get_service().validate()
         return {"diagnostics": diagnostics}
@@ -131,6 +156,7 @@ async def validate_actions():
 
 @router.post("/actions/validate")
 async def validate_actions_content(body: RawActionsUpdateRequest):
+    """Validate the supplied ``.mca`` content (``POST /actions/validate``)."""
     try:
         diagnostics = _get_service().validate(body.content)
         return {"diagnostics": diagnostics}
@@ -140,6 +166,7 @@ async def validate_actions_content(body: RawActionsUpdateRequest):
 
 @router.post("/actions/validate-triggers")
 async def validate_triggers_structured(body: ActionsUpdateRequest):
+    """Validate structured triggers without saving (``POST /actions/validate-triggers``)."""
     try:
         diagnostics = _get_service().validate_triggers(
             [t.model_dump() for t in body.triggers]
@@ -150,6 +177,7 @@ async def validate_triggers_structured(body: ActionsUpdateRequest):
 
 
 def _load_gifts() -> list[dict]:
+    """Load the gift catalog, returning an empty list when missing or unreadable."""
     from core.paths import get_gifts_file
 
     gifts_file = get_gifts_file()
@@ -164,6 +192,10 @@ def _load_gifts() -> list[dict]:
 
 @router.get("/gifts")
 async def get_gifts():
+    """Return the gift catalog enriched with image URLs (``GET /gifts``).
+
+Entries are sorted by coin value and then name for stable display order."""
+
     try:
         gifts = _load_gifts()
         image_map = _build_gift_image_map()
@@ -178,6 +210,7 @@ async def get_gifts():
 
 @router.post("/gifts/sync")
 def sync_gifts_catalog(body: GiftSyncRequest | None = None):
+    """Fetch and persist an updated gift catalog (``POST /gifts/sync``)."""
     import core.gift_sync as gift_sync
 
     if body is None:
@@ -190,6 +223,11 @@ def sync_gifts_catalog(body: GiftSyncRequest | None = None):
 
 @router.get("/actions/scripts")
 async def get_registered_scripts():
+    """List script actions registered by hooks (``GET /actions/scripts``).
+
+Lazily loads event hooks when the in-process registry is still empty, so the
+actions editor can offer script completions before a live connection starts."""
+
     try:
         from core.hook_api import HOOK_ACTIONS
         from core.hook_loader import load_event_hooks
@@ -223,9 +261,21 @@ async def get_registered_scripts():
 
                     class _StubAPI:
                         def register_action(self, name: str, fn) -> None:
+                            """Record a script action exposed by a hook.
+
+                            Args:
+                                name: Action name used in ``actions.mca`` scripts.
+                                fn: Callable implementing the action.
+                            """
                             HOOK_ACTIONS[name] = fn
 
                         def for_hook(self, name: str, **_kw) -> "_StubAPI":
+                            """Return this stub for the requested hook name.
+
+                            Hooks call ``for_hook`` while registering and expect the
+                            same API object back; all other attributes resolve to
+                            no-op callables.
+                            """
                             return self
 
                         def __getattr__(self, _name: str):

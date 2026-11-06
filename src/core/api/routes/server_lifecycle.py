@@ -1,3 +1,5 @@
+"""Endpoints that start, stop and monitor the supervised Minecraft server process."""
+
 import asyncio
 import logging
 import sys
@@ -118,10 +120,16 @@ _JAVA_INSTALL: dict[str, dict] = {}
 
 
 def _new_install_id() -> str:
+    """Return a short random id used to correlate Java install jobs."""
     return uuid.uuid4().hex[:8]
 
 
 def _proc_name(instance_id: str) -> str:
+    """Return the supervisor process name for an instance.
+
+The default instance keeps the historic process name; other instances are
+suffixed with their id."""
+
     if instance_id == "default":
         return SERVER_PROCESS_NAME
     return f"{SERVER_PROCESS_NAME}:{instance_id}"
@@ -234,6 +242,7 @@ def _build_server_cmd(instance_dir: Path, port: int) -> list[str]:
 
 
 def _build_status(proc) -> dict:
+    """Build the JSON status payload from a supervised process, or a stopped payload for ``None``."""
     if proc is None:
         return {
             "status": "stopped",
@@ -263,12 +272,18 @@ def _build_status(proc) -> dict:
 
 @router.get("/server/java/status")
 async def java_status(install_id: str | None = None):
+    """Return Java detection and installation status (``GET /server/java/status``)."""
     return _java_status_payload(install_id)
 
 
 @router.post("/server/java/install")
 async def java_install():
     # Check if any install is currently in progress
+    """Report or start a platform-specific Java installation (``POST /server/java/install``).
+
+Returns ``already_installed``/``in_progress``/``started`` and raises 400 when
+automatic installation is not supported."""
+
     any_installing = any(v.get("installing") for v in _JAVA_INSTALL.values())
     if any_installing:
         # Return the first in-progress install
@@ -310,6 +325,7 @@ async def java_install():
 
 @router.get("/server/{instance_id}/status")
 async def server_instance_status(instance_id: str):
+    """Return lifecycle status for one server instance."""
     supervisor = get_supervisor()
     proc = supervisor.get(_proc_name(instance_id))
     return _build_status(proc)
@@ -319,6 +335,11 @@ async def server_instance_status(instance_id: str):
 async def server_instance_start(instance_id: str):
     # Pre-flight: fail fast with a clear message when Java is missing/too old,
     # instead of spawning a subprocess that dies with a cryptic error.
+    """Start an instance after a Java pre-flight check.
+
+Missing instances other than ``default`` are registered from the instance
+metadata before the supervisor is asked to start them."""
+
     _require_java()
 
     supervisor = get_supervisor()
@@ -432,6 +453,7 @@ async def server_instance_start(instance_id: str):
 
 @router.post("/server/{instance_id}/stop")
 async def server_instance_stop(instance_id: str):
+    """Stop an instance through the supervisor."""
     supervisor = get_supervisor()
     pname = _proc_name(instance_id)
     proc = supervisor.get(pname)
@@ -469,6 +491,10 @@ async def server_instance_stop(instance_id: str):
 
 @router.post("/server/{instance_id}/restart")
 async def server_instance_restart(instance_id: str):
+    """Restart an instance in the background.
+
+The response is returned immediately; the actual stop/start runs as a task."""
+
     supervisor = get_supervisor()
     pname = _proc_name(instance_id)
     proc = supervisor.get(pname)
@@ -478,6 +504,7 @@ async def server_instance_restart(instance_id: str):
         )
 
     async def _bg_restart():
+        """Stop then start the instance, logging failures because the response has already been sent."""
         try:
             await supervisor.stop(pname)
             await supervisor.start(pname)
@@ -496,6 +523,7 @@ async def server_instance_restart(instance_id: str):
 
 @router.get("/server/status")
 async def server_status():
+    """Return status for the default server instance."""
     supervisor = get_supervisor()
     proc = supervisor.get(SERVER_PROCESS_NAME)
     return _build_status(proc)
@@ -503,14 +531,17 @@ async def server_status():
 
 @router.post("/server/start")
 async def server_start():
+    """Start the default server instance."""
     return await server_instance_start("default")
 
 
 @router.post("/server/stop")
 async def server_stop():
+    """Stop the default server instance."""
     return await server_instance_stop("default")
 
 
 @router.post("/server/restart")
 async def server_restart():
+    """Restart the default server instance."""
     return await server_instance_restart("default")

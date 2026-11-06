@@ -28,18 +28,30 @@ class ActionsService:
     """Read, write, parse, and serialize actions.mca."""
 
     def __init__(self) -> None:
+        """Create the service; the actions path is resolved on first access."""
         self._actions_path: Path | None = None
 
     # ── File path resolution ──────────────────────────────────────────
 
     @property
     def actions_path(self) -> Path:
+        """Return the resolved ``actions.mca`` path, resolving it once.
+
+The lookup prefers the active data home, then the bundled defaults file,
+and finally an as-yet-uncreated path under ``data/`` for the first save."""
+
         if self._actions_path is None:
             self._actions_path = self._resolve_path()
         return self._actions_path
 
     @staticmethod
     def _resolve_path() -> Path:
+        """Resolve the actions file for the current installation layout.
+
+Returns:
+    The active ``data/actions.mca`` when it exists, otherwise the defaults
+template, otherwise a data path suitable for creating the file on save."""
+
         from core.paths import get_data_home_base, get_root_dir
 
         root = get_root_dir()
@@ -60,6 +72,7 @@ class ActionsService:
 
     @property
     def file_exists(self) -> bool:
+        """Return whether the resolved actions file exists."""
         return self.actions_path.exists()
 
     # ── Raw file I/O ──────────────────────────────────────────────────

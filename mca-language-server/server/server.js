@@ -1,7 +1,11 @@
-// MCA Language Server — main entry point.
-//
-// Delegates to modular src/ modules for validation, completions, hover,
-// symbols, and code actions.
+/**
+ * @file MCA Language Server entry point.
+ *
+ * Wires the LSP connection to the modular providers for validation,
+ * completions, hover, symbols, folding ranges and quick fixes. Every handler
+ * degrades to an empty result (or a single internal-error diagnostic) so a
+ * provider failure never terminates the server.
+ */
 
 const {
   createConnection,

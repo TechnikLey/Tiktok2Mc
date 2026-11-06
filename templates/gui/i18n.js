@@ -1,4 +1,4 @@
-/* ─── i18n module ───
+/**─── i18n module ───
  * Vanilla-JS localization for the dashboard. The English dictionary is the
  * source of truth and always present; the German dictionary translates the
  * user-facing strings. Missing keys fall back to English, then to the key.
@@ -2287,6 +2287,7 @@
 
   let lang = 'en';
 
+  /** Return the persisted language when supported, otherwise derive it from the browser locale. */
   function detect() {
     let saved = 'en';
     try { saved = localStorage.getItem(STORAGE_KEY) || 'en'; } catch {} 
@@ -2295,6 +2296,11 @@
     return navLang.startsWith('de') ? 'de' : 'en';
   }
 
+  /**
+   * Translate ``key`` and interpolate ``{name}`` placeholders from ``params``.
+   *
+   * Missing keys fall back to English, then to the key itself.
+   */
   function t(key, params) {
     let str = dicts[lang][key];
     if (str === undefined) str = dicts.en[key];
@@ -2307,6 +2313,7 @@
     return str;
   }
 
+  /** Replace translation targets inside ``el`` for text, placeholder, title and aria-label attributes. */
   function _applyAttributes(el) {
     const texts = el.querySelectorAll('[data-i18n]');
     for (const node of texts) {
@@ -2326,12 +2333,18 @@
     }
   }
 
+  /** Apply the active language to ``root`` (default: the whole document). */
   function apply(root) {
     const scope = root || document;
     if (scope.documentElement) scope.documentElement.lang = lang;
     _applyAttributes(scope.documentElement || scope);
   }
 
+  /**
+   * Switch the dashboard language, persist it and notify listeners.
+   *
+   * Returns the active language; unsupported values are ignored.
+   */
   function setLang(next) {
     if (!SUPPORTED.includes(next)) return lang;
     lang = next;
@@ -2342,6 +2355,7 @@
     return lang;
   }
 
+  /** Detect the initial language and apply it to the document. */
   function init() {
     lang = detect();
     apply(document);

@@ -27,6 +27,11 @@ router = APIRouter(tags=["Reload"])
 
 
 class ReloadRequest(BaseModel):
+    """Select the runtime components to reload.
+
+Every flag writes or triggers only its own part of the system; at least
+one target must be enabled or the endpoint responds with HTTP 400."""
+
     config: bool = Field(True, description="Reload global config.yaml")
     actions: bool = Field(True, description="Reload data/actions.mca")
     comment_commands: bool = Field(
@@ -43,6 +48,12 @@ class ReloadRequest(BaseModel):
 
 
 class ReloadResponse(BaseModel):
+    """Result of a reload request.
+
+Attributes:
+    status: Always ``"reload_requested"`` on success.
+    signals: Names of the runtime signal files that were written."""
+
     status: str
     signals: list[str]
 

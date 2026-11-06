@@ -138,6 +138,7 @@ class OverlayConfig:
     """Overlay configuration backed by the global ``config.yaml``."""
 
     def __init__(self) -> None:
+        """Create the configuration store and load the current settings."""
         self._data: dict[str, Any] = {}
         self._lock = threading.Lock()
         self.reload()
@@ -151,10 +152,12 @@ class OverlayConfig:
             self._data = merged
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Return one overlay setting, or ``default`` when absent."""
         with self._lock:
             return self._data.get(key, default)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a deep copy of all overlay settings."""
         with self._lock:
             return copy.deepcopy(self._data)
 
@@ -170,6 +173,7 @@ class OverlayManager(OverlayManagerBase):
     """
 
     def __init__(self) -> None:
+        """Create the configuration store and initialise overlay clients."""
         self.config = OverlayConfig()
         super().__init__()
 
@@ -273,6 +277,11 @@ def set_event_loop(loop: asyncio.AbstractEventLoop) -> None:
 
 
 def _get_event_loop() -> asyncio.AbstractEventLoop:
+    """Return the loop used for overlay event-bus publishing.
+
+Prefers the loop registered by the API server, then the running loop,
+and finally the policy's current loop."""
+
     if _loop is not None:
         return _loop
     try:

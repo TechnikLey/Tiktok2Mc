@@ -1,4 +1,7 @@
-// Test that the shared spec (mca-spec.json) can be loaded and contains expected keys.
+/**
+ * @file Tests that the generated `mca-spec.json` loads and exposes every
+ * section required by the language server.
+ */
 
 const assert = require('assert');
 const path = require('path');

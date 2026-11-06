@@ -1,3 +1,5 @@
+"""Deathcounter plugin: tracks player deaths and emits milestone actions."""
+
 import json
 import logging
 
@@ -10,11 +12,13 @@ class DeathManager:
     """Thread-safe death counter with milestone support."""
 
     def __init__(self, stats_path):
+        """Initialize the counter and load the persisted value from ``stats_path``."""
         self._stats_path = stats_path
         self._count = 0
         self._load()
 
     def _load(self):
+        """Load the death count from disk, ignoring missing or malformed files."""
         if self._stats_path.exists():
             try:
                 data = json.loads(self._stats_path.read_text(encoding="utf-8"))
@@ -23,6 +27,7 @@ class DeathManager:
                 pass
 
     def save(self):
+        """Persist the current count as JSON, creating the parent directory if needed."""
         try:
             self._stats_path.parent.mkdir(parents=True, exist_ok=True)
             self._stats_path.write_text(
@@ -33,17 +38,21 @@ class DeathManager:
             pass
 
     def add(self, amount=1):
+        """Add ``amount`` deaths and persist the new count immediately."""
         self._count += amount
         self.save()
 
     def get_data(self):
+        """Return a snapshot of the counter in the plugin state format."""
         return {"deaths": self._count}
 
 
 class DeathCounterPlugin(BasePlugin):
+    """Plugin that counts player deaths and publishes milestone events."""
     PLUGIN_NAME = "death-counter"
 
     def __init__(self):
+        """Load milestone settings, restore the counter and register command handlers."""
         super().__init__()
         cfg = self.config
         self._milestones = sorted({int(m) for m in cfg.get("milestones", [])})
@@ -60,6 +69,12 @@ class DeathCounterPlugin(BasePlugin):
     # -- event publishing ------------------------------------------------
 
     def _maybe_signal(self, event_type: str, extra: dict | None = None):
+        """Publish ``death.<event_type>`` when that event is enabled in ``signal_on``.
+
+Args:
+    event_type: Signal name such as ``milestone``.
+    extra: Optional fields merged into the published counter snapshot."""
+
         if event_type in self._signal_on:
             data = self._manager.get_data()
             if extra:
@@ -74,6 +89,7 @@ class DeathCounterPlugin(BasePlugin):
     # -- command handlers ---------------------------------------------------
 
     def _on_death(self, args):
+        """Add deaths, emit any newly reached milestones once, then push the count."""
         self._manager.add(int(args.get("amount", 1)))
         for ms in self._milestones:
             if self._manager._count >= ms and ms not in self._milestones_sent:
@@ -82,15 +98,30 @@ class DeathCounterPlugin(BasePlugin):
         self._push_count()
 
     def _on_add_death(self, args):
+        """Handle the ``add_death`` command; identical to a player death.
+
+Args:
+    args: Command arguments; ``amount`` defaults to ``1``."""
+
         self._on_death(args)
 
     def _on_reset(self, _):
+        """Reset the counter and milestone history, persist the change and push state.
+
+Args:
+    _: Unused command arguments."""
+
         self._manager._count = 0
         self._milestones_sent.clear()
         self._manager.save()
         self._push_count()
 
     def _on_save_dims(self, args):
+        """Persist the overlay window size reported by the browser.
+
+Args:
+    args: Command arguments with optional ``width`` and ``height``."""
+
         self.save_window_state(
             args.get("width", 500),
             args.get("height", 400),
@@ -99,6 +130,7 @@ class DeathCounterPlugin(BasePlugin):
     # -- overlay HTML -------------------------------------------------------
 
     def get_overlay_html(self) -> str:
+        """Return the OBS overlay showing the death count via server-sent events."""
         return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -227,6 +259,7 @@ class DeathCounterPlugin(BasePlugin):
         return None
 
     def get_state(self):
+        """Return the current counter for state pushes and queries."""
         return self._manager.get_data()
 
 

@@ -82,6 +82,14 @@ class PluginLauncher:
         api_base_url: str | None = None,
         plugins_dir: Path | None = None,
     ) -> None:
+        """Configure the launcher.
+
+Args:
+    api_base_url: Base URL of the control-plane API. Defaults to the
+        ``API_BASE_URL`` environment variable or the local default.
+    plugins_dir: Directory containing plugin folders. When omitted, the
+        directory is resolved lazily through ``core.paths``."""
+
         self._api_base = (api_base_url or _get_api_base()).rstrip("/")
         self._plugins_dir: Path | None = plugins_dir
         self.source: str = "empty"
@@ -89,6 +97,11 @@ class PluginLauncher:
 
     @property
     def using_api(self) -> bool:
+        """Return whether the last discovery call used the API.
+
+This is ``True`` for both the ``"manifest"`` and ``"api"`` sources,
+because both paths end with a successful API fetch."""
+
         return self.source in ("manifest", "api")
 
     def get_plugins(self) -> list[AppConfig]:

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Supervisor entry point that owns the lifecycle of all tool components."""
+
 # ==================================================
 # start.py - TikTok2Mc lifecycle supervisor
 # ==================================================
@@ -391,6 +393,10 @@ _SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 
 
 def replace_updater_if_exists() -> None:
+    """Replace the updater binary with a newly downloaded one when present.
+
+A locked target only logs a message; the caller continues starting."""
+
     if update_new.exists():
         log.info("[..] New updater found. Installing...")
         try:
@@ -750,7 +756,18 @@ def _register_plugins(plugins: list[AppConfig]) -> None:
         if sb and IS_WINDOWS:
 
             def make_post_spawn(sb):
+                """Build a callback that applies sandbox settings after spawning.
+
+                Args:
+                    sb: Sandbox descriptor for the plugin process.
+
+                Returns:
+                    A callback accepting the spawned process and applying
+                    ``sb`` to it.
+                """
+
                 def _post_spawn(proc):
+                    """Apply sandbox settings to a freshly spawned process."""
                     sb.apply_post_spawn(proc)
 
                 return _post_spawn
@@ -846,6 +863,11 @@ async def _check_plugin_updates() -> None:
     """Query the API for available plugin updates without blocking the loop."""
 
     def _fetch():
+        """Fetch the plugin update summary from the API in a worker thread.
+
+Returns:
+    The decoded JSON mapping, or ``None`` on any request or decode error."""
+
         try:
             with urllib.request.urlopen(
                 f"{_API_BASE_URL}/plugins/updates", timeout=5
@@ -876,6 +898,11 @@ async def _fetch_plugin_path(plugin_name: str) -> str:
     """Ask the API for a plugin's executable path without blocking the loop."""
 
     def _fetch():
+        """Fetch a plugin's executable path from the API in a worker thread.
+
+Returns:
+    The path, or an empty string on any request or decode error."""
+
         try:
             encoded = urllib.parse.quote(plugin_name, safe="")
             with urllib.request.urlopen(
@@ -895,6 +922,10 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
     """Update the plugin registry to mark a plugin as dead/non-enabled."""
 
     def _put():
+        """Send the dead/disabled health update for one plugin.
+
+Runs in a worker thread; request errors propagate to the caller."""
+
         encoded = urllib.parse.quote(plugin_name, safe="")
         data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
         req = urllib.request.Request(
@@ -1525,6 +1556,10 @@ async def main() -> None:
 
 
 def _mc_plugin_sanitize_name(name: str) -> str:
+    """Strip archive suffixes and unsafe characters from a plugin name.
+
+Only letters, digits, dot, underscore and hyphen are kept."""
+
     import re
 
     name = re.sub(r"\.(jar|disabled)$", "", name, flags=re.IGNORECASE)
@@ -1532,6 +1567,7 @@ def _mc_plugin_sanitize_name(name: str) -> str:
 
 
 def _mc_plugin_plugins_dir() -> Path:
+    """Return the resolved plugin directory of the default server instance."""
     return (ROOT_DIR / "server" / "default" / "plugins").resolve()
 
 

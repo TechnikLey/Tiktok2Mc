@@ -1,3 +1,5 @@
+"""FastAPI control plane: app factory, event bus, plugin registry and services."""
+
 from .client import PluginAPIClient, register_plugin
 from .eventbus import EventBus, event_bus
 from .launcher import PluginLauncher

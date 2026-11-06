@@ -1,3 +1,5 @@
+"""REST endpoints for reading and writing ``config/config.yaml``."""
+
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -13,6 +15,7 @@ _service: ApiService | None = None
 
 
 def _get_service() -> ApiService:
+    """Return the lazily created module-level `ApiService` instance."""
     global _service
     if _service is None:
         _service = ApiService()
@@ -21,6 +24,12 @@ def _get_service() -> ApiService:
 
 @router.get("/config", response_model=ConfigResponse)
 async def get_config():
+    """Return the effective configuration with secrets redacted.
+
+Raises:
+    HTTPException: 404 if no configuration file exists, 500 on any other
+        read error."""
+
     svc = _get_service()
     try:
         # Secrets are replaced with a placeholder; write_config strips it
@@ -36,6 +45,14 @@ async def get_config():
 
 @router.put("/config", response_model=ConfigResponse)
 async def update_config(body: ConfigUpdateRequest):
+    """Persist a configuration update and return the stored result.
+
+Secrets sent back as placeholders are preserved by `write_config`. The
+response reflects the persisted state rather than the request body.
+
+Raises:
+    HTTPException: 500 if the configuration cannot be written."""
+
     svc = _get_service()
     try:
         svc.write_config(body.config, backup=body.backup)

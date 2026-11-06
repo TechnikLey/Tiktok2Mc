@@ -1,3 +1,5 @@
+"""``ApiService``: comment-preserving read/write access to ``config/config.yaml``."""
+
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,6 +27,11 @@ _SECRET_KEY_NAMES = frozenset(
 
 
 def _is_secret_key(key: Any) -> bool:
+    """Return whether a config key holds a secret value.
+
+Matching is case-insensitive and exact against the known secret key names;
+nested keys are classified by their own name, not their parent path."""
+
     return str(key).lower() in _SECRET_KEY_NAMES
 
 
@@ -63,6 +70,11 @@ class ApiService:
     """
 
     def __init__(self) -> None:
+        """Initialise uptime tracking and resolve the config file path.
+
+The normal location is ``config/config.yaml``. In development, when that
+file does not exist, ``defaults/config.yaml`` is used as a read fallback."""
+
         self._start_time: datetime = datetime.now(tz=UTC)
 
         # Config path with fallback:
@@ -79,6 +91,7 @@ class ApiService:
     # ------------------------------------------------------------------
 
     def get_uptime(self) -> float:
+        """Return the number of seconds since this service was created."""
         return (datetime.now(tz=UTC) - self._start_time).total_seconds()
 
     # ------------------------------------------------------------------
@@ -165,6 +178,7 @@ class ApiService:
         log.info("Config written: %s", self.config_path)
 
     def get_config_status(self) -> bool:
+        """Return whether the resolved config file currently exists."""
         return self.config_path.exists()
 
     def get_config_redacted(self) -> dict[str, Any]:

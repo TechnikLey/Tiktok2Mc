@@ -50,6 +50,11 @@ from typing import Any
 
 
 class Severity(enum.IntEnum):
+    """Ordered severity of an error, from diagnostic to fatal.
+
+Larger values are more severe; the numeric order matches the documented
+severity scale."""
+
     DEBUG = 0
     INFO = 1
     NOTICE = 2
@@ -59,10 +64,16 @@ class Severity(enum.IntEnum):
     FATAL = 6
 
     def label(self) -> str:
+        """Return the enum member name for display and serialization."""
         return self.name
 
     @classmethod
     def from_string(cls, s: str) -> Severity:
+        """Parse a severity name case-insensitively.
+
+Returns ``WARNING`` for unknown names so callers always receive a usable
+severity."""
+
         try:
             return cls[s.upper()]
         except KeyError:
@@ -70,6 +81,7 @@ class Severity(enum.IntEnum):
 
 
 class Subsystem(str, enum.Enum):
+    """Subsystem prefix used to namespace error codes."""
     CORE = "CORE"
     PLUGIN = "PLUGIN"
     GUI = "GUI"
@@ -97,6 +109,10 @@ class Subsystem(str, enum.Enum):
 
     @classmethod
     def from_string(cls, s: str) -> Subsystem:
+        """Parse a subsystem name case-insensitively.
+
+Unknown names fall back to ``CORE``."""
+
         try:
             return cls[s.upper()]
         except KeyError:
@@ -105,6 +121,11 @@ class Subsystem(str, enum.Enum):
 
 @dataclass
 class ErrorCode:
+    """Registry definition of a stable error code.
+
+Instances are module-level constants and describe the error; per-event
+data belongs in :class:`ErrorInstance`."""
+
     code: str
     subsystem: Subsystem
     severity: Severity
@@ -114,6 +135,15 @@ class ErrorCode:
     impact: str = ""
 
     def format(self, detail: str = "", context: dict[str, Any] | None = None) -> str:
+        """Render the code, message and optional details as multiple lines.
+
+Args:
+    detail: Extra occurrence-specific text, omitted when empty.
+    context: Key/value diagnostics appended under a ``Context:`` line.
+
+Returns:
+    The formatted text, including the recovery hint when one is defined."""
+
         parts = [self.code, self.message]
         if detail:
             parts.append("")
@@ -127,6 +157,10 @@ class ErrorCode:
         return "\n".join(parts)
 
     def with_context(self, **ctx: Any) -> ErrorInstance:
+        """Create an :class:`ErrorInstance` carrying the given context.
+
+The keyword arguments become the instance's ``context`` dictionary."""
+
         return ErrorInstance(
             code=self.code,
             subsystem=self.subsystem,
@@ -139,6 +173,7 @@ class ErrorCode:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        """Return the static definition as a JSON-serializable dictionary."""
         return {
             "code": self.code,
             "subsystem": self.subsystem.value,
@@ -152,6 +187,11 @@ class ErrorCode:
 
 @dataclass
 class ErrorInstance:
+    """One concrete occurrence of an error code.
+
+Adds runtime context, an optional root exception and recovery state to the
+static :class:`ErrorCode` definition."""
+
     code: str
     subsystem: Subsystem
     severity: Severity
@@ -165,10 +205,19 @@ class ErrorInstance:
     recovery_status: str = "none"
 
     def with_exception(self, exc: BaseException) -> ErrorInstance:
+        """Attach the originating exception and return this instance.
+
+The instance is modified in place to allow fluent construction."""
+
         self.root_exception = exc
         return self
 
     def format(self) -> str:
+        """Render the occurrence with reason, impact, recovery and context.
+
+Returns:
+    A multi-line, human-readable description suitable for logs and the UI."""
+
         parts = [
             self.code,
             self.message,
@@ -1593,6 +1642,7 @@ _CODE_MAP: dict[str, ErrorCode] = {}
 
 
 def _build_map() -> None:
+    """Index every module-level :class:`ErrorCode` by its code string."""
     for _obj in globals().values():
         if isinstance(_obj, ErrorCode):
             _CODE_MAP[_obj.code] = _obj

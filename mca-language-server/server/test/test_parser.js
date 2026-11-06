@@ -1,3 +1,10 @@
+/**
+ * @file Parser tests for the MCA language server.
+ *
+ * Exercises comments, disabled triggers, command prefixes, semicolon chains,
+ * quoting and the whole-document parser, including malformed input.
+ */
+
 const assert = require('assert');
 const { parseLine, parseDocument } = require('../src/parser');
 

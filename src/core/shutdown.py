@@ -111,6 +111,17 @@ class ShutdownRequest:
         stack: str = "",
         requester: dict[str, Any] | None = None,
     ) -> None:
+        """Capture one shutdown request with forensic metadata.
+
+The request id, process, thread, timestamp and caller stack are recorded
+at creation time.
+
+Args:
+    reason: Classified reason for the shutdown.
+    source: Component or endpoint that requested it.
+    stack: Formatted caller stack trace.
+    requester: Optional structured requester details."""
+
         self.id = _make_shutdown_id()
         self.reason = reason
         self.source = source
@@ -125,6 +136,7 @@ class ShutdownRequest:
         self.requester = requester
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the request for diagnostics output."""
         data: dict[str, Any] = {
             "id": self.id,
             "reason": self.reason.value,
@@ -162,6 +174,11 @@ class ShutdownController:
     """
 
     def __init__(self, diagnostics_dir: Path | None = None) -> None:
+        """Create a controller in the ``RUNNING`` state.
+
+Args:
+    diagnostics_dir: Optional directory for forensic state files."""
+
         self._lock = threading.Lock()
         self._state = ShutdownState.RUNNING
         self._requests: list[ShutdownRequest] = []
@@ -198,6 +215,7 @@ class ShutdownController:
 
     @property
     def state(self) -> ShutdownState:
+        """Return the current shutdown state."""
         with self._lock:
             return self._state
 
@@ -359,6 +377,7 @@ class ShutdownController:
 
     @property
     def is_shutdown_requested(self) -> bool:
+        """Return whether a shutdown has been requested or already started."""
         return self.state in (
             ShutdownState.SHUTDOWN_REQUESTED,
             ShutdownState.SHUTDOWN_RUNNING,
@@ -369,11 +388,13 @@ class ShutdownController:
 
     @property
     def accepted_request(self) -> ShutdownRequest | None:
+        """Return the first accepted request, or ``None``."""
         with self._lock:
             return self._accepted
 
     @property
     def all_requests(self) -> list[ShutdownRequest]:
+        """Return all received requests, accepted or rejected."""
         with self._lock:
             return list(self._requests)
 

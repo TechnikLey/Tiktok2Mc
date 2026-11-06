@@ -1,3 +1,5 @@
+"""REST endpoints for exporting and importing a portable configuration bundle."""
+
 import logging
 from typing import Annotated
 

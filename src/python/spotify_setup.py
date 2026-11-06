@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Interactive helper that performs the Spotify OAuth setup and stores tokens."""
+
 # ============================================================
 # spotify_setup.py — Spotify OAuth Flow Helper
 # ============================================================
@@ -44,6 +46,7 @@ DEFAULT_REDIRECT_URI = "http://localhost:8888/callback"
 
 
 def _print_banner():
+    """Print the setup wizard banner."""
     print("=" * 60)
     print("  Spotify OAuth Setup Helper")
     print("  TikTok2MC")
@@ -52,6 +55,7 @@ def _print_banner():
 
 
 def _print_instructions():
+    """Print the Spotify Developer app setup instructions."""
     print("""Step 1: Create a Spotify Developer App
 1. Visit  https://developer.spotify.com/dashboard
 2. Log in with your Spotify account
@@ -65,6 +69,15 @@ def _print_instructions():
 
 
 def _prompt_input(label: str, required: bool = True) -> str:
+    """Prompt until a value is entered, or allow an empty optional value.
+
+Args:
+    label: Prompt label.
+    required: When true, blank input is rejected.
+
+Returns:
+    The stripped input, or an empty string for an optional field."""
+
     while True:
         val = input(f"{label}: ").strip()
         if val:
@@ -75,17 +88,25 @@ def _prompt_input(label: str, required: bool = True) -> str:
 
 
 def _get_config_file() -> Path:
+    """Return the Spotify plugin config file path."""
     root = get_root_dir()
     from core.paths import get_plugins_dir
     return get_plugins_dir() / "spotify" / "config.yaml"
 
 
 def _load_spotify_config() -> dict[str, Any]:
+    """Load the Spotify plugin config, returning an empty mapping when absent."""
     cfg = load_config(_get_config_file())
     return cfg
 
 
 def _save_spotify_config(data: dict[str, Any]) -> None:
+    """Encrypt sensitive fields and write the Spotify config.
+
+Args:
+    data: Config mapping to persist; secret and token fields are encrypted
+        in place before saving."""
+
     cfg_file = _get_config_file()
     # Encrypt sensitive fields before persisting
     for key in ("client_secret", "access_token", "refresh_token"):
@@ -101,7 +122,13 @@ _auth_code: str | None = None
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
+    """HTTP handler that captures the OAuth authorization code."""
     def do_GET(self):
+        """Read the OAuth redirect parameters and answer the browser.
+
+Stores the authorization code globally and returns an HTML success or
+error page."""
+
         global _auth_code
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
@@ -117,6 +144,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             self._send_response(400, "Missing authorization code.")
 
     def _send_response(self, status: int, message: str):
+        """Send a small HTML response with the given status and message."""
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
@@ -132,6 +160,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         # Suppress default HTTP server logging
+        """Suppress the default per-request HTTP server logging."""
         pass
 
 
@@ -152,6 +181,17 @@ def _run_callback_server(port: int) -> str | None:
 def _exchange_code(
     code: str, client_id: str, client_secret: str, redirect_uri: str
 ) -> str | None:
+    """Exchange an authorization code for Spotify tokens.
+
+Args:
+    code: Authorization code from the callback.
+    client_id: Spotify application client ID.
+    client_secret: Spotify application client secret.
+    redirect_uri: Redirect URI used for the authorization request.
+
+Returns:
+    The raw JSON response body, or ``None`` on HTTP or network errors."""
+
     payload = urllib.parse.urlencode(
         {
             "grant_type": "authorization_code",
@@ -186,6 +226,11 @@ def _exchange_code(
 def _refresh_token(
     refresh_token: str, client_id: str, client_secret: str
 ) -> str | None:
+    """Refresh an access token using a saved refresh token.
+
+Returns:
+    The raw JSON response body, or ``None`` on network errors."""
+
     payload = urllib.parse.urlencode(
         {
             "grant_type": "refresh_token",
@@ -213,6 +258,12 @@ def _refresh_token(
 
 
 def main():
+    """Run the interactive OAuth setup wizard.
+
+Prompts for credentials, opens the authorization page, waits for the local
+callback and stores the encrypted tokens. Returns early when setup is
+aborted or the token response is incomplete."""
+
     _print_banner()
 
     # Check existing config

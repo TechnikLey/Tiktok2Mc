@@ -1,3 +1,5 @@
+"""Parsing and validation of ``hook.json`` manifests."""
+
 from __future__ import annotations
 
 import json
@@ -16,6 +18,7 @@ class HookManifest:
     """
 
     def __init__(self, data: dict) -> None:
+        """Read manifest fields from parsed ``hook.json`` data, applying defaults."""
         self.name: str = data.get("name", "")
         self.version: str = data.get("version", "1.0.0")
         self.display_name: str = data.get("display_name", self.name)
@@ -31,6 +34,7 @@ class HookManifest:
 
     @property
     def valid(self) -> bool:
+        """Return whether the manifest has the minimum required identity (``name``)."""
         return bool(self.name)
 
 
@@ -69,6 +73,7 @@ def discover_hooks_dirs() -> list[Path]:
     seen_paths: set[Path] = set()
 
     def _add(p: Path) -> None:
+        """Append ``p`` once, deduplicating by resolved path."""
         try:
             rp = p.resolve()
         except OSError:

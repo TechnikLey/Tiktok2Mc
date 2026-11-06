@@ -1,3 +1,5 @@
+"""Theme default merging for overlays and other theme-aware consumers."""
+
 import re
 
 # Core-owned theme defaults only. Plugins define their own default colors
@@ -43,6 +45,11 @@ def sanitize_css_value(value: str) -> str:
 
 
 def theme_css(colors: dict) -> str:
+    """Render ``colors`` as CSS custom properties inside a ``:root`` block.
+
+Keys are sanitised for use in CSS variable names; values are sanitised
+separately to keep generated styles safe."""
+
     lines = ["    :root {"]
     for key, value in colors.items():
         name = sanitize_css_key(key).replace("_", "-")

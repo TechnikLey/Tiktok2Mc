@@ -1,3 +1,5 @@
+"""Input validation rules for trigger payloads."""
+
 from __future__ import annotations
 
 from core.trigger_engine.models import ValidationError
@@ -20,6 +22,11 @@ class PayloadValidator:
         gift_id: str | None = None,
         gift_name: str | None = None,
     ) -> list[ValidationError]:
+        """Validate a trigger name and optional gift metadata.
+
+Returns:
+    A list of validation errors; empty means the payload is valid."""
+
         errors: list[ValidationError] = []
 
         if not trigger_name or not trigger_name.strip():
@@ -66,6 +73,14 @@ class PayloadValidator:
         superfan: bool = False,
         fanclub: bool = False,
     ) -> list[ValidationError]:
+        """Validate a comment payload.
+
+The moderator, superfan and fanclub flags are accepted for API
+compatibility but do not change the current rules.
+
+Returns:
+    A list of validation errors; empty means the payload is valid."""
+
         errors: list[ValidationError] = []
 
         if not user or not user.strip():
@@ -105,6 +120,14 @@ class PayloadValidator:
         return errors
 
     def validate_user(self, user: str | None) -> list[ValidationError]:
+        """Validate an optional user name.
+
+``None`` and blank names are accepted here because some triggers do not
+require a user.
+
+Returns:
+    A list of validation errors; empty means the value is valid."""
+
         errors: list[ValidationError] = []
         if user is None or not user.strip():
             return errors
@@ -119,6 +142,7 @@ class PayloadValidator:
         return errors
 
     def _validate_gift_id(self, gift_id: str, errors: list[ValidationError]) -> None:
+        """Append an error when a gift id is empty, non-numeric or not positive."""
         if not gift_id or not gift_id.strip():
             errors.append(
                 ValidationError(

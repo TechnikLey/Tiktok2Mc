@@ -1,4 +1,4 @@
-/* ─── Help module ───
+/**─── Help module ───
  * In-app context help for the dashboard. The content below ships inside the
  * GUI itself, so end users never need to read external documentation.
  *
@@ -730,6 +730,7 @@
     UPDATE: { en: 'Update system', de: 'Update-System' },
   };
 
+  /** Return the active dashboard language, falling back to English. */
   function _lang() {
     if (typeof window.I18N !== 'undefined' && typeof I18N.lang === 'function') {
       return I18N.lang();
@@ -737,12 +738,19 @@
     return LANG_FALLBACK;
   }
 
+  /** Extract a backend error code such as ``TIKTOK-0001`` from a detail string. */
   function _extractCode(detail) {
     if (!detail) return null;
     const m = String(detail).match(/\b[A-Z]+-\d{4}\b/);
     return m ? m[0] : null;
   }
 
+  /**
+   * Turn an HTTP status or backend error code into a localized, actionable message.
+   *
+   * Known backend codes are described by subsystem; other statuses fall back
+   * to retry or log hints.
+   */
   function formatApiError(status, detail) {
     const lang = _lang();
     const code = _extractCode(detail);
@@ -766,6 +774,7 @@
   /* ── Modal ── */
   let _current = _content.status;
 
+  /** Render the current help topic into the modal for the active language. */
   function _render() {
     const lang = _lang();
     const modal = document.getElementById('help-modal');
@@ -786,10 +795,12 @@
     }).join('');
   }
 
+  /** Close the help modal when Escape is pressed. */
   function _handleKeydown(e) {
     if (e.key === 'Escape') closeHelp();
   }
 
+  /** Open the help topic for ``topic``, falling back to the status topic. */
   function openHelp(topic) {
     const modal = document.getElementById('help-modal');
     if (!modal) return;
@@ -801,17 +812,20 @@
     document.addEventListener('keydown', _handleKeydown);
   }
 
+  /** Hide the help modal and remove its key listener. */
   function closeHelp() {
     const modal = document.getElementById('help-modal');
     if (modal) modal.classList.add('hidden');
     document.removeEventListener('keydown', _handleKeydown);
   }
 
+  /** Return whether the help modal is currently visible. */
   function isOpen() {
     const modal = document.getElementById('help-modal');
     return !!modal && !modal.classList.contains('hidden');
   }
 
+  /** Wire backdrop clicks and re-render the open modal when the language changes. */
   function init() {
     const modal = document.getElementById('help-modal');
     if (modal) {

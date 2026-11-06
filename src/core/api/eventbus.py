@@ -1,3 +1,5 @@
+"""Asynchronous in-memory event bus for real-time GUI and component updates."""
+
 import asyncio
 import logging
 import threading
@@ -25,6 +27,7 @@ class EventBus:
     """
 
     def __init__(self) -> None:
+        """Create an empty bus with one queue list per event type."""
         self._subscribers: dict[str, list[asyncio.Queue]] = defaultdict(list)
         self._lock = threading.Lock()
 

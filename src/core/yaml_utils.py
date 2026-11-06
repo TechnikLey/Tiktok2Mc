@@ -1,3 +1,5 @@
+"""ruamel.yaml helpers for comment-preserving load/save and deep merges."""
+
 from __future__ import annotations
 
 import logging

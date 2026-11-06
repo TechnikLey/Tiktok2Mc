@@ -1,3 +1,5 @@
+"""In-memory state and HTML/command stores for plugin-provided overlays and dashboards."""
+
 import asyncio
 import logging
 import threading
@@ -18,18 +20,29 @@ class PluginStateStore:
     """
 
     def __init__(self) -> None:
+        """Create an empty, thread-safe state store for plugin overlays."""
         self._states: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
     def set_state(self, name: str, state: dict[str, Any]) -> None:
+        """Replace the stored state for *name*.
+
+The dictionary is stored by reference; the whole previous state is
+discarded rather than merged."""
+
         with self._lock:
             self._states[name] = state
 
     def get_state(self, name: str) -> dict[str, Any] | None:
+        """Return the stored state for *name*, or ``None`` if unknown.
+
+The returned dictionary is the internal object, not a copy."""
+
         with self._lock:
             return self._states.get(name)
 
     def clear(self, name: str) -> None:
+        """Forget the stored state for *name*."""
         with self._lock:
             self._states.pop(name, None)
 
@@ -49,15 +62,27 @@ class CommandQueue:
     MAX_QUEUE_SIZE: int = 1000
 
     def __init__(self) -> None:
+        """Create empty per-plugin queues, wake-up events and their lock."""
         self._queues: dict[str, list[dict[str, Any]]] = {}
         self._events: dict[str, asyncio.Event] = {}
         self._lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Set the event loop used to wake long-polling plugin requests.
+
+Without a loop commands are still queued, but waiting plugins are not
+notified immediately."""
+
         self._loop = loop
 
     def enqueue(self, plugin_name: str, command: str, **kwargs: Any) -> str:
+        """Append a command for *plugin_name* and return its correlation id.
+
+When the queue is full the oldest command is dropped and a warning is
+logged. A waiting long-poll request is woken through the configured loop,
+which makes this method safe to call from other threads."""
+
         cmd_id = str(uuid.uuid4())
         entry: dict[str, Any] = {
             "id": cmd_id,
@@ -80,6 +105,10 @@ class CommandQueue:
         return cmd_id
 
     def dequeue_all(self, plugin_name: str) -> list[dict[str, Any]]:
+        """Remove and return all pending commands for *plugin_name*.
+
+The wake-up event is cleared so the next long poll waits for new work."""
+
         with self._lock:
             cmds = self._queues.pop(plugin_name, [])
             event = self._events.get(plugin_name)
@@ -102,6 +131,7 @@ class CommandQueue:
         await asyncio.wait_for(event.wait(), timeout=timeout)
 
     def clear(self, plugin_name: str) -> None:
+        """Discard the queue and wake-up event of *plugin_name*."""
         with self._lock:
             self._queues.pop(plugin_name, None)
             self._events.pop(plugin_name, None)
@@ -122,10 +152,16 @@ class QueryStore:
     """
 
     def __init__(self) -> None:
+        """Create an empty store for in-flight plugin queries."""
         self._pending: dict[str, tuple[str, asyncio.Future]] = {}
         self._lock = threading.Lock()
 
     def register(self, query_id: str, plugin_name: str, future: asyncio.Future) -> None:
+        """Track *future* as pending under *query_id*.
+
+The plugin name is stored alongside the future; an existing entry with the
+same id is overwritten."""
+
         with self._lock:
             self._pending[query_id] = (plugin_name, future)
 
@@ -143,6 +179,12 @@ class QueryStore:
             self._pending.pop(query_id, None)
 
     def _settle(self, query_id: str, outcome: dict[str, Any]) -> bool:
+        """Resolve a pending query with *outcome* and stop tracking it.
+
+Returns ``False`` for unknown ids and for futures that are already done
+(for example after a timeout). Delivery is scheduled on the future's loop
+when it is running, which allows responses from any thread."""
+
         with self._lock:
             entry = self._pending.pop(query_id, None)
         if entry is None:
@@ -152,6 +194,7 @@ class QueryStore:
             return False
 
         def _deliver() -> None:
+            """Deliver the outcome unless the future was completed in the meantime."""
             if not future.done():
                 future.set_result(outcome)
 
@@ -174,18 +217,22 @@ class OverlayHtmlStore:
     """
 
     def __init__(self) -> None:
+        """Create an empty, thread-safe cache for plugin overlay HTML."""
         self._html: dict[str, str] = {}
         self._lock = threading.Lock()
 
     def set_html(self, name: str, html: str) -> None:
+        """Store the rendered HTML for *name*, replacing any previous value."""
         with self._lock:
             self._html[name] = html
 
     def get_html(self, name: str) -> str | None:
+        """Return the cached HTML for *name*, or ``None`` if none was stored."""
         with self._lock:
             return self._html.get(name)
 
     def clear(self, name: str) -> None:
+        """Remove the cached HTML for *name*."""
         with self._lock:
             self._html.pop(name, None)
 

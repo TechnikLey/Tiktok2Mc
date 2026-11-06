@@ -1,3 +1,8 @@
+/**
+ * @file Dashboard controller for the TikTok2MC web UI.
+ *
+ * Owns API access, polling, SSE streams, the launcher/plugin/hook/server views, the schema-driven editors and the first-run wizard. Runtime state lives in this file's module-level variables; classes encapsulate the larger editors.
+ */
 const API = '/api/v1';
 let currentConfig = {};
 let currentPlugins = [];
@@ -19,12 +24,18 @@ if (_urlKey) {
   const cleanUrl = window.location.href.replace(/([?&])key=[^&]*/, '$1').replace(/[?&]$/, '');
   window.history.replaceState({}, document.title, cleanUrl);
 }
+/** Return a copy of `headers` with the dashboard `X-API-Key` header when a key is configured. */
 function _withApiKey(headers) {
   if (!_apiKey) return headers;
   return Object.assign({}, headers, { 'X-API-Key': _apiKey });
 }
 
 /* ─── API helpers ─── */
+/**
+ * Extract a human-readable error detail from a failed response.
+ *
+ * Prefers the JSON `detail` field and falls back to at most 500 characters of raw body text.
+ */
 async function _parseErrorDetail(res) {
   try {
     const data = await res.json();
@@ -38,6 +49,11 @@ async function _parseErrorDetail(res) {
   } catch (_) { /* body already consumed */ }
   return '';
 }
+/**
+ * Throw a localized error for a non-OK response.
+ *
+ * Shows a missing-key toast on 401 and delegates message formatting to `Help.formatApiError` when available.
+ */
 async function _throwResError(res) {
   const detail = await _parseErrorDetail(res);
   if (res.status === 401) {
@@ -48,11 +64,13 @@ async function _throwResError(res) {
     : res.status + ' ' + res.statusText + (detail ? ': ' + detail : '');
   throw new Error(friendly);
 }
+/** GET `path` below `/api/v1` and return the decoded JSON body, throwing on HTTP errors. */
 async function fetchJSON(path) {
   const res = await fetch(API + path, { headers: _withApiKey({}) });
   if (!res.ok) await _throwResError(res);
   return res.json();
 }
+/** POST `body` as JSON to `path` below `/api/v1` and return the decoded JSON response. */
 async function postJSON(path, body) {
   const res = await fetch(API + path, {
     method: 'POST',
@@ -62,6 +80,7 @@ async function postJSON(path, body) {
   if (!res.ok) await _throwResError(res);
   return res.json();
 }
+/** PUT `body` as JSON to `path` below `/api/v1` and return the decoded JSON response. */
 async function putJSON(path, body) {
   const res = await fetch(API + path, {
     method: 'PUT',
@@ -89,6 +108,7 @@ let _tiktokConnectDisabled = false; // bridge DISABLE_TIKTOK_CONNECT flag
 let _serverManagerCache = null;
 let _serverActionInProgress = false;
 
+/** Stop every dashboard refresh interval and forget its handle. */
 function _stopDashboardPolling() {
   if (_healthIntervalId) { clearInterval(_healthIntervalId); _healthIntervalId = null; }
   if (_statusIntervalId) { clearInterval(_statusIntervalId); _statusIntervalId = null; }
@@ -97,6 +117,7 @@ function _stopDashboardPolling() {
   if (_uptimeIntervalId) { clearInterval(_uptimeIntervalId); _uptimeIntervalId = null; }
 }
 
+/** Close the dashboard for shutdown: stop polling, close the SSE stream and request the native window to close. */
 function _closeWindowForShutdown() {
   _stopDashboardPolling();
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
@@ -106,6 +127,7 @@ function _closeWindowForShutdown() {
   }
 }
 
+/** Show the local 30-second shutdown countdown and disable its action buttons until the user chooses. */
 function startLocalShutdownCountdown() {
   _shutdownCountdownValue = 30;
   const overlay = document.getElementById('shutdown-overlay');
@@ -163,6 +185,7 @@ document.getElementById('btn-update-dismiss').addEventListener('click', hideUpda
 /* ─── TikTok Connection Failure Dialog ─── */
 let _tiktokFailedDialogActive = false;
 
+/** Show the blocking dialog that explains repeated TikTok connection failures. */
 function showTiktokFailedDialog(maxFails) {
   const dlg = document.getElementById('tiktok-failed-dialog');
   if (!dlg || _tiktokFailedDialogActive) return;
@@ -180,6 +203,7 @@ function showTiktokFailedDialog(maxFails) {
   _updateTiktokStatusDisplay();
 }
 
+/** Hide the TikTok connection failure dialog. */
 function hideTiktokFailedDialog() {
   const dlg = document.getElementById('tiktok-failed-dialog');
   if (!dlg) return;
@@ -239,6 +263,11 @@ document.getElementById('server-custom-name')?.addEventListener('input', validat
 document.getElementById('server-custom-file')?.addEventListener('change', validateServerCustomForm);
 
 /* ─── Dialogs ─── */
+/**
+ * Show a modal confirmation dialog.
+ *
+ * Returns a promise resolving to `true` when confirmed; Escape and the cancel button resolve to `false`.
+ */
 function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), okClass = 'btn-primary', messageClass = '') {
   return new Promise((resolve) => {
     const dlg = document.getElementById('confirm-dialog');
@@ -280,6 +309,7 @@ function showConfirmDialog(title, message, okText = I18N.t('common.confirm'), ok
   });
 }
 
+/** Show a modal prompt dialog and resolve to the trimmed input, or `null` when cancelled. */
 function showPromptDialog(title, message, defaultValue = '', okText = I18N.t('common.confirm'), okClass = 'btn-primary') {
   return new Promise((resolve) => {
     const dlg = document.getElementById('prompt-dialog');
@@ -340,7 +370,13 @@ const LOG_FILTER_KEY = 'tiktok2mc_log_filter';
 const LOG_AUTOSCROLL_KEY = 'tiktok2mc_log_autoscroll';
 const LOG_LEVELS = ['all', 'info', 'warning', 'error', 'debug', 'critical'];
 
+/**
+ * Filterable live-log view with its own SSE subscription and persisted display preferences.
+ *
+ * Keeps at most 500 entries in the DOM and supports level/search filters, pause, export and connection statistics.
+ */
 class LiveLog {
+  /** Create the log view, cache its DOM elements and restore persisted display preferences. */
   constructor() {
     this.view = document.getElementById('log-view');
     this.status = document.getElementById('log-status');
@@ -361,6 +397,7 @@ class LiveLog {
     this.render();
   }
 
+  /** Restore level, search and autoscroll preferences from localStorage. */
   _restorePrefs() {
     try {
       const savedFilter = localStorage.getItem(LOG_FILTER_KEY);
@@ -375,6 +412,7 @@ class LiveLog {
     this._applyFilterButtons();
   }
 
+  /** Highlight the level filter buttons for the active filter. */
   _applyFilterButtons() {
     const buttons = document.getElementById('log-filter-buttons');
     if (!buttons) return;
@@ -383,6 +421,7 @@ class LiveLog {
     });
   }
 
+  /** Persist autoscroll changes when the user toggles the checkbox. */
   _bindAutoscroll() {
     const autoScroll = document.getElementById('log-autoscroll');
     if (!autoScroll) return;
@@ -391,6 +430,7 @@ class LiveLog {
     });
   }
 
+  /** Normalize a raw log level to one of the filter categories. */
   _normalizeLevel(level) {
     const l = String(level || 'info').toLowerCase();
     if (l === 'warn') return 'warning';
@@ -400,6 +440,7 @@ class LiveLog {
     return 'info';
   }
 
+  /** Wire level filters, search, pause and export controls. */
   _bindFilters() {
     const buttons = document.getElementById('log-filter-buttons');
     if (!buttons) return;
@@ -411,6 +452,7 @@ class LiveLog {
     });
   }
 
+  /** Open the log SSE stream and reconnect with backoff. */
   _startSSE() {
     if (this._sse) { try { this._sse.close(); } catch (_) {} }
     if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
@@ -438,6 +480,7 @@ class LiveLog {
     }
   }
 
+  /** Handle one SSE log payload, skipping entries suppressed by pause or filters. */
   _addFromSSE(message, level, source) {
     if (this.paused) return;
     const entry = {
@@ -466,6 +509,7 @@ class LiveLog {
     this._updateVisibleCount();
   }
 
+  /** Select a level filter and re-render the visible entries. */
   setFilter(level) {
     this.filter = level || 'all';
     try { localStorage.setItem(LOG_FILTER_KEY, this.filter); } catch (_) {}
@@ -473,11 +517,13 @@ class LiveLog {
     this.render();
   }
 
+  /** Apply a search query and re-render the visible entries. */
   onSearch(query) {
     this.searchQuery = (query || '').toLowerCase().trim();
     this.render();
   }
 
+  /** Pause or resume live log updates. */
   togglePause() {
     this.paused = !this.paused;
     const btn = document.getElementById('log-pause-btn');
@@ -491,6 +537,7 @@ class LiveLog {
     }
   }
 
+  /** Update the SSE connection indicator. */
   setConnected(connected) {
     if (this.status) {
       this.status.textContent = this.paused
@@ -499,12 +546,14 @@ class LiveLog {
     }
   }
 
+  /** Remove all entries from the view. */
   clear() {
     this.entries = [];
     this.levelCounts = { all: 0, info: 0, warning: 0, error: 0, debug: 0, critical: 0 };
     this.render();
   }
 
+  /** Export the currently visible log entries as a text file. */
   export() {
     const lines = this.entries.map(e => `[${e.time}] [${e.level.toUpperCase()}] ${e.source ? '(' + e.source + ') ' : ''}${e.message}`);
     const content = lines.join('\n');
@@ -533,10 +582,12 @@ class LiveLog {
     showToast(I18N.t('log.exported'), 'success');
   }
 
+  /** Add a log entry, enforce the buffer limit and render it when it matches the filters. */
   add(message, level = 'info', source = '') {
     this._addFromSSE(message, level, source);
   }
 
+  /** Return whether an entry passes the active level and search filters. */
   _matches(entry) {
     if (this.filter !== 'all' && entry.level !== this.filter) return false;
     if (this.searchQuery) {
@@ -546,6 +597,7 @@ class LiveLog {
     return true;
   }
 
+  /** Build the DOM row for one log entry. */
   _renderEntry(entry) {
     const line = document.createElement('div');
     line.className = 'log-line log-' + entry.level;
@@ -555,12 +607,14 @@ class LiveLog {
     return line;
   }
 
+  /** Remove rendered rows beyond the 500-entry limit. */
   _trimVisible() {
     while (this.view.children.length > this.maxEntries) {
       this.view.removeChild(this.view.firstChild);
     }
   }
 
+  /** Scroll the log container to the newest entry. */
   _scrollToBottom() {
     const autoScroll = document.getElementById('log-autoscroll');
     if (!autoScroll || autoScroll.checked) {
@@ -568,6 +622,7 @@ class LiveLog {
     }
   }
 
+  /** Update entry counts and the pause button label. */
   _updateStats() {
     for (const level of Object.keys(this.levelCounts)) {
       const el = document.getElementById('stat-' + level);
@@ -575,6 +630,7 @@ class LiveLog {
     }
   }
 
+  /** Update the number of visible entries. */
   _updateVisibleCount() {
     if (this.visibleCount) {
       const visible = Array.from(this.view.children).filter(c => !c.classList.contains('hidden')).length;
@@ -582,6 +638,7 @@ class LiveLog {
     }
   }
 
+  /** Re-render all entries matching the current filters. */
   render() {
     if (!this.view) return;
     this.view.innerHTML = '';
@@ -600,6 +657,7 @@ class LiveLog {
   }
 }
 
+/** Append a message to the live-log widget, creating the widget on first use. */
 function log(msg, level = 'info') {
   liveLog.add(msg, level);
 }
@@ -607,7 +665,13 @@ function log(msg, level = 'info') {
 const liveLog = new LiveLog();
 
 /* ─── Crash Reports ─── */
+/**
+ * Crash-report browser backed by `/logs/crash-reports`.
+ *
+ * Renders the report list and a detail pane with the selected traceback.
+ */
 class CrashReports {
+  /** Create the crash-report browser and cache its DOM elements. */
   constructor() {
     this.container = document.getElementById('crash-reports-list');
     this.detailView = document.getElementById('crash-report-detail');
@@ -616,6 +680,7 @@ class CrashReports {
     this.reports = [];
   }
 
+  /** Fetch the crash-report list and render it. */
   async load() {
     try {
       const data = await fetchJSON('/logs/crash-reports');
@@ -626,6 +691,7 @@ class CrashReports {
     }
   }
 
+  /** Render the list of available crash reports. */
   renderList() {
     if (!this.container) return;
     if (!this.reports.length) {
@@ -645,6 +711,7 @@ class CrashReports {
     `).join('');
   }
 
+  /** Load and display one crash report. */
   async open(filename) {
     if (!this.detailView || !this.detailContent) return;
     try {
@@ -656,10 +723,12 @@ class CrashReports {
     }
   }
 
+  /** Close the detail view and return to the report list. */
   close() {
     if (this.detailView) this.detailView.classList.add('hidden');
   }
 
+  /** Render the traceback and metadata of the selected report. */
   _renderDetail(data) {
     const ts = escapeHtml(data.timestamp || I18N.t('common.unknown'));
     const mod = escapeHtml(data.module || 'unknown');
@@ -703,6 +772,7 @@ class CrashReports {
 
 const crashReports = new CrashReports();
 
+/** Show a transient toast notification; errors and warnings are announced to assistive technology. */
 function showToast(msg, type = 'info') {
   const c = document.getElementById('toast-container');
   const t = document.createElement('div');
@@ -714,6 +784,7 @@ function showToast(msg, type = 'info') {
 }
 
 /* ─── Dashboard ─── */
+/** Fetch the health endpoint and update the health summary cards. */
 async function loadHealth() {
   try {
     const data = await fetchJSON('/health');
@@ -728,6 +799,7 @@ async function loadHealth() {
   }
 }
 
+/** Format an uptime in seconds as hours, minutes and seconds. */
 function formatUptime(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -740,6 +812,7 @@ function formatUptime(seconds) {
 let _uptimeData = { baseSeconds: 0, lastFetch: 0 };
 let _serverUptimeData = {};
 
+/** Refresh the displayed uptime by extrapolating from the last API sample. */
 function _updateUptimeDisplay() {
   const el = document.getElementById('uptime-value');
   if (!el) return;
@@ -749,6 +822,7 @@ function _updateUptimeDisplay() {
   el.textContent = formatUptime(total);
 }
 
+/** Update uptime values on server cards, clearing stale values for stopped instances. */
 function _updateServerUptimeDisplay() {
   const now = Date.now();
   for (const instId in _serverUptimeData) {
@@ -770,6 +844,7 @@ function _updateServerUptimeDisplay() {
 }
 
 
+/** Fetch the dashboard status payload and update system, live and TikTok state. */
 async function loadStatus() {
   try {
     const data = await fetchJSON('/status');
@@ -816,6 +891,7 @@ async function loadStatus() {
   }
 }
 
+/** Render live-stream counters such as queue sizes, events per minute and gift value. */
 function renderLiveStats(data) {
   const grid = document.getElementById('live-stats-grid');
   if (!grid) return;
@@ -873,6 +949,7 @@ function renderLiveStats(data) {
   ).join('');
 }
 
+/** Update the TikTok status indicator, falling back to a recent event while the live state is unknown. */
 function _updateTiktokStatusDisplay() {
   const el = document.getElementById('tiktok-status-value');
   const pill = document.getElementById('tiktok-status-pill');
@@ -911,12 +988,14 @@ function _updateTiktokStatusDisplay() {
   eventTester._updateTiktokStateUI();
 }
 
+/** Classify a plugin record as `error`, `disabled` or `enabled` for status badges. */
 function getPluginStatus(p) {
   if (p.error) return { label: I18N.t('common.error'), cls: 'status-error' };
   if (!p.enabled) return { label: I18N.t('plugins.disabled'), cls: 'status-disabled' };
   return { label: I18N.t('plugins.enabled'), cls: 'status-enabled' };
 }
 
+/** Fetch the plugin registry and re-render the plugin manager and dashboard navigation. */
 async function loadPlugins() {
   try {
     const data = await fetchJSON('/plugins');
@@ -935,6 +1014,7 @@ async function loadPlugins() {
 const HOOK_WIDGET_VIEW = 'hookwidgets';
 const _HOOK_WIDGET_ICON = '<svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M21 3H3a1 1 0 00-1 1v16a1 1 0 001 1h18a1 1 0 001-1V4a1 1 0 00-1-1zm-1 16H4V9h16v10zM4 7V5h16v2H4z" fill="currentColor"/></svg>';
 
+/** Rebuild hook-provided dashboard widgets from `/hooks/widgets`, removing stale widgets and lazy-loading iframes. */
 async function refreshHookWidgets() {
   const nav = document.querySelector('.sidebar-nav');
   const main = document.getElementById('dashboard');
@@ -983,6 +1063,7 @@ async function refreshHookWidgets() {
   main.appendChild(view);
 }
 
+/** Activate a hook widget view and hydrate its deferred iframe sources. */
 function openHookWidgets() {
   const view = document.getElementById('view-' + HOOK_WIDGET_VIEW);
   if (!view) return;
@@ -996,12 +1077,14 @@ function openHookWidgets() {
 /* ─── Server Manager ─── */
 let _serverLifecycleInterval = null;
 
+/** Start periodic polling of server lifecycle state. */
 function startServerLifecyclePolling() {
   stopServerLifecyclePolling();
   updateServerLifecycleUI();
   _serverLifecycleInterval = setInterval(updateServerLifecycleUI, 5000);
 }
 
+/** Stop periodic server lifecycle polling. */
 function stopServerLifecyclePolling() {
   if (_serverLifecycleInterval) {
     clearInterval(_serverLifecycleInterval);
@@ -1009,6 +1092,7 @@ function stopServerLifecyclePolling() {
   }
 }
 
+/** Fetch the server inventory, re-render the manager, refresh the console selector and load Java status. */
 async function loadServerManager() {
   try {
     const data = await fetchJSON('/servers');
@@ -1027,6 +1111,7 @@ async function loadServerManager() {
 
 /* ─── Java runtime status banner ─── */
 
+/** Fetch Java runtime status and render the installation banner when Java is missing. */
 async function loadJavaStatus() {
   try {
     const data = await fetchJSON('/server/java/status');
@@ -1040,6 +1125,7 @@ async function loadJavaStatus() {
   }
 }
 
+/** Render the Java status banner, including the install action when Java is unavailable. */
 function renderJavaStatusBanner(data) {
   const el = document.getElementById('java-status-banner');
   if (!el) return;
@@ -1070,6 +1156,7 @@ function renderJavaStatusBanner(data) {
     '</div>';
 }
 
+/** Install a managed Java runtime and poll its progress until it finishes, fails or times out. */
 async function installJava() {
   const btn = document.getElementById('java-install-btn');
   if (btn) { btn.disabled = true; btn.textContent = I18N.t('servers.javaInstallingTitle') + '…'; }
@@ -1189,6 +1276,7 @@ async function installJava() {
   }, 2000);
 }
 
+/** Render server instance cards, the version library and the Minecraft plugin list. */
 function renderServerManager() {
   const instancesEl = document.getElementById('server-instances');
   const versionsList = document.getElementById('server-versions-list');
@@ -1211,6 +1299,7 @@ function renderServerManager() {
   loadMcPlugins();
 }
 
+/** Render one server card with state-dependent actions and metadata. */
 function renderServerCard(inst) {
   const notInstalled = !inst.hasJar;
   const state = notInstalled ? 'not-installed' : (inst.status || 'stopped');
@@ -1279,6 +1368,7 @@ function renderServerCard(inst) {
   </div>`;
 }
 
+/** Render the installed server version library with safety and size badges. */
 function renderVersionLibrary(versionsList) {
   const versions = _serverManagerCache.installed || [];
   const countEl = document.getElementById('version-count');
@@ -1311,6 +1401,7 @@ function renderVersionLibrary(versionsList) {
   versionsList.innerHTML = html;
 }
 
+/** Return the CSS badge class for a server version's safety category. */
 function _versionBadgeClass(version) {
   if (!_serverManagerCache) return 'server-status-badge--unsafe';
   const found = (_serverManagerCache.installed || []).find(v => v.version === version);
@@ -1323,6 +1414,7 @@ function _versionBadgeClass(version) {
        : 'server-status-badge--unsafe';
 }
 
+/** Return the localized badge label for a server version's safety category. */
 function _versionBadgeLabel(version) {
   if (!_serverManagerCache) return I18N.t('servers.unsafe');
   const found = (_serverManagerCache.installed || []).find(v => v.version === version);
@@ -1333,6 +1425,7 @@ function _versionBadgeLabel(version) {
   return found.type.toUpperCase();
 }
 
+/** Confirm switching to another server version, warning when that version is untested. */
 async function serverManagerPromptSwitch(version) {
   if (_serverManagerCache?.current_version === version) {
     showToast(I18N.t('servers.versionAlreadyActive', { version }), 'info');
@@ -1369,6 +1462,7 @@ async function serverManagerPromptSwitch(version) {
   }
 }
 
+/** Confirm and delete an installed server version. */
 async function serverManagerPromptRemove(version) {
   const confirmed = await showConfirmDialog(
     I18N.t('servers.removeTitle'),
@@ -1391,6 +1485,7 @@ async function serverManagerPromptRemove(version) {
 
 /* ─── Server Lifecycle UI Updates ─── */
 
+/** Refresh server cards and controls from the latest lifecycle state. */
 async function updateServerLifecycleUI() {
   try {
     const cards = document.querySelectorAll('[data-instance-id]');
@@ -1441,6 +1536,7 @@ async function updateServerLifecycleUI() {
   }
 }
 
+/** Persist the auto-start flag for a server instance. */
 async function toggleAutoStart(instanceId, enabled) {
   try {
     await putJSON('/servers/instances/' + encodeURIComponent(instanceId), { auto_start: enabled });
@@ -1451,6 +1547,7 @@ async function toggleAutoStart(instanceId, enabled) {
   }
 }
 
+/** Run a start, stop or restart action for a server instance and restore the card controls afterwards. */
 async function serverCardAction(instanceId, action) {
   if (_serverActionInProgress) return;
   if (action === 'restart') {
@@ -1480,6 +1577,7 @@ async function serverCardAction(instanceId, action) {
 
 /* ─── Server Manager: Instance Actions ─── */
 
+/** Open a server instance folder, preferring the native pywebview bridge and falling back to the API. */
 async function openServerFolder(instanceId) {
   // Preferred path: open the folder from the GUI process itself. On Linux the
   // backend API runs elevated (pkexec) with a sanitized environment that has
@@ -1519,6 +1617,7 @@ async function openServerFolder(instanceId) {
   }
 }
 
+/** Confirm and delete a server instance. */
 async function deleteServerInstance(instanceId) {
   const inst = (_serverManagerCache?.instances || []).find(i => i.id === instanceId);
   const name = inst ? inst.name : instanceId;
@@ -1544,11 +1643,13 @@ async function deleteServerInstance(instanceId) {
 
 let _mcPluginsCache = null;
 
+/** Return the instance selected in the Minecraft plugin view, defaulting to the first cached instance. */
 function _mcPluginsInstanceId() {
   const sel = document.getElementById('mc-plugins-instance-select');
   return sel ? sel.value : '';
 }
 
+/** Populate the Minecraft plugin instance selector from the cached server list. */
 function _populateMcPluginsInstanceSelector() {
   const sel = document.getElementById('mc-plugins-instance-select');
   if (!sel) return;
@@ -1564,6 +1665,7 @@ function _populateMcPluginsInstanceSelector() {
   }
 }
 
+/** Load the Minecraft plugin list for the selected instance. */
 async function loadMcPlugins() {
   const instanceId = _mcPluginsInstanceId();
   const listEl = document.getElementById('mc-plugins-list');
@@ -1595,6 +1697,7 @@ async function loadMcPlugins() {
   }
 }
 
+/** Render Minecraft plugin cards and the enabled-plugin count for one instance. */
 function renderMcPluginsList(listEl, countEl, instanceId) {
   const plugins = _mcPluginsCache || [];
   const enabledCount = plugins.filter(p => p.enabled).length;
@@ -1628,10 +1731,12 @@ function renderMcPluginsList(listEl, countEl, instanceId) {
 }
 
 const _CRITICAL_MC_PLUGINS = ['MinecraftServerAPI-1.21.x', 'DelayedTNT'];
+/** Return whether disabling or deleting a Minecraft plugin needs an extra confirmation. */
 function _isCriticalMcPlugin(name) {
   return _CRITICAL_MC_PLUGINS.includes(name);
 }
 
+/** Enable or disable a Minecraft plugin for an instance. */
 async function toggleMcPlugin(instanceId, pluginName, enable) {
   if (!enable && _isCriticalMcPlugin(pluginName)) {
     const confirmed = await showConfirmDialog(
@@ -1653,6 +1758,7 @@ async function toggleMcPlugin(instanceId, pluginName, enable) {
   }
 }
 
+/** Confirm and delete a Minecraft plugin jar. */
 async function deleteMcPlugin(instanceId, pluginName) {
   if (_isCriticalMcPlugin(pluginName)) {
     const confirmed = await showConfirmDialog(
@@ -1683,6 +1789,7 @@ async function deleteMcPlugin(instanceId, pluginName) {
   }
 }
 
+/** Open the file picker for uploading a Minecraft plugin jar. */
 function uploadMcPlugin() {
   const instanceId = _mcPluginsInstanceId();
   if (!instanceId) {
@@ -1696,6 +1803,7 @@ function uploadMcPlugin() {
   }
 }
 
+/** Validate and upload the selected Minecraft plugin jar. */
 async function confirmUploadMcPlugin() {
   const instanceId = _mcPluginsInstanceId();
   const input = document.getElementById('mc-plugins-file-input');
@@ -1729,6 +1837,7 @@ async function confirmUploadMcPlugin() {
 
 /* ─── Server Manager: Create Server Modal ─── */
 
+/** Open the create-server modal with default values. */
 async function openServerCreateModal() {
   const modal = document.getElementById('server-create-modal');
   const nameInput = document.getElementById('server-create-name');
@@ -1755,10 +1864,12 @@ async function openServerCreateModal() {
   modal.classList.remove('hidden');
 }
 
+/** Close the create-server modal. */
 function closeServerCreateModal() {
   document.getElementById('server-create-modal')?.classList.add('hidden');
 }
 
+/** Create a server instance from the validated form values. */
 async function confirmServerCreate() {
   const name = document.getElementById('server-create-name')?.value.trim();
   const version = document.getElementById('server-create-version')?.value;
@@ -1774,6 +1885,7 @@ async function confirmServerCreate() {
   }
 }
 
+/** Validate the create-server form and enable or disable its confirm button. */
 function validateServerCreateForm() {
   const nameInput = document.getElementById('server-create-name');
   const versionSelect = document.getElementById('server-create-version');
@@ -1802,6 +1914,7 @@ function validateServerCreateForm() {
 /* ─── Server Manager: Download Modal ─── */
 let _serverDownloadVersions = [];
 
+/** Open the version download modal and populate available versions. */
 async function openServerDownloadModal() {
   const modal = document.getElementById('server-download-modal');
   const select = document.getElementById('server-download-version');
@@ -1830,12 +1943,14 @@ async function openServerDownloadModal() {
   }
 }
 
+/** Close the version download modal. */
 function closeServerDownloadModal() {
   document.getElementById('server-download-modal')?.classList.add('hidden');
 }
 
 /* ─── Server Manager: Switch Version Modal ─── */
 
+/** Open the version switch modal for the installed versions. */
 function openServerSwitchModal() {
   const modal = document.getElementById('server-switch-modal');
   const list = document.getElementById('server-switch-list');
@@ -1888,10 +2003,12 @@ function openServerSwitchModal() {
   modal.classList.remove('hidden');
 }
 
+/** Close the version switch modal. */
 function closeServerSwitchModal() {
   document.getElementById('server-switch-modal')?.classList.add('hidden');
 }
 
+/** Download the selected server version and report already-installed versions. */
 async function confirmServerDownload() {
   const select = document.getElementById('server-download-version');
   const version = select?.value;
@@ -1915,6 +2032,7 @@ async function confirmServerDownload() {
 }
 
 /* ─── Server Manager: Custom Jar Modal ─── */
+/** Open the custom jar upload modal with reset fields. */
 function openServerCustomModal() {
   const modal = document.getElementById('server-custom-modal');
   const nameInput = document.getElementById('server-custom-name');
@@ -1930,10 +2048,12 @@ function openServerCustomModal() {
   modal.classList.remove('hidden');
 }
 
+/** Close the custom jar upload modal. */
 function closeServerCustomModal() {
   document.getElementById('server-custom-modal')?.classList.add('hidden');
 }
 
+/** Validate the custom jar form, enabling the upload button only for a `.jar` file. */
 function validateServerCustomForm() {
   const name = document.getElementById('server-custom-name')?.value?.trim();
   const file = document.getElementById('server-custom-file')?.files?.[0];
@@ -1941,6 +2061,7 @@ function validateServerCustomForm() {
   if (confirmBtn) confirmBtn.disabled = !(name && file && file.name.endsWith('.jar'));
 }
 
+/** Upload the selected custom server jar. */
 async function confirmServerCustom() {
   const nameInput = document.getElementById('server-custom-name');
   const fileInput = document.getElementById('server-custom-file');
@@ -1970,6 +2091,7 @@ async function confirmServerCustom() {
   }
 }
 
+/** Render the copyable browser overlay URLs for the configured overlays. */
 function renderOverlayUrls() {
   const container = document.getElementById('overlay-urls');
   if (!container) return;
@@ -2013,6 +2135,7 @@ function renderOverlayUrls() {
   container.innerHTML = html;
 }
 
+/** Send a test message to one overlay and reflect progress on its button. */
 async function testOverlay(encodedName, btn) {
   const overlayName = decodeURIComponent(encodedName);
   const el = btn;
@@ -2054,6 +2177,7 @@ let REVENUE_NET_PER_DIAMOND_USD = 0.004;
 const REVENUE_COINS_PER_DIAMOND = 2;
 const REVENUE_USD_PER_COIN = 0.013;
 
+/** Load the TikTok revenue settings used by the revenue view. */
 async function loadRevenueConfig() {
   try {
     const data = await fetchJSON('/config');
@@ -2064,10 +2188,12 @@ async function loadRevenueConfig() {
   }
 }
 
+/** Round a monetary value to two decimal places. */
 function _revenueRound2(value) {
   return Math.round(value * 100) / 100;
 }
 
+/** Return the creator's net share of gift revenue as a percentage. */
 function _revenueNetSharePct() {
   return (
     (REVENUE_NET_PER_DIAMOND_USD /
@@ -2076,6 +2202,7 @@ function _revenueNetSharePct() {
   );
 }
 
+/** Convert a net USD amount to its gross value using the configured net share. */
 function revenueGrossFromNet(netUsd) {
   const v = Number(netUsd) || 0;
   return _revenueRound2(
@@ -2084,6 +2211,7 @@ function revenueGrossFromNet(netUsd) {
   );
 }
 
+/** Enrich a revenue entry with gross values and derived display fields. */
 function revenueEnrichEntry(e) {
   const net = Number(e && e.estimated_revenue_usd) || 0;
   const gross = revenueGrossFromNet(net);
@@ -2095,6 +2223,7 @@ function revenueEnrichEntry(e) {
   };
 }
 
+/** Fetch revenue entries and render the revenue view. */
 async function loadRevenueView() {
   await loadRevenueConfig();
   refreshUsdToEurRate();
@@ -2111,6 +2240,7 @@ async function loadRevenueView() {
   }
 }
 
+/** Format a date as an ISO calendar day (`YYYY-MM-DD`). */
 function _revenueISODate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -2118,6 +2248,7 @@ function _revenueISODate(d) {
   return `${y}-${m}-${day}`;
 }
 
+/** Set the revenue filter to the last `days` days and re-render. */
 function revenueSetPeriod(days) {
   const from = document.getElementById('revenue-from');
   const to = document.getElementById('revenue-to');
@@ -2137,6 +2268,7 @@ function revenueSetPeriod(days) {
   revenueApplyFilters();
 }
 
+/** Clear the revenue date filters and show all entries. */
 function revenueClearFilters() {
   document.getElementById('revenue-from').value = '';
   document.getElementById('revenue-to').value = '';
@@ -2144,10 +2276,12 @@ function revenueClearFilters() {
   revenueApplyFilters();
 }
 
+/** Apply the revenue date filters to the loaded entries. */
 function revenueApplyFilters() {
   renderRevenueView();
 }
 
+/** Return revenue entries whose dates fall inside the inclusive ISO date range. */
 function filterRevenueEntries(entries, from, to) {
   return (entries || []).filter(e => {
     if (from && e.date < from) return false;
@@ -2156,6 +2290,7 @@ function filterRevenueEntries(entries, from, to) {
   }).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
+/** Compute revenue totals, averages, best/worst days and week-over-week change. */
 function computeRevenueStats(entries) {
   const values = (entries || []).map(e => e.estimated_revenue_usd);
   const count = values.length;
@@ -2205,6 +2340,7 @@ function computeRevenueStats(entries) {
   };
 }
 
+/** Format a USD amount with two decimals. */
 function formatUSD(value) {
   const v = Number(value) || 0;
   const neg = v < 0;
@@ -2214,6 +2350,7 @@ function formatUSD(value) {
   return (neg ? '-' : '') + '$' + parts.join('.');
 }
 
+/** Format an amount in EUR using German separators. */
 function formatEUR(value) {
   const v = Number(value) || 0;
   const neg = v < 0;
@@ -2224,6 +2361,7 @@ function formatEUR(value) {
 
 let USD_TO_EUR_RATE = 0.86; // 1 USD ≈ 0.86 EUR (default; refreshed at runtime)
 
+/** Refresh the cached USD-to-EUR exchange rate, keeping the fallback on failure. */
 async function refreshUsdToEurRate() {
   try {
     const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=EUR');
@@ -2241,6 +2379,7 @@ async function refreshUsdToEurRate() {
   }
 }
 
+/** Format a value in the currency selected by the current GUI language. */
 function formatCurrency(value) {
   const v = Number(value) || 0;
   if (I18N.lang() === 'de') {
@@ -2249,12 +2388,14 @@ function formatCurrency(value) {
   return formatUSD(v);
 }
 
+/** Format a signed currency delta with an explicit plus or minus. */
 function formatCurrencyDelta(value) {
   if (value == null || Number.isNaN(Number(value))) return '—';
   const sign = value > 0 ? '+' : '';
   return sign + formatCurrency(value);
 }
 
+/** Build the HTML for one revenue summary card with an optional delta. */
 function _revenueCard(label, value, delta) {
   return '<div class="status-card">' +
     '<span class="status-card__label">' + escapeHtml(label) + '</span>' +
@@ -2262,6 +2403,7 @@ function _revenueCard(label, value, delta) {
   '</div>';
 }
 
+/** Render the revenue summary cards. */
 function renderRevenueSummary(entries) {
   const el = document.getElementById('revenue-summary');
   if (!el) return;
@@ -2298,6 +2440,7 @@ function renderRevenueSummary(entries) {
   el.innerHTML = html.join('');
 }
 
+/** Render the stacked gross/net revenue bar chart. */
 function renderRevenueChart(entries) {
   const el = document.getElementById('revenue-chart');
   if (!el) return;
@@ -2332,6 +2475,7 @@ function renderRevenueChart(entries) {
   }).join('');
 }
 
+/** Render the revenue table with day-to-day deltas. */
 function renderRevenueTable(entries) {
   const wrap = document.getElementById('revenue-table-wrap');
   if (!wrap) return;
@@ -2365,6 +2509,7 @@ function renderRevenueTable(entries) {
   wrap.innerHTML = html;
 }
 
+/** Render the already-loaded revenue entries. */
 function renderRevenueView() {
   const fromEl = document.getElementById('revenue-from');
   const toEl = document.getElementById('revenue-to');
@@ -2379,6 +2524,7 @@ function renderRevenueView() {
 /* ─── Sessions ─── */
 let _sessionsData = { total: 0, sessions: [], total_gifts: 0, total_gift_value_usd: 0, total_likes: 0, total_follows: 0, total_comments: 0, total_shares: 0, total_joins: 0 };
 
+/** Fetch recorded stream sessions and render the sessions view. */
 async function loadSessions() {
   try {
     const data = await fetchJSON('/sessions');
@@ -2393,6 +2539,7 @@ async function loadSessions() {
   }
 }
 
+/** Format a duration in seconds as hours, minutes and seconds. */
 function formatDuration(seconds) {
   const total = Math.max(0, Math.round(Number(seconds) || 0));
   const h = Math.floor(total / 3600);
@@ -2403,6 +2550,7 @@ function formatDuration(seconds) {
   return h > 0 ? h + 'h ' + mm + 'm ' + ss + 's' : (m > 0 ? m + 'm ' + ss + 's' : s + 's');
 }
 
+/** Render the session summary cards. */
 function renderSessionsSummary() {
   const el = document.getElementById('sessions-summary');
   if (!el) return;
@@ -2425,6 +2573,7 @@ function renderSessionsSummary() {
   ).join('');
 }
 
+/** Render the session table, newest first. */
 function renderSessionsTable() {
   const wrap = document.getElementById('sessions-table-wrap');
   if (!wrap) return;
@@ -2458,11 +2607,13 @@ function renderSessionsTable() {
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
+/** Render the loaded sessions. */
 function renderSessionsView() {
   renderSessionsSummary();
   renderSessionsTable();
 }
 
+/** Download the Markdown session report through pywebview or a browser blob. */
 async function downloadSessionsReport() {
   try {
     showToast(I18N.t('sessions.downloading'), 'info');
@@ -2499,6 +2650,7 @@ async function downloadSessionsReport() {
 /* ─── Backups ─── */
 let _backupsData = { categories: [], total: 0 };
 
+/** Fetch the backup inventory and render it. */
 async function loadBackups() {
   try {
     const data = await fetchJSON('/backups');
@@ -2511,6 +2663,7 @@ async function loadBackups() {
   }
 }
 
+/** Format a byte count using B, KB or MB units. */
 function _formatBytes(n) {
   const v = Number(n) || 0;
   if (v < 1024) return v + ' B';
@@ -2518,6 +2671,7 @@ function _formatBytes(n) {
   return (v / 1048576).toFixed(1) + ' MB';
 }
 
+/** Return the localized label for a backup category. */
 function _backupCategoryLabel(category) {
   if (category === 'config') return I18N.t('backups.catConfig');
   if (category === 'actions') return I18N.t('backups.catActions');
@@ -2530,6 +2684,7 @@ function _backupCategoryLabel(category) {
   return escapeHtml(category);
 }
 
+/** Render the backup table with size, age and restore actions. */
 function renderBackups() {
   const root = document.getElementById('backups-root');
   if (!root) return;
@@ -2567,6 +2722,7 @@ function renderBackups() {
   root.innerHTML = html;
 }
 
+/** Restore a backup from a known category. */
 function restoreBackup(category, filename) {
   showConfirmDialog(
     I18N.t('backups.restoreTitle'),
@@ -2584,6 +2740,7 @@ function restoreBackup(category, filename) {
   });
 }
 
+/** Restore a backup from a category that needs a user-supplied target name. */
 async function restoreBackupCustom(category, filename) {
   const target = await showPromptDialog(
     I18N.t('backups.restoreTitle'),
@@ -2609,6 +2766,7 @@ async function restoreBackupCustom(category, filename) {
   }
 }
 
+/** Create backups for the config, actions and plugin registry. */
 async function createBackupsNow() {
   try {
     const res = await postJSON('/backups/create', { targets: ['config', 'actions', 'plugin_registry'] });
@@ -2622,6 +2780,7 @@ async function createBackupsNow() {
 
 /* ─── Config Bundle ─── */
 
+/** Convert an `ArrayBuffer` to a base64 string for the pywebview download bridge. */
 function _arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -2632,6 +2791,7 @@ function _arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+/** Export the configuration bundle as a zip download. */
 async function exportConfigBundle() {
   try {
     showToast(I18N.t('backups.bundleExporting'), 'info');
@@ -2665,6 +2825,7 @@ async function exportConfigBundle() {
   }
 }
 
+/** Ask for a config bundle zip and upload it. */
 function importConfigBundle() {
   const input = document.getElementById('bundle-file-input');
   if (!input) return;
@@ -2685,6 +2846,7 @@ function importConfigBundle() {
   input.click();
 }
 
+/** Upload a config bundle zip after user confirmation. */
 async function _uploadConfigBundle(file) {
   try {
     showToast(I18N.t('backups.bundleImporting'), 'info');
@@ -2706,11 +2868,13 @@ async function _uploadConfigBundle(file) {
   }
 }
 
+/** Return the operating-system identifier used by plugin compatibility checks. */
 function _currentOS() {
   const p = (navigator.platform || '').toLowerCase();
   return p.includes('win') ? 'windows' : 'linux';
 }
 
+/** Return the localized platform label. */
 function _platformLabel(platform) {
   if (!platform || platform === 'all') return I18N.t('plugins.platformAll');
   if (platform === 'linux') return I18N.t('plugins.platformLinux');
@@ -2718,11 +2882,13 @@ function _platformLabel(platform) {
   return platform;
 }
 
+/** Return whether a plugin supports the current platform. */
 function _isPlatformCompatible(plugin) {
   const pp = plugin.platform || 'all';
   return pp === 'all' || pp === _currentOS();
 }
 
+/** Render the plugin manager table, including error details and row actions. */
 function renderPluginManager() {
   const tableDiv = document.getElementById('plugin-manager-table');
   if (!tableDiv) return;
@@ -2765,20 +2931,24 @@ const PLUGIN_PAGE_PREFIX = 'plugindash-';
 
 const _PLUGIN_PAGE_ICON = '<svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z" fill="currentColor"/></svg>';
 
+/** Return the DOM id of a plugin's dashboard view. */
 function pluginPageViewId(name) {
   return PLUGIN_PAGE_PREFIX + name;
 }
 
+/** Return the active GUI theme identifier. */
 function _currentGuiTheme() {
   return document.documentElement.getAttribute('data-theme') || 'dark';
 }
 
+/** Build a plugin dashboard URL with the current theme applied. */
 function _pluginPageUrl(name, theme) {
   let url = API + '/plugins/' + encodeURIComponent(name) + '/dashboard';
   if (theme) url += '?theme=' + encodeURIComponent(theme);
   return url;
 }
 
+/** Retarget existing plugin iframes to a new theme. */
 function _retargetPluginFrames(theme) {
   document.querySelectorAll('.plugin-page-frame').forEach(f => {
     if (!f.dataset.pluginName) return;
@@ -2791,6 +2961,7 @@ function _retargetPluginFrames(theme) {
   });
 }
 
+/** Render dashboard navigation entries for plugins that provide pages. */
 function renderPluginPagesNav() {
   const nav = document.querySelector('.sidebar-nav');
   const main = document.getElementById('dashboard');
@@ -2855,6 +3026,7 @@ function renderPluginPagesNav() {
   }
 }
 
+/** Open a plugin dashboard page, creating and loading its iframe lazily. */
 function openPluginDashboard(name) {
   const view = document.getElementById('view-' + pluginPageViewId(name));
   if (!view) return;
@@ -2865,16 +3037,19 @@ function openPluginDashboard(name) {
 
 /* ─── Plugin View ─── */
 
+/** Open the inline configuration editor for a plugin. */
 function openInlinePluginConfig(pluginName, displayName) {  _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
   pluginEditor.openInline(pluginName, displayName);
 }
 
+/** Close the inline plugin configuration editor. */
 function closeInlinePluginConfig() {
   pluginEditor.closeInline();
 }
 
+/** Copy a URL to the clipboard and show a confirmation toast. */
 function copyUrl(btn, url) {
   navigator.clipboard.writeText(url).then(() => {
     btn.textContent = I18N.t('common.copied');
@@ -2883,6 +3058,7 @@ function copyUrl(btn, url) {
   });
 }
 
+/** Return whether a plugin is built in (and therefore not user-installable). */
 function isBuiltinPlugin(name) {
   // Bundled status comes from the plugin manifest ("bundled": true) via
   // GET /plugins — the frontend must not hardcode plugin names.
@@ -2890,6 +3066,7 @@ function isBuiltinPlugin(name) {
   return !!(plugin && plugin.bundled);
 }
 
+/** Confirm enabling a plugin, warn for external plugins and update the registry. */
 async function promptEnablePlugin(name, displayName) {
   const plugin = currentPlugins.find(p => p.name === name);
   if (plugin && !_isPlatformCompatible(plugin)) {
@@ -2921,6 +3098,7 @@ async function promptEnablePlugin(name, displayName) {
   }
 }
 
+/** Confirm disabling a plugin and update the registry. */
 async function promptDisablePlugin(name, displayName) {
   const confirmed = await showConfirmDialog(
     I18N.t('plugins.disableTitle'),
@@ -2941,6 +3119,7 @@ async function promptDisablePlugin(name, displayName) {
   }
 }
 
+/** Restart a plugin by disabling it, waiting briefly and enabling it again. */
 async function restartPlugin(name, displayName) {
   try {
     log(`Restarting plugin ${name}...`);
@@ -2961,6 +3140,7 @@ async function restartPlugin(name, displayName) {
 
 /* ─── Plugin README Modal ─── */
 
+/** Open a plugin README in a sanitized Markdown modal. */
 async function openReadmeModal(pluginName, displayName) {
   const modal = document.getElementById('readme-modal');
   const title = document.getElementById('readme-modal-title');
@@ -2986,18 +3166,21 @@ async function openReadmeModal(pluginName, displayName) {
   }
 }
 
+/** Close the README modal. */
 function closeReadmeModal() {
   document.getElementById('readme-modal')?.classList.add('hidden');
 }
 
 /* ─── Hook Management ─── */
 
+/** Return the display status for a hook record. */
 function getHookStatus(h) {
   if (h.error) return { label: I18N.t('common.error'), cls: 'status-error' };
   if (!h.enabled) return { label: I18N.t('common.disabled'), cls: 'status-disabled' };
   return { label: I18N.t('common.enabled'), cls: 'status-enabled' };
 }
 
+/** Fetch the hook registry and render the hook manager. */
 async function loadHooks() {
   try {
     const data = await fetchJSON('/hooks');
@@ -3008,6 +3191,7 @@ async function loadHooks() {
   }
 }
 
+/** Reload hooks and refresh the manager and dashboard navigation. */
 async function refreshHooks() {
   try {
     await postJSON('/hooks/discover', {});
@@ -3018,6 +3202,7 @@ async function refreshHooks() {
   }
 }
 
+/** Render the built-in action manager table. */
 async function renderBuiltinManager() {
   const div = document.getElementById('builtin-list');
   if (!div) return;
@@ -3045,6 +3230,7 @@ async function renderBuiltinManager() {
   }
 }
 
+/** Open the inline configuration editor for a built-in action. */
 function openInlineBuiltinConfig(name, displayName) {
   _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -3052,10 +3238,12 @@ function openInlineBuiltinConfig(name, displayName) {
   builtinEditor.openInline(name, displayName);
 }
 
+/** Close the inline built-in configuration editor. */
 function closeInlineBuiltinConfig() {
   builtinEditor.closeInline();
 }
 
+/** Render the hook manager table with enable, disable and config actions. */
 function renderHookManager() {
   const tableDiv = document.getElementById('hook-manager-table');
   if (!tableDiv) return;
@@ -3089,6 +3277,7 @@ function renderHookManager() {
   tableDiv.innerHTML = html;
 }
 
+/** Confirm enabling a hook and update the registry; a restart is required. */
 async function promptEnableHook(name, displayName) {
   const confirmed = await showConfirmDialog(
     I18N.t('hooks.enableTitle'),
@@ -3109,6 +3298,7 @@ async function promptEnableHook(name, displayName) {
   }
 }
 
+/** Confirm disabling a hook and update the registry; a restart is required. */
 async function promptDisableHook(name, displayName) {
   const confirmed = await showConfirmDialog(
     I18N.t('hooks.disableTitle'),
@@ -3131,6 +3321,7 @@ async function promptDisableHook(name, displayName) {
 
 /* ─── Hook Nav ─── */
 
+/** Open the inline configuration editor for a hook. */
 function openInlineHookConfig(hookName, displayName) {
   _hideAllEditors();
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -3138,13 +3329,20 @@ function openInlineHookConfig(hookName, displayName) {
   hookEditor.openInline(hookName, displayName);
 }
 
+/** Close the inline hook configuration editor. */
 function closeInlineHookConfig() {
   hookEditor.closeInline();
 }
 
 /* ─── Hook Config Editor ─── */
 
+/**
+ * Schema-driven editor for a hook's `config.yaml`.
+ *
+ * Loads `/hooks/<name>/config`, renders categorized fields, supports search, advanced mode, validation, review/diff and save.
+ */
 class HookConfigEditor {
+  /** Create the hook config editor and cache its DOM elements. */
   constructor() {
     this.hookName = null;
     this.displayName = null;
@@ -3162,6 +3360,7 @@ class HookConfigEditor {
     this._advancedMode = localStorage.getItem('hook_config_advanced_mode') === 'true';
   }
 
+  /** Load the hook schema and current configuration from the API. */
   async _loadConfig(hookName) {
     try {
       const [cfgRes, schemaRes] = await Promise.all([
@@ -3179,6 +3378,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Open the hook editor inline for the selected hook. */
   async openInline(hookName, displayName) {
     this.hookName = hookName;
     this.displayName = displayName || hookName;
@@ -3202,15 +3402,18 @@ class HookConfigEditor {
     this._attachInputListeners();
   }
 
+  /** Filter the inline hook editor by a search query. */
   onInlineSearch(query) {
     this.searchQuery = query.toLowerCase();
     this.renderContent();
   }
 
+  /** Return whether the editor has unsaved changes. */
   isDirty() {
     return JSON.stringify(this.config) !== JSON.stringify(this.original);
   }
 
+  /** Update the save button from dirty and validation state. */
   _updateSaveButton() {
     const btn = document.getElementById('hooks-config-save');
     if (!btn) return;
@@ -3220,6 +3423,7 @@ class HookConfigEditor {
     btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
   }
 
+  /** Attach change listeners to the rendered fields. */
   _attachInputListeners() {
     if (this._inputHandler) return;
     this._inputHandler = (e) => {
@@ -3235,6 +3439,7 @@ class HookConfigEditor {
     this.content.addEventListener('change', this._inputHandler);
   }
 
+  /** Detach field listeners before re-rendering. */
   _detachInputListeners() {
     if (!this._inputHandler) return;
     this.content.removeEventListener('input', this._inputHandler);
@@ -3243,6 +3448,7 @@ class HookConfigEditor {
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
   }
 
+  /** Close the inline editor and discard its transient state. */
   closeInline() {
     if (this.isDirty()) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedGoBack'), I18N.t('common.goBack'), 'btn-danger').then(confirmed => {
@@ -3258,6 +3464,7 @@ class HookConfigEditor {
     this._hideInline();
   }
 
+  /** Hide the inline editor without resetting its data. */
   _hideInline() {
     document.getElementById('hooks-config-section').classList.add('hidden');
     document.getElementById('hook-list-section').classList.remove('hidden');
@@ -3265,6 +3472,7 @@ class HookConfigEditor {
     document.querySelector('.nav-item[data-view="hooks"]')?.classList.add('active');
   }
 
+  /** Toggle visibility of advanced fields. */
   _toggleAdvanced() {
     if (this._advancedMode) {
       this._advancedMode = false;
@@ -3276,6 +3484,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Confirm and unlock advanced-field editing. */
   _unlockAdvanced() {
     const dlg = document.getElementById('advanced-confirm-dialog');
     if (!dlg) return;
@@ -3314,6 +3523,7 @@ class HookConfigEditor {
     if (cancelBtn) { cancelBtn.addEventListener('click', handleCancel); }
   }
 
+  /** Update the advanced-mode toggle and field visibility. */
   _updateAdvancedUI() {
     const btn = document.getElementById('hooks-config-advanced-btn');
     if (!btn) return;
@@ -3326,12 +3536,14 @@ class HookConfigEditor {
     }
   }
 
+  /** Render the complete editor. */
   render() {
     this.renderSidebar();
     this.renderContent();
     this.setupScrollSpy();
   }
 
+  /** Render category navigation. */
   renderSidebar() {
     let html = '<div class="sidebar-header">Categories</div>';
     if (!this.hasSchema) {
@@ -3352,6 +3564,7 @@ class HookConfigEditor {
     this.sidebar.innerHTML = html;
   }
 
+  /** Render configuration fields grouped by category. */
   renderContent() {
     if (!this.hasSchema) {
       this.content.innerHTML = this.buildRawEditor();
@@ -3380,6 +3593,7 @@ class HookConfigEditor {
     this.content.innerHTML = html;
   }
 
+  /** Group schema fields into their categories. */
   groupByCategory() {
     const cats = {};
     if (!this.schema || !this.schema.fields) return cats;
@@ -3391,6 +3605,7 @@ class HookConfigEditor {
     return cats;
   }
 
+  /** Build the input control for one schema field. */
   buildSchemaField(field, value) {
     if (field.advanced && !this._advancedMode) {
       const label = field.label || toTitle(field.key.split('.').pop());
@@ -3459,6 +3674,7 @@ class HookConfigEditor {
     </div>`;
   }
 
+  /** Build the array editor for a schema field. */
   buildArrayField(field, value, path, id) {
     const arr = Array.isArray(value) ? value : [];
     const itemSchema = field.item_schema || {};
@@ -3503,6 +3719,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Build the nested-object editor for a schema field. */
   buildObjectField(field, value, path, id) {
     const obj = (typeof value === 'object' && value !== null && !Array.isArray(value)) ? value : {};
     const subfields = field.item_schema ? (field.item_schema.fields || []) : [];
@@ -3519,6 +3736,7 @@ class HookConfigEditor {
     return html;
   }
 
+  /** Build the raw JSON fallback editor. */
   buildRawEditor() {
     return `<div class="section-card" id="section_raw">
       <div class="section-header"><h3>${I18N.t('hooks.rawConfig')}</h3></div>
@@ -3530,12 +3748,14 @@ class HookConfigEditor {
     </div>`;
   }
 
+  /** Return whether a category contains a search match. */
   categoryMatchesSearch(cat, fields) {
     const q = this.searchQuery;
     if (cat.toLowerCase().includes(q)) return true;
     return fields.some(f => this.fieldMatchesSearch(f));
   }
 
+  /** Return whether a field matches the search query. */
   fieldMatchesSearch(field) {
     const q = this.searchQuery;
     const label = (field.label || field.key || '').toLowerCase();
@@ -3543,11 +3763,13 @@ class HookConfigEditor {
     return label.includes(q) || help.includes(q);
   }
 
+  /** Apply a search query to the editor. */
   onSearch(q) {
     this.searchQuery = q.trim().toLowerCase();
     this.render();
   }
 
+  /** Read the current value at a dot-separated path. */
   getConfigValue(path) {
     const keys = path.split('.');
     let target = this.config;
@@ -3558,6 +3780,7 @@ class HookConfigEditor {
     return target !== undefined && target !== null ? target[keys[keys.length - 1]] : undefined;
   }
 
+  /** Write a value at a dot-separated path. */
   setConfigValue(path, value) {
     const keys = path.split('.');
     let target = this.config;
@@ -3570,6 +3793,7 @@ class HookConfigEditor {
     target[keys[keys.length - 1]] = value;
   }
 
+  /** Remove one array item and re-render. */
   removeArrayItem(path, index) {
     const arr = this.getConfigValue(path) || [];
     arr.splice(index, 1);
@@ -3577,6 +3801,7 @@ class HookConfigEditor {
     this.render();
   }
 
+  /** Append an empty object to an object array. */
   addArrayObjectItem(path) {
     const itemSchema = this.findFieldByPath(path)?.item_schema || {};
     const defaults = {};
@@ -3594,11 +3819,13 @@ class HookConfigEditor {
     this.render();
   }
 
+  /** Remove a tag at the given index. */
   removeTagByIndex(path, idx) {
     const arr = this.getConfigValue(path) || [];
     if (idx >= 0 && idx < arr.length) { arr.splice(idx, 1); this.setConfigValue(path, arr); this.render(); }
   }
 
+  /** Add the current tag input on Enter. */
   tagKey(e, path) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -3611,6 +3838,7 @@ class HookConfigEditor {
     setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
   }
 
+  /** Parse the raw JSON editor into the working configuration. */
   parseRawJson() {
     const raw = document.getElementById('hook-raw-json').value;
     try {
@@ -3622,11 +3850,13 @@ class HookConfigEditor {
     }
   }
 
+  /** Return schema metadata for a configuration path. */
   findFieldByPath(path) {
     if (!this.schema || !this.schema.fields) return null;
     return this.schema.fields.find(f => f.key === path) || null;
   }
 
+  /** Collect form values into a plain configuration object. */
   collect() {
     if (!this.hasSchema) return;
     this.content.querySelectorAll('[data-path]').forEach(el => {
@@ -3646,6 +3876,7 @@ class HookConfigEditor {
     });
   }
 
+  /** Validate all fields and render their errors. */
   validate() {
     this.errors.clear();
     if (!this.hasSchema) {
@@ -3693,6 +3924,7 @@ class HookConfigEditor {
     return ok;
   }
 
+  /** Validate one field value against its schema. */
   validateField(field, value) {
     const ftype = field.type || 'string';
     if (field.required) {
@@ -3719,6 +3951,7 @@ class HookConfigEditor {
     return null;
   }
 
+  /** Return whether a field currently has a validation error. */
   fieldHasError(path) {
     for (const [epath, _] of this.errors) {
       if (epath === path || epath.startsWith(path + '.')) return true;
@@ -3726,6 +3959,7 @@ class HookConfigEditor {
     return false;
   }
 
+  /** Validate and open the review dialog. */
   save() {
     this.collect();
     if (!this.validate()) {
@@ -3743,10 +3977,12 @@ class HookConfigEditor {
     document.getElementById('hook-review-modal').classList.remove('hidden');
   }
 
+  /** Hide the review dialog. */
   hideReview() {
     document.getElementById('hook-review-modal').classList.add('hidden');
   }
 
+  /** Persist the configuration through the API. */
   async confirmSave() {
     this.hideReview();
     try {
@@ -3763,6 +3999,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Compute changed paths for the review diff. */
   computeDiff() {
     const changes = [];
     const walk = (obj, orig, path) => {
@@ -3784,6 +4021,7 @@ class HookConfigEditor {
     return changes;
   }
 
+  /** Scroll a field into view. */
   scrollTo(id) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -3794,6 +4032,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Track the visible category while scrolling. */
   setupScrollSpy() {
     const main = document.querySelector('#view-hooks .editor-main');
     if (!main) return;
@@ -3825,6 +4064,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Highlight the active category in the sidebar. */
   updateSidebarActive() {
     this.sidebar.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
     const items = this.sidebar.querySelectorAll('.sidebar-item');
@@ -3838,6 +4078,7 @@ class HookConfigEditor {
     }
   }
 
+  /** Show an editor-local toast message. */
   showToast(msg, type) {
     const c = document.getElementById('toast-container');
     const t = document.createElement('div');
@@ -3848,7 +4089,13 @@ class HookConfigEditor {
   }
 }
 
+/**
+ * Schema-driven editor for a built-in action's configuration.
+ *
+ * Shares the hook editor architecture but talks to `/builtins/<name>/config` and prefixes its DOM ids with `builtins-`.
+ */
 class BuiltinConfigEditor {
+  /** Create the built-in config editor and cache its DOM elements. */
   constructor() {
     this.hookName = null;
     this.displayName = null;
@@ -3866,6 +4113,7 @@ class BuiltinConfigEditor {
     this._advancedMode = localStorage.getItem('hook_config_advanced_mode') === 'true';
   }
 
+  /** Load the built-in action schema and current configuration from the API. */
   async _loadConfig(hookName) {
     try {
       const [cfgRes, schemaRes] = await Promise.all([
@@ -3883,6 +4131,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Open the built-in editor inline for the selected action. */
   async openInline(hookName, displayName) {
     this.hookName = hookName;
     this.displayName = displayName || hookName;
@@ -3906,15 +4155,18 @@ class BuiltinConfigEditor {
     this._attachInputListeners();
   }
 
+  /** Filter the inline built-in editor by a search query. */
   onInlineSearch(query) {
     this.searchQuery = query.toLowerCase();
     this.renderContent();
   }
 
+  /** Return whether the editor has unsaved changes. */
   isDirty() {
     return JSON.stringify(this.config) !== JSON.stringify(this.original);
   }
 
+  /** Update the save button from dirty and validation state. */
   _updateSaveButton() {
     const btn = document.getElementById('builtins-config-save');
     if (!btn) return;
@@ -3924,6 +4176,7 @@ class BuiltinConfigEditor {
     btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
   }
 
+  /** Attach change listeners to the rendered fields. */
   _attachInputListeners() {
     if (this._inputHandler) return;
     this._inputHandler = (e) => {
@@ -3939,6 +4192,7 @@ class BuiltinConfigEditor {
     this.content.addEventListener('change', this._inputHandler);
   }
 
+  /** Detach field listeners before re-rendering. */
   _detachInputListeners() {
     if (!this._inputHandler) return;
     this.content.removeEventListener('input', this._inputHandler);
@@ -3947,6 +4201,7 @@ class BuiltinConfigEditor {
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
   }
 
+  /** Close the inline editor and discard its transient state. */
   closeInline() {
     if (this.isDirty()) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedGoBack'), I18N.t('common.goBack'), 'btn-danger').then(confirmed => {
@@ -3962,6 +4217,7 @@ class BuiltinConfigEditor {
     this._hideInline();
   }
 
+  /** Hide the inline editor without resetting its data. */
   _hideInline() {
     document.getElementById('builtins-config-section').classList.add('hidden');
     document.getElementById('builtin-list-section').classList.remove('hidden');
@@ -3969,6 +4225,7 @@ class BuiltinConfigEditor {
     document.querySelector('.nav-item[data-view="hooks"]')?.classList.add('active');
   }
 
+  /** Toggle visibility of advanced fields. */
   _toggleAdvanced() {
     if (this._advancedMode) {
       this._advancedMode = false;
@@ -3980,6 +4237,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Confirm and unlock advanced-field editing. */
   _unlockAdvanced() {
     const dlg = document.getElementById('advanced-confirm-dialog');
     if (!dlg) return;
@@ -4018,6 +4276,7 @@ class BuiltinConfigEditor {
     if (cancelBtn) { cancelBtn.addEventListener('click', handleCancel); }
   }
 
+  /** Update the advanced-mode toggle and field visibility. */
   _updateAdvancedUI() {
     const btn = document.getElementById('builtins-config-advanced-btn');
     if (!btn) return;
@@ -4030,12 +4289,14 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Render the complete editor. */
   render() {
     this.renderSidebar();
     this.renderContent();
     this.setupScrollSpy();
   }
 
+  /** Render category navigation. */
   renderSidebar() {
     let html = '<div class="sidebar-header">Categories</div>';
     if (!this.hasSchema) {
@@ -4056,6 +4317,7 @@ class BuiltinConfigEditor {
     this.sidebar.innerHTML = html;
   }
 
+  /** Render configuration fields grouped by category. */
   renderContent() {
     if (!this.hasSchema) {
       this.content.innerHTML = this.buildRawEditor();
@@ -4084,6 +4346,7 @@ class BuiltinConfigEditor {
     this.content.innerHTML = html;
   }
 
+  /** Group schema fields into their categories. */
   groupByCategory() {
     const cats = {};
     if (!this.schema || !this.schema.fields) return cats;
@@ -4095,6 +4358,7 @@ class BuiltinConfigEditor {
     return cats;
   }
 
+  /** Build the input control for one schema field. */
   buildSchemaField(field, value) {
     if (field.advanced && !this._advancedMode) {
       const label = field.label || toTitle(field.key.split('.').pop());
@@ -4163,6 +4427,7 @@ class BuiltinConfigEditor {
     </div>`;
   }
 
+  /** Build the array editor for a schema field. */
   buildArrayField(field, value, path, id) {
     const arr = Array.isArray(value) ? value : [];
     const itemSchema = field.item_schema || {};
@@ -4207,6 +4472,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Build the nested-object editor for a schema field. */
   buildObjectField(field, value, path, id) {
     const obj = (typeof value === 'object' && value !== null && !Array.isArray(value)) ? value : {};
     const subfields = field.item_schema ? (field.item_schema.fields || []) : [];
@@ -4223,6 +4489,7 @@ class BuiltinConfigEditor {
     return html;
   }
 
+  /** Build the raw JSON fallback editor. */
   buildRawEditor() {
     return `<div class="section-card" id="section_raw">
       <div class="section-header"><h3>${I18N.t('hooks.rawConfig')}</h3></div>
@@ -4234,12 +4501,14 @@ class BuiltinConfigEditor {
     </div>`;
   }
 
+  /** Return whether a category contains a search match. */
   categoryMatchesSearch(cat, fields) {
     const q = this.searchQuery;
     if (cat.toLowerCase().includes(q)) return true;
     return fields.some(f => this.fieldMatchesSearch(f));
   }
 
+  /** Return whether a field matches the search query. */
   fieldMatchesSearch(field) {
     const q = this.searchQuery;
     const label = (field.label || field.key || '').toLowerCase();
@@ -4247,11 +4516,13 @@ class BuiltinConfigEditor {
     return label.includes(q) || help.includes(q);
   }
 
+  /** Apply a search query to the editor. */
   onSearch(q) {
     this.searchQuery = q.trim().toLowerCase();
     this.render();
   }
 
+  /** Read the current value at a dot-separated path. */
   getConfigValue(path) {
     const keys = path.split('.');
     let target = this.config;
@@ -4262,6 +4533,7 @@ class BuiltinConfigEditor {
     return target !== undefined && target !== null ? target[keys[keys.length - 1]] : undefined;
   }
 
+  /** Write a value at a dot-separated path. */
   setConfigValue(path, value) {
     const keys = path.split('.');
     let target = this.config;
@@ -4274,6 +4546,7 @@ class BuiltinConfigEditor {
     target[keys[keys.length - 1]] = value;
   }
 
+  /** Remove one array item and re-render. */
   removeArrayItem(path, index) {
     const arr = this.getConfigValue(path) || [];
     arr.splice(index, 1);
@@ -4281,6 +4554,7 @@ class BuiltinConfigEditor {
     this.render();
   }
 
+  /** Append an empty object to an object array. */
   addArrayObjectItem(path) {
     const itemSchema = this.findFieldByPath(path)?.item_schema || {};
     const defaults = {};
@@ -4298,11 +4572,13 @@ class BuiltinConfigEditor {
     this.render();
   }
 
+  /** Remove a tag at the given index. */
   removeTagByIndex(path, idx) {
     const arr = this.getConfigValue(path) || [];
     if (idx >= 0 && idx < arr.length) { arr.splice(idx, 1); this.setConfigValue(path, arr); this.render(); }
   }
 
+  /** Add the current tag input on Enter. */
   tagKey(e, path) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -4315,6 +4591,7 @@ class BuiltinConfigEditor {
     setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
   }
 
+  /** Parse the raw JSON editor into the working configuration. */
   parseRawJson() {
     const raw = document.getElementById('hook-raw-json').value;
     try {
@@ -4326,11 +4603,13 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Return schema metadata for a configuration path. */
   findFieldByPath(path) {
     if (!this.schema || !this.schema.fields) return null;
     return this.schema.fields.find(f => f.key === path) || null;
   }
 
+  /** Collect form values into a plain configuration object. */
   collect() {
     if (!this.hasSchema) return;
     this.content.querySelectorAll('[data-path]').forEach(el => {
@@ -4350,6 +4629,7 @@ class BuiltinConfigEditor {
     });
   }
 
+  /** Validate all fields and render their errors. */
   validate() {
     this.errors.clear();
     if (!this.hasSchema) {
@@ -4397,6 +4677,7 @@ class BuiltinConfigEditor {
     return ok;
   }
 
+  /** Validate one field value against its schema. */
   validateField(field, value) {
     const ftype = field.type || 'string';
     if (field.required) {
@@ -4423,6 +4704,7 @@ class BuiltinConfigEditor {
     return null;
   }
 
+  /** Return whether a field currently has a validation error. */
   fieldHasError(path) {
     for (const [epath, _] of this.errors) {
       if (epath === path || epath.startsWith(path + '.')) return true;
@@ -4430,6 +4712,7 @@ class BuiltinConfigEditor {
     return false;
   }
 
+  /** Validate and open the review dialog. */
   save() {
     this.collect();
     if (!this.validate()) {
@@ -4447,10 +4730,12 @@ class BuiltinConfigEditor {
     document.getElementById('builtin-review-modal').classList.remove('hidden');
   }
 
+  /** Hide the review dialog. */
   hideReview() {
     document.getElementById('builtin-review-modal').classList.add('hidden');
   }
 
+  /** Persist the configuration through the API. */
   async confirmSave() {
     this.hideReview();
     try {
@@ -4467,6 +4752,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Compute changed paths for the review diff. */
   computeDiff() {
     const changes = [];
     const walk = (obj, orig, path) => {
@@ -4488,6 +4774,7 @@ class BuiltinConfigEditor {
     return changes;
   }
 
+  /** Scroll a field into view. */
   scrollTo(id) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -4498,6 +4785,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Track the visible category while scrolling. */
   setupScrollSpy() {
     const main = document.querySelector('#view-hooks .editor-main');
     if (!main) return;
@@ -4529,6 +4817,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Highlight the active category in the sidebar. */
   updateSidebarActive() {
     this.sidebar.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
     const items = this.sidebar.querySelectorAll('.sidebar-item');
@@ -4542,6 +4831,7 @@ class BuiltinConfigEditor {
     }
   }
 
+  /** Show an editor-local toast message. */
   showToast(msg, type) {
     const c = document.getElementById('toast-container');
     const t = document.createElement('div');
@@ -4556,6 +4846,7 @@ class BuiltinConfigEditor {
 const hookEditor = new HookConfigEditor();
 const builtinEditor = new BuiltinConfigEditor();
 
+/** Ask the user to confirm shutting down the application. */
 async function promptShutdown() {
   const confirmed = await showConfirmDialog(
     I18N.t('dialog.shutdownTitle'),
@@ -4567,6 +4858,7 @@ async function promptShutdown() {
   startLocalShutdownCountdown();
 }
 
+/** Open the main configuration editor view. */
 function openConfigEditor() {
   // Ensure currentConfig is loaded before opening
   if (currentConfig && Object.keys(currentConfig).length > 0) {
@@ -4582,6 +4874,7 @@ function openConfigEditor() {
   }
 }
 
+/** Load `config.yaml` into the configuration editor. */
 async function loadConfig() {
   try {
     const data = await fetchJSON('/config');
@@ -4602,11 +4895,13 @@ async function loadConfig() {
 }
 
 /* ─── Wizard (preserved) ─── */
+/** Return whether the configuration still looks like a first-run install. */
 function isFirstRun(cfg) {
   const tiktok = cfg.tiktok || {};
   const rcon = cfg.rcon || {};
   return tiktok.user === 'your_tiktok_username' || !rcon.password;
 }
+/** Show the first-run setup wizard. */
 function showWizard() {
   document.getElementById('wizard').classList.remove('hidden');
   document.getElementById('dashboard').classList.add('hidden');
@@ -4622,12 +4917,14 @@ function showWizard() {
   };
   renderWizardStep();
 }
+/** Hide the first-run setup wizard. */
 function hideWizard() {
   document.getElementById('wizard').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
 }
 let _restartPending = false;
 
+/** Show the restart-required dialog. */
 function showRestartDialog(title, message) {
   const card = document.querySelector('#restart-dialog .wizard-card');
   card.innerHTML = `
@@ -4644,6 +4941,7 @@ function showRestartDialog(title, message) {
   document.getElementById('wizard').classList.add('hidden');
   document.getElementById('restart-dialog').classList.remove('hidden');
 }
+/** Hide the restart-required dialog. */
 function hideRestartDialog() {
   document.getElementById('restart-dialog').classList.add('hidden');
   document.getElementById('wizard').classList.add('hidden');
@@ -4651,12 +4949,14 @@ function hideRestartDialog() {
   updateRestartBanner();
 }
 
+/** Show or hide the persistent restart banner based on pending state. */
 function updateRestartBanner() {
   const banner = document.getElementById('restart-pending-banner');
   if (banner) {
     banner.classList.toggle('hidden', !_restartPending);
   }
 }
+/** Render the current step of the first-run wizard. */
 function renderWizardStep() {
   const steps = document.getElementById('wizard-steps');
   const content = document.getElementById('wizard-content');
@@ -4691,6 +4991,7 @@ function renderWizardStep() {
       <p class="muted" style="font-size:0.85rem;margin:0;">${I18N.t('wizard.pluginsDisabledHint')}</p>`;
   }
 }
+/** Validate the RCON password policy (length, case, digit and special character). */
 function validatePassword(pass) {
   const issues = [];
   if (pass.length < 8) issues.push(I18N.t('pass.minLength'));
@@ -4700,6 +5001,7 @@ function validatePassword(pass) {
   if (!/[^A-Za-z0-9]/.test(pass)) issues.push(I18N.t('pass.special'));
   return issues;
 }
+/** Classify password strength as weak, medium or strong. */
 function getPasswordStrength(pass) {
   let score = 0;
   if (pass.length >= 8) score++;
@@ -4712,6 +5014,7 @@ function getPasswordStrength(pass) {
   if (score <= 4) return 'medium';
   return 'strong';
 }
+/** Update the password strength meter for the current input. */
 function updatePasswordMeter() {
   const pass = document.getElementById('w-rcon-password').value;
   const strength = getPasswordStrength(pass);
@@ -4724,6 +5027,7 @@ function updatePasswordMeter() {
     else { segments.forEach(s => s.classList.add('strong')); label.textContent = I18N.t('wizard.strong'); label.style.color = 'var(--success)'; }
   } else { label.textContent = I18N.t('wizard.strengthEnter'); label.style.color = 'var(--text-secondary)'; }
 }
+/** Advance the wizard, validating the current step first. */
 async function wizardNext() {
   document.querySelectorAll('.inline-error').forEach(el => el.classList.remove('visible'));
   document.querySelectorAll('input').forEach(el => el.classList.remove('invalid'));
@@ -4751,6 +5055,7 @@ async function wizardNext() {
   renderWizardStep();
 }
 
+/** Save the wizard's TikTok and RCON settings and offer a server restart. */
 async function wizardSave() {
   const nextBtn = document.getElementById('wizard-next');
   nextBtn.disabled = true;
@@ -4781,6 +5086,7 @@ async function wizardSave() {
     showToast(I18N.t('wizard.saveFailed', { msg: e.message }), 'error');
   } finally { nextBtn.disabled = false; nextBtn.textContent = I18N.t('wizard.save'); }
 }
+/** Show the full-screen restart overlay. */
 function _showRestartOverlay() {
   _stopDashboardPolling();
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
@@ -4791,6 +5097,7 @@ function _showRestartOverlay() {
   document.getElementById('restart-dialog').classList.remove('hidden');
 }
 
+/** Restart the managed server and wait for it to come back. */
 async function triggerRestart() {
   _restartPending = true;
   updateRestartBanner();
@@ -4816,6 +5123,7 @@ async function triggerRestart() {
   }
 }
 
+/** Wait for a restart to complete, resolving early on a matching SSE event and otherwise timing out. */
 function _waitForRestartCompletion(timeoutMs = 90000) {
   const start = Date.now();
   const timer = setInterval(() => {
@@ -4836,10 +5144,12 @@ function _waitForRestartCompletion(timeoutMs = 90000) {
     }
   }, 1000);
 }
+/** Dismiss the restart banner. */
 function dismissRestartBanner() {
   _restartPending = false;
   updateRestartBanner();
 }
+/** Record whether a restart is pending and persist the flag for reloads. */
 function setRestartPending(pending) {
   _restartPending = pending;
   updateRestartBanner();
@@ -5137,12 +5447,14 @@ const FIELD_META = {
   'outbound.channels': { basic: true, type: 'list' },
 };
 
+/** Return editor metadata (label, help and type) for a config path. */
 function getMeta(path) {
   if (FIELD_META[path]) return FIELD_META[path];
   const p = path.replace(/\.groups\[\d+\]/, '.groups[]').replace(/\.triggers\[\d+\]/, '.triggers[]').replace(/\.overlays\[\d+\]/, '.overlays[]').replace(/\.commands_config\.\w+/, '.commands_config[]').replace(/\.like_triggers\[\d+\]/, '.like_triggers[]');
   return FIELD_META[p] || { basic: false, type: 'text' };
 }
 
+/** Normalize a config path to the dot-separated form used by editor metadata. */
 function _normalizeEditorPath(path) {
   return path
     .replace(/\.groups\[\d+\]/, '.groups[]')
@@ -5152,10 +5464,12 @@ function _normalizeEditorPath(path) {
     .replace(/\.like_triggers\[\d+\]/, '.like_triggers[]');
 }
 
+/** Return whether the editor language is German. */
 function _editorLangIsDe() {
   return window.I18N && I18N.lang && I18N.lang() === 'de';
 }
 
+/** Return localized help text for a config path. */
 function getHelp(path) {
   const p = HELP_TEXT[path] ? path : _normalizeEditorPath(path);
   const en = HELP_TEXT[p];
@@ -5164,19 +5478,27 @@ function getHelp(path) {
   return en;
 }
 
+/** Return the section metadata used to group configuration fields. */
 function sectionMeta(key) {
   const en = SECTION_META[key] || null;
   if (!_editorLangIsDe() || !en) return en;
   return SECTION_META_DE[key] || en;
 }
 
+/** Return the localized display label for a configuration category. */
 function categoryLabel(cat) {
   if (_editorLangIsDe() && CATEGORY_LABELS_DE[cat]) return CATEGORY_LABELS_DE[cat];
   return cat;
 }
 
 /* ─── Editor Class ─── */
+/**
+ * Editor for the main `config.yaml`.
+ *
+ * Preserves unknown keys, renders typed fields from `SECTION_META`, validates input and supports review/diff before saving through the shared save flow.
+ */
 class ConfigEditor {
+  /** Create the main config editor and cache its DOM elements. */
   constructor() {
     this.data = {};
     this.original = {};
@@ -5192,6 +5514,7 @@ class ConfigEditor {
     this._advancedMode = localStorage.getItem('config_advanced_mode') === 'true';
   }
 
+  /** Open the editor for the supplied configuration document. */
   open(config) {
     this.original = JSON.parse(JSON.stringify(config));
     this.data = JSON.parse(JSON.stringify(config));
@@ -5219,10 +5542,12 @@ class ConfigEditor {
     this._attachInputListeners();
   }
 
+  /** Return whether the working config differs from the loaded config. */
   isDirty() {
     return JSON.stringify(this.data) !== JSON.stringify(this.original);
   }
 
+  /** Update the save button from dirty and validation state. */
   _updateSaveButton() {
     const btn = document.getElementById('config-editor-save');
     if (!btn) return;
@@ -5232,6 +5557,7 @@ class ConfigEditor {
     btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
   }
 
+  /** Attach change listeners to the rendered fields. */
   _attachInputListeners() {
     if (this._inputHandler) return;
     this._inputHandler = (e) => {
@@ -5247,6 +5573,7 @@ class ConfigEditor {
     this.content.addEventListener('change', this._inputHandler);
   }
 
+  /** Detach field listeners before re-rendering. */
   _detachInputListeners() {
     if (!this._inputHandler) return;
     this.content.removeEventListener('input', this._inputHandler);
@@ -5255,11 +5582,13 @@ class ConfigEditor {
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
   }
 
+  /** Return whether a config path is hidden behind advanced mode. */
   _isFieldAdvanced(path) {
     const meta = getMeta(path);
     return meta.basic === false;
   }
 
+  /** Toggle visibility of advanced fields. */
   _toggleAdvanced() {
     if (this._advancedMode) {
       this._advancedMode = false;
@@ -5271,6 +5600,7 @@ class ConfigEditor {
     }
   }
 
+  /** Confirm and unlock advanced-field editing. */
   _unlockAdvanced() {
     const dlg = document.getElementById('advanced-confirm-dialog');
     if (!dlg) return;
@@ -5309,6 +5639,7 @@ class ConfigEditor {
     if (cancelBtn) { cancelBtn.addEventListener('click', handleCancel); }
   }
 
+  /** Update the advanced-mode toggle and field visibility. */
   _updateAdvancedUI() {
     const btn = document.getElementById('config-advanced-btn');
     if (!btn) return;
@@ -5321,6 +5652,7 @@ class ConfigEditor {
     }
   }
 
+  /** Close the editor. */
   close() {
     if (this.isDirty()) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
@@ -5338,11 +5670,13 @@ class ConfigEditor {
     document.getElementById('review-modal').classList.add('hidden');
   }
 
+  /** Reset working data and dirty state. */
   _resetData() {
     this.data = JSON.parse(JSON.stringify(this.original));
     this.unknownKeys = JSON.parse(JSON.stringify(this.originalUnknownKeys));
   }
 
+  /** Collect config keys not represented by section metadata. */
   extractUnknownKeys() {
     for (const key of Object.keys(this.data)) {
       if (key === 'config_version' || key === 'config_advanced') {
@@ -5359,10 +5693,12 @@ class ConfigEditor {
     }
   }
 
+  /** Merge preserved unknown keys back into the configuration. */
   mergeUnknownKeys() {
     Object.assign(this.data, this.unknownKeys);
   }
 
+  /** Render the complete editor. */
   render() {
     this.renderSidebar();
     this.renderContent();
@@ -5370,6 +5706,7 @@ class ConfigEditor {
     this.setupScrollSpy();
   }
 
+  /** Render section navigation. */
   renderSidebar() {
     let html = `<div class="sidebar-header">${I18N.t('editor.navigation')}</div>`;
     for (const [cat, keys] of Object.entries(CATEGORIES)) {
@@ -5395,6 +5732,7 @@ class ConfigEditor {
     this.sidebar.innerHTML = html;
   }
 
+  /** Return whether a section currently has a validation error. */
   sectionHasError(key) {
     const prefix = key === '_unknown' ? '_unknown' : key;
     for (const [path, err] of this.errors) {
@@ -5403,6 +5741,7 @@ class ConfigEditor {
     return false;
   }
 
+  /** Render all configuration sections. */
   renderContent() {
     let html = '';
     const addedSections = new Set();
@@ -5426,6 +5765,7 @@ class ConfigEditor {
     this.content.innerHTML = html;
   }
 
+  /** Return whether a section matches the search query. */
   sectionMatchesSearch(key) {
     const meta = sectionMeta(key) || {};
     if ((meta.title || key).toLowerCase().includes(this.searchQuery)) return true;
@@ -5442,6 +5782,7 @@ class ConfigEditor {
     return false;
   }
 
+  /** Build one configuration section. */
   buildSection(key, value) {
     const meta = sectionMeta(key) || { title: toTitle(key), desc: '' };
     let body;
@@ -5468,6 +5809,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Build fields for an object section. */
   buildObjectFields(prefix, obj) {
     let html = '';
     for (const [k, v] of Object.entries(obj)) {
@@ -5512,6 +5854,7 @@ class ConfigEditor {
     return html;
   }
 
+  /** Return whether a field path matches the search query. */
   fieldMatchesSearch(path, key) {
     if (!this.searchQuery) return true;
     const q = this.searchQuery.toLowerCase();
@@ -5521,6 +5864,7 @@ class ConfigEditor {
     return false;
   }
 
+  /** Build a read-only field for a managed value. */
   _buildLockedField(key, path, help) {
     const label = toTitle(key);
     return `<div class="editor-field editor-field--locked" onclick="editor._unlockAdvanced()">
@@ -5536,6 +5880,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Build the control for one configuration value. */
   buildField(key, value, path) {
     const meta = getMeta(path);
     if (meta.basic === false && !this._advancedMode) {
@@ -5582,6 +5927,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Build a tag editor for a string array. */
   buildTagEditor(path, values, opts) {
     opts = opts || {};
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
@@ -5596,6 +5942,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Add the current tag input on Enter. */
   tagKey(e, path) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -5609,11 +5956,13 @@ class ConfigEditor {
     setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
   }
 
+  /** Remove a tag at the given index. */
   removeTagByIndex(path, idx) {
     const arr = this.getValue(path) || [];
     if (idx >= 0 && idx < arr.length) { arr.splice(idx, 1); this.setValue(path, arr); this.render(); }
   }
 
+  /** Build the role multi-select control. */
   buildRoleSelector(path, values) {
     const roles = ['all','moderator','superfan','fanclub'];
     const current = values || [];
@@ -5632,6 +5981,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Handle role selection changes. */
   onRoleChange(path, cb) {
     const role = cb.getAttribute('data-role');
     const arr = this.getValue(path) || [];
@@ -5640,6 +5990,7 @@ class ConfigEditor {
     this.setValue(path, arr);
   }
 
+  /** Remove one array item and re-render. */
   removeArrayItem(path, index) {
     const arr = this.getValue(path) || [];
     arr.splice(index, 1);
@@ -5647,11 +5998,13 @@ class ConfigEditor {
     this.render();
   }
 
+  /** Mark the editor dirty after a field edit. */
   onFieldInput() {
     this.collect();
     this._updateSaveButton();
   }
 
+  /** Build the overlay-slot editor. */
   buildOverlaySlotsEditor(path, slots) {
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
     const help = getHelp(path);
@@ -5677,6 +6030,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Append a new overlay slot. */
   addOverlaySlot(path) {
     const arr = this.getValue(path) || [];
     arr.push({ name: '', url: '' });
@@ -5684,6 +6038,7 @@ class ConfigEditor {
     this.render();
   }
 
+  /** Add a URL input to an overlay slot. */
   addOverlaySlotUrl(path, index) {
     const arr = this.getValue(path) || [];
     if (arr[index] && !('url' in arr[index])) {
@@ -5693,6 +6048,7 @@ class ConfigEditor {
     }
   }
 
+  /** Remove an overlay slot. */
   removeOverlaySlot(path, index) {
     const arr = this.getValue(path) || [];
     arr.splice(index, 1);
@@ -5700,6 +6056,7 @@ class ConfigEditor {
     this.render();
   }
 
+  /** Build the theme editor. */
   buildThemeEditor(path, theme) {
     // Structural rendering only: nested objects are colour groups, plain
     // strings are single colours. No hardcoded consumer names — the
@@ -5731,11 +6088,13 @@ class ConfigEditor {
     return html;
   }
 
+  /** Build the overlay configuration editor. */
   buildOverlayEditor(path, overlay) {
     const fields = this.buildObjectFields(path, overlay);
     return fields;
   }
 
+  /** Build the like-trigger editor. */
   buildLikeTriggersEditor(path, triggers) {
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
     const help = getHelp(path);
@@ -5803,6 +6162,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Append a like trigger. */
   addLikeTrigger(path) {
     const arr = this.getValue(path) || [];
     arr.push({ id: '', every: 100, function: '', payload: 'Community', enabled: true });
@@ -5810,11 +6170,13 @@ class ConfigEditor {
     this.render();
   }
 
+  /** Remove a like trigger. */
   removeLikeTrigger(path, index) {
     const arr = this.getValue(path) || [];
     if (index >= 0 && index < arr.length) { arr.splice(index, 1); this.setValue(path, arr); this.render(); }
   }
 
+  /** Collect like-trigger values from the form. */
   collectLikeTriggers() {
     const path = 'like_triggers';
     const current = this.getValue(path);
@@ -5840,6 +6202,7 @@ class ConfigEditor {
     this.setValue(path, triggers);
   }
 
+  /** Build the outbound notification editor. */
   buildOutboundEditor(path, value) {
     const lang = _editorLangIsDe() ? 'de' : 'en';
     const T = {
@@ -5877,6 +6240,7 @@ class ConfigEditor {
     return box + this.buildObjectFields(path, value);
   }
 
+  /** Build the outbound channel editor. */
   buildOutboundChannelsEditor(path, channels) {
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
     const help = getHelp(path);
@@ -5953,6 +6317,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Append an outbound channel. */
   addOutboundChannel(path) {
     const arr = this.getValue(path) || [];
     arr.push({ name: '', url: '', events: ['tiktok.*'], format: 'raw', template: '', enabled: false });
@@ -5960,6 +6325,7 @@ class ConfigEditor {
     this.render();
   }
 
+  /** Collect outbound channel values from the form. */
   collectOutboundChannels() {
     const current = this.getValue('outbound.channels');
     if (!Array.isArray(current)) return;
@@ -5973,6 +6339,7 @@ class ConfigEditor {
     });
   }
 
+  /** Build an editor for a primitive array. */
   buildPrimitiveArray(path, arr) {
     const help = getHelp(path);
     const id = 'f_' + path.replace(/[^a-zA-Z0-9]/g, '_');
@@ -5986,6 +6353,7 @@ class ConfigEditor {
     </div>`;
   }
 
+  /** Render the preserved unknown-keys section. */
   buildUnknownSection() {
     let html = '<div class="section-card" id="section_unknown"><div class="section-header"><h3>Unrecognized Settings</h3></div>';
     html += '<div class="section-body"><p class="field-desc">The following settings were found in your config file but are not supported by the visual editor. They have been preserved and will remain in your config when you save.</p>';
@@ -5997,6 +6365,7 @@ class ConfigEditor {
     return html;
   }
 
+  /** Serialize preserved unknown keys to YAML. */
   unknownKeysToYaml() {
     // Very simplified YAML-like serialization for display
     let out = '';
@@ -6006,6 +6375,7 @@ class ConfigEditor {
     return out;
   }
 
+  /** Parse the unknown-keys YAML editor. */
   parseUnknownYaml() {
     const raw = document.getElementById('unknown_yaml').value;
     try {
@@ -6035,6 +6405,7 @@ class ConfigEditor {
     }
   }
 
+  /** Scroll a field into view. */
   scrollTo(id) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -6046,6 +6417,7 @@ class ConfigEditor {
     }
   }
 
+  /** Track the visible section while scrolling. */
   setupScrollSpy() {
     const main = document.querySelector('.editor-main');
     if (!main) return;
@@ -6090,6 +6462,7 @@ class ConfigEditor {
     }
   }
 
+  /** Highlight the active section in the sidebar. */
   updateSidebarActive() {
     this.sidebar.querySelectorAll('.sidebar-item').forEach(item => {
       item.classList.remove('active');
@@ -6106,12 +6479,14 @@ class ConfigEditor {
     }
   }
 
+  /** Apply a search query to the editor. */
   onSearch(q) {
     this.searchQuery = q.trim().toLowerCase();
     this.render();
   }
 
   /* ─── Value helpers ─── */
+  /** Return the config value at a path, or `undefined` when an intermediate key is missing. */
   getValue(path) {
     const keys = path.split(/\.|\[(\d+)\]/).filter(k => k !== '' && k !== undefined);
     let target = this.data;
@@ -6123,6 +6498,7 @@ class ConfigEditor {
     return target[keys[keys.length - 1]];
   }
 
+  /** Set a config value by path and mark the editor dirty. */
   setValue(path, value) {
     const keys = path.split(/\.|\[(\d+)\]/).filter(k => k !== '' && k !== undefined);
     let target = this.data;
@@ -6137,6 +6513,7 @@ class ConfigEditor {
   }
 
   /* ─── Collect from DOM ─── */
+  /** Read simple fields and special editors from the DOM into the working config. */
   collect() {
     // Simple inputs
     this.content.querySelectorAll('[data-path]').forEach(el => {
@@ -6159,6 +6536,7 @@ class ConfigEditor {
   }
 
   /* ─── Validation ─── */
+  /** Validate required, pattern, range and known special fields; return whether all pass. */
   validate() {
     this.errors.clear();
     let ok = true;
@@ -6209,6 +6587,7 @@ class ConfigEditor {
   }
 
   /* ─── Save flow ─── */
+  /** Collect, validate and show the review diff before saving. */
   save() {
     this.collect();
     if (!this.validate()) {
@@ -6227,10 +6606,12 @@ class ConfigEditor {
     document.getElementById('review-modal').classList.remove('hidden');
   }
 
+  /** Hide the review dialog. */
   hideReview() {
     document.getElementById('review-modal').classList.add('hidden');
   }
 
+  /** Persist the configuration through the API. */
   async confirmSave() {
     this.hideReview();
     try {
@@ -6255,6 +6636,7 @@ class ConfigEditor {
     }
   }
 
+  /** Compute changed paths for the review diff. */
   computeDiff() {
     const changes = [];
     const walk = (obj, orig, path) => {
@@ -6279,6 +6661,7 @@ class ConfigEditor {
     return changes;
   }
 
+  /** Show an editor-local toast message. */
   showToast(msg, type) {
     const c = document.getElementById('toast-container');
     const t = document.createElement('div');
@@ -6293,6 +6676,7 @@ class ConfigEditor {
 const editor = new ConfigEditor();
 
 /* ─── Utilities ─── */
+/** Escape text for safe insertion into HTML. */
 function escapeHtml(text) {
   // Escapes quotes as well — the output is interpolated into quoted HTML
   // attributes and inline onclick JS strings throughout the dashboard.
@@ -6306,6 +6690,7 @@ function escapeHtml(text) {
 // Sanitizes rendered markdown (e.g. third-party plugin READMEs) before it is
 // assigned via innerHTML. The dashboard runs inside a pywebview window with a
 // privileged JS bridge, so active content must never survive this path.
+/** Sanitize rendered Markdown, using DOMPurify when available and a conservative escape/strip fallback otherwise. */
 function sanitizeMarkdownHtml(html) {
   const doc = new DOMParser().parseFromString(String(html), 'text/html');
   doc.querySelectorAll('script,style,iframe,frame,object,embed,link,meta,form,base')
@@ -6324,13 +6709,20 @@ function sanitizeMarkdownHtml(html) {
   });
   return doc.body.innerHTML;
 }
+/** Turn an identifier such as `snake_case` into a title-cased label. */
 function toTitle(str) {
   return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 /* ─── Plugin Config Editor ─── */
 
+/**
+ * Schema-driven plugin configuration editor.
+ *
+ * Supports the modal and inline variants, renders fields from the plugin manifest schema, validates values and saves through `/plugins/<name>/config`.
+ */
 class PluginConfigEditor {
+  /** Create the plugin config editor and cache both modal and inline DOM elements. */
   constructor() {
     this.pluginName = null;
     this.displayName = null;
@@ -6349,6 +6741,7 @@ class PluginConfigEditor {
     this._advancedMode = localStorage.getItem('plugin_config_advanced_mode') === 'true';
   }
 
+  /** Move the shared editor DOM between the modal and inline containers. */
   _swapElements(inline) {
     this._inlineMode = inline;
     if (inline) {
@@ -6369,6 +6762,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Load the plugin schema and current configuration from the API. */
   async _loadConfig(pluginName) {
     try {
       const [cfgRes, schemaRes] = await Promise.all([
@@ -6386,6 +6780,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Open the modal editor for a plugin. */
   async open(pluginName, displayName) {
     this._swapElements(false);
     this.pluginName = pluginName;
@@ -6409,6 +6804,7 @@ class PluginConfigEditor {
     this._attachInputListeners();
   }
 
+  /** Open the editor inline for a plugin. */
   async openInline(pluginName, displayName) {
     this._swapElements(true);
     this.pluginName = pluginName;
@@ -6434,15 +6830,18 @@ class PluginConfigEditor {
     this._attachInputListeners();
   }
 
+  /** Filter the inline plugin editor by a search query. */
   onInlineSearch(query) {
     this.searchQuery = query.toLowerCase();
     this.renderContent();
   }
 
+  /** Return whether the editor has unsaved changes. */
   isDirty() {
     return JSON.stringify(this.config) !== JSON.stringify(this.original);
   }
 
+  /** Update the save button from dirty and validation state. */
   _updateSaveButton() {
     const btn = this._inlineMode
       ? document.getElementById('plugins-config-save')
@@ -6454,6 +6853,7 @@ class PluginConfigEditor {
     btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
   }
 
+  /** Attach change listeners to the rendered fields. */
   _attachInputListeners() {
     if (this._inputHandler) return;
     this._inputHandler = (e) => {
@@ -6469,6 +6869,7 @@ class PluginConfigEditor {
     this.content.addEventListener('change', this._inputHandler);
   }
 
+  /** Detach field listeners before re-rendering. */
   _detachInputListeners() {
     if (!this._inputHandler) return;
     this.content.removeEventListener('input', this._inputHandler);
@@ -6477,6 +6878,7 @@ class PluginConfigEditor {
     if (this._inputTimer) { clearTimeout(this._inputTimer); this._inputTimer = null; }
   }
 
+  /** Close the modal editor. */
   close() {
     if (this._inlineMode) {
       this.closeInline();
@@ -6498,6 +6900,7 @@ class PluginConfigEditor {
     document.getElementById('plugin-review-modal').classList.add('hidden');
   }
 
+  /** Close the inline editor and discard its transient state. */
   closeInline() {
     if (this.isDirty()) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedGoBack'), I18N.t('common.goBack'), 'btn-danger').then(confirmed => {
@@ -6513,6 +6916,7 @@ class PluginConfigEditor {
     this._hideInline();
   }
 
+  /** Hide the inline editor without resetting its data. */
   _hideInline() {
     document.getElementById('plugins-config-section').classList.add('hidden');
     document.getElementById('plugin-list-section').classList.remove('hidden');
@@ -6520,6 +6924,7 @@ class PluginConfigEditor {
     document.querySelector('.nav-item[data-view="plugins"]')?.classList.add('active');
   }
 
+  /** Toggle visibility of advanced fields. */
   _toggleAdvanced() {
     if (this._advancedMode) {
       this._advancedMode = false;
@@ -6531,6 +6936,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Confirm and unlock advanced-field editing. */
   _unlockAdvanced() {
     const dlg = document.getElementById('advanced-confirm-dialog');
     if (!dlg) return;
@@ -6569,6 +6975,7 @@ class PluginConfigEditor {
     if (cancelBtn) { cancelBtn.addEventListener('click', handleCancel); }
   }
 
+  /** Update the advanced-mode toggle and field visibility. */
   _updateAdvancedUI() {
     const inlineBtn = document.getElementById('plugins-config-advanced-btn');
     const overlayBtn = document.getElementById('plugin-editor-advanced-btn');
@@ -6586,12 +6993,14 @@ class PluginConfigEditor {
 
   /* ─── Rendering ─── */
 
+  /** Render the sidebar, content and scroll spy. */
   render() {
     this.renderSidebar();
     this.renderContent();
     this.setupScrollSpy();
   }
 
+  /** Render category navigation. */
   renderSidebar() {
     let html = '<div class="sidebar-header">Categories</div>';
     if (!this.hasSchema) {
@@ -6612,6 +7021,7 @@ class PluginConfigEditor {
     this.sidebar.innerHTML = html;
   }
 
+  /** Render configuration fields grouped by category. */
   renderContent() {
     if (!this.hasSchema) {
       this.content.innerHTML = this.buildRawEditor();
@@ -6640,6 +7050,7 @@ class PluginConfigEditor {
     this.content.innerHTML = html;
   }
 
+  /** Group schema fields into their categories. */
   groupByCategory() {
     const cats = {};
     if (!this.schema || !this.schema.fields) return cats;
@@ -6653,6 +7064,7 @@ class PluginConfigEditor {
 
   /* ─── Schema Field Builders ─── */
 
+  /** Build the editor control for one schema field, including its locked advanced state. */
   buildSchemaField(field, value) {
     if (field.advanced && !this._advancedMode) {
       const label = field.label || toTitle(field.key.split('.').pop());
@@ -6722,6 +7134,7 @@ class PluginConfigEditor {
     </div>`;
   }
 
+  /** Build the array editor for a schema field. */
   buildArrayField(field, value, path, id) {
     const arr = Array.isArray(value) ? value : [];
     const itemSchema = field.item_schema || {};
@@ -6769,6 +7182,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Build the nested-object editor for a schema field. */
   buildObjectField(field, value, path, id) {
     const obj = (typeof value === 'object' && value !== null && !Array.isArray(value)) ? value : {};
     const subfields = field.item_schema ? (field.item_schema.fields || []) : [];
@@ -6785,6 +7199,7 @@ class PluginConfigEditor {
     return html;
   }
 
+  /** Build the raw JSON fallback editor. */
   buildRawEditor() {
     return `<div class="section-card" id="section_raw">
       <div class="section-header"><h3>Raw Configuration</h3></div>
@@ -6798,12 +7213,14 @@ class PluginConfigEditor {
 
   /* ─── Search ─── */
 
+  /** Return whether a category or any of its fields matches the search query. */
   categoryMatchesSearch(cat, fields) {
     const q = this.searchQuery;
     if (cat.toLowerCase().includes(q)) return true;
     return fields.some(f => this.fieldMatchesSearch(f));
   }
 
+  /** Return whether a field matches the search query. */
   fieldMatchesSearch(field) {
     const q = this.searchQuery;
     const label = (field.label || field.key || '').toLowerCase();
@@ -6811,6 +7228,7 @@ class PluginConfigEditor {
     return label.includes(q) || help.includes(q);
   }
 
+  /** Apply a search query to the editor. */
   onSearch(q) {
     this.searchQuery = q.trim().toLowerCase();
     this.render();
@@ -6818,6 +7236,7 @@ class PluginConfigEditor {
 
   /* ─── Data Helpers ─── */
 
+  /** Read a plugin config value at a dot-separated path. */
   getConfigValue(path) {
     const keys = path.split('.');
     let target = this.config;
@@ -6828,6 +7247,7 @@ class PluginConfigEditor {
     return target !== undefined && target !== null ? target[keys[keys.length - 1]] : undefined;
   }
 
+  /** Write a value at a dot-separated path. */
   setConfigValue(path, value) {
     const keys = path.split('.');
     let target = this.config;
@@ -6842,6 +7262,7 @@ class PluginConfigEditor {
 
   /* ─── Array / Tag Helpers ─── */
 
+  /** Remove one array item and re-render. */
   removeArrayItem(path, index) {
     const arr = this.getConfigValue(path) || [];
     arr.splice(index, 1);
@@ -6849,6 +7270,7 @@ class PluginConfigEditor {
     this.render();
   }
 
+  /** Append an empty object to an object array. */
   addArrayObjectItem(path) {
     const itemSchema = this.findFieldByPath(path)?.item_schema || {};
     const defaults = {};
@@ -6866,11 +7288,13 @@ class PluginConfigEditor {
     this.render();
   }
 
+  /** Remove a tag at the given index. */
   removeTagByIndex(path, idx) {
     const arr = this.getConfigValue(path) || [];
     if (idx >= 0 && idx < arr.length) { arr.splice(idx, 1); this.setConfigValue(path, arr); this.render(); }
   }
 
+  /** Add the current tag input on Enter. */
   tagKey(e, path) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -6883,6 +7307,7 @@ class PluginConfigEditor {
     setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
   }
 
+  /** Parse the raw JSON editor into the working configuration. */
   parseRawJson() {
     const raw = document.getElementById('plugin-raw-json').value;
     try {
@@ -6894,6 +7319,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Return schema metadata for a configuration path. */
   findFieldByPath(path) {
     if (!this.schema || !this.schema.fields) return null;
     return this.schema.fields.find(f => f.key === path) || null;
@@ -6901,6 +7327,7 @@ class PluginConfigEditor {
 
   /* ─── Collection ─── */
 
+  /** Read schema fields from the DOM into the working config. */
   collect() {
     if (!this.hasSchema) {
       // Raw JSON mode already updates this.config on change
@@ -6925,6 +7352,7 @@ class PluginConfigEditor {
 
   /* ─── Validation ─── */
 
+  /** Validate schema fields and the raw JSON fallback. */
   validate() {
     this.errors.clear();
     if (!this.hasSchema) {
@@ -6975,6 +7403,7 @@ class PluginConfigEditor {
     return ok;
   }
 
+  /** Validate one field value against its schema. */
   validateField(field, value) {
     const ftype = field.type || 'string';
     if (field.required) {
@@ -7007,6 +7436,7 @@ class PluginConfigEditor {
     return null;
   }
 
+  /** Return whether a field currently has a validation error. */
   fieldHasError(path) {
     for (const [epath, _] of this.errors) {
       if (epath === path || epath.startsWith(path + '.')) return true;
@@ -7016,6 +7446,7 @@ class PluginConfigEditor {
 
   /* ─── Save Flow ─── */
 
+  /** Collect, validate and show the review diff before saving. */
   save() {
     this.collect();
     if (!this.validate()) {
@@ -7033,10 +7464,12 @@ class PluginConfigEditor {
     document.getElementById('plugin-review-modal').classList.remove('hidden');
   }
 
+  /** Hide the review dialog. */
   hideReview() {
     document.getElementById('plugin-review-modal').classList.add('hidden');
   }
 
+  /** Persist the configuration through the API. */
   async confirmSave() {
     this.hideReview();
     try {
@@ -7070,6 +7503,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Persist changes without the review confirmation prompt. */
   async confirmSaveNoPrompt() {
     this.hideReview();
     try {
@@ -7086,6 +7520,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Compute changed paths for the review diff. */
   computeDiff() {
     const changes = [];
     const walk = (obj, orig, path) => {
@@ -7109,6 +7544,7 @@ class PluginConfigEditor {
 
   /* ─── Scroll Spy ─── */
 
+  /** Scroll a category into view and update the active sidebar item. */
   scrollTo(id) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -7119,6 +7555,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Track the visible category while scrolling. */
   setupScrollSpy() {
     const main = document.querySelector('#plugin-config-editor .editor-main');
     if (!main) return;
@@ -7150,6 +7587,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Highlight the active category in the sidebar. */
   updateSidebarActive() {
     this.sidebar.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
     const items = this.sidebar.querySelectorAll('.sidebar-item');
@@ -7163,6 +7601,7 @@ class PluginConfigEditor {
     }
   }
 
+  /** Show an editor-local toast message. */
   showToast(msg, type) {
     const c = document.getElementById('toast-container');
     const t = document.createElement('div');
@@ -7173,7 +7612,13 @@ class PluginConfigEditor {
   }
 }
 
+/**
+ * Editor for event-to-plugin/command reactions.
+ *
+ * Provides catalog-backed four-step creation, editing, deletion and dirty tracking for reaction rules.
+ */
 class ReactionEditor {
+  /** Create the reaction editor and cache its DOM elements. */
   constructor() {
     this.el = document.getElementById('reaction-editor');
     this.wizardEl = document.getElementById('reaction-wizard');
@@ -7223,6 +7668,7 @@ class ReactionEditor {
     this._bindEvents();
   }
 
+  /** Wire navigation, search, save and wizard controls. */
   _bindEvents() {
     document.getElementById('reaction-add')?.addEventListener('click', () => this.startCreate());
     document.getElementById('reaction-wizard-back')?.addEventListener('click', () => this.wizardBack());
@@ -7233,12 +7679,14 @@ class ReactionEditor {
 
   /* ─── Public API ─── */
 
+  /** Open the reaction editor, reload plugins and load reactions. */
   async open() {
     this.el.classList.remove('hidden');
     await loadPlugins();
     await this.load();
   }
 
+  /** Close the editor and discard transient wizard state. */
   close() {
     if (this._dirty) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
@@ -7252,6 +7700,7 @@ class ReactionEditor {
     this.el.classList.add('hidden');
   }
 
+  /** Fetch configured reactions and render the editor. */
   async load() {
     try {
       await this.loadCatalog();
@@ -7268,6 +7717,7 @@ class ReactionEditor {
     }
   }
 
+  /** Load the plugin and command catalogs used by the wizard. */
   async loadCatalog() {
     try {
       const res = await fetchJSON('/reactions/catalog');
@@ -7297,10 +7747,12 @@ class ReactionEditor {
     }
   }
 
+  /** Return whether the editor has unsaved changes. */
   isDirty() {
     return this._dirty;
   }
 
+  /** Apply a search query to the reaction list. */
   onSearch(q) {
     this.searchQuery = q.trim().toLowerCase();
     this.renderList();
@@ -7308,6 +7760,7 @@ class ReactionEditor {
 
   /* ─── Dashboard summary ─── */
 
+  /** Update the dashboard reaction count summary. */
   _updateDashboardSummary() {
     const el = document.getElementById('reactions-summary');
     if (!el) return;
@@ -7319,6 +7772,7 @@ class ReactionEditor {
     }
   }
 
+  /** Update the save button from dirty state. */
   _updateSaveButton() {
     const btn = document.getElementById('reaction-save');
     if (!btn) return;
@@ -7329,6 +7783,7 @@ class ReactionEditor {
 
   /* ─── Sidebar / Filters ─── */
 
+  /** Return the localized variant of a catalog field, falling back to the default value. */
   _localized(obj, field) {
     const i18nKey = field + '_i18n';
     if (obj[i18nKey]) {
@@ -7338,6 +7793,7 @@ class ReactionEditor {
     return obj[field] || '';
   }
 
+  /** Turn a category identifier into a readable label. */
   _humanizeCategory(cat) {
     return cat
       .split(/[-_]/)
@@ -7345,6 +7801,7 @@ class ReactionEditor {
       .join(' ');
   }
 
+  /** Return the localized label for a reaction category. */
   _categoryLabel(cat) {
     const i18nMap = {
       all: 'reactions.categoryAll',
@@ -7359,6 +7816,7 @@ class ReactionEditor {
     return this._humanizeCategory(cat);
   }
 
+  /** Render the category sidebar. */
   renderSidebar() {
     // Derive categories from the events that actually have reactions, so
     // plugin-defined categories appear automatically.
@@ -7384,6 +7842,7 @@ class ReactionEditor {
     this.sidebar.innerHTML = html;
   }
 
+  /** Select a reaction category and render its events. */
   setCategory(cat) {
     this.activeCategory = cat;
     this.renderSidebar();
@@ -7392,6 +7851,7 @@ class ReactionEditor {
 
   /* ─── List Rendering ─── */
 
+  /** Render reactions for the active category and search query. */
   renderList() {
     const allEvents = Object.keys(this.data);
     const filtered = allEvents.filter(event => {
@@ -7474,6 +7934,7 @@ class ReactionEditor {
     this.content.innerHTML = html;
   }
 
+  /** Render the argument fields for a reaction action. */
   _renderReactionArgs(action, cmdInfo) {
     const args = action.args || {};
     const keys = Object.keys(args);
@@ -7495,6 +7956,7 @@ class ReactionEditor {
     return `<div class="reaction-args">${chips}</div>`;
   }
 
+  /** Render the empty state when no reactions exist. */
   renderEmptyState() {
     const isSearch = this.searchQuery !== '';
     const isFilter = this.activeCategory !== 'all';
@@ -7515,6 +7977,7 @@ class ReactionEditor {
 
   /* ─── Actions ─── */
 
+  /** Start the wizard with an empty reaction draft. */
   startCreate() {
     this.wizardEditing = null;
     this.wizardStep = 0;
@@ -7523,6 +7986,7 @@ class ReactionEditor {
     this._renderWizard();
   }
 
+  /** Start editing an existing reaction in the wizard. */
   startEdit(event, idx) {
     const action = this.data[event]?.[idx];
     if (!action) return;
@@ -7538,6 +8002,7 @@ class ReactionEditor {
     this._renderWizard();
   }
 
+  /** Persist the current reaction configuration. */
   async save() {
     // Validate: every action must have a target and command
     for (const [event, actions] of Object.entries(this.data)) {
@@ -7561,6 +8026,7 @@ class ReactionEditor {
     }
   }
 
+  /** Send a test event for a configured reaction. */
   async testReaction(event, idx) {
     const action = this.data[event]?.[idx];
     if (!action) return;
@@ -7588,6 +8054,7 @@ class ReactionEditor {
     }
   }
 
+  /** Ask for confirmation before deleting a reaction. */
   confirmDelete(event, idx) {
     const action = this.data[event]?.[idx];
     if (!action) return;
@@ -7606,10 +8073,12 @@ class ReactionEditor {
     });
   }
 
+  /** Hide the delete confirmation dialog. */
   _hideDeleteModal() {
     document.getElementById('reaction-delete-modal').classList.add('hidden');
   }
 
+  /** Delete a reaction after confirmation. */
   _deleteReaction(event, idx) {
     if (!this.data[event]) return;
     this.data[event].splice(idx, 1);
@@ -7625,6 +8094,7 @@ class ReactionEditor {
 
   /* ─── Wizard ─── */
 
+  /** Show the reaction wizard and reset its scroll position. */
   _openWizard() {
     this.wizardEl.classList.remove('hidden');
     requestAnimationFrame(() => {
@@ -7633,10 +8103,12 @@ class ReactionEditor {
     });
   }
 
+  /** Close the reaction wizard. */
   _closeWizard() {
     this.wizardEl.classList.add('hidden');
   }
 
+  /** Render the current wizard step. */
   _renderWizard() {
     const titleEl = document.getElementById('reaction-wizard-title');
     const stepsEl = document.getElementById('reaction-wizard-steps');
@@ -7668,6 +8140,7 @@ class ReactionEditor {
     }
   }
 
+  /** Render the event-selection step. */
   _renderStepEvent() {
     const standardLabels = {
       tiktok: I18N.t('reactions.categoryTiktok'),
@@ -7724,6 +8197,7 @@ class ReactionEditor {
     return html;
   }
 
+  /** Render the plugin-selection step. */
   _renderStepPlugin() {
     let html = `<h3>${I18N.t('reactions.step2Title')}</h3>
     <p class="muted-desc">${I18N.t('reactions.step2Desc', { name: escapeHtml((this.eventCatalog[this.wizardDraft.event]?.name) || this.wizardDraft.event) })}</p>`;
@@ -7742,6 +8216,7 @@ class ReactionEditor {
     return html;
   }
 
+  /** Render the command-selection step. */
   _renderStepCommand() {
     let html = `<h3>${I18N.t('reactions.step3Title')}</h3>
     <p class="muted-desc">${I18N.t('reactions.step3Desc', { name: escapeHtml((this.pluginCatalog[this.wizardDraft.plugin]?.name) || this.wizardDraft.plugin) })}</p>`;
@@ -7765,6 +8240,7 @@ class ReactionEditor {
     return html;
   }
 
+  /** Render the argument and confirmation step. */
   _renderStepConfirm() {
     const evInfo = this.eventCatalog[this.wizardDraft.event] || { name: this.wizardDraft.event, icon: '⚡', desc: 'Custom event' };
     const plInfo = this.pluginCatalog[this.wizardDraft.plugin] || { name: this.wizardDraft.plugin, icon: '🔌' };
@@ -7811,16 +8287,19 @@ class ReactionEditor {
 
   /* ─── Wizard interactions ─── */
 
+  /** Select an event for the reaction draft. */
   selectEvent(key, isCustom = false) {
     this.wizardDraft.event = key;
     this._renderWizard();
   }
 
+  /** Track a custom event name entered by the user. */
   onCustomEventInput(value) {
     // Update draft without re-rendering so the input keeps focus
     this.wizardDraft.event = value;
   }
 
+  /** Select a plugin in the wizard. */
   selectPlugin(key) {
     this.wizardDraft.plugin = key;
     this.wizardDraft.command = '';
@@ -7828,6 +8307,7 @@ class ReactionEditor {
     this._renderWizard();
   }
 
+  /** Select a command in the wizard. */
   selectCommand(key) {
     this.wizardDraft.command = key;
     const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[key] || {};
@@ -7839,6 +8319,7 @@ class ReactionEditor {
     this._renderWizard();
   }
 
+  /** Move to the previous wizard step. */
   wizardBack() {
     if (this.wizardStep > 0) {
       this.wizardStep--;
@@ -7846,6 +8327,7 @@ class ReactionEditor {
     }
   }
 
+  /** Validate and advance to the next wizard step. */
   wizardNext() {
     if (this.wizardStep === 0) {
       if (!this.wizardDraft.event) {
@@ -7871,6 +8353,7 @@ class ReactionEditor {
     this._renderWizard();
   }
 
+  /** Collect argument values from the wizard form. */
   _collectArgs() {
     const cmdInfo = (this.commandCatalog[this.wizardDraft.plugin] || {})[this.wizardDraft.command] || {};
     const schema = cmdInfo.args || {};
@@ -7897,6 +8380,7 @@ class ReactionEditor {
     return true;
   }
 
+  /** Commit the wizard result to the working reaction list. */
   _commitWizard() {
     const { event, plugin, command, args } = this.wizardDraft;
     if (!event || !plugin || !command) {
@@ -7937,7 +8421,13 @@ class ReactionEditor {
    Comment Commands Editor
    ════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Editor for comment-command groups.
+ *
+ * Manages global enable/cooldown settings, plugin references, inline overrides and the three-step create/edit wizard.
+ */
 class CommentCommandsEditor {
+  /** Create the comment-command editor and cache its DOM elements. */
   constructor() {
     this.el = document.getElementById('comment-commands-editor');
     this.content = document.getElementById('cc-content');
@@ -7958,6 +8448,7 @@ class CommentCommandsEditor {
     this._bindEvents();
   }
 
+  /** Wire navigation, search, save and wizard controls. */
   _bindEvents() {
     document.getElementById('cc-add')?.addEventListener('click', () => this.startCreate());
     document.getElementById('cc-group-cancel')?.addEventListener('click', () => this._closeWizard());
@@ -7966,11 +8457,13 @@ class CommentCommandsEditor {
     document.getElementById('cc-delete-cancel')?.addEventListener('click', () => this._hideDeleteModal());
   }
 
+  /** Open the editor and load the current configuration. */
   async open() {
     this.el.classList.remove('hidden');
     await this.load();
   }
 
+  /** Close the editor and discard transient state. */
   close() {
     if (this._dirty) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
@@ -7984,6 +8477,7 @@ class CommentCommandsEditor {
     this.el.classList.add('hidden');
   }
 
+  /** Fetch comment-command groups and render the editor. */
   async load() {
     try {
       const res = await fetchJSON('/comment-commands');
@@ -8000,6 +8494,7 @@ class CommentCommandsEditor {
     this._loadPluginCatalog();
   }
 
+  /** Load the plugin catalog used by command references. */
   async _loadPluginCatalog() {
     try {
       const res = await fetchJSON('/reactions/catalog');
@@ -8009,10 +8504,13 @@ class CommentCommandsEditor {
     }
   }
 
+  /** Return whether the editor has unsaved changes. */
   isDirty() { return this._dirty; }
 
+  /** Apply a search query to the group list. */
   onSearch(q) { this.searchQuery = q.trim().toLowerCase(); this.renderList(); }
 
+  /** Update the save button from dirty state. */
   _updateSaveButton() {
     const btn = document.getElementById('cc-save');
     if (!btn) return;
@@ -8022,6 +8520,7 @@ class CommentCommandsEditor {
     btn.style.cursor = dirty ? 'pointer' : 'not-allowed';
   }
 
+  /** Populate a plugin select with the available plugins. */
   async _loadPluginsForSelect(selectEl, current) {
     try {
       const res = await fetchJSON('/plugins');
@@ -8036,6 +8535,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Sidebar ─── */
+  /** Render the all/system/plugin category filters. */
   renderSidebar() {
     const groups = this.data.groups || [];
     let sysCount = 0, plugCount = 0;
@@ -8056,9 +8556,11 @@ class CommentCommandsEditor {
     this.sidebar.innerHTML = html;
   }
 
+  /** Select a command category and re-render. */
   setCategory(cat) { this.activeCategory = cat; this.renderSidebar(); this.renderList(); }
 
   /* ─── List ─── */
+  /** Render comment-command groups matching the active category and search. */
   renderList() {
     const groups = this.data.groups || [];
     const filtered = groups.filter((g, i) => {
@@ -8092,6 +8594,7 @@ class CommentCommandsEditor {
     this.content.innerHTML = html;
   }
 
+  /** Render the detail panel for one comment-command group. */
   _renderGroupPanel(g) {
     const i = g._index;
     const h = (g.handler || '').toLowerCase();
@@ -8225,6 +8728,7 @@ class CommentCommandsEditor {
     return panelHtml;
   }
 
+  /** Render the inline override panel for one command. */
   _renderInlineOverridePanel(groupIdx, cmd, cfg, group) {
     const cdVal = cfg.cooldown != null ? cfg.cooldown : '';
     const handlerVal = cfg.handler || '';
@@ -8260,6 +8764,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Inline command management ─── */
+  /** Add a normalized command to a group, rejecting duplicates. */
   addCommand(groupIdx, raw) {
     const v = (raw || '').trim().toLowerCase();
     if (!v) return;
@@ -8273,6 +8778,7 @@ class CommentCommandsEditor {
     this.renderList();
   }
 
+  /** Remove a command from a group. */
   removeCommand(groupIdx, cmd) {
     const g = this.data.groups[groupIdx];
     if (!g) return;
@@ -8286,6 +8792,7 @@ class CommentCommandsEditor {
     this.renderList();
   }
 
+  /** Toggle an inline override for a command. */
   toggleOverride(groupIdx, cmd) {
     if (this._expandedOverride && this._expandedOverride.groupIdx === groupIdx && this._expandedOverride.cmdName === cmd) {
       this._collectAndSaveOverride(groupIdx, cmd);
@@ -8299,6 +8806,7 @@ class CommentCommandsEditor {
     this.renderList();
   }
 
+  /** Toggle a plugin reference for a group. */
   _toggleInlinePluginRef(groupIdx) {
     if (this._openPluginRefPanels.has(groupIdx)) {
       this._openPluginRefPanels.delete(groupIdx);
@@ -8308,6 +8816,7 @@ class CommentCommandsEditor {
     this.renderList();
   }
 
+  /** Collect and persist inline override values. */
   _collectAndSaveOverride(groupIdx, cmd) {
     const panel = document.querySelector(`.cc-override-panel[data-gi="${groupIdx}"][data-cmd="${CSS.escape(cmd)}"]`);
     if (!panel) return;
@@ -8330,6 +8839,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Global settings ─── */
+  /** Render the global enable and cooldown controls. */
   _renderGlobalSettings() {
     return `<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding:0.8rem 1rem;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">
       <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
@@ -8347,11 +8857,15 @@ class CommentCommandsEditor {
     </div>`;
   }
 
+  /** Toggle comment commands globally. */
   toggleGlobal(enabled) { this.data.enabled = enabled; this._dirty = true; this._updateSaveButton(); }
+  /** Set the global command cooldown. */
   setGlobalCooldown(v) { this.data.cooldown = v; this._dirty = true; this._updateSaveButton(); }
+  /** Set the per-user command cooldown. */
   setGlobalUserCooldown(v) { this.data.user_cooldown = v; this._dirty = true; this._updateSaveButton(); }
 
   /* ─── Wizard (create / edit group — 3 steps, no overrides) ─── */
+  /** Start the wizard with a new comment-command group draft. */
   startCreate() {
     this._wizardMode = 'create';
     this._wizardIndex = null;
@@ -8364,6 +8878,7 @@ class CommentCommandsEditor {
     this._openWizard();
   }
 
+  /** Start editing a group. */
   startEdit(idx) {
     const g = this.data.groups[idx];
     if (!g) return;
@@ -8375,23 +8890,28 @@ class CommentCommandsEditor {
     this._openWizard();
   }
 
+  /** Open the create/edit group wizard. */
   _openWizard() {
     this._renderWizardStep();
     document.getElementById('cc-group-editor').classList.remove('hidden');
   }
 
+  /** Close the group wizard. */
   _closeWizard() { document.getElementById('cc-group-editor').classList.add('hidden'); }
 
+  /** Return the next free command prefix for a new group. */
   _nextAvailablePrefix() {
     const seq = ['#','!','$','@','*','?','+','~','&','%','/','^'];
     const used = new Set((this.data.groups || []).map(g => g.prefix));
     return seq.find(c => !used.has(c)) || '?';
   }
 
+  /** Move to the previous wizard step. */
   _wizardBack() {
     if (this._wizardStep > 0) { this._wizardStep--; this._renderWizardStep(); }
   }
 
+  /** Validate and advance to the next wizard step. */
   _wizardNext() {
     if (!this._validateCurrentStep()) return;
     if (this._wizardStep < 2) {
@@ -8408,6 +8928,7 @@ class CommentCommandsEditor {
   static VALID_PREFIX_CHARS = new Set('!@#$%^&*?~+/=<>-_|\\:.;()[]{}\'"`');
   static _isSpecialChar(ch) { return CommentCommandsEditor.VALID_PREFIX_CHARS.has(ch); }
 
+  /** Validate the fields of the current wizard step. */
   _validateCurrentStep() {
     const d = this._wizardDraft;
     if (this._wizardStep === 0) {
@@ -8424,6 +8945,7 @@ class CommentCommandsEditor {
     return true;
   }
 
+  /** Display a validation error for the current step. */
   _showStepError(msg) {
     const el = document.getElementById('cc-wiz-error');
     if (el) { el.textContent = msg; el.style.display = 'flex'; }
@@ -8431,6 +8953,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Collect data ─── */
+  /** Copy the visible wizard fields into the draft for the given step. */
   _collectStepData(step) {
     const d = this._wizardDraft;
     if (step === 0) {
@@ -8460,6 +8983,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Render wizard step ─── */
+  /** Render the wizard title, step markers and current step body. */
   _renderWizardStep() {
     const d = this._wizardDraft;
     const title = document.getElementById('cc-group-title');
@@ -8490,6 +9014,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Step 0: Basic ─── */
+  /** Render the basic group settings step. */
   _renderStepBasic(d, body) {
     const isPlugin = d.handler === 'plugin';
     body.innerHTML = `
@@ -8561,6 +9086,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Step 1: Access ─── */
+  /** Render the access-control step. */
   _renderStepAccess(d, body) {
     const roles = d.allowed_roles || [];
     const showSecurityWarning = d.handler === 'rcon' && d.mode === 'allow-all' && roles.includes('all');
@@ -8597,6 +9123,7 @@ class CommentCommandsEditor {
     });
   }
 
+  /** Update the security warning for the selected group. */
   _updateSecurityWarning(d) {
     const warnEl = document.getElementById('cc-security-warning');
     if (!warnEl) return;
@@ -8605,6 +9132,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Step 2: Commands ─── */
+  /** Render the command and cooldown step. */
   _renderStepCommands(d, body) {
     const cmds = d.commands || [];
     body.innerHTML = `
@@ -8651,6 +9179,7 @@ class CommentCommandsEditor {
     this._bindRefPanel(d);
   }
 
+  /** Wire chip-style multi-value inputs. */
   _bindChipInput(d) {
     const container = document.getElementById('cc-chips-container');
     const input = document.getElementById('cc-cmd-input');
@@ -8702,6 +9231,7 @@ class CommentCommandsEditor {
     });
   }
 
+  /** Render the plugin-command reference panel. */
   _renderPluginCommandsRef(d) {
     const pname = d.plugin_name;
     const cmds = pname ? (this._pluginCatalog[pname] || null) : null;
@@ -8720,6 +9250,7 @@ class CommentCommandsEditor {
     </div>`;
   }
 
+  /** Wire the plugin-command reference panel. */
   _bindRefPanel(d) {
     const toggle = document.getElementById('cc-ref-toggle');
     const body = document.getElementById('cc-ref-body');
@@ -8766,6 +9297,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Commit wizard ─── */
+  /** Validate the draft and commit it to the working group list. */
   _commitWizard() {
     const draft = this._wizardDraft;
     if (!draft.prefix) { showToast(I18N.t('cc.prefixRequired'), 'error'); return; }
@@ -8783,6 +9315,7 @@ class CommentCommandsEditor {
   }
 
   /* ─── Delete ─── */
+  /** Ask for confirmation before deleting a group. */
   confirmDelete(idx) {
     const g = this.data.groups[idx];
     if (!g) return;
@@ -8802,9 +9335,11 @@ class CommentCommandsEditor {
     });
   }
 
+  /** Hide the group delete confirmation dialog. */
   _hideDeleteModal() { document.getElementById('cc-delete-modal').classList.add('hidden'); }
 
   /* ─── Save ─── */
+  /** Persist comment-command groups through the API. */
   async save() {
     for (const g of (this.data.groups || [])) {
       if (!g.prefix) { showToast(I18N.t('cc.groupWithoutPrefix'), 'error'); return; }
@@ -8842,11 +9377,13 @@ if (typeof pywebview === 'undefined' || !pywebview.api) {
   });
 }
 
+/** Return whether any open editor has unsaved changes. */
 function isAnyEditorDirty() {
   return editor.isDirty() || pluginEditor.isDirty() || actionsEditor.isDirty || reactionEditor.isDirty() || commentCommandsEditor.isDirty() || chatbotEditor.isDirty();
 }
 
 /* Detect close requests from pywebview's on_closing (deadlock-free polling) */
+/** Poll the native window for a pending close request and handle it. */
 async function _pollCloseRequest() {
   if (_closeInProgress) return;
   try {
@@ -8857,6 +9394,7 @@ async function _pollCloseRequest() {
   } catch (_) {}
 }
 
+/** Handle a window close request: close immediately when clean, otherwise ask the user to save or discard. */
 async function _handleCloseRequest() {
   if (_closeInProgress) return;
   if (!isAnyEditorDirty()) {
@@ -8871,6 +9409,7 @@ async function _handleCloseRequest() {
   document.getElementById('unsaved-changes-modal').classList.remove('hidden');
 }
 
+/** Save every dirty editor, reload state and restart the server or plugins when required. */
 async function _saveAllEditors() {
   let pluginChanged = false;
   let rconPasswordSet = false;
@@ -8929,6 +9468,7 @@ async function _saveAllEditors() {
   }
 }
 
+/** Discard unsaved changes in every editor and restore the loaded values. */
 function _discardAllEditors() {
   if (actionsEditor.isDirty) {
     actionsEditor.isDirty = false;
@@ -8998,6 +9538,7 @@ let _lastResultToastCode = null;
 let _autoInstallEnabled = true;
 let _updateNotificationShown = false;
 
+/** Check the tool, plugin and hook update endpoints in parallel and render the result. */
 async function checkAllUpdates() {
   const summary = document.getElementById('updates-summary');
   const detail = document.getElementById('updates-detail');
@@ -9036,6 +9577,7 @@ async function checkAllUpdates() {
   }
 }
 
+/** Render update-check results grouped by component with version details. */
 function _renderUpdateResults() {
   const summary = document.getElementById('updates-summary');
   const detail = document.getElementById('updates-detail');
@@ -9136,6 +9678,7 @@ function _renderUpdateResults() {
   detail.classList.remove('hidden');
 }
 
+/** Install pending plugin and hook updates, then offer the required restart. */
 async function applyUpdates() {
   log(I18N.t('updates.installing'), 'info');
   let installed = 0;
@@ -9184,6 +9727,7 @@ async function applyUpdates() {
   );
 }
 
+/** Show the update-available notification. */
 function showUpdateNotification(version) {
   const desc = document.getElementById('update-notification-desc');
   if (desc) {
@@ -9192,10 +9736,12 @@ function showUpdateNotification(version) {
   document.getElementById('update-notification-dialog').classList.remove('hidden');
 }
 
+/** Hide the update-available notification. */
 function hideUpdateNotification() {
   document.getElementById('update-notification-dialog').classList.add('hidden');
 }
 
+/** Start the self-update for the application itself. */
 async function triggerToolUpdate() {
   const btn = event?.target;
   if (btn) btn.disabled = true;
@@ -9219,6 +9765,7 @@ let _sseSource = null;
 let _sseReconnectTimer = null;
 let _sseReconnectDelay = 2000;
 
+/** Open the dashboard SSE stream and reconnect with exponential backoff. */
 function connectLogStream() {
   if (_sseSource) {
     _sseSource.close();
@@ -9318,6 +9865,7 @@ function connectLogStream() {
 
 /* ─── Live Dashboard Widgets ─── */
 
+/** Update the dashboard reactions summary from a diagnostics payload. */
 function updateEcmDiagnostics(payload) {
   // Update the reactions summary on the dashboard card if it shows 0
   const summary = document.getElementById('reactions-summary');
@@ -9333,6 +9881,7 @@ function updateEcmDiagnostics(payload) {
 
 /* ─── Minecraft Console Terminal ─── */
 
+/** Convert Minecraft section-sign color codes to escaped HTML with inline styles. */
 function parseMinecraftColors(text) {
   const colors = {
     '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
@@ -9388,6 +9937,7 @@ function parseMinecraftColors(text) {
 let _consoleInstanceId = '';
 let _consoleLastRefresh = 0;
 
+/** Refresh the console instance selector from the cached server list, throttled to once every two seconds. */
 function refreshConsoleInstanceSelector() {
   const sel = document.getElementById('console-instance-selector');
   if (!sel) return;
@@ -9436,18 +9986,21 @@ const consoleTerminal = {
     'trigger', 'weather', 'whitelist', 'worldborder', 'xp'
   ],
 
+  /** Persist the console command history to localStorage. */
   _saveHistory() {
     try {
       localStorage.setItem(CONSOLE_HISTORY_KEY, JSON.stringify(this._history.slice(-CONSOLE_HISTORY_MAX)));
     } catch (_) {}
   },
 
+  /** Reset the tab-completion cycling state. */
   _resetTabState() {
     this._tabIdx = -1;
     this._tabBase = '';
     this._tabMatches = [];
   },
 
+  /** Complete the token at the cursor from the available commands. */
   _completeCurrentToken(input, word) {
     if (!word) { this._resetTabState(); return false; }
     const lower = word.toLowerCase();
@@ -9473,6 +10026,7 @@ const consoleTerminal = {
     return true;
   },
 
+  /** Replace the token around the cursor with a completion. */
   _replaceLastToken(input, word, replacement) {
     const start = input.selectionStart ?? input.value.length;
     const val = input.value;
@@ -9482,6 +10036,7 @@ const consoleTerminal = {
     input.setSelectionRange(cursor, cursor);
   },
 
+  /** Handle Tab completion for the console input. */
   _complete(input) {
     const start = input.selectionStart ?? input.value.length;
     const before = input.value.slice(0, start);
@@ -9489,6 +10044,7 @@ const consoleTerminal = {
     this._completeCurrentToken(input, word);
   },
 
+  /** Switch the console to another server instance and reset its connection state. */
   switchInstance(instanceId) {
     _consoleInstanceId = instanceId || '';
     if (this._connected) {
@@ -9499,6 +10055,7 @@ const consoleTerminal = {
     this._print(I18N.t('console.switched', { target: instanceId ? I18N.t('console.serverPrefix', { id: instanceId }) : I18N.t('console.allServers') }), 'system');
   },
 
+  /** Connect or disconnect the console depending on its current state. */
   async toggleConnection() {
     if (this._connected) {
       await this.disconnect();
@@ -9507,6 +10064,7 @@ const consoleTerminal = {
     }
   },
 
+  /** Connect the console to the selected server instance. */
   async connect() {
     const btn = document.getElementById('btn-console-connect');
     const input = document.getElementById('console-input');
@@ -9540,6 +10098,7 @@ const consoleTerminal = {
     }
   },
 
+  /** Disconnect the console stream. */
   async disconnect() {
     const btn = document.getElementById('btn-console-connect');
     const input = document.getElementById('console-input');
@@ -9559,6 +10118,7 @@ const consoleTerminal = {
     btn.disabled = false;
   },
 
+  /** Send a command to the connected server. */
   async sendCommand(cmd) {
     if (!cmd.trim()) return;
     this._print('> ' + cmd, 'input');
@@ -9592,6 +10152,7 @@ const consoleTerminal = {
     }
   },
 
+  /** Append text to the console output, translating Minecraft color codes. */
   _print(text, cls = 'output') {
     const output = document.getElementById('console-output');
     const line = document.createElement('div');
@@ -9605,6 +10166,7 @@ const consoleTerminal = {
     output.scrollTop = output.scrollHeight;
   },
 
+  /** Clear the console output. */
   clear() {
     const output = document.getElementById('console-output');
     output.innerHTML = '';
@@ -9651,6 +10213,7 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ─── Sidebar ─── */
 let _sidebarMode = 0;
 const SIDEBAR_MODES = ['full', 'icons', 'hide'];
+/** Apply a sidebar display mode and persist it. */
 function _setSidebarMode(mode) {
   _sidebarMode = mode;
   const sidebar = document.querySelector('.sidebar');
@@ -9658,13 +10221,16 @@ function _setSidebarMode(mode) {
   sidebar.classList.add(SIDEBAR_MODES[_sidebarMode]);
   document.querySelector('.app-layout').classList.toggle('sidebar-hidden', _sidebarMode === 2);
 }
+/** Cycle through the sidebar display modes. */
 function cycleSidebar() {
   // Toggle between full (0) and icons (1)
   _setSidebarMode(_sidebarMode === 0 ? 1 : 0);
 }
+/** Hide the sidebar completely. */
 function hideSidebar() {
   _setSidebarMode(2);
 }
+/** Install the edge-reveal behaviour for a hidden sidebar. */
 function _initSidebarReveal() {
   const reveal = document.querySelector('.sidebar-reveal');
   reveal?.addEventListener('click', () => {
@@ -9678,10 +10244,12 @@ function _initSidebarReveal() {
 }
 
 /* ─── Mobile sidebar (off-canvas drawer) ─── */
+/** Return whether the viewport is in the mobile breakpoint. */
 function _isMobileWidth() {
   return window.innerWidth <= 768;
 }
 
+/** Toggle the mobile off-canvas sidebar. */
 function toggleMobileSidebar() {
   const sidebar = document.querySelector('.sidebar');
   if (!sidebar) return;
@@ -9694,6 +10262,7 @@ function toggleMobileSidebar() {
   }
 }
 
+/** Close the mobile off-canvas sidebar. */
 function closeMobileSidebar() {
   const sidebar = document.querySelector('.sidebar');
   if (!sidebar || !sidebar.classList.contains('mobile-open')) return;
@@ -9702,6 +10271,7 @@ function closeMobileSidebar() {
   document.querySelector('.mobile-menu-btn')?.setAttribute('aria-expanded', 'false');
 }
 
+/** Wire the mobile sidebar backdrop and accessibility state. */
 function _initMobileSidebar() {
   document.getElementById('sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
   window.addEventListener('resize', () => {
@@ -9710,10 +10280,12 @@ function _initMobileSidebar() {
 }
 
 /* ─── Editor helpers (show/hide editors within app-layout) ─── */
+/** Hide every editor overlay and return to the dashboard. */
 function _hideAllEditors() {
   document.querySelectorAll('.editor-overlay').forEach(el => el.classList.add('hidden'));
 }
 
+/** Synchronize dashboard visibility with the currently open editor. */
 function _syncDashboardVisibility() {
   const anyOpen = document.querySelector('.editor-overlay:not(.hidden)');
   document.getElementById('dashboard').classList.toggle('dashboard-hidden', !!anyOpen);
@@ -9723,6 +10295,7 @@ function _syncDashboardVisibility() {
   }
 }
 
+/** Install the observer that keeps dashboard visibility in sync with editor overlays. */
 function _initEditorVisibilityObserver() {
   const observer = new MutationObserver(_syncDashboardVisibility);
   document.querySelectorAll('.editor-overlay').forEach(el => {
@@ -9732,6 +10305,7 @@ function _initEditorVisibilityObserver() {
 }
 
 /* ─── Sidebar Navigation ─── */
+/** Run a navigation action only after resolving unsaved editor changes. */
 function _switchWithUnsavedGuard(action) {
   if (isAnyEditorDirty()) {
     _pendingNavigation = action;
@@ -9743,10 +10317,12 @@ function _switchWithUnsavedGuard(action) {
   }
 }
 
+/** Switch the main view after checking for unsaved changes. */
 function switchView(viewId) {
   _switchWithUnsavedGuard(() => switchViewNow(viewId));
 }
 
+/** Switch the main view immediately, loading view-specific data on demand. */
 function switchViewNow(viewId) {
   _hideAllEditors();
   closeMobileSidebar();
@@ -9803,10 +10379,12 @@ function switchViewNow(viewId) {
 }
 
 /* For nav items that open an editor (Actions/Reactions/Settings) */
+/** Open an editor behind the shared unsaved-changes guard. */
 function switchToEditor(viewId, openFn) {
   _switchWithUnsavedGuard(() => switchToEditorNow(viewId, openFn));
 }
 
+/** Open an editor immediately and restore navigation if it declines to open. */
 function switchToEditorNow(viewId, openFn) {
   const prevNav = document.querySelector('.nav-item.active');
   const prevOverlay = document.querySelector('.editor-overlay:not(.hidden)');
@@ -9834,6 +10412,7 @@ function switchToEditorNow(viewId, openFn) {
 }
 
 /* ─── Theme Toggle ─── */
+/** Apply the persisted theme, defaulting to dark. */
 function _initTheme() {
   const saved = localStorage.getItem('theme');
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -9842,6 +10421,7 @@ function _initTheme() {
   _updateThemeLabel(theme);
 }
 
+/** Toggle between the dark and light themes. */
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') || 'dark';
   const next = current === 'dark' ? 'light' : 'dark';
@@ -9851,6 +10431,7 @@ function toggleTheme() {
   _retargetPluginFrames(next);
 }
 
+/** Update the theme toggle label for the active theme. */
 function _updateThemeLabel(theme) {
   const label = document.getElementById('theme-label');
   if (!label) return;
@@ -9858,6 +10439,7 @@ function _updateThemeLabel(theme) {
 }
 
 /* ─── Language Switcher ─── */
+/** Synchronize the language switcher with the active language. */
 function _syncLangButtons() {
   const lang = I18N.lang();
   document.querySelectorAll('.lang-btn').forEach((btn) => {
@@ -9887,7 +10469,13 @@ document.addEventListener('i18n:changed', () => {
 });
 
 /* ─── Event Tester ─── */
+/**
+ * Interactive trigger tester.
+ *
+ * Renders type-specific inputs, sends test triggers, toggles the TikTok connection and keeps a local history.
+ */
 class EventTester {
+  /** Create the trigger tester and cache its DOM elements. */
   constructor() {
     this._cooldown = false;
     this._history = [];
@@ -9902,6 +10490,7 @@ class EventTester {
     this._milestonesLoaded = false;
   }
 
+  /** Render inputs appropriate for the selected trigger type. */
   onTypeChange() {
     const type = document.getElementById('trigger-type').value;
     const customGroup = document.getElementById('custom-trigger-group');
@@ -9921,6 +10510,7 @@ class EventTester {
     }
   }
 
+  /** Load the gift catalog for the trigger tester. */
   async _loadGifts() {
     try {
       const data = await fetchJSON('/gifts');
@@ -9933,6 +10523,7 @@ class EventTester {
     }
   }
 
+  /** Load the configured like milestones. */
   async _loadMilestones() {
     try {
       const data = await fetchJSON('/triggers/like-milestones');
@@ -9945,6 +10536,7 @@ class EventTester {
     }
   }
 
+  /** Render the milestone selector. */
   _renderMilestoneSelect(milestones) {
     const select = document.getElementById('like-milestone-select');
     const info = document.getElementById('like-milestone-info');
@@ -9979,6 +10571,7 @@ class EventTester {
     }
   }
 
+  /** Update tester state after a milestone selection. */
   onMilestoneChange() {
     const select = document.getElementById('like-milestone-select');
     const info = document.getElementById('like-milestone-info');
@@ -9991,6 +10584,7 @@ class EventTester {
     }
   }
 
+  /** Render the gift selector. */
   _renderGiftSelect(gifts) {
     const container = document.getElementById('gift-select');
     if (!container) return;
@@ -10022,6 +10616,7 @@ class EventTester {
     container.addEventListener('click', container._boundClick);
   }
 
+  /** Select a gift by id and display its name. */
   _selectGift(id, name) {
     this._selectedGift = { id: id, name: name };
     const hid = document.getElementById('gift-selected-id');
@@ -10034,6 +10629,7 @@ class EventTester {
     }
   }
 
+  /** Filter the gift selector by search text. */
   onGiftSearch(query) {
     const q = (query || '').toLowerCase().trim();
     const filtered = q
@@ -10042,6 +10638,7 @@ class EventTester {
     this._renderGiftSelect(filtered);
   }
 
+  /** Toggle the TikTok connection from the tester. */
   async toggleTiktok() {
     if (this._cooldown) {
       this._showError(I18N.t('triggers.pleaseWait'));
@@ -10090,6 +10687,7 @@ class EventTester {
     }
   }
 
+  /** Update the TikTok connection indicator and button state. */
   _updateTiktokStateUI() {
     const label = document.getElementById('tiktok-connection-state');
     const btn = document.getElementById('btn-tiktok-toggle');
@@ -10109,12 +10707,14 @@ class EventTester {
     btn.className = 'btn btn--secondary';
   }
 
+  /** Set the tester status message and style. */
   _setStatus(state, text) {
     if (!this._statusEl) return;
     this._statusEl.textContent = text;
     this._statusEl.className = 'console-status ' + state;
   }
 
+  /** Display an error in the tester. */
   _showError(msg) {
     if (!this._errorEl) return;
     this._errorEl.textContent = msg;
@@ -10122,6 +10722,7 @@ class EventTester {
     setTimeout(() => this._errorEl.classList.add('hidden'), 5000);
   }
 
+  /** Send the configured test trigger. */
   async sendTrigger() {
     if (this._cooldown) {
       this._showError(I18N.t('triggers.pleaseWaitTrigger'));
@@ -10221,6 +10822,7 @@ class EventTester {
     }
   }
 
+  /** Append an entry to the local trigger history. */
   _addHistory(kind, trigger, user, status, message) {
     const entry = {
       time: new Date().toLocaleTimeString(),
@@ -10235,6 +10837,7 @@ class EventTester {
     this._renderHistory();
   }
 
+  /** Render the local trigger history. */
   _renderHistory() {
     if (!this._historyEl) return;
     if (!this._history.length) {
@@ -10258,6 +10861,7 @@ class EventTester {
     }).join('');
   }
 
+  /** Clear the local trigger history. */
   clearHistory() {
     this._history = [];
     this._renderHistory();
@@ -10267,6 +10871,7 @@ class EventTester {
 const eventTester = new EventTester();
 
 /* ─── Init ─── */
+/** Initialize the dashboard: theme, language, navigation, data loaders, SSE, updates and the first-run wizard. */
 async function init() {
   _initTheme();
   _syncLangButtons();
@@ -10307,6 +10912,7 @@ async function init() {
     }
   }
 }
+/** Hide the full-screen application loading indicator. */
 function hideAppLoading() {
   document.getElementById('app-loading')?.classList.add('app-loading--hidden');
 }

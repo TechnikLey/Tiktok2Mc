@@ -38,6 +38,11 @@ class TikTokLiveTracker:
     """Thread-safe store of the last reported TikTok live status."""
 
     def __init__(self) -> None:
+        """Create an unknown/empty live-status record.
+
+``connected`` stays ``None`` until the bridge reports a state, which lets
+the GUI distinguish "unknown" from "disconnected"."""
+
         self._lock = threading.Lock()
         self._connected: bool | None = None
         self._last_update: float = 0.0
@@ -50,6 +55,11 @@ class TikTokLiveTracker:
     # ------------------------------------------------------------------
 
     def set_connected(self, connected: bool, source: str = "") -> None:
+        """Record a reported connection state.
+
+Updates the report timestamp and source. A transition to connected also
+sets the last-event timestamp so a fresh connection counts as activity."""
+
         ts = time.time()
         with self._lock:
             self._connected = bool(connected)
@@ -59,6 +69,7 @@ class TikTokLiveTracker:
             self._source = source
 
     def record_event(self) -> None:
+        """Record that a non-test TikTok event was observed."""
         with self._lock:
             self._last_event_at = time.time()
 
@@ -67,6 +78,12 @@ class TikTokLiveTracker:
     # ------------------------------------------------------------------
 
     def snapshot(self) -> dict[str, Any]:
+        """Return the current status fields for the API.
+
+If the last bridge update is older than ``STALE_AFTER_SECONDS``, the
+reported connection is downgraded to ``None`` (unknown) while the original
+timestamps and source are still returned."""
+
         now = time.time()
         with self._lock:
             connected = self._connected
@@ -87,6 +104,11 @@ class TikTokLiveTracker:
     # ------------------------------------------------------------------
 
     async def _consume(self) -> None:
+        """Process events from the API event bus until cancelled.
+
+Every event is acknowledged with ``task_done``. Handler errors are logged
+and do not terminate the consumer; cancellation exits quietly."""
+
         q = event_bus.subscribe()
         try:
             while True:
@@ -101,6 +123,12 @@ class TikTokLiveTracker:
             pass
 
     def _handle(self, msg: dict[str, Any]) -> None:
+        """Update tracker state from one bus event.
+
+``tiktok.live_status`` events set the connection state. Other ``tiktok.*``
+events refresh the activity timestamp unless they are marked as test
+events, which are ignored so simulations never look like live traffic."""
+
         event_type = msg.get("type", "")
         data = msg.get("data", {}) or {}
         if event_type == EVENT_TYPE:
@@ -118,11 +146,16 @@ class TikTokLiveTracker:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        """Start the background consumer task.
+
+Calling this while a task already exists is a no-op."""
+
         if self._task is not None:
             return
         self._task = asyncio.create_task(self._consume())
 
     async def stop(self) -> None:
+        """Cancel and await the consumer task, if one is running."""
         if self._task is None:
             return
         self._task.cancel()
@@ -138,6 +171,7 @@ _tracker: TikTokLiveTracker | None = None
 
 
 def get_tiktok_live_tracker() -> TikTokLiveTracker:
+    """Return the global :class:`TikTokLiveTracker` singleton."""
     global _tracker
     if _tracker is None:
         _tracker = TikTokLiveTracker()

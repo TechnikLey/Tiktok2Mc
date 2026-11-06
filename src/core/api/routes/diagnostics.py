@@ -19,6 +19,11 @@ _crash_manager = None
 
 
 def set_crash_manager(cm: Any) -> None:
+    """Register the crash manager used by the diagnostics report and crash-history endpoint.
+
+Args:
+    cm: Crash manager instance, or ``None`` to clear the current one."""
+
     global _crash_manager
     _crash_manager = cm
 

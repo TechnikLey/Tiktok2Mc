@@ -6,6 +6,7 @@
  * editor modules; app.js globals are only touched inside methods.
  */
 class ChatbotEditor {
+  /** Cache the editor root, initialize draft state and bind configuration events. */
   constructor() {
     this.el = document.getElementById('chatbot-editor');
     this.data = {};
@@ -20,6 +21,12 @@ class ChatbotEditor {
     window.addEventListener('pywebviewready', () => this._updateWebviewButton());
   }
 
+  /**
+   * Return whether the user has acknowledged the chatbot beta warning.
+   *
+   * Storage failures are treated as acknowledged so an unavailable
+   * ``localStorage`` never locks the user out.
+   */
   _betaAcked() {
     try {
       return localStorage.getItem('tiktok2mc_chatbot_beta_ack') === '1';
@@ -28,10 +35,12 @@ class ChatbotEditor {
     }
   }
 
+  /** Show the beta acknowledgement modal. */
   _showBetaModal() {
     document.getElementById('chatbot-beta-modal')?.classList.remove('hidden');
   }
 
+  /** Persist the beta acknowledgement, switch to the chatbot view and open the editor. */
   acceptBeta() {
     try {
       localStorage.setItem('tiktok2mc_chatbot_beta_ack', '1');
@@ -43,10 +52,16 @@ class ChatbotEditor {
     return this.open();
   }
 
+  /** Dismiss the beta modal without acknowledging it. */
   declineBeta() {
     document.getElementById('chatbot-beta-modal')?.classList.add('hidden');
   }
 
+  /**
+   * Track dirty state for configuration inputs and wire reply/type controls.
+   *
+   * Session-card inputs are excluded because they are saved separately.
+   */
   _bindEvents() {
     // Dirty-tracking for every config input inside the editor. Session
     // inputs are excluded — they are saved separately via their own API.
@@ -71,6 +86,7 @@ class ChatbotEditor {
     }
   }
 
+  /** Open the editor, load configuration and session state, and fetch one status snapshot. */
   async open() {
     if (!this._betaAcked()) {
       this._showBetaModal();
@@ -88,6 +104,7 @@ class ChatbotEditor {
     return true;
   }
 
+  /** Hide the editor, asking for confirmation when the configuration is dirty. */
   close() {
     if (this._dirty) {
       showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger').then(confirmed => {
@@ -101,6 +118,7 @@ class ChatbotEditor {
     this.el.classList.add('hidden');
   }
 
+  /** Return whether the configuration has unsaved changes. */
   isDirty() { return this._dirty; }
 
   /** The master toggle headline reflects the action, not the state. */
@@ -111,6 +129,7 @@ class ChatbotEditor {
     title.textContent = I18N.t(enabled ? 'chatbot.disableBot' : 'chatbot.enableBot');
   }
 
+  /** Load chatbot configuration from the API into the form. */
   async load() {
     let cfg = {};
     try {
@@ -126,6 +145,7 @@ class ChatbotEditor {
     this._applyToForm();
   }
 
+  /** Validate and persist the configuration, then report reload behaviour. */
   async save() {
     const payload = this._collect();
     const prevEnabled = !!this.original?.enabled;
@@ -152,6 +172,7 @@ class ChatbotEditor {
 
   /* ─── Form <-> data ─── */
 
+  /** Copy the loaded configuration into the DOM controls and reply rows. */
   _applyToForm() {
     const d = this.data;
     const spam = d.spam_protection || {};
@@ -173,6 +194,12 @@ class ChatbotEditor {
     this._renderSessionWarning();
   }
 
+  /**
+   * Build the configuration payload from the current form values.
+   *
+   * Empty reply messages are dropped; invalid numeric fields fall back to
+   * the documented defaults.
+   */
   _collect() {
     const replies = this._rules
       .map(r => ({
@@ -197,6 +224,7 @@ class ChatbotEditor {
 
   /* ─── TikTok session (login) ─── */
 
+  /** Load the stored TikTok session metadata and refresh the session UI. */
   async loadSession() {
     try {
       this._sessionInfo = await fetchJSON('/chatbot/session');
@@ -207,6 +235,7 @@ class ChatbotEditor {
     this._renderSessionWarning();
   }
 
+  /** Render the signed-in badge, masked session id and remove-button state. */
   _renderSessionState() {
     const badge = document.getElementById('cb-session-badge');
     const badgeText = document.getElementById('cb-session-badge-text');
@@ -247,6 +276,7 @@ class ChatbotEditor {
     }
   }
 
+  /** Toggle the session id field between password and plain text. */
   toggleSessionVisibility() {
     const field = document.querySelector('#cb-session-card .chatbot-secret-field');
     const input = document.getElementById('cb-session-id');
@@ -256,18 +286,21 @@ class ChatbotEditor {
     field.classList.toggle('revealed', reveal);
   }
 
+  /** Toggle the inline help for obtaining a TikTok session id. */
   toggleSessionHelp() {
     document.getElementById('cb-session-steps')?.classList.toggle('hidden');
   }
 
   /* ─── Webview login (desktop app only, CHATBOT.md §5) ─── */
 
+  /** Return whether the pywebview login bridge is available. */
   _hasWebviewLogin() {
     if (typeof window === 'undefined') return false;
     const api = window.pywebview && window.pywebview.api;
     return !!(api && typeof api.open_tiktok_login === 'function');
   }
 
+  /** Show or hide the webview login button based on bridge availability. */
   _updateWebviewButton() {
     const btn = document.getElementById('cb-session-webview');
     if (!btn) return;
@@ -288,6 +321,12 @@ class ChatbotEditor {
     setTimeout(() => this._checkWebviewAvailability(delays), next);
   }
 
+  /**
+   * Start the interactive TikTok login and poll its state until it finishes.
+   *
+   * Polling stops on a final state, a bridge failure, or after the local
+   * safety deadline. Only one login attempt may run at a time.
+   */
   async webviewLogin() {
     if (this._loginPolling) return;
     const api = window.pywebview && window.pywebview.api;
@@ -336,6 +375,7 @@ class ChatbotEditor {
     }
   }
 
+  /** Report the final webview login state and refresh session data on success. */
   async _handleLoginState(state) {
     switch (state.state) {
       case 'success':
@@ -356,6 +396,7 @@ class ChatbotEditor {
     }
   }
 
+  /** Disable the login button while polling and restore its label afterwards. */
   _setWebviewLoginBusy(busy) {
     const btn = document.getElementById('cb-session-webview');
     if (!btn) return;
@@ -369,6 +410,7 @@ class ChatbotEditor {
     }
   }
 
+  /** Store a pasted session id and optional target idc through the API. */
   async saveSession() {
     const input = document.getElementById('cb-session-id');
     const idcInput = document.getElementById('cb-session-idc');
@@ -396,6 +438,7 @@ class ChatbotEditor {
     }
   }
 
+  /** Delete the stored TikTok session after confirmation. */
   async clearSession() {
     try {
       const confirmed = await showConfirmDialog(
@@ -423,6 +466,7 @@ class ChatbotEditor {
 
   /* ─── Placeholder chips ─── */
 
+  /** Insert a placeholder at the caret of the focused reply message field. */
   insertPlaceholder(text) {
     const msgs = Array.from(document.querySelectorAll('#cb-replies-list .cb-reply-msg'));
     const input = msgs.find(el => el === document.activeElement) || msgs[0];
@@ -437,11 +481,13 @@ class ChatbotEditor {
 
   /* ─── Reply rules ─── */
 
+  /** Return the reply-rule array, creating it lazily. */
   _ruleRows() {
     if (!this._rules) this._rules = [];
     return this._rules;
   }
 
+  /** Append a blank gift reply rule and focus its message field. */
   addRule() {
     this._ruleRows().push({ on: 'gift', match: '', message: '' });
     this.renderRules();
@@ -451,18 +497,21 @@ class ChatbotEditor {
     (last?.querySelector('.cb-reply-msg') || last)?.focus?.();
   }
 
+  /** Remove the reply rule at ``i``. */
   removeRule(i) {
     this._ruleRows().splice(i, 1);
     this.renderRules();
     this._markDirty();
   }
 
+  /** Return the match-field placeholder for the selected reply event. */
   _matchPlaceholder(on) {
     if (on === 'keyword') return I18N.t('chatbot.matchKeywordPlaceholder');
     if (on === 'gift') return I18N.t('chatbot.matchGiftPlaceholder');
     return '';
   }
 
+  /** Render all reply rules and bind their change/input handlers. */
   renderRules() {
     const list = document.getElementById('cb-replies-list');
     if (!list) return;
@@ -501,11 +550,13 @@ class ChatbotEditor {
 
   /* ─── Dirty / save button ─── */
 
+  /** Mark the draft dirty and refresh the save button. */
   _markDirty() {
     this._dirty = true;
     this._updateSaveButton();
   }
 
+  /** Enable the save button only while the draft is dirty. */
   _updateSaveButton() {
     const btn = document.getElementById('chatbot-save');
     if (!btn) return;

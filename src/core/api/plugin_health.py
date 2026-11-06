@@ -31,21 +31,38 @@ class PluginHealthMonitor:
     """
 
     def __init__(self) -> None:
+        """Create an idle monitor; the check task starts in :meth:`start`."""
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
+        """Start the periodic health-check task.
+
+Calling this while a task already exists is a no-op. The task begins with
+a sleep, so the first check runs one interval after startup."""
+
         if self._task is not None:
             return
         self._task = asyncio.create_task(self._run())
         log.info("Plugin health monitor started")
 
     async def stop(self) -> None:
+        """Cancel the periodic health-check task, if any.
+
+The task is cancelled without being awaited and the reference is cleared,
+allowing a later :meth:`start` to create a fresh task."""
+
         if self._task is not None:
             self._task.cancel()
             self._task = None
             log.info("Plugin health monitor stopped")
 
     async def _run(self) -> None:
+        """Run health checks until cancelled.
+
+Each iteration sleeps for the check interval and then evaluates the
+registry. Unexpected errors are logged and the loop continues, so a single
+failed check cannot stop monitoring."""
+
         while True:
             try:
                 await asyncio.sleep(_HEALTH_CHECK_INTERVAL)
@@ -56,6 +73,14 @@ class PluginHealthMonitor:
                 log.exception("Health monitor check failed")
 
     def _check_health(self) -> None:
+        """Update registry health from heartbeat ages.
+
+Only enabled plugins with a recorded heartbeat are considered. A heartbeat
+older than the timeout marks the plugin ``unhealthy`` unless it is already
+``dead``. A fresh heartbeat promotes ``starting``, ``unknown``,
+``unhealthy``, or ``dead`` plugins to ``healthy``; plugins already marked
+healthy are left untouched."""
+
         registry = get_registry()
         now = time.time()
         for plugin in registry.list():

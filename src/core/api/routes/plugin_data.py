@@ -21,6 +21,11 @@ router = APIRouter(tags=["Plugin Data"])
 
 
 class PluginDataSetRequest(BaseModel):
+    """Request body for writing a single plugin data key.
+
+Attributes:
+    value: Arbitrary JSON value to store under the key."""
+
     value: Any
 
 

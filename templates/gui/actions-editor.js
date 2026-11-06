@@ -1,4 +1,11 @@
+/**
+ * Visual editor for ``data/actions.mca``.
+ *
+ * Keeps a parsed trigger list in memory, validates it against the API, renders
+ * the trigger table and command detail panel, and saves through ``PUT /actions``.
+ */
 class ActionsEditor {
+  /** Cache DOM nodes, initialize editor state and bind the static controls. */
   constructor() {
     this.triggers = [];
     this.selectedIndex = -1;
@@ -35,6 +42,7 @@ class ActionsEditor {
     this._bindEvents();
   }
 
+  /** Wire the save/add buttons and the controls of the add-trigger modal. */
   _bindEvents() {
     this.saveBtn?.addEventListener('click', () => this.save());
     this.addBtn?.addEventListener('click', () => this.openAddModal());
@@ -49,6 +57,7 @@ class ActionsEditor {
 
   /* ── Open / Close ── */
 
+  /** Show the editor, reset selection and dirty state, then load triggers. */
   async open() {
     this.el.classList.remove('hidden');
     this.selectedIndex = -1;
@@ -57,6 +66,7 @@ class ActionsEditor {
     this._updateSaveButton();
   }
 
+  /** Close the editor after confirming unsaved changes. */
   async close() {
     if (this.isDirty) {
       const confirmed = await showConfirmDialog(I18N.t('dialog.unsavedTitle'), I18N.t('dialog.unsavedClose'), I18N.t('common.close'), 'btn-danger');
@@ -67,6 +77,7 @@ class ActionsEditor {
     this.el.classList.add('hidden');
   }
 
+  /** Enable saving only when the draft is dirty and has no error/warning diagnostics. */
   _updateSaveButton() {
     const btn = document.getElementById('actions-editor-save');
     if (!btn) return;
@@ -80,6 +91,7 @@ class ActionsEditor {
 
   /* ── Validation ── */
 
+  /** Validate the current triggers through the API and refresh diagnostics. */
   async _validate() {
     try {
       const data = await postJSON('/actions/validate-triggers', { triggers: this.triggers });
@@ -92,11 +104,13 @@ class ActionsEditor {
     this._updateSaveButton();
   }
 
+  /** Debounce validation so typing does not trigger a request per keystroke. */
   _scheduleValidate() {
     if (this._validateTimer) clearTimeout(this._validateTimer);
     this._validateTimer = setTimeout(() => this._validate(), 400);
   }
 
+  /** Render the error/warning summary and per-trigger diagnostic list. */
   _renderDiagnostics() {
     const panel = document.getElementById('actions-diagnostics');
     if (!panel) return;
@@ -125,6 +139,7 @@ class ActionsEditor {
     panel.innerHTML = html;
   }
 
+  /** Load triggers from the API, refresh the table, scripts and diagnostics. */
   async load() {
     try {
       const data = await fetchJSON('/actions');
@@ -139,6 +154,7 @@ class ActionsEditor {
     await this._validate();
   }
 
+  /** Load the gift catalog sorted by coin value, then by name. */
   async loadGifts() {
     try {
       const data = await fetchJSON('/gifts');
@@ -150,6 +166,7 @@ class ActionsEditor {
     }
   }
 
+  /** Ask the backend to refresh the gift catalog and reload the local list. */
   async syncGifts() {
     const btn = document.getElementById('syncGiftsBtn');
     if (btn) { btn.disabled = true; btn.textContent = I18N.t('actions.syncingGifts'); }
@@ -169,6 +186,7 @@ class ActionsEditor {
 
   /* ── Table Rendering ── */
 
+  /** Render the trigger table with type, enabled state and a command summary. */
   renderTable() {
     if (!this.tableBody) return;
     if (!this.triggers.length) {
@@ -202,6 +220,7 @@ class ActionsEditor {
     }
   }
 
+  /** Select a trigger by index and refresh both table and detail panel. */
   selectTrigger(index) {
     this.selectedIndex = index;
     this.renderTable();
@@ -210,6 +229,7 @@ class ActionsEditor {
 
   /* ── Detail Panel ── */
 
+  /** Render the editable command list for one trigger. */
   renderDetail(index) {
     const t = this.triggers[index];
     if (!t) {
@@ -305,6 +325,7 @@ class ActionsEditor {
     this._populateScriptDropdowns();
   }
 
+  /** Fetch the scripting API catalogue used by the script autocomplete. */
   async _populateScriptDropdowns() {
     try {
       const data = await fetchJSON('/actions/scripts');
@@ -315,6 +336,7 @@ class ActionsEditor {
     }
   }
 
+  /** Show the script autocomplete filtered by the current input value. */
   _showScriptDropdown(event, triggerIdx, cmdIdx) {
     const input = event.target;
     const dropdown = input.nextElementSibling;
@@ -350,6 +372,7 @@ class ActionsEditor {
     this._ensureDropdownCloseHandler();
   }
 
+  /** Install the document click listener that closes script dropdowns once per editor. */
   _ensureDropdownCloseHandler() {
     if (this._dropdownCloseHandler) return;
     this._dropdownCloseHandler = true;
@@ -366,6 +389,7 @@ class ActionsEditor {
     });
   }
 
+  /** Apply the chosen script name to the command input. */
   _selectScript(event, scriptName) {
     event.stopPropagation();
     const option = event.target;
@@ -384,6 +408,7 @@ class ActionsEditor {
     this.updateCmd(triggerIdx, cmdIdx, 'command', scriptName);
   }
 
+  /** Re-filter the script dropdown while the user types. */
   _filterScriptDropdown(event) {
     const input = event.target;
     const triggerIdx = parseInt(input.dataset.triggerIdx);
@@ -391,6 +416,7 @@ class ActionsEditor {
     this._showScriptDropdown(event, triggerIdx, cmdIdx);
   }
 
+  /** Ask for confirmation and delete a trigger. */
   async confirmDeleteTrigger(index) {
     if (index < 0 || index >= this.triggers.length) return;
     const trigger = this.triggers[index];
@@ -405,6 +431,7 @@ class ActionsEditor {
     this.removeTrigger(index);
   }
 
+  /** Remove a trigger, mark the draft dirty and keep a neighbouring selection. */
   removeTrigger(index) {
     if (index < 0 || index >= this.triggers.length) return;
     this.triggers.splice(index, 1);
@@ -462,6 +489,7 @@ class ActionsEditor {
     this._scheduleValidate();
   }
 
+  /** Update one command field, then rerender the table and schedule validation. */
   updateCmd(ti, ci, field, value) {
     const cmd = this.triggers[ti]?.commands?.[ci];
     if (cmd) {
@@ -473,6 +501,7 @@ class ActionsEditor {
     }
   }
 
+  /** Update a command field from live typing without rerendering the table. */
   _updateCmdLive(ti, ci, field, value) {
     const cmd = this.triggers[ti]?.commands?.[ci];
     if (cmd) {
@@ -483,6 +512,7 @@ class ActionsEditor {
     }
   }
 
+  /** Append a blank vanilla command to a trigger. */
   addCmd(ti) {
     const t = this.triggers[ti];
     if (!t) return;
@@ -495,6 +525,7 @@ class ActionsEditor {
     this._scheduleValidate();
   }
 
+  /** Remove one command from a trigger. */
   removeCmd(ti, ci) {
     const t = this.triggers[ti];
     if (!t) return;
@@ -508,6 +539,7 @@ class ActionsEditor {
 
   /* ── Add Event Modal (replaces prompt) ── */
 
+  /** Open the add-trigger modal and populate its event/gift choices. */
   async openAddModal() {
     await this.loadGifts();
     this.selectedGiftId = null;
@@ -518,6 +550,7 @@ class ActionsEditor {
     this._onAddTypeChange();
   }
 
+  /** Fill the event dropdown with known events and custom triggers already in use. */
   _populateEventSelect() {
     const select = document.getElementById('actions-add-event-name');
     const customInput = document.getElementById('actions-add-event-custom');
@@ -559,10 +592,12 @@ class ActionsEditor {
     };
   }
 
+  /** Hide the add-trigger modal. */
   _closeAddModal() {
     this.addModal.classList.add('hidden');
   }
 
+  /** Switch the add modal between gift and event panels. */
   _onAddTypeChange() {
     const type = this.addTypeSelect.value;
     const isGift = type === 'gift';
@@ -582,6 +617,7 @@ class ActionsEditor {
     }
   }
 
+  /** Render the selectable gift list filtered by name or id. */
   _renderGiftList() {
     if (!this.addGiftList) return;
     const q = (this.addGiftSearch.value || '').toLowerCase().trim();
@@ -617,6 +653,7 @@ class ActionsEditor {
     this.addGiftList.addEventListener('click', this._boundGiftClick);
   }
 
+  /** Mark one gift as selected and enable its confirm button. */
   _selectGift(id) {
     this.selectedGiftId = id;
     this.addGiftConfirm.disabled = false;
@@ -625,6 +662,7 @@ class ActionsEditor {
     });
   }
 
+  /** Add a ``Gift`` trigger for the selected gift. */
   _confirmAddGift() {
     if (!this.selectedGiftId) return;
     const gift = this.gifts.find(g => g.id === this.selectedGiftId);
@@ -633,6 +671,7 @@ class ActionsEditor {
     this._addTrigger(name, 'Gift');
   }
 
+  /** Add an event or custom trigger from the modal's current selection. */
   _confirmAddEvent() {
     const type = this.addTypeSelect.value;
     if (type === 'gift') return;
@@ -653,6 +692,7 @@ class ActionsEditor {
     this._addTrigger(eventName, 'Event');
   }
 
+  /** Append a new trigger unless the normalized name already exists. */
   _addTrigger(name, type) {
     if (!name || !name.trim()) return;
     const normalized = name.trim().replace(/^'|'$/g, '').toLowerCase();
@@ -679,12 +719,14 @@ class ActionsEditor {
     this._scheduleValidate();
   }
 
+  /** Show an inline error in the add modal. */
   _showAddError(msg) {
     if (!this.addError) return;
     this.addError.textContent = msg;
     this.addError.classList.remove('hidden');
   }
 
+  /** Hide the add modal's inline error. */
   _hideAddError() {
     if (!this.addError) return;
     this.addError.classList.add('hidden');
@@ -692,10 +734,12 @@ class ActionsEditor {
 
   /* ── Save ── */
 
+  /** Save the visual editor draft. */
   async save() {
     await this._saveVisual();
   }
 
+  /** Validate the draft, persist it with ``PUT /actions`` and reload it. */
   async _saveVisual() {
     try {
       for (const t of this.triggers) {
@@ -724,6 +768,7 @@ class ActionsEditor {
     }
   }
 
+  /** Trigger an actions reload and optionally ask the Minecraft server to reload. */
   async _askAndReloadActions() {
     let sendReload = false;
     if (currentConfig && currentConfig.rcon && currentConfig.rcon.enabled) {
@@ -738,6 +783,11 @@ class ActionsEditor {
     }
   }
 
+  /**
+   * Ask whether the server should reload now or later.
+   *
+   * Falls back to ``window.confirm`` when the custom dialog is unavailable.
+   */
   _askServerRestart() {
     const dlg = document.getElementById('actions-restart-dialog');
     const nowBtn = document.getElementById('btn-actions-restart-now');

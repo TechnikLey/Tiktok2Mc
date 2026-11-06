@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Filesystem layout resolution for dev trees, legacy installs and versioned releases."""
+
 import os
 import sys
 from pathlib import Path
@@ -11,6 +13,7 @@ _USER_DATA_DIRS: Final[tuple[str, ...]] = ("config", "data", "server", "versions
 
 
 def get_base_dir() -> Path:
+    """Return the directory of the running executable, or of this module when running from source."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
@@ -183,6 +186,11 @@ def get_plugin_data_dir() -> Path:
 
 
 def get_plugin_dir() -> Path:
+    """Return the directory of the currently loaded plugin or hook entry point.
+
+Frozen builds use the executable directory; source runs inspect ``__main__``
+and fall back to the interpreter directory when no file path is available."""
+
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     try:
@@ -194,6 +202,7 @@ def get_plugin_dir() -> Path:
 
 
 def get_plugin_config_file() -> Path:
+    """Return the plugin-local ``config.yaml`` next to the current entry point."""
     return get_plugin_dir() / "config.yaml"
 
 

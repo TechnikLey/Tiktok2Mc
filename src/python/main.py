@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""TikTok Live to Minecraft bridge: event ingestion, queues and command dispatch."""
+
 # ==================================================
 # main.py - TikTok Live to Minecraft bridge
 # ==================================================
@@ -125,6 +127,14 @@ BASE_DIR = get_base_dir()
 #   TIKTOK2MC_RUNTIME_DIR  — overrides the runtime signal files dir.
 # Both are opt-in; with them unset the behaviour is byte-identical to before.
 def _env_path(name: str) -> Path | None:
+    """Return a resolved path from an environment variable.
+
+Args:
+    name: Environment variable to read.
+
+Returns:
+    The resolved ``Path``, or ``None`` when the variable is unset or empty."""
+
     value = os.environ.get(name)
     return Path(value).resolve() if value else None
 
@@ -157,6 +167,14 @@ class BotContext:
 
     def __init__(self):
         # RCON
+        """Initialise the mutable bridge state shared by all handlers.
+
+The context holds the RCON connection and retry state, loaded config
+values, follow tracking and its caches, like-rate limiting, comment
+command settings, the action and comment queues, datapack and action
+caches, TikTok diagnostics and session counters, and the runtime paths
+used for shutdown signalling."""
+
         self.mc_host = "localhost"
         self.mc_port = 25575
         self.mc_pass = ""
@@ -308,6 +326,12 @@ def _webhook_request_authorized() -> bool:
 
 
 def _bridge_auth_check():
+    """Check the API key on an incoming bridge request.
+
+Returns:
+    ``None`` when the request is authorised, otherwise a ``(body, 401)``
+    tuple describing the missing or invalid credentials."""
+
     if not _webhook_request_authorized():
         return {
             "status": "error",
@@ -496,6 +520,15 @@ def _unpack_trigger_item(item: tuple) -> tuple[str, str, int, HookContext]:
     """Normalize a trigger-queue item to ``(trigger, user, depth, context)``."""
 
     def _as_hook_context(context: object) -> HookContext:
+        """Normalise a trigger context to a ``HookContext``.
+
+Args:
+    value: A ``HookContext``, a mapping, or ``None``.
+
+Returns:
+    The existing context, a context built from the mapping, or an empty
+    context when no usable value was supplied."""
+
         if isinstance(context, HookContext):
             return context
         if isinstance(context, dict):
@@ -1202,6 +1235,14 @@ async def execute_global_command(
 
     # --- 4. ENQUEUE ---
     def _enqueue():
+        """Queue commands for the RCON worker without blocking.
+
+Args:
+    commands: Commands to execute.
+    source_user: User credited as the trigger source, if any.
+
+A full queue is logged and the commands are dropped."""
+
         try:
             ctx.rcon_queue.put_nowait((commands_to_send, source_user))
         except asyncio.QueueFull:
@@ -1283,6 +1324,12 @@ def _publish_event(event_type: str, event_data: dict) -> None:
 
 @app.route("/health", methods=["GET"])
 def handle_health():
+    """Return the bridge health probe response.
+
+Returns:
+    A ``(body, 200)`` tuple containing the service name and whether
+    TikTok handling is currently disabled."""
+
     return {
         "status": "ok",
         "service": "bridge",
@@ -1292,6 +1339,13 @@ def handle_health():
 
 @app.route("/metrics", methods=["GET"])
 def handle_metrics():
+    """Return rolling bridge metrics for the dashboard.
+
+Returns:
+    A ``(body, 200)`` tuple with the event count of the last 60 seconds,
+    queue sizes, TikTok connection state and gift revenue for today and
+    for the current stream."""
+
     import time
 
     now = time.time()
@@ -1353,6 +1407,16 @@ def _apply_mc_queue_semantics(event: str) -> None:
 
 @app.route("/webhook", methods=["POST"])
 def handle_minecraft_events():
+    """Accept an event forwarded by the Minecraft plugin.
+
+Args:
+    None directly; the JSON request body must contain ``event`` and
+    ``data`` fields.
+
+Malformed JSON or a missing event name yields HTTP 400. Accepted events
+are queued for the configured dispatch mode and published as
+``minecraft.<event>``. Returns ``(result, 200)`` on success."""
+
     try:
         data = request.json
     except Exception as e:  # malformed webhook JSON returns 400
@@ -1397,6 +1461,12 @@ def _dispatch_comment_to_plugin(plugin_name: str, cmd_text: str, username: str) 
 
 
 def _dispatch_comment_http(cmd_url, username, cmd_text):
+    """Send a comment command to an HTTP endpoint.
+
+Substitutes ``{user}`` and ``{text}`` with URL-encoded values and posts
+the result with a 5-second timeout. Failures are logged and reported as
+``TIKTOK_0005``; the function does not return a value."""
+
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -1412,6 +1482,12 @@ def _dispatch_comment_http(cmd_url, username, cmd_text):
 
 
 def _dispatch_comment_http_sync(cmd_url, username, cmd_text):
+    """Send a comment command and decode the JSON reply.
+
+Uses the same placeholder substitution as :func:`_dispatch_comment_http`
+but a 10-second timeout. Returns the decoded response body, or ``None``
+when the request fails or the body is not valid JSON."""
+
     try:
         url = cmd_url.replace("{user}", urllib.parse.quote(username, safe=""))
         url = url.replace("{text}", urllib.parse.quote(cmd_text, safe=""))
@@ -1508,6 +1584,11 @@ def _check_connect_failure_threshold(reason: str) -> bool:
 
 
 def _post_tiktok_status(body: bytes) -> None:
+    """Publish a TikTok status event to the control plane.
+
+Sends ``body`` to ``/events`` with the bridge source header. This is best
+effort: failures are reported as ``TIKTOK_0004`` and swallowed."""
+
     try:
         req = urllib.request.Request(
             f"{API_BASE}/events",
@@ -1614,6 +1695,12 @@ def _follow_db_path(configured: Path) -> Path:
 
 
 def _is_sqlite_database(path: Path) -> bool:
+    """Return whether *path* starts with the SQLite header.
+
+Returns:
+    ``True`` for a readable SQLite database, ``False`` for other files or
+    on ``OSError``."""
+
     try:
         with path.open("rb") as fh:
             return fh.read(len(_SQLITE_HEADER)) == _SQLITE_HEADER
@@ -1726,6 +1813,11 @@ def _initialize_follow_tracking(configured: Path, mode: str) -> tuple[Path, set[
 
 
 def _append_follow_tracking(user_lower: str):
+    """Record a followed user in the local database.
+
+Inserts the lower-cased username with ``INSERT OR IGNORE`` and commits.
+Database errors are logged; the function has no return value."""
+
     try:
         with closing(_open_follow_db(ctx.follow_tracking_db, initialize=False)) as conn:
             conn.execute(
@@ -1742,6 +1834,11 @@ def _append_follow_tracking(user_lower: str):
 
 
 def _touch_runtime_shutdown():
+    """Create the runtime shutdown signal file.
+
+The file is used as IPC to tell the supervisor to stop. ``OSError`` is
+logged and otherwise ignored."""
+
     try:
         ctx.runtime_path_shutdown.touch(exist_ok=True)
     except OSError as e:
@@ -2306,6 +2403,12 @@ def _enqueue_comment(item: tuple) -> None:
 
 
 def _comment_worker_main():
+    """Process queued comment events until the process exits.
+
+For every item the worker calls ``_handle_comment_event`` and always
+marks the queue task as done. Unexpected errors are reported as
+``TIKTOK_0003`` without stopping the worker."""
+
     while True:
         item = _comment_queue.get()
         try:
@@ -2320,6 +2423,11 @@ def _comment_worker_main():
 
 
 def _start_comment_worker():
+    """Start the comment worker thread once.
+
+The check and thread creation happen under a lock, so concurrent callers
+cannot start multiple workers."""
+
     global _comment_worker_started
     with _comment_worker_lock:
         if _comment_worker_started:
@@ -2396,6 +2504,12 @@ def _handle_comment_event(
 # ==========================================
 @app.route("/test_comment", methods=["POST"])
 def handle_test_comment():
+    """Inject a test comment through the normal command path.
+
+The JSON body must provide ``user`` and ``text``; invalid input returns
+HTTP 400. On success the comment is processed and the result is returned,
+while unexpected failures produce HTTP 500."""
+
     try:
         data = request.json
         if not data:
@@ -2458,6 +2572,17 @@ def handle_test_comment():
 # ==========================================
 @app.route("/custom_trigger", methods=["POST"])
 def handle_custom_trigger():
+    """Execute a manual trigger from the control plane.
+
+Args:
+    None directly; the JSON body carries ``trigger`` and optional
+    ``user``/``comment`` fields.
+
+The special ``tiktok`` trigger disables or re-enables the TikTok client,
+and ``follow`` goes through the follow handler. Other names are passed to
+the trigger engine. Invalid input returns HTTP 400 and unexpected errors
+HTTP 500."""
+
     try:
         data = request.json
         if not data:
@@ -2580,6 +2705,12 @@ def handle_custom_trigger():
 
 # --- Start webhook server in its own thread ---
 def run_signal_server():
+    """Run the Flask signal server used for local commands.
+
+Binds the configured host and port, warns when binding to ``0.0.0.0``,
+and runs threaded without the reloader. A startup failure is logged; the
+function does not return while the server is running."""
+
     if ctx.server_host == "0.0.0.0":
         log.warning(
             "SECURITY: Webhook server binding to 0.0.0.0 (all interfaces). "
@@ -2609,6 +2740,12 @@ def run_signal_server():
 
 
 def execute_http_command_sync(cmd: str):
+    """Run a shell command configured as an HTTP action.
+
+Uses ``shlex.split`` and ``subprocess.run`` with ``check=True`` and a
+30-second timeout. Invalid syntax, timeouts and non-zero exits are logged;
+the function returns ``None``."""
+
     try:
         args = shlex.split(cmd)
     except ValueError as e:
@@ -2624,6 +2761,12 @@ def execute_http_command_sync(cmd: str):
 
 
 async def execute_http_command(cmd: str):
+    """Run a shell command without blocking the event loop.
+
+Returns:
+    An awaitable that completes after the command executed in a worker
+    thread."""
+
     await asyncio.to_thread(execute_http_command_sync, cmd)
 
 
@@ -2637,6 +2780,11 @@ async def execute_shell_commands(cmds: list[str]):
 # User-friendly name extraction
 # ==========================================
 def get_safe_username(user):
+    """Return a display name for a TikTok user.
+
+Falls back from ``unique_id`` to ``nickname`` and finally ``Unknown`` so
+logging and triggers never receive an empty name."""
+
     name = (
         getattr(user, "unique_id", None) or getattr(user, "nickname", None) or "Unknown"
     )
@@ -2658,6 +2806,15 @@ def user_attr_safe(event, name, default=None):
 
 
 def username_from_event_safe(event, default: str | None = "Unknown"):
+    """Extract a username from an event without raising.
+
+Args:
+    event: TikTok event whose ``user`` attribute is inspected.
+    default: Value returned when no usable name exists.
+
+Returns:
+    ``unique_id``, then ``nickname``, then ``default``."""
+
     return (
         user_attr_safe(event, "unique_id", None)
         or user_attr_safe(event, "nickname", None)
@@ -2671,6 +2828,12 @@ def username_from_event_safe(event, default: str | None = "Unknown"):
 
 
 def create_client(user):
+    """Create and configure the TikTokLive client.
+
+Registers the error listener and raw-event diagnostics first, then all
+event handlers. Returns:
+    The configured ``TikTokLiveClient`` instance."""
+
     client = TikTokLiveClient(unique_id=user)
 
     # A single event-handler exception must never tear down the WebSocket
@@ -2678,6 +2841,10 @@ def create_client(user):
     # listener that propagation kills the whole stream (silence after the
     # initial burst). Registering a handler keeps the loop alive.
     def _on_client_event_error(exc):
+        """Log and report a TikTok client event error.
+
+Reporting failures are swallowed so the event loop keeps running."""
+
         log.error("TikTok event handler error (recovered, loop kept alive): %s", exc)
         get_crash_manager().report_exception(
             TIKTOK_0003, exc=exc, context_info={"source": "client_event_handler"}
@@ -2702,6 +2869,11 @@ def create_client(user):
     # first occurrence and then every 200th, so a silent loop (the old
     # "loop crash"/stranded-reader symptom) is visible in the logs.
     def _log_raw_event(etype: str) -> None:
+        """Record raw-event diagnostics.
+
+Updates the last-event timestamp and counter, then logs the first three
+events and every two-hundredth event to avoid flooding the log."""
+
         now = time.time()
         ctx._last_tiktok_event_ts = now
         cnt = ctx._tiktok_event_counters.get(etype, 0) + 1
@@ -2717,6 +2889,13 @@ def create_client(user):
     # =========================
     @client.on(GiftEvent)
     def on_gift(event: GiftEvent):
+        """Handle a gift event.
+
+Streaking combo updates are ignored so each gift is counted once. The
+gift value is accumulated for the stream and day, the event is published,
+and one trigger is queued per gift count when the gift has a usable name
+or id."""
+
         _log_raw_event("gift")
         try:
             if event.gift.combo:
@@ -2779,6 +2958,11 @@ def create_client(user):
     # =========================
     @client.on(FollowEvent)
     def on_follow(event: FollowEvent):
+        """Handle a new follower.
+
+Increments the session counter, publishes the event and runs the follow
+processing path."""
+
         _log_raw_event("follow")
         username = username_from_event_safe(event)
         ctx.session_follows += 1
@@ -2790,6 +2974,12 @@ def create_client(user):
     # =========================
     @client.on(LikeEvent)
     def on_like(event: LikeEvent):
+        """Handle a like event.
+
+Publishes the event and converts cumulative like counts into positive
+deltas. Trigger dispatch is throttled to roughly one batch every three
+seconds, while errors are reported without interrupting the handler."""
+
         _log_raw_event("like")
         username = username_from_event_safe(event, default=None)
         if username:
@@ -2848,6 +3038,11 @@ def create_client(user):
     # ========================
     @client.on(JoinEvent)
     def on_join(event):
+        """Handle a viewer joining the stream.
+
+Increments the session join counter, publishes the event and queues the
+join trigger when it is enabled."""
+
         _log_raw_event("join")
         username = username_from_event_safe(event)
         ctx.session_joins += 1
@@ -2862,6 +3057,12 @@ def create_client(user):
     # =========================
     @client.on(CommentEvent)
     def on_comment(event):
+        """Handle a chat comment.
+
+After a short warm-up the comment is counted and published. The user is
+resolved once, moderator/superfan/fanclub flags are derived, and the
+comment is handed to the worker queue for command processing."""
+
         _log_raw_event("comment")
         if (
             _connect_time[0] is None
@@ -2887,6 +3088,12 @@ def create_client(user):
             user = None
 
         def _ua(name, default=None):
+            """Read an attribute from a possibly missing user object.
+
+Returns:
+    The attribute value, or ``False`` when the user or attribute is not
+    available."""
+
             return getattr(user, name, default) if user is not None else default
 
         in_fanclub = False
@@ -2915,6 +3122,11 @@ def create_client(user):
     # =========================
     @client.on(ShareEvent)
     def on_share(event):
+        """Handle a share event.
+
+Increments the session share counter, publishes the event and queues the
+share trigger when it is enabled."""
+
         _log_raw_event("share")
         username = username_from_event_safe(event)
         ctx.session_shares += 1
@@ -2929,6 +3141,12 @@ def create_client(user):
     # =========================
     @client.on(LiveEndEvent)
     def on_live_end(_):
+        """Handle the end of a live stream.
+
+Marks the stream as ended, publishes the status, and starts background
+work for revenue and session persistence, the shutdown signal and the
+``live_end`` hook lifecycle event."""
+
         log.info(f"Live ended for @{user}.")
         ctx.tiktok_live = False
         ctx.session_end_ts = time.time()
@@ -2948,6 +3166,11 @@ def create_client(user):
     # =========================
     @client.on(DisconnectEvent)
     def on_disconnect(_):
+        """Handle a dropped TikTok connection.
+
+Marks the stream as not live and publishes the updated status. Session
+counters are intentionally left intact for the reconnect handler."""
+
         log.info(f"Live disconnected: @{user}")
         ctx.tiktok_live = False
         _publish_tiktok_status(False)
@@ -2957,6 +3180,13 @@ def create_client(user):
     # =========================
     @client.on(ConnectEvent)
     def on_connect(_):
+        """Handle a successful TikTok connection.
+
+Records the connect time, marks the stream live, clears the failure
+streak, updates diagnostics, starts a new session when required,
+publishes the status, emits the ``live_start`` hook lifecycle event and
+binds the chatbot to the running loop."""
+
         _connect_time[0] = time.time()
         log.info(f"Live connection established: @{user}")
         ctx.tiktok_live = True
@@ -3037,6 +3267,11 @@ def update_daily_revenue():
 
 
 async def gift_revenue_counter():
+    """Periodically persist daily gift revenue.
+
+Sleeps for ``ctx.autosave_interval_seconds`` between runs and performs
+the write in a worker thread so the event loop is not blocked."""
+
     while True:
         await asyncio.sleep(ctx.autosave_interval_seconds)
         await asyncio.to_thread(update_daily_revenue)
