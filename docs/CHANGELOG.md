@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Comprehensive code documentation** - every Python module, class, and public function under `src/` now has an accurate docstring, including parameters, return values, raised errors, and error codes. The MCA language server and GUI JavaScript modules received complete JSDoc coverage (`app.js` alone gained documentation for all functions, classes, and methods). Comments now explain non-obvious logic and invariants instead of restating the code. This is a documentation-only change; runtime behavior is unchanged.
 - **Config version bumped to 1.2** - the new `tiktok.like_rate_limit` setting is automatically merged into existing configs on startup via `auto_update_config`. No manual action needed.
 - **Complete update system rework** - the update system has been rebuilt to be more robust and reliable. Every download is verified against a signed manifest and per-file checksums before the switch-over, so failed downloads or interrupted updates can no longer break your installation. The running installation is never overwritten in place, and your config, data, plugins and hooks stay exactly where they are.
 - **No shipped plugins anymore** - Death Counter, Spotify, Timer, Win Counter are removed from the shipped release.
