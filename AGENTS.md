@@ -155,6 +155,7 @@ jq '.key' <file.json>                # JSON parsing/inspection
 
 ## 9. AI Agent Workflow
 Working rules:
+- **Documentation is mandatory:** every module, class, public function/method, and non-obvious private helper must have a clean, accurate docstring. State the purpose and document parameters, return values, raised errors (including `core.error_codes` codes) and side effects where relevant, using Google-style `Args:`/`Returns:`/`Raises:` sections. Comments explain why code exists, non-obvious logic and invariants — never just restate the code. Behavior changes require updated docstrings in the same change; a task is not complete with missing or stale documentation.
 - **Analyze first:** read `src/core/paths.py`, `src/core/version.py`, and the relevant route/service before editing.
 - **Reuse existing systems** instead of re-implementing: `TriggerEngine` / `services/actions.py` for triggers, `core/validator.py` for validation, `get_x()` singletons, `ApiService`, `BasePlugin`.
 - **Prefer small, scoped changes;** no drive-by refactors, touch only files the task needs.
