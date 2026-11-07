@@ -23,7 +23,7 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 | `src/core/trigger_engine/` | `TriggerEngine` — **only** place for trigger execution/test logic |
 | `src/plugins/<name>/` | `plugin.json` + `main.py` + `config.yaml`. Scaffold: `python create_plugin.py` |
 | `src/hooks/<name>/` | `hook.json` + `main.py` + `config.yaml`. Scaffold: `python create_hook.py` |
-| `templates/gui/` | Web dashboard (vanilla JS): `app.js`, `actions-editor.js`, `index.html`, `launcher.html`, `style.css`, `design-system.css`; tests in `tests/` (vitest) |
+| `templates/gui/` | Web dashboard (vanilla JS): `index.html`, `launcher.html`, `app.js` (bootstrap), `js/app-*.js` (ordered controller parts), `actions-editor.js`, `chatbot-editor.js`, `style.css`, `design-system.css`; tests in `tests/` (vitest) |
 | `mca-language-server/` | VSCode extension + JS language server for `.mca` (parity with Python validator); tests in `server/test/` |
 | `defaults/` | Templates copied to `config/`+`data/` on first run: `config.yaml`, `actions.mca`, `gifts.json`, `event_commands.yaml`, server configs |
 | `tests/` | pytest: `test_core/`, `test_api/`, `conftest.py` (WriteGuard + heavy-dep mocks), `workspace/` (only writable area) |
@@ -45,10 +45,11 @@ TikTok Live → Minecraft: viewer gifts/follows/likes/comments trigger MC comman
 - Don't remove the heavy-dep mocks in `tests/conftest.py` (TikTokLive, mcrcon, flask).
 
 ## 5. GUI (JS)
-- Vanilla JS, no framework/bundler; globals on one object, `<script>` tags.
-- API helpers at top of `app.js`: `fetchJSON`/`postJSON`/`putJSON`/`_throwResError` (`/api/v1`).
+- Vanilla JS, no framework/bundler; globals on one object, classic `<script>` tags. The dashboard controller is split into ordered parts under `js/app-*.js`; load order is defined in `index.html` and `app.js` must stay last.
+- API helpers in `js/app-00-core.js`: `fetchJSON`/`postJSON`/`putJSON`/`_throwResError` (`/api/v1`).
 - Real-time via SSE (`/api/v1/ws`); pywebview bridge = `pywebview.api.*` (`src/python/gui.py` `LauncherAPI`).
-- Shared DOM helpers stay in `app.js`; `actions-editor.js` reuses them — don't duplicate.
+- Shared DOM helpers in `js/app-75-dom-helpers.js`; `actions-editor.js` reuses them — don't duplicate.
+- Keep classic-script semantics: no ES modules, no `defer`/`async`. Top-level declarations are shared across the parts, so reordering script tags can break load-time wiring.
 - Dark UI: design tokens in `design-system.css`.
 
 ## 6. Configuration System

@@ -1325,7 +1325,35 @@
     <!-- marked is bundled locally (pinned v15.0.12) — no CDN: the dashboard
          runs in a privileged pywebview window and must work offline. -->
     <script src="./vendor/marked.min.js?v=1"></script>
-    <script src="./app.js?v=8"></script>
+    <!-- app.js controller, split into ordered classic scripts. Load order matters:
+         top-level declarations from earlier files are used by later files, and
+         the two wiring blocks at the end of app-20/app-94 rely on declarations
+         in those same files. app.js must stay last. -->
+    <script src="./js/app-00-core.js?v=9"></script>
+    <script src="./js/app-05-ui-shell.js?v=9"></script>
+    <script src="./js/app-10-live-log.js?v=9"></script>
+    <script src="./js/app-15-dashboard.js?v=9"></script>
+    <script src="./js/app-20-servers.js?v=9"></script>
+    <script src="./js/app-25-revenue.js?v=9"></script>
+    <script src="./js/app-30-sessions.js?v=9"></script>
+    <script src="./js/app-35-backups.js?v=9"></script>
+    <script src="./js/app-40-plugins.js?v=9"></script>
+    <script src="./js/app-45-hooks.js?v=9"></script>
+    <script src="./js/app-50-hook-config-editor.js?v=9"></script>
+    <script src="./js/app-55-builtin-config-editor.js?v=9"></script>
+    <script src="./js/app-60-config-wizard.js?v=9"></script>
+    <script src="./js/app-65-config-schema.js?v=9"></script>
+    <script src="./js/app-70-config-editor.js?v=9"></script>
+    <script src="./js/app-75-dom-helpers.js?v=9"></script>
+    <script src="./js/app-80-plugin-config-editor.js?v=9"></script>
+    <script src="./js/app-85-reaction-editor.js?v=9"></script>
+    <script src="./js/app-90-comment-commands-editor.js?v=9"></script>
+    <script src="./js/app-92-editor-lifecycle.js?v=9"></script>
+    <script src="./js/app-94-updates.js?v=9"></script>
+    <script src="./js/app-96-console.js?v=9"></script>
+    <script src="./js/app-97-navigation.js?v=9"></script>
+    <script src="./js/app-98-event-tester.js?v=9"></script>
+    <script src="./app.js?v=9"></script>
 </div>
 </body>
 </html>

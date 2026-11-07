@@ -107,14 +107,24 @@ const shortcutsJs = readFileSync(join(__dirname, '..', 'shortcuts.js'), 'utf-8')
 const accessibilityJs = readFileSync(join(__dirname, '..', 'accessibility.js'), 'utf-8');
 const actionsEditorJs = readFileSync(join(__dirname, '..', 'actions-editor.js'), 'utf-8');
 const chatbotEditorJs = readFileSync(join(__dirname, '..', 'chatbot-editor.js'), 'utf-8');
-const appJs = readFileSync(join(__dirname, '..', 'app.js'), 'utf-8');
 
-// Evaluate in global scope (i18n first: help.js/app.js/actions-editor.js use I18N;
-// help.js second: app.js uses Help; shortcuts.js third: binds global shortcuts)
+// The app controller is split across ordered classic scripts. Use index.html as
+// the single source of truth for their load order so tests and the browser can
+// never drift apart.
+const appSources = Array.from(document.querySelectorAll('script[src]'))
+  .map((script) => script.getAttribute('src') || '')
+  .filter((src) => /^(?:\.\/)?js\/app-[^?]+\.js(?:\?.*)?$/.test(src) || /^(?:\.\/)?app\.js(?:\?.*)?$/.test(src))
+  .map((src) => src.replace(/\?.*$/, ''));
+if (appSources.length === 0) throw new Error('index.html does not reference any app scripts');
+if (!appSources[appSources.length - 1].endsWith('app.js')) throw new Error('app.js must be the last app script');
+const appJsByPath = appSources.map((src) => readFileSync(join(__dirname, '..', src.replace(/^\.\//, '')), 'utf-8'));
+
+// Evaluate in global scope (i18n first: help.js/app parts/actions-editor.js use
+// I18N; help.js second: app parts use Help; shortcuts.js third: binds globals)
 (0, eval)(toGlobalScope(i18nJs));
 (0, eval)(toGlobalScope(helpJs));
 (0, eval)(toGlobalScope(shortcutsJs));
 (0, eval)(toGlobalScope(accessibilityJs));
 (0, eval)(toGlobalScope(actionsEditorJs));
 (0, eval)(toGlobalScope(chatbotEditorJs));
-(0, eval)(toGlobalScope(appJs));
+for (const source of appJsByPath) (0, eval)(toGlobalScope(source));

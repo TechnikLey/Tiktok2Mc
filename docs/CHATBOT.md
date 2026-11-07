@@ -241,7 +241,8 @@ Webview-Flow mal nicht funktioniert).
      Registrierung in `routes/__init__.py`; PUT schreibt das
      `reload_chatbot`-Runtime-Signal für die Bridge
 8. **GUI-Tab „Chatbot"** (`templates/gui/`: Tab in `index.html`, Logik in
-   neuem `chatbot-editor.js`, wiederverwendete DOM-Helper aus `app.js`):
+   neuem `chatbot-editor.js`, wiederverwendete DOM-Helper aus
+   `js/app-75-dom-helpers.js` und API-Helper aus `js/app-00-core.js`):
    - **Bot aktivieren/deaktivieren** (Master-Toggle mit dynamischem Titel,
      schreibt `enabled`; Änderung greift sofort — Toast bestätigt das bzw.
      warnt, wenn die Bridge nicht läuft)

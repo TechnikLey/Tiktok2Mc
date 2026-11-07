@@ -1,9 +1,10 @@
 /**
  * Chatbot editor — config/chatbot.yaml, encrypted TikTok session and live status.
  *
- * Reuses shared DOM/API helpers from app.js (fetchJSON, putJSON,
- * showToast, escapeHtml, I18N).  Loaded before app.js like the other
- * editor modules; app.js globals are only touched inside methods.
+ * Reuses shared dashboard globals from the ordered app parts
+ * (`js/app-00-core.js`: fetchJSON/putJSON, `js/app-10-live-log.js`: showToast,
+ * `js/app-75-dom-helpers.js`: escapeHtml, plus I18N). Loaded before the
+ * app parts; those globals are only touched inside methods.
  */
 class ChatbotEditor {
   /** Cache the editor root, initialize draft state and bind configuration events. */
@@ -568,7 +569,7 @@ class ChatbotEditor {
   /* ─── Live status ─── */
 
   /**
-   * Called by the central SSE dispatcher in app.js when a
+   * Called by the central SSE dispatcher in js/app-96-console.js when a
    * ``chatbot.status`` event arrives (bridge → POST /events → SSE).
    */
   _renderStatus(status) {
