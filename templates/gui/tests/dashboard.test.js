@@ -622,6 +622,33 @@ describe('connectLogStream', () => {
     expect(view.lastChild).toBeTruthy();
     expect(view.lastChild.textContent).toContain('hello');
   });
+
+  it('shows the degraded banner on config.degraded events', () => {
+    connectLogStream();
+    // Seed banner DOM (same structure as index.html).
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div id="degraded-banner" class="restart-banner hidden"><span class="restart-banner__text" id="degraded-banner-text"></span></div>'
+    );
+    const msgEvent = {
+      data: JSON.stringify({
+        type: 'config.degraded',
+        data: { code: 'CONFIG-0009', component: 'gift_catalog', detail: 'helpers.json kaputt', path: 'core/gifts.json' },
+      }),
+    };
+    _sseSource.onmessage(msgEvent);
+    const banner = document.getElementById('degraded-banner');
+    expect(banner.classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('degraded-banner-text').textContent).toContain('gift_catalog');
+    expect(_degradedComponents.has('gift_catalog')).toBe(true);
+    // Second call for the same component does not duplicate the entry.
+    _sseSource.onmessage(msgEvent);
+    expect(_degradedComponents.size).toBe(1);
+    // Dismiss hides the banner without forgetting the state.
+    dismissDegradedBanner();
+    expect(banner.classList.contains('hidden')).toBe(true);
+    document.getElementById('degraded-banner').remove();
+  });
 });
 
 /* ─── TikTok live status ─── */

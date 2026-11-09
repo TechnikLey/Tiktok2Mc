@@ -173,6 +173,7 @@
     'restart.now': 'Restart Now',
     'restart.dismiss': 'Dismiss',
     'restart.later': 'Later',
+    'degraded.banner': 'Degraded modes (running with restricted functionality):',
 
     /* ── Status view ── */
     'status.title': 'Status',
@@ -1300,6 +1301,7 @@
 
     /* ── Restart banner ── */
     'restart.pending': 'Neustart ausstehend, einige Änderungen erfordern einen Neustart.',
+    'degraded.banner': 'Eingeschränkter Modus (läuft mit eingeschränkter Funktionalität):',
     'restart.now': 'Jetzt neu starten',
     'restart.dismiss': 'Ausblenden',
     'restart.later': 'Später',

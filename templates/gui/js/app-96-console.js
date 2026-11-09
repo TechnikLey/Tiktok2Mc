@@ -24,6 +24,9 @@ function connectLogStream() {
     // Reset backoff on successful connection.
     _sseReconnectDelay = 2000;
     liveLog.setConnected(true);
+    // Reconcile degraded component state from the health endpoint: events
+    // fired before the GUI connected would otherwise be missed.
+    initDegradedFromHealth();
   };
   _sseSource.onmessage = (event) => {
     try {
@@ -78,6 +81,8 @@ function connectLogStream() {
         updateEcmDiagnostics(payload);
       } else if (type === 'chatbot.status') {
         chatbotEditor._renderStatus(payload);
+      } else if (type === 'config.degraded') {
+        registerDegraded(payload);
       } else if (type === 'update.available') {
         // Auto-install disabled: show notification if not already shown
         if (!_autoInstallEnabled && !_updateNotificationShown) {
@@ -105,6 +110,67 @@ function connectLogStream() {
     // Exponential backoff up to 10s.
     _sseReconnectDelay = Math.min(_sseReconnectDelay * 1.5, 10000);
   };
+}
+
+/* ─── Degraded Component Banner ─── */
+
+/** Known degraded component states: component name -> payload from report_degraded. */
+const _degradedComponents = new Map();
+
+/**
+ * Register/render one degraded fallback report (from config.degraded SSE).
+ * @param {object} payload - {code, component, message, detail, path} from core.degraded.
+ */
+function registerDegraded(payload) {
+  const component = payload.component || payload.code || 'unknown';
+  _degradedComponents.set(component, payload);
+  renderDegradedBanner();
+  const loc = payload.path ? ' (' + payload.path + ')' : '';
+  liveLog.add(
+    (payload.code || 'DEGRADED') + ': ' + (payload.detail || payload.message || component) + loc,
+    'error',
+    'config'
+  );
+}
+
+/**
+ * Initial synchronisation from /health/extended — catches degraded states
+ * that were reported before the SSE stream was connected.
+ */
+async function initDegradedFromHealth() {
+  try {
+    const data = await fetchJSON('/health/extended');
+    const names = (data.subsystems && data.subsystems.degraded_components) || [];
+    for (const name of names) {
+      if (!_degradedComponents.has(name)) {
+        _degradedComponents.set(name, { component: name, code: 'DEGRADED', detail: '' });
+      }
+    }
+    renderDegradedBanner();
+  } catch (_) {
+    // Health endpoint unavailable — banner stays empty; SSE events cover new cases.
+  }
+}
+
+/** Show or hide the degraded banner and set its summary text. */
+function renderDegradedBanner() {
+  const banner = document.getElementById('degraded-banner');
+  if (!banner) return;
+  const text = document.getElementById('degraded-banner-text');
+  if (_degradedComponents.size === 0) {
+    banner.classList.add('hidden');
+    return;
+  }
+  const names = Array.from(_degradedComponents.keys()).slice(0, 5).join(', ');
+  const more = _degradedComponents.size > 5 ? ' …' : '';
+  text.textContent =
+    I18N.t('degraded.banner') + ' ' + names + more;
+  banner.classList.remove('hidden');
+}
+
+/** User dismissed the banner; new degraded reports will show it again. */
+function dismissDegradedBanner() {
+  document.getElementById('degraded-banner').classList.add('hidden');
 }
 
 /* ─── Live Dashboard Widgets ─── */
