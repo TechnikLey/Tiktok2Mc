@@ -52,8 +52,8 @@ from typing import Any
 class Severity(enum.IntEnum):
     """Ordered severity of an error, from diagnostic to fatal.
 
-Larger values are more severe; the numeric order matches the documented
-severity scale."""
+    Larger values are more severe; the numeric order matches the documented
+    severity scale."""
 
     DEBUG = 0
     INFO = 1
@@ -71,8 +71,8 @@ severity scale."""
     def from_string(cls, s: str) -> Severity:
         """Parse a severity name case-insensitively.
 
-Returns ``WARNING`` for unknown names so callers always receive a usable
-severity."""
+        Returns ``WARNING`` for unknown names so callers always receive a usable
+        severity."""
 
         try:
             return cls[s.upper()]
@@ -82,6 +82,7 @@ severity."""
 
 class Subsystem(str, enum.Enum):
     """Subsystem prefix used to namespace error codes."""
+
     CORE = "CORE"
     PLUGIN = "PLUGIN"
     GUI = "GUI"
@@ -111,7 +112,7 @@ class Subsystem(str, enum.Enum):
     def from_string(cls, s: str) -> Subsystem:
         """Parse a subsystem name case-insensitively.
 
-Unknown names fall back to ``CORE``."""
+        Unknown names fall back to ``CORE``."""
 
         try:
             return cls[s.upper()]
@@ -123,8 +124,8 @@ Unknown names fall back to ``CORE``."""
 class ErrorCode:
     """Registry definition of a stable error code.
 
-Instances are module-level constants and describe the error; per-event
-data belongs in :class:`ErrorInstance`."""
+    Instances are module-level constants and describe the error; per-event
+    data belongs in :class:`ErrorInstance`."""
 
     code: str
     subsystem: Subsystem
@@ -137,12 +138,12 @@ data belongs in :class:`ErrorInstance`."""
     def format(self, detail: str = "", context: dict[str, Any] | None = None) -> str:
         """Render the code, message and optional details as multiple lines.
 
-Args:
-    detail: Extra occurrence-specific text, omitted when empty.
-    context: Key/value diagnostics appended under a ``Context:`` line.
+        Args:
+            detail: Extra occurrence-specific text, omitted when empty.
+            context: Key/value diagnostics appended under a ``Context:`` line.
 
-Returns:
-    The formatted text, including the recovery hint when one is defined."""
+        Returns:
+            The formatted text, including the recovery hint when one is defined."""
 
         parts = [self.code, self.message]
         if detail:
@@ -159,7 +160,7 @@ Returns:
     def with_context(self, **ctx: Any) -> ErrorInstance:
         """Create an :class:`ErrorInstance` carrying the given context.
 
-The keyword arguments become the instance's ``context`` dictionary."""
+        The keyword arguments become the instance's ``context`` dictionary."""
 
         return ErrorInstance(
             code=self.code,
@@ -189,8 +190,8 @@ The keyword arguments become the instance's ``context`` dictionary."""
 class ErrorInstance:
     """One concrete occurrence of an error code.
 
-Adds runtime context, an optional root exception and recovery state to the
-static :class:`ErrorCode` definition."""
+    Adds runtime context, an optional root exception and recovery state to the
+    static :class:`ErrorCode` definition."""
 
     code: str
     subsystem: Subsystem
@@ -207,7 +208,7 @@ static :class:`ErrorCode` definition."""
     def with_exception(self, exc: BaseException) -> ErrorInstance:
         """Attach the originating exception and return this instance.
 
-The instance is modified in place to allow fluent construction."""
+        The instance is modified in place to allow fluent construction."""
 
         self.root_exception = exc
         return self
@@ -215,8 +216,8 @@ The instance is modified in place to allow fluent construction."""
     def format(self) -> str:
         """Render the occurrence with reason, impact, recovery and context.
 
-Returns:
-    A multi-line, human-readable description suitable for logs and the UI."""
+        Returns:
+            A multi-line, human-readable description suitable for logs and the UI."""
 
         parts = [
             self.code,
@@ -815,6 +816,19 @@ CONFIG_0008 = ErrorCode(
     description="A plugin's config.yaml could not be loaded.",
     recovery_hint="Check the plugin configuration file.",
     impact="Plugin defaults will be used.",
+)
+CONFIG_0009 = ErrorCode(
+    code="CONFIG-0009",
+    subsystem=Subsystem.CONFIG,
+    severity=Severity.ERROR,
+    message="Data file unreadable — fallback in use.",
+    description=(
+        "A configuration or data file (e.g. event_commands.yaml, gifts.json) "
+        "could not be parsed, so an empty/default fallback value is used "
+        "while the application keeps running."
+    ),
+    recovery_hint="Fix the syntax of the named file; affected reactions stay disabled until then.",
+    impact="Affected features run without the file's contents until it is repaired.",
 )
 
 # -------------------------------------------------------------- OVERLAY ----

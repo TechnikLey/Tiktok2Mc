@@ -7,6 +7,8 @@ from typing import Any
 
 from ruamel.yaml.comments import CommentedMap
 
+import core.degraded
+import core.error_codes
 import core.paths
 from core.config_lock import config_transaction
 from core.utils import normalize_config_version
@@ -29,8 +31,8 @@ _SECRET_KEY_NAMES = frozenset(
 def _is_secret_key(key: Any) -> bool:
     """Return whether a config key holds a secret value.
 
-Matching is case-insensitive and exact against the known secret key names;
-nested keys are classified by their own name, not their parent path."""
+    Matching is case-insensitive and exact against the known secret key names;
+    nested keys are classified by their own name, not their parent path."""
 
     return str(key).lower() in _SECRET_KEY_NAMES
 
@@ -72,8 +74,8 @@ class ApiService:
     def __init__(self) -> None:
         """Initialise uptime tracking and resolve the config file path.
 
-The normal location is ``config/config.yaml``. In development, when that
-file does not exist, ``defaults/config.yaml`` is used as a read fallback."""
+        The normal location is ``config/config.yaml``. In development, when that
+        file does not exist, ``defaults/config.yaml`` is used as a read fallback."""
 
         self._start_time: datetime = datetime.now(tz=UTC)
 
@@ -85,6 +87,18 @@ file does not exist, ``defaults/config.yaml`` is used as a read fallback."""
             fallback = core.paths.get_root_dir() / "defaults" / "config.yaml"
             if fallback.exists():
                 self.config_path = fallback
+                # A silent fallback masks a broken install: surface it through
+                # the crash manager / health monitor (event bus publish is
+                # skipped in synchronous init context, which is fine — the
+                # info stays available via diagnostics endpoints).
+                core.degraded.report_degraded(
+                    core.error_codes.CONFIG_0009,
+                    "api_config",
+                    "config.yaml not found — using defaults/config.yaml "
+                    "fallback for the API service.",
+                    path=str(fallback),
+                    publish=False,
+                )
 
     # ------------------------------------------------------------------
     # Uptime

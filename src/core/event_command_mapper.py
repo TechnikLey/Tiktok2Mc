@@ -27,6 +27,8 @@ from typing import Any
 
 from ruamel.yaml.error import YAMLError
 
+from core.degraded import report_degraded
+from core.error_codes import CONFIG_0002, CONFIG_0009
 from core.health_monitor import HealthState, get_health_monitor
 from core.paths import get_root_dir
 from core.yaml_utils import load_yaml, save_yaml
@@ -74,7 +76,16 @@ class EventCommandMapper:
             cfg = load_yaml(path)
             return dict(cfg.get("event_commands", {}))
         except (OSError, ValueError, YAMLError) as exc:
-            log.warning("[ECM] Failed to load event_commands config: %s", exc)
+            # A broken event_commands file would previously have disabled all
+            # event→command reactions silently. Report the degraded fallback
+            # (empty mapping) through health/crash/event channels.
+            report_degraded(
+                CONFIG_0002 if isinstance(exc, YAMLError) else CONFIG_0009,
+                "event_command_mapper",
+                f"Failed to load {path}: {exc} — no event commands will be "
+                "dispatched until the file is repaired.",
+                path=str(path),
+            )
             return {}
 
     def _ensure_config_file(self) -> None:

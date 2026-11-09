@@ -35,6 +35,9 @@ from pathlib import Path
 
 import requests
 
+from core.degraded import report_degraded
+from core.error_codes import CONFIG_0009
+
 # NOTE: plain stdlib logger — no filesystem work at import time (tests).
 log: Logger = getLogger(__name__)
 
@@ -171,13 +174,24 @@ def normalize_entries(raw_entries: list) -> list[dict]:
 
 
 def read_catalog(catalog_file: Path) -> list[dict]:
-    """Read a local gifts.json catalog; invalid/missing files read as ``[]``."""
+    """Read a local gifts.json catalog; invalid/missing files read as ``[]``.
+
+    A *missing* file is a normal bootstrap state and stays silent. An
+    *unreadable* file (JSON syntax error, I/O problem) applies the ``[]``
+    fallback **visibly** via :meth:`core.degraded.report_degraded`, so the
+    loss of gift reactions is surfaced instead of hidden in log noise."""
     try:
         data = json.loads(catalog_file.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return []
     except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
-        log.warning("Could not read gift catalog %s: %s", catalog_file, exc)
+        report_degraded(
+            CONFIG_0009,
+            "gift_catalog",
+            f"Could not read gift catalog {catalog_file}: {exc} — an empty "
+            "gift catalog is used until the file is repaired.",
+            path=str(catalog_file),
+        )
         return []
     return data if isinstance(data, list) else []
 
