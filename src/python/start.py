@@ -39,6 +39,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
@@ -53,7 +54,13 @@ from core.api.updater import set_last_update_result  # noqa: E402
 from core.config_gate import load_and_validate_config  # noqa: E402
 from core.crash_manager import CrashManager  # noqa: E402
 from core.diagnostics import generate_diagnostics_report  # noqa: E402
-from core.error_codes import CORE_0001, PLUGIN_0010, SHUTDOWN_0004  # noqa: E402
+from core.error_codes import (  # noqa: E402
+    CORE_0001,
+    LIFECYCLE_0012,
+    LIFECYCLE_0013,
+    PLUGIN_0010,
+    SHUTDOWN_0004,
+)
 from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
 from core.lifecycle import (  # noqa: E402
     ProcessState,
@@ -1321,6 +1328,94 @@ async def command_loop() -> None:
 _PLUGIN_HEALTH_INTERVAL = 15.0
 _AUTO_RESTART_PLUGINS = True
 _BUILTIN_NAMES = {"App", "Minecraft Server", "GUI", "Overlay"}
+# Built-ins with bounded auto-restart. GUI/Overlay are deliberately excluded:
+# a user closing them is intentional and restarting would fight the user.
+_AUTO_RESTART_BUILTINS = {"App", "Minecraft Server"}
+_RESTART_BUDGET = 3
+_RESTART_WINDOW = 300.0  # seconds (5 minutes)
+
+# name -> deque of restart timestamps within the window (for budget checks)
+_builtin_restart_times: dict[str, deque] = {}
+
+
+def _builtin_restart_allowed(name: str) -> bool:
+    """Return whether the restart budget still allows restarting *name*.
+
+    Two criteria must hold: the sliding budget window (restarts within the
+    last ``_RESTART_WINDOW`` seconds must be below ``_RESTART_BUDGET``) and
+    the process must not have already been permanently given up on.
+    Budget state is kept in :data:`_builtin_restart_times`.
+
+    Args:
+        name: Supervisor process name (e.g. ``"App"``).
+
+    Returns:
+        ``True`` when a restart may be attempted.
+    """
+    times = _builtin_restart_times.setdefault(name, deque())
+    now = time.monotonic()
+    while times and now - times[0] > _RESTART_WINDOW:
+        times.popleft()
+    if len(times) >= _RESTART_BUDGET:
+        return False
+    times.append(now)
+    return True
+
+
+async def _restart_builtin(proc) -> None:
+    """Restart a dead built-in process with a structured report.
+
+    Args:
+        proc: Supervisor ``ProcEntry`` (name, state, restart_count...).
+    """
+    name = proc.name
+    if not _builtin_restart_allowed(name):
+        log.error(
+            "Auto-restart limit for '%s' exhausted (%d restarts in %ds) — "
+            "leaving it stopped until manually restarted",
+            name,
+            _RESTART_BUDGET,
+            _RESTART_WINDOW,
+        )
+        proc.state = ProcessState.FAILED
+        _health_mon.set_state(f"process.{name}", HealthState.FAILED)
+        _health_mon.record_error(
+            f"process.{name}",
+            f"Restart limit exhausted ({LIFECYCLE_0013.code}), process stays down",
+        )
+        crash_mgr.report_error(
+            LIFECYCLE_0013,
+            detail=f"Built-in process '{name}' crashed repeatedly; not restarting.",
+            context_info={"process": name},
+        )
+        return
+
+    log.warning(
+        "Built-in process '%s' died — auto-restarting (attempt within budget) ...",
+        name,
+    )
+    crash_mgr.report_error(
+        LIFECYCLE_0012,
+        detail=f"Built-in process '{name}' died; auto-restarting.",
+        context_info={
+            "process": name,
+            "exit_code": proc.proc.returncode if proc.proc is not None else None,
+        },
+    )
+    proc.state = ProcessState.FAILED
+    proc.restart_count += 1
+    try:
+        await supervisor.start(name)
+        log.info("Built-in process '%s' restarted successfully", name)
+    except Exception as exc:
+        # supervisor.start failures are reported and re-attempted on the
+        # next health check cycle while the budget allows it.
+        crash_mgr.report_exception(
+            error_code=LIFECYCLE_0012,
+            exc=exc,
+            context_info={"source": "builtin_restart", "process": name},
+        )
+        log.warning("Auto-restart of '%s' failed: %s", name, exc)
 
 
 async def _plugin_health_check_loop() -> None:
@@ -1341,7 +1436,10 @@ async def _plugin_health_check_loop() -> None:
                 continue
 
             if proc.name in _BUILTIN_NAMES:
-                # Built-in processes are handled by dedicated workers
+                # GUI/Overlay: no auto-restart (user-controlled processes).
+                # App/Minecraft Server: bounded auto-restart (Stufe 3).
+                if proc.name in _AUTO_RESTART_BUILTINS:
+                    await _restart_builtin(proc)
                 continue
 
             exit_code = proc.proc.returncode if proc.proc is not None else "?"

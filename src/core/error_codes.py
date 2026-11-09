@@ -1014,6 +1014,33 @@ LIFECYCLE_0011 = ErrorCode(
     recovery_hint="Check runtime directory permissions.",
     impact="Plugin may not auto-restart.",
 )
+LIFECYCLE_0012 = ErrorCode(
+    code="LIFECYCLE-0012",
+    subsystem=Subsystem.LIFECYCLE,
+    severity=Severity.ERROR,
+    message="Built-in process died unexpectedly.",
+    description=(
+        "A supervised built-in process (bridge 'App' or 'Minecraft Server') "
+        "exited unexpectedly. A bounded auto-restart attempt is made."
+    ),
+    recovery_hint="Check the process log; repeated occurrences indicate a crash loop.",
+    impact="A auto-restart is attempted; with restart-limit exhaustion the process stays down.",
+)
+LIFECYCLE_0013 = ErrorCode(
+    code="LIFECYCLE-0013",
+    subsystem=Subsystem.LIFECYCLE,
+    severity=Severity.ERROR,
+    message="Auto-restart limit exhausted.",
+    description=(
+        "A built-in process died more often than the restart budget allows "
+        "within the restart window; the supervisor gives up restarting it."
+    ),
+    recovery_hint=(
+        "Fix the underlying crash cause (check the process log), then start "
+        "the component manually from the dashboard."
+    ),
+    impact="The affected built-in process stays stopped until manually restarted.",
+)
 
 # ------------------------------------------------------------------- MC ----
 MC_0001 = ErrorCode(
