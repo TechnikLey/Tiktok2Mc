@@ -50,9 +50,10 @@ from core.api.launcher import PluginLauncher  # noqa: E402
 from core.api.models import API_VERSION  # noqa: E402
 from core.api.server import DEFAULT_PORT  # noqa: E402
 from core.api.updater import set_last_update_result  # noqa: E402
+from core.config_gate import load_and_validate_config  # noqa: E402
 from core.crash_manager import CrashManager  # noqa: E402
 from core.diagnostics import generate_diagnostics_report  # noqa: E402
-from core.error_codes import CORE_0001, LIFECYCLE_0001, SHUTDOWN_0004  # noqa: E402
+from core.error_codes import CORE_0001, PLUGIN_0010, SHUTDOWN_0004  # noqa: E402
 from core.health_monitor import HealthState, get_health_monitor  # noqa: E402
 from core.lifecycle import (  # noqa: E402
     ProcessState,
@@ -81,7 +82,6 @@ from core.shutdown import (  # noqa: E402
     get_shutdown_controller,
 )
 from core.update_exit import EXIT_MESSAGES, EXIT_NO_UPDATE, EXIT_OK  # noqa: E402
-from core.utils import load_config  # noqa: E402
 from core.validation_framework import (  # noqa: E402
     run_startup_validation,
     validate_runtime,
@@ -188,13 +188,21 @@ except ImportError:
     log.debug("update engine not available; skipping launcher maintenance")
 
 # -----------------------------
-# Load configuration
+# Load configuration (single central gate — once at startup)
 # -----------------------------
-try:
-    cfg = load_config(CONFIG_FILE)
-except (FileNotFoundError, ValueError, RuntimeError) as e:
-    log.error("Failed to load config: %s", e)
+_cfg_gate = load_and_validate_config(CONFIG_FILE, crash_manager=crash_mgr)
+if _cfg_gate.fatal or not _cfg_gate.ok:
+    for _issue in _cfg_gate.issues:
+        (log.error if _issue.fatal else log.warning)(
+            "[CONFIG-GATE] %s", _issue.format()
+        )
+if _cfg_gate.fatal:
+    log.error(
+        "Configuration could not be loaded (%d fatal issue(s)) — exiting",
+        len(_cfg_gate.issues),
+    )
     _input_confirm_exit("Press Enter to exit...")
+cfg = _cfg_gate.config if _cfg_gate.config is not None else {}
 
 if sys.platform != "win32" and cfg.get("show_sudo_warning", True):
     if os.geteuid() != 0:
@@ -395,7 +403,7 @@ _SERVER_HOST = cfg.get("server_host", "127.0.0.1")
 def replace_updater_if_exists() -> None:
     """Replace the updater binary with a newly downloaded one when present.
 
-A locked target only logs a message; the caller continues starting."""
+    A locked target only logs a message; the caller continues starting."""
 
     if update_new.exists():
         log.info("[..] New updater found. Installing...")
@@ -865,8 +873,8 @@ async def _check_plugin_updates() -> None:
     def _fetch():
         """Fetch the plugin update summary from the API in a worker thread.
 
-Returns:
-    The decoded JSON mapping, or ``None`` on any request or decode error."""
+        Returns:
+            The decoded JSON mapping, or ``None`` on any request or decode error."""
 
         try:
             with urllib.request.urlopen(
@@ -900,8 +908,8 @@ async def _fetch_plugin_path(plugin_name: str) -> str:
     def _fetch():
         """Fetch a plugin's executable path from the API in a worker thread.
 
-Returns:
-    The path, or an empty string on any request or decode error."""
+        Returns:
+            The path, or an empty string on any request or decode error."""
 
         try:
             encoded = urllib.parse.quote(plugin_name, safe="")
@@ -924,7 +932,7 @@ async def _mark_plugin_dead(plugin_name: str) -> None:
     def _put():
         """Send the dead/disabled health update for one plugin.
 
-Runs in a worker thread; request errors propagate to the caller."""
+        Runs in a worker thread; request errors propagate to the caller."""
 
         encoded = urllib.parse.quote(plugin_name, safe="")
         data = json.dumps({"health_status": "dead", "enabled": False}).encode("utf-8")
@@ -1430,8 +1438,10 @@ async def main() -> None:
     supervisor.shutdown_delay = float(SHUTDOWN_DELAY_SECONDS)
 
     # Run startup validation
+    # The config file has already been loaded and validated once through
+    # the central config gate at module level; only directories get
+    # re-checked here.
     startup_suite = run_startup_validation(
-        config_path=CONFIG_FILE,
         required_dirs=[
             (ROOT_DIR / "config", "config", False),
             (ROOT_DIR / "logs", "logs", True),
@@ -1462,7 +1472,7 @@ async def main() -> None:
         _register_plugins(plugin_registry)
     except Exception as exc:  # non-fatal; reported via crash manager
         crash_mgr.report_error(
-            LIFECYCLE_0001,
+            PLUGIN_0010,
             detail=f"Plugin discovery failed: {exc}",
             context_info={"phase": "startup"},
         )
@@ -1558,7 +1568,7 @@ async def main() -> None:
 def _mc_plugin_sanitize_name(name: str) -> str:
     """Strip archive suffixes and unsafe characters from a plugin name.
 
-Only letters, digits, dot, underscore and hyphen are kept."""
+    Only letters, digits, dot, underscore and hyphen are kept."""
 
     import re
 

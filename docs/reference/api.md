@@ -44,16 +44,16 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/actions` | Get Actions |
-| PUT | `/api/v1/actions` | Update Actions |
-| GET | `/api/v1/actions/raw` | Get Actions Raw |
-| PUT | `/api/v1/actions/raw` | Update Actions Raw |
-| GET | `/api/v1/actions/scripts` | Get Registered Scripts |
-| GET | `/api/v1/actions/validate` | Validate Actions |
-| POST | `/api/v1/actions/validate` | Validate Actions Content |
-| POST | `/api/v1/actions/validate-triggers` | Validate Triggers Structured |
-| GET | `/api/v1/gifts` | Get Gifts |
-| POST | `/api/v1/gifts/sync` | Sync Gifts Catalog |
+| GET | `/api/v1/actions` | Return all parsed action triggers (``GET /actions``) |
+| PUT | `/api/v1/actions` | Validate, serialise and persist structured triggers (``PUT /actions``) |
+| GET | `/api/v1/actions/raw` | Return raw `` |
+| PUT | `/api/v1/actions/raw` | Validate and persist raw `` |
+| GET | `/api/v1/actions/scripts` | List script actions registered by hooks (``GET /actions/scripts``) |
+| GET | `/api/v1/actions/validate` | Validate the stored `` |
+| POST | `/api/v1/actions/validate` | Validate the supplied `` |
+| POST | `/api/v1/actions/validate-triggers` | Validate structured triggers without saving (``POST /actions/validate-triggers``) |
+| GET | `/api/v1/gifts` | Return the gift catalog enriched with image URLs (``GET /gifts``) |
+| POST | `/api/v1/gifts/sync` | Fetch and persist an updated gift catalog (``POST /gifts/sync``) |
 
 ## Backups
 
@@ -78,15 +78,15 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/comment-commands` | Get Comment Commands |
-| PUT | `/api/v1/comment-commands` | Update Comment Commands |
+| GET | `/api/v1/comment-commands` | Return the comment-command mapping and the file it came from |
+| PUT | `/api/v1/comment-commands` | Persist a new comment-command mapping to the data directory |
 
 ## Config
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/config` | Get Config |
-| PUT | `/api/v1/config` | Update Config |
+| GET | `/api/v1/config` | Return the effective configuration with secrets redacted |
+| PUT | `/api/v1/config` | Persist a configuration update and return the stored result |
 
 ## Config Bundle
 
@@ -109,8 +109,8 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/event-commands` | Get Event Commands |
-| PUT | `/api/v1/event-commands` | Update Event Commands |
+| GET | `/api/v1/event-commands` | Return the event-command mapping and the file it came from |
+| PUT | `/api/v1/event-commands` | Persist a new event-command mapping to the data directory |
 
 ## Events
 
@@ -124,9 +124,9 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/health` | Health |
+| GET | `/api/v1/health` | Return the minimal liveness response with API and tool versions |
 | GET | `/api/v1/health/extended` | Extended health check with subsystem status |
-| GET | `/api/v1/status` | Status |
+| GET | `/api/v1/status` | Return aggregated runtime status for plugins, TikTok and the bridge |
 
 ## Hooks
 
@@ -160,11 +160,11 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/server/{instance_id}/mc-plugins` | List Mc Plugins |
-| POST | `/api/v1/server/{instance_id}/mc-plugins/upload` | Upload Mc Plugin |
-| DELETE | `/api/v1/server/{instance_id}/mc-plugins/{plugin_name}` | Delete Mc Plugin |
-| POST | `/api/v1/server/{instance_id}/mc-plugins/{plugin_name}/disable` | Disable Mc Plugin |
-| POST | `/api/v1/server/{instance_id}/mc-plugins/{plugin_name}/enable` | Enable Mc Plugin |
+| GET | `/api/v1/server/{instance_id}/mc-plugins` | List installed plugins for a server instance (``GET |
+| POST | `/api/v1/server/{instance_id}/mc-plugins/upload` | Stream an uploaded `` |
+| DELETE | `/api/v1/server/{instance_id}/mc-plugins/{plugin_name}` | Delete a plugin jar (or its disabled variant) from an instance |
+| POST | `/api/v1/server/{instance_id}/mc-plugins/{plugin_name}/disable` | Disable a plugin by appending the `` |
+| POST | `/api/v1/server/{instance_id}/mc-plugins/{plugin_name}/enable` | Enable a plugin by removing its `` |
 
 ## Notifications
 
@@ -253,10 +253,10 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| POST | `/api/v1/rcon/command` | Send Command |
-| POST | `/api/v1/rcon/connect` | Connect |
-| POST | `/api/v1/rcon/disconnect` | Disconnect |
-| GET | `/api/v1/rcon/status` | Get Status |
+| POST | `/api/v1/rcon/command` | Execute a command when the HTTP command API is enabled (``POST /rcon/command``) |
+| POST | `/api/v1/rcon/connect` | Connect using the configured RCON settings (``POST /rcon/connect``) |
+| POST | `/api/v1/rcon/disconnect` | Disconnect RCON and stop console capture for the default instance |
+| GET | `/api/v1/rcon/status` | Return the current RCON connection state (``GET /rcon/status``) |
 
 ## Reactions
 
@@ -281,34 +281,34 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| POST | `/api/v1/server/java/install` | Java Install |
-| GET | `/api/v1/server/java/status` | Java Status |
-| POST | `/api/v1/server/restart` | Server Restart |
-| POST | `/api/v1/server/start` | Server Start |
-| GET | `/api/v1/server/status` | Server Status |
-| POST | `/api/v1/server/stop` | Server Stop |
-| POST | `/api/v1/server/{instance_id}/restart` | Server Instance Restart |
-| POST | `/api/v1/server/{instance_id}/start` | Server Instance Start |
-| GET | `/api/v1/server/{instance_id}/status` | Server Instance Status |
-| POST | `/api/v1/server/{instance_id}/stop` | Server Instance Stop |
+| POST | `/api/v1/server/java/install` | Report or start a platform-specific Java installation (``POST /server/java/install``) |
+| GET | `/api/v1/server/java/status` | Return Java detection and installation status (``GET /server/java/status``) |
+| POST | `/api/v1/server/restart` | Restart the default server instance |
+| POST | `/api/v1/server/start` | Start the default server instance |
+| GET | `/api/v1/server/status` | Return status for the default server instance |
+| POST | `/api/v1/server/stop` | Stop the default server instance |
+| POST | `/api/v1/server/{instance_id}/restart` | Restart an instance in the background |
+| POST | `/api/v1/server/{instance_id}/start` | Start an instance after a Java pre-flight check |
+| GET | `/api/v1/server/{instance_id}/status` | Return lifecycle status for one server instance |
+| POST | `/api/v1/server/{instance_id}/stop` | Stop an instance through the supervisor |
 
 ## Servers
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/servers` | List Servers |
-| POST | `/api/v1/servers/custom` | Upload Custom Jar |
-| POST | `/api/v1/servers/download` | Download Version |
-| GET | `/api/v1/servers/instances` | List Instances |
-| POST | `/api/v1/servers/instances` | Create Instance |
-| DELETE | `/api/v1/servers/instances/{instance_id}` | Delete Instance |
-| GET | `/api/v1/servers/instances/{instance_id}` | Get Instance |
-| PUT | `/api/v1/servers/instances/{instance_id}` | Update Instance |
-| POST | `/api/v1/servers/instances/{instance_id}/open` | Open Instance Folder |
+| GET | `/api/v1/servers` | Return installed versions, configured instances and the active version |
+| POST | `/api/v1/servers/custom` | Store an uploaded jar as a custom server version |
+| POST | `/api/v1/servers/download` | Download a PaperMC server jar for *version* |
+| GET | `/api/v1/servers/instances` | Return all configured instances with their live status |
+| POST | `/api/v1/servers/instances` | Create a server instance from a downloaded version |
+| DELETE | `/api/v1/servers/instances/{instance_id}` | Remove an instance from the config and delete its data directory |
+| GET | `/api/v1/servers/instances/{instance_id}` | Return one configured instance with its live status |
+| PUT | `/api/v1/servers/instances/{instance_id}` | Apply the provided fields to an existing instance |
+| POST | `/api/v1/servers/instances/{instance_id}/open` | Open an instance folder in the operating system's file manager |
 | GET | `/api/v1/servers/instances/{instance_id}/path` | Return the absolute on-disk folder path of a server instance |
-| PUT | `/api/v1/servers/instances/{instance_id}/version` | Set Instance Version |
-| POST | `/api/v1/servers/switch` | Switch Version |
-| DELETE | `/api/v1/servers/{version}` | Remove Version |
+| PUT | `/api/v1/servers/instances/{instance_id}/version` | Record a version for an instance without changing its jar |
+| POST | `/api/v1/servers/switch` | Activate a downloaded version for the default instance |
+| DELETE | `/api/v1/servers/{version}` | Delete a downloaded version directory |
 
 ## Sessions
 
@@ -328,13 +328,13 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| POST | `/api/v1/triggers/comment` | Send Test Comment |
+| POST | `/api/v1/triggers/comment` | Send a simulated comment through the trigger service |
 | POST | `/api/v1/triggers/dispatch` | Programmatic trigger execution for extensions (no GUI debounce) |
-| POST | `/api/v1/triggers/execute` | Execute Trigger |
-| GET | `/api/v1/triggers/history` | Get Trigger History |
-| GET | `/api/v1/triggers/like-milestones` | Get Like Milestones |
-| POST | `/api/v1/triggers/tiktok-connection` | Toggle Tiktok Connection |
-| GET | `/api/v1/triggers/types` | List Trigger Types |
+| POST | `/api/v1/triggers/execute` | Execute a trigger as a simulated event-tester action |
+| GET | `/api/v1/triggers/history` | Return the trigger service's recent execution history |
+| GET | `/api/v1/triggers/like-milestones` | Return the configured like milestones |
+| POST | `/api/v1/triggers/tiktok-connection` | Toggle the bridge's TikTok connection |
+| GET | `/api/v1/triggers/types` | Return the trigger types supported by the event tester |
 
 ## Updater
 
@@ -352,14 +352,14 @@ All 159 registered endpoints on the `/api/v1` router. Interactive OpenAPI docs a
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/versions` | List Versions |
-| POST | `/api/v1/versions/set` | Set Version |
+| GET | `/api/v1/versions` | List supported PaperMC versions and the configured default (``GET /versions``) |
+| POST | `/api/v1/versions/set` | Validate and persist the selected server version (``POST /versions/set``) |
 
 ## builtins
 
 | Method | Path | Summary |
 | --- | --- | --- |
-| GET | `/api/v1/builtins` | Get Builtins |
-| GET | `/api/v1/builtins/{name}/config` | Get Builtin Config |
-| PUT | `/api/v1/builtins/{name}/config` | Put Builtin Config |
-| GET | `/api/v1/builtins/{name}/config/schema` | Get Builtin Config Schema |
+| GET | `/api/v1/builtins` | List all built-in script actions and their metadata |
+| GET | `/api/v1/builtins/{name}/config` | Return the stored configuration for one built-in action |
+| PUT | `/api/v1/builtins/{name}/config` | Replace the configuration of a built-in action |
+| GET | `/api/v1/builtins/{name}/config/schema` | Return the configuration schema declared by a built-in action |

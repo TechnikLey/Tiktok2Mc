@@ -124,7 +124,10 @@ class TestModuleReference:
         assert "| Modules | With docstrings |" in text
         assert "## `core.gift_sync`" in text
         assert "## `core.api.server`" in text
-        assert "## Modules without docstrings" in text
+        # The "Modules without docstrings" section only appears when at
+        # least one module is undocumented. Doc coverage is complete, so
+        # every collected module must be listed with its own section.
+        assert text.count("## `core.") == len(generator.collect_modules())
 
     def test_generated_notice_present(self, generator: ModuleType) -> None:
         assert generator.GENERATED_NOTE in generator.render_modules()
