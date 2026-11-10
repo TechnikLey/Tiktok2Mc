@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable diamond payout rate** - the Revenue view now reads the payout per diamond from the new `tiktok.diamond_value_usd` setting (default `0.004`) and converts USD→EUR with the current exchange rate instead of a fixed value.
 - **Per-viewer like limit** - the new `tiktok.like_rate_limit` setting caps how many likes a single viewer can add to the like counter per rolling minute (disabled by default; limit `500`; `0` = unlimited). Likes above the limit are ignored by like triggers, so one account can no longer farm milestone rewards by spamming likes.
 - **SQLite follower tracking** - the follow-tracking list now lives in `data/followed_users.db` instead of a plain text file. It handles 100K+ entries efficiently, writes atomically, and legacy `followed_users.txt` lists are imported automatically and archived.
+- **Safer startup with clear error messages** - a missing or broken `config.yaml` no longer lets the tool start "half working". The app now stops with a readable error message instead — including the exact line and column of a YAML syntax error — so problems are visible immediately instead of causing mysterious misbehavior later.
+- **Degraded-mode banner** - when a data file (event commands, gift catalog) is unreadable, the tool keeps running but the dashboard now shows a banner listing which components are operating with restricted functionality. Problems no longer go unnoticed.
+- **Automatic restart for bridge and Minecraft server** - if the TikTok bridge or the Minecraft server process crashes, the supervisor restarts it automatically (up to 3 times within 5 minutes). If it keeps failing, this is clearly reported instead of silently leaving you with nothing working.
+- **Clear errors for a broken actions file** - a missing `data/actions.mca` (or one containing validation errors) is now reported as a structured error in the diagnostics and dashboard instead of reactions just silently not firing. Previously working reactions stay active until a reload succeeds.
 
 ### Changed
 
@@ -36,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Outdated gift names and IDs in the gift database** - new TikTok gifts were missing and renamed gifts still showed their old names (over 150 current gifts were not in the shipped snapshot). The catalog now stays current.
+- **Config files can no longer be corrupted by concurrent access** - saving configuration while the dashboard reads the same file could fail on Windows ("file in use"). Config saves now retry briefly, making them robust when the dashboard polls at the same time.
+- **More reliable shutdown and internal restarts** - background services (event bridge, outbound dispatcher, overlays, trackers) now stop cleanly even when an app section was restarted before, which could previously cause hangs or a flood of internal error messages. Internal health-state reporting at shutdown no longer logs spurious warnings.
 
 ---
 
