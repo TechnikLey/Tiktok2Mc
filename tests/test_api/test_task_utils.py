@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 
 import pytest
 
@@ -100,6 +101,14 @@ class TestStopTaskSafely:
                     holder["task"], on_abandoned=lambda: calls.append(True)
                 )
             )
+            # The cancel was scheduled on the foreign loop; give it a moment
+            # to process before that loop is stopped (call_soon_threadsafe
+            # callbacks never run once the loop is stopped — stopping too
+            # early would leave the task pending and flake this assertion).
+            for _ in range(100):
+                if holder["task"].cancelled():
+                    break
+                time.sleep(0.02)
         finally:
             _stop_loop_thread(holder, thread)
         assert calls == [True]

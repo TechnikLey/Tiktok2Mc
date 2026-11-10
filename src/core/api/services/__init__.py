@@ -113,10 +113,36 @@ class ApiService:
     # ------------------------------------------------------------------
 
     def read_config(self) -> dict[str, Any]:
-        """Load the YAML config file and normalise its version."""
+        """Load the YAML config file and normalise its version.
+
+        If the user config exists but cannot be parsed (e.g. a YAML syntax
+        error), the shipped ``defaults/config.yaml`` is served instead of
+        raising — a broken config would otherwise turn every config-reading
+        endpoint into an HTTP 500 and take the whole dashboard down. The
+        fallback is surfaced as a degraded report (CONFIG-0002), which the
+        dashboard shows in its degraded-mode banner.
+
+        Raises:
+            FileNotFoundError: neither the user config nor the defaults
+                fallback exists.
+        """
         if not self.config_path.exists():
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
-        data = load_yaml(self.config_path)
+        try:
+            data = load_yaml(self.config_path)
+        except (OSError, ValueError) as exc:
+            fallback = core.paths.get_root_dir() / "defaults" / "config.yaml"
+            if not fallback.exists():
+                raise
+            core.degraded.report_degraded(
+                core.error_codes.CONFIG_0002,
+                "api_config",
+                "config.yaml could not be parsed — serving "
+                "defaults/config.yaml until it is fixed. "
+                f"Parse error: {exc}",
+                path=str(self.config_path),
+            )
+            data = load_yaml(fallback)
 
         # Normalise legacy integer / string config_version on load
         if "config_version" in data:
