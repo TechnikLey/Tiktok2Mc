@@ -3600,47 +3600,62 @@ def _read_signal_options(path: Path) -> dict:
     return {"send_minecraft_reload": True}
 
 
-_last_actions_mtime: int | None = None
-_pending_actions_mtime: int | None = None
+class _MtimeAutoReload:
+    """Debounced modification-time poller for one watched file.
+
+    The first successful observation establishes the baseline (never fires
+    right after startup). A change is reported only once the mtime is stable
+    across two consecutive polls, which debounces writes that are still in
+    progress. A missing or unreadable file polls as "no change"."""
+
+    def __init__(self) -> None:
+        self._last: int | None = None
+        self._pending: int | None = None
+
+    def poll(self, path: Path) -> bool:
+        """Observe *path* once; return ``True`` when a stable change occurred."""
+        try:
+            mtime = path.stat().st_mtime_ns
+        except OSError:
+            return False  # file missing or unreadable — nothing to watch
+        if self._last is None:
+            self._last = mtime
+            return False
+        if mtime == self._last:
+            return False
+        if self._pending == mtime:
+            # Unchanged since the previous tick: the write has finished.
+            self._last = mtime
+            self._pending = None
+            return True
+        self._pending = mtime
+        return False
+
+
+_config_auto_reload = _MtimeAutoReload()
+_actions_auto_reload = _MtimeAutoReload()
 
 
 async def _reload_signal_watcher():
     """Poll runtime signal files and trigger in-process reloads.
 
-    Also watches ``data/actions.mca`` modification times so external edits
-    (e.g. in a text editor) auto-reload without using the dashboard or a
-    restart signal file. A change fires only once the file's mtime is
-    stable across two consecutive polls, which debounces writes that are
-    still in progress. Reload errors are handled inside
-    :func:`reload_actions` (including degraded reporting); the watcher
-    itself never dies on errors."""
-
-    global _last_actions_mtime, _pending_actions_mtime
+    Also watches ``config/config.yaml`` and ``data/actions.mca`` modification
+    times so external edits (e.g. in a text editor) auto-reload without using
+    the dashboard or a restart signal file. A change fires only once the
+    file's mtime is stable across two consecutive polls, which debounces
+    writes that are still in progress. Reload errors are handled inside
+    :func:`reload_config` / :func:`reload_actions` (including degraded
+    reporting); the watcher itself never dies on errors."""
 
     while True:
         await asyncio.sleep(1)
         try:
-            try:
-                mtime = ACTIONS_FILE.stat().st_mtime_ns
-            except OSError:
-                mtime = None  # file missing or unreadable — nothing to watch
-            if mtime is not None:
-                if _last_actions_mtime is None:
-                    # First observation is the baseline: never auto-reload
-                    # right after startup.
-                    _last_actions_mtime = mtime
-                elif mtime != _last_actions_mtime:
-                    if _pending_actions_mtime == mtime:
-                        # Unchanged since the previous tick: the write has
-                        # finished, safe to reload.
-                        _last_actions_mtime = mtime
-                        _pending_actions_mtime = None
-                        log.info(
-                            "[RELOAD] actions.mca changed on disk — auto-reloading"
-                        )
-                        await reload_actions()
-                    else:
-                        _pending_actions_mtime = mtime
+            if _config_auto_reload.poll(CONFIG_FILE):
+                log.info("[RELOAD] config.yaml changed on disk — auto-reloading")
+                await reload_config()
+            if _actions_auto_reload.poll(ACTIONS_FILE):
+                log.info("[RELOAD] actions.mca changed on disk — auto-reloading")
+                await reload_actions()
             if RELOAD_CONFIG_SIGNAL.exists():
                 try:
                     RELOAD_CONFIG_SIGNAL.unlink()

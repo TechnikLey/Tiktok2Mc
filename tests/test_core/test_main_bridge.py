@@ -2215,3 +2215,60 @@ class TestConnectFailureThreshold:
             "type": "tiktok.connect_failed",
             "data": {"max_fails": 3, "reason": "reconnect"},
         }
+
+
+# =========================================================================
+# Mtime auto-reload polling (config.yaml / actions.mca watchers)
+# =========================================================================
+
+
+class TestMtimeAutoReload:
+    """Tests for the debounced mtime poller used by _reload_signal_watcher."""
+
+    def test_first_observation_is_baseline(self, tmp_path):
+        import os
+
+        from src.python.main import _MtimeAutoReload
+
+        f = tmp_path / "file.yaml"
+        f.write_text("a: 1", encoding="utf-8")
+        os.utime(f, ns=(1_000_000_000, 1_000_000_000))
+        w = _MtimeAutoReload()
+
+        # Baseline: no fire on first poll.
+        assert w.poll(f) is False
+
+        # Force a distinct mtime (change) → first poll pends, second fires.
+        os.utime(f, ns=(2_000_000_000, 2_000_000_000))
+        assert w.poll(f) is False  # pending
+        assert w.poll(f) is True  # stable → fire
+        # Unchanged afterwards → quiet.
+        assert w.poll(f) is False
+
+    def test_missing_file_never_fires(self, tmp_path):
+        from src.python.main import _MtimeAutoReload
+
+        f = tmp_path / "missing.yaml"
+        w = _MtimeAutoReload()
+        for _ in range(3):
+            assert w.poll(f) is False
+
+    def test_mid_write_files_do_not_fire_immediately(self, tmp_path):
+        import os
+
+        from src.python.main import _MtimeAutoReload
+
+        f = tmp_path / "actions.mca"
+        f.write_text("a", encoding="utf-8")
+        os.utime(f, ns=(1_000_000_000, 1_000_000_000))
+        w = _MtimeAutoReload()
+        assert w.poll(f) is False
+
+        # Two rapid mtime changes (editor still writing) → still pending.
+        os.utime(f, ns=(2_000_000_000, 2_000_000_000))
+        assert w.poll(f) is False
+        os.utime(f, ns=(3_000_000_000, 3_000_000_000))
+        assert w.poll(f) is False
+        # Stable on the second change → exactly one fire.
+        assert w.poll(f) is True
+        assert w.poll(f) is False
