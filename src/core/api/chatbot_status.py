@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from core.api.eventbus import event_bus
+from core.api.task_utils import stop_task_safely
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class ChatbotStatusTracker:
         self._status: dict[str, Any] | None = None
         self._last_update: float = 0.0
         self._task: asyncio.Task | None = None
+        self._sub_q: asyncio.Queue | None = None  # released via unsubscribe
 
     # ------------------------------------------------------------------
     # Mutation / query
@@ -49,9 +51,9 @@ class ChatbotStatusTracker:
     def snapshot(self) -> dict[str, Any] | None:
         """Return the latest status, or ``None`` when it is stale or absent.
 
-A status older than :data:`STALE_AFTER_SECONDS` is treated as unknown,
-which hides state left behind by a dead bridge process. The stored
-dictionary itself is returned, not a copy."""
+        A status older than :data:`STALE_AFTER_SECONDS` is treated as unknown,
+        which hides state left behind by a dead bridge process. The stored
+        dictionary itself is returned, not a copy."""
 
         now = time.time()
         with self._lock:
@@ -68,10 +70,10 @@ dictionary itself is returned, not a copy."""
     async def _consume(self) -> None:
         """Record ``chatbot.status`` events until cancelled.
 
-Malformed events are logged at debug level and skipped so the
-subscription loop keeps running."""
+        Malformed events are logged at debug level and skipped so the
+        subscription loop keeps running."""
 
-        q = event_bus.subscribe(EVENT_TYPE)
+        q = self._sub_q = event_bus.subscribe(EVENT_TYPE)
         try:
             while True:
                 msg = await q.get()
@@ -85,25 +87,36 @@ subscription loop keeps running."""
                     q.task_done()
         except asyncio.CancelledError:
             pass
+        finally:
+            event_bus.unsubscribe(q)
+            self._sub_q = None
 
     def start(self) -> None:
         """Start the event consumer once.
 
-Must be called from a running event loop."""
+        Must be called from a running event loop."""
 
         if self._task is not None:
             return
         self._task = asyncio.create_task(self._consume())
 
+    def _release_sub_q(self) -> None:
+        """Release the event-bus subscription when abandoning the task.
+
+        Used by :meth:`stop` via :func:`stop_task_safely`: when the consumer
+        task lives on a foreign event loop its own cleanup cannot be awaited,
+        so the subscription is unsubscribed directly here instead. Idempotent
+        — unsubscribing an already-released queue is a no-op."""
+
+        if self._sub_q is not None:
+            event_bus.unsubscribe(self._sub_q)
+            self._sub_q = None
+
     async def stop(self) -> None:
-        """Cancel and await the consumer task, ignoring cancellation."""
+        """Stop the consumer task (loop-safe) and release its subscription."""
         if self._task is None:
             return
-        self._task.cancel()
-        try:
-            await self._task
-        except asyncio.CancelledError:
-            pass
+        await stop_task_safely(self._task, on_abandoned=self._release_sub_q)
         self._task = None
 
 

@@ -34,6 +34,7 @@ import logging
 import threading
 from typing import Any
 
+from core.api.task_utils import stop_task_safely
 from core.event_patterns import match_event
 from core.health_monitor import HealthState, get_health_monitor
 from core.plugin_config import discover_plugins_dir, load_plugin_manifest
@@ -90,10 +91,11 @@ class PluginEventBridge:
     def __init__(self) -> None:
         """Create the bridge with no active task or declarations.
 
-Health monitoring is registered in the ``STARTING`` state; declarations
-are loaded lazily by :meth:`start` and :meth:`refresh_subscriptions`."""
+        Health monitoring is registered in the ``STARTING`` state; declarations
+        are loaded lazily by :meth:`start` and :meth:`refresh_subscriptions`."""
 
         self._task: asyncio.Task | None = None
+        self._sub_q: asyncio.Queue | None = None  # released via unsubscribe
         self._running = False
         self._lock = threading.Lock()
         self._subscriptions: dict[str, list[str]] = {}
@@ -147,9 +149,9 @@ are loaded lazily by :meth:`start` and :meth:`refresh_subscriptions`."""
     def _recipients_for(self, event_type: str) -> set[str]:
         """Return the set of plugins subscribed to an event type.
 
-All subscription patterns are matched against ``event_type`` and their
-recipients are unioned, so a plugin subscribed through several patterns is
-notified only once per event."""
+        All subscription patterns are matched against ``event_type`` and their
+        recipients are unioned, so a plugin subscribed through several patterns is
+        notified only once per event."""
 
         with self._lock:
             subscriptions = dict(self._subscriptions)
@@ -231,14 +233,15 @@ notified only once per event."""
     async def _loop(self) -> None:
         """Consume the event bus until the bridge is stopped.
 
-Waits at most five seconds for each event, ignores idle timeouts, and
-delegates delivery to :meth:`_dispatch`. A dispatch failure marks the
-bridge degraded but keeps the worker alive. The bus subscription is always
-released on exit, including cancellation."""
+        Waits at most five seconds for each event, ignores idle timeouts, and
+        delegates delivery to :meth:`_dispatch`. A dispatch failure marks the
+        bridge degraded but keeps the worker alive. The bus subscription is always
+        released on exit, including cancellation."""
 
         from core.api.eventbus import event_bus
 
         q = event_bus.subscribe()  # all events; filtered in _dispatch
+        self._sub_q = q
         log.info("[EVENT-BRIDGE] PluginEventBridge started (declarative)")
         try:
             while self._running:
@@ -263,18 +266,33 @@ released on exit, including cancellation."""
             pass
         finally:
             event_bus.unsubscribe(q)
+            self._sub_q = None
             log.info("[EVENT-BRIDGE] PluginEventBridge stopped")
 
     # ------------------------------------------------------------------
     #  Lifecycle
     # ------------------------------------------------------------------
 
+    def _release_sub_q(self) -> None:
+        """Release the event-bus subscription when abandoning the task.
+
+        Used by :meth:`stop` via :func:`stop_task_safely`: if the loop task
+        lives on a foreign event loop its ``finally`` block cannot be awaited,
+        so the subscription is unsubscribed directly here instead. Idempotent
+        — unsubscribing an already-released queue is a no-op."""
+
+        from core.api.eventbus import event_bus  # local: deferred circular import
+
+        if self._sub_q is not None:
+            event_bus.unsubscribe(self._sub_q)
+            self._sub_q = None
+
     def start(self) -> None:
         """Start the background delivery task.
 
-Calling this while the bridge is already running is a no-op. Declarations
-are refreshed before the task starts, and the health state becomes
-``RUNNING``."""
+        Calling this while the bridge is already running is a no-op. Declarations
+        are refreshed before the task starts, and the health state becomes
+        ``RUNNING``."""
 
         if self._running:
             return
@@ -286,19 +304,20 @@ are refreshed before the task starts, and the health state becomes
     async def stop(self) -> None:
         """Stop the background task and mark the bridge stopped.
 
-Calling this when the bridge is not running is a no-op. The task is
-cancelled and awaited so its event-bus subscription is released before the
-health state becomes ``STOPPED``."""
+        Calling this when the bridge is not running is a no-op. Task teardown is
+        loop-safe: when the task was created on a foreign (e.g. already closed)
+        event loop it is only scheduled for cancellation there and the bus
+        subscription is released directly via ``unsubscribe``. The health state
+        becomes ``STOPPED``."""
 
         if not self._running:
             return
         self._running = False
         if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+            await stop_task_safely(
+                self._task,
+                on_abandoned=self._release_sub_q,
+            )
             self._task = None
         self._health.set_state("plugin_event_bridge", HealthState.STOPPED)
 

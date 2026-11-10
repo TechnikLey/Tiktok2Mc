@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
+from core.api.task_utils import stop_task_safely
 from core.error_codes import (
     OUTBOUND_0001,
     OUTBOUND_0002,
@@ -56,8 +57,8 @@ class _SafeFormatDict(dict[str, Any]):
     def __missing__(self, key: str) -> str:
         """Return an empty string for unknown template placeholders.
 
-This lets notification templates reference optional event fields without
-raising ``KeyError`` when an event does not carry them."""
+        This lets notification templates reference optional event fields without
+        raising ``KeyError`` when an event does not carry them."""
 
         return ""
 
@@ -139,10 +140,10 @@ class OutboundChannel:
     def status(self) -> dict[str, Any]:
         """Describe this channel for the API and GUI.
 
-Returns:
-    A mapping with the masked URL, format, subscribed event patterns, and
-    delivery counters. The circuit-breaker state is included as
-    ``breaker_open`` and ``cooldown_remaining``."""
+        Returns:
+            A mapping with the masked URL, format, subscribed event patterns, and
+            delivery counters. The circuit-breaker state is included as
+            ``breaker_open`` and ``cooldown_remaining``."""
 
         open_, remaining = (
             self.breaker.get_cooldown_status() if self.breaker else (False, 0)
@@ -270,10 +271,11 @@ class OutboundDispatcher:
     def __init__(self) -> None:
         """Create the dispatcher with no channels and no active task.
 
-The process-level health monitor is registered in the ``STARTING`` state;
-:meth:`start` switches it to ``RUNNING`` once the event loop task exists."""
+        The process-level health monitor is registered in the ``STARTING`` state;
+        :meth:`start` switches it to ``RUNNING`` once the event loop task exists."""
 
         self._task: asyncio.Task | None = None
+        self._sub_q: asyncio.Queue | None = None  # released via unsubscribe
         self._running = False
         self._lock = threading.Lock()
         self._channels: dict[str, OutboundChannel] = {}
@@ -299,8 +301,8 @@ The process-level health monitor is registered in the ``STARTING`` state;
     def _snapshot(self) -> tuple[bool, dict[str, OutboundChannel]]:
         """Return a consistent copy of the master switch and channel mapping.
 
-The mapping is shallow-copied under the lock so dispatch can iterate it
-without holding the lock while network work is scheduled."""
+        The mapping is shallow-copied under the lock so dispatch can iterate it
+        without holding the lock while network work is scheduled."""
 
         with self._lock:
             return self._master_enabled, dict(self._channels)
@@ -410,14 +412,15 @@ without holding the lock while network work is scheduled."""
     async def _loop(self) -> None:
         """Consume the event bus until the dispatcher is stopped.
 
-Waits at most five seconds per event, ignores idle timeouts, and delegates
-to :meth:`_dispatch`. Dispatch failures mark the dispatcher degraded but do
-not terminate the worker. The bus subscription is always released on exit,
-including cancellation."""
+        Waits at most five seconds per event, ignores idle timeouts, and delegates
+        to :meth:`_dispatch`. Dispatch failures mark the dispatcher degraded but do
+        not terminate the worker. The bus subscription is always released on exit,
+        including cancellation."""
 
         from core.api.eventbus import event_bus
 
         q = event_bus.subscribe()  # all events; filtered per channel
+        self._sub_q = q
         log.info("[OUTBOUND] OutboundDispatcher started")
         try:
             while self._running:
@@ -442,11 +445,26 @@ including cancellation."""
             pass
         finally:
             event_bus.unsubscribe(q)
+            self._sub_q = None
             log.info("[OUTBOUND] OutboundDispatcher stopped")
 
     # ------------------------------------------------------------------
     #  Public API
     # ------------------------------------------------------------------
+
+    def _release_sub_q(self) -> None:
+        """Release the event-bus subscription when abandoning the task.
+
+        Used by :meth:`stop` via :func:`stop_task_safely`: when the loop task
+        lives on a foreign event loop its ``finally`` block cannot be awaited,
+        so the subscription is unsubscribed directly here instead. Idempotent
+        — unsubscribing an already-released queue is a no-op."""
+
+        from core.api.eventbus import event_bus  # local: deferred circular import
+
+        if self._sub_q is not None:
+            event_bus.unsubscribe(self._sub_q)
+            self._sub_q = None
 
     async def send_test(self, name: str) -> tuple[bool, str]:
         """Send a synthetic test message through one channel.
@@ -493,9 +511,9 @@ including cancellation."""
     def start(self) -> None:
         """Start the background event-forwarding task.
 
-Calling this while the dispatcher is already running is a no-op. Channels
-are reloaded before the task starts, and the health state becomes
-``RUNNING``."""
+        Calling this while the dispatcher is already running is a no-op. Channels
+        are reloaded before the task starts, and the health state becomes
+        ``RUNNING``."""
 
         if self._running:
             return
@@ -507,19 +525,21 @@ are reloaded before the task starts, and the health state becomes
     async def stop(self) -> None:
         """Stop the task and drain in-flight deliveries.
 
-Running HTTP posts cannot be interrupted because they execute in worker
-threads, so they receive a short grace period before pending tasks are
-cancelled. The health state moves through ``STOPPING`` to ``STOPPED`` only
-when the dispatcher was actually running."""
+        Running HTTP posts cannot be interrupted because they execute in worker
+        threads, so they receive a short grace period before pending tasks are
+        cancelled. Task teardown is loop-safe: when the task was created on a
+        foreign (e.g. already closed) event loop it is only scheduled for
+        cancellation there and the bus subscription is released directly. The
+        health state moves through ``STOPPING`` to ``STOPPED`` only when the
+        dispatcher was actually running."""
 
         was_running = self._running
         self._running = False
         if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+            await stop_task_safely(
+                self._task,
+                on_abandoned=self._release_sub_q,
+            )
             self._task = None
         # Deliveries already running in worker threads cannot be interrupted;
         # give them a short grace period before cancelling stragglers.

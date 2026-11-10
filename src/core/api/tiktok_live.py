@@ -19,6 +19,7 @@ import time
 from typing import Any
 
 from core.api.eventbus import event_bus
+from core.api.task_utils import stop_task_safely
 
 log = logging.getLogger(__name__)
 
@@ -40,8 +41,8 @@ class TikTokLiveTracker:
     def __init__(self) -> None:
         """Create an unknown/empty live-status record.
 
-``connected`` stays ``None`` until the bridge reports a state, which lets
-the GUI distinguish "unknown" from "disconnected"."""
+        ``connected`` stays ``None`` until the bridge reports a state, which lets
+        the GUI distinguish "unknown" from "disconnected"."""
 
         self._lock = threading.Lock()
         self._connected: bool | None = None
@@ -49,6 +50,7 @@ the GUI distinguish "unknown" from "disconnected"."""
         self._last_event_at: float = 0.0
         self._source: str = ""
         self._task: asyncio.Task | None = None
+        self._sub_q: asyncio.Queue | None = None  # released via unsubscribe
 
     # ------------------------------------------------------------------
     # Mutation
@@ -57,8 +59,8 @@ the GUI distinguish "unknown" from "disconnected"."""
     def set_connected(self, connected: bool, source: str = "") -> None:
         """Record a reported connection state.
 
-Updates the report timestamp and source. A transition to connected also
-sets the last-event timestamp so a fresh connection counts as activity."""
+        Updates the report timestamp and source. A transition to connected also
+        sets the last-event timestamp so a fresh connection counts as activity."""
 
         ts = time.time()
         with self._lock:
@@ -80,9 +82,9 @@ sets the last-event timestamp so a fresh connection counts as activity."""
     def snapshot(self) -> dict[str, Any]:
         """Return the current status fields for the API.
 
-If the last bridge update is older than ``STALE_AFTER_SECONDS``, the
-reported connection is downgraded to ``None`` (unknown) while the original
-timestamps and source are still returned."""
+        If the last bridge update is older than ``STALE_AFTER_SECONDS``, the
+        reported connection is downgraded to ``None`` (unknown) while the original
+        timestamps and source are still returned."""
 
         now = time.time()
         with self._lock:
@@ -106,10 +108,10 @@ timestamps and source are still returned."""
     async def _consume(self) -> None:
         """Process events from the API event bus until cancelled.
 
-Every event is acknowledged with ``task_done``. Handler errors are logged
-and do not terminate the consumer; cancellation exits quietly."""
+        Every event is acknowledged with ``task_done``. Handler errors are logged
+        and do not terminate the consumer; cancellation exits quietly."""
 
-        q = event_bus.subscribe()
+        q = self._sub_q = event_bus.subscribe()
         try:
             while True:
                 msg = await q.get()
@@ -121,13 +123,16 @@ and do not terminate the consumer; cancellation exits quietly."""
                     q.task_done()
         except asyncio.CancelledError:
             pass
+        finally:
+            event_bus.unsubscribe(q)
+            self._sub_q = None
 
     def _handle(self, msg: dict[str, Any]) -> None:
         """Update tracker state from one bus event.
 
-``tiktok.live_status`` events set the connection state. Other ``tiktok.*``
-events refresh the activity timestamp unless they are marked as test
-events, which are ignored so simulations never look like live traffic."""
+        ``tiktok.live_status`` events set the connection state. Other ``tiktok.*``
+        events refresh the activity timestamp unless they are marked as test
+        events, which are ignored so simulations never look like live traffic."""
 
         event_type = msg.get("type", "")
         data = msg.get("data", {}) or {}
@@ -148,21 +153,29 @@ events, which are ignored so simulations never look like live traffic."""
     def start(self) -> None:
         """Start the background consumer task.
 
-Calling this while a task already exists is a no-op."""
+        Calling this while a task already exists is a no-op."""
 
         if self._task is not None:
             return
         self._task = asyncio.create_task(self._consume())
 
+    def _release_sub_q(self) -> None:
+        """Release the event-bus subscription when abandoning the task.
+
+        Used by :meth:`stop` via :func:`stop_task_safely`: when the consumer
+        task lives on a foreign event loop its own cleanup cannot be awaited,
+        so the subscription is unsubscribed directly here instead. Idempotent
+        — unsubscribing an already-released queue is a no-op."""
+
+        if self._sub_q is not None:
+            event_bus.unsubscribe(self._sub_q)
+            self._sub_q = None
+
     async def stop(self) -> None:
-        """Cancel and await the consumer task, if one is running."""
+        """Stop the consumer task (loop-safe) and release its subscription."""
         if self._task is None:
             return
-        self._task.cancel()
-        try:
-            await self._task
-        except asyncio.CancelledError:
-            pass
+        await stop_task_safely(self._task, on_abandoned=self._release_sub_q)
         self._task = None
 
 
