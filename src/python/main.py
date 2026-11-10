@@ -3600,11 +3600,47 @@ def _read_signal_options(path: Path) -> dict:
     return {"send_minecraft_reload": True}
 
 
+_last_actions_mtime: int | None = None
+_pending_actions_mtime: int | None = None
+
+
 async def _reload_signal_watcher():
-    """Poll runtime signal files and trigger in-process reloads."""
+    """Poll runtime signal files and trigger in-process reloads.
+
+    Also watches ``data/actions.mca`` modification times so external edits
+    (e.g. in a text editor) auto-reload without using the dashboard or a
+    restart signal file. A change fires only once the file's mtime is
+    stable across two consecutive polls, which debounces writes that are
+    still in progress. Reload errors are handled inside
+    :func:`reload_actions` (including degraded reporting); the watcher
+    itself never dies on errors."""
+
+    global _last_actions_mtime, _pending_actions_mtime
+
     while True:
         await asyncio.sleep(1)
         try:
+            try:
+                mtime = ACTIONS_FILE.stat().st_mtime_ns
+            except OSError:
+                mtime = None  # file missing or unreadable — nothing to watch
+            if mtime is not None:
+                if _last_actions_mtime is None:
+                    # First observation is the baseline: never auto-reload
+                    # right after startup.
+                    _last_actions_mtime = mtime
+                elif mtime != _last_actions_mtime:
+                    if _pending_actions_mtime == mtime:
+                        # Unchanged since the previous tick: the write has
+                        # finished, safe to reload.
+                        _last_actions_mtime = mtime
+                        _pending_actions_mtime = None
+                        log.info(
+                            "[RELOAD] actions.mca changed on disk — auto-reloading"
+                        )
+                        await reload_actions()
+                    else:
+                        _pending_actions_mtime = mtime
             if RELOAD_CONFIG_SIGNAL.exists():
                 try:
                     RELOAD_CONFIG_SIGNAL.unlink()
