@@ -319,7 +319,7 @@ class PluginEventBridge:
                 on_abandoned=self._release_sub_q,
             )
             self._task = None
-        self._health.set_state("plugin_event_bridge", HealthState.STOPPED)
+        self._health.move_to_stopped("plugin_event_bridge")
 
 
 # Module-level singleton

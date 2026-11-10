@@ -54,8 +54,8 @@ class PluginWatcher:
     def __init__(self, plugins_dir: Path | None = None) -> None:
         """Create a stopped watcher for an optional plugins directory.
 
-When ``plugins_dir`` is omitted, the directory is resolved lazily via
-``core.paths``. Process health is registered in the ``STARTING`` state."""
+        When ``plugins_dir`` is omitted, the directory is resolved lazily via
+        ``core.paths``. Process health is registered in the ``STARTING`` state."""
 
         self._plugins_dir: Path | None = plugins_dir
         self._thread: threading.Thread | None = None
@@ -67,8 +67,8 @@ When ``plugins_dir`` is omitted, the directory is resolved lazily via
     def _resolve_plugins_dir(self) -> Path | None:
         """Return the configured plugins directory, or resolve it lazily.
 
-Returns:
-    The directory path, or ``None`` when it cannot be resolved."""
+        Returns:
+            The directory path, or ``None`` when it cannot be resolved."""
 
         if self._plugins_dir is not None:
             return self._plugins_dir
@@ -82,9 +82,9 @@ Returns:
     def start(self) -> None:
         """Start the daemon polling thread.
 
-Starting an already-running watcher is a no-op. The current manifest names
-are captured first so pre-existing plugins are not re-registered as new;
-only directories added after this snapshot are auto-registered."""
+        Starting an already-running watcher is a no-op. The current manifest names
+        are captured first so pre-existing plugins are not re-registered as new;
+        only directories added after this snapshot are auto-registered."""
 
         if self._thread is not None and self._thread.is_alive():
             return
@@ -101,14 +101,15 @@ only directories added after this snapshot are auto-registered."""
     def stop(self) -> None:
         """Signal the polling thread to stop and wait for it.
 
-The thread is joined with a five-second timeout so shutdown cannot hang on
-a slow directory scan. The watcher health state becomes ``STOPPED``."""
+        The thread is joined with a five-second timeout so shutdown cannot hang on
+        a slow directory scan. The watcher health state becomes ``STOPPED``."""
 
         self._stop_event.set()
         if self._thread is not None:
+            self._health.set_state("plugin_watcher", HealthState.STOPPING)
             self._thread.join(timeout=5)
             self._thread = None
-        self._health.set_state("plugin_watcher", HealthState.STOPPED)
+        self._health.move_to_stopped("plugin_watcher")
         log.info("Plugin watcher stopped")
 
     def _run(self) -> None:
@@ -120,11 +121,11 @@ a slow directory scan. The watcher health state becomes ``STOPPED``."""
     def _sync(self) -> None:
         """Reconcile the registry with the current plugin directories.
 
-Directories that appeared since the last scan are registered disabled;
-registry entries whose directories disappeared are removed. Only removals
-of previously known directories are acted on, so externally registered
-plugins are not unregistered merely because they have no folder here. File
-and manifest errors are logged and skipped."""
+        Directories that appeared since the last scan are registered disabled;
+        registry entries whose directories disappeared are removed. Only removals
+        of previously known directories are acted on, so externally registered
+        plugins are not unregistered merely because they have no folder here. File
+        and manifest errors are logged and skipped."""
 
         plugins_dir = self._resolve_plugins_dir()
         if plugins_dir is None:

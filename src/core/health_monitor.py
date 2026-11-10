@@ -40,8 +40,8 @@ log = logging.getLogger(__name__)
 class HealthState(str, enum.Enum):
     """Lifecycle state of a monitored subsystem.
 
-The values are serialized as their uppercase names; use ``.value`` when
-putting a state into an API response."""
+    The values are serialized as their uppercase names; use ``.value`` when
+    putting a state into an API response."""
 
     UNKNOWN = "UNKNOWN"
     STARTING = "STARTING"
@@ -94,8 +94,8 @@ _VALID_TRANSITIONS: dict[HealthState, set[HealthState]] = {
 class HeartbeatRecord:
     """Latest heartbeat and error information for one component.
 
-Timestamps are Unix epoch seconds. ``uptime`` stores the time of the first
-heartbeat rather than a duration."""
+    Timestamps are Unix epoch seconds. ``uptime`` stores the time of the first
+    heartbeat rather than a duration."""
 
     component: str
     alive: bool = True
@@ -110,7 +110,7 @@ heartbeat rather than a duration."""
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable copy of the record.
 
-Floating-point timings are rounded to two decimals for display."""
+        Floating-point timings are rounded to two decimals for display."""
 
         return {
             "component": self.component,
@@ -153,9 +153,9 @@ class HealthMonitor:
     ) -> None:
         """Register a component if it is not registered yet.
 
-Registering an existing component is a no-op, so callers can safely
-register during repeated startup paths. A fresh heartbeat record is
-created with the current time as last activity."""
+        Registering an existing component is a no-op, so callers can safely
+        register during repeated startup paths. A fresh heartbeat record is
+        created with the current time as last activity."""
 
         with self._lock:
             if component in self._states:
@@ -172,7 +172,7 @@ created with the current time as last activity."""
     def unregister(self, component: str) -> None:
         """Forget a component's state and heartbeat.
 
-Unknown components are ignored."""
+        Unknown components are ignored."""
 
         with self._lock:
             self._states.pop(component, None)
@@ -182,13 +182,13 @@ Unknown components are ignored."""
     def set_state(self, component: str, new_state: HealthState) -> bool:
         """Transition a component to *new_state*.
 
-Unregistered components are registered implicitly. Transitions outside
-:data:`_VALID_TRANSITIONS` are logged and rejected. Setting the current
-state again counts as success but does not notify listeners.
+        Unregistered components are registered implicitly. Transitions outside
+        :data:`_VALID_TRANSITIONS` are logged and rejected. Setting the current
+        state again counts as success but does not notify listeners.
 
-Returns:
-    ``True`` when the state was applied or already current, ``False`` when
-    the transition is illegal."""
+        Returns:
+            ``True`` when the state was applied or already current, ``False`` when
+            the transition is illegal."""
 
         with self._lock:
             current = self._states.get(component)
@@ -234,6 +234,27 @@ Returns:
         with self._lock:
             return self._states.get(component, HealthState.UNKNOWN)
 
+    def move_to_stopped(self, component: str) -> None:
+        """Transition *component* to ``STOPPED`` via a legal path.
+
+        Inserts the ``STOPPING`` transition when the current state does not
+        allow a direct jump to ``STOPPED`` (e.g. ``RUNNING`` or ``DEGRADED``),
+        which keeps lifecycle shutdowns free of "Illegal state transition"
+        log errors. Unregistered components and components already ``FAILED``
+        go to ``STOPPED`` directly — both transitions are legal.
+
+        Args:
+            component: Health-monitor component name.
+        """
+
+        with self._lock:
+            current = self._states.get(component, HealthState.UNKNOWN)
+        if current in (HealthState.UNKNOWN, HealthState.FAILED):
+            self.set_state(component, HealthState.STOPPED)
+            return
+        self.set_state(component, HealthState.STOPPING)
+        self.set_state(component, HealthState.STOPPED)
+
     def get_states(self) -> dict[str, str]:
         """Return all component states as a name-to-value mapping."""
         with self._lock:
@@ -244,9 +265,9 @@ Returns:
     ) -> None:
         """Register a callback invoked after every successful state change.
 
-The callback receives ``(component, old_state, new_state)``. Exceptions
-raised by listeners are caught and logged so they cannot break health
-updates."""
+        The callback receives ``(component, old_state, new_state)``. Exceptions
+        raised by listeners are caught and logged so they cannot break health
+        updates."""
 
         self._state_listeners.append(callback)
 
@@ -257,10 +278,10 @@ updates."""
     def record_heartbeat(self, component: str, response_time_ms: float = 0.0) -> None:
         """Record activity for a component and refresh its liveness data.
 
-A missing component is created implicitly. The heartbeat marks the record
-alive, resets the missed-beat counter and moves the component to
-``RUNNING`` when it was previously unknown, starting, recovering or
-degraded. Other states (for example ``STOPPING``) are left untouched."""
+        A missing component is created implicitly. The heartbeat marks the record
+        alive, resets the missed-beat counter and moves the component to
+        ``RUNNING`` when it was previously unknown, starting, recovering or
+        degraded. Other states (for example ``STOPPING``) are left untouched."""
 
         now = time.time()
         with self._lock:
@@ -288,8 +309,8 @@ degraded. Other states (for example ``STOPPING``) are left untouched."""
     def record_error(self, component: str, error_message: str) -> None:
         """Store the latest error for a component and for the monitor overall.
 
-The component does not change state here; callers decide whether an error
-is fatal, degraded or transient."""
+        The component does not change state here; callers decide whether an error
+        is fatal, degraded or transient."""
 
         now = time.time()
         with self._lock:
@@ -312,13 +333,13 @@ is fatal, degraded or transient."""
     def check_heartbeat(self, component: str, timeout: float = 60.0) -> bool:
         """Check whether a component has sent activity within *timeout* seconds.
 
-Each check on a stale component increments ``missed_beats``; after three
-missed checks the record is marked dead and a ``RUNNING`` component
-becomes ``DEGRADED``. A fresh heartbeat resets the counter.
+        Each check on a stale component increments ``missed_beats``; after three
+        missed checks the record is marked dead and a ``RUNNING`` component
+        becomes ``DEGRADED``. A fresh heartbeat resets the counter.
 
-Returns:
-    ``True`` when the last activity is within the timeout, otherwise
-    ``False`` (including for unknown components)."""
+        Returns:
+            ``True`` when the last activity is within the timeout, otherwise
+            ``False`` (including for unknown components)."""
 
         now = time.time()
         with self._lock:
@@ -347,8 +368,8 @@ Returns:
     def get_heartbeat(self, component: str) -> HeartbeatRecord | None:
         """Return a snapshot of a component's heartbeat, or ``None`` if unknown.
 
-The returned record is a copy and can be mutated without affecting the
-monitor."""
+        The returned record is a copy and can be mutated without affecting the
+        monitor."""
 
         with self._lock:
             record = self._heartbeats.get(component)
@@ -372,8 +393,8 @@ monitor."""
     def summary(self) -> dict[str, Any]:
         """Return aggregate health information for dashboards and diagnostics.
 
-Includes counts by state, per-component states and heartbeats, the lists
-of failed and degraded components, and the most recent error."""
+        Includes counts by state, per-component states and heartbeats, the lists
+        of failed and degraded components, and the most recent error."""
 
         with self._lock:
             states = dict(self._states)
@@ -416,8 +437,8 @@ def get_health_monitor() -> HealthMonitor:
 def reset_health_monitor() -> None:
     """Replace the global monitor with a fresh instance.
 
-Intended for tests and full restarts; existing references keep pointing at
-the previous monitor."""
+    Intended for tests and full restarts; existing references keep pointing at
+    the previous monitor."""
 
     global _monitor
     with _monitor_lock:

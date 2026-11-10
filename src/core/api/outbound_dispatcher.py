@@ -545,14 +545,12 @@ class OutboundDispatcher:
         # give them a short grace period before cancelling stragglers.
         inflight = list(self._inflight)
         if inflight:
-            if was_running:
-                self._health.set_state("outbound_dispatcher", HealthState.STOPPING)
             _, pending = await asyncio.wait(inflight, timeout=STOP_GRACE)
             for task in pending:
                 task.cancel()
             self._inflight.clear()
         if was_running:
-            self._health.set_state("outbound_dispatcher", HealthState.STOPPED)
+            self._health.move_to_stopped("outbound_dispatcher")
 
 
 # Module-level singleton

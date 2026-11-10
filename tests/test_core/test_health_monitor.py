@@ -97,6 +97,33 @@ class TestHealthMonitor:
         hm.register("comp", initial_state=HealthState.STARTING)
         assert hm.set_state("comp", HealthState.STARTING) is True
 
+    def test_move_to_stopped_from_running_inserts_stopping(self):
+        from core.health_monitor import HealthMonitor, HealthState
+
+        hm = HealthMonitor()
+        hm.register("comp", initial_state=HealthState.STARTING)
+        hm.set_state("comp", HealthState.RUNNING)
+        hm.move_to_stopped("comp")
+        assert hm.get_state("comp") == HealthState.STOPPED
+
+    def test_move_to_stopped_from_failed_is_direct(self):
+        from core.health_monitor import HealthMonitor, HealthState
+
+        hm = HealthMonitor()
+        hm.register("comp", initial_state=HealthState.STARTING)
+        hm.set_state("comp", HealthState.FAILED)
+        hm.move_to_stopped("comp")
+        assert hm.get_state("comp") == HealthState.STOPPED
+
+    def test_move_to_stopped_from_degraded_is_legal(self):
+        from core.health_monitor import HealthMonitor, HealthState
+
+        hm = HealthMonitor()
+        hm.register("comp", initial_state=HealthState.STARTING)
+        hm.set_state("comp", HealthState.DEGRADED)
+        hm.move_to_stopped("comp")
+        assert hm.get_state("comp") == HealthState.STOPPED
+
     def test_state_listener_called(self):
         from core.health_monitor import HealthMonitor, HealthState
 

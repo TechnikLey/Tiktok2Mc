@@ -237,7 +237,7 @@ class EventCommandMapper:
         if self._task:
             await stop_task_safely(self._task, on_abandoned=self._release_sub_q)
             self._task = None
-        self._health.set_state("event_command_mapper", HealthState.STOPPED)
+        self._health.move_to_stopped("event_command_mapper")
 
     def _release_sub_q(self) -> None:
         """Release the event-bus subscription when abandoning the task.
