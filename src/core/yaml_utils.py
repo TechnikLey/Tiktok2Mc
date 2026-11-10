@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,13 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from core.backup import get_backup_manager
 
 log = logging.getLogger(__name__)
+
+# Windows keeps sharing violations for a moment while a concurrent reader
+# (e.g. the dashboard publisher polling ECM diagnostics) still has the
+# target open — the atomic replace then fails with PermissionError. A short
+# bounded retry is enough for these transient collisions.
+REPLACE_RETRY_ATTEMPTS = 5
+REPLACE_RETRY_DELAY = 0.05  # base delay in seconds; doubles per attempt
 
 
 def create_yaml_rt() -> YAML:
@@ -50,7 +58,9 @@ def save_yaml(path: Path, data: Any, backup: bool = False) -> None:
     """Write *data* to *path* atomically, preserving ruamel.yaml metadata.
 
     Delegates backup creation to the centralized ``BackupManager`` when
-    *backup* is ``True`` and the file already exists.
+    *backup* is ``True`` and the file already exists. The atomic replace
+    retries transient Windows sharing violations (a concurrent reader
+    holding the target open) a bounded number of times before failing.
     """
     yaml = create_yaml_rt()
     if backup and path.exists():
@@ -62,7 +72,22 @@ def save_yaml(path: Path, data: Any, backup: bool = False) -> None:
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         yaml.dump(data, f)
-    tmp_path.replace(path)
+    # Atomic replace with bounded retry: a concurrent reader holding the
+    # target open (Windows sharing violation) clears within milliseconds.
+    delay = REPLACE_RETRY_DELAY
+    for attempt in range(1, REPLACE_RETRY_ATTEMPTS + 1):
+        try:
+            tmp_path.replace(path)
+            return
+        except PermissionError as exc:
+            if attempt == REPLACE_RETRY_ATTEMPTS:
+                tmp_path.unlink(missing_ok=True)
+                raise
+            log.debug(
+                "save_yaml: replace of %s busy (attempt %d): %s", path, attempt, exc
+            )
+            time.sleep(delay)
+            delay *= 2
 
 
 def deep_update_rt(base: Any, overlay: Any) -> None:

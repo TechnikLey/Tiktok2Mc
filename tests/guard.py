@@ -11,9 +11,15 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 from pathlib import Path
 
 logger = logging.getLogger("test_guard")
+
+# Transient Windows sharing violations on unlink (concurrent reader still
+# holds the file open): retry briefly instead of failing the test instantly.
+UNLINK_RETRY_ATTEMPTS = 10
+UNLINK_RETRY_DELAY = 0.1
 
 
 class WriteGuard:
@@ -109,7 +115,21 @@ class WriteGuard:
 
         def _unlink(self, *args, **kwargs):
             guard._check(self, "Path.unlink")
-            return guard._originals["Path.unlink"](self, *args, **kwargs)
+            original = guard._originals["Path.unlink"]
+            try:
+                return original(self, *args, **kwargs)
+            except PermissionError:
+                # Windows sharing violation: a concurrent reader (e.g. a stale
+                # publisher tick or AV scan) still holds the file open and
+                # closes it within milliseconds. Retry briefly before
+                # surfacing the error so teardown stays deterministic.
+                for attempt in range(1, UNLINK_RETRY_ATTEMPTS):
+                    time.sleep(UNLINK_RETRY_DELAY)
+                    try:
+                        return original(self, *args, **kwargs)
+                    except PermissionError:
+                        logger.debug("unlink of %s busy (attempt %d)", self, attempt)
+                raise
 
         def _rmdir(self, *args, **kwargs):
             guard._check(self, "Path.rmdir")

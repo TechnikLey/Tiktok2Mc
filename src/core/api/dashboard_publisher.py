@@ -13,6 +13,7 @@ from typing import Any
 from core.api.eventbus import event_bus
 from core.api.plugin_overlay import state_store
 from core.api.registry import get_registry
+from core.api.task_utils import stop_task_safely
 
 log = logging.getLogger(__name__)
 
@@ -68,8 +69,8 @@ class DashboardPublisher:
     async def _loop(self) -> None:
         """Publish dashboard snapshots once per :data:`PUSH_INTERVAL`.
 
-Plugin states are always published; ECM diagnostics only when available.
-Individual push failures are logged and do not stop the loop."""
+        Plugin states are always published; ECM diagnostics only when available.
+        Individual push failures are logged and do not stop the loop."""
 
         log.info("[DASHBOARD] Publisher started (interval %.1fs)", PUSH_INTERVAL)
         while self._running:
@@ -110,16 +111,16 @@ Individual push failures are logged and do not stop the loop."""
         self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
-        """Cancel the publisher task and wait for it to finish."""
+        """Stop the publisher task (loop-safe).
+
+        When the task was created on a foreign (e.g. already closed) event
+        loop, awaiting it would block; :func:`stop_task_safely` only schedules
+        the cancellation on the owning loop instead."""
         if not self._running:
             return
         self._running = False
         if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+            await stop_task_safely(self._task)
             self._task = None
 
 

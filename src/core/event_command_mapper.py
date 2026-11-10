@@ -27,6 +27,7 @@ from typing import Any
 
 from ruamel.yaml.error import YAMLError
 
+from core.api.task_utils import stop_task_safely
 from core.degraded import report_degraded
 from core.error_codes import CONFIG_0002, CONFIG_0009
 from core.health_monitor import HealthState, get_health_monitor
@@ -46,6 +47,7 @@ class EventCommandMapper:
 
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
+        self._sub_q: asyncio.Queue | None = None  # released via unsubscribe
         self._running = False
         self._history: deque[dict[str, Any]] = deque(maxlen=MAX_HISTORY)
         self._dispatch_counts: dict[str, int] = {}
@@ -190,7 +192,7 @@ class EventCommandMapper:
         """Subscribe to all events and dispatch matching commands."""
         from core.api.eventbus import event_bus
 
-        q = event_bus.subscribe()  # subscribe to ALL events
+        q = self._sub_q = event_bus.subscribe()  # subscribe to ALL events
         log.info("[ECM] Event-Command Mapper started")
         try:
             while self._running:
@@ -206,6 +208,7 @@ class EventCommandMapper:
             pass
         finally:
             event_bus.unsubscribe(q)
+            self._sub_q = None
             log.info("[ECM] Event-Command Mapper stopped")
 
     # ------------------------------------------------------------------
@@ -222,18 +225,33 @@ class EventCommandMapper:
         self._health.set_state("event_command_mapper", HealthState.RUNNING)
 
     async def stop(self) -> None:
-        """Stop the background mapper task gracefully."""
+        """Stop the background mapper task gracefully (loop-safe).
+
+        When the task was created on a foreign (e.g. already closed) event
+        loop, awaiting it would block; :func:`stop_task_safely` only schedules
+        the cancellation on the owning loop and releases the bus subscription
+        directly."""
         if not self._running:
             return
         self._running = False
         if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+            await stop_task_safely(self._task, on_abandoned=self._release_sub_q)
             self._task = None
         self._health.set_state("event_command_mapper", HealthState.STOPPED)
+
+    def _release_sub_q(self) -> None:
+        """Release the event-bus subscription when abandoning the task.
+
+        Used by :meth:`stop` via :func:`stop_task_safely`: when the loop task
+        lives on a foreign event loop its ``finally`` block cannot be awaited,
+        so the subscription is unsubscribed directly here instead. Idempotent
+        — unsubscribing an already-released queue is a no-op."""
+
+        from core.api.eventbus import event_bus  # local: deferred circular import
+
+        if self._sub_q is not None:
+            event_bus.unsubscribe(self._sub_q)
+            self._sub_q = None
 
 
 # Module-level singleton
