@@ -30,6 +30,8 @@ from typing import Any
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import YAMLError
 
+from core.degraded import report_degraded
+from core.error_codes import CONFIG_0008
 from core.yaml_utils import deep_update_rt, load_yaml, save_yaml
 
 log = logging.getLogger(__name__)
@@ -187,6 +189,12 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
             data = load_yaml(config_path)
         except (OSError, ValueError, YAMLError) as exc:
             log.warning("Failed to load plugin config %s: %s", config_path, exc)
+            report_degraded(
+                CONFIG_0008,
+                f"plugin:{config_path.parent.name}",
+                detail=f"Plugin config fallback in use: {exc}",
+                path=str(config_path),
+            )
             data = {}
     else:
         data = {}
@@ -398,6 +406,11 @@ def load_all_plugin_configs() -> dict[str, dict]:
             result[name] = load_plugin_config(child)
         except Exception as exc:  # one broken plugin must not break config loading
             log.warning("Failed to load config for plugin '%s': %s", name, exc)
+            report_degraded(
+                CONFIG_0008,
+                f"plugin:{name}",
+                detail=f"Plugin config fallback in use: {exc}",
+            )
             result[name] = {}
 
     return result

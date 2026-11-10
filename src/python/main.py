@@ -56,6 +56,7 @@ from core.crash_manager import get_crash_manager
 from core.error_codes import (
     CONFIG_0005,
     CONFIG_0006,
+    CONFIG_0007,
     HOOK_0006,
     MC_0004,
     MC_0006,
@@ -759,6 +760,13 @@ def _apply_comment_commands_from_yaml() -> None:
         if prefix in seen_prefixes:
             log.warning(
                 f"comment_commands: duplicate prefix '{prefix}' — keeping only first definition, skipping duplicate"
+            )
+            _report_degraded_bridge(
+                CONFIG_0007,
+                "comment_commands",
+                f"Duplicate comment command prefix '{prefix}' — only the first "
+                "definition is used, later duplicates are skipped.",
+                path=str(COMMENT_COMMANDS_FILE),
             )
             continue
         seen_prefixes.add(prefix)
@@ -3587,6 +3595,11 @@ async def reload_hooks_runtime():
         )
     except Exception as e:  # reload is best-effort; previous state stays active
         log.error("[RELOAD] Event hooks reload failed: %s", e)
+        _report_degraded_bridge(
+            CONFIG_0005,
+            "tiktok_bridge",
+            f"Event hooks reload failed: {e}. Previously loaded hooks stay active.",
+        )
 
 
 def _read_signal_options(path: Path) -> dict:
