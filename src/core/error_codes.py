@@ -1554,6 +1554,32 @@ VALIDATE_0001 = ErrorCode(
     recovery_hint="Review the validation message and fix the configuration.",
     impact="May cause runtime issues.",
 )
+VALIDATE_0002 = ErrorCode(
+    code="VALIDATE-0002",
+    subsystem=Subsystem.VALIDATE,
+    severity=Severity.ERROR,
+    message="Actions file missing.",
+    description=(
+        "data/actions.mca could not be read, so no reaction commands were "
+        "loaded. The bridge keeps running, but gift/follow/like/comment "
+        "reactions stay disabled until the file is restored."
+    ),
+    recovery_hint="Restore data/actions.mca or copy defaults/actions.mca, then reload.",
+    impact="No reaction commands are dispatched.",
+)
+VALIDATE_0003 = ErrorCode(
+    code="VALIDATE-0003",
+    subsystem=Subsystem.VALIDATE,
+    severity=Severity.ERROR,
+    message="Actions file contains validation errors.",
+    description=(
+        "The .mca validator reported ERROR-severity diagnostics for "
+        "data/actions.mca; datapack generation was skipped. The bridge keeps "
+        "running, but the affected reactions stay disabled."
+    ),
+    recovery_hint="Fix the reported lines in data/actions.mca and trigger a reload.",
+    impact="Affected reactions are not dispatched until repaired.",
+)
 
 # ---------------------------------------------------------------- DIAG ----
 DIAG_0001 = ErrorCode(
