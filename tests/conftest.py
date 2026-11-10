@@ -24,6 +24,10 @@ for _mod in _heavy:
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
 
+# Never let the API app's boot-time gift catalog sync reach the network
+# during tests — the sync is skipped when this env flag is set.
+os.environ.setdefault("T2M_DISABLE_GIFT_SYNC", "1")
+
 # Core modules import MCRconException by name and use it in `except` clauses;
 # the mock needs a real exception class for those clauses to stay valid.
 if "mcrcon" in sys.modules:

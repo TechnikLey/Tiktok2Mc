@@ -4,6 +4,7 @@ import asyncio
 import ipaddress
 import json
 import logging
+import os
 import secrets
 import socket
 from collections.abc import Iterable
@@ -78,8 +79,8 @@ def _is_local_machine_host(hostname: str | None) -> bool:
 async def _send_json_error(send, status: int, detail: str) -> None:
     """Send a minimal JSON error response directly over ASGI.
 
-Used by middleware, which runs before/outside FastAPI's exception
-handling and therefore cannot raise ``HTTPException``."""
+    Used by middleware, which runs before/outside FastAPI's exception
+    handling and therefore cannot raise ``HTTPException``."""
 
     body = json.dumps({"detail": detail}).encode()
     await send(
@@ -124,7 +125,7 @@ class LocalOriginGuardMiddleware:
     def __init__(self, app, extra_origins: Iterable[str] = ()) -> None:
         """Wrap *app* and allow the given additional origins.
 
-``extra_origins`` is stored as a frozenset for O(1) membership checks."""
+        ``extra_origins`` is stored as a frozenset for O(1) membership checks."""
 
         self.app = app
         self.extra_origins = frozenset(extra_origins)
@@ -132,9 +133,9 @@ class LocalOriginGuardMiddleware:
     async def __call__(self, scope, receive, send) -> None:
         """Reject browser requests that are cross-origin or rebound.
 
-Checks the ``Origin`` and ``Sec-Fetch-Site`` headers, and for loopback
-clients also validates the ``Host`` header. Non-HTTP scopes and trusted
-requests are forwarded unchanged."""
+        Checks the ``Origin`` and ``Sec-Fetch-Site`` headers, and for loopback
+        clients also validates the ``Host`` header. Non-HTTP scopes and trusted
+        requests are forwarded unchanged."""
 
         if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
@@ -169,7 +170,7 @@ requests are forwarded unchanged."""
     async def _reject(scope, send, detail: str) -> None:
         """Reject a request with JSON 403, or close a WebSocket handshake.
 
-WebSockets are closed with code 1008 before the handshake completes."""
+        WebSockets are closed with code 1008 before the handshake completes."""
 
         if scope["type"] != "websocket":
             await _send_json_error(send, 403, detail)
@@ -198,9 +199,9 @@ class SameHostCORSMiddleware:
     async def __call__(self, scope, receive, send) -> None:
         """Reflect CORS headers when the origin matches the request host.
 
-Preflight requests are answered directly; normal requests are forwarded
-with the CORS headers appended to the response start message. Foreign
-origins pass through without CORS headers."""
+        Preflight requests are answered directly; normal requests are forwarded
+        with the CORS headers appended to the response start message. Foreign
+        origins pass through without CORS headers."""
 
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -299,11 +300,11 @@ def _discover_hooks_at_startup() -> None:
 async def lifespan(app: FastAPI):
     """Start and stop all API-owned background services.
 
-Startup prepares the shutdown secret, event loop bindings, watchers,
-health monitoring, event bridges, trackers, the gift catalog and RCON.
-Shutdown disconnects RCON and stops every service in reverse order.
-Individual optional steps are best effort so the API still starts when
-they fail; ``CancelledError`` during shutdown is expected and swallowed."""
+    Startup prepares the shutdown secret, event loop bindings, watchers,
+    health monitoring, event bridges, trackers, the gift catalog and RCON.
+    Shutdown disconnects RCON and stops every service in reverse order.
+    Individual optional steps are best effort so the API still starts when
+    they fail; ``CancelledError`` during shutdown is expected and swallowed."""
 
     from core.event_command_mapper import get_event_command_mapper
 
@@ -334,10 +335,12 @@ they fail; ``CancelledError`` during shutdown is expected and swallowed."""
     get_chatbot_status_tracker().start()
     # Auto-sync the gift catalog once at boot (config-gated, best-effort).
     # Failures never block startup — the stale catalog keeps serving.
+    # Tests set T2M_DISABLE_GIFT_SYNC=1 so the boot sync never hits the network.
     try:
         cfg = ApiService().read_config()
         gifts_cfg = cfg.get("gifts", {}) or {}
-        if gifts_cfg.get("auto_sync", True):
+        disable_sync = os.environ.get("T2M_DISABLE_GIFT_SYNC", "") in ("1", "true")
+        if gifts_cfg.get("auto_sync", True) and not disable_sync:
             try:
                 from core.gift_sync import sync_gifts
 
@@ -451,8 +454,8 @@ def create_app(
         async def __call__(self, scope, receive, send):
             """Convert client disconnects into a 499 response when possible.
 
-Non-HTTP scopes are passed through. If the client is already gone while
-sending the response, the send error is ignored."""
+            Non-HTTP scopes are passed through. If the client is already gone while
+            sending the response, the send error is ignored."""
 
             if scope["type"] != "http":
                 await self.app(scope, receive, send)
