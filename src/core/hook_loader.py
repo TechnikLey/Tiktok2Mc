@@ -15,7 +15,9 @@ from pathlib import Path
 from ruamel.yaml.error import YAMLError
 
 from core.crash_manager import get_crash_manager
+from core.degraded import report_degraded
 from core.error_codes import (
+    CONFIG_0009,
     HOOK_0002,
     HOOK_0003,
     HOOK_0004,
@@ -244,6 +246,12 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
             return cfg
         except (TypeError, OSError, ValueError, YAMLError) as exc:
             log.warning("[HOOK] Failed to load config for '%s': %s", manifest.name, exc)
+            report_degraded(
+                CONFIG_0009,
+                f"hook:{manifest.name}",
+                detail=f"Hook config fallback in use: {exc}",
+                path=str(config_path),
+            )
         finally:
             if manifest_path.exists():
                 manifest_path.unlink()
@@ -257,6 +265,12 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
         except (OSError, ValueError, YAMLError) as exc:
             log.warning(
                 "[HOOK] Failed to load config.yaml for '%s': %s", manifest.name, exc
+            )
+            report_degraded(
+                CONFIG_0009,
+                f"hook:{manifest.name}",
+                detail=f"Hook config fallback in use: {exc}",
+                path=str(config_path),
             )
     return {}
 
