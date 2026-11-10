@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Degraded-mode banner** - when a data file (event commands, gift catalog) is unreadable, the tool keeps running but the dashboard now shows a banner listing which components are operating with restricted functionality. Problems no longer go unnoticed.
 - **Automatic restart for bridge and Minecraft server** - if the TikTok bridge or the Minecraft server process crashes, the supervisor restarts it automatically (up to 3 times within 5 minutes). If it keeps failing, this is clearly reported instead of silently leaving you with nothing working.
 - **Clear errors for a broken actions file** - a missing `data/actions.mca` (or one containing validation errors) is now reported as a structured error in the diagnostics and dashboard instead of reactions just silently not firing. Previously working reactions stay active until a reload succeeds.
+- **Actions file auto-reload** - editing `data/actions.mca` externally (e.g. in a text editor) no longer requires a dashboard reload or a restart: the tool notices the change and regenerates the datapack automatically. Note that Minecraft function changes still need the server restart as before.
+- **Visible errors for broken hook configs** - a hook's `config.yaml` that cannot be parsed is now reported in the diagnostics and dashboard instead of the hook silently running with empty defaults.
 
 ### Changed
 
