@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers
 from starlette.status import HTTP_401_UNAUTHORIZED
 
+from core.degraded import report_degraded
+from core.error_codes import CONFIG_0009
 from core.overlay import set_event_loop
 from core.paths import get_root_dir
 
@@ -353,10 +355,25 @@ async def lifespan(app: FastAPI):
                     )
                 else:
                     log.warning("Gift catalog sync failed: %s", summary.get("error"))
+                    report_degraded(
+                        CONFIG_0009,
+                        "gift_catalog",
+                        f"Gift catalog sync at boot failed: {summary.get('error')}",
+                    )
             except Exception as exc:
                 log.warning("Gift catalog sync failed: %s", exc)
-    except Exception:  # RCON-style: config read may fail; sync optional
+                report_degraded(
+                    CONFIG_0009,
+                    "gift_catalog",
+                    f"Gift catalog sync at boot failed: {exc}",
+                )
+    except Exception as exc:  # RCON-style: config read may fail; sync optional
         log.warning("Gift catalog sync skipped: could not read config")
+        report_degraded(
+            CONFIG_0009,
+            "gift_catalog",
+            f"Gift catalog sync skipped: could not read config ({exc})",
+        )
     # Pre-configure RCON from config for the console feature
     try:
         cfg = ApiService().read_config()
@@ -366,9 +383,16 @@ async def lifespan(app: FastAPI):
             port=rcon_cfg.get("port", 25575),
             password=rcon_cfg.get("password", ""),
         )
-    except Exception:  # RCON is optional; console auto-configures on first request
+    except (
+        Exception
+    ) as exc:  # RCON is optional; console auto-configures on first request
         log.warning(
             "Could not read RCON config — console will auto-configure on first request"
+        )
+        report_degraded(
+            CONFIG_0009,
+            "rcon_service",
+            f"RCON pre-configuration skipped: could not read config ({exc})",
         )
 
     await event_bus.publish("server.started", {"version": API_VERSION})

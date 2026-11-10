@@ -54,6 +54,8 @@ from core.api.services.datapack import sync_datapack
 from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
 from core.error_codes import (
+    CONFIG_0005,
+    CONFIG_0006,
     HOOK_0006,
     MC_0004,
     MC_0006,
@@ -611,6 +613,11 @@ def _check_dup_cmd_config():
         _validate_dup_cmd_config()
     except ValueError as exc:
         log.error(str(exc))
+        get_crash_manager().report_error(
+            CONFIG_0006,
+            detail=str(exc),
+            context_info={"component": "tiktok_bridge", "file": str(CONFIG_FILE)},
+        )
         if sys.stdin.isatty():
             try:
                 input("Press Enter to exit...")
@@ -3470,6 +3477,12 @@ async def reload_config():
         log.info("[RELOAD] Config reloaded successfully")
     except Exception as e:  # runtime reload is best-effort; old config stays active
         log.error("[RELOAD] Config reload failed: %s", e)
+        _report_degraded_bridge(
+            CONFIG_0005,
+            "tiktok_bridge",
+            f"Config reload failed: {e}. The previously loaded configuration "
+            "stays active.",
+        )
 
 
 def _request_minecraft_restart() -> None:
