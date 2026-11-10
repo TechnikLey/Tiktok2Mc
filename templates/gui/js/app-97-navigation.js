@@ -161,6 +161,9 @@ function switchViewNow(viewId) {
     crashReports.load();
     requestAnimationFrame(() => liveLog._scrollToBottom());
   }
+  if (viewId === 'diagnostics') {
+    diagnosticsView.load();
+  }
   if (viewId === 'revenue') {
     loadRevenueView();
   }

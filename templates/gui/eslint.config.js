@@ -66,6 +66,7 @@ const appGlobals = {
   "confirmServerDownload": "writable",
   "connectLogStream": "writable",
   "crashReports": "writable",
+  "diagnosticsView": "writable",
   "currentConfig": "writable",
   "currentHooks": "writable",
   "currentPlugins": "writable",

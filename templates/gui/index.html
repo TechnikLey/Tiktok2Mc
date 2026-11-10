@@ -95,6 +95,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>
                     <span class="nav-label" data-i18n="nav.updates">Updates</span>
                 </button>
+                <button type="button" class="nav-item" data-view="diagnostics" onclick="switchView('diagnostics')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" width="20" height="20"><path d="M3 12h4l2-6 4 12 2-6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="nav-label" data-i18n="nav.diagnostics">Diagnostics</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -342,6 +346,39 @@
                         <span class="text-muted" data-i18n="updates.noInfo">No update information available.</span>
                     </div>
                     <div id="updates-detail" class="hidden"></div>
+                </section>
+            </div>
+
+            <!-- ─── Diagnostics ─── -->
+            <div class="view" id="view-diagnostics">
+                <div class="view-header">
+                    <h2 data-i18n="diagnostics.title">Diagnostics</h2>
+                    <div class="header-actions">
+                        <button class="btn btn--secondary btn--sm" onclick="diagnosticsView.load()" data-i18n="common.refresh" title="Refresh diagnostics">Refresh</button>
+                        <button class="btn-help" onclick="Help.openHelp('diagnostics')" data-i18n-title="help.openTitle" data-i18n-aria-label="help.openTitle" title="Help">?</button>
+                    </div>
+                </div>
+
+                <section class="view-section">
+                    <h3 data-i18n="diagnostics.health.title">Health</h3>
+                    <div id="diag-health"></div>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="diagnostics.crashes.title">Crash History</h3>
+                    <div id="diag-crash-list"></div>
+                    <p id="diag-crash-empty" class="text-muted hidden" data-i18n="diagnostics.crashes.empty">No crashes recorded.</p>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="diagnostics.codes.title">Error Codes</h3>
+                    <div class="form-row">
+                        <label for="diag-subsystem" data-i18n="diagnostics.codes.subsystem">Subsystem</label>
+                        <select id="diag-subsystem" onchange="diagnosticsView.loadCodes()">
+                            <option value="" data-i18n="diagnostics.codes.all">All subsystems</option>
+                        </select>
+                    </div>
+                    <div id="diag-codes-list"></div>
                 </section>
             </div>
 
@@ -1357,6 +1394,7 @@
     <script src="./js/app-85-reaction-editor.js?v=9"></script>
     <script src="./js/app-90-comment-commands-editor.js?v=9"></script>
     <script src="./js/app-92-editor-lifecycle.js?v=9"></script>
+    <script src="./js/app-93-diagnostics.js?v=9"></script>
     <script src="./js/app-94-updates.js?v=9"></script>
     <script src="./js/app-96-console.js?v=9"></script>
     <script src="./js/app-97-navigation.js?v=9"></script>

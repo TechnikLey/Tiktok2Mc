@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Clear errors for a broken actions file** - a missing `data/actions.mca` (or one containing validation errors) is now reported as a structured error in the diagnostics and dashboard instead of reactions just silently not firing. Previously working reactions stay active until a reload succeeds.
 - **Actions file auto-reload** - editing `data/actions.mca` externally (e.g. in a text editor) no longer requires a dashboard reload or a restart: the tool notices the change and regenerates the datapack automatically. Note that Minecraft function changes still need the server restart as before.
 - **Visible errors for broken hook configs** - a hook's `config.yaml` that cannot be parsed is now reported in the diagnostics and dashboard instead of the hook silently running with empty defaults.
+- **Config auto-reload** - editing `config.yaml` or `data/actions.mca` externally (e.g. in a text editor) no longer requires a restart or manual reload: the tool notices the change and applies it automatically. A broken config keeps the previous settings active and is reported instead.
+- **Diagnostics view in the dashboard** - a new sidebar page shows the health of all internal components (running/degraded/failed), the crash history, and the full catalog of error codes with a subsystem filter, so problems can be reviewed without reading log files.
 
 ### Changed
 
