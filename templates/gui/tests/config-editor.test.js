@@ -63,6 +63,23 @@ describe('ConfigEditor', () => {
     });
   });
 
+  /* ─── collect ─── */
+  describe('collect', () => {
+    it('clears stale parse errors when a JSON field leaves the DOM', () => {
+      const field = document.createElement('textarea');
+      field.setAttribute('data-path', 'custom_json');
+      field.setAttribute('data-type', 'json');
+      field.value = '{invalid}';
+      editor.content.appendChild(field);
+      editor.collect();
+      expect(editor.collectErrors.has('custom_json')).toBe(true);
+
+      field.remove();
+      editor.collect();
+      expect(editor.collectErrors.size).toBe(0);
+    });
+  });
+
   /* ─── isDirty ─── */
   describe('isDirty', () => {
     it('returns false when data is unchanged', () => {

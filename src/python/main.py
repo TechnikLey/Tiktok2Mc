@@ -672,12 +672,15 @@ def _apply_config(config: dict) -> None:
     ctx.max_connect_fails = max(
         1, int(config.get("tiktok", {}).get("max_connect_fails", 5) or 5)
     )
-    ctx.mcserver_api_port = int(
-        os.environ.get(
-            "RESOLVED_PORT_WEBHOOK_PORT",
-            config.get("minecraft_server_api", {}).get("web_server_port", 29188),
-        )
+    webhook_port = os.environ.get(
+        "RESOLVED_PORT_WEBHOOK_PORT",
+        config.get("minecraft_server_api", {}).get("web_server_port", 29188),
     )
+    try:
+        ctx.mcserver_api_port = int(webhook_port)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        log.warning("Invalid webhook port %r — using 29188.", webhook_port)
+        ctx.mcserver_api_port = 29188
     ctx.queue_pause_on_death = bool(
         config.get("minecraft_server_api", {}).get("queue_pause_on_death", True)
     )

@@ -43,11 +43,49 @@ def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
+def _as_mapping(value: object) -> dict:
+    """Return *value* when it is a mapping, otherwise an empty dict.
+
+    Config files are user-editable, so a section that should be a mapping may
+    contain a scalar or a list. Treat those as absent instead of crashing the
+    launcher with ``AttributeError``.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _parse_port(value: object) -> int | None:
+    """Return *value* as a valid TCP port, or ``None`` when it is unusable."""
+    try:
+        port = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return port if 1 <= port <= 65535 else None
+
+
+def _port(value: object, default: int, label: str) -> int:
+    """Coerce *value* to a valid TCP port, falling back to *default*.
+
+    Args:
+        value: Raw port value from the environment or config (may be empty,
+            ``None`` or a non-numeric string).
+        default: Port used when *value* cannot be parsed or is out of range.
+        label: Human-readable name used in the warning message.
+
+    Returns:
+        The parsed port in the range 1-65535, or *default*.
+    """
+    port = _parse_port(value)
+    if port is None:
+        log.warning("Invalid %s %r — using default %d.", label, value, default)
+        return default
+    return port
+
+
 def _wait_or_skip(prompt: str = "Press Enter to continue..."):
     """Wait for Enter only in interactive sessions, ignoring EOF and interrupts.
 
-Args:
-    prompt: Prompt shown before waiting."""
+    Args:
+        prompt: Prompt shown before waiting."""
 
     if _is_interactive():
         try:
@@ -169,61 +207,73 @@ WEBSERVERPORT = 29188
 APIPORT = 29187
 SERVER_HOST = "127.0.0.1"
 MC_VERSION = "26.3"
+cfg: dict = {}
 
 try:
     if CONFIG_FILE.exists():
-        cfg = load_yaml(CONFIG_FILE)
-        Xms = cfg.get("java", {}).get("xms", "1G")
-        Xmx = cfg.get("java", {}).get("xmx", "1G")
-        MC_PORT = int(
-            os.environ.get(
-                "RESOLVED_PORT_MC_GAME_PORT", cfg.get("java", {}).get("port", 25565)
-            )
+        cfg = _as_mapping(load_yaml(CONFIG_FILE))
+        java_cfg = _as_mapping(cfg.get("java"))
+        api_cfg = _as_mapping(cfg.get("minecraft_server_api"))
+        Xms = java_cfg.get("xms", "1G")
+        Xmx = java_cfg.get("xmx", "1G")
+        MC_PORT = _port(
+            os.environ.get("RESOLVED_PORT_MC_GAME_PORT", java_cfg.get("port", 25565)),
+            25565,
+            "MC game port",
         )
-        WEBSERVERPORT = int(
+        WEBSERVERPORT = _port(
             os.environ.get(
                 "RESOLVED_PORT_WEBHOOK_PORT",
-                cfg.get("minecraft_server_api", {}).get("web_server_port", 29188),
-            )
+                api_cfg.get("web_server_port", 29188),
+            ),
+            29188,
+            "webhook port",
         )
-        APIPORT = int(
+        APIPORT = _port(
             os.environ.get(
-                "RESOLVED_PORT_MCSERVER_API_PORT",
-                cfg.get("minecraft_server_api", {}).get("api_port", 29187),
-            )
+                "RESOLVED_PORT_MCSERVER_API_PORT", api_cfg.get("api_port", 29187)
+            ),
+            29187,
+            "MinecraftServerAPI port",
         )
         SERVER_HOST = cfg.get("server_host", "127.0.0.1")
         MC_VERSION = cfg.get("mc_version", "26.3")
     else:
         log.warning("Config not found at %s — using defaults.", CONFIG_FILE)
-except (OSError, ValueError, YAMLError) as e:
+except (OSError, TypeError, ValueError, YAMLError) as e:
     log.warning("Failed to load config: %s — using defaults.", e)
 
 # === Port override from CLI ===
 if _args.port:
-    try:
-        MC_PORT = int(_args.port)
-        log.info("Port overridden by CLI: %d", MC_PORT)
-    except ValueError:
+    cli_port = _parse_port(_args.port)
+    if cli_port is None:
         log.warning("Invalid --port value '%s' — using config default.", _args.port)
+    else:
+        MC_PORT = cli_port
+        log.info("Port overridden by CLI: %d", MC_PORT)
 
 # === Ensure MinecraftServerAPI config is in sync ===
 if CONFIGSERVERAPI_FILE.exists():
+    yaml_obj = YAML(typ="rt")
+    yaml_obj.preserve_quotes = True
+    yaml_obj.indent(mapping=2, sequence=4, offset=2)
+    yaml_obj.width = 120
     try:
-        yaml_obj = YAML(typ="rt")
-        yaml_obj.preserve_quotes = True
-        yaml_obj.indent(mapping=2, sequence=4, offset=2)
-        yaml_obj.width = 120
         with CONFIGSERVERAPI_FILE.open("r", encoding="utf-8") as f:
-            cfg_api = yaml_obj.load(f) or CommentedMap()
-    except (OSError, ValueError, YAMLError):
+            loaded_api = yaml_obj.load(f)
+        cfg_api = _as_mapping(loaded_api)
+    except (OSError, TypeError, ValueError, YAMLError) as e:
+        log.warning(
+            "Failed to load MinecraftServerAPI config: %s — rewriting defaults.", e
+        )
         cfg_api = CommentedMap()
 
-    webhook = cfg_api.setdefault("webhooks", {})
+    webhook = _as_mapping(cfg_api.get("webhooks"))
+    cfg_api["webhooks"] = webhook
     webhook.setdefault("urls", [f"http://127.0.0.1:{WEBSERVERPORT}"])
 
     if APIPORT != cfg_api.get("port", 29187):
-        cfg_api["port"] = int(APIPORT)
+        cfg_api["port"] = APIPORT
 
     try:
         with CONFIGSERVERAPI_FILE.open("w", encoding="utf-8") as f:
@@ -232,7 +282,7 @@ if CONFIGSERVERAPI_FILE.exists():
         log.warning("Failed to write MinecraftServerAPI config: %s", e)
 
 # === RCON settings ===
-RCON = cfg.get("rcon", {}) if "cfg" in dir() else {}
+RCON = _as_mapping(cfg.get("rcon"))
 RCON_ENABLED = RCON.get("enabled", False)
 RCON_PASSWORD = RCON.get("password", "")
 RCON_PORT = RCON.get("port", 25575)
@@ -286,13 +336,13 @@ if not EULA_FILE.exists():
 def set_server_property(file_path: Path, key, value):
     """Set or append a ``key=value`` line in a properties file.
 
-Existing lines are replaced; a missing file is created first. Write errors
-are logged and otherwise ignored.
+    Existing lines are replaced; a missing file is created first. Write errors
+    are logged and otherwise ignored.
 
-Args:
-    file_path: Properties file to update.
-    key: Property name.
-    value: New property value."""
+    Args:
+        file_path: Properties file to update.
+        key: Property name.
+        value: New property value."""
 
     try:
         if not file_path.exists():

@@ -604,7 +604,14 @@ class PluginConfigEditor {
   parseRawJson() {
     const raw = document.getElementById('plugin-raw-json').value;
     try {
-      this.config = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // The editor only works with a JSON object. Arrays, primitives and null
+      // would make setConfigValue/getConfigValue throw on the next interaction.
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        this.showToast(I18N.t('editor.jsonObjectRequired'), 'error');
+        return;
+      }
+      this.config = parsed;
       this.errors.clear();
       this.collectErrors.clear();
       this.showToast(I18N.t('editor.jsonValid'), 'info');
@@ -623,6 +630,10 @@ class PluginConfigEditor {
 
   /** Read schema fields from the DOM into the working config. */
   collect() {
+    // Parse errors are derived from the current DOM pass. Fields can disappear
+    // (array item removed, search filter, advanced mode), so keeping old
+    // entries would block saving with an error the user cannot see.
+    this.collectErrors.clear();
     if (!this.hasSchema) {
       // Raw JSON mode already updates this.config on change
       return;

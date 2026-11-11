@@ -244,6 +244,19 @@ class TestWebhookQueueSemantics:
         _apply_config({"minecraft_server_api": {"queue_pause_on_death": False}})
         assert bc.queue_pause_on_death is False
 
+    def test_apply_config_falls_back_on_invalid_webhook_port(self, monkeypatch):
+        from src.python import main as main_mod
+        from src.python.main import BotContext, _apply_config
+
+        bc = BotContext()
+        monkeypatch.setattr(main_mod, "ctx", bc)
+        monkeypatch.setattr(Path, "mkdir", lambda self, *a, **k: None)
+
+        for invalid in ("not-a-port", ""):
+            monkeypatch.setenv("RESOLVED_PORT_WEBHOOK_PORT", invalid)
+            _apply_config({})
+            assert bc.mcserver_api_port == 29188
+
 
 # =========================================================================
 # Duplicate config detection

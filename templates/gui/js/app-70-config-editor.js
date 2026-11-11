@@ -1030,6 +1030,10 @@ class ConfigEditor {
   /* ─── Collect from DOM ─── */
   /** Read simple fields and special editors from the DOM into the working config. */
   collect() {
+    // Parse errors are derived from the current DOM pass. Fields can disappear
+    // (array item removed, search filter, advanced mode), so keeping old
+    // entries would block saving with an error the user cannot see.
+    this.collectErrors.clear();
     // Simple inputs
     this.content.querySelectorAll('[data-path]').forEach(el => {
       const path = el.getAttribute('data-path');

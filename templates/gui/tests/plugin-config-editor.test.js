@@ -302,6 +302,29 @@ describe('PluginConfigEditor', () => {
     });
   });
 
+  /* ─── collect ─── */
+  describe('collect', () => {
+    it('clears stale parse errors when a JSON field leaves the DOM', () => {
+      pluginEditor.hasSchema = true;
+      pluginEditor.schema = { fields: [{ key: 'settings', type: 'json' }] };
+      const field = document.createElement('textarea');
+      field.setAttribute('data-path', 'settings');
+      field.setAttribute('data-type', 'json');
+      field.value = '{invalid}';
+      pluginEditor.content.appendChild(field);
+      pluginEditor.collect();
+      expect(pluginEditor.collectErrors.has('settings')).toBe(true);
+      expect(pluginEditor.validate()).toBe(false);
+
+      // Removing the field (array item, search filter, advanced mode) must not
+      // leave an invisible error that blocks saving.
+      field.remove();
+      pluginEditor.collect();
+      expect(pluginEditor.collectErrors.size).toBe(0);
+      expect(pluginEditor.validate()).toBe(true);
+    });
+  });
+
   /* ─── parseRawJson ─── */
   describe('parseRawJson', () => {
     it('parses valid JSON', () => {
@@ -315,6 +338,15 @@ describe('PluginConfigEditor', () => {
       pluginEditor.config = { original: true };
       pluginEditor.parseRawJson();
       expect(pluginEditor.config.original).toBe(true);
+    });
+
+    it('rejects JSON values that are not objects', () => {
+      pluginEditor.config = { original: true };
+      for (const raw of ['[]', '"text"', '42', 'null']) {
+        document.getElementById('plugin-raw-json').value = raw;
+        pluginEditor.parseRawJson();
+        expect(pluginEditor.config).toEqual({ original: true });
+      }
     });
   });
 
