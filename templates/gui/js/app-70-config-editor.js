@@ -19,6 +19,7 @@ class ConfigEditor {
     this.originalUnknownKeys = {};
     this.searchQuery = '';
     this.errors = new Map();
+    this.collectErrors = new Map();
     this.sidebar = document.getElementById('editor-sidebar');
     this.content = document.getElementById('editor-content');
     this.knownTop = new Set(Object.keys(SECTION_META));
@@ -34,6 +35,7 @@ class ConfigEditor {
     this.unknownKeys = {};
     this.originalUnknownKeys = {};
     this.errors.clear();
+    this.collectErrors.clear();
     // Read config_advanced from file before extractUnknownKeys removes it
     if (typeof config.config_advanced === 'boolean') {
       this._advancedMode = config.config_advanced;
@@ -1039,7 +1041,14 @@ class ConfigEditor {
         const v = el.value.trim();
         this.setValue(path, v === '' ? 0 : Number(v));
       } else if (type === 'json') {
-        try { this.setValue(path, JSON.parse(el.value)); } catch (e) {}
+        try {
+          this.setValue(path, JSON.parse(el.value));
+          this.collectErrors.delete(path);
+        } catch (e) {
+          // Surface the parse error instead of silently discarding the edit;
+          // validate() merges these into the field errors shown to the user.
+          this.collectErrors.set(path, I18N.t('editor.invalidJson', { msg: e.message }));
+        }
       } else {
         this.setValue(path, el.value);
       }
@@ -1052,7 +1061,11 @@ class ConfigEditor {
   /** Validate required, pattern, range and known special fields; return whether all pass. */
   validate() {
     this.errors.clear();
-    let ok = true;
+    // JSON parse failures collected during collect() override the field
+    // validation: the stored data still holds the old value, so schema
+    // checks alone would wrongly report a clean state.
+    for (const [p, m] of this.collectErrors) this.errors.set(p, m);
+    let ok = this.collectErrors.size === 0;
     for (const path of Object.keys(FIELD_META)) {
       const meta = FIELD_META[path];
       if (meta.required) {

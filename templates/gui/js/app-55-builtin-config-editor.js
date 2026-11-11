@@ -18,6 +18,7 @@ class BuiltinConfigEditor {
     this.schema = null;
     this.original = {};
     this.errors = new Map();
+    this.collectErrors = new Map();
     this.searchQuery = '';
     this.sidebar = document.getElementById('builtins-config-sidebar');
     this.content = document.getElementById('builtins-config-content');
@@ -53,6 +54,7 @@ class BuiltinConfigEditor {
     this.searchQuery = '';
     this.searchInput.value = '';
     this.errors.clear();
+    this.collectErrors.clear();
 
     try {
       await this._loadConfig(hookName);
@@ -512,6 +514,7 @@ class BuiltinConfigEditor {
     try {
       this.config = JSON.parse(raw);
       this.errors.clear();
+      this.collectErrors.clear();
       this.showToast(I18N.t('editor.jsonValid'), 'info');
     } catch (e) {
       this.showToast(I18N.t('editor.jsonInvalid', { msg: e.message }), 'error');
@@ -537,7 +540,14 @@ class BuiltinConfigEditor {
         const v = el.value.trim();
         this.setConfigValue(path, v === '' ? undefined : Number(v));
       } else if (type === 'json') {
-        try { this.setConfigValue(path, JSON.parse(el.value)); } catch (e) {}
+        try {
+          this.setConfigValue(path, JSON.parse(el.value));
+          this.collectErrors.delete(path);
+        } catch (e) {
+          // Surface the parse error instead of silently discarding the edit;
+          // validate() merges these into the field errors shown to the user.
+          this.collectErrors.set(path, I18N.t('editor.invalidJson', { msg: e.message }));
+        }
       } else {
         this.setConfigValue(path, el.value);
       }
@@ -551,7 +561,11 @@ class BuiltinConfigEditor {
       try { JSON.stringify(this.config); return true; }
       catch (e) { this.showToast(I18N.t('hooks.invalidJson'), 'error'); return false; }
     }
-    let ok = true;
+    // JSON parse failures collected during collect() override the field
+    // validation: the stored config still holds the old value, so schema
+    // checks alone would wrongly report a clean state.
+    for (const [p, m] of this.collectErrors) this.errors.set(p, m);
+    let ok = this.collectErrors.size === 0;
     for (const field of (this.schema.fields || [])) {
       const path = field.key;
       const value = this.getConfigValue(path);

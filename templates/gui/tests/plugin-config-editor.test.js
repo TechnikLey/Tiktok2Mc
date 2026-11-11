@@ -66,6 +66,20 @@ describe('PluginConfigEditor', () => {
       expect(pluginEditor.validate()).toBe(true);
     });
 
+    it('fails validation when a JSON field failed to parse during collect', () => {
+      pluginEditor.hasSchema = true;
+      pluginEditor.schema = { fields: [{ key: 'settings', type: 'json' }] };
+      pluginEditor.config = {};
+      // simulate collect() catching a JSON.parse failure in a json field
+      pluginEditor.collectErrors.set('settings', I18N.t('editor.invalidJson', { msg: 'Unexpected token' }));
+      expect(pluginEditor.validate()).toBe(false);
+      expect(pluginEditor.errors.has('settings')).toBe(true);
+      expect(pluginEditor.errors.get('settings')).toMatch(/Unexpected token/);
+      // clearing the collect error restores schema-only validation
+      pluginEditor.collectErrors.clear();
+      expect(pluginEditor.validate()).toBe(true);
+    });
+
     it('validates required fields', () => {
       pluginEditor.hasSchema = true;
       pluginEditor.schema = {

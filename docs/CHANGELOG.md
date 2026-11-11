@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Visible errors for broken hook configs** - a hook's `config.yaml` that cannot be parsed is now reported in the diagnostics and dashboard instead of the hook silently running with empty defaults.
 - **Config auto-reload** - editing `config.yaml` or `data/actions.mca` externally (e.g. in a text editor) no longer requires a restart or manual reload: the tool notices the change and applies it automatically. A broken config keeps the previous settings active and is reported instead.
 - **Diagnostics view in the dashboard** - a new sidebar page shows the health of all internal components (running/degraded/failed), the crash history, and the full catalog of error codes with a subsystem filter, so problems can be reviewed without reading log files.
+- **Clear error for invalid JSON fields in config editors** - entering invalid JSON in a JSON-type field of a config editor now shows a field error ("Invalid JSON value: …") on save instead of silently keeping the previous value, so edits are never lost without notice.
 - **Restart prompt for Minecraft function changes** - after editing the actions file, the dashboard now detects when datapack functions actually changed and offers to restart the Minecraft server with one click, so the changes take effect immediately instead of waiting for the next restart. The fresh datapack and the restart prompt cover **all server instances**, not just the default one.
 
 ### Changed
