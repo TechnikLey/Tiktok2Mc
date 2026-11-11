@@ -175,6 +175,12 @@
     'restart.dismiss': 'Dismiss',
     'restart.later': 'Later',
     'degraded.banner': 'Degraded modes (running with restricted functionality):',
+    'datapack.changedTitle': 'Datapack functions changed',
+    'datapack.changedMessage':
+      'The actions file was reloaded and datapack functions changed. Minecraft only loads them at server start — restart the Minecraft server now so the changes take effect?',
+    'datapack.restartNow': 'Restart Minecraft',
+    'datapack.restartRequested': 'Minecraft server restart requested (datapack change)',
+    'datapack.restartSkipped': 'Minecraft restart skipped — changes take effect at the next server restart',
 
     /* ── Status view ── */
     'status.title': 'Status',
@@ -1330,6 +1336,12 @@
     'restart.now': 'Jetzt neu starten',
     'restart.dismiss': 'Ausblenden',
     'restart.later': 'Später',
+    'datapack.changedTitle': 'Datapack-Funktionen geändert',
+    'datapack.changedMessage':
+      'Die Actions-Datei wurde neu geladen und Datapack-Funktionen haben sich geändert. Minecraft lädt sie nur beim Serverstart — den Minecraft-Server jetzt neu starten, damit die Änderungen wirksam werden?',
+    'datapack.restartNow': 'Minecraft neu starten',
+    'datapack.restartRequested': 'Minecraft-Server-Neustart angefordert (Datapack-Änderung)',
+    'datapack.restartSkipped': 'Minecraft-Neustart übersprungen — die Änderungen greifen beim nächsten Server-Neustart',
 
     /* ── Status view ── */
     'status.title': 'Status',

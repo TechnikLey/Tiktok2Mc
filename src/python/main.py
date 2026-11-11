@@ -3512,6 +3512,60 @@ def _request_minecraft_restart() -> None:
         )
 
 
+def _notify_datapack_changed(changed: bool) -> None:
+    """Tell the API (and thereby the GUI) whether functions changed.
+
+    Published as a ``datapack.changed`` event on every auto-reload that did
+    not already restart Minecraft. The dashboard uses it to offer a
+    confirmation dialog for restarting the Minecraft server so regenerated
+    ``.mcfunction`` files take effect. Best-effort: failures are logged,
+    never raised."""
+
+    body = json.dumps(
+        {"type": "datapack.changed", "data": {"changed": changed}}
+    ).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/events",
+            data=body,
+            headers={"Content-Type": "application/json", "X-T2M-Source": "bridge"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except (OSError, ValueError) as exc:
+        log.warning("Failed to publish datapack.changed event: %s", exc)
+
+
+def _datapack_signature() -> str | None:
+    """Return a content hash of the generated datapack source directory.
+
+    Combines every file's relative path and SHA-256 content into one digest,
+    so any change to generated ``.mcfunction`` files, the pack metadata or
+    hook-provided functions is detected. Returns ``None`` when the datapack
+    root is missing or unreadable (callers must treat that as "unknown")."""
+
+    import hashlib
+
+    root = Path(ctx.datapack_root)
+    if not root.exists():
+        return None
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        digest.update(str(path.relative_to(root)).encode("utf-8"))
+        digest.update(b"\0")
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            digest.update(b"<unreadable>")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+_last_datapack_signature: str | None = None
+
+
 async def reload_actions(send_minecraft_reload: bool = False):
     """Reload actions.mca at runtime without restarting the bridge.
 
@@ -3553,6 +3607,19 @@ async def reload_actions(send_minecraft_reload: bool = False):
             )
         except OSError as exc:
             log.warning("[RELOAD] Failed to sync datapack into the world: %s", exc)
+        # Compare a content hash of the generated datapack with the previous
+        # rebuild: Minecraft loads .mcfunction files only at server start, so
+        # function changes need a restart while pure RCON-trigger changes do
+        # not. The first reload after bridge start only establishes the
+        # baseline (functions_changed stays False).
+        global _last_datapack_signature
+        new_signature = await asyncio.to_thread(_datapack_signature)
+        functions_changed = (
+            _last_datapack_signature is not None
+            and new_signature is not None
+            and new_signature != _last_datapack_signature
+        )
+        _last_datapack_signature = new_signature
         ctx.actions_valid = True
         get_health_monitor().set_state("tiktok_bridge", HealthState.RUNNING)
         ctx.like_triggers = prepare_like_triggers(ctx.like_triggers)
@@ -3565,10 +3632,18 @@ async def reload_actions(send_minecraft_reload: bool = False):
             # server (the world copy was already synced above).
             _request_minecraft_restart()
         else:
-            log.info(
-                "[RELOAD] No Minecraft server restart requested — "
-                "datapack function changes require a restart to take effect"
-            )
+            _notify_datapack_changed(functions_changed)
+            if functions_changed:
+                log.info(
+                    "[RELOAD] Datapack function content changed — the dashboard "
+                    "will ask to restart the Minecraft server so the changes "
+                    "take effect"
+                )
+            else:
+                log.info(
+                    "[RELOAD] No datapack content change — no Minecraft "
+                    "server restart needed"
+                )
 
         log.info("[RELOAD] Actions reloaded successfully")
     except Exception as e:  # runtime reload is best-effort; previous state stays active

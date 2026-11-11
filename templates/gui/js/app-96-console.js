@@ -83,6 +83,8 @@ function connectLogStream() {
         chatbotEditor._renderStatus(payload);
       } else if (type === 'config.degraded') {
         registerDegraded(payload);
+      } else if (type === 'datapack.changed') {
+        if (payload.changed === true) handleDatapackFunctionChange();
       } else if (type === 'update.available') {
         // Auto-install disabled: show notification if not already shown
         if (!_autoInstallEnabled && !_updateNotificationShown) {
@@ -110,6 +112,39 @@ function connectLogStream() {
     // Exponential backoff up to 10s.
     _sseReconnectDelay = Math.min(_sseReconnectDelay * 1.5, 10000);
   };
+}
+
+/* ─── Datapack Function Change ─── */
+
+/**
+ * Ask the user whether to restart the Minecraft server after the bridge
+ * reports that datapack function content changed (from datapack.changed SSE).
+ *
+ * Minecraft loads .mcfunction files only at server start, so regenerated
+ * functions take effect only after a restart. The user confirms via dialog;
+ * on confirm the default MC server instance is restarted through the API.
+ */
+function handleDatapackFunctionChange() {
+  showConfirmDialog(
+    I18N.t('datapack.changedTitle'),
+    I18N.t('datapack.changedMessage'),
+    I18N.t('datapack.restartNow'),
+    'btn-primary'
+  )
+    .then((ok) => {
+      if (!ok) {
+        liveLog.add(
+          I18N.t('datapack.restartSkipped'),
+          'warning',
+          'datapack'
+        );
+        return;
+      }
+      return postJSON('/server/default/restart').then(() => {
+        liveLog.add(I18N.t('datapack.restartRequested'), 'info', 'datapack');
+      });
+    })
+    .catch((e) => showToast(e.message || I18N.t('common.unknown'), 'error'));
 }
 
 /* ─── Degraded Component Banner ─── */
