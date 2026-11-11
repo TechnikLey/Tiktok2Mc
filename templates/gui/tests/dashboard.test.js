@@ -652,28 +652,31 @@ describe('connectLogStream', () => {
 
   it('offers a Minecraft restart on datapack.changed (changed=true)', async () => {
     connectLogStream();
-    let posted = '';
+    const posted = [];
     const prevPost = postJSON;
     postJSON = (url) => {
-      posted = url;
+      posted.push(url);
       return Promise.resolve({});
     };
     const msgEvent = {
-      data: JSON.stringify({ type: 'datapack.changed', data: { changed: true } }),
+      data: JSON.stringify({
+        type: 'datapack.changed',
+        data: { changed: true, instances: ['default', 'skyblock'] },
+      }),
     };
     _sseSource.onmessage(msgEvent);
     expect(document.getElementById('confirm-dialog').classList.contains('hidden')).toBe(false);
     expect(document.getElementById('confirm-title').textContent).toContain('Datapack');
-    // user confirms → restart endpoint called
+    // user confirms → restart endpoint called for every synced instance
     document.getElementById('btn-confirm-ok').click();
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
-    expect(posted).toBe('/server/default/restart');
+    expect(posted).toEqual(['/server/default/restart', '/server/skyblock/restart']);
     // changed=false does not open the dialog
-    posted = '';
-    _sseSource.onmessage({ data: JSON.stringify({ type: 'datapack.changed', data: { changed: false } }) });
-    expect(posted).toBe('');
+    posted.length = 0;
+    _sseSource.onmessage({ data: JSON.stringify({ type: 'datapack.changed', data: { changed: false, instances: ['default'] } }) });
+    expect(posted).toEqual([]);
     postJSON = prevPost;
   });
 });

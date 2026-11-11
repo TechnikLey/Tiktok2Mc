@@ -84,7 +84,7 @@ function connectLogStream() {
       } else if (type === 'config.degraded') {
         registerDegraded(payload);
       } else if (type === 'datapack.changed') {
-        if (payload.changed === true) handleDatapackFunctionChange();
+        if (payload.changed === true) handleDatapackFunctionChange(payload);
       } else if (type === 'update.available') {
         // Auto-install disabled: show notification if not already shown
         if (!_autoInstallEnabled && !_updateNotificationShown) {
@@ -117,14 +117,19 @@ function connectLogStream() {
 /* ─── Datapack Function Change ─── */
 
 /**
- * Ask the user whether to restart the Minecraft server after the bridge
+ * Ask the user whether to restart the Minecraft servers after the bridge
  * reports that datapack function content changed (from datapack.changed SSE).
  *
  * Minecraft loads .mcfunction files only at server start, so regenerated
- * functions take effect only after a restart. The user confirms via dialog;
- * on confirm the default MC server instance is restarted through the API.
+ * functions take effect only after a restart. The bridge sends the list of
+ * instances whose world received the datapack; one confirmation covers all
+ * of them. On confirm every instance is restarted through the API.
+ * @param {object} payload - {changed: boolean, instances: string[]} from the bridge.
  */
-function handleDatapackFunctionChange() {
+function handleDatapackFunctionChange(payload) {
+  const instances = Array.isArray(payload.instances) && payload.instances.length
+    ? payload.instances
+    : ['default'];
   showConfirmDialog(
     I18N.t('datapack.changedTitle'),
     I18N.t('datapack.changedMessage'),
@@ -133,15 +138,21 @@ function handleDatapackFunctionChange() {
   )
     .then((ok) => {
       if (!ok) {
-        liveLog.add(
-          I18N.t('datapack.restartSkipped'),
-          'warning',
-          'datapack'
-        );
-        return;
+        liveLog.add(I18N.t('datapack.restartSkipped'), 'warning', 'datapack');
+        return null;
       }
-      return postJSON('/server/default/restart').then(() => {
-        liveLog.add(I18N.t('datapack.restartRequested'), 'info', 'datapack');
+      return Promise.allSettled(
+        instances.map((id) => postJSON('/server/' + encodeURIComponent(id) + '/restart'))
+      ).then((results) => {
+        const failed = results.filter((r) => r.status === 'rejected');
+        if (failed.length) {
+          showToast(
+            I18N.t('datapack.restartFailed').replace('{n}', String(failed.length)),
+            'error'
+          );
+        } else {
+          liveLog.add(I18N.t('datapack.restartRequested'), 'info', 'datapack');
+        }
       });
     })
     .catch((e) => showToast(e.message || I18N.t('common.unknown'), 'error'));

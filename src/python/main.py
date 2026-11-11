@@ -3512,17 +3512,21 @@ def _request_minecraft_restart() -> None:
         )
 
 
-def _notify_datapack_changed(changed: bool) -> None:
+def _notify_datapack_changed(changed: bool, instances: list[str]) -> None:
     """Tell the API (and thereby the GUI) whether functions changed.
 
     Published as a ``datapack.changed`` event on every auto-reload that did
-    not already restart Minecraft. The dashboard uses it to offer a
-    confirmation dialog for restarting the Minecraft server so regenerated
-    ``.mcfunction`` files take effect. Best-effort: failures are logged,
-    never raised."""
+    not already restart Minecraft. ``instances`` lists the MC server
+    instances whose world received the synced datapack — the dashboard uses
+    it to offer one confirmation dialog for restarting the servers so
+    regenerated ``.mcfunction`` files take effect. Best-effort: failures
+    are logged, never raised."""
 
     body = json.dumps(
-        {"type": "datapack.changed", "data": {"changed": changed}}
+        {
+            "type": "datapack.changed",
+            "data": {"changed": changed, "instances": instances},
+        }
     ).encode("utf-8")
     try:
         req = urllib.request.Request(
@@ -3534,6 +3538,56 @@ def _notify_datapack_changed(changed: bool) -> None:
         urllib.request.urlopen(req, timeout=3)
     except (OSError, ValueError) as exc:
         log.warning("Failed to publish datapack.changed event: %s", exc)
+
+
+def _datapack_sync_instances() -> list[str]:
+    """Return the instance ids whose worlds receive the generated datapack.
+
+    Reads the ``instances`` section from the bridge's loaded config and always
+    includes ``"default"`` (the historic sync target, also kept working when
+    the section is missing/empty). Non-dict entries and disabled instances
+    are skipped."""
+
+    raw = ctx.config.get("instances", {}) if isinstance(ctx.config, dict) else {}
+    ids = {"default"}
+    if isinstance(raw, dict):
+        for inst_id, data in raw.items():
+            if isinstance(data, dict) and data.get("enabled", True):
+                ids.add(str(inst_id))
+    return sorted(ids)
+
+
+def _sync_datapack_to_instances() -> list[str]:
+    """Sync the generated datapack into every configured instance's world.
+
+    Returns the list of instance ids that were synced successfully (used for
+    the ``datapack.changed`` event so the GUI restarts the right servers).
+    A sync failure for one instance is logged and does not abort the others;
+    if every attempt fails, the historic ``default`` sync is retried last so
+    behavior is never worse than before."""
+
+    synced: list[str] = []
+    for inst_id in _datapack_sync_instances():
+        try:
+            sync_datapack(
+                (_BASE_PARENT / "server" / inst_id).resolve(), ctx.datapack_root
+            )
+            synced.append(inst_id)
+        except OSError as exc:
+            log.warning(
+                "[RELOAD] Failed to sync datapack into instance '%s': %s",
+                inst_id,
+                exc,
+            )
+    if not synced:
+        try:
+            sync_datapack(
+                (_BASE_PARENT / "server" / "default").resolve(), ctx.datapack_root
+            )
+            synced = ["default"]
+        except OSError as exc:
+            log.warning("[RELOAD] Failed to sync datapack into default world: %s", exc)
+    return synced
 
 
 def _datapack_signature() -> str | None:
@@ -3599,14 +3653,9 @@ async def reload_actions(send_minecraft_reload: bool = False):
             return
 
         await asyncio.to_thread(generate_datapack)
-        # Push the fresh datapack into the server world so the restart below
-        # boots with the regenerated functions.
-        try:
-            sync_datapack(
-                (_BASE_PARENT / "server" / "default").resolve(), ctx.datapack_root
-            )
-        except OSError as exc:
-            log.warning("[RELOAD] Failed to sync datapack into the world: %s", exc)
+        # Push the fresh datapack into every configured instance's world so
+        # the restarts below boot with the regenerated functions.
+        synced_instances = await asyncio.to_thread(_sync_datapack_to_instances)
         # Compare a content hash of the generated datapack with the previous
         # rebuild: Minecraft loads .mcfunction files only at server start, so
         # function changes need a restart while pure RCON-trigger changes do
@@ -3632,7 +3681,7 @@ async def reload_actions(send_minecraft_reload: bool = False):
             # server (the world copy was already synced above).
             _request_minecraft_restart()
         else:
-            _notify_datapack_changed(functions_changed)
+            _notify_datapack_changed(functions_changed, synced_instances)
             if functions_changed:
                 log.info(
                     "[RELOAD] Datapack function content changed — the dashboard "

@@ -180,6 +180,7 @@
       'The actions file was reloaded and datapack functions changed. Minecraft only loads them at server start — restart the Minecraft server now so the changes take effect?',
     'datapack.restartNow': 'Restart Minecraft',
     'datapack.restartRequested': 'Minecraft server restart requested (datapack change)',
+    'datapack.restartFailed': 'Restart failed for {n} Minecraft server(s) — check the server manager',
     'datapack.restartSkipped': 'Minecraft restart skipped — changes take effect at the next server restart',
 
     /* ── Status view ── */
@@ -1341,6 +1342,7 @@
       'Die Actions-Datei wurde neu geladen und Datapack-Funktionen haben sich geändert. Minecraft lädt sie nur beim Serverstart — den Minecraft-Server jetzt neu starten, damit die Änderungen wirksam werden?',
     'datapack.restartNow': 'Minecraft neu starten',
     'datapack.restartRequested': 'Minecraft-Server-Neustart angefordert (Datapack-Änderung)',
+    'datapack.restartFailed': 'Neustart für {n} Minecraft-Server fehlgeschlagen — bitte im Server-Manager prüfen',
     'datapack.restartSkipped': 'Minecraft-Neustart übersprungen — die Änderungen greifen beim nächsten Server-Neustart',
 
     /* ── Status view ── */
