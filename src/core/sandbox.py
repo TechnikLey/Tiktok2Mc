@@ -248,6 +248,10 @@ def resolve_plugin_sandbox(
 
             with manifest_file.open("r", encoding="utf-8") as fh:
                 raw = json.load(fh)
+            if not isinstance(raw, dict):
+                raise TypeError(
+                    f"manifest root must be a JSON object, got {type(raw).__name__}"
+                )
             profile = str(raw.get("sandbox_profile", "") or "").strip()
             if profile:
                 sb = PluginSandbox.from_profile(profile)
@@ -264,6 +268,6 @@ def resolve_plugin_sandbox(
                     plugin_name,
                     profile,
                 )
-    except (OSError, ValueError) as exc:
+    except (OSError, TypeError, ValueError) as exc:
         log.warning("[SANDBOX] Manifest read failed for '%s': %s", plugin_name, exc)
     return global_sandbox

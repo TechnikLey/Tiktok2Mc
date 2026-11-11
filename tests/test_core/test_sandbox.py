@@ -189,5 +189,9 @@ class TestSandboxProfiles:
         )
         assert resolve_plugin_sandbox(global_sb, "my-plugin", plugin_dir) is global_sb
 
+        # Non-object manifest -> falls back to the global sandbox
+        (plugin_dir / "plugin.json").write_text("[]", encoding="utf-8")
+        assert resolve_plugin_sandbox(global_sb, "my-plugin", plugin_dir) is global_sb
+
         # Sandbox disabled -> always None
         assert resolve_plugin_sandbox(None, "my-plugin", plugin_dir) is None

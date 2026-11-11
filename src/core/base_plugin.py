@@ -86,11 +86,11 @@ class _CircuitBreaker:
     def __init__(self, max_fails: int = 5, cooldown: float = 30.0) -> None:
         """Create a closed breaker.
 
-Args:
-    max_fails: Consecutive failures that open the breaker; values below 1
-        are raised to 1.
-    cooldown: Seconds the breaker stays open before calls are allowed
-        again."""
+        Args:
+            max_fails: Consecutive failures that open the breaker; values below 1
+                are raised to 1.
+            cooldown: Seconds the breaker stays open before calls are allowed
+                again."""
 
         self.max_fails = max(1, int(max_fails))
         self.cooldown = float(cooldown)
@@ -109,8 +109,8 @@ Args:
     def mark_failure(self) -> None:
         """Count a failure and open the breaker when the limit is reached.
 
-The counter is reset when the breaker opens, so the cooldown covers the
-next failure window rather than accumulating across it."""
+        The counter is reset when the breaker opens, so the cooldown covers the
+        next failure window rather than accumulating across it."""
 
         self._fails += 1
         if self._fails >= self.max_fails:
@@ -139,13 +139,13 @@ class BasePlugin:
     def __init__(self):
         """Initialize paths, configuration, theme, state and health tracking.
 
-Resolves the plugin directory from the subclass module, loads
-``plugin.json``/``config.yaml`` and the declared permissions, restores the
-saved window size and registers the plugin with the health monitor.
-Registration failures are ignored so a plugin can still start.
+        Resolves the plugin directory from the subclass module, loads
+        ``plugin.json``/``config.yaml`` and the declared permissions, restores the
+        saved window size and registers the plugin with the health monitor.
+        Registration failures are ignored so a plugin can still start.
 
-Raises:
-    RuntimeError: When the subclass did not set ``PLUGIN_NAME``."""
+        Raises:
+            RuntimeError: When the subclass did not set ``PLUGIN_NAME``."""
 
         if not self.PLUGIN_NAME:
             raise RuntimeError("PLUGIN_NAME must be set on subclass")
@@ -239,25 +239,37 @@ Raises:
     def _load_window_state(self) -> dict[str, int]:
         """Read the saved window size, falling back to sensible defaults.
 
-Missing or invalid values are clamped to a minimum of 200x100; an
-unreadable state file yields the default 600x300."""
+        Missing, non-object or non-integer values are treated as invalid;
+        valid sizes are clamped to a minimum of 200x100. An unreadable or
+        malformed state file yields the default 600x300."""
 
         if self._state_file.exists():
             try:
                 with self._state_file.open("r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return {
-                        "width": max(data.get("width", 600), 200),
-                        "height": max(data.get("height", 300), 100),
-                    }
-            except (json.JSONDecodeError, OSError, ValueError) as e:
+                if not isinstance(data, dict):
+                    raise TypeError(
+                        "window state root must be a JSON object, "
+                        f"got {type(data).__name__}"
+                    )
+                width = data.get("width", 600)
+                height = data.get("height", 300)
+                if (
+                    not isinstance(width, int)
+                    or isinstance(width, bool)
+                    or not isinstance(height, int)
+                    or isinstance(height, bool)
+                ):
+                    raise TypeError("window state width/height must be integers")
+                return {"width": max(width, 200), "height": max(height, 100)}
+            except (json.JSONDecodeError, OSError, TypeError, ValueError) as e:
                 log.warning("[%s] Failed to load window state: %s", self.PLUGIN_NAME, e)
         return {"width": 600, "height": 300}
 
     def save_window_state(self, width: int, height: int) -> None:
         """Persist the window size for the next start.
 
-Failures are logged and ignored because window state is cosmetic."""
+        Failures are logged and ignored because window state is cosmetic."""
 
         try:
             with self._state_file.open("w", encoding="utf-8") as f:
@@ -288,6 +300,13 @@ Failures are logged and ignored because window state is cosmetic."""
         except (json.JSONDecodeError, OSError) as e:
             log.warning(
                 "[%s] Cannot read plugin.json for permissions: %s", self.PLUGIN_NAME, e
+            )
+            return set()
+        if not isinstance(raw, dict):
+            log.warning(
+                "[%s] plugin.json root must be a JSON object — no permissions "
+                "granted (default deny)",
+                self.PLUGIN_NAME,
             )
             return set()
         raw_perms = raw.get("permissions")
@@ -1121,9 +1140,9 @@ Failures are logged and ignored because window state is cosmetic."""
     def _start_threads(self):
         """Start the daemon tick and command-polling threads.
 
-Returns:
-    The ``(tick_thread, poll_thread)`` pair so callers can join them when
-    running headless."""
+        Returns:
+            The ``(tick_thread, poll_thread)`` pair so callers can join them when
+            running headless."""
 
         self._running = True
         tick_thread = threading.Thread(target=self._tick_loop, daemon=True)

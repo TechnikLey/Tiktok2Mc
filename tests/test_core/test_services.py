@@ -112,6 +112,21 @@ class TestApiService:
         with pytest.raises(TypeError, match="must be dict"):
             svc.write_config({"java": "not_a_dict"}, backup=False)
 
+    def test_write_config_creates_missing_file(self, svc, project_dir):
+        """A missing config file must be created with the written values.
+
+        Regression: rebinding the transaction's yielded plain dict to a
+        CommentedMap used to write back the untouched empty dict, silently
+        dropping the new configuration.
+        """
+        svc.config_path = project_dir / "fresh_config.yaml"
+
+        svc.write_config({"server_host": "127.0.0.1"}, backup=False)
+
+        reread = svc.read_config()
+        assert reread["server_host"] == "127.0.0.1"
+        assert reread["config_version"] == "1.2"
+
     def test_write_config_replace_keys_removes_nested_keys(self, svc):
         cfg = svc.read_config()
         cfg["instances"] = {"a": {"name": "A"}, "b": {"name": "B"}}

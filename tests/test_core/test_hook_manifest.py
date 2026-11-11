@@ -81,6 +81,14 @@ class TestLoadHookManifest:
         manifest = load_hook_manifest(hook_dir)
         assert manifest is None
 
+    def test_non_object_manifest_returns_none(self, tmp_path):
+        from core.hook_manifest import load_hook_manifest
+
+        hook_dir = tmp_path / "array_hook"
+        hook_dir.mkdir()
+        (hook_dir / "hook.json").write_text("[]", encoding="utf-8")
+        assert load_hook_manifest(hook_dir) is None
+
     def test_missing_name_returns_none(self, tmp_path):
         from core.hook_manifest import load_hook_manifest
 

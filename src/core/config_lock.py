@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from filelock import FileLock, Timeout
+from ruamel.yaml.comments import CommentedMap
 
 from core.yaml_utils import load_yaml, save_yaml
 
@@ -101,7 +102,9 @@ def config_transaction(
 
     Acquires a cross-process file lock, loads the current config, yields
     it for in-place mutation, and writes it back on success.  The config
-    version counter is bumped so readers can detect changes.
+    version counter is bumped so readers can detect changes.  The yielded
+    mapping is always a ``CommentedMap``; the same object is written back,
+    so callers must mutate it in place rather than rebind it.
 
     Usage::
 
@@ -112,11 +115,17 @@ def config_transaction(
     lock = _acquire_lock(lock_path)
 
     try:
-        # Read current config inside the lock
+        # Read current config inside the lock. Always yield a CommentedMap:
+        # callers mutate the yielded object in place, and the same object is
+        # written back below. Yielding a plain dict (missing file) and letting
+        # a caller rebind it to a CommentedMap would silently discard every
+        # change on write-back.
         if config_path.exists():
             data = load_yaml(config_path)
         else:
-            data = {}
+            data = CommentedMap()
+        if not isinstance(data, CommentedMap):
+            data = CommentedMap(data) if isinstance(data, dict) else CommentedMap()
 
         # Yield for caller to mutate
         yield data

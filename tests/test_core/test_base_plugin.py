@@ -91,6 +91,55 @@ class TestBasePluginLifecycle:
         assert p._window_state["width"] == 800
         assert p._window_state["height"] == 600
 
+    def test_window_state_non_object_falls_back(self, tmp_path, monkeypatch):
+        from core.base_plugin import BasePlugin
+
+        data_dir = tmp_path.parent / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        (data_dir / "window_state_fake.json").write_text("[]", encoding="utf-8")
+
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+
+        class P(BasePlugin):
+            PLUGIN_NAME = "fake"
+
+            def get_overlay_html(self):
+                return ""
+
+        p = P()
+        assert p._window_state == {"width": 600, "height": 300}
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            '{"width": "wide", "height": 600}',
+            '{"width": true, "height": 600}',
+        ],
+    )
+    def test_window_state_non_integer_values_fall_back(
+        self, tmp_path, monkeypatch, payload
+    ):
+        from core.base_plugin import BasePlugin
+
+        data_dir = tmp_path.parent / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        (data_dir / "window_state_fake.json").write_text(payload, encoding="utf-8")
+
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+
+        class P(BasePlugin):
+            PLUGIN_NAME = "fake"
+
+            def get_overlay_html(self):
+                return ""
+
+        p = P()
+        assert p._window_state == {"width": 600, "height": 300}
+
 
 class TestBasePluginAPIHelpers:
     """api_post, api_get, push_state, send_command."""
@@ -750,6 +799,16 @@ class TestBasePluginPermissions:
         (plugin_dir / "plugin.json").write_text(
             json.dumps({"name": "plug"}), encoding="utf-8"
         )
+        p = self._make_plugin(tmp_path, monkeypatch)
+        p._plugin_dir = plugin_dir
+        assert p._load_permissions() == set()
+
+    def test_load_permissions_non_object_manifest_is_default_deny(
+        self, tmp_path, monkeypatch
+    ):
+        plugin_dir = tmp_path / "plug"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text("[]", encoding="utf-8")
         p = self._make_plugin(tmp_path, monkeypatch)
         p._plugin_dir = plugin_dir
         assert p._load_permissions() == set()

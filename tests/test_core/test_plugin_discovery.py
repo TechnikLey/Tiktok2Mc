@@ -76,6 +76,26 @@ class TestDiscoverPluginsFromManifests:
         result = discover_plugins_from_manifests(str(tmp_path / "plugins"))
         assert result == []
 
+    def test_manifest_root_not_object_reports_error(self, tmp_path):
+        from core.api.services.plugin_discovery import discover_plugins_from_manifests
+
+        plugins_dir = tmp_path / "plugins"
+        plugin_dir = plugins_dir / "array-manifest"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "plugin.json").write_text("[]", encoding="utf-8")
+        (plugins_dir / "valid").mkdir()
+        (plugins_dir / "valid" / "plugin.json").write_text(
+            json.dumps({"name": "valid"}), encoding="utf-8"
+        )
+
+        result = discover_plugins_from_manifests(str(plugins_dir))
+
+        by_name = {entry["name"]: entry for entry in result}
+        assert set(by_name) == {"array-manifest", "valid"}
+        assert by_name["array-manifest"]["version"] == "0.0.0"
+        assert "JSON object" in by_name["array-manifest"]["error"]
+        assert by_name["valid"]["error"] == ""
+
     def test_duplicate_names(self, tmp_path):
         from core.api.services.plugin_discovery import discover_plugins_from_manifests
 
@@ -125,3 +145,42 @@ class TestDiscoverPluginsFromManifests:
         manifest_file.write_text("garbage", encoding="utf-8")
         result = discover_plugins_from_manifests(str(tmp_path / "plugins"))
         assert len(result) >= 1
+
+
+class TestDiscoverQueriesFromManifests:
+    def test_directory_not_found_returns_empty(self):
+        from core.api.services.plugin_discovery import discover_queries_from_manifests
+
+        assert discover_queries_from_manifests("/nonexistent/path") == []
+
+    def test_collects_sorted_unique_queries(self, tmp_path):
+        from core.api.services.plugin_discovery import discover_queries_from_manifests
+
+        plugins_dir = tmp_path / "plugins"
+        plugin_dir = plugins_dir / "chat"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps({"name": "chat", "queries": ["z", "a", "z", ""]}),
+            encoding="utf-8",
+        )
+
+        result = discover_queries_from_manifests(str(plugins_dir))
+
+        assert result == [{"name": "chat", "queries": ["a", "z"]}]
+
+    def test_non_object_manifest_is_skipped_without_aborting_scan(self, tmp_path):
+        from core.api.services.plugin_discovery import discover_queries_from_manifests
+
+        plugins_dir = tmp_path / "plugins"
+        broken = plugins_dir / "broken"
+        broken.mkdir(parents=True)
+        (broken / "plugin.json").write_text("42", encoding="utf-8")
+        valid = plugins_dir / "valid"
+        valid.mkdir()
+        (valid / "plugin.json").write_text(
+            json.dumps({"name": "valid", "queries": ["ping"]}), encoding="utf-8"
+        )
+
+        result = discover_queries_from_manifests(str(plugins_dir))
+
+        assert result == [{"name": "valid", "queries": ["ping"]}]

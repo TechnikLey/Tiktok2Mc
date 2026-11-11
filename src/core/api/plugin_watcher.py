@@ -34,6 +34,11 @@ def _get_plugin_dirs(plugins_dir: Path) -> dict[str, Path]:
         try:
             with manifest_file.open("r", encoding="utf-8") as fh:
                 raw = json.load(fh)
+            if not isinstance(raw, dict):
+                log.debug(
+                    "Ignoring manifest %s: root is not a JSON object", manifest_file
+                )
+                continue
             name = raw.get("name", "")
             if name and isinstance(name, str):
                 result[name] = child
@@ -142,6 +147,14 @@ class PluginWatcher:
                 try:
                     with (plugin_dir / "plugin.json").open("r", encoding="utf-8") as fh:
                         raw = json.load(fh)
+                    if not isinstance(raw, dict):
+                        log.warning(
+                            "Failed to auto-register plugin '%s': manifest root "
+                            "must be a JSON object, got %s",
+                            name,
+                            type(raw).__name__,
+                        )
+                        continue
                     entry_point = raw.get("entry_point", "")
                     manifest_path_part = raw.get("entry_point", "")
                     registration = PluginRegistration(

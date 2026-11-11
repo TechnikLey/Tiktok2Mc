@@ -84,11 +84,11 @@ class PluginLauncher:
     ) -> None:
         """Configure the launcher.
 
-Args:
-    api_base_url: Base URL of the control-plane API. Defaults to the
-        ``API_BASE_URL`` environment variable or the local default.
-    plugins_dir: Directory containing plugin folders. When omitted, the
-        directory is resolved lazily through ``core.paths``."""
+        Args:
+            api_base_url: Base URL of the control-plane API. Defaults to the
+                ``API_BASE_URL`` environment variable or the local default.
+            plugins_dir: Directory containing plugin folders. When omitted, the
+                directory is resolved lazily through ``core.paths``."""
 
         self._api_base = (api_base_url or _get_api_base()).rstrip("/")
         self._plugins_dir: Path | None = plugins_dir
@@ -99,8 +99,8 @@ Args:
     def using_api(self) -> bool:
         """Return whether the last discovery call used the API.
 
-This is ``True`` for both the ``"manifest"`` and ``"api"`` sources,
-because both paths end with a successful API fetch."""
+        This is ``True`` for both the ``"manifest"`` and ``"api"`` sources,
+        because both paths end with a successful API fetch."""
 
         return self.source in ("manifest", "api")
 
@@ -175,8 +175,12 @@ because both paths end with a successful API fetch."""
             try:
                 with manifest_file.open("r", encoding="utf-8") as fh:
                     raw = json.load(fh)
+                if not isinstance(raw, dict):
+                    raise TypeError(
+                        f"manifest root must be a JSON object, got {type(raw).__name__}"
+                    )
                 manifest = PluginManifest(**raw)
-            except (json.JSONDecodeError, ValueError) as exc:
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 log.warning(
                     "Skipping invalid manifest %s: %s",
                     manifest_file,
@@ -206,7 +210,7 @@ because both paths end with a successful API fetch."""
         """
         import sys
 
-        from core.paths import get_root_dir, get_active_app_dir
+        from core.paths import get_active_app_dir, get_root_dir
 
         frozen = getattr(sys, "frozen", False)
         if frozen:

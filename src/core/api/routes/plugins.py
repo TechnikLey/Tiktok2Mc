@@ -167,11 +167,21 @@ async def list_plugins():
                         try:
                             with manifest_path.open("r", encoding="utf-8") as fh:
                                 raw = json.load(fh)
+                            if not isinstance(raw, dict):
+                                raise TypeError(
+                                    "plugin.json root must be a JSON object, "
+                                    f"got {type(raw).__name__}"
+                                )
                             plugin.dashboard_ui = bool(raw.get("dashboard_ui", False))
                             plugin.bundled = bool(raw.get("bundled", False))
                             plugin.platform = raw.get("platform", plugin.platform)
                             plugin.queries = _queries_from_manifest(raw)
-                        except (json.JSONDecodeError, OSError) as exc:
+                        except (
+                            json.JSONDecodeError,
+                            OSError,
+                            TypeError,
+                            ValueError,
+                        ) as exc:
                             plugin.error = str(exc)
 
         # Scan filesystem for unregistered plugins (broken manifests)
@@ -193,9 +203,15 @@ async def list_plugins():
                 try:
                     with manifest_file.open("r", encoding="utf-8") as fh:
                         raw = json.load(fh)
+                    if not isinstance(raw, dict):
+                        raise TypeError(
+                            "plugin.json root must be a JSON object, "
+                            f"got {type(raw).__name__}"
+                        )
                     name = raw.get("name", child.name)
-                except (json.JSONDecodeError, OSError) as exc:
+                except (json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
                     error = str(exc)
+                    raw = {}
                 if any(p.name == name for p in plugins):
                     continue
                 from core.api.models import PluginRegistration

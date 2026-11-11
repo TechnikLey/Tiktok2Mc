@@ -49,6 +49,13 @@ def load_hook_manifest(hook_dir: Path) -> HookManifest | None:
     try:
         with manifest_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
+        if not isinstance(data, dict):
+            log.warning(
+                "Invalid hook manifest (root must be a JSON object, got %s): %s",
+                type(data).__name__,
+                manifest_path,
+            )
+            return None
         manifest = HookManifest(data)
         if not manifest.valid:
             log.warning("Invalid hook manifest (missing name): %s", manifest_path)
@@ -66,7 +73,7 @@ def discover_hooks_dirs() -> list[Path]:
     1. ``hooks/`` — standalone hooks shipped with the tool
     2. ``plugins/*/hooks/`` — hooks bundled with specific plugins
     """
-    from core.paths import get_root_dir, get_active_app_dir
+    from core.paths import get_root_dir
 
     root = get_root_dir()
     dirs: list[Path] = []
@@ -95,6 +102,7 @@ def discover_hooks_dirs() -> list[Path]:
 
     # Plugin-bundled hooks
     from core.paths import get_plugins_dir
+
     plugins_dir = get_plugins_dir()
     if plugins_dir.is_dir():
         for child in sorted(plugins_dir.iterdir()):

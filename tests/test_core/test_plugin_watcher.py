@@ -36,6 +36,13 @@ class TestPluginDirs:
         )
         assert _get_plugin_dirs(tmp_path) == {}
 
+    def test_get_plugin_dirs_skips_non_object_manifest(self, tmp_path: Path):
+        plugin_dir = tmp_path / "array-manifest"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text("[]", encoding="utf-8")
+
+        assert _get_plugin_dirs(tmp_path) == {}
+
 
 class TestPluginWatcherSync:
     @pytest.fixture(autouse=True)

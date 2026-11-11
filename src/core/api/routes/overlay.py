@@ -31,17 +31,18 @@ async def overlay_event_stream():
     """SSE endpoint for the built-in overlay state stream.
 
     Clients (OBS browser sources, pywebview) connect here and receive
-    real-time state updates.  On connection the client receives the
-    latest cached state if one exists.
+    real-time state updates published on the overlay event bus. The
+    stream starts with the next update; transient display commands are
+    not replayed for late subscribers.
     """
-    mgr = get_overlay_manager()
 
     async def generate():
         """Yield overlay state updates as server-sent events.
 
-Only the ``data`` payload of each bus message is sent. Keepalive comments
-are emitted after 30 s without updates; the bus subscription is always
-released on disconnect or cancellation."""
+        Only the ``data`` payload of each bus message is sent. Keepalive
+        comments are emitted after 30 s without updates; the bus
+        subscription is always released on disconnect or cancellation.
+        """
 
         q = event_bus.subscribe("overlay.state_update")
         try:

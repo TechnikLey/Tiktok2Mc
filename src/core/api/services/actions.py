@@ -18,7 +18,6 @@ from core.mca_parser import (
     parse_mca,
     serialize_mca,
 )
-from core.paths import get_root_dir
 from core.validator import validate_text
 
 log = logging.getLogger(__name__)
@@ -37,8 +36,8 @@ class ActionsService:
     def actions_path(self) -> Path:
         """Return the resolved ``actions.mca`` path, resolving it once.
 
-The lookup prefers the active data home, then the bundled defaults file,
-and finally an as-yet-uncreated path under ``data/`` for the first save."""
+        The lookup prefers the active data home, then the bundled defaults file,
+        and finally an as-yet-uncreated path under ``data/`` for the first save."""
 
         if self._actions_path is None:
             self._actions_path = self._resolve_path()
@@ -48,9 +47,11 @@ and finally an as-yet-uncreated path under ``data/`` for the first save."""
     def _resolve_path() -> Path:
         """Resolve the actions file for the current installation layout.
 
-Returns:
-    The active ``data/actions.mca`` when it exists, otherwise the defaults
-template, otherwise a data path suitable for creating the file on save."""
+        Returns:
+            The active ``data/actions.mca`` when it exists, otherwise the
+            defaults template, otherwise a data path suitable for creating
+            the file on save.
+        """
 
         from core.paths import get_data_home_base, get_root_dir
 

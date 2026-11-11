@@ -71,12 +71,12 @@ def _print_instructions():
 def _prompt_input(label: str, required: bool = True) -> str:
     """Prompt until a value is entered, or allow an empty optional value.
 
-Args:
-    label: Prompt label.
-    required: When true, blank input is rejected.
+    Args:
+        label: Prompt label.
+        required: When true, blank input is rejected.
 
-Returns:
-    The stripped input, or an empty string for an optional field."""
+    Returns:
+        The stripped input, or an empty string for an optional field."""
 
     while True:
         val = input(f"{label}: ").strip()
@@ -91,6 +91,7 @@ def _get_config_file() -> Path:
     """Return the Spotify plugin config file path."""
     root = get_root_dir()
     from core.paths import get_plugins_dir
+
     return get_plugins_dir() / "spotify" / "config.yaml"
 
 
@@ -103,9 +104,9 @@ def _load_spotify_config() -> dict[str, Any]:
 def _save_spotify_config(data: dict[str, Any]) -> None:
     """Encrypt sensitive fields and write the Spotify config.
 
-Args:
-    data: Config mapping to persist; secret and token fields are encrypted
-        in place before saving."""
+    Args:
+        data: Config mapping to persist; secret and token fields are encrypted
+            in place before saving."""
 
     cfg_file = _get_config_file()
     # Encrypt sensitive fields before persisting
@@ -123,11 +124,12 @@ _auth_code: str | None = None
 
 class _CallbackHandler(BaseHTTPRequestHandler):
     """HTTP handler that captures the OAuth authorization code."""
+
     def do_GET(self):
         """Read the OAuth redirect parameters and answer the browser.
 
-Stores the authorization code globally and returns an HTML success or
-error page."""
+        Stores the authorization code globally and returns an HTML success or
+        error page."""
 
         global _auth_code
         parsed = urllib.parse.urlparse(self.path)
@@ -159,9 +161,7 @@ error page."""
         self.wfile.write(body.encode("utf-8"))
 
     def log_message(self, format, *args):
-        # Suppress default HTTP server logging
         """Suppress the default per-request HTTP server logging."""
-        pass
 
 
 def _run_callback_server(port: int) -> str | None:
@@ -183,14 +183,14 @@ def _exchange_code(
 ) -> str | None:
     """Exchange an authorization code for Spotify tokens.
 
-Args:
-    code: Authorization code from the callback.
-    client_id: Spotify application client ID.
-    client_secret: Spotify application client secret.
-    redirect_uri: Redirect URI used for the authorization request.
+    Args:
+        code: Authorization code from the callback.
+        client_id: Spotify application client ID.
+        client_secret: Spotify application client secret.
+        redirect_uri: Redirect URI used for the authorization request.
 
-Returns:
-    The raw JSON response body, or ``None`` on HTTP or network errors."""
+    Returns:
+        The raw JSON response body, or ``None`` on HTTP or network errors."""
 
     payload = urllib.parse.urlencode(
         {
@@ -228,8 +228,8 @@ def _refresh_token(
 ) -> str | None:
     """Refresh an access token using a saved refresh token.
 
-Returns:
-    The raw JSON response body, or ``None`` on network errors."""
+    Returns:
+        The raw JSON response body, or ``None`` on network errors."""
 
     payload = urllib.parse.urlencode(
         {
@@ -260,9 +260,9 @@ Returns:
 def main():
     """Run the interactive OAuth setup wizard.
 
-Prompts for credentials, opens the authorization page, waits for the local
-callback and stores the encrypted tokens. Returns early when setup is
-aborted or the token response is incomplete."""
+    Prompts for credentials, opens the authorization page, waits for the local
+    callback and stores the encrypted tokens. Returns early when setup is
+    aborted or the token response is incomplete."""
 
     _print_banner()
 

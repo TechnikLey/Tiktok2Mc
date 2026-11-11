@@ -90,16 +90,29 @@ def discover_plugins_dir() -> Path:
 
 
 def load_plugin_manifest(plugin_dir: Path) -> dict | None:
-    """Read ``plugin.json`` from the given plugin directory."""
+    """Read ``plugin.json`` from the given plugin directory.
+
+    Returns ``None`` when the file is missing, unreadable, invalid JSON, or
+    when its root is not a JSON object. Non-object roots are rejected so
+    callers can safely treat the result as a mapping.
+    """
     manifest_path = plugin_dir / "plugin.json"
     if not manifest_path.exists():
         return None
     try:
         with manifest_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
         log.warning("Failed to load manifest %s: %s", manifest_path, exc)
         return None
+    if not isinstance(data, dict):
+        log.warning(
+            "Failed to load manifest %s: root must be a JSON object, got %s",
+            manifest_path,
+            type(data).__name__,
+        )
+        return None
+    return data
 
 
 def get_plugin_config_path(plugin_dir: Path) -> Path:

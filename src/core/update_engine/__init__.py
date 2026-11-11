@@ -9,9 +9,9 @@ Provides the building blocks for the Omaha-style update architecture:
 
 Design rule: every function operates on **explicitly passed paths** so the
 logic stays testable without depending on ``core.paths`` (which depends on
-this package at runtime; avoid a cycle).
+this package at runtime; avoid a cycle). Submodules must be imported
+explicitly (``from core.update_engine import pointer``); this package does
+not re-export them.
 """
 
 from __future__ import annotations
-
-__all__ = ["launch_layout", "manifest", "migration", "pointer"]

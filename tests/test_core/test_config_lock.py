@@ -27,6 +27,18 @@ class TestConfigTransaction:
         assert cl.load_yaml(cfg) == {"a": 1, "b": 2}
         assert cl.read_config_version(cfg) == 2
 
+    def test_missing_file_yields_commented_map(self, tmp_path):
+        """Callers rely on the yielded mapping being the object written back."""
+        from ruamel.yaml.comments import CommentedMap
+
+        cfg = tmp_path / "config.yaml"
+
+        with cl.config_transaction(cfg) as data:
+            assert isinstance(data, CommentedMap)
+            data["a"] = 1
+
+        assert cl.load_yaml(cfg) == {"a": 1}
+
 
 class TestFailClosed:
     def test_lock_timeout_raises_and_does_not_write(self, tmp_path, monkeypatch):

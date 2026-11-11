@@ -58,6 +58,23 @@ class TestPluginEndpoints:
         assert resp.json()["total"] == 0
         assert resp.json()["plugins"] == []
 
+    def test_list_plugins_surfaces_non_object_manifest(self, client):
+        """A manifest whose JSON root is not an object must not abort the scan."""
+        import core.paths
+
+        plugin_dir = core.paths.get_plugins_dir() / "broken-manifest"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "plugin.json").write_text("[]", encoding="utf-8")
+
+        resp = client.get("/api/v1/plugins")
+
+        assert resp.status_code == 200
+        entry = next(
+            p for p in resp.json()["plugins"] if p["name"] == "broken-manifest"
+        )
+        assert "JSON object" in entry["error"]
+        assert entry["enabled"] is False
+
     def test_update_plugin(self, client):
         client.post("/api/v1/plugins/register", json=self.PLUGIN)
         resp = client.put("/api/v1/plugins/test-plugin", json={"enabled": False})

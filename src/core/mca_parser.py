@@ -84,7 +84,7 @@ class ParsedCommand:
     def from_dict(cls, d: dict[str, Any]) -> ParsedCommand:
         """Build a command from a mapping produced by `to_dict`.
 
-Missing keys fall back to the same defaults as a freshly parsed command."""
+        Missing keys fall back to the same defaults as a freshly parsed command."""
 
         return cls(
             type=d.get("type", "vanilla"),
@@ -110,9 +110,9 @@ class ParsedTrigger:
     def to_dict(self, gifts: list[dict] | None = None) -> dict[str, Any]:
         """Serialise the trigger, detecting its type from the gift catalog.
 
-Args:
-    gifts: Optional gift entries used to classify the trigger as a gift;
-        without them only numeric names are treated as gifts."""
+        Args:
+            gifts: Optional gift entries used to classify the trigger as a gift;
+                without them only numeric names are treated as gifts."""
 
         return {
             "name": self.name,
@@ -124,8 +124,8 @@ Args:
     def _detect_type(self, gifts: list[dict] | None = None) -> str:
         """Classify the trigger as ``Event``, ``Gift`` or ``Custom``.
 
-Gift matching accepts the catalog name with flexible spacing and the
-numeric gift id."""
+        Gift matching accepts the catalog name with flexible spacing and the
+        numeric gift id."""
 
         name = self.raw_name
         if name in EVENT_TRIGGERS:
@@ -238,9 +238,9 @@ def parse_mca(text: str, *, gifts: list[dict] | None = None) -> ParseResult:
         if is_full_comment:
             continue  # skip entirely
 
-        # For disabled triggers, strip the "##" prefix but keep leading whitespace
+        # For disabled triggers, strip the "##" prefix; indentation is
+        # normalized by the final strip below for every line.
         if is_disabled:
-            lead = raw_line[: len(raw_line) - len(stripped)]
             content = stripped[len(DISABLED_PREFIX) :].lstrip()
         else:
             content = stripped

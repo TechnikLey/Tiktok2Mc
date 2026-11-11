@@ -21,7 +21,9 @@ def discover_plugins_from_manifests(base_path: str) -> list[dict[str, Any]]:
     and ``enabled_by_registry`` (always ``False`` — this function does
     **not** query the registry).
 
-    Malformed manifests are logged as warnings and skipped.
+    Unreadable, invalid-JSON, and non-object manifests are logged as
+    warnings and reported as entries with an ``error`` field, so the
+    dashboard can surface them instead of dropping them silently.
     """
     plugins_dir = Path(base_path)
     if not plugins_dir.is_dir():
@@ -39,11 +41,15 @@ def discover_plugins_from_manifests(base_path: str) -> list[dict[str, Any]]:
             continue
 
         error = ""
+        raw: Any = None
         try:
             with manifest_file.open("r", encoding="utf-8") as fh:
                 raw = json.load(fh)
         except (json.JSONDecodeError, OSError) as exc:
             error = str(exc)
+        else:
+            if not isinstance(raw, dict):
+                error = f"manifest root must be a JSON object, got {type(raw).__name__}"
 
         if error:
             name = child.name
@@ -119,6 +125,14 @@ def discover_queries_from_manifests(base_path: str) -> list[dict[str, Any]]:
                 raw = json.load(fh)
         except (json.JSONDecodeError, OSError) as exc:
             log.warning("Skipping manifest %s: %s", manifest_file, exc)
+            continue
+
+        if not isinstance(raw, dict):
+            log.warning(
+                "Skipping manifest %s: root must be a JSON object, got %s",
+                manifest_file,
+                type(raw).__name__,
+            )
             continue
 
         name = raw.get("name", "")

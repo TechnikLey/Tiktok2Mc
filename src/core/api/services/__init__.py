@@ -191,13 +191,6 @@ class ApiService:
         data["config_version"] = EXPECTED_CONFIG_VERSION
 
         with config_transaction(self.config_path, backup=backup) as existing:
-            if not isinstance(existing, CommentedMap):
-                existing = (
-                    CommentedMap(existing)
-                    if isinstance(existing, dict)
-                    else CommentedMap()
-                )
-
             # For keys marked as replace, remove nested keys in existing
             # that are not in data.
             if replace_keys:

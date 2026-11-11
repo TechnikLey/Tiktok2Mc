@@ -98,6 +98,11 @@ class TestLoadPluginManifest:
         result = load_plugin_manifest(tmp_path)
         assert result is None
 
+    def test_non_object_manifest(self, tmp_path):
+        p = tmp_path / "plugin.json"
+        p.write_text("[]", encoding="utf-8")
+        assert load_plugin_manifest(tmp_path) is None
+
 
 class TestLoadPluginConfig:
     def test_load_existing_config(self, tmp_path):
