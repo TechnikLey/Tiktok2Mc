@@ -33,7 +33,10 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from core.api.task_utils import stop_task_safely
+from core.degraded import report_degraded
 from core.error_codes import (
+    CONFIG_0002,
+    CONFIG_0009,
     OUTBOUND_0001,
     OUTBOUND_0002,
     OUTBOUND_0003,
@@ -255,6 +258,13 @@ def load_outbound_config() -> dict[str, Any]:
         cfg = load_yaml(cfg_path) if cfg_path.exists() else {}
     except (OSError, ValueError, YAMLError) as exc:
         log.warning("Failed to load global config for outbound: %s", exc)
+        report_degraded(
+            CONFIG_0002 if isinstance(exc, YAMLError) else CONFIG_0009,
+            "outbound_dispatcher",
+            detail="Global config unreadable — outbound channels fall back "
+            "to empty until the config is fixed.",
+            path=str(cfg_path),
+        )
         return {}
     section = cfg.get("outbound", {})
     return section if isinstance(section, dict) else {}
