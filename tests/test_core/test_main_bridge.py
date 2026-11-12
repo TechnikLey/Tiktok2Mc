@@ -994,6 +994,33 @@ class TestHookContext:
             "context": {"event": "gift", "streak": 5},
         }
 
+    @pytest.mark.asyncio
+    async def test_worker_completes_malformed_item_and_keeps_running(self, monkeypatch):
+        import src.python.main as main_mod
+        from src.python.main import ctx
+
+        received = []
+
+        async def fake_execute(trigger, user, depth, context):
+            received.append(trigger)
+
+        monkeypatch.setattr(main_mod, "execute_global_command", fake_execute)
+        monkeypatch.setattr(main_mod, "get_crash_manager", lambda: MagicMock())
+        queue = asyncio.Queue()
+        await queue.put(("malformed",))
+        await queue.put(("valid", "viewer"))
+        monkeypatch.setattr(ctx, "trigger_queue", queue)
+
+        worker = asyncio.create_task(main_mod.trigger_worker())
+        try:
+            await asyncio.wait_for(queue.join(), timeout=2)
+        finally:
+            worker.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await worker
+
+        assert received == ["valid"]
+
 
 # =========================================================================
 # Runtime reload signal watcher
@@ -1953,6 +1980,32 @@ class TestWebhookAuth:
         monkeypatch.setattr(main_mod, "request", self._make_request("192.168.1.50"))
 
         assert main_mod._webhook_request_authorized() is True
+
+    def test_non_mapping_config_fails_closed(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", ["not", "a", "mapping"])
+        monkeypatch.setattr(main_mod, "request", self._make_request("192.168.1.50"))
+
+        assert main_mod._webhook_request_authorized() is False
+
+    def test_non_string_api_key_fails_closed(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": 123})
+        monkeypatch.setattr(
+            main_mod, "request", self._make_request("192.168.1.50", "123")
+        )
+
+        assert main_mod._webhook_request_authorized() is False
+
+    def test_zero_api_key_is_not_treated_as_unconfigured(self, monkeypatch):
+        from src.python import main as main_mod
+
+        monkeypatch.setattr(main_mod.ctx, "config", {"api_key": 0})
+        monkeypatch.setattr(main_mod, "request", self._make_request("192.168.1.50"))
+
+        assert main_mod._webhook_request_authorized() is False
 
     def test_before_request_guard_returns_401_when_unauthorized(self, monkeypatch):
         from src.python import main as main_mod

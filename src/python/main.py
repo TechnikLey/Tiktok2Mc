@@ -328,13 +328,29 @@ def _webhook_request_authorized() -> bool:
     ``X-API-Key`` header.  Localhost stays exempt so local plugins and
     desktop-app integrations keep working without a key.  When no key is
     configured, authentication is disabled entirely.
+
+    A malformed configuration must not crash the Flask request guard:
+    a non-mapping config or a non-string key fails closed (rejects
+    non-localhost requests) and is logged. Localhost remains exempt.
     """
     remote = request.remote_addr or ""
     if remote in _LOCALHOSTS:
         return True
-    api_key = (ctx.config or {}).get("api_key", "")
-    if not api_key:
+    if not isinstance(ctx.config, dict):
+        log.warning(
+            "[WEBHOOK] config is not a mapping (%s); rejecting non-local request",
+            type(ctx.config).__name__,
+        )
+        return False
+    api_key = ctx.config.get("api_key", "")
+    if api_key is None or api_key == "":
         return True
+    if not isinstance(api_key, str):
+        log.warning(
+            "[WEBHOOK] api_key must be a string, got %s; rejecting non-local request",
+            type(api_key).__name__,
+        )
+        return False
     return secrets.compare_digest(request.headers.get("X-API-Key", ""), api_key)
 
 
@@ -1303,8 +1319,10 @@ async def trigger_worker():
     """Processes TikTok events from the trigger queue and converts them into RCON commands."""
     log.info("[TRIGGER-QUEUE] Worker started.")
     while True:
+        got_item = False
         try:
             item = await ctx.trigger_queue.get()
+            got_item = True
             trigger, source_user, chain_depth, hook_context = _unpack_trigger_item(item)
             try:
                 await execute_global_command(
@@ -1319,14 +1337,17 @@ async def trigger_worker():
                     exc=e,
                     context_info={"trigger": trigger, "user": str(source_user)},
                 )
-            finally:
-                ctx.trigger_queue.task_done()
         except Exception as e_outer:  # worker loop must never die
             log.error(f"[TRIGGER-QUEUE LOOP ERROR] {e_outer}")
             get_crash_manager().report_exception(
                 TIKTOK_0005, exc=e_outer, context_info={"source": "trigger_queue_loop"}
             )
             await asyncio.sleep(0.1)
+        finally:
+            # A malformed item must still complete its queue task, otherwise
+            # any Queue.join() waiter (including tests) waits forever.
+            if got_item:
+                ctx.trigger_queue.task_done()
 
 
 # Central API base URL. The supervisor exports RESOLVED_PORT_API_PORT when

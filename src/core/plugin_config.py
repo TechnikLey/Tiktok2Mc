@@ -179,7 +179,12 @@ def _heal_plugin_config(data: dict, schema: dict) -> dict:
     return healed
 
 
-def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
+def load_plugin_config(
+    plugin_dir: Path,
+    apply_defaults: bool = True,
+    *,
+    manifest_override: dict | None = None,
+) -> dict:
     """Load a plugin's local ``config.yaml``.
 
     If the file does not exist and the manifest declares a
@@ -189,8 +194,23 @@ def load_plugin_config(plugin_dir: Path, apply_defaults: bool = True) -> dict:
 
     After loading, the config is validated against the schema (if any)
     and invalid values are replaced with schema defaults (healing).
+
+    Args:
+        plugin_dir: Plugin directory containing ``config.yaml``.
+        apply_defaults: Fill missing keys from the schema defaults.
+        manifest_override: Manifest mapping to use instead of reading
+            ``plugin.json``. Hook directories have a ``hook.json`` but no
+            ``plugin.json``, so the hook loader passes the hook manifest here
+            to reuse schema defaults without writing a temporary file.
+
+    Returns:
+        The loaded (and possibly healed) configuration mapping.
     """
-    manifest = load_plugin_manifest(plugin_dir)
+    manifest = (
+        manifest_override
+        if manifest_override is not None
+        else load_plugin_manifest(plugin_dir)
+    )
     schema = None
     if manifest:
         schema = manifest.get("config_schema")

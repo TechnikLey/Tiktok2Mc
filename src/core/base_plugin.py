@@ -660,8 +660,20 @@ class BasePlugin:
                                 f"handler '{cmd}' failed: {e}",
                             )
                 else:
-                    # Fall through to subclass ``on_command`` override
-                    self.on_command(cmd, args)
+                    # Fall through to subclass ``on_command`` override. Like
+                    # registered handlers, an override is user code and must
+                    # not kill the polling thread.
+                    try:
+                        self.on_command(cmd, args)
+                    except Exception as e:
+                        log.exception(
+                            "[%s] on_command('%s') failed", self.PLUGIN_NAME, cmd
+                        )
+                        if self._health:
+                            self._health.record_error(
+                                f"plugin.{self.PLUGIN_NAME}",
+                                f"on_command '{cmd}' failed: {e}",
+                            )
 
     # -- graceful shutdown ---------------------------------------------------
 

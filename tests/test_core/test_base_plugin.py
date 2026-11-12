@@ -403,6 +403,49 @@ class TestBasePluginCommandPolling:
         p._command_polling_loop()
         assert ("unknown", {}) in p.seen
 
+    def test_on_command_exception_does_not_kill_polling(self, tmp_path, monkeypatch):
+        from core.base_plugin import BasePlugin
+
+        monkeypatch.setattr("core.base_plugin.parse_args", lambda: FakeArgs())
+        monkeypatch.setattr("core.base_plugin.load_plugin_config", lambda d: {})
+        monkeypatch.setattr("core.base_plugin.get_base_dir", lambda: tmp_path)
+
+        class P(BasePlugin):
+            PLUGIN_NAME = "fake"
+
+            def __init__(self):
+                super().__init__()
+                self.seen = []
+
+            def get_overlay_html(self):
+                return ""
+
+            def on_command(self, command, args):
+                if command == "boom":
+                    raise RuntimeError("handler failed")
+                self.seen.append((command, args))
+
+        p = P()
+        call_count = [0]
+
+        def mock_get(path, timeout=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {
+                    "commands": [
+                        {"command": "boom", "args": {}},
+                        {"command": "after", "args": {"ok": True}},
+                    ]
+                }
+            p._running = False
+            return {"commands": []}
+
+        monkeypatch.setattr(p, "_http_get", mock_get)
+        p._running = True
+        p._command_polling_loop()
+
+        assert p.seen == [("after", {"ok": True})]
+
     def test_handler_registration_replaces_existing(self, tmp_path, monkeypatch):
         p = self._make_plugin(tmp_path, monkeypatch)
         calls = []

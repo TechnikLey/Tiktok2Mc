@@ -234,16 +234,14 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
     config_path = hook_dir / "config.yaml"
 
     if manifest.config_schema:
-        # Create a temporary plugin.json-like structure so we can reuse
-        # the config system
+        # Reuse the plugin config loader's schema/default/healing logic.
+        # Hooks have hook.json instead of plugin.json, so pass the manifest
+        # explicitly instead of writing a temporary plugin.json.
         fake_manifest = {"config_schema": manifest.config_schema, "name": manifest.name}
-        manifest_path = hook_dir / ".hook_schema.tmp"
         try:
-            import json
-
-            manifest_path.write_text(json.dumps(fake_manifest), encoding="utf-8")
-            cfg = load_plugin_config(hook_dir, apply_defaults=True)
-            return cfg
+            return load_plugin_config(
+                hook_dir, apply_defaults=True, manifest_override=fake_manifest
+            )
         except (TypeError, OSError, ValueError, YAMLError) as exc:
             log.warning("[HOOK] Failed to load config for '%s': %s", manifest.name, exc)
             report_degraded(
@@ -252,9 +250,6 @@ def _ensure_hook_config(hook_dir: Path, manifest: HookManifest) -> dict:
                 detail=f"Hook config fallback in use: {exc}",
                 path=str(config_path),
             )
-        finally:
-            if manifest_path.exists():
-                manifest_path.unlink()
 
     # No schema: load raw if exists, return empty otherwise
     if config_path.exists():

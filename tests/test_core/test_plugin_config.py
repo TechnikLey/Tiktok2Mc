@@ -105,6 +105,22 @@ class TestLoadPluginManifest:
 
 
 class TestLoadPluginConfig:
+    def test_manifest_override_applies_schema_without_plugin_json(self, tmp_path):
+        plugin_dir = tmp_path / "hook-dir"
+        plugin_dir.mkdir()
+        schema = {
+            "version": 1,
+            "fields": [{"key": "greeting", "type": "string", "default": "hello"}],
+        }
+
+        cfg = load_plugin_config(
+            plugin_dir,
+            manifest_override={"name": "hook", "config_schema": schema},
+        )
+
+        assert cfg["greeting"] == "hello"
+        assert not (plugin_dir / "plugin.json").exists()
+
     def test_load_existing_config(self, tmp_path):
         plugin_dir = tmp_path / "myplugin"
         plugin_dir.mkdir()

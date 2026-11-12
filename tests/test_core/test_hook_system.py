@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,36 @@ def test_each_hook_dir_has_hook_json(hooks_dir):
         if d.is_dir() and d.name != "__pycache__":
             hook_json = d / "hook.json"
             assert hook_json.exists(), f"Missing hook.json in hook dir: {d}"
+
+
+def test_hook_config_schema_defaults_are_applied(tmp_path):
+    """Hook manifests use hook.json, but schema defaults must still apply."""
+    from core.hook_loader import _ensure_hook_config
+    from core.hook_manifest import load_hook_manifest
+
+    hook_dir = tmp_path / "myhook"
+    hook_dir.mkdir()
+    manifest_data = {
+        "name": "myhook",
+        "version": "1.0.0",
+        "config_schema": {
+            "version": 1,
+            "fields": [
+                {"key": "greeting", "type": "string", "default": "hello"},
+            ],
+        },
+    }
+    (hook_dir / "hook.json").write_text(json.dumps(manifest_data), encoding="utf-8")
+
+    manifest = load_hook_manifest(hook_dir)
+    assert manifest is not None
+    assert manifest.config_schema is not None
+
+    cfg = _ensure_hook_config(hook_dir, manifest)
+
+    assert cfg["greeting"] == "hello"
+    assert not (hook_dir / ".hook_schema.tmp").exists()
+    assert not (hook_dir / "config.yaml").exists()
 
 
 def test_hook_registration(clean_registry, hooks_dir):
