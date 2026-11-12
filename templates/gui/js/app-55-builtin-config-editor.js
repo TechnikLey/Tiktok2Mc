@@ -412,7 +412,7 @@ class BuiltinConfigEditor {
       <div class="section-header"><h3>${I18N.t('hooks.rawConfig')}</h3></div>
       <div class="section-body">
         <p class="field-desc">${I18N.t('hooks.noSchema')}</p>
-        <textarea id="hook-raw-json" rows="20" style="font-family:monospace;width:100%;" onchange="builtinEditor.parseRawJson()">${escapeHtml(JSON.stringify(this.config, null, 2))}</textarea>
+        <textarea id="builtin-raw-json" rows="20" style="font-family:monospace;width:100%;" onchange="builtinEditor.parseRawJson()">${escapeHtml(JSON.stringify(this.config, null, 2))}</textarea>
         <p class="field-desc">${I18N.t('hooks.noSchemaCareful')}</p>
       </div>
     </div>`;
@@ -510,7 +510,11 @@ class BuiltinConfigEditor {
 
   /** Parse the raw JSON editor into the working configuration. */
   parseRawJson() {
-    const raw = document.getElementById('hook-raw-json').value;
+    // Scope the lookup to this editor: the dashboard keeps all editor sections
+    // in the DOM, so a global id lookup could read another editor's field.
+    const field = this.content.querySelector('#builtin-raw-json');
+    if (!field) return;
+    const raw = field.value;
     try {
       const parsed = JSON.parse(raw);
       // The editor only works with a JSON object. Arrays, primitives and null

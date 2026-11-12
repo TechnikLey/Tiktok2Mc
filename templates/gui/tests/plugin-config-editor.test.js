@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('PluginConfigEditor', () => {
   beforeEach(() => {
@@ -327,14 +327,27 @@ describe('PluginConfigEditor', () => {
 
   /* ─── parseRawJson ─── */
   describe('parseRawJson', () => {
+    let rawField;
+
+    beforeEach(() => {
+      pluginEditor.content.innerHTML = '';
+      rawField = document.createElement('textarea');
+      rawField.id = 'plugin-raw-json';
+      pluginEditor.content.appendChild(rawField);
+    });
+
+    afterEach(() => {
+      rawField.remove();
+    });
+
     it('parses valid JSON', () => {
-      document.getElementById('plugin-raw-json').value = '{"key": "value"}';
+      rawField.value = '{"key": "value"}';
       pluginEditor.parseRawJson();
       expect(pluginEditor.config.key).toBe('value');
     });
 
     it('does not modify config on invalid JSON', () => {
-      document.getElementById('plugin-raw-json').value = '{invalid}';
+      rawField.value = '{invalid}';
       pluginEditor.config = { original: true };
       pluginEditor.parseRawJson();
       expect(pluginEditor.config.original).toBe(true);
@@ -343,7 +356,7 @@ describe('PluginConfigEditor', () => {
     it('rejects JSON values that are not objects', () => {
       pluginEditor.config = { original: true };
       for (const raw of ['[]', '"text"', '42', 'null']) {
-        document.getElementById('plugin-raw-json').value = raw;
+        rawField.value = raw;
         pluginEditor.parseRawJson();
         expect(pluginEditor.config).toEqual({ original: true });
       }

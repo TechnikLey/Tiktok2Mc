@@ -602,7 +602,11 @@ class PluginConfigEditor {
 
   /** Parse the raw JSON editor into the working configuration. */
   parseRawJson() {
-    const raw = document.getElementById('plugin-raw-json').value;
+    // Scope the lookup to this editor: the dashboard keeps all editor sections
+    // in the DOM, so a global id lookup could read another editor's field.
+    const field = this.content.querySelector('#plugin-raw-json');
+    if (!field) return;
+    const raw = field.value;
     try {
       const parsed = JSON.parse(raw);
       // The editor only works with a JSON object. Arrays, primitives and null

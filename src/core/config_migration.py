@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from logging import Logger, getLogger
 from pathlib import Path
+from typing import cast
 
 from packaging import version
 from ruamel.yaml import YAML
@@ -33,19 +34,43 @@ from core.utils import normalize_config_version
 log: Logger = getLogger(__name__)
 
 
-def load_yaml_with_debug(path: Path, yaml_obj: YAML, label: str):
-    """Load a YAML file, logging a precise error on malformed input."""
+def load_yaml_with_debug(path: Path, yaml_obj: YAML, label: str) -> CommentedMap | None:
+    """Load a YAML file, logging a precise error on malformed input.
+
+    Args:
+        path: YAML file to read.
+        yaml_obj: Configured ruamel YAML instance (round-trip mode).
+        label: Human-readable role of the file (``Template``/``User Config``)
+            used in diagnostics.
+
+    Returns:
+        The parsed mapping, an empty ``CommentedMap`` for an empty file, or
+        ``None`` when the file is missing, malformed, or not a mapping. The
+        migration callers treat ``None`` as "do not touch the file".
+    """
     try:
         with path.open("r", encoding="utf-8") as f:
             data = yaml_obj.load(f)
             if data is None:
                 return CommentedMap()
-            return data
+            if not isinstance(data, dict):
+                # A list/scalar root would crash the later ``.get()`` and
+                # ``yaml_set_start_comment()`` calls with an AttributeError.
+                log.error(
+                    "[FAIL] %s root must be a YAML mapping, got %s: %s",
+                    label,
+                    type(data).__name__,
+                    path,
+                )
+                return None
+            # ruamel returns a CommentedMap for mapping roots in round-trip
+            # mode; the isinstance guard above is what makes this safe.
+            return cast(CommentedMap, data)
     except YAMLError as e:
         log.error("[FAIL] YAML error in %s: %s", label, path)
 
-        if hasattr(e, "problem_mark") and e.problem_mark is not None:
-            mark = e.problem_mark
+        mark = getattr(e, "problem_mark", None)
+        if mark is not None:
             log.error("[FAIL] Line: %s, Column: %s", mark.line + 1, mark.column + 1)
 
         log.error("[FAIL] Details: %s", e)

@@ -7,6 +7,7 @@ a live TikTok connection or RCON server.
 import asyncio
 import datetime
 import json
+import logging
 import sqlite3
 import threading
 from contextlib import closing
@@ -707,6 +708,31 @@ class TestHookActionOffload:
         # Context stays empty when no source context was provided — no
         # internal machinery (chain depth) leaks into the hook contract.
         assert calls[0][1] == ("viewer", "myaction", {})
+
+
+class TestGlobalCommandLoopGuard:
+    """Triggers must not be lost silently before the bridge loop exists."""
+
+    def test_drops_trigger_when_event_loop_missing(self, monkeypatch, caplog):
+        from src.python.main import ctx, execute_global_command
+
+        monkeypatch.setattr(ctx, "valid_functions", {"mytrigger"})
+        monkeypatch.setattr(ctx, "script_actions", {})
+        monkeypatch.setattr(ctx, "overlay_actions", {})
+        monkeypatch.setattr(ctx, "vanilla_functions", {"mytrigger"})
+        monkeypatch.setattr(ctx, "rcon_only_actions", {})
+        monkeypatch.setattr(ctx, "shell_actions_cache", {})
+        monkeypatch.setattr(ctx, "namespace", "tiktok")
+        monkeypatch.setattr(ctx, "main_loop", None)
+
+        rcon_queue = asyncio.Queue(maxsize=100)
+        monkeypatch.setattr(ctx, "rcon_queue", rcon_queue)
+
+        with caplog.at_level(logging.WARNING):
+            asyncio.run(execute_global_command("mytrigger", "viewer"))
+
+        assert rcon_queue.empty()
+        assert "bridge event loop is not ready" in caplog.text
 
 
 class TestHookVeto:

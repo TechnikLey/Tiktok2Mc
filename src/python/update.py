@@ -131,10 +131,10 @@ def wait_for_key(msg="Press Enter to exit..."):
 def _init():
     """Initialize paths, config, HTTP headers and signing key for the updater.
 
-Exits with status 1 when the config cannot be loaded. On Linux without
-root, it either exits or warns depending on TTY availability and
-``show_sudo_warning``. Test-only environment variables may override the
-update source and signing key."""
+    Exits with status 1 when the config cannot be loaded. On Linux without
+    root, it either exits or warns depending on TTY availability and
+    ``show_sudo_warning``. Test-only environment variables may override the
+    update source and signing key."""
 
     global \
         BASE_DIR, \
@@ -237,8 +237,8 @@ def get_local_tool_version(root: Path) -> str:
 def download_with_progress(url, target):
     """Stream ``url`` to ``target`` while reporting download progress.
 
-Progress is written to stdout and, best effort, to the GUI status file.
-Raises the underlying request or filesystem error on failure."""
+    Progress is written to stdout and, best effort, to the GUI status file.
+    Raises the underlying request or filesystem error on failure."""
 
     target = Path(target) if isinstance(target, str) else target
     with requests.get(url, headers=HEADERS_ASSET, stream=True) as r:
@@ -274,9 +274,9 @@ def download_bytes(url: str) -> bytes | None:
 def safe_extract_zip(zip_path: Path, dest: Path) -> None:
     """Extract a zip after rejecting entries outside ``dest``.
 
-Raises:
-    ValueError: If an archive member would escape the destination
-        (zip-slip protection)."""
+    Raises:
+        ValueError: If an archive member would escape the destination
+            (zip-slip protection)."""
 
     with zipfile.ZipFile(zip_path, "r") as z:
         # Validate all member paths first (zip slip protection)
@@ -291,9 +291,9 @@ Raises:
 def safe_extract_tar(tar_path: Path, dest: Path) -> None:
     """Extract a gzipped tar after rejecting entries outside ``dest``.
 
-Raises:
-    ValueError: If an archive member would escape the destination
-        (path traversal protection)."""
+    Raises:
+        ValueError: If an archive member would escape the destination
+            (path traversal protection)."""
 
     with tarfile.open(tar_path, "r:gz") as t:
         resolved_dest = dest.resolve()
@@ -682,10 +682,22 @@ def _verify_files(content_root: Path, manifest: dict) -> None:
         sys.exit(EXIT_CHECKSUM_MISMATCH)
 
 
-def _step_stage(content_root: Path, manifest: dict) -> tuple[Path, dict | None]:
+def _step_stage(
+    content_root: Path, manifest: dict
+) -> tuple[Path, pointer_mod.AppPointer | None]:
     """STAGE: move the verified app dir into the install root.
 
-    Returns ``(app_dir, old_pointer)``.
+    Args:
+        content_root: Extracted package root containing ``app-<version>/``.
+        manifest: Verified release manifest (uses ``tool_version``).
+
+    Returns:
+        ``(app_dir, old_pointer)`` where ``old_pointer`` is the pointer that
+        was active before staging, or ``None`` on a first install.
+
+    Raises:
+        SystemExit: With an ``EXIT_*`` code when the package layout is invalid
+            or the staged directory cannot be moved into place.
     """
     app_dir_name = f"app-{manifest['tool_version']}"
     staged_app_dir = content_root / app_dir_name
@@ -805,10 +817,10 @@ def run_update():
     # fresh "checking" status so the GUI launcher can show progress.
     """Run the complete update flow from version check to relaunch.
 
-Steps: check, fetch, verify signature and checksums, stage, atomically flip
-the version pointer, prune old versions, swap launcher binaries, update the
-legacy version file and notify the GUI. A legacy ``--resume`` argument is
-accepted and ignored because the flow is idempotent."""
+    Steps: check, fetch, verify signature and checksums, stage, atomically flip
+    the version pointer, prune old versions, swap launcher binaries, update the
+    legacy version file and notify the GUI. A legacy ``--resume`` argument is
+    accepted and ignored because the flow is idempotent."""
 
     _clear_update_status()
     _write_update_status("checking")

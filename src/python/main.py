@@ -33,6 +33,7 @@ import urllib.parse
 import urllib.request
 from contextlib import closing
 from pathlib import Path
+from typing import overload
 
 from flask import Flask, request
 from mcrcon import MCRcon
@@ -113,7 +114,9 @@ if os.environ.get("TIKTOK2MC_DEBUG"):  # troubleshooting: unveil TikTokLive inte
         def _force_debug_get_logger(cls, level=None, stream=None):
             return _orig_get_logger.__func__(cls, LogLevel.DEBUG, stream)
 
-        TikTokLiveLogHandler.get_logger = _force_debug_get_logger
+        # The replacement intentionally has a different signature; it is only
+        # installed in debug mode and always forwards to the original method.
+        TikTokLiveLogHandler.get_logger = _force_debug_get_logger  # pyright: ignore[reportAttributeAccessIssue]
     except Exception:
         pass
     log.info("[DEBUG] TIKTOK2MC_DEBUG=1 — TikTokLive debug logging enabled")
@@ -167,6 +170,9 @@ RELOAD_CHATBOT_SIGNAL = (RUNTIME_DIR / "reload_chatbot").resolve()
 RELOAD_HOOKS_SIGNAL = (RUNTIME_DIR / "reload_hooks").resolve()
 
 _last_config_version: int = 0
+# Rolling timestamps for the bridge /metrics endpoint. A module-level list
+# keeps the state explicit instead of mutating function attributes.
+_metrics_event_timestamps: list[float] = []
 
 
 class BotContext:
@@ -228,9 +234,9 @@ class BotContext:
         self.datapack_name = "StreamingTool"
         self.namespace = "streamingtool"
         self.actions_valid = True
-        self.start_likes = None
-        self._last_like_total = None
-        self._last_like_event = 0.0
+        self.start_likes: int | None = None
+        self._last_like_total: int | None = None
+        self._last_like_event: float = 0.0
         self.like_triggers: list[dict] = []
 
         # TikTok event diagnostics (raw-received counter + stall watchdog)
@@ -253,14 +259,14 @@ class BotContext:
         self.rcon_pool_lock = asyncio.Lock()
 
         # RCON state
-        self.rcon_connection = None
-        self.last_rcon_attempt = 0
+        self.rcon_connection: MCRcon | None = None
+        self.last_rcon_attempt: float = 0.0
         self.rcon_enabled = False
 
         # TikTok state
         self.disable_tiktok_connect = False
-        self.tiktok_client = None
-        self.tiktok_client_loop = None
+        self.tiktok_client: TikTokLiveClient | None = None
+        self.tiktok_client_loop: asyncio.AbstractEventLoop | None = None
         self.tiktok_live = False
 
         # Connection-failure protection (repeated fails -> GUI popup + pause)
@@ -270,13 +276,13 @@ class BotContext:
         self.connect_fail_popup_triggered = False
 
         # Gift tracking
-        self.gift_value_usd = 0
-        self.gift_day_start_value = 0
-        self.gift_current_log_date = None
+        self.gift_value_usd: float = 0.0
+        self.gift_day_start_value: float = 0.0
+        self.gift_current_log_date: str | None = None
         self.diamond_value_usd = 0.004
 
         # Session tracking (reset on each live connection)
-        self.session_start_ts = None
+        self.session_start_ts: float | None = None
         self.session_gifts = 0
         self.session_gift_value_usd = 0.0
         self.session_likes = 0
@@ -284,11 +290,11 @@ class BotContext:
         self.session_comments = 0
         self.session_shares = 0
         self.session_joins = 0
-        self.session_end_ts = None
+        self.session_end_ts: float | None = None
 
         # Runtime
-        self.main_loop = None
-        self.hook_api = None
+        self.main_loop: asyncio.AbstractEventLoop | None = None
+        self.hook_api: HookAPI | None = None
         self.queue_active = True
         self.queue_pause_on_death = True
         self.config = {}
@@ -1179,7 +1185,8 @@ async def execute_global_command(
         for action in ctx.script_actions[name]:
             if action in HOOK_ACTIONS:
                 try:
-                    ctx.hook_api.set_depth(chain_depth)
+                    if ctx.hook_api is not None:
+                        ctx.hook_api.set_depth(chain_depth)
                     # Hook actions are sync callables that may block (plugin
                     # I/O); run them on the executor so script triggers never
                     # stall the main loop.
@@ -1275,6 +1282,12 @@ async def execute_global_command(
             ctx.rcon_queue.put_nowait((commands_to_send, source_user))
         except asyncio.QueueFull:
             log.warning(f"[RCON-QUEUE FULL] Trigger {name} dropped!")
+
+    if ctx.main_loop is None:
+        log.warning(
+            "[ACTION] Trigger %s dropped: bridge event loop is not ready yet", name
+        )
+        return
 
     ctx.main_loop.call_soon_threadsafe(_enqueue)
     if ctx.rcon_queue.qsize() < 10:
@@ -1439,14 +1452,11 @@ def handle_metrics():
     now = time.time()
     # Calculate events per minute (rolling window)
     # We track event counts in the last 60 seconds
-    if not hasattr(handle_metrics, "_event_timestamps"):
-        handle_metrics._event_timestamps = []
-    # Clean old timestamps (older than 60 seconds)
     cutoff = now - 60
-    handle_metrics._event_timestamps = [
-        ts for ts in handle_metrics._event_timestamps if ts > cutoff
+    _metrics_event_timestamps[:] = [
+        ts for ts in _metrics_event_timestamps if ts > cutoff
     ]
-    events_per_minute = len(handle_metrics._event_timestamps)
+    events_per_minute = len(_metrics_event_timestamps)
 
     return {
         "rcon_queue_size": ctx.rcon_queue.qsize() if ctx.rcon_queue else 0,
@@ -1464,16 +1474,18 @@ def _record_metrics_event():
     import time
 
     now = time.time()
-    if not hasattr(handle_metrics, "_event_timestamps"):
-        handle_metrics._event_timestamps = []
-    timestamps = handle_metrics._event_timestamps
-    timestamps.append(now)
+    _metrics_event_timestamps.append(now)
     # Prune here as well — GET /metrics may never be polled, and the list
     # would otherwise grow for the whole stream (likes alone can be
     # thousands per minute).
-    if len(timestamps) > 10000 or len(timestamps) % 500 == 0:
+    if (
+        len(_metrics_event_timestamps) > 10000
+        or len(_metrics_event_timestamps) % 500 == 0
+    ):
         cutoff = now - 60
-        handle_metrics._event_timestamps = [ts for ts in timestamps if ts > cutoff]
+        _metrics_event_timestamps[:] = [
+            ts for ts in _metrics_event_timestamps if ts > cutoff
+        ]
 
 
 def _apply_mc_queue_semantics(event: str) -> None:
@@ -2893,7 +2905,15 @@ def user_attr_safe(event, name, default=None):
     return getattr(user, name, default)
 
 
-def username_from_event_safe(event, default: str | None = "Unknown"):
+@overload
+def username_from_event_safe(event, default: str = "Unknown") -> str: ...
+
+
+@overload
+def username_from_event_safe(event, default: None = None) -> str | None: ...
+
+
+def username_from_event_safe(event, default: str | None = "Unknown") -> str | None:
     """Extract a username from an event without raising.
 
     Args:
@@ -2901,7 +2921,8 @@ def username_from_event_safe(event, default: str | None = "Unknown"):
         default: Value returned when no usable name exists.
 
     Returns:
-        ``unique_id``, then ``nickname``, then ``default``."""
+        ``unique_id``, then ``nickname``, then ``default``. The overloads keep
+        callers that rely on the non-``None`` default statically typed."""
 
     return (
         user_attr_safe(event, "unique_id", None)
@@ -2945,7 +2966,9 @@ def create_client(user):
     # never let an unsupported registration tear down the whole bridge at client
     # creation.
     try:
-        client.add_listener("error", _on_client_event_error)
+        # TikTokLive's type stubs only accept event classes even though newer
+        # releases also support the string "error" at runtime.
+        client.add_listener("error", _on_client_event_error)  # type: ignore[arg-type]
     except (AttributeError, TypeError):
         log.warning(
             "[TIKTOK] Error-listener registration unsupported by this TikTokLive "
@@ -2969,7 +2992,7 @@ def create_client(user):
         if cnt <= 3 or cnt % 200 == 0:
             log.info(f"[TIKTOK][RAW] {etype} event #{cnt} received")
 
-    _connect_time = [None]
+    _connect_time: list[float | None] = [None]
     COMMENT_WARMUP_SECONDS = 1
 
     # =========================
@@ -2986,7 +3009,12 @@ def create_client(user):
 
         _log_raw_event("gift")
         try:
-            if event.gift.combo:
+            gift = event.gift
+            if gift is None:
+                log.warning("[TIKTOK] Gift event without gift payload; ignoring")
+                return
+
+            if gift.combo:
                 if getattr(event, "streaking", False):
                     return
 
@@ -2994,17 +3022,17 @@ def create_client(user):
             else:
                 count = 1
 
-            gift_name = sanitize_filename(event.gift.name)
-            gift_id = str(event.gift.id)
+            gift_name = sanitize_filename(gift.name)
+            gift_id = str(gift.id)
 
             with ctx.gift_lock:
                 diamonds = getattr(event, "repeat_count", 1) * getattr(
-                    event.gift, "diamond_count", 0
+                    gift, "diamond_count", 0
                 )
                 if diamonds:
                     value_usd = diamonds * ctx.diamond_value_usd
                 else:
-                    value_usd = event.value
+                    value_usd = float(event.value or 0.0)
                 ctx.gift_value_usd += value_usd
                 ctx.session_gift_value_usd += value_usd
                 ctx.session_gifts += count
@@ -3481,7 +3509,9 @@ async def reload_config():
 
         if old_user != ctx.tiktok_user and ctx.tiktok_client is not None:
             try:
-                ctx.tiktok_client.stop()
+                # TikTokLive's stubs omit ``stop`` although the runtime client
+                # provides it; the call is already best-effort and guarded.
+                ctx.tiktok_client.stop()  # type: ignore[attr-defined]
             except Exception as e:  # best-effort stop
                 log.debug("[RELOAD] Failed to stop old TikTok client: %s", e)
 

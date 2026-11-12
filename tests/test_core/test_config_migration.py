@@ -105,6 +105,16 @@ class TestLoadYamlWithDebug:
         f.write_text("key: [unclosed\n  broken: :\n", encoding="utf-8")
         assert load_yaml_with_debug(f, yaml_obj, "T") is None
 
+    def test_non_mapping_root_returns_none(self, tmp_path: Path):
+        yaml_obj = YAML(typ="rt")
+        for name, content in (
+            ("list.yaml", "- one\n- two\n"),
+            ("scalar.yaml", "just-a-string\n"),
+        ):
+            f = tmp_path / name
+            f.write_text(content, encoding="utf-8")
+            assert load_yaml_with_debug(f, yaml_obj, "T") is None
+
     def test_missing_file_returns_none(self, tmp_path: Path):
         yaml_obj = YAML(typ="rt")
         assert load_yaml_with_debug(tmp_path / "nope.yaml", yaml_obj, "T") is None
@@ -186,6 +196,14 @@ class TestMigrateConfig:
             migrate_config(user_config, tmp_path / "missing.yaml", yaml_obj=_yaml())
             is False
         )
+
+    def test_returns_false_for_non_mapping_root(self, tmp_path: Path):
+        default_config = tmp_path / "config.default.yaml"
+        user_config = tmp_path / "config.yaml"
+        default_config.write_text("- not\n- a mapping\n", encoding="utf-8")
+        user_config.write_text("config_version: '0.7'\n", encoding="utf-8")
+        assert migrate_config(user_config, default_config, yaml_obj=_yaml()) is False
+        assert user_config.read_text(encoding="utf-8") == "config_version: '0.7'\n"
 
 
 def _yaml() -> YAML:
