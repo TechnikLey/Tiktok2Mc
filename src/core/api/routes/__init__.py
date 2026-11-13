@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from .actions import router as actions_router
+from .analytics import router as analytics_router
 from .backups import router as backups_router
 from .builtins import router as builtins_router
 from .chatbot import router as chatbot_router
@@ -42,6 +43,7 @@ api_router.include_router(diagnostics_router)
 api_router.include_router(config_router)
 api_router.include_router(config_bundle_router)
 api_router.include_router(sessions_router)
+api_router.include_router(analytics_router)
 api_router.include_router(plugins_router)
 api_router.include_router(plugin_config_router)
 api_router.include_router(plugin_data_router)

@@ -572,6 +572,30 @@ tr:last-child td { border-bottom: none; }
 .status-card__value.success { color: var(--color-success); }
 .status-card__value.danger { color: var(--color-danger); }
 
+/* ─── Sessions Analytics ─── */
+.sessions-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.sessions-detail-header h3 { margin: 0; }
+.sessions-detail-meta { margin: 0 0 var(--space-2); }
+.sessions-top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.sessions-top-block h4 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+#sessions-detail h4 {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
 /* ─── Revenue View ─── */
 .revenue-summary {
   gap: var(--space-4);

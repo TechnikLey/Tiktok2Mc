@@ -239,6 +239,58 @@ tiktok:
     max_per_user_per_minute: 500
 
 # ===========================================================================
+#  STREAM ANALYTICS
+# ===========================================================================
+# Collects detailed stream statistics in a local SQLite database
+# (data/analytics.sqlite3). Event handlers only update in-memory counters; a
+# background writer batches them to disk, so long streams and event bursts
+# never block the bridge.
+#
+# The classic data/sessions.jsonl and data/revenue_log.jsonl files are still
+# written unchanged, so existing tools and older app versions keep working.
+analytics:
+  # Master switch. false = no analytics database writes at all.
+  enabled: true
+
+  # Which tiers are stored. Session totals are always kept in memory while a
+  # stream runs; these flags only control what is persisted.
+  store:
+    # Per-viewer rows (gifts, likes, comments, follows, shares, joins).
+    viewer_details: true
+    # Per-gift rows (events, units, diamonds, value, unique gifters).
+    gift_details: true
+    # Top lists (top gifters/likers/commenters/gifts, largest gift/combo).
+    # Kept even when viewer_details/gift_details are disabled.
+    top_lists: true
+    # All-time viewer/gift totals and daily rollups.
+    lifetime_aggregates: true
+    # Store comment text. Default off for privacy.
+    comment_text: false
+    # Store a raw event log. Default off; high volume on busy streams.
+    raw_events: false
+
+  # Number of entries per top list.
+  top_n: 10
+
+  # Maximum distinct viewers tracked per session. Beyond this, events are
+  # merged into an "__other__" bucket instead of growing memory without bound.
+  max_tracked_viewers: 50000
+
+  # Seconds between background flushes to SQLite (15-60 is a good range).
+  flush_interval_seconds: 30
+
+  # How long data is kept. 0 = unlimited.
+  retention:
+    # Per-viewer / per-gift detail rows and session top lists.
+    details_days: 90
+    # Session summary rows.
+    summaries_days: 0
+    # Optional raw event log.
+    raw_events_days: 7
+    # All-time viewer/gift aggregates and daily rollups.
+    aggregates_days: 0
+
+# ===========================================================================
 # GIFT CATALOG SYNC
 # ===========================================================================
 # The gift ID→name database (core/gifts.json) is auto-refreshed from TikTok's

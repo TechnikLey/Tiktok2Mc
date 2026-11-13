@@ -527,9 +527,22 @@
 
                 <div class="status-grid" id="sessions-summary"></div>
 
+                <section class="view-section" id="sessions-detail-section" hidden>
+                    <div class="sessions-detail-header">
+                        <h3 data-i18n="sessions.detailTitle">Session Details</h3>
+                        <button class="btn btn--secondary btn--sm" onclick="closeSessionDetail()" data-i18n="sessions.close">Close</button>
+                    </div>
+                    <div id="sessions-detail"></div>
+                </section>
+
                 <section class="view-section">
                     <h3 data-i18n="sessions.history">Stream History</h3>
                     <div id="sessions-table-wrap"></div>
+                </section>
+
+                <section class="view-section">
+                    <h3 data-i18n="sessions.leaderboard">All-time Leaderboards</h3>
+                    <div id="sessions-leaderboard"></div>
                 </section>
             </div>
 

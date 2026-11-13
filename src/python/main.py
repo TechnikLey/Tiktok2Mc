@@ -51,6 +51,7 @@ from TikTokLive.events import (
 )
 
 from core import mcrcon_compat  # noqa: F401  (thread-safe mcrcon timeouts)
+from core.analytics import AnalyticsConfig, get_analytics_aggregator
 from core.api.services.datapack import sync_datapack
 from core.config_lock import read_config_version
 from core.crash_manager import get_crash_manager
@@ -712,6 +713,15 @@ def _apply_config(config: dict) -> None:
     ctx.diamond_value_usd = float(
         config.get("tiktok", {}).get("diamond_value_usd", 0.004) or 0.004
     )
+
+    # Stream analytics: tolerant parsing; a malformed block must never stop
+    # the bridge from starting. configure() starts/stops the background writer.
+    try:
+        get_analytics_aggregator().configure(
+            AnalyticsConfig.from_mapping(config.get("analytics"))
+        )
+    except Exception:
+        log.exception("[ANALYTICS] Failed to apply analytics configuration")
 
     ft_cfg = config.get("tiktok", {}).get("follow_tracking", {})
     ctx.follow_tracking_mode = str(ft_cfg.get("mode", "all_time")).lower()
@@ -2926,6 +2936,30 @@ def user_attr_safe(event, name, default=None):
     return getattr(user, name, default)
 
 
+def event_user_or_none(event):
+    """Return ``event.user``, or ``None`` when TikTok's payload is malformed.
+
+    Analytics needs the user object (stable id, unique id, nickname), but a
+    broken payload must never interrupt live-event handling.
+    """
+    try:
+        return event.user
+    except Exception:
+        return None
+
+
+def _analytics_record(method: str, *args, **kwargs) -> None:
+    """Call an analytics aggregator method, swallowing every failure.
+
+    Analytics is best-effort: an unexpected error must never break gift,
+    like, follow, comment, share or join processing.
+    """
+    try:
+        getattr(get_analytics_aggregator(), method)(*args, **kwargs)
+    except Exception:
+        log.exception("[ANALYTICS] Failed to record %s", method)
+
+
 @overload
 def username_from_event_safe(event, default: str = "Unknown") -> str: ...
 
@@ -3059,6 +3093,16 @@ def create_client(user):
                 ctx.session_gifts += count
 
             username = username_from_event_safe(event)
+            _analytics_record(
+                "record_gift",
+                event_user_or_none(event),
+                gift_id,
+                gift_name,
+                count,
+                int(diamonds),
+                float(value_usd),
+                fallback_username=username,
+            )
             _publish_tiktok_event(
                 "gift", username, gift_name=gift_name, gift_id=gift_id, count=count
             )
@@ -3103,6 +3147,9 @@ def create_client(user):
         _log_raw_event("follow")
         username = username_from_event_safe(event)
         ctx.session_follows += 1
+        _analytics_record(
+            "record_follow", event_user_or_none(event), fallback_username=username
+        )
         _publish_tiktok_event("follow", username)
         _process_follow(username)
 
@@ -3133,14 +3180,26 @@ def create_client(user):
                 return
             # TikTok's cumulative count can rewind / reset mid-stream, so only
             # accumulate positive deltas (real new likes) instead of comparing
-            # to a one-time baseline — otherwise total_since_start goes
+            # to a one-time baseline - otherwise total_since_start goes
             # negative and milestones never fire.
+            previous_total = ctx._last_like_total
+            counted_before = ctx.session_likes
             ctx.session_likes, ctx._last_like_total = _accumulate_like_event(
                 ctx._last_like_total,
                 event.total,
                 ctx.session_likes,
                 int(getattr(event, "count", 0) or 0),
                 username,
+            )
+            raw_delta = int(getattr(event, "count", 0) or 0)
+            if raw_delta <= 0 and previous_total is not None:
+                raw_delta = max(0, event.total - previous_total)
+            _analytics_record(
+                "record_like",
+                event_user_or_none(event),
+                raw_delta,
+                ctx.session_likes - counted_before,
+                fallback_username=username,
             )
             total_since_start = ctx.session_likes
             log.debug(
@@ -3183,6 +3242,9 @@ def create_client(user):
         _log_raw_event("join")
         username = username_from_event_safe(event)
         ctx.session_joins += 1
+        _analytics_record(
+            "record_join", event_user_or_none(event), fallback_username=username
+        )
         _publish_tiktok_event("join", username)
         if "join" in ctx.valid_functions:
             enqueue_threadsafe(
@@ -3223,6 +3285,10 @@ def create_client(user):
             user = event.user
         except Exception:
             user = None
+
+        _analytics_record(
+            "record_comment", user, comment_text, fallback_username=username
+        )
 
         def _ua(name, default=None):
             """Read an attribute from a possibly missing user object.
@@ -3267,6 +3333,9 @@ def create_client(user):
         _log_raw_event("share")
         username = username_from_event_safe(event)
         ctx.session_shares += 1
+        _analytics_record(
+            "record_share", event_user_or_none(event), fallback_username=username
+        )
         _publish_tiktok_event("share", username)
         if "share" in ctx.valid_functions:
             enqueue_threadsafe(
@@ -3293,6 +3362,7 @@ def create_client(user):
         # TikTok client thread.
         _run_in_background(update_daily_revenue)
         _run_in_background(_save_session_summary, _session_summary_entry())
+        _run_in_background(_finalize_analytics_session, ctx.session_end_ts, "live_end")
         _run_in_background(_touch_runtime_shutdown)
         # Hook lifecycle callbacks run isolated per hook; also offloaded to
         # the background executor so slow hook code cannot stall live-end.
@@ -3335,6 +3405,10 @@ def create_client(user):
         ctx._last_tiktok_event_ts = time.time()
         if _should_start_new_session():
             _reset_session()
+        else:
+            # Same stream, fresh websocket after a drop: keep the session
+            # counters and only note that a reconnect happened.
+            _analytics_record("record_reconnect")
         _publish_tiktok_status(True)
         _run_in_background(fire_hook_lifecycle, "live_start")
         # Capture the client's event loop — this handler runs on it, exactly
@@ -3443,6 +3517,9 @@ def _reset_session():
     ctx.session_end_ts = None
     with ctx.like_lock:
         ctx._like_rate_windows.clear()
+    _analytics_record(
+        "start_session", ctx.session_start_ts, tiktok_user=ctx.tiktok_user
+    )
 
 
 def _session_summary_entry() -> dict:
@@ -3493,14 +3570,37 @@ def _flush_active_session() -> None:
 
     ``LiveEndEvent`` is the normal persistence point. This covers shutdowns
     and abrupt disconnects where the stream-end event never arrives. Sessions
-    that already ended normally (``session_end_ts`` set) were persisted by the
-    live-end handler and are skipped to avoid duplicate records.
+    that already ended normally (``session_end_ts`` set) are not written to
+    ``sessions.jsonl`` again, but their analytics session is still finalised
+    in case the background live-end task did not finish before shutdown.
     """
-    if ctx.session_start_ts is None or ctx.session_end_ts is not None:
+    if ctx.session_start_ts is None:
         return
-    entry = _session_summary_entry()
-    if entry:
-        _save_session_summary(entry)
+    if ctx.session_end_ts is None:
+        entry = _session_summary_entry()
+        if entry:
+            _save_session_summary(entry)
+        _finalize_analytics_session(time.time(), "shutdown")
+    else:
+        # Live end already persisted the summary; make sure the analytics
+        # session is finalised too (idempotent when the background task won).
+        _finalize_analytics_session(ctx.session_end_ts, "live_end")
+
+
+def _finalize_analytics_session(
+    ended_at: float | None = None, reason: str = "live_end"
+) -> None:
+    """Finalise and persist the analytics session, never raising.
+
+    Safe to call from the background executor (live end) and synchronously at
+    shutdown. The aggregator makes repeat calls a no-op once finalised.
+    """
+    try:
+        get_analytics_aggregator().finalize_session(
+            ended_at if ended_at is not None else time.time(), reason
+        )
+    except Exception:
+        log.exception("[ANALYTICS] Failed to finalise session")
 
 
 # ==========================================
@@ -4089,6 +4189,7 @@ async def run_bot():
             # (no LiveEndEvent will arrive). Sync on purpose — the task must
             # finish before the process exits.
             _flush_active_session()
+            _analytics_record("close")
             _publish_tiktok_status(False)
             await asyncio.sleep(2)
 
