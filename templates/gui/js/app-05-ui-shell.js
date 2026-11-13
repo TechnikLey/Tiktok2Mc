@@ -31,13 +31,34 @@ function _stopDashboardPolling() {
   if (_uptimeIntervalId) { clearInterval(_uptimeIntervalId); _uptimeIntervalId = null; }
 }
 
-/** Close the dashboard for shutdown: stop polling, close the SSE stream and request the native window to close. */
-function _closeWindowForShutdown() {
+/** Shut the whole app down: ask the signed API first, then close the window. */
+async function _closeWindowForShutdown() {
   _stopDashboardPolling();
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  const bridge = (typeof pywebview !== 'undefined' && pywebview.api) ? pywebview.api : null;
+  if (bridge && typeof bridge.request_shutdown === 'function') {
+    let result;
+    try {
+      result = await bridge.request_shutdown();
+    } catch (e) {
+      result = 'error:' + (e && e.message ? e.message : e);
+    }
+    if (result !== 'requested') {
+      // Keep the window open so the user can retry instead of leaving the
+      // backend processes orphaned with no visible UI.
+      const overlay = document.getElementById('shutdown-overlay');
+      if (overlay) overlay.classList.add('hidden');
+      const nowBtn = document.getElementById('btn-shutdown-now');
+      const cancelBtn = document.getElementById('btn-shutdown-cancel');
+      if (nowBtn) nowBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      showToast(I18N.t('dialog.shutdownFailed'), 'error');
+      return;
+    }
+  }
   try { window.close(); } catch (_) {}
-  if (typeof pywebview !== 'undefined' && pywebview.api) {
-    try { pywebview.api.close_app(); } catch (_) {}
+  if (bridge && typeof bridge.close_app === 'function') {
+    try { await bridge.close_app(); } catch (_) {}
   }
 }
 

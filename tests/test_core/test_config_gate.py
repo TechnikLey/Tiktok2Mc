@@ -98,6 +98,19 @@ class TestConfigGateResult:
         assert result.issues[0].error_code == "CONFIG-0004"
         assert result.issues[0].fatal is False
 
+    def test_unquoted_numeric_config_version_is_accepted(self, tmp_path):
+        """YAML parses unquoted ``1.2`` as a float; that must stay valid."""
+        from core.config_gate import load_and_validate_config
+
+        path = tmp_path / "config.yaml"
+        path.write_text("config_version: 1.2\n", encoding="utf-8")
+
+        result = load_and_validate_config(path)
+
+        assert result.ok is True
+        assert result.fatal is False
+        assert result.issues == []
+
     def test_reports_via_crash_manager(self, tmp_path, caplog):
         """When a crash manager is passed, each issue is reported via it."""
         from core.config_gate import load_and_validate_config

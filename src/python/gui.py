@@ -92,13 +92,13 @@ _login_state: dict[str, Any] = {
 def _set_login_state(state: str, masked: str | None = None, error: str = "") -> None:
     """Publish the TikTok login state for the web UI.
 
-Args:
-    state: Coarse state name such as ``idle``, ``waiting`` or ``error``.
-    masked: Masked session identifier safe to show in the browser.
-    error: Human-readable error message; empty when there is no error.
+    Args:
+        state: Coarse state name such as ``idle``, ``waiting`` or ``error``.
+        masked: Masked session identifier safe to show in the browser.
+        error: Human-readable error message; empty when there is no error.
 
-The shared dictionary is updated under ``_login_lock`` because the login
-worker publishes from a background thread while the GUI reads it."""
+    The shared dictionary is updated under ``_login_lock`` because the login
+    worker publishes from a background thread while the GUI reads it."""
 
     with _login_lock:
         _login_state["state"] = state
@@ -132,8 +132,8 @@ def _tiktok_login_worker() -> None:
     def _on_closed() -> None:
         """Signal that the user closed the login window.
 
-Sets the ``closed`` event so the polling loop can stop waiting for a
-``sessionid`` cookie."""
+        Sets the ``closed`` event so the polling loop can stop waiting for a
+        ``sessionid`` cookie."""
 
         closed.set()
 
@@ -428,8 +428,8 @@ class LauncherAPI:
     def __init__(self):
         """Initialise the launcher close-flow flags.
 
-``_approved`` records that JavaScript allowed the window to close and
-``_close_requested`` records an outstanding close request from the page."""
+        ``_approved`` records that JavaScript allowed the window to close and
+        ``_close_requested`` records an outstanding close request from the page."""
 
         self._approved = False
         self._close_requested = False
@@ -438,23 +438,23 @@ class LauncherAPI:
     def approve_close(self):
         """Allow the pending window close to proceed.
 
-Called from JavaScript after the user confirmed closing the application."""
+        Called from JavaScript after the user confirmed closing the application."""
 
         self._approved = True
 
     def close_requested(self) -> bool:
         """Return whether JavaScript requested a close.
 
-Returns:
-    ``True`` while a close request is waiting to be handled."""
+        Returns:
+            ``True`` while a close request is waiting to be handled."""
 
         return self._close_requested
 
     def reset_close_request(self):
         """Clear a previously raised close request.
 
-Called before showing another confirmation dialog so an old request does
-not close the window immediately."""
+        Called before showing another confirmation dialog so an old request does
+        not close the window immediately."""
 
         self._close_requested = False
 
@@ -467,6 +467,39 @@ not close the window immediately."""
             except Exception as e:  # webview teardown errors are best-effort
                 log.warning("Failed to destroy window: %s", e)
         return "closing"
+
+    def request_shutdown(self) -> str:
+        """Request a full application shutdown through the signed API.
+
+        The dashboard's shutdown button uses this instead of only closing the
+        GUI window.  Unlike :meth:`stop_system` it does not require the GUI to
+        own the supervisor process, so it also works when ``start.exe`` owns
+        the process tree.
+
+        Returns:
+            ``"requested"`` when the API accepted the request, otherwise an
+            ``"error:<reason>"`` string.
+        """
+        _write_shutdown_marker()
+        headers = _signed_shutdown_headers("gui.py:request_shutdown")
+        if headers is None:
+            return "error:no_secret"
+        headers["Content-Type"] = "application/json"
+        try:
+            req = urllib.request.Request(
+                f"{API_URL}/api/v1/shutdown/now",
+                method="POST",
+                headers=headers,
+                data=b"{}",
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    log.warning("request_shutdown() accepted by API")
+                    return "requested"
+                return f"error:http_{resp.status}"
+        except OSError as exc:
+            log.warning("request_shutdown() failed: %s", exc)
+            return f"error:{exc}"
 
     def close_for_update(self, lang: str = "en") -> str:
         """Close the GUI so the updater can replace ``core/gui.exe``.
@@ -975,8 +1008,8 @@ def _acquire_lock() -> None:
 def _release_lock() -> None:
     """Remove the GUI lockfile when this process owns it.
 
-The lockfile stores a PID. It is only deleted when that PID matches the
-current process; unreadable or missing files are ignored."""
+    The lockfile stores a PID. It is only deleted when that PID matches the
+    current process; unreadable or missing files are ignored."""
 
     try:
         if GUI_LOCKFILE.exists():
@@ -1070,10 +1103,10 @@ def _shutdown_pending() -> bool:
 def main() -> None:
     """Start the pywebview launcher window.
 
-Parses ``--gui-hidden``, enforces a single GUI instance, performs the
-Linux Qt/xcb pre-flight check, and then opens either the dashboard (when
-the API is already reachable) or the local launcher page. The function
-returns when the webview loop ends."""
+    Parses ``--gui-hidden``, enforces a single GUI instance, performs the
+    Linux Qt/xcb pre-flight check, and then opens either the dashboard (when
+    the API is already reachable) or the local launcher page. The function
+    returns when the webview loop ends."""
 
     parser = argparse.ArgumentParser(description="TikTok2Mc GUI")
     parser.add_argument("--gui-hidden", action="store_true", help="Run without window")
@@ -1201,8 +1234,8 @@ def _open_window(url: str, is_launcher: bool = False) -> None:
     def _on_closing():
         """Log why the window is closing and allow the close.
 
-The stack trace is diagnostic only; returning ``True`` keeps pywebview's
-default close behaviour."""
+        The stack trace is diagnostic only; returning ``True`` keeps pywebview's
+        default close behaviour."""
 
         log.warning(
             "GUI WINDOW CLOSING — _on_closing() called. Stack trace:\n%s",

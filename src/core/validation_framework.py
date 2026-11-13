@@ -540,14 +540,16 @@ def validate_runtime(
 # Config schema validation
 # ==============================================================================
 
-_CONFIG_SCHEMA: dict[str, type] = {
+_CONFIG_SCHEMA: dict[str, type | tuple[type, ...]] = {
     "analytics": dict,
     "api": dict,
     "api_key": str,
     "auto_update_config": bool,
     "builtins": dict,
     "config_advanced": bool,
-    "config_version": str,
+    # Unquoted YAML versions like ``1.2`` are parsed as int/float by ruamel;
+    # normalize_config_version() accepts those, so the schema must too.
+    "config_version": (str, int, float),
     "console": dict,
     "control_method": str,
     "gifts": dict,
@@ -585,9 +587,13 @@ def validate_config_schema(data: Any, path: str = "") -> None:
             continue
         value = data[key]
         if not isinstance(value, expected_type):
+            expected_name = (
+                " or ".join(t.__name__ for t in expected_type)
+                if isinstance(expected_type, tuple)
+                else expected_type.__name__
+            )
             raise TypeError(
-                f"{full_key!r} must be {expected_type.__name__}, "
-                f"got {type(value).__name__}"
+                f"{full_key!r} must be {expected_name}, got {type(value).__name__}"
             )
 
     raw_ver = data.get("config_version", "")
