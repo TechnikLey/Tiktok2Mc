@@ -541,9 +541,11 @@ def validate_runtime(
 # ==============================================================================
 
 _CONFIG_SCHEMA: dict[str, type] = {
+    "analytics": dict,
     "api": dict,
     "api_key": str,
     "auto_update_config": bool,
+    "builtins": dict,
     "config_advanced": bool,
     "config_version": str,
     "console": dict,

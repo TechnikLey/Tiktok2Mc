@@ -101,6 +101,27 @@ RCON allows the tool to send commands to the Minecraft server. IMPORTANT: Keep t
   - **`enabled`** (default: `false`)
   - **`max_per_user_per_minute`** (default: `500`)
 
+## `analytics`
+
+Collects detailed stream statistics in a local SQLite database (data/analytics.sqlite3). Event handlers only update in-memory counters; a background writer batches them to disk, so long streams and event bursts never block the bridge. The classic data/sessions.jsonl and data/revenue_log.jsonl files are still written unchanged, so existing tools and older app versions keep working.
+
+- **`enabled`** — Master switch. false = no analytics database writes at all (default: `true`)
+- **`store`** — Which tiers are stored. Session totals are always kept in memory while a stream runs; these flags only control what is persisted
+  - **`viewer_details`** — Per-viewer rows (gifts, likes, comments, follows, shares, joins) (default: `true`)
+  - **`gift_details`** — Per-gift rows (events, units, diamonds, value, unique gifters) (default: `true`)
+  - **`top_lists`** — Top lists (top gifters/likers/commenters/gifts, largest gift/combo). Kept even when viewer_details/gift_details are disabled (default: `true`)
+  - **`lifetime_aggregates`** — All-time viewer/gift totals and daily rollups (default: `true`)
+  - **`comment_text`** — Store comment text. Default off for privacy (default: `false`)
+  - **`raw_events`** — Store a raw event log. Default off; high volume on busy streams (default: `false`)
+- **`top_n`** — Number of entries per top list (default: `10`)
+- **`max_tracked_viewers`** — Maximum distinct viewers tracked per session. Beyond this, events are merged into an "__other__" bucket instead of growing memory without bound (default: `50000`)
+- **`flush_interval_seconds`** — Seconds between background flushes to SQLite (15-60 is a good range) (default: `30`)
+- **`retention`** — How long data is kept. 0 = unlimited
+  - **`details_days`** — Per-viewer / per-gift detail rows and session top lists (default: `90`)
+  - **`summaries_days`** — Session summary rows (default: `0`)
+  - **`raw_events_days`** — Optional raw event log (default: `7`)
+  - **`aggregates_days`** — All-time viewer/gift aggregates and daily rollups (default: `0`)
+
 ## `gifts`
 
 The gift ID→name database (core/gifts.json) is auto-refreshed from TikTok's official live-gift endpoint at app start (and on demand via the GUI button in the Actions editor). The factory template (defaults/gifts.json) is never modified, so a stale/missing catalog still has a shipped fallback.

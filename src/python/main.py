@@ -3755,6 +3755,11 @@ def _datapack_signature() -> str | None:
     import hashlib
 
     root = Path(ctx.datapack_root)
+    # Before the first config load ``datapack_root`` is ``Path("")`` (i.e. the
+    # current directory). Hashing the whole working tree would read unrelated
+    # files and can stall on large build artefacts, so treat it as unknown.
+    if not str(ctx.datapack_root).strip() or root == Path("."):
+        return None
     if not root.exists():
         return None
     digest = hashlib.sha256()

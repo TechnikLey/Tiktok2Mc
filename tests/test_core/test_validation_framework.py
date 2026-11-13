@@ -394,3 +394,27 @@ class TestShutdownValidation:
         done.join()
         suite = validate_shutdown(threads_to_check=[done])
         assert suite.all_passed() is True
+
+
+class TestConfigSchema:
+    def test_accepts_analytics_section(self):
+        """The analytics block is part of the supported config schema."""
+        from core.validation_framework import validate_config_schema
+
+        validate_config_schema(
+            {
+                "config_version": "1.2",
+                "analytics": {"enabled": True, "top_n": 10},
+            }
+        )
+
+    def test_rejects_non_mapping_analytics_section(self):
+        """A malformed analytics block is reported as a schema violation."""
+        import pytest
+
+        from core.validation_framework import validate_config_schema
+
+        with pytest.raises(TypeError, match="'analytics' must be dict"):
+            validate_config_schema(
+                {"config_version": "1.2", "analytics": ["not", "a", "mapping"]}
+            )

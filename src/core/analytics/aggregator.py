@@ -664,7 +664,12 @@ class SessionAggregator:
         with self._lock:
             if not self._active or self._finalized:
                 return False
-            return self._finalize_locked(ended_at or time.time(), end_reason)
+            finalized = self._finalize_locked(ended_at or time.time(), end_reason)
+        # Stop the writer outside the lock: joining while holding it could
+        # deadlock with a writer that is currently inside flush().
+        if finalized:
+            self._stop_writer()
+        return finalized
 
     def _finalize_locked(self, ended_at: float, end_reason: str | None) -> bool:
         """Finalise while the caller holds the lock."""
